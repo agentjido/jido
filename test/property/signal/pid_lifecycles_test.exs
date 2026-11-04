@@ -1,4 +1,4 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 Code.require_file("support/runtime.exs", __DIR__)
 
 defmodule JidoTest.Property.Signal.PidLifecyclesTest do
@@ -6,22 +6,17 @@ defmodule JidoTest.Property.Signal.PidLifecyclesTest do
   import StreamData
   alias Jido.Signal
   alias Jido.Signal.Dispatch
-  alias JidoTest.Property.Signal.{Fuzz, Runtime}
+  alias JidoTest.Property.Fuzz
+  alias JidoTest.Property.Signal.Runtime
 
   for {suite, runs} <- [property: 40, fuzz: 500] do
     @tag [
       {suite, true},
+      fuzz_id: "pid_lifecycles",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["DISP-002"]
-    @tag contract_cases: [
-           "DISP-002/live-dead-remote-self",
-           "DISP-002/held-sync",
-           "DISP-002/timeout-ceiling",
-           "DISP-002/async-message"
-         ]
     test "#{suite}: PID delivery follows process lifecycle", context do
       generator =
         fixed_map(%{

@@ -1,14 +1,19 @@
-defmodule JidoTest.Property.Signal.Fuzz do
+Code.require_file("config.exs", __DIR__)
+
+defmodule JidoTest.Property.Fuzz do
   @moduledoc false
 
-  # A small adapter for public StreamData.check_all/3. StreamData owns generation
-  # and shrinking. Inputs and returned observation names must be JSON data.
+  alias JidoTest.Property.Config
+
+  # StreamData owns generation and shrinking. Inputs and observation names must
+  # use JSON-compatible data so a reduced failure can be replayed.
   def check(id, generator, options, assertion) do
     unless Regex.match?(~r/^[a-z][a-z0-9_]+$/, id), do: raise(ArgumentError, "invalid fuzz ID")
 
     if options[:property] && options[:fuzz],
       do: raise(ArgumentError, "property and fuzz tags must not overlap; use ExUnit test/3")
 
+    family = Keyword.get(options, :family) || Config.family_for_measurement(id) || "test"
     key = {__MODULE__, make_ref()}
     seed = Keyword.get(options, :seed, ExUnit.configuration()[:seed])
     variant = if options[:fuzz], do: :fuzz, else: :property
@@ -32,11 +37,10 @@ defmodule JidoTest.Property.Signal.Fuzz do
 
     stats = %{
       id: id,
+      family: family,
       run_id: run_id,
       variant: variant,
       seed: seed,
-      contracts: Keyword.get(options, :contracts, []),
-      declared_forced_cases: Keyword.get(options, :contract_cases, []),
       test_timeout: Keyword.get(options, :timeout),
       limits: Map.new(limits),
       generated: 0,
@@ -55,10 +59,10 @@ defmodule JidoTest.Property.Signal.Fuzz do
         run_fixed!(key, :examples, input, assertion)
       end
 
-      corpus = Path.wildcard(Path.expand("../../corpus/signal/#{id}/*.json", __DIR__))
+      corpus = Keyword.get(options, :corpus, Config.corpus(family, id))
 
       set_phase(key, :replay_load)
-      inputs = saved_inputs(root, id, Keyword.get(options, :corpus, corpus))
+      inputs = saved_inputs(root, family, id, corpus)
 
       for input <- inputs do
         run_fixed!(key, :replayed, input, assertion)
@@ -84,7 +88,7 @@ defmodule JidoTest.Property.Signal.Fuzz do
 
         {:error, failure} ->
           reduced = failure.shrunk_failure
-          path = save_failure(root, id, seed, reduced, stats.contracts)
+          path = save_failure(root, family, id, seed, reduced)
 
           update(
             key,
@@ -95,7 +99,6 @@ defmodule JidoTest.Property.Signal.Fuzz do
             })
           )
 
-          # Check the same reduced input once more. An unstable replay is still a failure.
           stable? =
             case attempt(key, :confirmations, reduced.input, assertion) do
               {:error, again} -> signature(again) == signature(reduced)
@@ -125,11 +128,7 @@ defmodule JidoTest.Property.Signal.Fuzz do
     after
       {stats, _phase} = Process.delete(key)
       stats = Map.put(stats, :elapsed_ms, System.monotonic_time(:millisecond) - started)
-
-      write!(
-        Path.join([root, "property-fuzz", run_id || "standalone", "#{id}-#{variant}.json"]),
-        stats
-      )
+      write!(Config.measurement_path(root, run_id, family, id, variant), stats)
     end
 
     :ok
@@ -151,13 +150,7 @@ defmodule JidoTest.Property.Signal.Fuzz do
   end
 
   defp attempt(key, phase, input, assertion) do
-    field =
-      case phase do
-        :generate -> :generated
-        :shrink -> :shrink_attempts
-        other -> other
-      end
-
+    field = if phase == :generate, do: :generated, else: if(phase == :shrink, do: :shrink_attempts, else: phase)
     update(key, &Map.update!(&1, field, fn n -> n + 1 end))
 
     try do
@@ -166,7 +159,6 @@ defmodule JidoTest.Property.Signal.Fuzz do
       unless is_list(observations) and Enum.all?(observations, &is_binary/1),
         do: raise(ArgumentError, "fuzz assertions must return a list of observation names")
 
-      # Count passing discovery/examples/replays, never successful shrink candidates.
       if phase not in [:shrink, :confirmations] do
         update(key, fn stats ->
           observations =
@@ -185,8 +177,8 @@ defmodule JidoTest.Property.Signal.Fuzz do
     end
   end
 
-  defp saved_inputs(root, id, corpus) do
-    generated = Path.wildcard(Path.join([root, "property-counterexamples", id, "*.json"]))
+  defp saved_inputs(root, family, id, corpus) do
+    generated = Path.wildcard(Path.join(Config.counterexample_dir(root, family, id), "*.json"))
 
     Enum.map(Enum.sort(Enum.uniq(corpus ++ generated)), fn path ->
       with {:ok, data} <- File.read(path),
@@ -198,20 +190,19 @@ defmodule JidoTest.Property.Signal.Fuzz do
     end)
   end
 
-  defp save_failure(root, id, seed, failure, contracts) do
-    # Do not persist opaque BEAM resources or rely on atom creation when replaying.
+  defp save_failure(root, family, id, seed, failure) do
     input = failure.input
 
     unless JSON.decode!(JSON.encode!(input)) == input,
       do: raise(ArgumentError, "fuzz replay input must round-trip as plain JSON data")
 
     hash = :crypto.hash(:sha256, JSON.encode!(input)) |> Base.encode16(case: :lower)
-    path = Path.join([root, "property-counterexamples", id, hash <> ".json"])
+    path = Path.join(Config.counterexample_dir(root, family, id), hash <> ".json")
 
     write!(path, %{
       format: 1,
       property: id,
-      contracts: contracts,
+      family: family,
       input: input,
       seed: seed,
       elixir: System.version(),
@@ -240,7 +231,7 @@ defmodule JidoTest.Property.Signal.Fuzz do
   defp report_run_id(root), do: read_report(root)["run_id"]
 
   defp read_report(root) do
-    with {:ok, data} <- File.read(Path.join(root, "property-report.json")),
+    with {:ok, data} <- File.read(Config.report_path(root)),
          {:ok, report} <- JSON.decode(data) do
       report
     else

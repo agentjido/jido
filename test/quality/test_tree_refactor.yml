@@ -1,0 +1,60 @@
+version: 1
+plan: docs/plans/2026-11-04-1314-refactor-jido-test-tree-plan.md
+baseline:
+  revision: d620b317327b25b7970677c0b1d52167efc89e7b
+  test_files: 841
+  test_lines: 152626
+  default_suite:
+    passed: 3337
+    excluded: 528
+  ex_dna:
+    clone_groups: 59
+    duplicated_lines: 2348
+u1_result:
+  default_suite:
+    passed: 3337
+    excluded: 508
+  authoring_suite:
+    passed: 134
+  bench_suite:
+    passed: 28
+  property_suite:
+    passed: 37
+    excluded: 13
+  fuzz_suite:
+    passed: 13
+    excluded: 37
+  quality_contract:
+    passed: 8
+  ex_dna:
+    clone_groups: 42
+    duplicated_lines: 1592
+deletions:
+  - removed:
+      - test/property/signal/support/fuzz.exs
+      - test/property/action_flow/support/fuzz.exs
+    reason: duplicate_infrastructure
+    surviving_proof: test/property/support/fuzz.exs and test/property/signal/fuzz_support_test.exs
+  - removed:
+      - test/property/signal/support/report.exs
+      - test/property/action_flow/support/report.exs
+      - test/property/action_flow/support/check_report.exs
+    reason: duplicate_infrastructure
+    surviving_proof: test/property/support/report.exs and the test.property and test.fuzz aliases
+  - removed:
+      - test/property/signal/report_test.exs
+      - test/property/action_flow/report_test.exs
+    reason: duplicate_test_contract
+    surviving_proof: test/property/report_test.exs
+  - removed:
+      - test/authoring/support/compiler.exs
+    reason: unused_infrastructure
+    surviving_proof: No active test loaded or called this module at the baseline revision.
+  - removed:
+      - test/bench/layout_test.exs
+    reason: layout_enforcement_removed
+    surviving_proof: test/bench/catalog_test.exs validates registered benchmark evidence without enforcing a general tree shape.
+  - removed:
+      - Property BUS and EXPR contract tags and contract_cases tags
+    reason: parallel_contract_vocabulary_removed
+    surviving_proof: Covenant obligation tags and test/contracts records remain the behavior ownership source.

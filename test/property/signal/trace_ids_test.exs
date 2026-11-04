@@ -1,4 +1,4 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 
 defmodule JidoTest.Property.Signal.TraceIDsTest do
   use ExUnit.Case, async: true
@@ -6,23 +6,16 @@ defmodule JidoTest.Property.Signal.TraceIDsTest do
   alias Jido.{Id, Trace}
   alias Jido.Signal
   alias Jido.Signal.{Codec, Context}
-  alias JidoTest.Property.Signal.Fuzz
+  alias JidoTest.Property.Fuzz
 
   for {suite, runs} <- [property: 40, fuzz: 1000] do
     @tag [
       {suite, true},
+      fuzz_id: "trace_ids",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["TRACE-001", "ID-001"]
-    @tag contract_cases: [
-           "TRACE-001/carrier-lifecycle",
-           "TRACE-001/invalid-carriers",
-           "ID-001/byte-oracle",
-           "ID-001/timestamp-extremes",
-           "ID-001/invalid-shape"
-         ]
     test "#{suite}: trace carriers and complete UUID7 values", context do
       generator =
         fixed_map(%{

@@ -1,21 +1,14 @@
-Code.require_file("../support/fuzz.exs", __DIR__)
+Code.require_file("../../support/fuzz.exs", __DIR__)
 
 defmodule JidoTest.Property.ActionFlow.Expression.ExpressionContractTest do
   use Covenant.Case, component: "jido_action.expression", async: true
   use ExUnitProperties
-  alias JidoTest.Property.ActionFlow.Fuzz
+  alias JidoTest.Property.Fuzz
   alias Jido.Expr
 
   @tag :fuzz
   @tag fuzz_id: "expression_trees"
   @tag max_runs: 1_000, max_run_time: 300_000, timeout: 900_000
-  @tag contracts: ["EXPR-001", "EXPR-002"]
-  @tag contract_cases: [
-         "EXPR-001/fuzz-short-circuit",
-         "EXPR-002/fuzz-limits",
-         "EXPR-002/fuzz-arity",
-         "EXPR-002/fuzz-host-call"
-       ]
   @tag obligation: [
          "jido_action.expression.I1",
          "jido_action.expression.I2",
@@ -120,14 +113,6 @@ defmodule JidoTest.Property.ActionFlow.Expression.ExpressionContractTest do
 
   defp expression(value), do: {value, value, 0}
 
-  @tag contracts: ["EXPR-001"]
-  @tag contract_cases: [
-         "EXPR-001/arithmetic",
-         "EXPR-001/comparison",
-         "EXPR-001/strict-membership",
-         "EXPR-001/concat",
-         "EXPR-001/parse"
-       ]
   @tag obligation: "jido_action.expression.I1"
   property "the fixed operator set agrees with native Elixir for generated operands" do
     check all(left <- integer(-100..100), right <- integer(1..100), max_runs: 60) do
@@ -165,13 +150,6 @@ defmodule JidoTest.Property.ActionFlow.Expression.ExpressionContractTest do
     end
   end
 
-  @tag contracts: ["EXPR-001"]
-  @tag contract_cases: [
-         "EXPR-001/short-circuit",
-         "EXPR-001/right-value",
-         "EXPR-001/strict-left",
-         "EXPR-001/invalid-operands"
-       ]
   @tag obligation: "jido_action.expression.I1"
   property "Boolean operations short-circuit invalid branches and retain their result rules" do
     check all(value <- integer(), max_runs: 40) do
@@ -196,16 +174,6 @@ defmodule JidoTest.Property.ActionFlow.Expression.ExpressionContractTest do
     end
   end
 
-  @tag contracts: ["EXPR-002"]
-  @tag contract_cases: [
-         "EXPR-002/depth",
-         "EXPR-002/nodes",
-         "EXPR-002/binary-bytes",
-         "EXPR-002/integer-bits",
-         "EXPR-002/arity",
-         "EXPR-002/unknown-operator",
-         "EXPR-002/arbitrary-call"
-       ]
   @tag obligation: "jido_action.expression.I4"
   property "public limits reject oversized data and constructors reject unsupported operations" do
     check all(size <- integer(5..16), max_runs: 30) do

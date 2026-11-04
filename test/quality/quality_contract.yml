@@ -96,7 +96,6 @@ suites:
     coverage: included
     evidence_artifacts:
       - _build/test/property-report.json
-      - _build/test/action-flow-property-report.json
   - id: fuzz
     state: required
     alias: test.fuzz
@@ -105,7 +104,6 @@ suites:
     coverage: included
     evidence_artifacts:
       - _build/test/property-report.json
-      - _build/test/action-flow-property-report.json
   - id: system
     state: required
     alias: test.system
@@ -173,6 +171,7 @@ reports:
 registries:
   component_proof: test/quality/component_proof.yml
   coverage_baseline: test/quality/coverage_baseline.json
+  test_tree_refactor: test/quality/test_tree_refactor.yml
 waivers: []
 stability_findings:
   - id: covenant-persistence-token-cleanup-race

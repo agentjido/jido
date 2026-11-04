@@ -1,4 +1,4 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 Code.require_file("support/runtime.exs", __DIR__)
 
 defmodule JidoTest.Property.Signal.DispatchSequencesTest do
@@ -7,7 +7,8 @@ defmodule JidoTest.Property.Signal.DispatchSequencesTest do
   alias Jido.{Error, Trace}
   alias Jido.Signal
   alias Jido.Signal.{Context, Dispatch}
-  alias JidoTest.Property.Signal.{Fuzz, Runtime}
+  alias JidoTest.Property.Fuzz
+  alias JidoTest.Property.Signal.Runtime
 
   defmodule Adapter do
     @behaviour Jido.Signal.Dispatch.Adapter
@@ -43,18 +44,11 @@ defmodule JidoTest.Property.Signal.DispatchSequencesTest do
   for {suite, runs, bound} <- [{:property, 40, 6}, {:fuzz, 500, 20}] do
     @tag [
       {suite, true},
+      fuzz_id: "dispatch_sequences",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["DISP-001", "OBS-001"]
-    @tag contract_cases: [
-           "DISP-001/ordered-results",
-           "DISP-001/propagated-faults",
-           "DISP-001/raw-normalized",
-           "DISP-001/invalid-config",
-           "OBS-001/start-terminal-pairs"
-         ]
     test "#{suite}: ordered dispatch results and lifecycle events", context do
       generator =
         fixed_map(%{

@@ -1,4 +1,4 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 Code.require_file("support/runtime.exs", __DIR__)
 
 defmodule JidoTest.Property.Signal.BusObservationsTest do
@@ -7,7 +7,8 @@ defmodule JidoTest.Property.Signal.BusObservationsTest do
   alias Jido.Trace
   alias Jido.Signal
   alias Jido.Signal.{Bus, Context}
-  alias JidoTest.Property.Signal.{Fuzz, Runtime}
+  alias JidoTest.Property.Fuzz
+  alias JidoTest.Property.Signal.Runtime
 
   def event(event, measurements, metadata, {owner, token, bus}) do
     if self() == bus, do: send(owner, {token, event, measurements, metadata})
@@ -16,17 +17,11 @@ defmodule JidoTest.Property.Signal.BusObservationsTest do
   for {suite, runs, bound} <- [{:property, 40, 4}, {:fuzz, 500, 12}] do
     @tag [
       {suite, true},
+      fuzz_id: "bus_observations",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["OBS-001"]
-    @tag contract_cases: [
-           "OBS-001/bus-identity-order",
-           "OBS-001/ack-before-delivery",
-           "OBS-001/ownership-death-detach",
-           "OBS-001/repeated-detach"
-         ]
     test "#{suite}: Bus events follow subscription transitions", context do
       generator =
         list_of(member_of(~w(event.a event.b **.x.a)), min_length: 1, max_length: unquote(bound))

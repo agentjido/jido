@@ -1,4 +1,4 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 Code.require_file("support/runtime.exs", __DIR__)
 Code.require_file("support/model.exs", __DIR__)
 
@@ -8,26 +8,17 @@ defmodule JidoTest.Property.Signal.BusHistoriesTest do
   alias Jido.Signal
   alias Jido.Signal.Bus
   alias Jido.Signal.Codec
-  alias JidoTest.Property.Signal.{Fuzz, Model, Runtime}
+  alias JidoTest.Property.Fuzz
+  alias JidoTest.Property.Signal.{Model, Runtime}
 
   for {suite, runs, bound} <- [{:property, 40, 12}, {:fuzz, 500, 40}] do
     @tag [
       {suite, true},
+      fuzz_id: "bus_histories",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["BUS-001", "BUS-002", "BUS-003", "DUR-001"]
-    @tag contract_cases: [
-           "BUS-001/atomic-batch",
-           "BUS-002/subscribe-unsubscribe",
-           "BUS-002/target-death",
-           "BUS-003/exclusive-filter-limit",
-           "DUR-001/one-in-flight",
-           "DUR-001/ack-owner",
-           "DUR-001/detach-redelivery",
-           "DUR-001/delete-recreate"
-         ]
     test "#{suite}: Bus publication and durable state histories", context do
       command =
         fixed_map(%{

@@ -1,4 +1,4 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 Code.require_file("support/runtime.exs", __DIR__)
 Code.require_file("support/fault_store.exs", __DIR__)
 
@@ -9,7 +9,8 @@ defmodule JidoTest.Property.Signal.DurableStoreFaultsTest do
   alias Jido.Signal.Bus
   alias Jido.Signal.Bus.Store
   alias Jido.Signal.Bus.Store.Memory
-  alias JidoTest.Property.Signal.{FaultStore, Fuzz, Model, Runtime}
+  alias JidoTest.Property.Fuzz
+  alias JidoTest.Property.Signal.{FaultStore, Model, Runtime}
 
   @times [
     "2026-09-29T00:00:00Z",
@@ -21,20 +22,11 @@ defmodule JidoTest.Property.Signal.DurableStoreFaultsTest do
   for {suite, runs} <- [property: 40, fuzz: 500] do
     @tag [
       {suite, true},
+      fuzz_id: "durable_store_faults",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["BUS-001", "DUR-002", "STORE-002"]
-    @tag contract_cases: [
-           "BUS-001/append-before-send",
-           "DUR-002/write-faults",
-           "DUR-002/restore-timestamp",
-           "DUR-002/restart-redelivery",
-           "STORE-002/callback-faults",
-           "STORE-002/malformed-reads",
-           "STORE-002/external-ownership"
-         ]
     test "#{suite}: Store failure and durable recovery", context do
       generator = fixed_map(%{"fault" => member_of(@faults), "time" => member_of(@times)})
       examples = for fault <- @faults, time <- @times, do: %{"fault" => fault, "time" => time}

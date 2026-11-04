@@ -1,11 +1,12 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 Code.require_file("support/runtime.exs", __DIR__)
-Code.require_file("support/report.exs", __DIR__)
+Code.require_file("../support/report.exs", __DIR__)
 
 defmodule JidoTest.Property.Signal.FuzzSupportTest do
   use ExUnit.Case, async: true
   @moduletag :property
-  alias JidoTest.Property.Signal.{Fuzz, Report, Runtime}
+  alias JidoTest.Property.{Fuzz, Report}
+  alias JidoTest.Property.Signal.Runtime
 
   setup do
     root =
@@ -125,39 +126,36 @@ defmodule JidoTest.Property.Signal.FuzzSupportTest do
     assert stats(root, "variants", :fuzz)["generated"] == 3
   end
 
-  test "measurements retain public contract tags and the test timeout", %{root: root} do
+  test "measurements retain their family and test timeout", %{root: root} do
     Fuzz.check(
-      "contract_metadata",
+      "measurement_metadata",
       StreamData.constant(0),
       [
         root: root,
         fuzz: true,
         max_runs: 1,
-        timeout: 900_000,
-        contracts: ["BUS-001"],
-        contract_cases: ["BUS-001/once"]
+        timeout: 900_000
       ],
       fn _ -> ["one-call"] end
     )
 
-    record = stats(root, "contract_metadata", :fuzz)
-    assert record["contracts"] == ["BUS-001"]
-    assert record["declared_forced_cases"] == ["BUS-001/once"]
+    record = stats(root, "measurement_metadata", :fuzz)
+    assert record["family"] == "test"
     assert record["test_timeout"] == 900_000
   end
 
-  test "saved failures retain the owning public contracts", %{root: root} do
+  test "saved failures retain the owning family", %{root: root} do
     assert_raise RuntimeError, "contract probe", fn ->
       Fuzz.check(
         "contract_failure",
         StreamData.constant(0),
-        [root: root, max_runs: 1, contracts: ["BUS-001"]],
+        [root: root, max_runs: 1],
         fn _ -> raise "contract probe" end
       )
     end
 
     saved = stats(root, "contract_failure")["counterexample"] |> File.read!() |> JSON.decode!()
-    assert saved["contracts"] == ["BUS-001"]
+    assert saved["family"] == "test"
   end
 
   test "saved failure contains the current incomplete report source", %{root: root} do
@@ -170,7 +168,7 @@ defmodule JidoTest.Property.Signal.FuzzSupportTest do
     end
 
     [path] =
-      Path.wildcard(Path.join([root, "property-counterexamples", "source_failure", "*.json"]))
+      Path.wildcard(Path.join([root, "property-counterexamples", "test", "source_failure", "*.json"]))
 
     saved = path |> File.read!() |> JSON.decode!()
 
@@ -283,7 +281,7 @@ defmodule JidoTest.Property.Signal.FuzzSupportTest do
 
   defp stats(root, id, variant \\ :property),
     do:
-      Path.join([root, "property-fuzz", "standalone", "#{id}-#{variant}.json"])
+      Path.join([root, "property-fuzz", "standalone", "test", "#{id}-#{variant}.json"])
       |> File.read!()
       |> JSON.decode!()
 end

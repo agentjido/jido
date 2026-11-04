@@ -31,16 +31,13 @@ if Enum.any?(quality_selection, fn
      {tag, value} when tag in [:property, :fuzz] -> value != false
      _other -> false
    end) do
-  Code.require_file("property/signal/support/report.exs", __DIR__)
-  Code.require_file("property/action_flow/support/report.exs", __DIR__)
-  JidoTest.Property.Signal.Report.prepare!()
-  JidoTest.Property.ActionFlow.Report.prepare!()
+  Code.require_file("property/support/report.exs", __DIR__)
+  JidoTest.Property.Report.prepare!()
 
   ExUnit.configure(
     formatters: [
       ExUnit.CLIFormatter,
-      JidoTest.Property.Signal.Report,
-      JidoTest.Property.ActionFlow.Report
+      JidoTest.Property.Report
     ]
   )
 end

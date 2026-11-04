@@ -1,4 +1,4 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 
 defmodule JidoTest.Property.Signal.EnvelopeWireTest do
   use ExUnit.Case, async: true
@@ -6,7 +6,7 @@ defmodule JidoTest.Property.Signal.EnvelopeWireTest do
   alias Jido.Id
   alias Jido.Signal
   alias Jido.Signal.Codec
-  alias JidoTest.Property.Signal.Fuzz
+  alias JidoTest.Property.Fuzz
 
   defmodule CountSignal do
     use Jido.Signal,
@@ -27,20 +27,11 @@ defmodule JidoTest.Property.Signal.EnvelopeWireTest do
   for {suite, runs, bound} <- [{:property, 40, 6}, {:fuzz, 500, 20}] do
     @tag [
       {suite, true},
+      fuzz_id: "envelope_wire",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["SIG-001", "CTX-001", "WIRE-001"]
-    @tag contract_cases: [
-           "SIG-001/core-boundaries",
-           "SIG-001/custom-data",
-           "CTX-001/name-value-boundaries",
-           "CTX-001/no-new-atoms",
-           "WIRE-001/data-forms",
-           "WIRE-001/null-context",
-           "WIRE-001/opaque-context"
-         ]
     test "#{suite}: canonical envelope and flat context", context do
       generator =
         fixed_map(%{

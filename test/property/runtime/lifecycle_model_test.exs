@@ -1,10 +1,12 @@
+Code.require_file("../support/fuzz.exs", __DIR__)
+
 defmodule JidoTest.Property.Runtime.LifecycleModelTest do
   use JidoTest.Case, async: false
-  use ExUnitProperties
 
   @moduletag :tmp_dir
 
   alias Jido.AgentServer, as: Server
+  alias JidoTest.Property.Fuzz
 
   defmodule Add do
     use Jido.Action,
@@ -58,25 +60,45 @@ defmodule JidoTest.Property.Runtime.LifecycleModelTest do
   end
 
   for {suite, runs} <- [{:property, 30}, {:fuzz, 300}] do
-    @tag [{suite, true}, {:timeout, 180_000}]
+    @tag [
+      {suite, true},
+      fuzz_id: "agent_server_lifecycle",
+      max_runs: runs,
+      max_run_time: 120_000,
+      timeout: 180_000
+    ]
     test "#{suite} generated histories preserve commit, recovery, and cleanup", c do
       step =
         StreamData.fixed_map(%{
-          mode: StreamData.member_of([:success, :failure, :invalid_state, :invalid_directive]),
-          by: StreamData.integer(-100..100)
+          "mode" => StreamData.member_of(~w(success failure invalid_state invalid_directive)),
+          "by" => StreamData.integer(-100..100)
         })
 
-      history = StreamData.list_of(step, max_length: 20)
-      initial = StreamData.integer(-1_000..1_000)
+      generator =
+        StreamData.fixed_map(%{
+          "initial_count" => StreamData.integer(-1_000..1_000),
+          "steps" => StreamData.list_of(step, max_length: 20)
+        })
 
-      check all(
-              initial_count <- initial,
-              steps <- history,
-              max_runs: unquote(runs),
-              max_run_time: 120_000
-            ) do
-        verify_history(c, initial_count, steps)
-      end
+      examples = [
+        %{
+          "initial_count" => 0,
+          "steps" =>
+            for(
+              mode <- ~w(success failure invalid_state invalid_directive),
+              do: %{"mode" => mode, "by" => 1}
+            )
+        }
+      ]
+
+      Fuzz.check(
+        "agent_server_lifecycle",
+        generator,
+        Map.to_list(c) ++ [examples: examples],
+        fn %{"initial_count" => initial_count, "steps" => steps} ->
+          verify_history(c, initial_count, steps)
+        end
+      )
     end
   end
 
@@ -93,26 +115,27 @@ defmodule JidoTest.Property.Runtime.LifecycleModelTest do
         persistence_mode: :create
       )
 
-    expected =
-      Enum.reduce(steps, %{count: initial_count, history: []}, fn step, model ->
-        result = Server.call(server, signal("runtime.property.mutate", step))
+    {expected, observations} =
+      Enum.reduce(steps, {%{count: initial_count, history: []}, MapSet.new()}, fn step, {model, observations} ->
+        mode = String.to_existing_atom(step["mode"])
+        result = Server.call(server, signal("runtime.property.mutate", %{mode: mode, by: step["by"]}))
 
         next_model =
           case step do
-            %{mode: :success, by: by} ->
+            %{"mode" => "success", "by" => by} ->
               expected = %{count: model.count + by, history: model.history ++ [by]}
               assert {:ok, next, []} = result
               assert next.state == expected
               expected
 
-            %{mode: mode} when mode in [:failure, :invalid_state, :invalid_directive] ->
+            %{"mode" => mode} when mode in ~w(failure invalid_state invalid_directive) ->
               assert {:error, error} = result
               assert is_exception(error)
               model
           end
 
         assert Server.agent(server).state == next_model
-        next_model
+        {next_model, MapSet.put(observations, step["mode"])}
       end)
 
     assert Server.agent(server).state == expected
@@ -127,5 +150,7 @@ defmodule JidoTest.Property.Runtime.LifecycleModelTest do
     assert :ok = Jido.stop_agent(c.jido, restored)
     assert Jido.whereis_agent(c.jido, id) == nil
     assert Jido.agent_count(c.jido) == 0
+
+    ["hibernate", "restore", "cleanup" | MapSet.to_list(observations)]
   end
 end

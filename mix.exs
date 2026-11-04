@@ -148,12 +148,15 @@ defmodule Jido.MixProject do
       "test.examples": test_alias("test/examples", :example),
       "test.fuzz": fn args ->
         run_tagged_tests("test/property", :fuzz, args)
-        check_property_reports!(args)
+        check_property_report!(args, :fuzz)
       end,
       "test.live": test_alias("test/live", :live),
       "test.load": test_alias("test/load", :load),
       "test.peer": test_alias("test", :peer),
-      "test.property": test_alias("test/property", :property),
+      "test.property": fn args ->
+        run_tagged_tests("test/property", :property, args)
+        check_property_report!(args, :property)
+      end,
       "test.services": test_alias("test/system/services", :service),
       "test.system": test_alias("test/system", :system),
       "quality.contract": "test test/quality/quality_contract_test.exs --seed 0",
@@ -223,19 +226,12 @@ defmodule Jido.MixProject do
     not String.starts_with?(argument, "-") and File.exists?(argument)
   end
 
-  defp check_property_reports!(args) do
+  defp check_property_report!(args, suite) do
     paths = Enum.filter(args, &test_path?/1)
     all? = paths == [] or Enum.any?(paths, &(Path.expand(&1) == Path.expand("test/property")))
 
-    if all? or Enum.any?(paths, &String.contains?(Path.expand(&1), "/test/property/signal")) do
-      Code.require_file("test/property/signal/support/report.exs")
-      JidoTest.Property.Signal.Report.check!()
-    end
-
-    if all? or Enum.any?(paths, &String.contains?(Path.expand(&1), "/test/property/action_flow")) do
-      Code.require_file("test/property/action_flow/support/report.exs")
-      JidoTest.Property.ActionFlow.Report.check!()
-    end
+    Code.require_file("test/property/support/report.exs")
+    JidoTest.Property.Report.check!(full: all?, suite: suite)
   end
 
   defp test_ignore_filters do
@@ -247,7 +243,7 @@ defmodule Jido.MixProject do
       ~r{^test/bench/(?:action_flow/(?:dsl_compile|fixtures|flow_compile|flow_run|react_stress|support)|ai/(?:react_fresh_workflow|react_memory|react_state_growth|react_support)|signal/run)\.exs$},
       ~r{^test/bench/(?:signal/support|support)/},
       ~r/^test\/quality\/support\//,
-      ~r|^test/property/[^/]+/support/|,
+      ~r{^test/property/(?:support|[^/]+/support)/},
       ~r|^test/system/services/support/|,
       ~r|^test/system/runtime/core/support/|,
       ~r/^test\/jido\/core_contract\/.*(?:support|configuration_support)\.ex$/

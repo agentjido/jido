@@ -1,27 +1,22 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 Code.require_file("support/model.exs", __DIR__)
 
 defmodule JidoTest.Property.Signal.MemoryHistoriesTest do
   use ExUnit.Case, async: true
   import StreamData
   alias Jido.Signal.Bus.Store.Memory
-  alias JidoTest.Property.Signal.{Fuzz, Model}
+  alias JidoTest.Property.Fuzz
+  alias JidoTest.Property.Signal.Model
 
   @paths ~w(** a.** **.a **.a.**.b b)
   for {suite, runs, bound} <- [{:property, 40, 12}, {:fuzz, 500, 40}] do
     @tag [
       {suite, true},
+      fuzz_id: "memory_histories",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["STORE-001", "BUS-003"]
-    @tag contract_cases: [
-           "STORE-001/pinned-capacity",
-           "STORE-001/cursor-atomicity",
-           "STORE-001/definition-history",
-           "BUS-003/filter-before-limit"
-         ]
     test "#{suite}: retained records follow a required-record model", context do
       command =
         fixed_map(%{

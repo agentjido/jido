@@ -11,18 +11,17 @@ The current suite covers `Jido.Expr`. It checks the fixed operator set,
 short-circuit behavior, parser limits, and bounded generated expression trees.
 The required fuzz case list contains only `expression_trees`.
 
-`mix test.fuzz` runs the full-report gate after the tests. A focused Action and
-Flow fuzz run checks only the Action and Flow report.
+`mix test.fuzz` runs the full-report gate after the tests. A focused Expr run
+checks only the selected family.
 
 ## Reports
 
-The fuzz run writes `_build/test/action-flow-property-report.json`. The report
-must finish, pass, and contain a measurement for each current required fuzz
-case. Focused property runs can create a partial report and do not use the full
-fuzz gate.
+All property families write `_build/test/property-report.json`. A full fuzz run
+must finish, pass, and contain every configured Signal, Expr, and AgentServer
+measurement. Focused runs can contain only their selected family.
 
 Reduced failures use
-`_build/test/action-flow-property-counterexamples/<case-id>`. Review a failure
+`_build/test/property-counterexamples/jido_expr/<case-id>`. Review a failure
 before you remove it. Promote a useful input into a fixed regression test.
 
 ## Limits

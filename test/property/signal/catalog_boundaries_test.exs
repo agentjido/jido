@@ -1,4 +1,4 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 
 defmodule JidoTest.Property.Signal.CatalogBoundariesTest do
   use ExUnit.Case, async: true
@@ -7,7 +7,7 @@ defmodule JidoTest.Property.Signal.CatalogBoundariesTest do
   alias Jido.Error.ValidationError
   alias Jido.Signal.Catalog
   alias Jido.Signal.Codec
-  alias JidoTest.Property.Signal.Fuzz
+  alias JidoTest.Property.Fuzz
 
   defmodule MessageV1 do
     use Jido.Signal,
@@ -39,17 +39,11 @@ defmodule JidoTest.Property.Signal.CatalogBoundariesTest do
   for {suite, runs, bound} <- [{:property, 40, 16}, {:fuzz, 500, 128}] do
     @tag [
       {suite, true},
+      fuzz_id: "catalog_boundaries",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["CAT-001"]
-    @tag contract_cases: [
-           "CAT-001/exact-pairs",
-           "CAT-001/preserved-identity",
-           "CAT-001/data-errors",
-           "CAT-001/constructor-identity"
-         ]
     test "#{suite}: exact catalog selection and preserved identity", context do
       generator =
         fixed_map(%{

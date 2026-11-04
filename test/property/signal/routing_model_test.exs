@@ -1,4 +1,4 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 Code.require_file("support/model.exs", __DIR__)
 
 defmodule JidoTest.Property.Signal.RoutingModelTest do
@@ -7,7 +7,8 @@ defmodule JidoTest.Property.Signal.RoutingModelTest do
   alias Jido.Signal
   alias Jido.Signal.Router
   alias Jido.Signal.Bus.Store.Memory
-  alias JidoTest.Property.Signal.{Fuzz, Model}
+  alias JidoTest.Property.Fuzz
+  alias JidoTest.Property.Signal.Model
 
   @paths ~w(a b a.b a.* *.a ** a.** **.a **.a.** **.a.**.b **.*.a)
   @modes ~w(scalar group nested empty opaque)
@@ -24,18 +25,11 @@ defmodule JidoTest.Property.Signal.RoutingModelTest do
   for {suite, runs, bound} <- [{:property, 40, 6}, {:fuzz, 500, 16}] do
     @tag [
       {suite, true},
+      fuzz_id: "routing_model",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["ROUTE-001", "ROUTE-002", "ROUTE-003"]
-    @tag contract_cases: [
-           "ROUTE-001/globstar-star-types",
-           "ROUTE-002/order-predicates-targets",
-           "ROUTE-003/immutable-mutations",
-           "ROUTE-003/compiled-static",
-           "ROUTE-003/invalid-paths"
-         ]
     test "#{suite}: routing matches an independent list model", context do
       route =
         fixed_map(%{

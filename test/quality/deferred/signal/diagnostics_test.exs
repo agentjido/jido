@@ -1,4 +1,4 @@
-Code.require_file("../../../property/signal/support/fuzz.exs", __DIR__)
+Code.require_file("../../../property/support/fuzz.exs", __DIR__)
 
 defmodule JidoTest.Property.Signal.DiagnosticsTest do
   use ExUnit.Case, async: true
@@ -6,7 +6,7 @@ defmodule JidoTest.Property.Signal.DiagnosticsTest do
   alias Jido.Error
   alias Jido.Signal
   alias Jido.Signal.Boundary
-  alias JidoTest.Property.Signal.Fuzz
+  alias JidoTest.Property.Fuzz
 
   @classes [
     {:validation_error, :validation_error, false},
@@ -33,19 +33,11 @@ defmodule JidoTest.Property.Signal.DiagnosticsTest do
   for {suite, runs, bound} <- [{:property, 40, 8}, {:fuzz, 500, 30}] do
     @tag [
       {suite, true},
+      fuzz_id: "diagnostics",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["ERROR-001"]
-    @tag contract_cases: [
-           "ERROR-001/type-retry-table",
-           "ERROR-001/grouped-improper",
-           "ERROR-001/compound-secret-keys",
-           "ERROR-001/summary-bounds",
-           "ERROR-001/long-module-names",
-           "ERROR-001/no-stacktrace"
-         ]
     test "#{suite}: errors and diagnostic values stay bounded", context do
       generator =
         fixed_map(%{

@@ -1,27 +1,20 @@
-Code.require_file("support/fuzz.exs", __DIR__)
+Code.require_file("../support/fuzz.exs", __DIR__)
 
 defmodule JidoTest.Property.Signal.WireMutationsTest do
   use ExUnit.Case, async: true
   import StreamData
   alias Jido.Signal.Codec
-  alias JidoTest.Property.Signal.Fuzz
+  alias JidoTest.Property.Fuzz
 
   @mutations ~w(missing-id missing-version version both base64 extension key legacy type)
   for {suite, runs, bound} <- [{:property, 40, 32}, {:fuzz, 500, 512}] do
     @tag [
       {suite, true},
+      fuzz_id: "wire_mutations",
       max_runs: runs,
       max_run_time: if(suite == :fuzz, do: 300_000, else: 10_000),
       timeout: if(suite == :fuzz, do: 900_000, else: 90_000)
     ]
-    @tag contracts: ["WIRE-002"]
-    @tag contract_cases: [
-           "WIRE-002/known-invalid",
-           "WIRE-002/atomic-batch",
-           "WIRE-002/exact-size",
-           "WIRE-002/compressed-etf",
-           "WIRE-002/malformed-input"
-         ]
     test "#{suite}: invalid wire data and byte limits", context do
       generator =
         fixed_map(%{
