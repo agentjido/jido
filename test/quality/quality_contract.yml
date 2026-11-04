@@ -179,7 +179,7 @@ stability_findings:
     suite_id: covenant
     component: jido.persistence
     owner: jido.persistence
-    status: unresolved
+    status: resolved
     observed_on: 2026-11-04
-    reason: A full Covenant run failed once during token-test shutdown cleanup, then passed in focused and full reruns.
-    resolution_condition: Resolve the shutdown ordering cause or add a versioned waiver with an owner and expiry condition.
+    reason: The token tests used a linked Agent with a check-then-stop cleanup callback. ExUnit now owns that Agent under its per-test supervisor, which removes the cleanup ordering race.
+    resolution_condition: Keep supervised test-process ownership and retain passing repeated token tests plus a complete Covenant run.

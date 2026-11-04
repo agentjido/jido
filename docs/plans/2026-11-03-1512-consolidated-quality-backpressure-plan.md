@@ -690,11 +690,11 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Test scenarios and acceptance criteria:**
 
-- [ ] Each required offline surface has a named CI job.
-- [ ] CI runs Covenant and Reach.
-- [ ] Live and service checks are not required offline jobs.
-- [ ] Agent guidance names the focused command for each change type.
-- [ ] The quality report is available as a job artifact.
+- [x] Each required offline surface has a named CI job.
+- [x] CI runs Covenant and Reach.
+- [x] Live and service checks are not required offline jobs.
+- [x] Agent guidance names the focused command for each change type.
+- [x] The quality report is available as a job artifact.
 
 **Verification:** `mix test.ci`, `mix quality`, `mix quality.report`, `mix covenant.check`, and `mix reach.check --arch --smells` exit with status `0`.
 
@@ -957,19 +957,19 @@ An arrow means that the source ticket blocks the destination ticket.
 
 ## Definition of Done
 
-- [ ] Every reviewed quality asset has a manifest disposition and exact source commit.
-- [ ] All focused aliases exist and match their documentation.
-- [ ] Authoring, example, property, fuzz, system, load, and benchmark smoke surfaces pass offline.
-- [ ] Live and external service surfaces are explicit and documented.
-- [ ] The quality contract registers every required suite and active public component.
-- [ ] Package coverage is at least 90%, every component meets R18, and Covenant covers 100% of active obligations.
-- [ ] Each suite's total and unique line contribution is present in the quality report.
-- [ ] Every public component has required fuzz or property proof, or a validated not-applicable reason.
-- [ ] Required CI runs every offline surface, Covenant, Reach, and the objective quality report.
-- [ ] No unresolved stability finding is hidden by a later passing run.
-- [ ] No source ref changed.
-- [ ] No file under `lib/**` changed.
-- [ ] No abandoned experiment or generated report remains outside ignored `tmp/quality/` paths.
+- [x] Every reviewed quality asset has a manifest disposition and exact source commit.
+- [x] All focused aliases exist and match their documentation.
+- [x] Authoring, example, property, fuzz, system, load, and benchmark smoke surfaces pass offline.
+- [x] Live and external service surfaces are explicit and documented.
+- [x] The quality contract registers every required suite and active public component.
+- [x] Package coverage is at least 90%, every component meets R18, and Covenant covers 100% of active obligations.
+- [x] Each suite's total and unique line contribution is present in the quality report.
+- [x] Every public component has required fuzz or property proof, or a validated not-applicable reason.
+- [x] Required CI runs every offline surface, Covenant, Reach, and the objective quality report.
+- [x] No unresolved stability finding is hidden by a later passing run.
+- [x] No source ref changed.
+- [x] No file under `lib/**` changed.
+- [x] No abandoned experiment or generated report remains outside ignored `tmp/quality/` paths.
 
 ---
 

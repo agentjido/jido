@@ -53,3 +53,33 @@ Some active Covenant IDs still start with `jido_action.` or `jido_ai.`. These ar
 - Run `mix test.authoring` for public authoring compatibility and `mix test.contracts` for all Covenant contracts. Both commands run in `mix test.ci`.
 - Run `mix quality.coverage` before `mix quality.report`. The report runs all required offline suites and fails on missing, stale, unowned, or unresolved evidence. Provider and external-service suites stay opt-in.
 - Do not edit generated files in `_build/`, `cover/`, or `deps/`.
+
+## Change verification matrix
+
+Run the focused command for every changed surface. Run more than one command
+when a change crosses rows. `mix test.all` is the complete offline test alias.
+It does not select live provider or external-service tests.
+
+| Change type | Required focused command |
+|---|---|
+| Unit behavior | The narrow `mix test path/to/test.exs`, then `mix test` |
+| Public DSL, JSON, codec, or authoring | `mix test.authoring` |
+| Supported numbered example | `mix test.examples` |
+| Generated invariant or public API fuzz surface | `mix test.property` and `mix test.fuzz` |
+| Runtime, persistence, recovery, or process cleanup | `mix test.system` and, when applicable, `mix test.peer` |
+| Concurrency, ownership, or sustained execution | `mix test.load` |
+| Benchmark runner or metric | `mix test.bench`, then the changed documented `mix bench.*` command |
+| Covenant component behavior | `mix test.contracts` |
+| Namespace, dependency direction, or architecture | `mix reach.check --arch --smells` |
+| Quality contract, ownership, or coverage | `mix quality.contract`, `mix quality.coverage`, then `mix quality.report` |
+| External adapter | The documented `mix test.services` target with a dedicated test service |
+| Live AI provider | `mix test.live` with `JIDO_LIVE_OPENAI_API_KEY` set to an approved test key |
+
+Always finish with `mix format --check-formatted`. Use `mix test.ci` or
+`mix test.all` before a full handoff. Use `mix quality` for the static quality
+gate. The gate fails on highest-priority Credo findings. It also prints the
+full strict Credo backlog as advisory output. Compile warnings, Dialyzer,
+ExDNA, and Reach remain blocking. Dialyzer uses the line-specific checked-in
+baseline in `.dialyzer_ignore.exs` and fails when an entry becomes unused.
+ExDNA reports every clone and fails when the current 17-clone brownfield
+baseline increases.

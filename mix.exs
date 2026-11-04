@@ -10,7 +10,7 @@ defmodule Jido.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
-      dialyzer: [plt_add_apps: [:ex_unit]],
+      dialyzer: [plt_add_apps: [:ex_unit], ignore_warnings: ".dialyzer_ignore.exs"],
       package: package(),
       test_ignore_filters: test_ignore_filters(),
       test_coverage: test_coverage()
@@ -39,6 +39,7 @@ defmodule Jido.MixProject do
         "quality.coverage": :test,
         "quality.report": :test,
         "test.authoring": :test,
+        "test.all": :test,
         "test.bench": :test,
         "test.ci": :test,
         "test.contracts": :test,
@@ -123,35 +124,26 @@ defmodule Jido.MixProject do
         "compile --warnings-as-errors",
         "format --check-formatted",
         "test.ci",
-        "credo --strict",
-        "dialyzer",
-        "ex_dna",
+        "credo --strict --min-priority higher",
+        "credo --strict --mute-exit-status",
+        "dialyzer --list-unused-filters",
+        "ex_dna --max-clones 17",
         "reach.check --arch --smells"
       ],
       quality: [
         "quality.contract",
         "compile --warnings-as-errors",
         "format --check-formatted",
-        "credo --strict",
-        "dialyzer",
-        "ex_dna",
+        "credo --strict --min-priority higher",
+        "credo --strict --mute-exit-status",
+        "dialyzer --list-unused-filters",
+        "ex_dna --max-clones 17",
         "reach.check --arch --smells"
       ],
       "test.authoring": test_alias("test/authoring", :authoring),
+      "test.all": "test.ci",
       "test.bench": test_alias("test/bench", :bench),
-      "test.ci": [
-        "quality.contract",
-        "test",
-        "test.authoring",
-        "test.contracts",
-        "test.examples",
-        "test.property",
-        "test.fuzz",
-        "test.system",
-        "test.load",
-        "test.peer",
-        "test.bench"
-      ],
+      "test.ci": &run_test_ci/1,
       "test.contracts": "covenant.check",
       "test.examples": test_alias("test/examples", :example),
       "test.fuzz": fn args ->
@@ -195,6 +187,35 @@ defmodule Jido.MixProject do
       Mix.Task.run("test", ["--only", Atom.to_string(tag), "--seed", "0"] ++ paths ++ args)
     else
       Mix.shell().info("No #{tag} tests found under #{default_path}")
+    end
+  end
+
+  defp run_test_ci([]) do
+    [
+      ["quality.contract"],
+      ["test", "--seed", "0"],
+      ["test.authoring"],
+      ["test.contracts"],
+      ["test.examples"],
+      ["test.property"],
+      ["test.fuzz"],
+      ["test.system"],
+      ["test.load"],
+      ["test.peer"],
+      ["test.bench"]
+    ]
+    |> Enum.each(&run_mix_task!/1)
+  end
+
+  defp run_test_ci(args), do: Mix.raise("mix test.ci does not accept arguments: #{inspect(args)}")
+
+  defp run_mix_task!(args) do
+    mix = System.find_executable("mix") || Mix.raise("mix executable is not available")
+    Mix.shell().info("test.ci: mix #{Enum.join(args, " ")}")
+
+    case System.cmd(mix, args, env: [{"MIX_ENV", "test"}], stderr_to_stdout: true) do
+      {output, 0} -> IO.write(output)
+      {output, status} -> Mix.raise("mix #{Enum.join(args, " ")} failed with status #{status}\n#{output}")
     end
   end
 

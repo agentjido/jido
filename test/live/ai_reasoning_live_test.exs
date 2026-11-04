@@ -1,9 +1,9 @@
 defmodule JidoTest.AI.ReasoningLiveTest do
   use ExUnit.Case, async: false
 
-  alias Jido.AITest.ChainOfThoughtAgent
   alias Jido.Agent.Directive.Reply
   alias Jido.AgentServer
+  alias Jido.AITest.ChainOfThoughtAgent
   alias JidoTest.AI.LiveTrace
 
   @moduletag :live

@@ -22,7 +22,7 @@ special_quality_tags = [
   :service
 ]
 
-ExUnit.configure(exclude: [:integration, :skip, :flaky] ++ special_quality_tags)
+ExUnit.configure(seed: 0, exclude: [:integration, :skip, :flaky] ++ special_quality_tags)
 
 quality_selection = ExUnit.configuration()[:include]
 

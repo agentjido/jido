@@ -64,6 +64,7 @@ Each command uses seed `0`. A command exits successfully with a clear message wh
 
 ```text
 mix test.authoring
+mix test.contracts
 mix test.examples
 mix test.property
 mix test.fuzz
@@ -73,10 +74,28 @@ mix test.peer
 mix test.bench
 mix test.live
 mix test.services
+mix test.ci
+mix test.all
 ```
 
 `mix test.ci` runs the default suite and every offline quality surface that is available. Live and service checks stay
-explicit and opt-in.
+explicit and opt-in. `mix test.all` is an equivalent full offline test alias for local use.
+
+`.github/workflows/ci.yml` gives every required offline surface a named job. It
+runs Covenant and Reach as required jobs. The objective quality job runs
+coverage before the combined report and uploads `tmp/quality/` as a workflow
+artifact. Scheduled or manually selected jobs run extended fuzz, load burn-in,
+and benchmark checks. Service and live provider jobs require explicit manual
+inputs; the live job also requires the dedicated repository test secret.
+
+The static `mix quality` gate blocks highest-priority Credo findings and keeps
+the full strict Credo scan visible as advisory debt. Compile warnings,
+formatting, Dialyzer, ExDNA, and Reach remain blocking checks.
+The checked-in `.dialyzer_ignore.exs` file records existing warnings by file,
+warning type, and line. The gate rejects both new warnings and unused baseline
+entries.
+ExDNA reports all clone groups and rejects an increase above the current
+17-clone brownfield baseline.
 
 ## Combined quality report
 

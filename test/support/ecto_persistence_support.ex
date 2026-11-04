@@ -50,7 +50,7 @@ defmodule JidoTest.Persistence.EctoSupport do
   end
 
   def migrate! do
-    Ecto.Migrator.up(EctoRepo, 20_260_909_01, EctoMigration, log: false)
+    Ecto.Migrator.up(EctoRepo, 2_026_090_901, EctoMigration, log: false)
   end
 
   def remove_database(path) do

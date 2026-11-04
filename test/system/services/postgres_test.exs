@@ -47,7 +47,7 @@ defmodule JidoTest.System.Services.PostgresTest do
       timeout: 30_000
     )
 
-    Ecto.Migrator.up(Repo, 20_260_909_01, Jido.Persistence.Ecto.Migration, log: false)
+    Ecto.Migrator.up(Repo, 2_026_090_901, Jido.Persistence.Ecto.Migration, log: false)
     {:ok, store: {Jido.Persistence.Ecto, repo: Repo}}
   end
 end

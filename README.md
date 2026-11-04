@@ -20,8 +20,7 @@ include:
 - migration guidance from the four separate packages;
 - final package, version, and release configuration;
 - a complete public API and compatibility review; and
-- the full benchmark, load, property, system, and authoring test suites from
-  the source repositories.
+- final performance baselines across the supported runtime matrix.
 
 Do not use this repository as the official guide for a released Jido version.
 The current focus is architecture and quality backpressure. Documentation and
@@ -44,6 +43,17 @@ decisions in `docs/aspirational-module-dependency-map.md`.
 mix deps.get
 mix test
 mix test.ci
+mix test.all
+mix test.contracts
+mix test.authoring
+mix test.examples
+mix test.property
+mix test.fuzz
+mix test.system
+mix test.load
+mix test.peer
+mix test.bench
+mix quality
 mix quality.coverage
 mix quality.report
 mix reach.check --arch --smells
@@ -53,6 +63,27 @@ mix reach.check --arch --smells
 before `mix quality.report`. The report writes JSON and text evidence under `tmp/quality/` and fails when a required
 suite, obligation, component proof, coverage rule, or stability record is not satisfied. Live provider and external
 service checks are separate opt-in commands.
+
+`mix quality` blocks highest-priority Credo findings, compile warnings,
+Dialyzer errors, ExDNA errors, Reach architecture errors, and formatting
+errors. It also prints the full strict Credo backlog as advisory output.
+Dialyzer checks new warnings against the line-specific baseline in
+`.dialyzer_ignore.exs` and rejects unused baseline entries.
+ExDNA reports all clone groups and fails above the current 17-clone baseline.
+
+Run external services and the paid provider only when you explicitly select
+them:
+
+```sh
+mix test.services
+JIDO_LIVE_OPENAI_API_KEY=... mix test.live
+```
+
+The live command requires a dedicated test key. See
+`test/system/services/README.md` and `test/live/README.md` for setup and cleanup
+rules. The CI workflow runs each required offline surface as a named job. Its
+scheduled or manual extended jobs run longer fuzz, load burn-in, and benchmark
+checks. Service and live jobs are manual only.
 
 The live graph-first example makes a paid model call. It starts a Jido instance,
 runs the canonical ReAct Flow in an AgentServer, calls two Actions in one tool
