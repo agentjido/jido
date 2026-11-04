@@ -25,8 +25,49 @@ categories:
   - id: ai
     source_root: examples/ai
     test_root: test/examples/ai
-index_readmes: []
-examples: []
+index_readmes:
+  - examples/flow/compilation/README.md
+examples:
+  - id: flow/compilation/single_step
+    category: flow
+    readme: examples/flow/compilation/single_step/README.md
+    source: examples/flow/compilation/single_step/single_step.ex
+    test: test/examples/flow/compilation/single_step_test.exs
+  - id: flow/compilation/dependency_graph
+    category: flow
+    readme: examples/flow/compilation/dependency_graph/README.md
+    source: examples/flow/compilation/dependency_graph/dependency_graph.ex
+    test: test/examples/flow/compilation/dependency_graph_test.exs
+  - id: flow/compilation/dsl_flow
+    category: flow
+    readme: examples/flow/compilation/dsl_flow/README.md
+    source: examples/flow/compilation/dsl_flow/dsl_flow.ex
+    test: test/examples/flow/compilation/dsl_flow_test.exs
+  - id: flow/compilation/stored_json
+    category: flow
+    readme: examples/flow/compilation/stored_json/README.md
+    source: examples/flow/compilation/stored_json/stored_json.ex
+    test: test/examples/flow/compilation/stored_json_test.exs
+  - id: flow/compilation/authoring_equivalence
+    category: flow
+    readme: examples/flow/compilation/authoring_equivalence/README.md
+    source: examples/flow/compilation/authoring_equivalence/authoring_equivalence.ex
+    test: test/examples/flow/compilation/authoring_equivalence_test.exs
+  - id: flow/compilation/validation
+    category: flow
+    readme: examples/flow/compilation/validation/README.md
+    source: examples/flow/compilation/validation/validation.ex
+    test: test/examples/flow/compilation/validation_test.exs
+  - id: flow/compilation/inputs_and_output
+    category: flow
+    readme: examples/flow/compilation/inputs_and_output/README.md
+    source: examples/flow/compilation/inputs_and_output/inputs_and_output.ex
+    test: test/examples/flow/compilation/inputs_and_output_test.exs
+  - id: flow/compilation/compiled_program
+    category: flow
+    readme: examples/flow/compilation/compiled_program/README.md
+    source: examples/flow/compilation/compiled_program/compiled_program.ex
+    test: test/examples/flow/compilation/compiled_program_test.exs
 exclusions:
   - path: examples/00_graph_first
     reason: The current script needs a live provider. U15 will move and pair the supported offline AI examples, and U19 owns live-provider proof.
