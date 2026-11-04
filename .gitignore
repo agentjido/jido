@@ -13,6 +13,9 @@
 # Generated Reach architecture reports.
 /reach_report/
 
+# Generated Covenant contract reports.
+/covenant/results/
+
 # Temporary files, for example, from tests.
 /tmp/
 
