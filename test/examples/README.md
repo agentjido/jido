@@ -1,8 +1,8 @@
 # Example tests
 
-The example test tree mirrors each numbered category, chapter, and lesson in
-[`examples/`](../../examples/README.md). The catalog contract is in
-[`catalog.yml`](catalog.yml).
+The public [example tree](../../examples/README.md) and this test tree use the
+same flat chapter and lesson names. The catalog in
+[`catalog.yml`](catalog.yml) pairs each source lesson with its test.
 
 Every paired test must:
 
@@ -15,7 +15,7 @@ Every paired test must:
 This pattern prevents default `mix test` from loading example source:
 
 ```elixir
-Code.require_file("../../../support/loader.exs", __DIR__)
+Code.require_file("../../support/loader.exs", __DIR__)
 
 defmodule JidoTest.Examples.SampleTest do
   use ExUnit.Case, async: false
@@ -23,7 +23,7 @@ defmodule JidoTest.Examples.SampleTest do
 
   setup_all do
     JidoTest.Examples.Loader.require_source!(
-      "flow/01_compilation/01_01_sample/sample.ex"
+      "02_flow_authoring/02_01_sample/sample.ex"
     )
     :ok
   end

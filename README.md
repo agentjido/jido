@@ -90,7 +90,7 @@ runs the canonical ReAct Flow in an AgentServer, calls two Actions in one tool
 round, and checks the committed Session.
 
 ```sh
-mix run examples/00_graph_first/live_react.exs
+mix run examples/00_quick_start/00_03_live_react/live_react.exs
 ```
 
 The default model is `openai:gpt-4o-mini`. Use `JIDO_LIVE_MODEL` and

@@ -22,7 +22,7 @@ defmodule Jido.AI do
   nodes and joins their ordered results.
 
   Applications define their own Agent modules. A complete runnable Agent is in
-  `examples/00_graph_first`.
+  `examples/00_quick_start`.
 
   Select the Chain of Thought graph when one model call should return a
   variable-length numbered reasoning chain and a marked conclusion:

@@ -43,27 +43,27 @@ defmodule JidoTest.Examples.CatalogTest do
   test "duplicate IDs and duplicate paired assets are rejected" do
     with_fixture(fn root, catalog ->
       [entry] = catalog["examples"]
-      duplicate = %{entry | "source" => "examples/flow/01_basics/01_01_echo/second.ex"}
+      duplicate = %{entry | "source" => "examples/01_flow_basics/01_01_echo/second.ex"}
       File.write!(Path.join(root, duplicate["source"]), "defmodule Fixture.Second, do: nil\n")
       invalid = %{catalog | "examples" => [entry, duplicate]}
       errors = Catalog.validate(invalid, root)
-      assert "duplicate example id: flow/01_01_echo" in errors
-      assert "duplicate example readme: examples/flow/01_basics/01_01_echo/README.md" in errors
-      assert "duplicate example test: test/examples/flow/01_basics/01_01_echo/echo_test.exs" in errors
+      assert "duplicate example id: 01_01_echo" in errors
+      assert "duplicate example readme: examples/01_flow_basics/01_01_echo/README.md" in errors
+      assert "duplicate example test: test/examples/01_flow_basics/01_01_echo/echo_test.exs" in errors
     end)
   end
 
   test "unlisted source, README, test, and top-level paths are rejected" do
     with_fixture(fn root, catalog ->
-      write!(root, "examples/flow/01_basics/01_02_orphan/orphan.ex", "defmodule Fixture.Orphan, do: nil\n")
-      write!(root, "examples/flow/01_basics/01_02_orphan/README.md", "# Orphan\n")
-      write!(root, "test/examples/flow/01_basics/01_02_orphan/orphan_test.exs", tagged_test())
+      write!(root, "examples/01_flow_basics/01_02_orphan/orphan.ex", "defmodule Fixture.Orphan, do: nil\n")
+      write!(root, "examples/01_flow_basics/01_02_orphan/README.md", "# Orphan\n")
+      write!(root, "test/examples/01_flow_basics/01_02_orphan/orphan_test.exs", tagged_test())
       write!(root, "examples/unknown/example.ex", "defmodule Fixture.Unknown, do: nil\n")
 
       errors = Catalog.validate(catalog, root)
-      assert "unlisted example source: examples/flow/01_basics/01_02_orphan/orphan.ex" in errors
-      assert "unlisted example README: examples/flow/01_basics/01_02_orphan/README.md" in errors
-      assert "unlisted example test: test/examples/flow/01_basics/01_02_orphan/orphan_test.exs" in errors
+      assert "unlisted example source: examples/01_flow_basics/01_02_orphan/orphan.ex" in errors
+      assert "unlisted example README: examples/01_flow_basics/01_02_orphan/README.md" in errors
+      assert "unlisted example test: test/examples/01_flow_basics/01_02_orphan/orphan_test.exs" in errors
       assert "unlisted top-level example path: examples/unknown" in errors
     end)
   end
@@ -72,26 +72,30 @@ defmodule JidoTest.Examples.CatalogTest do
     with_fixture(fn root, catalog ->
       [entry] = catalog["examples"]
 
-      invalid_chapter = %{entry | "source" => "examples/flow/basics/01_01_echo/echo.ex"}
+      invalid_chapter = %{entry | "source" => "examples/flow_basics/01_01_echo/echo.ex"}
       errors = Catalog.validate(%{catalog | "examples" => [invalid_chapter]}, root)
-      assert "source chapter must use NN_chapter: examples/flow/basics/01_01_echo/echo.ex" in errors
+      assert "source chapter must use NN_chapter: examples/flow_basics/01_01_echo/echo.ex" in errors
 
-      wrong_prefix = %{entry | "source" => "examples/flow/01_basics/02_01_echo/echo.ex"}
+      wrong_prefix = %{entry | "source" => "examples/01_flow_basics/02_01_echo/echo.ex"}
       errors = Catalog.validate(%{catalog | "examples" => [wrong_prefix]}, root)
 
-      assert "source lesson chapter prefix does not match its parent: examples/flow/01_basics/02_01_echo/echo.ex" in errors
+      assert "source lesson chapter prefix does not match its parent: examples/01_flow_basics/02_01_echo/echo.ex" in errors
+
+      nested = %{entry | "source" => "examples/flow/01_flow_basics/01_01_echo/echo.ex"}
+      errors = Catalog.validate(%{catalog | "examples" => [nested]}, root)
+      assert "source path must use NN_chapter/NN_NN_lesson: examples/flow/01_flow_basics/01_01_echo/echo.ex" in errors
 
       second = %{
-        "id" => "flow/02_01_second",
+        "id" => "02_01_second",
         "category" => "flow",
-        "readme" => "examples/flow/02_more/02_01_second/README.md",
-        "source" => "examples/flow/02_more/02_01_second/second.ex",
-        "test" => "test/examples/flow/02_more/02_01_second/second_test.exs"
+        "readme" => "examples/02_flow_more/02_01_second/README.md",
+        "source" => "examples/02_flow_more/02_01_second/second.ex",
+        "test" => "test/examples/02_flow_more/02_01_second/second_test.exs"
       }
 
       write!(root, second["readme"], "# Second\n")
       write!(root, second["source"], "defmodule Fixture.Second, do: nil\n")
-      write!(root, second["test"], tagged_test("flow/02_more/02_01_second/second.ex"))
+      write!(root, second["test"], tagged_test("02_flow_more/02_01_second/second.ex"))
 
       errors = Catalog.validate(%{catalog | "examples" => [second, entry]}, root)
       assert "example entries must be sorted by id" in errors
@@ -114,11 +118,11 @@ defmodule JidoTest.Examples.CatalogTest do
 
     try do
       entry = %{
-        "id" => "flow/01_01_echo",
+        "id" => "01_01_echo",
         "category" => "flow",
-        "readme" => "examples/flow/01_basics/01_01_echo/README.md",
-        "source" => "examples/flow/01_basics/01_01_echo/echo.ex",
-        "test" => "test/examples/flow/01_basics/01_01_echo/echo_test.exs"
+        "readme" => "examples/01_flow_basics/01_01_echo/README.md",
+        "source" => "examples/01_flow_basics/01_01_echo/echo.ex",
+        "test" => "test/examples/01_flow_basics/01_01_echo/echo_test.exs"
       }
 
       write!(root, entry["readme"], "# Echo\n")
@@ -128,12 +132,12 @@ defmodule JidoTest.Examples.CatalogTest do
 
       catalog = %{
         "version" => 1,
-        "id_pattern" => "^[a-z][a-z0-9_]*/[0-9]{2}_[0-9]{2}_[a-z][a-z0-9_]*$",
+        "id_pattern" => "^[0-9]{2}_[0-9]{2}_[a-z][a-z0-9_]*$",
         "categories" => [
           %{
             "id" => "flow",
-            "source_root" => "examples/flow",
-            "test_root" => "test/examples/flow"
+            "source_root" => "examples",
+            "test_root" => "test/examples"
           }
         ],
         "index_readmes" => [],
@@ -147,7 +151,7 @@ defmodule JidoTest.Examples.CatalogTest do
     end
   end
 
-  defp tagged_test(source \\ "flow/01_basics/01_01_echo/echo.ex") do
+  defp tagged_test(source \\ "01_flow_basics/01_01_echo/echo.ex") do
     """
     defmodule Fixture.EchoTest do
       use ExUnit.Case

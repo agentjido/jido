@@ -66,8 +66,6 @@ defmodule JidoTest.Examples.Catalog do
   defp validate_categories(errors, categories) when is_list(categories) do
     errors
     |> duplicates(categories, "id", "duplicate category id")
-    |> duplicates(categories, "source_root", "duplicate category source root")
-    |> duplicates(categories, "test_root", "duplicate category test root")
     |> then(fn current ->
       Enum.reduce(categories, current, fn category, category_errors ->
         category_errors
@@ -125,16 +123,11 @@ defmodule JidoTest.Examples.Catalog do
 
   defp validate_id(errors, entry, regex) do
     id = entry["id"]
-    category = entry["category"]
 
-    errors
-    |> maybe_error(
+    maybe_error(
+      errors,
       is_nil(regex) or not is_binary(id) or not Regex.match?(regex, id),
       "invalid example id: #{inspect(id)}"
-    )
-    |> maybe_error(
-      is_binary(id) and is_binary(category) and not String.starts_with?(id, category <> "/"),
-      "example id does not start with its category: #{inspect(id)}"
     )
   end
 
@@ -205,7 +198,7 @@ defmodule JidoTest.Examples.Catalog do
 
     expected_id =
       case unique_locations do
-        [{_chapter, lesson}] -> "#{entry["category"]}/#{lesson}"
+        [{_chapter, lesson}] -> lesson
         _ -> nil
       end
 
@@ -303,12 +296,16 @@ defmodule JidoTest.Examples.Catalog do
         [entry["source"] | Map.get(entry, "auxiliary_sources", [])]
       end)
 
-    registered_readmes = Enum.map(entries, & &1["readme"]) ++ indexes
+    registered_readmes = ["examples/README.md" | Enum.map(entries, & &1["readme"])] ++ indexes
     registered_tests = Enum.map(entries, & &1["test"])
 
     discovered_sources = discover(categories, "source_root", ["**/*.ex", "**/*.exs"], root, excluded)
     discovered_readmes = discover(categories, "source_root", ["**/README.md"], root, excluded)
-    discovered_tests = discover(categories, "test_root", ["**/*_test.exs"], root, excluded)
+
+    discovered_tests =
+      categories
+      |> discover("test_root", ["**/*_test.exs"], root, excluded)
+      |> List.delete("test/examples/catalog_test.exs")
 
     errors
     |> unlisted(discovered_sources, registered_sources, "source")
@@ -317,33 +314,56 @@ defmodule JidoTest.Examples.Catalog do
     |> missing_inventory(registered_sources, discovered_sources, "registered source")
     |> missing_inventory(registered_readmes, discovered_readmes, "registered README")
     |> missing_inventory(registered_tests, discovered_tests, "registered test")
-    |> validate_top_level(categories, excluded, root)
+    |> validate_top_level(entries, indexes, excluded, root)
   end
 
   defp discover(categories, root_field, patterns, root, exclusions) do
-    for category <- categories,
-        category_root = category[root_field],
-        is_binary(category_root),
-        pattern <- patterns,
-        path <- Path.wildcard(Path.join([root, category_root, pattern])),
-        File.regular?(path),
-        relative = Path.relative_to(path, root),
-        not Enum.any?(exclusions, &under?(relative, &1)),
-        do: relative
+    for(
+      category <- categories,
+      category_root = category[root_field],
+      is_binary(category_root),
+      pattern <- patterns,
+      path <- Path.wildcard(Path.join([root, category_root, pattern])),
+      File.regular?(path),
+      relative = Path.relative_to(path, root),
+      not Enum.any?(exclusions, &under?(relative, &1)),
+      do: relative
+    )
+    |> Enum.uniq()
   end
 
-  defp validate_top_level(errors, categories, exclusions, root) do
-    allowed =
+  defp validate_top_level(errors, entries, indexes, exclusions, root) do
+    example_paths =
       ["examples/README.md"] ++
-        Enum.map(categories, &first_path_segment(&1["source_root"])) ++
-        Enum.map(exclusions, &first_path_segment/1)
+        Enum.flat_map(entries, fn entry -> [entry["readme"], entry["source"]] end) ++
+        indexes ++ exclusions
+
+    test_paths =
+      [
+        "test/examples/README.md",
+        "test/examples/catalog.yml",
+        "test/examples/catalog_test.exs",
+        "test/examples/support"
+      ] ++ Enum.map(entries, & &1["test"]) ++ exclusions
+
+    errors
+    |> validate_root_children("examples", example_paths, root, "example")
+    |> validate_root_children("test/examples", test_paths, root, "example test")
+  end
+
+  defp validate_root_children(errors, directory, registered, root, label) do
+    allowed =
+      registered
+      |> Enum.filter(&under?(&1, directory))
+      |> Enum.map(&top_child(&1, directory))
+      |> Enum.uniq()
 
     root
-    |> Path.join("examples/*")
+    |> Path.join("#{directory}/*")
     |> Path.wildcard()
     |> Enum.map(&Path.relative_to(&1, root))
     |> Enum.reject(&(&1 in allowed))
-    |> Enum.reduce(errors, fn path, current -> ["unlisted top-level example path: #{path}" | current] end)
+    |> Enum.reduce(errors, fn path, current -> ["unlisted top-level #{label} path: #{path}" | current] end)
   end
 
   defp unlisted(errors, discovered, registered, label) do
@@ -382,7 +402,12 @@ defmodule JidoTest.Examples.Catalog do
 
   defp under?(_path, _root), do: false
 
-  defp first_path_segment(path), do: path |> Path.split() |> Enum.take(2) |> Path.join()
+  defp top_child(path, directory) do
+    case path |> Path.relative_to(directory) |> Path.split() do
+      [child | _rest] -> Path.join(directory, child)
+      [] -> directory
+    end
+  end
 
   defp maybe_error(errors, true, message), do: [message | errors]
   defp maybe_error(errors, false, _message), do: errors

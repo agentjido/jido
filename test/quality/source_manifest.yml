@@ -146,15 +146,15 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/examples
-    target_path: test/examples/flow
+    target_path: test/examples/catalog.yml
     quality_surface: examples
     owner: jido.flow
     disposition: ported
-    reason: Ported across jido-07x.9 through jido-07x.11 as numbered, registered, offline Flow lessons with paired tests.
+    reason: Ported across jido-07x.9 through jido-07x.11 as numbered, registered, offline Flow lessons with paired tests registered in the flat example catalog.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation
-    target_path: examples/flow/01_compilation
+    target_path: examples/02_flow_authoring
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -162,7 +162,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_01_single_step
-    target_path: examples/flow/01_compilation/01_01_single_step
+    target_path: examples/02_flow_authoring/02_01_single_step
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -170,7 +170,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_02_dependency_graph
-    target_path: examples/flow/01_compilation/01_02_dependency_graph
+    target_path: examples/02_flow_authoring/02_02_dependency_graph
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -178,7 +178,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_03_dsl_flow
-    target_path: examples/flow/01_compilation/01_03_dsl_flow
+    target_path: examples/02_flow_authoring/02_03_dsl_flow
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -186,7 +186,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_04_stored_json
-    target_path: examples/flow/01_compilation/01_04_stored_json
+    target_path: examples/02_flow_authoring/02_04_stored_json
     quality_surface: examples
     owner: jido.codec
     disposition: ported
@@ -194,7 +194,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_05_authoring_equivalence
-    target_path: examples/flow/01_compilation/01_05_authoring_equivalence
+    target_path: examples/02_flow_authoring/02_05_authoring_equivalence
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -202,7 +202,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_06_validation
-    target_path: examples/flow/01_compilation/01_06_validation
+    target_path: examples/02_flow_authoring/02_06_validation
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -210,7 +210,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_07_inputs_and_output
-    target_path: examples/flow/01_compilation/01_07_inputs_and_output
+    target_path: examples/02_flow_authoring/02_07_inputs_and_output
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -218,7 +218,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation/01_09_compiled_program
-    target_path: examples/flow/01_compilation/01_09_compiled_program
+    target_path: examples/02_flow_authoring/02_08_compiled_program
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -226,7 +226,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution
-    target_path: examples/flow/02_execution
+    target_path: examples/03_flow_execution
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -234,7 +234,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_01_single_action
-    target_path: examples/flow/02_execution/02_01_single_action
+    target_path: examples/03_flow_execution/03_01_single_action
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -242,7 +242,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_02_three_step_flow
-    target_path: examples/flow/02_execution/02_02_three_step_flow
+    target_path: examples/03_flow_execution/03_02_three_step_flow
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -250,7 +250,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_03_serial_then_parallel
-    target_path: examples/flow/02_execution/02_03_serial_then_parallel
+    target_path: examples/03_flow_execution/03_03_serial_then_parallel
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -258,7 +258,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_04_choice
-    target_path: examples/flow/02_execution/02_04_choice
+    target_path: examples/03_flow_execution/03_04_choice
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -266,7 +266,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_05_map_reduce
-    target_path: examples/flow/02_execution/02_05_map_reduce
+    target_path: examples/03_flow_execution/03_05_map_reduce
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -274,7 +274,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_06_loop_invoke_wait
-    target_path: examples/flow/02_execution/02_06_loop_invoke_wait
+    target_path: examples/03_flow_execution/03_06_loop_invoke_wait
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -282,7 +282,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_07_parallel
-    target_path: examples/flow/02_execution/02_07_parallel
+    target_path: examples/03_flow_execution/03_07_parallel
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -290,7 +290,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_08_map
-    target_path: examples/flow/02_execution/02_08_map
+    target_path: examples/03_flow_execution/03_08_map
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -298,7 +298,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_09_reduce
-    target_path: examples/flow/02_execution/02_09_reduce
+    target_path: examples/03_flow_execution/03_09_reduce
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -306,7 +306,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_10_iterate
-    target_path: examples/flow/02_execution/02_10_iterate
+    target_path: examples/03_flow_execution/03_10_iterate
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -314,7 +314,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_11_child_flow
-    target_path: examples/flow/02_execution/02_11_child_flow
+    target_path: examples/03_flow_execution/03_11_child_flow
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -322,7 +322,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_12_wait_and_signal
-    target_path: examples/flow/02_execution/02_12_wait_and_signal
+    target_path: examples/03_flow_execution/03_12_wait_and_signal
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -330,7 +330,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_13_controlled_execution
-    target_path: examples/flow/02_execution/02_13_controlled_execution
+    target_path: examples/03_flow_execution/03_13_controlled_execution
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -338,7 +338,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_14_effects_and_failure
-    target_path: examples/flow/02_execution/02_14_effects_and_failure
+    target_path: examples/03_flow_execution/03_14_effects_and_failure
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -346,7 +346,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/02_execution/02_15_dynamic_invoke
-    target_path: examples/flow/02_execution/02_15_dynamic_invoke
+    target_path: examples/03_flow_execution/03_15_dynamic_invoke
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -354,7 +354,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/03_durability
-    target_path: examples/flow/03_durability
+    target_path: examples/05_flow_durability
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -362,7 +362,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/03_durability/03_01_run_identity
-    target_path: examples/flow/03_durability/03_01_run_identity
+    target_path: examples/05_flow_durability/05_01_run_identity
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -370,7 +370,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/03_durability/03_02_snapshot_and_resume
-    target_path: examples/flow/03_durability/03_02_snapshot_and_resume
+    target_path: examples/05_flow_durability/05_02_snapshot_and_resume
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -378,7 +378,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/03_durability/03_03_process_recovery
-    target_path: examples/flow/03_durability/03_03_process_recovery
+    target_path: examples/05_flow_durability/05_03_process_recovery
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -410,7 +410,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/03_durability/03_07_run_inspection
-    target_path: examples/flow/03_durability/03_07_run_inspection
+    target_path: examples/05_flow_durability/05_04_run_inspection
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -418,7 +418,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/03_durability/03_08_cancellation
-    target_path: examples/flow/03_durability/03_08_cancellation
+    target_path: examples/05_flow_durability/05_05_cancellation
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -450,7 +450,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/03_durability/03_12_telemetry
-    target_path: examples/flow/03_durability/03_12_telemetry
+    target_path: examples/05_flow_durability/05_06_telemetry
     quality_surface: examples
     owner: jido.telemetry
     disposition: ported
@@ -474,7 +474,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/04_patterns
-    target_path: examples/flow/04_patterns
+    target_path: examples/06_flow_patterns
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -482,7 +482,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/04_patterns/04_01_human_approval
-    target_path: examples/flow/04_patterns/04_01_human_approval
+    target_path: examples/06_flow_patterns/06_01_human_approval
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -490,7 +490,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/04_patterns/04_02_batch_processing
-    target_path: examples/flow/04_patterns/04_02_batch_processing
+    target_path: examples/06_flow_patterns/06_02_batch_processing
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -506,7 +506,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/04_patterns/04_04_compensation
-    target_path: examples/flow/04_patterns/04_04_compensation
+    target_path: examples/06_flow_patterns/06_03_compensation
     quality_surface: examples
     owner: jido.execution
     disposition: ported
@@ -514,7 +514,7 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/05_distribution
-    target_path: examples/flow/05_distribution
+    target_path: examples/07_flow_distribution
     quality_surface: examples
     owner: jido.execution
     disposition: deferred
@@ -714,7 +714,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/01_basic
-    target_path: examples/agent/01_basic
+    target_path: examples/01_agent_basics
     quality_surface: examples
     owner: jido.agent
     disposition: ported
@@ -722,7 +722,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/01_basic/01_01_minimal_agent
-    target_path: examples/agent/01_basic/01_01_minimal_agent
+    target_path: examples/01_agent_basics/01_01_minimal_agent
     quality_surface: examples
     owner: jido.agent
     disposition: ported
@@ -730,7 +730,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/01_basic/01_02_typed_command_agent
-    target_path: examples/agent/01_basic/01_02_typed_command_agent
+    target_path: examples/01_agent_basics/01_02_typed_command_agent
     quality_surface: examples
     owner: jido.agent
     disposition: ported
@@ -738,7 +738,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/01_basic/01_03_plugin_state_agent
-    target_path: examples/agent/01_basic/01_03_plugin_state_agent
+    target_path: examples/01_agent_basics/01_04_plugin_state_agent
     quality_surface: examples
     owner: jido.plugin
     disposition: ported
@@ -746,7 +746,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/01_basic/01_04_directive_agent
-    target_path: examples/agent/01_basic/01_04_directive_agent
+    target_path: examples/01_agent_basics/01_05_directive_agent
     quality_surface: examples
     owner: jido.agent_server
     disposition: ported
@@ -754,7 +754,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/01_basic/01_05_otp_supervision
-    target_path: examples/agent/01_basic/01_05_otp_supervision
+    target_path: examples/01_agent_basics/01_06_otp_supervision
     quality_surface: examples
     owner: jido.agent_server
     disposition: ported
@@ -762,7 +762,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/01_basic/01_06_route_selection
-    target_path: examples/agent/01_basic/01_06_route_selection
+    target_path: examples/01_agent_basics/01_03_route_selection
     quality_surface: examples
     owner: jido.agent
     disposition: ported
@@ -770,7 +770,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/01_basic/01_07_data_defined_agent
-    target_path: examples/agent/01_basic/01_07_data_defined_agent
+    target_path: examples/01_agent_basics/01_07_data_defined_agent
     quality_surface: examples
     owner: jido.agent
     disposition: ported
@@ -778,7 +778,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/01_basic/01_09_authoring_plugin
-    target_path: examples/agent/01_basic/01_09_authoring_plugin
+    target_path: examples/01_agent_basics/01_08_authoring_plugin
     quality_surface: examples
     owner: jido.plugin
     disposition: ported
@@ -786,7 +786,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/02_workflow
-    target_path: examples/agent/02_workflow
+    target_path: examples/04_agent_workflows
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -794,7 +794,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/02_workflow/02_01_sequential_flow
-    target_path: examples/agent/02_workflow/02_01_sequential_flow
+    target_path: examples/04_agent_workflows/04_01_sequential_flow
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -802,7 +802,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/02_workflow/02_02_effectful_steps
-    target_path: examples/agent/02_workflow/02_02_effectful_steps
+    target_path: examples/04_agent_workflows/04_02_effectful_steps
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -810,7 +810,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/02_workflow/02_03_conditional_routes
-    target_path: examples/agent/02_workflow/02_03_conditional_routes
+    target_path: examples/04_agent_workflows/04_03_conditional_routes
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -818,7 +818,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/02_workflow/02_04_parallel_join
-    target_path: examples/agent/02_workflow/02_04_parallel_join
+    target_path: examples/04_agent_workflows/04_04_parallel_join
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -826,7 +826,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/02_workflow/02_05_ordered_batch
-    target_path: examples/agent/02_workflow/02_05_ordered_batch
+    target_path: examples/04_agent_workflows/04_05_ordered_batch
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -834,7 +834,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/02_workflow/02_06_bounded_iteration
-    target_path: examples/agent/02_workflow/02_06_bounded_iteration
+    target_path: examples/04_agent_workflows/04_06_bounded_iteration
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -842,7 +842,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/02_workflow/02_07_nested_flow
-    target_path: examples/agent/02_workflow/02_07_nested_flow
+    target_path: examples/04_agent_workflows/04_07_nested_flow
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -850,7 +850,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/02_workflow/02_08_executable_continuation
-    target_path: examples/agent/02_workflow/02_08_executable_continuation
+    target_path: examples/04_agent_workflows/04_08_executable_continuation
     quality_surface: examples
     owner: jido.flow
     disposition: ported
@@ -858,7 +858,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/02_workflow/02_09_flow_directives
-    target_path: examples/agent/02_workflow/02_09_flow_directives
+    target_path: examples/04_agent_workflows/04_09_flow_directives
     quality_surface: examples
     owner: jido.agent_server
     disposition: ported
@@ -874,7 +874,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/04_runtime
-    target_path: examples/runtime/04_runtime
+    target_path: examples/08_runtime
     quality_surface: examples
     owner: jido.agent_server
     disposition: ported
@@ -882,7 +882,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/05_multi_agent
-    target_path: examples/runtime/05_multi_agent
+    target_path: examples/09_multi_agent
     quality_surface: examples
     owner: jido.agent_server
     disposition: ported
@@ -890,7 +890,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/07_topology
-    target_path: examples/topology/07_topology
+    target_path: examples/10_topologies
     quality_surface: examples
     owner: jido.agent_server
     disposition: ported
@@ -898,7 +898,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/support/keep_state.ex
-    target_path: examples/runtime/support/keep_state.ex
+    target_path: examples/08_runtime/support/keep_state.ex
     quality_surface: examples
     owner: jido.agent
     disposition: ported
@@ -906,7 +906,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/08_applications
-    target_path: examples/plugin/08_applications
+    target_path: examples/12_plugin_applications
     quality_surface: examples
     owner: jido.plugin
     disposition: ported
@@ -914,7 +914,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/09_plugins
-    target_path: examples/plugin/09_plugins
+    target_path: examples/11_plugins
     quality_surface: examples
     owner: jido.plugin
     disposition: ported
@@ -922,7 +922,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/10_persistence
-    target_path: examples/persistence/10_persistence
+    target_path: examples/13_persistence
     quality_surface: examples
     owner: jido.persistence
     disposition: ported
@@ -930,7 +930,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/11_durable
-    target_path: examples/durable/11_durable
+    target_path: examples/14_durable_agents
     quality_surface: examples
     owner: jido.agent_server.durable
     disposition: ported
@@ -978,7 +978,7 @@ assets:
   - source_repository: jido_ai
     source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
     source_path: examples/00_graph_first
-    target_path: examples/ai/00_graph_first
+    target_path: examples/00_quick_start
     quality_surface: examples
     owner: jido.ai.agent_authoring
     disposition: ported
@@ -986,7 +986,7 @@ assets:
   - source_repository: jido_ai
     source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
     source_path: examples/01_basics
-    target_path: examples/ai/01_basics
+    target_path: examples/15_ai_basics
     quality_surface: examples
     owner: jido.ai.agent_authoring
     disposition: ported
@@ -994,7 +994,7 @@ assets:
   - source_repository: jido_ai
     source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
     source_path: examples/02_conversations
-    target_path: examples/ai/02_conversations
+    target_path: examples/16_ai_conversations
     quality_surface: examples
     owner: jido.ai.conversation
     disposition: ported
