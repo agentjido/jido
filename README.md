@@ -98,7 +98,7 @@ The default model is `openai:gpt-4o-mini`. Use `JIDO_LIVE_MODEL` and
 
 ## Runic ReAct memory benchmark
 
-[`bench/react_memory.exs`](bench/react_memory.exs) is one self-contained
+[`test/bench/ai/react_memory.exs`](test/bench/ai/react_memory.exs) is one self-contained
 reproduction and benchmark for the canonical graph-first ReAct path. It does
 not call a model provider. A deterministic local inference client emits known
 tool calls. A local Action returns an empty payload.

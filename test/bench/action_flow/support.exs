@@ -117,8 +117,8 @@ defmodule Jido.Bench.ActionFlow.Support do
   defp source do
     files =
       (Path.wildcard("lib/**/*") ++
-         Path.wildcard("bench/action_flow/**/*") ++
-         ["bench/react_memory.exs", "mix.exs", "mix.lock"])
+         Path.wildcard("test/bench/action_flow/**/*") ++
+         ["test/bench/ai/react_memory.exs", "mix.exs", "mix.lock"])
       |> Enum.filter(&File.regular?/1)
       |> Enum.sort()
 
@@ -165,7 +165,7 @@ defmodule Jido.Bench.ActionFlow.Support do
 
   defp usage_error!(suite) do
     raise ArgumentError,
-          "usage: mix run bench/action_flow/#{suite}.exs " <>
+          "usage: mix run test/bench/action_flow/#{suite}.exs " <>
             "--profile quick|standard|stress " <>
             "[--output tmp/bench/action_flow/FILE.json]"
   end

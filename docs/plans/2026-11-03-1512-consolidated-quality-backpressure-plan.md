@@ -98,9 +98,9 @@ Land only quality work in this effort. Do not change `lib/**`. If an imported ch
 - **Fact F2:** `test/test_helper.exs` excludes all special tags by default.
 - **Fact F3:** `test/authoring/` has 74 passing JSON and DSL authoring tests.
 - **Fact F4:** The focused quality aliases and Covenant alias are present on `main`.
-- **Fact F5:** `.formatter.exs` includes `examples/**` and `bench/**`.
+- **Fact F5:** `.formatter.exs` includes `examples/**` and `test/**`.
 - **Fact F6:** The target already has the main test dependencies, including StreamData, Mimic, SQLite, PostgreSQL, and OpenTelemetry.
-- **Fact F7:** `bench/react_memory.exs` is the current consolidated ReAct memory benchmark.
+- **Fact F7:** `test/bench/ai/react_memory.exs` is the current consolidated ReAct memory benchmark.
 - **Fact F8:** The target has no GitHub CI workflow and no single quality report.
 - **Fact F9:** The local Signal and split core refs are at their required baseline commits.
 - **Fact F10:** The local Action ref is clean at `40ec1f0af3a373bae5e6d869017cc229c85aef92` on `main`. Its required baseline object is not in the local clone.
@@ -116,7 +116,7 @@ Land only quality work in this effort. Do not change `lib/**`. If an imported ch
 
 - KTD1. **Source ledger:** Use `test/quality/source_manifest.yml` as the source ledger with the fields in R1 and the states `ported`, `superseded`, `deferred`, and `excluded`.
 - KTD2. **Source commits:** Use the required baseline commits for Signal, split core, and AI. Use Action commit `40ec1f0af3a373bae5e6d869017cc229c85aef92` only for quality assets.
-- KTD3. **Suite layout:** Use `test/authoring`, `test/examples`, `test/property`, `test/system`, `test/load`, `test/live`, `test/bench`, and `bench`.
+- KTD3. **Suite layout:** Use `test/authoring`, `test/examples`, `test/property`, `test/system`, `test/load`, `test/live`, and `test/bench`.
 - KTD4. **Behavior import:** Import behavior, not old package setup. Remove separate application startup and legacy test namespaces during adaptation.
 - KTD5. **Suite selection:** Keep all special tags excluded by default. Use focused aliases for each suite.
 - KTD6. **Example sources:** Use the split core example catalog as the broad catalog. Use Action examples for Flow depth and AI examples for AI depth. Exclude proposal and research folders.
@@ -178,7 +178,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 | U1 | Establish manifest and runners | `test/quality/source_manifest.yml`, `mix.exs` | None |
 | U2 | Activate authoring and Covenant | `test/authoring/**`, `mix.exs` | U1 |
 | U3 | Port Signal properties | `test/property/signal/**` | U1 |
-| U4 | Port Signal benchmarks | `test/bench/signal/**`, `bench/signal/**` | U1 |
+| U4 | Port Signal benchmarks | `test/bench/signal/**` | U1 |
 | U5 | Port Action properties | `test/property/action_flow/**` | U2, U3 |
 | U21 | Encode quality contract | `test/quality/quality_contract.yml` | U1, U2 |
 | U22 | Map component proof | `test/quality/component_proof.yml` | U21 |
@@ -196,7 +196,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 | U15 | Port offline AI examples | `test/examples/ai/**` | U2, U8 |
 | U16 | Port core runtime pressure | `test/property/runtime/**`, `test/system/runtime/core/**` | U2, U3, U6 |
 | U17 | Port service checks | `test/system/services/**` | U16 |
-| U18 | Reconcile AI benchmarks | `test/bench/ai/**`, `bench/ai/**` | U7, U15 |
+| U18 | Reconcile AI benchmarks | `test/bench/ai/**` | U7, U15 |
 | U19 | Port AI live check | `test/live/**` | U15 |
 | U20 | Enforce final gates | `.github/workflows/ci.yml`, `mix.exs` | U9-U19, U24 |
 
@@ -213,7 +213,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 **Directive:**
 
 1. Add all focused aliases with empty-safe target paths and fixed seed `0`.
-2. Extend formatter inputs to `examples/**` and `bench/**`.
+2. Extend formatter inputs to `examples/**` and `test/bench/**`.
 3. Add the manifest schema and records for every source suite root.
 4. Add validation for full commit SHAs, allowed states, unique target paths, and existing files for `ported` records.
 
@@ -284,7 +284,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Dependencies:** U1.
 
-**Files:** Read `../refs/jido_signal/test/bench/**` and `../refs/jido_signal/bench/**` at the Signal baseline. Add `test/bench/signal/**` and `bench/signal/**`. Exclude `../refs/jido_signal/bench/results/**`. Change the manifest.
+**Files:** Read `../refs/jido_signal/test/bench/**` and `../refs/jido_signal/bench/**` at the Signal baseline. Add `test/bench/signal/**`. Exclude `../refs/jido_signal/bench/results/**`. Change the manifest.
 
 **Directive:**
 
@@ -299,7 +299,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 - [ ] No historical result file is copied.
 - [ ] The manual runner needs no network or service.
 
-**Verification:** `mix test.bench test/bench/signal` and `mix run bench/signal/run.exs --profile smoke` exit with status `0`.
+**Verification:** `mix test.bench test/bench/signal` and `mix run test/bench/signal/run.exs --profile smoke` exit with status `0`.
 
 ### U5. Port Action and Flow property checks
 
@@ -358,7 +358,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Dependencies:** U4, U5, and U24.
 
-**Files:** Read `../refs/jido_action/test/bench/**` at Action commit `40ec1f0af3a373bae5e6d869017cc229c85aef92`. Add `test/bench/action_flow/**` and `bench/action_flow/**`. Exclude checked-in result JSON. Change the manifest.
+**Files:** Read `../refs/jido_action/test/bench/**` at Action commit `40ec1f0af3a373bae5e6d869017cc229c85aef92`. Add `test/bench/action_flow/**`. Exclude checked-in result JSON. Change the manifest.
 
 **Directive:**
 
@@ -628,11 +628,11 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Dependencies:** U7 and U15.
 
-**Files:** Read AI baseline `test/bench/**`, post-baseline `react_fresh_memory.exs` at `65cc5fda0380c0b95fef955687495b8786d03e3b`, and current `bench/react_memory.exs`. Add `test/bench/ai/**` and `bench/ai/**` only for distinct checks. Change the manifest.
+**Files:** Read AI baseline `test/bench/**`, post-baseline `react_fresh_memory.exs` at `65cc5fda0380c0b95fef955687495b8786d03e3b`, and current `test/bench/ai/react_memory.exs`. Add `test/bench/ai/**` only for distinct checks. Change the manifest.
 
 **Directive:**
 
-1. Keep `bench/react_memory.exs` as the current memory owner.
+1. Keep `test/bench/ai/react_memory.exs` as the current memory owner.
 2. Add the baseline state-growth check when it proves a distinct invariant.
 3. Add the fresh-workflow check with its post-baseline commit when it proves a distinct invariant.
 4. Use deterministic model and tool fixtures.

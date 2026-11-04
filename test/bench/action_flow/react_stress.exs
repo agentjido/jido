@@ -31,7 +31,7 @@ defmodule Jido.Bench.ActionFlow.ReActStress do
     }
 
     Support.report!("jido.action_flow.react_stress", options, settings, [case_row], %{
-      benchmark_owner: "bench/react_memory.exs",
+      benchmark_owner: "test/bench/ai/react_memory.exs",
       isolation: "fresh BEAM VM"
     })
   end
@@ -43,7 +43,7 @@ defmodule Jido.Bench.ActionFlow.ReActStress do
       "run",
       "--no-compile",
       "--no-deps-check",
-      "bench/react_memory.exs",
+      "test/bench/ai/react_memory.exs",
       "--case",
       "iterative",
       "direct",

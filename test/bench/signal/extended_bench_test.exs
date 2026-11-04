@@ -1,4 +1,4 @@
-Code.require_file("../../../bench/signal/support/suite.exs", __DIR__)
+Code.require_file("support/suite.exs", __DIR__)
 
 defmodule JidoTest.Bench.Signal.ExtendedBenchTest do
   use ExUnit.Case, async: false

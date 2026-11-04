@@ -117,9 +117,9 @@ defmodule Jido.MixProject do
 
   defp aliases do
     [
-      bench: "run bench/react_memory.exs",
-      "bench.ai.fresh_workflow": "run bench/ai/react_fresh_workflow.exs",
-      "bench.ai.state_growth": "run bench/ai/react_state_growth.exs",
+      bench: "run test/bench/ai/react_memory.exs",
+      "bench.ai.fresh_workflow": "run test/bench/ai/react_fresh_workflow.exs",
+      "bench.ai.state_growth": "run test/bench/ai/react_state_growth.exs",
       ci: [
         "compile --warnings-as-errors",
         "format --check-formatted",
@@ -244,6 +244,8 @@ defmodule Jido.MixProject do
       ~r/^test\/contracts\//,
       ~r/^test\/authoring\/support\//,
       ~r/^test\/examples\/support\//,
+      ~r{^test/bench/(?:action_flow/(?:dsl_compile|fixtures|flow_compile|flow_run|react_stress|support)|ai/(?:react_fresh_workflow|react_memory|react_state_growth|react_support)|signal/run)\.exs$},
+      ~r{^test/bench/(?:signal/support|support)/},
       ~r/^test\/quality\/support\//,
       ~r|^test/property/[^/]+/support/|,
       ~r|^test/system/services/support/|,

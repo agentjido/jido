@@ -157,7 +157,7 @@ locals_without_parens = Enum.uniq(action_locals ++ agent_locals ++ ai_locals)
 
 [
   line_length: 120,
-  inputs: ["{mix,.formatter}.exs", "{config,lib,test,examples,bench}/**/*.{ex,exs}"],
+  inputs: ["{mix,.formatter}.exs", "{config,lib,test,examples}/**/*.{ex,exs}"],
   locals_without_parens: locals_without_parens,
   export: [locals_without_parens: locals_without_parens]
 ]

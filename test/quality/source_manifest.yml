@@ -50,7 +50,7 @@ assets:
   - source_repository: jido_signal
     source_commit: 7b825f1d050a0e0159bb2a72ba79c100b5d362d3
     source_path: bench
-    target_path: bench/signal
+    target_path: test/bench/signal/run.exs
     quality_surface: benchmark
     owner: jido.signal
     disposition: ported
@@ -130,11 +130,11 @@ assets:
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/bench/*.exs
-    target_path: bench/action_flow
+    target_path: test/bench/action_flow/flow_compile.exs
     quality_surface: benchmark
     owner: jido.flow
     disposition: ported
-    reason: Ported by jido-07x.7 as manual runners that use current Flow data and execution APIs and delegate ReAct measurement to bench/react_memory.exs.
+    reason: Ported by jido-07x.7 as manual runners that use current Flow data and execution APIs and delegate ReAct measurement to test/bench/ai/react_memory.exs.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/bench/results
@@ -962,7 +962,7 @@ assets:
   - source_repository: jido_ai
     source_commit: 65cc5fda0380c0b95fef955687495b8786d03e3b
     source_path: test/bench/react_fresh_memory.exs
-    target_path: bench/ai/react_fresh_workflow.exs
+    target_path: test/bench/ai/react_fresh_workflow.exs
     quality_surface: benchmark
     owner: jido.ai.react
     disposition: ported

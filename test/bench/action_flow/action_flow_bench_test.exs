@@ -19,7 +19,7 @@ defmodule JidoTest.Bench.ActionFlowBenchTest do
             "run",
             "--no-compile",
             "--no-deps-check",
-            "bench/action_flow/#{runner}.exs",
+            "test/bench/action_flow/#{runner}.exs",
             "--profile",
             "quick",
             "--output",
@@ -59,7 +59,7 @@ defmodule JidoTest.Bench.ActionFlowBenchTest do
           "run",
           "--no-compile",
           "--no-deps-check",
-          "bench/action_flow/flow_compile.exs",
+          "test/bench/action_flow/flow_compile.exs",
           "--output",
           "flow-compile.json"
         ],

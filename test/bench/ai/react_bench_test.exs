@@ -1,4 +1,4 @@
-Code.require_file("../../../bench/ai/react_support.exs", __DIR__)
+Code.require_file("react_support.exs", __DIR__)
 
 defmodule JidoTest.Bench.AI.ReActBenchTest do
   use ExUnit.Case, async: false
@@ -44,7 +44,7 @@ defmodule JidoTest.Bench.AI.ReActBenchTest do
             "run",
             "--no-compile",
             "--no-deps-check",
-            "bench/ai/#{name}.exs",
+            "test/bench/ai/#{name}.exs",
             "--requests",
             "2",
             "--output",

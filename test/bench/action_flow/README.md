@@ -1,12 +1,28 @@
-# Action and Flow benchmark smoke checks
+# Action and Flow benchmarks
 
-The smoke check runs every Action and Flow benchmark with its `quick` profile.
-It checks result data, task cleanup, fresh-VM ReAct execution, report shape,
-environment data, and the source fingerprint. It does not fail on a timing or
-memory value.
+These runners check Flow construction, execution, DSL compilation, and the
+current ReAct memory benchmark. Each runner has `quick`, `standard`, and
+`stress` profiles. The required smoke check runs only `quick`.
 
 Run it with:
 
 ```sh
 mix test.bench test/bench/action_flow
 ```
+
+Run each quick manual profile from the package root:
+
+```sh
+MIX_ENV=test mix run test/bench/action_flow/flow_compile.exs --profile quick
+MIX_ENV=test mix run test/bench/action_flow/flow_run.exs --profile quick
+MIX_ENV=test mix run test/bench/action_flow/dsl_compile.exs --profile quick
+MIX_ENV=test mix run test/bench/action_flow/react_stress.exs --profile quick
+```
+
+Reports go under `tmp/bench/action_flow/`. They include the runtime
+environment and a source fingerprint. Result checks and process cleanup are
+pass conditions. Timing and memory values are trend data. They have no CI
+limit.
+
+The ReAct runner starts `test/bench/ai/react_memory.exs` in a fresh BEAM VM.
+That file owns the ReAct implementation and memory measurement.
