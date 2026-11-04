@@ -639,9 +639,9 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Test scenarios and acceptance criteria:**
 
-- [ ] Each AI benchmark metric has one documented owner.
-- [ ] No duplicate ReAct implementation enters `lib/**`.
-- [ ] Offline benchmark checks need no provider key.
+- [x] Each AI benchmark metric has one documented owner.
+- [x] No duplicate ReAct implementation enters `lib/**`.
+- [x] Offline benchmark checks need no provider key.
 
 **Verification:** `mix test.bench test/bench/ai` and all documented offline `mix bench.*` commands exit with status `0`.
 

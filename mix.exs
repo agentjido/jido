@@ -29,6 +29,8 @@ defmodule Jido.MixProject do
     [
       preferred_envs: [
         bench: :prod,
+        "bench.ai.fresh_workflow": :prod,
+        "bench.ai.state_growth": :prod,
         ci: :test,
         coveralls: :test,
         "coveralls.json": :test,
@@ -115,6 +117,8 @@ defmodule Jido.MixProject do
   defp aliases do
     [
       bench: "run bench/react_memory.exs",
+      "bench.ai.fresh_workflow": "run bench/ai/react_fresh_workflow.exs",
+      "bench.ai.state_growth": "run bench/ai/react_state_growth.exs",
       ci: [
         "compile --warnings-as-errors",
         "format --check-formatted",

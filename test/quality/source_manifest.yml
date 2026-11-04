@@ -957,8 +957,16 @@ assets:
     target_path: test/bench/ai
     quality_surface: benchmark_smoke
     owner: jido.ai.react
-    disposition: deferred
-    reason: Scheduled for jido-07x.18.
+    disposition: ported
+    reason: Ported by jido-07x.18 as deterministic smoke checks and a distinct sequential-request state-growth runner.
+  - source_repository: jido_ai
+    source_commit: 65cc5fda0380c0b95fef955687495b8786d03e3b
+    source_path: test/bench/react_fresh_memory.exs
+    target_path: bench/ai/react_fresh_workflow.exs
+    quality_surface: benchmark
+    owner: jido.ai.react
+    disposition: ported
+    reason: Adapted by jido-07x.18 as a deterministic fresh-Agent preflight, workflow-shape, and retained-size check.
   - source_repository: jido_ai
     source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
     source_path: test/live
