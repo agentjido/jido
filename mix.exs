@@ -31,6 +31,7 @@ defmodule Jido.MixProject do
         bench: :prod,
         ci: :test,
         quality: :test,
+        "quality.contract": :test,
         "test.authoring": :test,
         "test.bench": :test,
         "test.ci": :test,
@@ -117,6 +118,7 @@ defmodule Jido.MixProject do
         "reach.check --arch --smells"
       ],
       quality: [
+        "quality.contract",
         "compile --warnings-as-errors",
         "format --check-formatted",
         "credo --strict",
@@ -127,6 +129,7 @@ defmodule Jido.MixProject do
       "test.authoring": test_alias("test/authoring", :authoring),
       "test.bench": test_alias("test/bench", :bench),
       "test.ci": [
+        "quality.contract",
         "test",
         "test.authoring",
         "test.contracts",
@@ -149,7 +152,8 @@ defmodule Jido.MixProject do
       "test.peer": test_alias("test", :peer),
       "test.property": test_alias("test/property", :property),
       "test.services": test_alias("test/system/services", :service),
-      "test.system": test_alias("test/system", :system)
+      "test.system": test_alias("test/system", :system),
+      "quality.contract": "test test/quality/quality_contract_test.exs --seed 0"
     ]
   end
 
@@ -193,6 +197,7 @@ defmodule Jido.MixProject do
       ~r/^test\/fixtures\//,
       ~r/^test\/contracts\//,
       ~r/^test\/authoring\/support\//,
+      ~r/^test\/quality\/support\//,
       ~r|^test/property/[^/]+/support/|,
       ~r/^test\/jido\/core_contract\/.*(?:support|configuration_support)\.ex$/
     ]

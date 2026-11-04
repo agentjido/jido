@@ -13,6 +13,23 @@ Allowed dispositions are:
 Target paths must be unique. A `ported` record must point to an existing file or directory. Source paths are records only.
 Never edit a source repository while updating this manifest.
 
+## Objective quality contract
+
+`quality_contract.yml` is the normative package-quality definition. It registers each required or opt-in suite, its
+owner, fixed seed, code-coverage state, and evidence artifacts. It also owns the package and component coverage floors,
+Covenant obligation coverage, fuzz evidence rules, report paths, versioned waivers, and stability findings.
+
+Run the contract check before evidence collection:
+
+```text
+mix quality.contract
+```
+
+The check rejects missing or duplicate required suites, unknown aliases or states, thresholds below the package rules,
+expired or incomplete waivers, unowned stability findings, and evidence paths outside the repository. A required-suite
+failure remains in `stability_findings` until its cause is resolved or a versioned waiver records its owner, reason,
+expiry date, and resolution condition.
+
 ## Focused commands
 
 Each command uses seed `0`. A command exits successfully with a clear message when its default target path does not exist.
