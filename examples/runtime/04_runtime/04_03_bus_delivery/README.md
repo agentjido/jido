@@ -1,0 +1,45 @@
+# 04_03 Bus Delivery
+
+An Agent consumes ordered Signals from a replayable local Bus subscription.
+The subscription supports acknowledgement and retry; the example store is in memory.
+
+## What you will learn
+
+- How the Bus Client Plugin routes matching records into Agent Turns.
+- How the Bus Manager starts before the Client becomes ready.
+- How commit acknowledgement, retry order, and stable Signal IDs work together.
+
+## Read the code
+
+Read [the Bus delivery Agent](bus_delivery.ex), then read its behavior test.
+
+## Run it
+
+```sh
+mix test test/examples/runtime/04_runtime/04_03_bus_delivery --include example --seed 0
+```
+
+Expected result: matching records commit in order, a failed Turn retries before
+later input, and a restarted Client continues its subscription.
+
+## Important behavior
+
+Declare `Jido.Plugin.Bus.Manager` before `Jido.Plugin.Bus.Client` when one Agent
+owns and consumes the Bus. `AgentServer.await_ready/2` returns only after the
+Client has subscribed to the Manager-owned Bus.
+
+The Bus acknowledges a record only after the Turn commits. The Agent accepts
+an already committed Signal ID so that a repeated delivery can be
+acknowledged. The Client rebuilds its durable subscription after replacement.
+Both Plugin runtimes stop with the Agent owner.
+
+## Limits
+
+The example Bus and cursor use local memory. This does not prove disk durability.
+
+## Files
+
+- [Source](bus_delivery.ex)
+- [Tests](../../../../test/examples/runtime/04_runtime/04_03_bus_delivery/bus_delivery_test.exs)
+
+Previous: [Keyed Timers](../04_02_keyed_timers/README.md) | Next: [Managed Jobs](../04_04_managed_jobs/README.md)

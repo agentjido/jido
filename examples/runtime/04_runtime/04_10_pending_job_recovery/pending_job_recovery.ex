@@ -1,0 +1,160 @@
+defmodule Jido.Examples.PendingJobRecovery do
+  @moduledoc """
+  An Agent saves approval and requires an explicit retry after runtime loss.
+
+  Request and approval are separate Turns. Saved job input survives Agent or
+  Plugin loss. A retry starts a fresh attempt and cancels an old task if it
+  still exists. A running record does not prove that a task is still alive.
+  """
+
+  use Jido.Agent,
+    name: "example_pending_job_recovery",
+    plugins: [Jido.Examples.PendingJobRecovery.JobRuntime]
+
+  alias Jido.Examples.PendingJobRecovery.JobRunner
+  alias Jido.Examples.PendingJobRecovery.JobRuntime.{Cancel, Submit}
+
+  state do
+    schema Jido.Joi.object(%{
+             job_id: Jido.Joi.string() |> Jido.Joi.default(""),
+             value: Jido.Joi.integer() |> Jido.Joi.default(0),
+             status:
+               Jido.Joi.enum([:idle, :awaiting_approval, :running, :completed, :failed, :cancelled])
+               |> Jido.Joi.default(:idle),
+             approved?: Jido.Joi.boolean() |> Jido.Joi.default(false),
+             attempt_id: Jido.Joi.string() |> Jido.Joi.default(""),
+             attempts: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
+             seen: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
+             result: Jido.Joi.string() |> Jido.Joi.default("")
+           })
+  end
+
+  routes do
+    signal_source "/examples/runtime/pending_jobs"
+
+    route "examples.runtime.pending_jobs.request", as: :request_job do
+      action input,
+        schema: Jido.Joi.object(%{job_id: Jido.Joi.string() |> Jido.Joi.min(1), value: Jido.Joi.integer()}),
+        context: context do
+        state = context.agent_state
+
+        if state.status in [:idle, :completed, :cancelled] and input.job_id not in state.seen do
+          {:ok,
+           %{
+             state
+             | job_id: input.job_id,
+               value: input.value,
+               status: :awaiting_approval,
+               approved?: false,
+               attempt_id: "",
+               result: "",
+               seen: state.seen ++ [input.job_id]
+           }}
+        else
+          {:error, Jido.Error.validation_error("job is active or already used")}
+        end
+      end
+    end
+
+    route "examples.runtime.pending_jobs.approve", as: :approve_job do
+      action input,
+        schema:
+          Jido.Joi.object(%{
+            job_id: Jido.Joi.string() |> Jido.Joi.min(1),
+            attempt_id: Jido.Joi.string() |> Jido.Joi.min(1)
+          }),
+        context: context do
+        state = context.agent_state
+
+        if state.status == :awaiting_approval and state.job_id == input.job_id do
+          with {:ok, _runner} <- JobRunner.fetch(context) do
+            Jido.Examples.PendingJobRecovery.begin_attempt(state, input.attempt_id)
+          end
+        else
+          {:error, Jido.Error.validation_error("job is not awaiting approval")}
+        end
+      end
+    end
+
+    route "examples.runtime.pending_jobs.retry", as: :retry_job do
+      action input,
+        schema:
+          Jido.Joi.object(%{
+            job_id: Jido.Joi.string() |> Jido.Joi.min(1),
+            attempt_id: Jido.Joi.string() |> Jido.Joi.min(1)
+          }),
+        context: context do
+        state = context.agent_state
+
+        if state.approved? and state.status in [:running, :failed] and
+             state.job_id == input.job_id do
+          with {:ok, _runner} <- JobRunner.fetch(context),
+               {:ok, candidate, directives} <-
+                 Jido.Examples.PendingJobRecovery.begin_attempt(state, input.attempt_id) do
+            {:ok, candidate, [struct!(Cancel, job_id: state.attempt_id) | directives]}
+          end
+        else
+          {:error, Jido.Error.validation_error("job is not approved for retry")}
+        end
+      end
+    end
+
+    route "examples.runtime.pending_jobs.cancel", as: :cancel_job do
+      action %{job_id: job_id},
+        schema: Jido.Joi.object(%{job_id: Jido.Joi.string()}),
+        context: context do
+        state = context.agent_state
+
+        if state.job_id == job_id and
+             state.status in [:awaiting_approval, :running, :failed] do
+          directives =
+            if state.status == :running,
+              do: [struct!(Cancel, job_id: state.attempt_id)],
+              else: []
+
+          {:ok, %{state | status: :cancelled}, directives}
+        else
+          {:error, Jido.Error.validation_error("job cannot be cancelled")}
+        end
+      end
+    end
+
+    route "examples.runtime.jobs.settle", as: :settle_attempt do
+      action input,
+        schema:
+          Jido.Joi.object(%{
+            job_id: Jido.Joi.string(),
+            status: Jido.Joi.enum([:completed, :failed]),
+            result: Jido.Joi.string()
+          }),
+        context: context do
+        state = context.agent_state
+
+        if state.attempt_id == input.job_id and state.status == :running do
+          {:ok, %{state | status: input.status, result: input.result}}
+        else
+          {:error, Jido.Error.validation_error("attempt result is stale")}
+        end
+      end
+    end
+  end
+
+  @doc false
+  def begin_attempt(state, attempt_id) do
+    if attempt_id in state.attempts do
+      {:error, Jido.Error.validation_error("attempt ID is already used")}
+    else
+      candidate = %{
+        state
+        | status: :running,
+          approved?: true,
+          attempt_id: attempt_id,
+          attempts: state.attempts ++ [attempt_id],
+          result: ""
+      }
+
+      directive = struct!(Submit, job_id: attempt_id, value: state.value)
+      {:ok, candidate, [directive]}
+    end
+  end
+end

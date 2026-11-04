@@ -1,0 +1,62 @@
+# 07_03 Local Bus Broadcast
+
+One declared local Bus broadcasts work outputs to three counted members.
+
+## What you will learn
+
+- How `Jido.Plugin.Bus.DSL` contributes an explicit local Bus.
+- How connections carry root outputs through the Bus to members.
+- Why a counted destination requires `delivery: :broadcast`.
+
+## Read the code
+
+Read the root Agent and its connections, then the Cell Agent and tests.
+
+## Run it
+
+```sh
+mix test test/examples/topology/07_topology/07_03_bus_swarm --include example --seed 0
+```
+
+Expected result: One root command commits and emits a work Signal. Each of the three members
+commits its own Turn and records the value. Owner shutdown stops the owned
+supervisor tree.
+
+## Important behavior
+
+The count binds from root state at startup. A root command is selected by its
+route; its emitted Signal follows the declared output connections. The root
+reply confirms its own commit. The tests wait separately for member commits.
+
+The Bus runtime belongs to the AgentServer supervisor. The cleanup test
+monitors that supervisor and its supervised descendants through public OTP APIs.
+
+## Limits
+
+Delivery uses best-effort casts. This example does not promise durable
+delivery, acknowledgements, or atomic changes across all members. It is a
+small behavior example, not a 1,000-worker capacity test.
+
+## Files
+
+- [Source](swarm.ex)
+- [Cell Agent](../support/cell.ex)
+- [Tests](../../../../test/examples/topology/07_topology/07_03_bus_swarm/bus_swarm_test.exs)
+- [Test runtime assertions](../../../test/examples/support/agent_topology_assertions.ex)
+
+This is also the fixed-group lesson: the Agent declares stable worker roles
+and the Bus routes work. A separate controller membership table is not needed.
+
+```elixir
+connections do
+  connect "examples.topology.cell.work", from: :root, to: bus(:work)
+  connect "examples.topology.cell.work", from: bus(:work), to: :workers,
+    delivery: :broadcast
+end
+```
+
+Start with [Direct Connections](../07_11_direct_connections/README.md) for the
+simpler Agent-to-Agent path. An ordinary Action must return `emit/1` explicitly.
+Connections fan out to every match; they do not use route precedence.
+
+Previous: [Direct Connections](../07_11_direct_connections/README.md) | Next: [Nested Agents](../07_02_hierarchy/README.md)

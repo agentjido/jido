@@ -506,7 +506,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Dependencies:** U8, U6, and U3.
 
-**Files:** Read split core `examples/04_runtime/**`, `05_multi_agent/**`, `07_topology/**`, and matching tests at the core baseline. Add `examples/runtime/**`, `examples/topology/**`, and matching tests. Change the manifest.
+**Files:** Read split core `examples/04_runtime/**`, `05_multi_agent/**`, `07_topology/**`, and matching tests at the core baseline. Add `examples/runtime/04_runtime/**`, `examples/runtime/05_multi_agent/**`, `examples/topology/07_topology/**`, and matching tests. Change the manifest.
 
 **Directive:**
 
@@ -520,7 +520,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 - [ ] Runtime ordering uses barriers or monitors.
 - [ ] Peer examples do not run under default `mix test`.
 
-**Verification:** `mix test.examples test/examples/runtime test/examples/topology` and `mix test.peer` exit with status `0`.
+**Verification:** `mix test.examples test/examples/runtime/04_runtime test/examples/runtime/05_multi_agent test/examples/topology/07_topology` and `mix test.peer` exit with status `0`.
 
 ### U14. Port core Plugin and persistence examples
 

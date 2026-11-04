@@ -1,0 +1,133 @@
+Code.require_file("../../../support/loader.exs", __DIR__)
+
+alias JidoTest.Examples.Loader
+Loader.require_source!("runtime/04_runtime/04_12_stable_reference/stable_reference.ex")
+
+defmodule JidoTest.Examples.Runtime.StableReferenceTest do
+  use ExUnit.Case, async: true
+  @moduletag :example
+
+  setup_all do
+    JidoTest.Examples.Loader.require_source!("runtime/04_runtime/04_12_stable_reference/stable_reference.ex")
+    :ok
+  end
+
+  import JidoTest.Eventually
+
+  alias Jido.Agent.Ref
+  alias Jido.Examples.StableReference
+  alias JidoTest.Persistence.ProbeStore
+
+  setup do
+    store = start_supervised!(ProbeStore)
+    primary = :"ref_primary_#{System.unique_integer([:positive])}"
+    other = :"ref_other_#{System.unique_integer([:positive])}"
+    primary_namespace = "chat/primary/#{System.unique_integer([:positive])}"
+    other_namespace = "chat/secondary/#{System.unique_integer([:positive])}"
+    start_supervised!({Jido, name: primary, namespace: primary_namespace}, id: primary)
+    start_supervised!({Jido, name: other, namespace: other_namespace}, id: other)
+
+    ref = Ref.new!(namespace: primary_namespace, partition: "team-a", id: "conversation")
+
+    %{
+      store: {ProbeStore, store: store},
+      primary: primary,
+      other: other,
+      ref: ref,
+      other_namespace: other_namespace
+    }
+  end
+
+  test "a saved Ref survives persistent process replacement", c do
+    assert {:ok, first} =
+             Jido.start_agent_ref(c.primary, c.ref, StableReference, persistence: c.store)
+
+    assert :ok = Jido.AgentServer.await_ready(first)
+
+    assert {:ok, _, _directives} = StableReference.append(c.ref, c.primary, "first")
+    monitor = Process.monitor(first)
+    Process.exit(first, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^first, _reason}, 1_000
+
+    replacement =
+      eventually(fn ->
+        case Jido.resolve_agent(c.primary, c.ref) do
+          {:ok, pid} when pid != first -> pid
+          _result -> nil
+        end
+      end)
+
+    assert replacement != first
+    assert :ok = Jido.AgentServer.await_ready(replacement)
+    assert {:ok, agent, _directives} = StableReference.append(c.ref, c.primary, "second")
+    assert agent.state.messages == ["first", "second"]
+  end
+
+  test "equal IDs in separate namespaces reach separate conversations", c do
+    other_ref = %{c.ref | namespace: c.other_namespace}
+
+    assert {:ok, server} = Jido.start_agent_ref(c.primary, c.ref, StableReference)
+    assert :ok = Jido.AgentServer.await_ready(server)
+    assert {:ok, server} = Jido.start_agent_ref(c.other, other_ref, StableReference)
+    assert :ok = Jido.AgentServer.await_ready(server)
+
+    assert {:ok, first, _directives} = StableReference.append(c.ref, c.primary, "A")
+    assert {:ok, second, _directives} = StableReference.append(other_ref, c.other, "B")
+    assert first.state.messages == ["A"]
+    assert second.state.messages == ["B"]
+  end
+
+  test "equal namespace and ID remain isolated by partition", c do
+    other_partition = %{c.ref | partition: "team-b"}
+
+    assert {:ok, server} = Jido.start_agent_ref(c.primary, c.ref, StableReference)
+    assert :ok = Jido.AgentServer.await_ready(server)
+    assert {:ok, server} = Jido.start_agent_ref(c.primary, other_partition, StableReference)
+    assert :ok = Jido.AgentServer.await_ready(server)
+
+    assert {:ok, first, _directives} = StableReference.append(c.ref, c.primary, "team A")
+
+    assert {:ok, second, _directives} =
+             StableReference.append(other_partition, c.primary, "team B")
+
+    assert first.state.messages == ["team A"]
+    assert second.state.messages == ["team B"]
+  end
+
+  test "a Ref round trips through its exact versioned public map", c do
+    assert {:ok, encoded} = Ref.to_map(c.ref)
+
+    assert encoded == %{
+             "version" => 1,
+             "namespace" => c.ref.namespace,
+             "partition" => "team-a",
+             "id" => "conversation"
+           }
+
+    assert {:ok, decoded} = Ref.from_map(encoded)
+    assert decoded == c.ref
+  end
+
+  test "a Ref survives rebinding its namespace to another local instance", c do
+    assert {:ok, first} =
+             Jido.start_agent_ref(c.primary, c.ref, StableReference, persistence: c.store)
+
+    assert :ok = Jido.AgentServer.await_ready(first)
+
+    assert {:ok, _, _directives} = StableReference.append(c.ref, c.primary, "saved")
+    assert :ok = Jido.hibernate_ref(c.primary, c.ref)
+    refute Process.alive?(first)
+    assert :ok = stop_supervised(c.primary)
+
+    rebound = :"ref_rebound_#{System.unique_integer([:positive])}"
+    start_supervised!({Jido, name: rebound, namespace: c.ref.namespace}, id: rebound)
+
+    assert {:ok, rebound_server} =
+             Jido.activate_agent(rebound, c.ref, StableReference, persistence: c.store)
+
+    assert :ok = Jido.AgentServer.await_ready(rebound_server)
+
+    assert {:ok, agent, _directives} = StableReference.append(c.ref, rebound, "restored")
+    assert agent.state.messages == ["saved", "restored"]
+  end
+end

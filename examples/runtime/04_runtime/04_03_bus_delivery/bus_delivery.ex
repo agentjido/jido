@@ -1,0 +1,49 @@
+defmodule Jido.Examples.BusDelivery do
+  @moduledoc """
+  A durable Bus subscription delivers ordered Signals to an Agent. The Client
+  acknowledges a record after its Turn commits. The Agent owns duplicate policy.
+  The Bus and its cursor are local memory; this does not prove disk durability.
+  The Agent owns the Bus Manager before it starts the durable Client.
+  """
+  use Jido.Agent,
+    name: "example_bus_delivery",
+    plugins: [
+      {Jido.Plugin.Bus.Manager, %{name: :example_commands}},
+      {Jido.Plugin.Bus.Client,
+       %{
+         bus: :example_commands,
+         path: "examples.runtime.bus_delivery.**",
+         durable: "example-consumer",
+         start_from: :origin,
+         retry_delay_ms: 10
+       }}
+    ]
+
+  state do
+    schema Jido.Joi.object(%{
+             seen: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
+             values: Jido.Joi.list(Jido.Joi.integer()) |> Jido.Joi.default([])
+           })
+  end
+
+  routes do
+    signal_source "/examples/runtime/bus_delivery"
+
+    route "examples.runtime.bus_delivery.record", as: :record do
+      action %{value: value},
+        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+        context: context do
+        state = context.agent_state
+        signal_id = context.signal.id
+
+        if signal_id in state.seen do
+          # A retry of an already committed record must still succeed so that
+          # the durable subscription can acknowledge it.
+          {:ok, state}
+        else
+          {:ok, %{state | seen: state.seen ++ [signal_id], values: state.values ++ [value]}}
+        end
+      end
+    end
+  end
+end

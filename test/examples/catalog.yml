@@ -33,6 +33,9 @@ index_readmes:
   - examples/flow/03_durability/README.md
   - examples/flow/04_patterns/README.md
   - examples/flow/05_distribution/README.md
+  - examples/runtime/04_runtime/README.md
+  - examples/runtime/05_multi_agent/README.md
+  - examples/topology/07_topology/README.md
 examples:
   - id: agent/01_01_minimal_agent
     category: agent
@@ -289,6 +292,149 @@ examples:
     readme: examples/flow/04_patterns/04_04_compensation/README.md
     source: examples/flow/04_patterns/04_04_compensation/compensation.ex
     test: test/examples/flow/04_patterns/04_04_compensation/compensation_test.exs
+  - id: runtime/04_01_scheduled_signals
+    category: runtime
+    readme: examples/runtime/04_runtime/04_01_scheduled_signals/README.md
+    source: examples/runtime/04_runtime/04_01_scheduled_signals/scheduled_counter.ex
+    test: test/examples/runtime/04_runtime/04_01_scheduled_signals/scheduled_counter_test.exs
+  - id: runtime/04_02_keyed_timers
+    category: runtime
+    readme: examples/runtime/04_runtime/04_02_keyed_timers/README.md
+    source: examples/runtime/04_runtime/04_02_keyed_timers/burst_buncher.ex
+    auxiliary_sources:
+      - examples/runtime/04_runtime/04_02_keyed_timers/timer.ex
+    test: test/examples/runtime/04_runtime/04_02_keyed_timers/burst_buncher_test.exs
+  - id: runtime/04_03_bus_delivery
+    category: runtime
+    readme: examples/runtime/04_runtime/04_03_bus_delivery/README.md
+    source: examples/runtime/04_runtime/04_03_bus_delivery/bus_delivery.ex
+    test: test/examples/runtime/04_runtime/04_03_bus_delivery/bus_delivery_test.exs
+  - id: runtime/04_04_managed_jobs
+    category: runtime
+    readme: examples/runtime/04_runtime/04_04_managed_jobs/README.md
+    source: examples/runtime/04_runtime/04_04_managed_jobs/managed_jobs.ex
+    auxiliary_sources:
+      - examples/runtime/04_runtime/04_04_managed_jobs/job_runtime.ex
+    test: test/examples/runtime/04_runtime/04_04_managed_jobs/managed_jobs_test.exs
+  - id: runtime/04_05_runtime_inspection
+    category: runtime
+    readme: examples/runtime/04_runtime/04_05_runtime_inspection/README.md
+    source: examples/runtime/04_runtime/04_05_runtime_inspection/agent_live_debugger.ex
+    test: test/examples/runtime/04_runtime/04_05_runtime_inspection/agent_live_debugger_test.exs
+  - id: runtime/04_07_agent_observation
+    category: runtime
+    readme: examples/runtime/04_runtime/04_07_agent_observation/README.md
+    source: examples/runtime/04_runtime/04_07_agent_observation/turn_observation.ex
+    auxiliary_sources:
+      - examples/runtime/04_runtime/04_07_agent_observation/demo.exs
+    test: test/examples/runtime/04_runtime/04_07_agent_observation/agent_observation_test.exs
+  - id: runtime/04_08_causal_trace
+    category: runtime
+    readme: examples/runtime/04_runtime/04_08_causal_trace/README.md
+    source: examples/runtime/04_runtime/04_08_causal_trace/causal_trace.ex
+    auxiliary_sources:
+      - examples/runtime/04_runtime/04_08_causal_trace/worker.ex
+    test: test/examples/runtime/04_runtime/04_08_causal_trace/causal_trace_test.exs
+  - id: runtime/04_10_pending_job_recovery
+    category: runtime
+    readme: examples/runtime/04_runtime/04_10_pending_job_recovery/README.md
+    source: examples/runtime/04_runtime/04_10_pending_job_recovery/pending_job_recovery.ex
+    auxiliary_sources:
+      - examples/runtime/04_runtime/04_10_pending_job_recovery/job_runtime.ex
+    test: test/examples/runtime/04_runtime/04_10_pending_job_recovery/pending_job_recovery_test.exs
+  - id: runtime/04_12_stable_reference
+    category: runtime
+    readme: examples/runtime/04_runtime/04_12_stable_reference/README.md
+    source: examples/runtime/04_runtime/04_12_stable_reference/stable_reference.ex
+    test: test/examples/runtime/04_runtime/04_12_stable_reference/stable_reference_test.exs
+  - id: runtime/04_14_state_migration
+    category: runtime
+    readme: examples/runtime/04_runtime/04_14_state_migration/README.md
+    source: examples/runtime/04_runtime/04_14_state_migration/state_migration.ex
+    test: test/examples/runtime/04_runtime/04_14_state_migration/state_migration_test.exs
+  - id: runtime/04_15_request_modes
+    category: runtime
+    readme: examples/runtime/04_runtime/04_15_request_modes/README.md
+    source: examples/runtime/04_runtime/04_15_request_modes/request_modes.ex
+    test: test/examples/runtime/04_runtime/04_15_request_modes/request_modes_test.exs
+  - id: runtime/04_16_turn_control
+    category: runtime
+    readme: examples/runtime/04_runtime/04_16_turn_control/README.md
+    source: examples/runtime/04_runtime/04_16_turn_control/turn_control.ex
+    test: test/examples/runtime/04_runtime/04_16_turn_control/turn_control_test.exs
+  - id: runtime/04_17_failure_outcome
+    category: runtime
+    readme: examples/runtime/04_runtime/04_17_failure_outcome/README.md
+    source: examples/runtime/04_runtime/04_17_failure_outcome/failure_outcome.ex
+    test: test/examples/runtime/04_runtime/04_17_failure_outcome/failure_outcome_test.exs
+  - id: runtime/04_18_heartbeat
+    category: runtime
+    readme: examples/runtime/04_runtime/04_18_heartbeat/README.md
+    source: examples/runtime/04_runtime/04_18_heartbeat/heartbeat.ex
+    test: test/examples/runtime/04_runtime/04_18_heartbeat/heartbeat_test.exs
+  - id: runtime/04_19_definition_changes
+    category: runtime
+    readme: examples/runtime/04_runtime/04_19_definition_changes/README.md
+    source: examples/runtime/04_runtime/04_19_definition_changes/definition_changes.ex
+    test: test/examples/runtime/04_runtime/04_19_definition_changes/definition_changes_test.exs
+  - id: runtime/05_01_child_lifecycle
+    category: runtime
+    readme: examples/runtime/05_multi_agent/05_01_child_lifecycle/README.md
+    source: examples/runtime/05_multi_agent/05_01_child_lifecycle/child_lifecycle.ex
+    test: test/examples/runtime/05_multi_agent/05_01_child_lifecycle/child_lifecycle_test.exs
+  - id: runtime/05_02_correlated_requests
+    category: runtime
+    readme: examples/runtime/05_multi_agent/05_02_correlated_requests/README.md
+    source: examples/runtime/05_multi_agent/05_02_correlated_requests/correlated_requests.ex
+    test: test/examples/runtime/05_multi_agent/05_02_correlated_requests/correlated_requests_test.exs
+  - id: runtime/05_06_orphan_adoption
+    category: runtime
+    readme: examples/runtime/05_multi_agent/05_06_orphan_adoption/README.md
+    source: examples/runtime/05_multi_agent/05_06_orphan_adoption/orphan_adoption.ex
+    test: test/examples/runtime/05_multi_agent/05_06_orphan_adoption/orphan_adoption_test.exs
+  - id: topology/07_01_independent
+    category: topology
+    readme: examples/topology/07_topology/07_01_independent/README.md
+    source: examples/topology/07_topology/07_01_independent/independent.ex
+    auxiliary_sources:
+      - examples/topology/07_topology/07_01_independent/cell.ex
+    test: test/examples/topology/07_topology/07_01_independent/independent_test.exs
+  - id: topology/07_02_hierarchy
+    category: topology
+    readme: examples/topology/07_topology/07_02_hierarchy/README.md
+    source: examples/topology/07_topology/07_02_hierarchy/hierarchy.ex
+    test: test/examples/topology/07_topology/07_02_hierarchy/hierarchy_test.exs
+  - id: topology/07_03_bus_swarm
+    category: topology
+    readme: examples/topology/07_topology/07_03_bus_swarm/README.md
+    source: examples/topology/07_topology/07_03_bus_swarm/swarm.ex
+    test: test/examples/topology/07_topology/07_03_bus_swarm/bus_swarm_test.exs
+  - id: topology/07_09_topology_mutations
+    category: topology
+    readme: examples/topology/07_topology/07_09_topology_mutations/README.md
+    source: examples/topology/07_topology/07_09_topology_mutations/mutations.ex
+    test: test/examples/topology/07_topology/07_09_topology_mutations/mutations_test.exs
+  - id: topology/07_11_direct_connections
+    category: topology
+    readme: examples/topology/07_topology/07_11_direct_connections/README.md
+    source: examples/topology/07_topology/07_11_direct_connections/direct_connections.ex
+    auxiliary_sources:
+      - examples/topology/07_topology/07_11_direct_connections/sink.ex
+      - examples/topology/07_topology/07_11_direct_connections/worker.ex
+    test: test/examples/topology/07_topology/07_11_direct_connections/direct_connections_test.exs
+  - id: topology/07_12_connection_changes
+    category: topology
+    readme: examples/topology/07_topology/07_12_connection_changes/README.md
+    source: examples/topology/07_topology/07_12_connection_changes/connection_changes.ex
+    test: test/examples/topology/07_topology/07_12_connection_changes/connection_changes_test.exs
 exclusions:
   - path: examples/00_graph_first
     reason: The numbered live-provider lesson is opt-in. U15 owns offline AI examples, and U19 owns live-provider proof.
+  - path: examples/runtime/04_runtime/support
+    reason: Shared observation support is loaded by numbered runtime lessons and is not a standalone lesson.
+  - path: examples/runtime/05_multi_agent/support
+    reason: The shared Worker is loaded by numbered multi-Agent lessons and is not a standalone lesson.
+  - path: examples/runtime/support
+    reason: The shared lifecycle Action is loaded by numbered runtime lessons and is not a standalone lesson.
+  - path: examples/topology/07_topology/support
+    reason: The shared Cell is loaded by numbered topology lessons and is not a standalone lesson.
