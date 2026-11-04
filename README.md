@@ -103,7 +103,8 @@ reproduction and benchmark for the canonical graph-first ReAct path. It does
 not call a model provider. A deterministic local inference client emits known
 tool calls. A local Action returns an empty payload.
 
-The default profile is the shared base case for Jido and Runic work. It removes
+The default `quick` profile is one bounded iterative case for local checks. The
+`base` profile is the shared comparison case for Jido and Runic work. It removes
 model, network, payload, concurrency, and AgentServer effects. It compares two
 orchestration strategies.
 
@@ -188,13 +189,13 @@ not a second library implementation.
 Run the base profile in the production Mix environment:
 
 ```sh
-mix bench
+JIDO_MEMORY_BENCH_PROFILE=base mix bench
 ```
 
 Save one report that you can attach to an issue or send to another developer:
 
 ```sh
-mix bench 2>&1 | tee runic-react-memory.txt
+JIDO_MEMORY_BENCH_PROFILE=base mix bench 2>&1 | tee runic-react-memory.txt
 ```
 
 The report records the Jido Git revision, dirty-worktree state, Runic version,
@@ -247,7 +248,7 @@ The workloads are:
 
 | Environment variable | Meaning |
 | --- | --- |
-| `JIDO_MEMORY_BENCH_PROFILE` | `base` or `expanded` |
+| `JIDO_MEMORY_BENCH_PROFILE` | `quick`, `base`, or `expanded` |
 | `JIDO_MEMORY_BENCH_STRATEGIES` | Comma-separated `recursive` or `iterative` strategies |
 | `JIDO_MEMORY_BENCH_MODES` | Comma-separated `direct` or `managed` modes |
 | `JIDO_MEMORY_BENCH_ROUNDS` | Comma-separated round counts from 1 through 8 |

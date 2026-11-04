@@ -1,5 +1,9 @@
+Code.require_file("../support/result.exs", __DIR__)
+
 defmodule Jido.Bench.ActionFlow.Support do
   @moduledoc false
+
+  alias Jido.Bench.Result
 
   @profiles ~w(quick standard stress)
   @root Path.expand("tmp/bench/action_flow")
@@ -79,7 +83,9 @@ defmodule Jido.Bench.ActionFlow.Support do
     report =
       Map.merge(
         %{
+          benchmark_result_schema_version: Result.schema_version(),
           schema_version: 1,
+          metadata: Result.metadata(suite, options.profile),
           suite: suite,
           source: source(),
           environment: environment(),
@@ -90,6 +96,8 @@ defmodule Jido.Bench.ActionFlow.Support do
         },
         extra
       )
+
+    Result.validate!(report)
 
     File.mkdir_p!(Path.dirname(options.output))
     File.write!(options.output, [JSON.encode!(report), "\n"])

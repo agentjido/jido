@@ -6,6 +6,7 @@ defmodule JidoTest.Bench.AI.ReActBenchTest do
   @moduletag :bench
 
   alias Jido.Bench.AI.ReActSupport
+  alias Jido.Bench.Result
 
   test "sequential requests report retained state growth" do
     cases = ReActSupport.run(:state_growth, 3)
@@ -35,35 +36,81 @@ defmodule JidoTest.Bench.AI.ReActBenchTest do
           {"react_state_growth", "state_growth"},
           {"react_fresh_workflow", "fresh_workflow"}
         ] do
-      output = Path.join(root, "#{name}.json")
+      reports =
+        for repetition <- 1..2 do
+          output = Path.join(root, "#{name}-#{repetition}.json")
 
-      {log, status} =
-        System.cmd(
-          System.find_executable("mix"),
-          [
-            "run",
-            "--no-compile",
-            "--no-deps-check",
-            "test/bench/ai/#{name}.exs",
-            "--requests",
-            "2",
-            "--output",
-            output
-          ],
-          env: [{"MIX_ENV", "test"}],
-          stderr_to_stdout: true
-        )
+          report =
+            run_mix_report!(
+              [
+                "run",
+                "--no-compile",
+                "--no-deps-check",
+                "test/bench/ai/#{name}.exs",
+                "--profile",
+                "quick",
+                "--output",
+                output
+              ],
+              output
+            )
 
-      assert status == 0, "#{name} failed:\n#{log}"
-      report = output |> File.read!() |> JSON.decode!()
-      assert report["schema_version"] == 1
-      assert report["mode"] == mode
-      assert report["requests"] == 2
-      assert report["provider"] == "deterministic-local"
-      assert report["network"] == false
-      assert length(report["cases"]) == 2
-      assert Enum.all?(report["cases"], &(&1["model_calls"] == 2 and &1["tool_calls"] == 1))
+          assert Result.validate(report) == []
+          assert report["schema_version"] == 1
+          assert report["mode"] == mode
+          assert report["requests"] == 2
+          assert report["provider"] == "deterministic-local"
+          assert report["network"] == false
+          assert length(report["cases"]) == 2
+          assert Enum.all?(report["cases"], &(&1["model_calls"] == 2 and &1["tool_calls"] == 1))
+          report
+        end
+
+      assert reports |> Enum.map(&Result.case_inventory/1) |> Enum.uniq() |> length() == 1
     end
+  end
+
+  test "the ReAct memory quick profile is repeatable and writes the common result" do
+    root = Path.expand("tmp/bench/ai/memory-smoke")
+    File.rm_rf!(root)
+    File.mkdir_p!(root)
+
+    reports =
+      for repetition <- 1..2 do
+        output = Path.join(root, "react-memory-#{repetition}.json")
+
+        report =
+          run_mix_report!(
+            ["run", "--no-compile", "--no-deps-check", "test/bench/ai/react_memory.exs"],
+            output,
+            [
+              {"JIDO_MEMORY_BENCH_PROFILE", "quick"},
+              {"JIDO_MEMORY_BENCH_OUTPUT", "json"},
+              {"JIDO_MEMORY_BENCH_FILE", output}
+            ]
+          )
+
+        assert Result.validate(report) == []
+        assert report["metadata"]["profile"] == "quick"
+        assert length(report["cases"]) == 1
+        report
+      end
+
+    assert reports |> Enum.map(&Result.case_inventory/1) |> Enum.uniq() |> length() == 1
+  end
+
+  defp run_mix_report!(arguments, output, extra_environment \\ []) do
+    {log, status} =
+      System.cmd(
+        System.find_executable("mix"),
+        arguments,
+        env: [{"MIX_ENV", "test"} | extra_environment],
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, "benchmark failed:\n#{log}"
+    assert File.regular?(output)
+    output |> File.read!() |> JSON.decode!()
   end
 
   defp strictly_increasing?([first | rest]) do

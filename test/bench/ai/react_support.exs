@@ -1,3 +1,5 @@
+Code.require_file("../support/result.exs", __DIR__)
+
 defmodule Jido.Bench.AI.ReActSupport.Echo do
   use Jido.Action,
     id: "jido/bench/ai/tools/echo",
@@ -109,18 +111,22 @@ end
 defmodule Jido.Bench.AI.ReActSupport do
   alias Jido.Agent.Directive.Reply
   alias Jido.Bench.AI.ReActSupport.{Agent, Client}
+  alias Jido.Bench.Result
 
-  @default_requests 5
+  @profiles %{"quick" => 2, "standard" => 20, "stress" => 100}
 
   def run(:state_growth, requests), do: with_client(fn -> state_growth(requests) end)
   def run(:fresh_workflow, requests), do: with_client(fn -> fresh_workflows(requests) end)
 
   def parse!(arguments) do
     {options, rest, invalid} =
-      OptionParser.parse(arguments, strict: [requests: :integer, output: :string])
+      OptionParser.parse(arguments, strict: [profile: :string, requests: :integer, output: :string])
 
     if rest != [] or invalid != [], do: raise("unknown benchmark arguments")
-    requests = Keyword.get(options, :requests, @default_requests)
+    profile = Keyword.get(options, :profile, "quick")
+    requests = Keyword.get(options, :requests, Map.get(@profiles, profile))
+
+    unless Map.has_key?(@profiles, profile), do: raise("--profile must be quick, standard, or stress")
     unless requests in 1..100, do: raise("--requests must be from 1 through 100")
 
     output =
@@ -129,12 +135,20 @@ defmodule Jido.Bench.AI.ReActSupport do
         path -> output_path!(path)
       end
 
-    %{requests: requests, output: output}
+    %{profile: profile, requests: requests, output: output}
   end
 
-  def report!(mode, %{requests: requests, output: output}) do
+  def report!(mode, %{profile: profile, requests: requests, output: output}) do
+    benchmark_id = "jido.ai.react.#{mode}"
+
     report = %{
+      benchmark_result_schema_version: Result.schema_version(),
       schema_version: 1,
+      metadata:
+        Result.metadata(benchmark_id, profile, %{
+          input_size: "#{requests} requests",
+          sample_count: requests
+        }),
       mode: mode,
       requests: requests,
       provider: "deterministic-local",
@@ -146,6 +160,8 @@ defmodule Jido.Bench.AI.ReActSupport do
         runic: Application.spec(:runic, :vsn) |> to_string()
       }
     }
+
+    Result.validate!(report)
 
     encoded = JSON.encode!(report)
     IO.puts(encoded)
@@ -171,6 +187,7 @@ defmodule Jido.Bench.AI.ReActSupport do
         metric =
           sizes(next)
           |> Map.merge(%{
+            id: "request/#{request_number}",
             request: request_number,
             elapsed_us: elapsed_us(started),
             thread_entries: length(session.thread.entries),
@@ -199,6 +216,7 @@ defmodule Jido.Bench.AI.ReActSupport do
 
       sizes(next)
       |> Map.merge(%{
+        id: "request/#{request_number}",
         request: request_number,
         compile_us: compile_us,
         execution_us: elapsed_us(started),

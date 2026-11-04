@@ -5,6 +5,7 @@ defmodule JidoTest.Bench.Signal.SignalBenchTest do
   @moduletag :bench
 
   alias Jido.Bench.Signal.{Fixtures, Measure, Report, Suite}
+  alias Jido.Bench.Result
 
   test "all workloads check results and stop their processes for each payload" do
     for payload <- [:small, :large_map, :large_binary],
@@ -116,14 +117,26 @@ defmodule JidoTest.Bench.Signal.SignalBenchTest do
     Suite.write!(report, directory)
 
     assert report.suite == "jido.signal"
+    assert Result.validate(report) == []
     assert length(report.cases) == 150
     assert report.schema_version == 2
     assert length(report.growth_checks) == 2
     assert Enum.all?(report.cases, &is_map(&1.dimensions))
     assert Enum.all?(report.cases, &(&1.resources.owned_remaining == 0))
     decoded = directory |> Path.join("report.json") |> File.read!() |> Jason.decode!()
+    assert Result.validate(decoded) == []
     assert Report.compare!(decoded, decoded) =~ "1.000"
     assert File.read!(Path.join(directory, "report.md")) =~ "Signal benchmark"
+  end
+
+  test "the smoke workload inventory is repeatable" do
+    inventories =
+      for _run <- 1..2 do
+        Suite.workloads("smoke") |> Enum.map(& &1.id)
+      end
+
+    assert Enum.uniq(inventories) |> length() == 1
+    assert inventories |> hd() |> length() == 150
   end
 
   test "comparison rejects incompatible reports and duplicate or missing cases" do

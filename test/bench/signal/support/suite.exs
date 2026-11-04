@@ -7,10 +7,12 @@ Code.require_file("selector_cases.exs", __DIR__)
 Code.require_file("candidate_cases.exs", __DIR__)
 Code.require_file("measure.exs", __DIR__)
 Code.require_file("report.exs", __DIR__)
+Code.require_file("../../support/result.exs", __DIR__)
 
 defmodule Jido.Bench.Signal.Suite do
   @moduledoc false
   alias Jido.Bench.Signal.{Fixtures, Measure, Report}
+  alias Jido.Bench.Result
 
   def run(profile) do
     settings = settings(profile)
@@ -38,8 +40,10 @@ defmodule Jido.Bench.Signal.Suite do
         }
       end)
 
-    %{
+    report = %{
+      benchmark_result_schema_version: Result.schema_version(),
       schema_version: 2,
+      metadata: Result.metadata("jido.signal", profile),
       suite: "jido.signal",
       source: source(),
       environment: environment(),
@@ -51,6 +55,8 @@ defmodule Jido.Bench.Signal.Suite do
       limitations: Report.limitations(),
       cases: cases
     }
+
+    Result.validate!(report)
   end
 
   def workloads("candidates"),

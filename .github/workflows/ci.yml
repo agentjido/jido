@@ -138,7 +138,7 @@ jobs:
               MIX_ENV=test mix run test/bench/action_flow/react_stress.exs --profile standard &&
               mix bench.ai.state_growth --requests 20 &&
               mix bench.ai.fresh_workflow --requests 20 &&
-              mix bench
+              JIDO_MEMORY_BENCH_PROFILE=base mix bench
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1

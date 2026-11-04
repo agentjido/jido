@@ -1,0 +1,115 @@
+schema_version: 1
+families:
+  - id: jido.signal
+    component: jido_action.authoring
+    owner: jido.signal
+    workload: Signal construction, codec, routing, dispatch, Bus, selector, replay, and cleanup
+    limiter: Caller CPU, scheduler work, process memory, mailbox growth, and retained term size
+    command: MIX_ENV=test mix run test/bench/signal/run.exs --profile smoke --output tmp/bench/signal/smoke
+    quick_profile: smoke
+    supported_profiles: [smoke, short, candidates, scale]
+    metrics: [wall_ns, caller_reductions, process_memory_bytes, mailbox_messages, retained_term_bytes]
+    units: [nanoseconds, reductions, bytes, messages]
+    profiles:
+      smoke: {input_size: "2 and 6 fixture units", concurrency: "case-specific and bounded", warmup: 1, sample_count: 2}
+      short: {input_size: "8 fixture units", concurrency: "case-specific and bounded", warmup: 3, sample_count: 15}
+      candidates: {input_size: "2 and 32 fixture units", concurrency: "case-specific and bounded", warmup: 3, sample_count: 15}
+      scale: {input_size: "2, 8, and 32 fixture units", concurrency: "case-specific and bounded", warmup: 5, sample_count: 30}
+  - id: jido.action_flow.compile
+    component: jido_action.flow
+    owner: jido.flow
+    workload: Normalize and compile wide Flow values
+    limiter: Caller CPU and reductions during normalization and compilation
+    command: MIX_ENV=test mix run test/bench/action_flow/flow_compile.exs --profile quick
+    quick_profile: quick
+    supported_profiles: [quick, standard, stress]
+    metrics: [elapsed_us, system_reductions]
+    units: [microseconds, reductions]
+    profiles:
+      quick: {input_size: "Flow widths 4 and 16", concurrency: "1 caller", warmup: 1, sample_count: 2}
+      standard: {input_size: "Flow widths 16 and 64", concurrency: "1 caller", warmup: 2, sample_count: 5}
+      stress: {input_size: "Flow widths 64 and 256", concurrency: "1 caller", warmup: 3, sample_count: 10}
+  - id: jido.action_flow.run
+    component: jido_action.execution
+    owner: jido.execution
+    workload: Run an Action, a Flow module, and a normalized Flow value
+    limiter: Execution CPU, reductions, and owned task cleanup
+    command: MIX_ENV=test mix run test/bench/action_flow/flow_run.exs --profile quick
+    quick_profile: quick
+    supported_profiles: [quick, standard, stress]
+    metrics: [elapsed_us, system_reductions]
+    units: [microseconds, reductions]
+    profiles:
+      quick: {input_size: "Flow width 4", concurrency: "bounded by the Flow runtime", warmup: 1, sample_count: 3}
+      standard: {input_size: "Flow width 16", concurrency: "bounded by the Flow runtime", warmup: 3, sample_count: 15}
+      stress: {input_size: "Flow width 64", concurrency: "bounded by the Flow runtime", warmup: 5, sample_count: 30}
+  - id: jido.action_flow.dsl_compile
+    component: jido_action.flow
+    owner: jido.flow
+    workload: Compile generated Action and Flow DSL modules and run the Flow
+    limiter: Elixir compiler CPU and generated module cleanup
+    command: MIX_ENV=test mix run test/bench/action_flow/dsl_compile.exs --profile quick
+    quick_profile: quick
+    supported_profiles: [quick, standard, stress]
+    metrics: [elapsed_us, compiled_modules]
+    units: [microseconds, modules]
+    profiles:
+      quick: {input_size: "2 generated Flow modules", concurrency: "1 compiler caller", warmup: 1, sample_count: 2}
+      standard: {input_size: "10 generated Flow modules", concurrency: "1 compiler caller", warmup: 1, sample_count: 10}
+      stress: {input_size: "25 generated Flow modules", concurrency: "1 compiler caller", warmup: 1, sample_count: 25}
+  - id: jido.action_flow.react_stress
+    component: jido_ai.react
+    owner: jido.ai.react
+    workload: Run one isolated iterative ReAct request in a fresh BEAM VM
+    limiter: ReAct execution CPU, process memory, and tool concurrency
+    command: MIX_ENV=test mix run test/bench/action_flow/react_stress.exs --profile quick
+    quick_profile: quick
+    supported_profiles: [quick, standard, stress]
+    metrics: [elapsed_ms, peak_process_delta_bytes, peak_total_delta_bytes, model_calls, tool_calls]
+    units: [milliseconds, bytes, calls]
+    profiles:
+      quick: {input_size: "1 round and 1 tool per round", concurrency: "1 tool", warmup: 0, sample_count: 1}
+      standard: {input_size: "3 rounds and 4 tools per round", concurrency: "4 tools", warmup: 0, sample_count: 1}
+      stress: {input_size: "4 rounds and 4 tools per round", concurrency: "4 tools", warmup: 0, sample_count: 1}
+  - id: jido.ai.react.state_growth
+    component: jido_ai.react
+    owner: jido.ai.react
+    workload: Run sequential deterministic ReAct requests on one Agent
+    limiter: Retained Agent, Session, and Thread size across requests
+    command: MIX_ENV=test mix bench.ai.state_growth --profile quick
+    quick_profile: quick
+    supported_profiles: [quick, standard, stress]
+    metrics: [elapsed_us, retained_external_bytes, retained_shared_bytes, retained_flat_bytes, thread_entries]
+    units: [microseconds, bytes, entries]
+    profiles:
+      quick: {input_size: "2 requests", concurrency: "1 request", warmup: 0, sample_count: 2}
+      standard: {input_size: "20 requests", concurrency: "1 request", warmup: 0, sample_count: 20}
+      stress: {input_size: "100 requests", concurrency: "1 request", warmup: 0, sample_count: 100}
+  - id: jido.ai.react.fresh_workflow
+    component: jido_ai.react
+    owner: jido.ai.react
+    workload: Compile and run independent deterministic ReAct workflows
+    limiter: Preflight compile CPU, execution CPU, and retained workflow size
+    command: MIX_ENV=test mix bench.ai.fresh_workflow --profile quick
+    quick_profile: quick
+    supported_profiles: [quick, standard, stress]
+    metrics: [compile_us, execution_us, workflow_external_bytes, retained_external_bytes]
+    units: [microseconds, bytes]
+    profiles:
+      quick: {input_size: "2 fresh Agents", concurrency: "1 request", warmup: 0, sample_count: 2}
+      standard: {input_size: "20 fresh Agents", concurrency: "1 request", warmup: 0, sample_count: 20}
+      stress: {input_size: "100 fresh Agents", concurrency: "1 request", warmup: 0, sample_count: 100}
+  - id: jido.ai.react.memory
+    component: jido_ai.react
+    owner: jido.ai.react
+    workload: Run isolated recursive and iterative ReAct scenarios and sample VM memory
+    limiter: Runic graph work, process memory, allocator growth, and tool concurrency
+    command: JIDO_MEMORY_BENCH_PROFILE=quick JIDO_MEMORY_BENCH_OUTPUT=json JIDO_MEMORY_BENCH_FILE=tmp/bench/ai/react-memory-quick.json mix bench
+    quick_profile: quick
+    supported_profiles: [quick, base, expanded]
+    metrics: [elapsed_ms, peak_process_delta_bytes, peak_total_delta_bytes, retained_agent_shared_bytes, retained_session_shared_bytes]
+    units: [milliseconds, bytes]
+    profiles:
+      quick: {input_size: "1 iterative case with 1 round", concurrency: "1 tool", warmup: 0, sample_count: 1}
+      base: {input_size: "6 direct serial cases with 1, 3, or 5 rounds", concurrency: "1 tool", warmup: 0, sample_count: 1}
+      expanded: {input_size: "18 recursive direct or managed cases with 1, 3, or 4 rounds", concurrency: "1 or 4 tools", warmup: 0, sample_count: 1}

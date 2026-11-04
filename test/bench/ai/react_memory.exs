@@ -4,13 +4,16 @@
 #
 #     mix bench
 #
-# The base profile runs direct, serial ReAct turns with one empty tool result
+# The default quick profile runs one iterative round. The base profile runs
+# direct, serial ReAct turns with one empty tool result
 # per round. It uses isolated BEAM VMs for 1, 3, and 5 rounds. It does not use
 # a model provider or make a network call. Runic 0.1.0-alpha.13 completes the
 # first two cases and reaches its canonical identity item limit in the
 # five-round case.
 #
 # Use JIDO_MEMORY_BENCH_PROFILE=expanded to run the larger comparison matrix.
+
+Code.require_file("../support/result.exs", __DIR__)
 
 defmodule Jido.Bench.ReActMemory.Tool do
   use Jido.Action,
@@ -223,12 +226,20 @@ defmodule Jido.Bench.ReActMemory do
   alias Jido.Bench.ReActMemory.Agent, as: BenchAgent
   alias Jido.Bench.ReActMemory.Client
   alias Jido.Bench.ReActMemory.IterativeAgent
+  alias Jido.Bench.Result
 
   @memory_keys [:total, :processes_used, :binary, :ets]
   @workloads %{
     "serial" => %{tools_per_round: 1, max_concurrency: 1},
     "constrained" => %{tools_per_round: 4, max_concurrency: 1},
     "parallel" => %{tools_per_round: 4, max_concurrency: 4}
+  }
+  @quick_defaults %{
+    modes: [:direct],
+    rounds: [1],
+    strategies: [:iterative],
+    workloads: ["serial"],
+    payload_bytes: 0
   }
   @base_defaults %{
     modes: [:direct],
@@ -277,7 +288,7 @@ defmodule Jido.Bench.ReActMemory do
   end
 
   def main([]) do
-    profile = System.get_env("JIDO_MEMORY_BENCH_PROFILE", "base") |> profile!()
+    profile = System.get_env("JIDO_MEMORY_BENCH_PROFILE", "quick") |> profile!()
     defaults = profile_defaults(profile)
 
     modes = csv_values("JIDO_MEMORY_BENCH_MODES", defaults.modes, &mode!/1)
@@ -388,6 +399,7 @@ defmodule Jido.Bench.ReActMemory do
       |> Map.delete(:sample_ms)
       |> Map.merge(runic)
       |> Map.merge(%{
+        id: scenario_id(scenario),
         elapsed_ms: elapsed_ms,
         samples: samples,
         peak_process_delta_bytes: delta(peak.processes_used, baseline.processes_used),
@@ -641,24 +653,59 @@ defmodule Jido.Bench.ReActMemory do
   defp report(results, sample_ms, profile) do
     metadata = metadata(sample_ms, profile)
 
+    artifact = %{
+      benchmark_result_schema_version: Result.schema_version(),
+      schema_version: 1,
+      metadata: metadata,
+      cases: results,
+      results: results
+    }
+
+    Result.validate!(artifact)
+    write_artifact!(artifact)
+
     case System.get_env("JIDO_MEMORY_BENCH_OUTPUT", "markdown") do
       "markdown" -> print_report(results, metadata)
-      "json" -> IO.puts(Jason.encode!(%{metadata: metadata, results: results}, pretty: true))
+      "json" -> IO.puts(Jason.encode!(artifact, pretty: true))
       output -> raise "unsupported JIDO_MEMORY_BENCH_OUTPUT: #{inspect(output)}"
     end
   end
 
   defp metadata(sample_ms, profile) do
-    %{
-      elixir: System.version(),
+    Result.metadata("jido.ai.react.memory", profile, %{
+      concurrency: "up to #{profile_max_concurrency(profile)} tools",
       jido_revision: git_revision(),
-      otp: System.otp_release(),
-      profile: profile,
       runic: Application.spec(:runic, :vsn) |> to_string(),
       schedulers: :erlang.system_info(:schedulers_online),
       sample_ms: sample_ms,
       system_architecture: :erlang.system_info(:system_architecture) |> List.to_string()
-    }
+    })
+  end
+
+  defp profile_max_concurrency(profile) do
+    profile
+    |> profile_defaults()
+    |> Map.fetch!(:workloads)
+    |> Enum.map(&Map.fetch!(@workloads, &1).max_concurrency)
+    |> Enum.max()
+  end
+
+  defp write_artifact!(artifact) do
+    case System.get_env("JIDO_MEMORY_BENCH_FILE") do
+      nil ->
+        :ok
+
+      path ->
+        root = Path.expand("tmp/bench/ai")
+        output = Path.expand(path)
+
+        unless output == root or String.starts_with?(output, root <> "/") do
+          raise "benchmark output must be under tmp/bench/ai"
+        end
+
+        File.mkdir_p!(Path.dirname(output))
+        File.write!(output, Jason.encode!(artifact, pretty: true) <> "\n")
+    end
   end
 
   defp print_report(results, metadata) do
@@ -906,12 +953,14 @@ defmodule Jido.Bench.ReActMemory do
       else: raise("unknown workload #{inspect(name)}; expected one of #{inspect(Map.keys(@workloads))}")
   end
 
+  defp profile!("quick"), do: :quick
   defp profile!("base"), do: :base
   defp profile!("expanded"), do: :expanded
 
   defp profile!(profile),
-    do: raise("expected base or expanded benchmark profile, got: #{inspect(profile)}")
+    do: raise("expected quick, base, or expanded benchmark profile, got: #{inspect(profile)}")
 
+  defp profile_defaults(:quick), do: @quick_defaults
   defp profile_defaults(:base), do: @base_defaults
   defp profile_defaults(:expanded), do: @expanded_defaults
 

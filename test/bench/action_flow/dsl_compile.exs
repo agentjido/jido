@@ -6,9 +6,9 @@ defmodule Jido.Bench.ActionFlow.DSLCompile do
   alias Jido.Bench.ActionFlow.Support
 
   @profiles %{
-    "quick" => %{modules: 2, samples: 2, warmup: 0},
-    "standard" => %{modules: 10, samples: 5, warmup: 0},
-    "stress" => %{modules: 25, samples: 10, warmup: 0}
+    "quick" => %{modules: 2, samples: 2, warmup: 1},
+    "standard" => %{modules: 10, samples: 10, warmup: 1},
+    "stress" => %{modules: 25, samples: 25, warmup: 1}
   }
 
   def main(argv) do
