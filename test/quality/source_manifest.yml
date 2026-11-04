@@ -109,16 +109,16 @@ assets:
     target_path: test/system/runtime/action_flow
     quality_surface: system
     owner: jido.execution
-    disposition: deferred
-    reason: Scheduled for jido-07x.6 as explicit post-baseline quality work.
+    disposition: ported
+    reason: Ported by jido-07x.6 with Flow value, Flow module, and Instruction equivalence plus supervised task cleanup checks.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/load
     target_path: test/load/action_flow
     quality_surface: load
     owner: jido.execution
-    disposition: deferred
-    reason: Scheduled for jido-07x.6 as explicit post-baseline quality work.
+    disposition: ported
+    reason: Ported by jido-07x.6 with 200 fixed concurrent workflows, input ownership, caller task cleanup, supervised execution cleanup, and a fresh-VM burn-in command.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/bench
