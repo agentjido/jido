@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
-unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
+unless Code.ensure_loaded?(Jido.Test.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
 
-JidoTest.Examples.Loader.require_source!("16_ai_conversations/16_01_thread_agent/thread_agent.ex")
+Jido.Test.Examples.Loader.require_source!("16_ai_conversations/16_01_thread_agent/thread_agent.ex")
 
-defmodule JidoTest.Examples.AI.ThreadAgentTest do
+defmodule Jido.Examples.AI.ThreadAgentTest do
   use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("16_ai_conversations/16_01_thread_agent/thread_agent.ex")
+    Jido.Test.Examples.Loader.require_source!("16_ai_conversations/16_01_thread_agent/thread_agent.ex")
     :ok
   end
 
@@ -19,7 +19,7 @@ defmodule JidoTest.Examples.AI.ThreadAgentTest do
 
   alias Jido.AI.Thread.Projection
   alias Jido.Examples.AI.ThreadAgent.Agent
-  alias JidoTest.Examples.AIModel
+  alias Jido.Test.Examples.AIModel
 
   test "one completed request commits a portable conversation Thread" do
     AIModel.expect_text("OTP uses supervised processes.")

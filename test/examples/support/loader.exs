@@ -1,4 +1,4 @@
-defmodule JidoTest.Examples.Loader do
+defmodule Jido.Test.Examples.Loader do
   @moduledoc false
 
   @root Path.expand("../../../examples", __DIR__)

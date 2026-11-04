@@ -1,4 +1,4 @@
-defmodule JidoTest.JobRunner.Barrier do
+defmodule Jido.Test.Examples.JobRunner.Barrier do
   @moduledoc false
 
   @behaviour Jido.Examples.ManagedJobs.JobRunner
@@ -16,10 +16,10 @@ defmodule JidoTest.JobRunner.Barrier do
   end
 end
 
-defmodule JidoTest.JobRunner do
+defmodule Jido.Test.Examples.JobRunner do
   @moduledoc false
 
-  alias JidoTest.JobRunner.Barrier
+  alias Jido.Test.Examples.JobRunner.Barrier
 
   def context(owner, label \\ nil), do: %{job_runner: {Barrier, {owner, label}}}
 end

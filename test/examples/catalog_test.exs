@@ -1,13 +1,13 @@
 Code.require_file("support/catalog.exs", __DIR__)
 
-defmodule JidoTest.Examples.CatalogTest do
+defmodule Jido.Examples.CatalogTest do
   use ExUnit.Case, async: true
 
   @moduletag :example
   @root Path.expand("../..", __DIR__)
   @catalog Path.join(__DIR__, "catalog.yml")
 
-  alias JidoTest.Examples.Catalog
+  alias Jido.Test.Examples.Catalog
 
   test "the checked-in example register is complete" do
     assert Catalog.validate(Catalog.load!(@catalog), @root) == []
@@ -24,6 +24,12 @@ defmodule JidoTest.Examples.CatalogTest do
     with_fixture(fn root, catalog ->
       assert Catalog.validate(catalog, root) == []
     end)
+  end
+
+  test "every example names its proof component" do
+    catalog = Catalog.load!(@catalog)
+
+    assert Enum.all?(catalog["examples"], &is_binary(&1["component"]))
   end
 
   test "a missing README, source, or paired test is rejected" do
@@ -88,6 +94,7 @@ defmodule JidoTest.Examples.CatalogTest do
       second = %{
         "id" => "02_01_second",
         "category" => "flow",
+        "component" => "jido_action.flow",
         "readme" => "examples/02_flow_more/02_01_second/README.md",
         "source" => "examples/02_flow_more/02_01_second/second.ex",
         "test" => "test/examples/02_flow_more/02_01_second/second_test.exs"
@@ -120,6 +127,7 @@ defmodule JidoTest.Examples.CatalogTest do
       entry = %{
         "id" => "01_01_echo",
         "category" => "flow",
+        "component" => "jido_action.flow",
         "readme" => "examples/01_flow_basics/01_01_echo/README.md",
         "source" => "examples/01_flow_basics/01_01_echo/echo.ex",
         "test" => "test/examples/01_flow_basics/01_01_echo/echo_test.exs"
@@ -157,7 +165,7 @@ defmodule JidoTest.Examples.CatalogTest do
       use ExUnit.Case
       @moduletag :example
       setup_all do
-        JidoTest.Examples.Loader.require_source!("#{source}")
+        Jido.Test.Examples.Loader.require_source!("#{source}")
         :ok
       end
       test "echo", do: assert(true)

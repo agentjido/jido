@@ -1,11 +1,11 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Durability.ProcessRecoveryTest do
+defmodule Jido.Examples.Durability.ProcessRecoveryTest do
   use ExUnit.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("05_flow_durability/05_03_process_recovery/process_recovery.ex")
+    Jido.Test.Examples.Loader.require_source!("05_flow_durability/05_03_process_recovery/process_recovery.ex")
 
     :ok
   end

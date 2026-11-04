@@ -1,9 +1,9 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_09_runtime_inspection/agent_live_debugger.ex")
 
-defmodule JidoTest.Examples.Runtime.InspectionFixture do
+defmodule Jido.Test.Examples.Runtime.InspectionFixture do
   @moduledoc false
 
   use Jido.Agent, name: "test_runtime_inspection", plugins: [Jido.Plugin.Scheduler]
@@ -30,12 +30,12 @@ defmodule JidoTest.Examples.Runtime.InspectionFixture do
   end
 end
 
-defmodule JidoTest.Examples.Runtime.AgentLiveDebuggerTest do
+defmodule Jido.Examples.Runtime.AgentLiveDebuggerTest do
   use Jido.Test.Agent.FeatureSDKCase
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_09_runtime_inspection/agent_live_debugger.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_09_runtime_inspection/agent_live_debugger.ex")
     :ok
   end
 
@@ -43,7 +43,7 @@ defmodule JidoTest.Examples.Runtime.AgentLiveDebuggerTest do
   @moduletag complexity: 3
 
   alias Jido.Examples.AgentLiveDebugger
-  alias JidoTest.Examples.Runtime.InspectionFixture
+  alias Jido.Test.Examples.Runtime.InspectionFixture
   alias Jido.Test.AgentServer.RuntimeBarrier
 
   setup do

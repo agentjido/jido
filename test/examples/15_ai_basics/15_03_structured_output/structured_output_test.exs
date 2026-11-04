@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
-unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
+unless Code.ensure_loaded?(Jido.Test.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
 
-JidoTest.Examples.Loader.require_source!("15_ai_basics/15_03_structured_output/agent.ex")
+Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_03_structured_output/agent.ex")
 
-defmodule JidoTest.Examples.AI.StructuredOutputTest do
+defmodule Jido.Examples.AI.StructuredOutputTest do
   use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("15_ai_basics/15_03_structured_output/agent.ex")
+    Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_03_structured_output/agent.ex")
     :ok
   end
 
@@ -18,7 +18,7 @@ defmodule JidoTest.Examples.AI.StructuredOutputTest do
   setup :verify_on_exit!
 
   alias Jido.Examples.AI.StructuredOutput.Agent
-  alias JidoTest.Examples.AIModel
+  alias Jido.Test.Examples.AIModel
 
   test "preflight carries the strict output schema" do
     assert {:ok, %{params: %{output_schema: schema}}} = Agent.preflight(%{input: "Assess OTP"})

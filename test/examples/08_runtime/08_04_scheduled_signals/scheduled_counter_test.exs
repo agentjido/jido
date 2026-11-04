@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_04_scheduled_signals/scheduled_counter.ex")
 
-defmodule JidoTest.Examples.Runtime.ScheduledCounterTest do
+defmodule Jido.Examples.Runtime.ScheduledCounterTest do
   use Jido.Test.Agent.Case
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_04_scheduled_signals/scheduled_counter.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_04_scheduled_signals/scheduled_counter.ex")
     :ok
   end
 

@@ -35,7 +35,8 @@ tests.
 Each supported offline example has one catalog entry, one README, one primary
 source file, and one paired test. Auxiliary source files are in the same
 entry. The catalog rejects unregistered files, nested domain folders, invalid
-chapter or lesson numbers, and entries that are not sorted by ID.
+chapter or lesson numbers, and entries that are not sorted by ID. Each entry
+also names the component whose canonical behavior the lesson supplements.
 
 Run all offline examples with:
 

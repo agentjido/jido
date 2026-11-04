@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("13_persistence/13_08_definition_revision/definition_revision.ex")
 
-defmodule JidoTest.Examples.Persistence.DefinitionRevisionTest do
+defmodule Jido.Examples.Persistence.DefinitionRevisionTest do
   use ExUnit.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("13_persistence/13_08_definition_revision/definition_revision.ex")
+    Jido.Test.Examples.Loader.require_source!("13_persistence/13_08_definition_revision/definition_revision.ex")
 
     :ok
   end

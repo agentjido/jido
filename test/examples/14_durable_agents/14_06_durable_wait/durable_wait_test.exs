@@ -1,9 +1,9 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("14_durable_agents/14_06_durable_wait/durable_wait.ex")
 
-defmodule JidoTest.Examples.Durable.ImmediateApproval do
+defmodule Jido.Test.Examples.Durable.ImmediateApproval do
   @moduledoc false
   use Jido.Flow,
     name: "test_immediate_approval",
@@ -38,12 +38,12 @@ defmodule JidoTest.Examples.Durable.ImmediateApproval do
   end
 end
 
-defmodule JidoTest.Examples.Durable.DurableWaitTest do
+defmodule Jido.Examples.Durable.DurableWaitTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("14_durable_agents/14_06_durable_wait/durable_wait.ex")
+    Jido.Test.Examples.Loader.require_source!("14_durable_agents/14_06_durable_wait/durable_wait.ex")
     :ok
   end
 
@@ -130,7 +130,7 @@ defmodule JidoTest.Examples.Durable.DurableWaitTest do
   test "timer expiry completes the approval Flow and survives thaw", c do
     raw = Map.from_struct(Example.definition())
     [route] = raw.routes
-    route = put_in(route.handler.target, JidoTest.Examples.Durable.ImmediateApproval)
+    route = put_in(route.handler.target, Jido.Test.Examples.Durable.ImmediateApproval)
     definition = Jido.Agent.define!(%{raw | routes: [route]})
     persistence = {Jido.Persistence.File, path: c.tmp_dir}
     id = unique_id("expired-approval")

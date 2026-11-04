@@ -1,11 +1,11 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Compilation.InputsAndOutputTest do
+defmodule Jido.Examples.Compilation.InputsAndOutputTest do
   use ExUnit.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("02_flow_authoring/02_07_inputs_and_output/inputs_and_output.ex")
+    Jido.Test.Examples.Loader.require_source!("02_flow_authoring/02_07_inputs_and_output/inputs_and_output.ex")
 
     :ok
   end

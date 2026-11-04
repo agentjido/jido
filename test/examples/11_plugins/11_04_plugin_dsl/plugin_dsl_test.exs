@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("11_plugins/11_04_plugin_dsl/thresholds.ex")
 Loader.require_source!("11_plugins/11_04_plugin_dsl/plugin_dsl.ex")
 
-defmodule JidoTest.Examples.Plugins.DSLTest do
+defmodule Jido.Examples.Plugins.DSLTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("11_plugins/11_04_plugin_dsl/plugin_dsl.ex")
+    Jido.Test.Examples.Loader.require_source!("11_plugins/11_04_plugin_dsl/plugin_dsl.ex")
     :ok
   end
 

@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_03_failure_outcome/failure_outcome.ex")
 
-defmodule JidoTest.Examples.Runtime.FailureOutcomeTest do
+defmodule Jido.Examples.Runtime.FailureOutcomeTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_03_failure_outcome/failure_outcome.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_03_failure_outcome/failure_outcome.ex")
     :ok
   end
 

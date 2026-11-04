@@ -1,11 +1,11 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Patterns.CompensationTest do
+defmodule Jido.Examples.Patterns.CompensationTest do
   use ExUnit.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("06_flow_patterns/06_03_compensation/compensation.ex")
+    Jido.Test.Examples.Loader.require_source!("06_flow_patterns/06_03_compensation/compensation.ex")
 
     :ok
   end

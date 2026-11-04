@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-JidoTest.Examples.Loader.require_source!("15_ai_basics/15_08_model_helpers/models.ex")
+Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_08_model_helpers/models.ex")
 
-defmodule JidoTest.Examples.AI.ModelHelpersTest do
+defmodule Jido.Examples.AI.ModelHelpersTest do
   use Jido.Test.Case, async: true
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("15_ai_basics/15_08_model_helpers/models.ex")
+    Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_08_model_helpers/models.ex")
     :ok
   end
 

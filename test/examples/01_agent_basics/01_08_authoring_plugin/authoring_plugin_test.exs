@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("01_agent_basics/01_08_authoring_plugin/authoring_plugin.ex")
 
-defmodule JidoTest.Examples.Basic.AuthoringPluginTest do
+defmodule Jido.Examples.Basic.AuthoringPluginTest do
   use ExUnit.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("01_agent_basics/01_08_authoring_plugin/authoring_plugin.ex")
+    Jido.Test.Examples.Loader.require_source!("01_agent_basics/01_08_authoring_plugin/authoring_plugin.ex")
     :ok
   end
 

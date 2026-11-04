@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("12_plugin_applications/12_05_purpose_loop/clock.ex")
 Loader.require_source!("12_plugin_applications/12_05_purpose_loop/purpose_loop.ex")
 
-defmodule JidoTest.Examples.Applications.PurposeLoopTest do
+defmodule Jido.Examples.Applications.PurposeLoopTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("12_plugin_applications/12_05_purpose_loop/purpose_loop.ex")
+    Jido.Test.Examples.Loader.require_source!("12_plugin_applications/12_05_purpose_loop/purpose_loop.ex")
     :ok
   end
 

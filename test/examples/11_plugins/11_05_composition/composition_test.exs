@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("11_plugins/11_05_composition/inputs.ex")
 Loader.require_source!("11_plugins/11_05_composition/composition.ex")
 
-defmodule JidoTest.Examples.Plugins.CompositionTest do
+defmodule Jido.Examples.Plugins.CompositionTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("11_plugins/11_05_composition/composition.ex")
+    Jido.Test.Examples.Loader.require_source!("11_plugins/11_05_composition/composition.ex")
     :ok
   end
 

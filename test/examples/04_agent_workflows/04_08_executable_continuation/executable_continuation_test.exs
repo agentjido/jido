@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("04_agent_workflows/04_08_executable_continuation/executable_continuation.ex")
 
-defmodule JidoTest.Examples.Workflow.ExecutableContinuationTest do
+defmodule Jido.Examples.Workflow.ExecutableContinuationTest do
   use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!(
+    Jido.Test.Examples.Loader.require_source!(
       "04_agent_workflows/04_08_executable_continuation/executable_continuation.ex"
     )
 

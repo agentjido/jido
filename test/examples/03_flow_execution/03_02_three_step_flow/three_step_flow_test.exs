@@ -1,10 +1,10 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Execution.ThreeStepFlowTest do
+defmodule Jido.Examples.Execution.ThreeStepFlowTest do
   use ExUnit.Case, async: true
   @moduletag :example
   setup_all do
-    JidoTest.Examples.Loader.require_source!("03_flow_execution/03_02_three_step_flow/three_step_flow.ex")
+    Jido.Test.Examples.Loader.require_source!("03_flow_execution/03_02_three_step_flow/three_step_flow.ex")
     :ok
   end
 

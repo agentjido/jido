@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
-unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
+unless Code.ensure_loaded?(Jido.Test.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
 
-JidoTest.Examples.Loader.require_source!("15_ai_basics/15_06_request_contract/agent.ex")
+Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_06_request_contract/agent.ex")
 
-defmodule JidoTest.Examples.AI.RequestContractTest do
+defmodule Jido.Examples.AI.RequestContractTest do
   use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("15_ai_basics/15_06_request_contract/agent.ex")
+    Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_06_request_contract/agent.ex")
     :ok
   end
 
@@ -18,7 +18,7 @@ defmodule JidoTest.Examples.AI.RequestContractTest do
   setup :verify_on_exit!
 
   alias Jido.Examples.AI.RequestContract
-  alias JidoTest.Examples.AIModel
+  alias Jido.Test.Examples.AIModel
 
   test "preflight reports the selected visible tool and complete limits" do
     assert {:ok, %{params: params, tools: tools}} =

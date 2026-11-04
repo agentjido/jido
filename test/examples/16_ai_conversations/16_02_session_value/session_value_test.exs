@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-JidoTest.Examples.Loader.require_source!("16_ai_conversations/16_02_session_value/session_value.ex")
+Jido.Test.Examples.Loader.require_source!("16_ai_conversations/16_02_session_value/session_value.ex")
 
-defmodule JidoTest.Examples.AI.SessionValueTest do
+defmodule Jido.Examples.AI.SessionValueTest do
   use Jido.Test.Case, async: true
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("16_ai_conversations/16_02_session_value/session_value.ex")
+    Jido.Test.Examples.Loader.require_source!("16_ai_conversations/16_02_session_value/session_value.ex")
     :ok
   end
 

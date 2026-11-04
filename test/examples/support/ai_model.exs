@@ -1,4 +1,4 @@
-defmodule JidoTest.Examples.AIModel do
+defmodule Jido.Test.Examples.AIModel do
   @moduledoc false
 
   import Mimic

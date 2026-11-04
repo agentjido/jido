@@ -1,4 +1,4 @@
-defmodule JidoTest.Examples.Durable.CompletionProbe do
+defmodule Jido.Test.Examples.Durable.CompletionProbe do
   @moduledoc false
   use GenServer
 
@@ -25,10 +25,10 @@ defmodule JidoTest.Examples.Durable.CompletionProbe do
   end
 end
 
-defmodule JidoTest.Examples.Durable.CompletionStorage do
+defmodule Jido.Test.Examples.Durable.CompletionStorage do
   @moduledoc false
   @behaviour Jido.Persistence.Store
-  alias JidoTest.Examples.Durable.CompletionProbe
+  alias Jido.Test.Examples.Durable.CompletionProbe
 
   @impl Jido.Persistence.Store
   def get(key, opts), do: Jido.Persistence.File.get(key, opts)

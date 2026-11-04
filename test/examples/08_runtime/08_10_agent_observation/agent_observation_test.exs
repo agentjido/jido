@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/support/event_probe.ex")
 Loader.require_source!("08_runtime/08_10_agent_observation/turn_observation.ex")
 
-defmodule JidoTest.Examples.Runtime.AgentObservationTest do
+defmodule Jido.Examples.Runtime.AgentObservationTest do
   use Jido.Test.Agent.Case
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_10_agent_observation/turn_observation.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_10_agent_observation/turn_observation.ex")
     :ok
   end
 

@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("14_durable_agents/14_04_accepted_work/accepted_work.ex")
 
-defmodule JidoTest.Examples.Durable.AcceptedWorkTest do
+defmodule Jido.Examples.Durable.AcceptedWorkTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("14_durable_agents/14_04_accepted_work/accepted_work.ex")
+    Jido.Test.Examples.Loader.require_source!("14_durable_agents/14_04_accepted_work/accepted_work.ex")
     :ok
   end
 

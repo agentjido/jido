@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("11_plugins/11_02_runtime_admission/runtime_admission.ex")
 
-defmodule JidoTest.Examples.Plugins.RuntimeAdmissionTest do
+defmodule Jido.Examples.Plugins.RuntimeAdmissionTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("11_plugins/11_02_runtime_admission/runtime_admission.ex")
+    Jido.Test.Examples.Loader.require_source!("11_plugins/11_02_runtime_admission/runtime_admission.ex")
     :ok
   end
 

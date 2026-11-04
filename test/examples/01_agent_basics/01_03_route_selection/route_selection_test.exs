@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("01_agent_basics/01_03_route_selection/route_selection.ex")
 
-defmodule JidoTest.Examples.Basic.RouteSelectionTest do
+defmodule Jido.Examples.Basic.RouteSelectionTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("01_agent_basics/01_03_route_selection/route_selection.ex")
+    Jido.Test.Examples.Loader.require_source!("01_agent_basics/01_03_route_selection/route_selection.ex")
     :ok
   end
 

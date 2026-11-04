@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("11_plugins/11_03_state_middleware/state_middleware.ex")
 
-defmodule JidoTest.Examples.Plugins.StateMiddlewareTest do
+defmodule Jido.Examples.Plugins.StateMiddlewareTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("11_plugins/11_03_state_middleware/state_middleware.ex")
+    Jido.Test.Examples.Loader.require_source!("11_plugins/11_03_state_middleware/state_middleware.ex")
     :ok
   end
 

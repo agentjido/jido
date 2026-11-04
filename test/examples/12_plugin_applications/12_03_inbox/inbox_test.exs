@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("12_plugin_applications/12_03_inbox/inbox_sensor.ex")
 Loader.require_source!("12_plugin_applications/12_03_inbox/inbox.ex")
 
-defmodule JidoTest.Examples.Applications.InboxTest do
+defmodule Jido.Examples.Applications.InboxTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("12_plugin_applications/12_03_inbox/inbox.ex")
+    Jido.Test.Examples.Loader.require_source!("12_plugin_applications/12_03_inbox/inbox.ex")
     :ok
   end
 

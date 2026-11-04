@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
-unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
+unless Code.ensure_loaded?(Jido.Test.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
 
-JidoTest.Examples.Loader.require_source!("16_ai_conversations/16_03_session_agent/session_agent.ex")
+Jido.Test.Examples.Loader.require_source!("16_ai_conversations/16_03_session_agent/session_agent.ex")
 
-defmodule JidoTest.Examples.AI.SessionAgentTest do
+defmodule Jido.Examples.AI.SessionAgentTest do
   use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("16_ai_conversations/16_03_session_agent/session_agent.ex")
+    Jido.Test.Examples.Loader.require_source!("16_ai_conversations/16_03_session_agent/session_agent.ex")
     :ok
   end
 
@@ -18,7 +18,7 @@ defmodule JidoTest.Examples.AI.SessionAgentTest do
   setup :verify_on_exit!
 
   alias Jido.Examples.AI.SessionAgent
-  alias JidoTest.Examples.AIModel
+  alias Jido.Test.Examples.AIModel
 
   test "the first successful request creates and commits Agent-owned Session state" do
     AIModel.expect_text("A Session owns one Thread.")

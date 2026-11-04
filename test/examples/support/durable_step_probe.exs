@@ -1,9 +1,9 @@
-defmodule JidoTest.Examples.Durable.StepProbe do
+defmodule Jido.Test.Examples.Durable.StepProbe do
   @moduledoc false
   use GenServer
 
   alias Jido.Examples.Durable.SavedProgress
-  alias JidoTest.Examples.Durable.ObservedStep
+  alias Jido.Test.Examples.Durable.ObservedStep
 
   @doc "Returns a validated test copy of SavedProgress with the barrier Action."
   def flow do
@@ -52,14 +52,14 @@ defmodule JidoTest.Examples.Durable.StepProbe do
   end
 end
 
-defmodule JidoTest.Examples.Durable.ObservedStep do
+defmodule Jido.Test.Examples.Durable.ObservedStep do
   @moduledoc false
   use Jido.Action,
     name: "observed_durable_step",
     schema: Jido.Joi.object(%{step: Jido.Joi.integer(), value: Jido.Joi.integer()}),
     output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
-  alias JidoTest.Examples.Durable.StepProbe
+  alias Jido.Test.Examples.Durable.StepProbe
 
   @impl true
   def run(params, context) do
@@ -73,7 +73,7 @@ defmodule JidoTest.Examples.Durable.ObservedStep do
   end
 end
 
-defmodule JidoTest.Examples.Durable.ObservedAgent do
+defmodule Jido.Test.Examples.Durable.ObservedAgent do
   @moduledoc false
 
   def new(id) do
@@ -84,7 +84,7 @@ defmodule JidoTest.Examples.Durable.ObservedAgent do
       Jido.Agent.Mutation.apply(agent, agent.state, [
         Jido.Agent.Directive.route_replace(
           "examples.durable.saved_progress.run",
-          JidoTest.Examples.Durable.ObservedFlow,
+          Jido.Test.Examples.Durable.ObservedFlow,
           state: %{source: :output, path: []}
         )
       ])
@@ -93,12 +93,12 @@ defmodule JidoTest.Examples.Durable.ObservedAgent do
   end
 end
 
-defmodule JidoTest.Examples.Durable.ObservedFlow do
+defmodule Jido.Test.Examples.Durable.ObservedFlow do
   @moduledoc false
   @behaviour Jido.Flow
   @impl true
   def flow do
-    {:ok, flow} = JidoTest.Examples.Durable.StepProbe.flow()
+    {:ok, flow} = Jido.Test.Examples.Durable.StepProbe.flow()
     flow
   end
 

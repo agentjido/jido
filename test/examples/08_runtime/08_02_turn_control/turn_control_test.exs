@@ -1,9 +1,9 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_02_turn_control/turn_control.ex")
 
-defmodule JidoTest.Examples.Runtime.TurnControlBlockingAction do
+defmodule Jido.Test.Examples.Runtime.TurnControlBlockingAction do
   @moduledoc false
   use Jido.Action,
     name: "test_runtime_turn_control_blocking_action",
@@ -17,7 +17,7 @@ defmodule JidoTest.Examples.Runtime.TurnControlBlockingAction do
   end
 end
 
-defmodule JidoTest.Examples.Runtime.TurnControlBlockingAgent do
+defmodule Jido.Test.Examples.Runtime.TurnControlBlockingAgent do
   @moduledoc false
   use Jido.Agent, name: "test_runtime_turn_control_blocking_agent"
 
@@ -29,22 +29,22 @@ defmodule JidoTest.Examples.Runtime.TurnControlBlockingAgent do
     signal_source "/test/examples/runtime/turn_control"
 
     route "test.examples.runtime.turn_control.complete",
-          JidoTest.Examples.Runtime.TurnControlBlockingAction do
+          Jido.Test.Examples.Runtime.TurnControlBlockingAction do
     end
   end
 end
 
-defmodule JidoTest.Examples.Runtime.TurnControlTest do
+defmodule Jido.Examples.Runtime.TurnControlTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_02_turn_control/turn_control.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_02_turn_control/turn_control.ex")
     :ok
   end
 
   alias Jido.AgentServer
-  alias JidoTest.Examples.Runtime.TurnControlBlockingAgent
+  alias Jido.Test.Examples.Runtime.TurnControlBlockingAgent
   alias Jido.Test.AgentServer.RuntimeBarrier
 
   setup do

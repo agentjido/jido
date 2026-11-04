@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("13_persistence/13_05_durable_delete/durable_delete.ex")
 
-defmodule JidoTest.Examples.Persistence.DurableDeleteTest do
+defmodule Jido.Examples.Persistence.DurableDeleteTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("13_persistence/13_05_durable_delete/durable_delete.ex")
+    Jido.Test.Examples.Loader.require_source!("13_persistence/13_05_durable_delete/durable_delete.ex")
     :ok
   end
 

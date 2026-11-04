@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("10_topologies/support/cell.ex")
 Loader.require_source!("10_topologies/10_04_nested_agents/hierarchy.ex")
 
-defmodule JidoTest.Examples.Topology.HierarchyTest do
+defmodule Jido.Examples.Topology.HierarchyTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("10_topologies/10_04_nested_agents/hierarchy.ex")
+    Jido.Test.Examples.Loader.require_source!("10_topologies/10_04_nested_agents/hierarchy.ex")
     :ok
   end
 

@@ -131,6 +131,23 @@ u5_result:
     system_execution: 14
     signal_property: 1
     quality_executable: 0
+u6_result:
+  example_suite:
+    passed: 261
+  peer_suite:
+    passed: 7
+    excluded: 3847
+  catalog:
+    lessons: 117
+    order: preserved
+  component_proof:
+    claims: 183
+    example_documentation_claims: 117
+    validation_tests_passed: 17
+  ownership_policy:
+    - Jido.Examples namespaces own executable example tests.
+    - Jido.Test.Examples namespaces own shared example loaders and fixtures.
+    - Each lesson owns one documentation claim and supplements one canonical component behavior claim.
 deletions:
   - removed:
       - test/property/signal/support/fuzz.exs

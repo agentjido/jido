@@ -1,18 +1,18 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("13_persistence/13_07_recoverable_delivery/sink.ex")
 Loader.require_source!("13_persistence/13_07_recoverable_delivery/support/memory_sink.ex")
 Loader.require_source!("13_persistence/13_07_recoverable_delivery/delivery_plugin.ex")
 Loader.require_source!("13_persistence/13_07_recoverable_delivery/delivery_worker.ex")
 Loader.require_source!("13_persistence/13_07_recoverable_delivery/recoverable_delivery.ex")
 
-defmodule JidoTest.Examples.Persistence.RecoverableDeliveryTest do
+defmodule Jido.Examples.Persistence.RecoverableDeliveryTest do
   use Jido.Test.Agent.Case
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("13_persistence/13_07_recoverable_delivery/recoverable_delivery.ex")
+    Jido.Test.Examples.Loader.require_source!("13_persistence/13_07_recoverable_delivery/recoverable_delivery.ex")
 
     :ok
   end

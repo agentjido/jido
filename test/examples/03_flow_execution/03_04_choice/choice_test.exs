@@ -1,10 +1,10 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Execution.ChoiceTest do
+defmodule Jido.Examples.Execution.ChoiceTest do
   use ExUnit.Case, async: true
   @moduletag :example
   setup_all do
-    JidoTest.Examples.Loader.require_source!("03_flow_execution/03_04_choice/choice.ex")
+    Jido.Test.Examples.Loader.require_source!("03_flow_execution/03_04_choice/choice.ex")
     :ok
   end
 

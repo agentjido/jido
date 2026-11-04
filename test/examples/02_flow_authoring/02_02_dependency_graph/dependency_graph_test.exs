@@ -1,11 +1,11 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Compilation.DependencyGraphTest do
+defmodule Jido.Examples.Compilation.DependencyGraphTest do
   use ExUnit.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("02_flow_authoring/02_02_dependency_graph/dependency_graph.ex")
+    Jido.Test.Examples.Loader.require_source!("02_flow_authoring/02_02_dependency_graph/dependency_graph.ex")
 
     :ok
   end

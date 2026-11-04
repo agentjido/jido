@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("13_persistence/13_04_plugin_state_conversion/persisted_state_plugin.ex")
 Loader.require_source!("13_persistence/13_04_plugin_state_conversion/persisted_state.ex")
 
-defmodule JidoTest.Examples.Persistence.PluginStateConversionTest do
+defmodule Jido.Examples.Persistence.PluginStateConversionTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("13_persistence/13_04_plugin_state_conversion/persisted_state.ex")
+    Jido.Test.Examples.Loader.require_source!("13_persistence/13_04_plugin_state_conversion/persisted_state.ex")
 
     :ok
   end

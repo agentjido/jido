@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
-unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
+unless Code.ensure_loaded?(Jido.Test.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
 
-JidoTest.Examples.Loader.require_source!("15_ai_basics/15_04_controls/agent.ex")
+Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_04_controls/agent.ex")
 
-defmodule JidoTest.Examples.AI.ControlsTest do
+defmodule Jido.Examples.AI.ControlsTest do
   use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("15_ai_basics/15_04_controls/agent.ex")
+    Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_04_controls/agent.ex")
     :ok
   end
 
@@ -18,7 +18,7 @@ defmodule JidoTest.Examples.AI.ControlsTest do
   setup :verify_on_exit!
 
   alias Jido.Examples.AI.Controls
-  alias JidoTest.Examples.AIModel
+  alias Jido.Test.Examples.AIModel
 
   test "the local membership Action denies missing authorization" do
     assert {:ok, %{allowed: true}} = Jido.Exec.run(Controls.MemberOnly, %{input: "hello"}, %{role: :member})

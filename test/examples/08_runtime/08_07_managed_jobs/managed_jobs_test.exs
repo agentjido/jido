@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_07_managed_jobs/job_runtime.ex")
 Loader.require_source!("08_runtime/08_07_managed_jobs/managed_jobs.ex")
 Code.require_file("../../support/job_runner.exs", __DIR__)
 
-defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
+defmodule Jido.Examples.Runtime.ManagedJobsTest do
   use Jido.Test.Agent.FeatureSDKCase
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_07_managed_jobs/managed_jobs.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_07_managed_jobs/managed_jobs.ex")
     :ok
   end
 
@@ -25,7 +25,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     {:ok, route_signal_1} = ManagedJobs.start_job_signal(%{job_id: "job", value: 3})
 
     assert {:ok, pending, _directives} =
-             Jido.AgentServer.call(agent, route_signal_1, context: JidoTest.JobRunner.context(self()))
+             Jido.AgentServer.call(agent, route_signal_1, context: Jido.Test.Examples.JobRunner.context(self()))
 
     assert pending.state.status == :running
     assert_receive {:job_work, worker, 3}, 1000
@@ -44,7 +44,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
              ManagedJobs.cmd(
                before.agent,
                command_signal_1,
-               context: JidoTest.JobRunner.context(self())
+               context: Jido.Test.Examples.JobRunner.context(self())
              )
 
     assert candidate.state.status == :running
@@ -55,7 +55,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     {:ok, route_signal_2} = ManagedJobs.start_job_signal(%{job_id: "job", value: 3})
 
     assert {:ok, _, _directives} =
-             Jido.AgentServer.call(agent, route_signal_2, context: JidoTest.JobRunner.context(self()))
+             Jido.AgentServer.call(agent, route_signal_2, context: Jido.Test.Examples.JobRunner.context(self()))
 
     assert_receive {:job_work, worker, 3}, 1000
     assert state(agent).status == :running

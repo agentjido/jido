@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
-unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
-JidoTest.Examples.Loader.require_source!("00_quick_start/00_01_simple_ai_agent/simple_agent.ex")
+unless Code.ensure_loaded?(Jido.Test.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
+Jido.Test.Examples.Loader.require_source!("00_quick_start/00_01_simple_ai_agent/simple_agent.ex")
 
-defmodule JidoTest.Examples.AI.SimpleAgentTest do
+defmodule Jido.Examples.AI.SimpleAgentTest do
   use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("00_quick_start/00_01_simple_ai_agent/simple_agent.ex")
+    Jido.Test.Examples.Loader.require_source!("00_quick_start/00_01_simple_ai_agent/simple_agent.ex")
     :ok
   end
 
@@ -17,7 +17,7 @@ defmodule JidoTest.Examples.AI.SimpleAgentTest do
   setup :verify_on_exit!
 
   alias Jido.Examples.AI.SimpleAgent
-  alias JidoTest.Examples.AIModel
+  alias Jido.Test.Examples.AIModel
 
   test "the Agent exposes its root graph and ordered tools" do
     assert SimpleAgent.reasoning() == Jido.AI.Reasoning.ReAct

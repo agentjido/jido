@@ -1,4 +1,4 @@
-defmodule JidoTest.Examples.Durable.Peer do
+defmodule Jido.Test.Examples.Durable.Peer do
   @moduledoc false
   import ExUnit.Assertions
   import ExUnit.Callbacks

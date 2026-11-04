@@ -1,11 +1,11 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Durability.SnapshotAndResumeTest do
+defmodule Jido.Examples.Durability.SnapshotAndResumeTest do
   use ExUnit.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("05_flow_durability/05_02_snapshot_and_resume/snapshot_and_resume.ex")
+    Jido.Test.Examples.Loader.require_source!("05_flow_durability/05_02_snapshot_and_resume/snapshot_and_resume.ex")
 
     :ok
   end

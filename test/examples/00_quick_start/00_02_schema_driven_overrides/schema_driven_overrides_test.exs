@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-JidoTest.Examples.Loader.require_source!("00_quick_start/00_02_schema_driven_overrides/schema_driven_overrides.ex")
+Jido.Test.Examples.Loader.require_source!("00_quick_start/00_02_schema_driven_overrides/schema_driven_overrides.ex")
 
-defmodule JidoTest.Examples.AI.SchemaDrivenOverridesTest do
+defmodule Jido.Examples.AI.SchemaDrivenOverridesTest do
   use Jido.Test.Case, async: true
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("00_quick_start/00_02_schema_driven_overrides/schema_driven_overrides.ex")
+    Jido.Test.Examples.Loader.require_source!("00_quick_start/00_02_schema_driven_overrides/schema_driven_overrides.ex")
 
     :ok
   end

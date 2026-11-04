@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("01_agent_basics/01_04_plugin_state_agent/count_turns.ex")
 Loader.require_source!("01_agent_basics/01_04_plugin_state_agent/plugin_state_agent.ex")
 
-defmodule JidoTest.Examples.Basic.PluginStateAgentTest do
+defmodule Jido.Examples.Basic.PluginStateAgentTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("01_agent_basics/01_04_plugin_state_agent/plugin_state_agent.ex")
+    Jido.Test.Examples.Loader.require_source!("01_agent_basics/01_04_plugin_state_agent/plugin_state_agent.ex")
     :ok
   end
 

@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("01_agent_basics/01_01_minimal_agent/minimal_agent.ex")
 
-defmodule JidoTest.Examples.Basic.MinimalAgentTest do
+defmodule Jido.Examples.Basic.MinimalAgentTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("01_agent_basics/01_01_minimal_agent/minimal_agent.ex")
+    Jido.Test.Examples.Loader.require_source!("01_agent_basics/01_01_minimal_agent/minimal_agent.ex")
     :ok
   end
 

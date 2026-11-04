@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("14_durable_agents/14_01_saved_agent/request_report.ex")
 Loader.require_source!("14_durable_agents/14_01_saved_agent/saved_agent.ex")
 Code.require_file("../../support/durable_peer.exs", __DIR__)
 
-defmodule JidoTest.Examples.Durable.SavedAgentTest do
+defmodule Jido.Examples.Durable.SavedAgentTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("14_durable_agents/14_01_saved_agent/saved_agent.ex")
+    Jido.Test.Examples.Loader.require_source!("14_durable_agents/14_01_saved_agent/saved_agent.ex")
     :ok
   end
 
@@ -19,7 +19,7 @@ defmodule JidoTest.Examples.Durable.SavedAgentTest do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Durable.SavedAgent, as: Example
-  alias JidoTest.Examples.Durable.Peer
+  alias Jido.Test.Examples.Durable.Peer
 
   @instance Jido.DurableSavedAgentExample
   @sources Path.wildcard(Path.expand("../../../../examples/14_durable_agents/14_01_saved_agent/*.ex", __DIR__))

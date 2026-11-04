@@ -1,7 +1,7 @@
-defmodule JidoTest.Examples.Catalog do
+defmodule Jido.Test.Examples.Catalog do
   @moduledoc false
 
-  @required_entry_fields ~w(id category readme source test)
+  @required_entry_fields ~w(id category component readme source test)
   @required_category_fields ~w(id source_root test_root)
   @chapter_pattern ~r/^\d{2}_[a-z][a-z0-9_]*$/
   @lesson_pattern ~r/^(\d{2})_\d{2}_[a-z][a-z0-9_]*$/
@@ -249,7 +249,7 @@ defmodule JidoTest.Examples.Catalog do
       errors
       |> maybe_error(not String.contains?(content, ":example"), "paired test has no :example tag: #{path}")
       |> maybe_error(
-        not String.contains?(content, "JidoTest.Examples.Loader.require_source!"),
+        not String.contains?(content, "Jido.Test.Examples.Loader.require_source!"),
         "paired test does not use the example loader: #{path}"
       )
       |> maybe_error(

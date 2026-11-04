@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("11_plugins/support/crypto.ex")
 Loader.require_source!("11_plugins/11_07_identity/identity_plugin.ex")
 Loader.require_source!("11_plugins/11_07_identity/identity.ex")
 
-defmodule JidoTest.Examples.Plugins.IdentityTest do
+defmodule Jido.Examples.Plugins.IdentityTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("11_plugins/11_07_identity/identity.ex")
+    Jido.Test.Examples.Loader.require_source!("11_plugins/11_07_identity/identity.ex")
     :ok
   end
 

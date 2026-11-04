@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_13_stable_reference/stable_reference.ex")
 
-defmodule JidoTest.Examples.Runtime.StableReferenceTest do
+defmodule Jido.Examples.Runtime.StableReferenceTest do
   use ExUnit.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_13_stable_reference/stable_reference.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_13_stable_reference/stable_reference.ex")
     :ok
   end
 

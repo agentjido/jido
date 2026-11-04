@@ -1,9 +1,9 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_06_bus_delivery/bus_delivery.ex")
 
-defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
+defmodule Jido.Test.Examples.Runtime.BusDeliveryFixture do
   @moduledoc false
 
   use Jido.Agent,
@@ -55,12 +55,12 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
   end
 end
 
-defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
+defmodule Jido.Examples.Runtime.BusDeliveryTest do
   use Jido.Test.Agent.FeatureSDKCase
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_06_bus_delivery/bus_delivery.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_06_bus_delivery/bus_delivery.ex")
     :ok
   end
 
@@ -68,7 +68,7 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
   alias Jido.Examples.BusDelivery
   alias Jido.Plugin.Bus.{Client, Manager}
   alias Jido.Signal.Bus
-  alias JidoTest.Examples.Runtime.BusDeliveryFixture
+  alias Jido.Test.Examples.Runtime.BusDeliveryFixture
 
   test "durable delivery waits for a commit before it sends the next record", %{jido: jido} do
     {:ok, agent} =

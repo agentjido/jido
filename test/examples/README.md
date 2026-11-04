@@ -8,21 +8,26 @@ Every paired test must:
 
 - use the `:example` tag;
 - load its primary source in `setup_all` with
-  `JidoTest.Examples.Loader.require_source!/1`;
+  `Jido.Test.Examples.Loader.require_source!/1`;
 - make exact assertions about the documented result;
 - run without provider keys or external services.
+
+Executable test modules use the production `Jido.Examples.*` namespace.
+Shared loaders and fixtures use `Jido.Test.Examples.*`. Each catalog entry
+names its component, and each paired test owns one executable documentation
+claim in `test/quality/component_proof.yml`.
 
 This pattern prevents default `mix test` from loading example source:
 
 ```elixir
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.SampleTest do
+defmodule Jido.Examples.SampleTest do
   use ExUnit.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!(
+    Jido.Test.Examples.Loader.require_source!(
       "02_flow_authoring/02_01_sample/sample.ex"
     )
     :ok

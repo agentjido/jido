@@ -88,6 +88,7 @@ evidence_groups:
   unit: [test/jido]
   covenant: [test/contracts/coverage.json]
   authoring: [test/authoring]
+  examples: [test/examples]
   signal_property: [test/property/jido_signal]
   signal_fuzz: [test/property/jido_signal]
   expression_property: [test/property/jido_expr]
@@ -113,12 +114,14 @@ claims:
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace the named Agent obligations to the canonical behavior tests."}
+      - {mode: example, evidence_group: examples, proves: "Executable Agent lessons supplement canonical behavior with public documentation promises."}
   - id: jido.agent_evaluation.behavior
     component: jido.agent_evaluation
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent/evaluation, proves: "Canonical evaluation semantics for route selection, directives, and Agent turns."}
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace named evaluation obligations to the canonical behavior tests."}
+      - {mode: example, evidence_group: examples, proves: "Executable workflow lessons supplement canonical evaluation behavior with documented user paths."}
   - id: jido.agent_server.behavior
     component: jido.agent_server
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/core, proves: "Canonical AgentServer lifecycle, request, ownership, and control semantics."}
@@ -126,6 +129,7 @@ claims:
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace named AgentServer obligations to the canonical behavior tests."}
       - {mode: property, evidence_group: agent_server_property, proves: "Generated command histories supplement deterministic lifecycle cases with cleanup, hibernation, rejection, and restoration sequences."}
+      - {mode: example, evidence_group: examples, proves: "Executable runtime lessons supplement canonical lifecycle behavior with documented operating sequences."}
   - id: jido.agent_server.activation.behavior
     component: jido.agent_server.activation
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/activation, proves: "Canonical activation, recovery, and root ownership semantics for AgentServer."}
@@ -138,12 +142,14 @@ claims:
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace composition obligations to the canonical behavior tests."}
+      - {mode: example, evidence_group: examples, proves: "Executable topology lessons supplement canonical composition behavior with documented multi-agent arrangements."}
   - id: jido.agent_server.durable.behavior
     component: jido.agent_server.durable
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/durable, proves: "Canonical durable AgentServer persistence, control, and evolution semantics."}
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace durable runtime obligations to the canonical behavior tests."}
+      - {mode: example, evidence_group: examples, proves: "Executable durable-agent lessons supplement canonical recovery behavior with documented persistence sequences."}
   - id: jido.agent_server.durable_turn.behavior
     component: jido.agent_server.durable_turn
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/agent_server/durable_turn, proves: "Canonical durable turn checkpoint, wait, policy, and runtime semantics."}
@@ -186,12 +192,14 @@ claims:
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace persistence obligations to the canonical behavior tests."}
+      - {mode: example, evidence_group: examples, proves: "Executable persistence lessons supplement canonical adapter behavior with documented storage sequences."}
   - id: jido.plugin.behavior
     component: jido.plugin
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/plugin/api_test.exs, proves: "Canonical plugin API behavior and provider contract semantics."}
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace plugin obligations to the canonical behavior tests."}
+      - {mode: example, evidence_group: examples, proves: "Executable plugin lessons supplement canonical provider behavior with documented composition paths."}
   - id: jido.plugin.audit.behavior
     component: jido.plugin.audit
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/plugin/audit, proves: "Canonical audit plugin API and recorded event semantics."}
@@ -258,6 +266,7 @@ claims:
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace execution obligations to the canonical behavior tests."}
+      - {mode: example, evidence_group: examples, proves: "Executable Flow lessons supplement canonical execution behavior with documented runtime sequences."}
   - id: jido_action.expression.behavior
     component: jido_action.expression
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/expr, proves: "Canonical expression evaluation and survivor contract semantics."}
@@ -270,6 +279,7 @@ claims:
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace Flow obligations to the canonical behavior tests."}
+      - {mode: example, evidence_group: examples, proves: "Executable Flow lessons supplement canonical authoring behavior with documented graph forms."}
   - id: jido_action.inline.behavior
     component: jido_action.inline
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/action/inline_test.exs, proves: "Canonical inline Action lowering and execution semantics."}
@@ -306,12 +316,14 @@ claims:
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace AI Agent obligations to the canonical behavior tests."}
+      - {mode: example, evidence_group: examples, proves: "Executable AI lessons supplement canonical agent authoring behavior with documented compositions."}
   - id: jido_ai.conversation.behavior
     component: jido_ai.conversation
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/ai/conversation, proves: "Canonical AI conversation and conversation codec semantics."}
     covenant_obligations: all
     supplemental:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace conversation obligations to the canonical behavior tests."}
+      - {mode: example, evidence_group: examples, proves: "Executable conversation lessons supplement canonical behavior with documented thread and session use."}
   - id: jido_ai.model_execution.behavior
     component: jido_ai.model_execution
     canonical: {mode: unit, evidence_group: unit, owner: test/jido/ai/model_execution, proves: "Canonical model call, budget, context, and execution boundary semantics."}
@@ -436,6 +448,357 @@ claims:
   - id: jido_ai.react.capacity
     component: jido_ai.react
     canonical: {mode: benchmark, evidence_group: react_benchmark, owner: test/perf/jido_ai/react_bench_test.exs, proves: "Deterministic ReAct workloads own retained state, fresh workflow, isolated memory, and repeatable case inventory measurements."}
+  - id: example.00_01_simple_ai_agent.documentation
+    component: jido_ai.agent_authoring
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/00_quick_start/00_01_simple_ai_agent/simple_agent_test.exs, proves: "The 00_01_simple_ai_agent public lesson owns its executable documentation promise."}
+  - id: example.00_02_schema_driven_overrides.documentation
+    component: jido_ai.agent_authoring
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/00_quick_start/00_02_schema_driven_overrides/schema_driven_overrides_test.exs, proves: "The 00_02_schema_driven_overrides public lesson owns its executable documentation promise."}
+  - id: example.01_01_minimal_agent.documentation
+    component: jido.agent
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/01_agent_basics/01_01_minimal_agent/minimal_agent_test.exs, proves: "The 01_01_minimal_agent public lesson owns its executable documentation promise."}
+  - id: example.01_02_typed_command_agent.documentation
+    component: jido.agent
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/01_agent_basics/01_02_typed_command_agent/typed_command_agent_test.exs, proves: "The 01_02_typed_command_agent public lesson owns its executable documentation promise."}
+  - id: example.01_03_route_selection.documentation
+    component: jido.agent
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/01_agent_basics/01_03_route_selection/route_selection_test.exs, proves: "The 01_03_route_selection public lesson owns its executable documentation promise."}
+  - id: example.01_04_plugin_state_agent.documentation
+    component: jido.agent
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/01_agent_basics/01_04_plugin_state_agent/plugin_state_agent_test.exs, proves: "The 01_04_plugin_state_agent public lesson owns its executable documentation promise."}
+  - id: example.01_05_directive_agent.documentation
+    component: jido.agent
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/01_agent_basics/01_05_directive_agent/directive_agent_test.exs, proves: "The 01_05_directive_agent public lesson owns its executable documentation promise."}
+  - id: example.01_06_otp_supervision.documentation
+    component: jido.agent
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/01_agent_basics/01_06_otp_supervision/example_test.exs, proves: "The 01_06_otp_supervision public lesson owns its executable documentation promise."}
+  - id: example.01_07_data_defined_agent.documentation
+    component: jido.agent
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/01_agent_basics/01_07_data_defined_agent/data_defined_agent_test.exs, proves: "The 01_07_data_defined_agent public lesson owns its executable documentation promise."}
+  - id: example.01_08_authoring_plugin.documentation
+    component: jido.agent
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/01_agent_basics/01_08_authoring_plugin/authoring_plugin_test.exs, proves: "The 01_08_authoring_plugin public lesson owns its executable documentation promise."}
+  - id: example.02_01_single_step.documentation
+    component: jido_action.flow
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/02_flow_authoring/02_01_single_step/single_step_test.exs, proves: "The 02_01_single_step public lesson owns its executable documentation promise."}
+  - id: example.02_02_dependency_graph.documentation
+    component: jido_action.flow
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/02_flow_authoring/02_02_dependency_graph/dependency_graph_test.exs, proves: "The 02_02_dependency_graph public lesson owns its executable documentation promise."}
+  - id: example.02_03_dsl_flow.documentation
+    component: jido_action.flow
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/02_flow_authoring/02_03_dsl_flow/dsl_flow_test.exs, proves: "The 02_03_dsl_flow public lesson owns its executable documentation promise."}
+  - id: example.02_04_stored_json.documentation
+    component: jido_action.flow
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/02_flow_authoring/02_04_stored_json/stored_json_test.exs, proves: "The 02_04_stored_json public lesson owns its executable documentation promise."}
+  - id: example.02_05_authoring_equivalence.documentation
+    component: jido_action.flow
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/02_flow_authoring/02_05_authoring_equivalence/authoring_equivalence_test.exs, proves: "The 02_05_authoring_equivalence public lesson owns its executable documentation promise."}
+  - id: example.02_06_validation.documentation
+    component: jido_action.flow
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/02_flow_authoring/02_06_validation/validation_test.exs, proves: "The 02_06_validation public lesson owns its executable documentation promise."}
+  - id: example.02_07_inputs_and_output.documentation
+    component: jido_action.flow
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/02_flow_authoring/02_07_inputs_and_output/inputs_and_output_test.exs, proves: "The 02_07_inputs_and_output public lesson owns its executable documentation promise."}
+  - id: example.02_08_compiled_program.documentation
+    component: jido_action.flow
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/02_flow_authoring/02_08_compiled_program/compiled_program_test.exs, proves: "The 02_08_compiled_program public lesson owns its executable documentation promise."}
+  - id: example.03_01_single_action.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_01_single_action/single_action_test.exs, proves: "The 03_01_single_action public lesson owns its executable documentation promise."}
+  - id: example.03_02_three_step_flow.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_02_three_step_flow/three_step_flow_test.exs, proves: "The 03_02_three_step_flow public lesson owns its executable documentation promise."}
+  - id: example.03_03_serial_then_parallel.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_03_serial_then_parallel/serial_then_parallel_test.exs, proves: "The 03_03_serial_then_parallel public lesson owns its executable documentation promise."}
+  - id: example.03_04_choice.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_04_choice/choice_test.exs, proves: "The 03_04_choice public lesson owns its executable documentation promise."}
+  - id: example.03_05_map_reduce.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_05_map_reduce/map_reduce_test.exs, proves: "The 03_05_map_reduce public lesson owns its executable documentation promise."}
+  - id: example.03_06_loop_invoke_wait.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_06_loop_invoke_wait/loop_invoke_wait_test.exs, proves: "The 03_06_loop_invoke_wait public lesson owns its executable documentation promise."}
+  - id: example.03_07_parallel.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_07_parallel/parallel_test.exs, proves: "The 03_07_parallel public lesson owns its executable documentation promise."}
+  - id: example.03_08_map.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_08_map/map_test.exs, proves: "The 03_08_map public lesson owns its executable documentation promise."}
+  - id: example.03_09_reduce.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_09_reduce/reduce_test.exs, proves: "The 03_09_reduce public lesson owns its executable documentation promise."}
+  - id: example.03_10_iterate.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_10_iterate/iterate_test.exs, proves: "The 03_10_iterate public lesson owns its executable documentation promise."}
+  - id: example.03_11_child_flow.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_11_child_flow/child_flow_test.exs, proves: "The 03_11_child_flow public lesson owns its executable documentation promise."}
+  - id: example.03_12_wait_and_signal.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_12_wait_and_signal/wait_and_signal_test.exs, proves: "The 03_12_wait_and_signal public lesson owns its executable documentation promise."}
+  - id: example.03_13_controlled_execution.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_13_controlled_execution/controlled_execution_test.exs, proves: "The 03_13_controlled_execution public lesson owns its executable documentation promise."}
+  - id: example.03_14_effects_and_failure.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_14_effects_and_failure/effects_and_failure_test.exs, proves: "The 03_14_effects_and_failure public lesson owns its executable documentation promise."}
+  - id: example.03_15_dynamic_invoke.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/03_flow_execution/03_15_dynamic_invoke/dynamic_invoke_test.exs, proves: "The 03_15_dynamic_invoke public lesson owns its executable documentation promise."}
+  - id: example.04_01_sequential_flow.documentation
+    component: jido.agent_evaluation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/04_agent_workflows/04_01_sequential_flow/sequential_flow_test.exs, proves: "The 04_01_sequential_flow public lesson owns its executable documentation promise."}
+  - id: example.04_02_effectful_steps.documentation
+    component: jido.agent_evaluation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/04_agent_workflows/04_02_effectful_steps/effectful_steps_test.exs, proves: "The 04_02_effectful_steps public lesson owns its executable documentation promise."}
+  - id: example.04_03_conditional_routes.documentation
+    component: jido.agent_evaluation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/04_agent_workflows/04_03_conditional_routes/conditional_routes_test.exs, proves: "The 04_03_conditional_routes public lesson owns its executable documentation promise."}
+  - id: example.04_04_parallel_join.documentation
+    component: jido.agent_evaluation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/04_agent_workflows/04_04_parallel_join/parallel_join_test.exs, proves: "The 04_04_parallel_join public lesson owns its executable documentation promise."}
+  - id: example.04_05_ordered_batch.documentation
+    component: jido.agent_evaluation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/04_agent_workflows/04_05_ordered_batch/ordered_batch_test.exs, proves: "The 04_05_ordered_batch public lesson owns its executable documentation promise."}
+  - id: example.04_06_bounded_iteration.documentation
+    component: jido.agent_evaluation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/04_agent_workflows/04_06_bounded_iteration/bounded_iteration_test.exs, proves: "The 04_06_bounded_iteration public lesson owns its executable documentation promise."}
+  - id: example.04_07_nested_flow.documentation
+    component: jido.agent_evaluation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/04_agent_workflows/04_07_nested_flow/nested_flow_test.exs, proves: "The 04_07_nested_flow public lesson owns its executable documentation promise."}
+  - id: example.04_08_executable_continuation.documentation
+    component: jido.agent_evaluation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/04_agent_workflows/04_08_executable_continuation/executable_continuation_test.exs, proves: "The 04_08_executable_continuation public lesson owns its executable documentation promise."}
+  - id: example.04_09_flow_directives.documentation
+    component: jido.agent_evaluation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/04_agent_workflows/04_09_flow_directives/flow_directives_test.exs, proves: "The 04_09_flow_directives public lesson owns its executable documentation promise."}
+  - id: example.05_01_run_identity.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/05_flow_durability/05_01_run_identity/run_identity_test.exs, proves: "The 05_01_run_identity public lesson owns its executable documentation promise."}
+  - id: example.05_02_snapshot_and_resume.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/05_flow_durability/05_02_snapshot_and_resume/snapshot_and_resume_test.exs, proves: "The 05_02_snapshot_and_resume public lesson owns its executable documentation promise."}
+  - id: example.05_03_process_recovery.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/05_flow_durability/05_03_process_recovery/process_recovery_test.exs, proves: "The 05_03_process_recovery public lesson owns its executable documentation promise."}
+  - id: example.05_04_run_inspection.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/05_flow_durability/05_04_run_inspection/run_inspection_test.exs, proves: "The 05_04_run_inspection public lesson owns its executable documentation promise."}
+  - id: example.05_05_cancellation.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/05_flow_durability/05_05_cancellation/cancellation_test.exs, proves: "The 05_05_cancellation public lesson owns its executable documentation promise."}
+  - id: example.05_06_telemetry.documentation
+    component: jido_action.execution
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/05_flow_durability/05_06_telemetry/telemetry_test.exs, proves: "The 05_06_telemetry public lesson owns its executable documentation promise."}
+  - id: example.06_01_human_approval.documentation
+    component: jido_action.flow
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/06_flow_patterns/06_01_human_approval/human_approval_test.exs, proves: "The 06_01_human_approval public lesson owns its executable documentation promise."}
+  - id: example.06_02_batch_processing.documentation
+    component: jido_action.flow
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/06_flow_patterns/06_02_batch_processing/batch_processing_test.exs, proves: "The 06_02_batch_processing public lesson owns its executable documentation promise."}
+  - id: example.06_03_compensation.documentation
+    component: jido_action.flow
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/06_flow_patterns/06_03_compensation/compensation_test.exs, proves: "The 06_03_compensation public lesson owns its executable documentation promise."}
+  - id: example.08_01_request_modes.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_01_request_modes/request_modes_test.exs, proves: "The 08_01_request_modes public lesson owns its executable documentation promise."}
+  - id: example.08_02_turn_control.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_02_turn_control/turn_control_test.exs, proves: "The 08_02_turn_control public lesson owns its executable documentation promise."}
+  - id: example.08_03_failure_outcome.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_03_failure_outcome/failure_outcome_test.exs, proves: "The 08_03_failure_outcome public lesson owns its executable documentation promise."}
+  - id: example.08_04_scheduled_signals.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_04_scheduled_signals/scheduled_counter_test.exs, proves: "The 08_04_scheduled_signals public lesson owns its executable documentation promise."}
+  - id: example.08_05_keyed_timers.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_05_keyed_timers/burst_buncher_test.exs, proves: "The 08_05_keyed_timers public lesson owns its executable documentation promise."}
+  - id: example.08_06_bus_delivery.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_06_bus_delivery/bus_delivery_test.exs, proves: "The 08_06_bus_delivery public lesson owns its executable documentation promise."}
+  - id: example.08_07_managed_jobs.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_07_managed_jobs/managed_jobs_test.exs, proves: "The 08_07_managed_jobs public lesson owns its executable documentation promise."}
+  - id: example.08_08_heartbeat.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_08_heartbeat/heartbeat_test.exs, proves: "The 08_08_heartbeat public lesson owns its executable documentation promise."}
+  - id: example.08_09_runtime_inspection.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_09_runtime_inspection/agent_live_debugger_test.exs, proves: "The 08_09_runtime_inspection public lesson owns its executable documentation promise."}
+  - id: example.08_10_agent_observation.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_10_agent_observation/agent_observation_test.exs, proves: "The 08_10_agent_observation public lesson owns its executable documentation promise."}
+  - id: example.08_11_causal_trace.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_11_causal_trace/causal_trace_test.exs, proves: "The 08_11_causal_trace public lesson owns its executable documentation promise."}
+  - id: example.08_12_definition_changes.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_12_definition_changes/definition_changes_test.exs, proves: "The 08_12_definition_changes public lesson owns its executable documentation promise."}
+  - id: example.08_13_stable_reference.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_13_stable_reference/stable_reference_test.exs, proves: "The 08_13_stable_reference public lesson owns its executable documentation promise."}
+  - id: example.08_14_state_migration.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_14_state_migration/state_migration_test.exs, proves: "The 08_14_state_migration public lesson owns its executable documentation promise."}
+  - id: example.08_15_pending_job_recovery.documentation
+    component: jido.agent_server
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/08_runtime/08_15_pending_job_recovery/pending_job_recovery_test.exs, proves: "The 08_15_pending_job_recovery public lesson owns its executable documentation promise."}
+  - id: example.09_01_child_lifecycle.documentation
+    component: jido.agent_server.composition
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/09_multi_agent/09_01_child_lifecycle/child_lifecycle_test.exs, proves: "The 09_01_child_lifecycle public lesson owns its executable documentation promise."}
+  - id: example.09_02_correlated_requests.documentation
+    component: jido.agent_server.composition
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/09_multi_agent/09_02_correlated_requests/correlated_requests_test.exs, proves: "The 09_02_correlated_requests public lesson owns its executable documentation promise."}
+  - id: example.09_03_orphan_adoption.documentation
+    component: jido.agent_server.composition
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/09_multi_agent/09_03_orphan_adoption/orphan_adoption_test.exs, proves: "The 09_03_orphan_adoption public lesson owns its executable documentation promise."}
+  - id: example.10_01_named_agents.documentation
+    component: jido.agent_server.composition
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/10_topologies/10_01_named_agents/independent_test.exs, proves: "The 10_01_named_agents public lesson owns its executable documentation promise."}
+  - id: example.10_02_direct_connections.documentation
+    component: jido.agent_server.composition
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/10_topologies/10_02_direct_connections/direct_connections_test.exs, proves: "The 10_02_direct_connections public lesson owns its executable documentation promise."}
+  - id: example.10_03_bus_broadcast.documentation
+    component: jido.agent_server.composition
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/10_topologies/10_03_bus_broadcast/bus_swarm_test.exs, proves: "The 10_03_bus_broadcast public lesson owns its executable documentation promise."}
+  - id: example.10_04_nested_agents.documentation
+    component: jido.agent_server.composition
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/10_topologies/10_04_nested_agents/hierarchy_test.exs, proves: "The 10_04_nested_agents public lesson owns its executable documentation promise."}
+  - id: example.10_05_topology_mutations.documentation
+    component: jido.agent_server.composition
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/10_topologies/10_05_topology_mutations/mutations_test.exs, proves: "The 10_05_topology_mutations public lesson owns its executable documentation promise."}
+  - id: example.10_06_connection_changes.documentation
+    component: jido.agent_server.composition
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/10_topologies/10_06_connection_changes/connection_changes_test.exs, proves: "The 10_06_connection_changes public lesson owns its executable documentation promise."}
+  - id: example.11_01_prepared_input.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/11_plugins/11_01_prepared_input/prepared_input_test.exs, proves: "The 11_01_prepared_input public lesson owns its executable documentation promise."}
+  - id: example.11_02_runtime_admission.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/11_plugins/11_02_runtime_admission/runtime_admission_test.exs, proves: "The 11_02_runtime_admission public lesson owns its executable documentation promise."}
+  - id: example.11_03_state_middleware.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/11_plugins/11_03_state_middleware/state_middleware_test.exs, proves: "The 11_03_state_middleware public lesson owns its executable documentation promise."}
+  - id: example.11_04_plugin_dsl.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/11_plugins/11_04_plugin_dsl/plugin_dsl_test.exs, proves: "The 11_04_plugin_dsl public lesson owns its executable documentation promise."}
+  - id: example.11_05_composition.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/11_plugins/11_05_composition/composition_test.exs, proves: "The 11_05_composition public lesson owns its executable documentation promise."}
+  - id: example.11_06_live_plugin_changes.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/11_plugins/11_06_live_plugin_changes/live_plugin_changes_test.exs, proves: "The 11_06_live_plugin_changes public lesson owns its executable documentation promise."}
+  - id: example.11_07_identity.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/11_plugins/11_07_identity/identity_test.exs, proves: "The 11_07_identity public lesson owns its executable documentation promise."}
+  - id: example.11_08_secure_signal.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/11_plugins/11_08_secure_signal/secure_signal_test.exs, proves: "The 11_08_secure_signal public lesson owns its executable documentation promise."}
+  - id: example.12_01_audit.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/12_plugin_applications/12_01_audit/audit_test.exs, proves: "The 12_01_audit public lesson owns its executable documentation promise."}
+  - id: example.12_02_subscription.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/12_plugin_applications/12_02_subscription/subscription_test.exs, proves: "The 12_02_subscription public lesson owns its executable documentation promise."}
+  - id: example.12_03_inbox.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/12_plugin_applications/12_03_inbox/inbox_test.exs, proves: "The 12_03_inbox public lesson owns its executable documentation promise."}
+  - id: example.12_04_approval_workflow.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/12_plugin_applications/12_04_approval_workflow/approval_workflow_test.exs, proves: "The 12_04_approval_workflow public lesson owns its executable documentation promise."}
+  - id: example.12_05_purpose_loop.documentation
+    component: jido.plugin
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/12_plugin_applications/12_05_purpose_loop/purpose_loop_test.exs, proves: "The 12_05_purpose_loop public lesson owns its executable documentation promise."}
+  - id: example.13_01_persistent_agent.documentation
+    component: jido.persistence
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/13_persistence/13_01_persistent_agent/persistent_agent_test.exs, proves: "The 13_01_persistent_agent public lesson owns its executable documentation promise."}
+  - id: example.13_02_hibernate_and_thaw.documentation
+    component: jido.persistence
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/13_persistence/13_02_hibernate_and_thaw/hibernate_and_thaw_test.exs, proves: "The 13_02_hibernate_and_thaw public lesson owns its executable documentation promise."}
+  - id: example.13_03_portable_checkpoint.documentation
+    component: jido.persistence
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/13_persistence/13_03_portable_checkpoint/checkpoint_portability_test.exs, proves: "The 13_03_portable_checkpoint public lesson owns its executable documentation promise."}
+  - id: example.13_04_plugin_state_conversion.documentation
+    component: jido.persistence
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/13_persistence/13_04_plugin_state_conversion/persisted_state_test.exs, proves: "The 13_04_plugin_state_conversion public lesson owns its executable documentation promise."}
+  - id: example.13_05_durable_delete.documentation
+    component: jido.persistence
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/13_persistence/13_05_durable_delete/durable_delete_test.exs, proves: "The 13_05_durable_delete public lesson owns its executable documentation promise."}
+  - id: example.13_06_indeterminate_write.documentation
+    component: jido.persistence
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/13_persistence/13_06_indeterminate_write/indeterminate_write_test.exs, proves: "The 13_06_indeterminate_write public lesson owns its executable documentation promise."}
+  - id: example.13_07_recoverable_delivery.documentation
+    component: jido.persistence
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/13_persistence/13_07_recoverable_delivery/recoverable_delivery_test.exs, proves: "The 13_07_recoverable_delivery public lesson owns its executable documentation promise."}
+  - id: example.13_08_definition_revision.documentation
+    component: jido.persistence
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/13_persistence/13_08_definition_revision/definition_revision_test.exs, proves: "The 13_08_definition_revision public lesson owns its executable documentation promise."}
+  - id: example.14_01_saved_agent.documentation
+    component: jido.agent_server.durable
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/14_durable_agents/14_01_saved_agent/saved_agent_test.exs, proves: "The 14_01_saved_agent public lesson owns its executable documentation promise."}
+  - id: example.14_02_saved_progress.documentation
+    component: jido.agent_server.durable
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/14_durable_agents/14_02_saved_progress/saved_progress_test.exs, proves: "The 14_02_saved_progress public lesson owns its executable documentation promise."}
+  - id: example.14_03_vm_recovery.documentation
+    component: jido.agent_server.durable
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/14_durable_agents/14_03_vm_recovery/vm_recovery_test.exs, proves: "The 14_03_vm_recovery public lesson owns its executable documentation promise."}
+  - id: example.14_04_accepted_work.documentation
+    component: jido.agent_server.durable
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/14_durable_agents/14_04_accepted_work/accepted_work_test.exs, proves: "The 14_04_accepted_work public lesson owns its executable documentation promise."}
+  - id: example.14_05_saved_completion.documentation
+    component: jido.agent_server.durable
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/14_durable_agents/14_05_saved_completion/saved_completion_test.exs, proves: "The 14_05_saved_completion public lesson owns its executable documentation promise."}
+  - id: example.14_06_durable_wait.documentation
+    component: jido.agent_server.durable
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/14_durable_agents/14_06_durable_wait/durable_wait_test.exs, proves: "The 14_06_durable_wait public lesson owns its executable documentation promise."}
+  - id: example.14_07_external_uncertainty.documentation
+    component: jido.agent_server.durable
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/14_durable_agents/14_07_external_uncertainty/external_uncertainty_test.exs, proves: "The 14_07_external_uncertainty public lesson owns its executable documentation promise."}
+  - id: example.15_01_basic_agent.documentation
+    component: jido_ai.agent_authoring
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/15_ai_basics/15_01_basic_agent/basic_agent_test.exs, proves: "The 15_01_basic_agent public lesson owns its executable documentation promise."}
+  - id: example.15_02_tool_flow.documentation
+    component: jido_ai.agent_authoring
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/15_ai_basics/15_02_tool_flow/tool_flow_test.exs, proves: "The 15_02_tool_flow public lesson owns its executable documentation promise."}
+  - id: example.15_03_structured_output.documentation
+    component: jido_ai.agent_authoring
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/15_ai_basics/15_03_structured_output/structured_output_test.exs, proves: "The 15_03_structured_output public lesson owns its executable documentation promise."}
+  - id: example.15_04_controls.documentation
+    component: jido_ai.agent_authoring
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/15_ai_basics/15_04_controls/controls_test.exs, proves: "The 15_04_controls public lesson owns its executable documentation promise."}
+  - id: example.15_05_streaming.documentation
+    component: jido_ai.agent_authoring
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/15_ai_basics/15_05_streaming/streaming_test.exs, proves: "The 15_05_streaming public lesson owns its executable documentation promise."}
+  - id: example.15_06_request_contract.documentation
+    component: jido_ai.agent_authoring
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/15_ai_basics/15_06_request_contract/request_contract_test.exs, proves: "The 15_06_request_contract public lesson owns its executable documentation promise."}
+  - id: example.15_07_core_composition.documentation
+    component: jido_ai.agent_authoring
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/15_ai_basics/15_07_core_composition/core_composition_test.exs, proves: "The 15_07_core_composition public lesson owns its executable documentation promise."}
+  - id: example.15_08_model_helpers.documentation
+    component: jido_ai.agent_authoring
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/15_ai_basics/15_08_model_helpers/model_helpers_test.exs, proves: "The 15_08_model_helpers public lesson owns its executable documentation promise."}
+  - id: example.15_09_json_agent.documentation
+    component: jido_ai.agent_authoring
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/15_ai_basics/15_09_json_agent/json_agent_test.exs, proves: "The 15_09_json_agent public lesson owns its executable documentation promise."}
+  - id: example.16_01_thread_agent.documentation
+    component: jido_ai.conversation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/16_ai_conversations/16_01_thread_agent/thread_agent_test.exs, proves: "The 16_01_thread_agent public lesson owns its executable documentation promise."}
+  - id: example.16_02_session_value.documentation
+    component: jido_ai.conversation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/16_ai_conversations/16_02_session_value/session_value_test.exs, proves: "The 16_02_session_value public lesson owns its executable documentation promise."}
+  - id: example.16_03_session_agent.documentation
+    component: jido_ai.conversation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/16_ai_conversations/16_03_session_agent/session_agent_test.exs, proves: "The 16_03_session_agent public lesson owns its executable documentation promise."}
+  - id: example.16_04_conversation_history.documentation
+    component: jido_ai.conversation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/16_ai_conversations/16_04_conversation_history/conversation_history_test.exs, proves: "The 16_04_conversation_history public lesson owns its executable documentation promise."}
+  - id: example.16_05_request_modes.documentation
+    component: jido_ai.conversation
+    canonical: {mode: example, evidence_group: examples, owner: test/examples/16_ai_conversations/16_05_request_modes/request_modes_test.exs, proves: "The 16_05_request_modes public lesson owns its executable documentation promise."}
 proof_profiles:
   closed_contract:
     unit: {state: required, evidence_group: unit}
@@ -463,6 +826,34 @@ proof_profiles:
     covenant: {state: required, evidence_group: covenant}
     authoring: {state: required, evidence_group: authoring}
     example: {state: not_applicable, owner: self, reason_code: no_supported_example, reason: No supported example catalog entry is registered for this component in the current package.}
+    property: {state: not_applicable, owner: self, reason_code: stateful_lifecycle, reason: Executable authoring plus deterministic lifecycle scenarios are the required proof for this stateful component.}
+    fuzz: {state: not_applicable, owner: self, reason_code: stateful_lifecycle, reason: Stateful process ownership needs deterministic barriers and cleanup checks instead of an uncoordinated fuzz loop.}
+  closed_example_contract:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: not_applicable, owner: self, reason_code: no_supported_authoring_surface, reason: This component has no supported JSON or DSL authoring form in the current package.}
+    example: {state: required, evidence_group: examples}
+    property: {state: not_applicable, owner: self, reason_code: deterministic_contract_matrix, reason: The component uses a finite deterministic contract matrix; unit and Covenant cases are its primary generated-input boundary.}
+    fuzz: {state: not_applicable, owner: self, reason_code: deterministic_contract_matrix, reason: The component uses a finite deterministic contract matrix with no separate unbounded parser or data generator.}
+  authoring_example_contract:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: required, evidence_group: authoring}
+    example: {state: required, evidence_group: examples}
+    property: {state: not_applicable, owner: self, reason_code: deterministic_contract_matrix, reason: The authored forms have a finite deterministic contract matrix covered by executable authoring and Covenant cases.}
+    fuzz: {state: not_applicable, owner: self, reason_code: deterministic_contract_matrix, reason: The authored forms use bounded static declarations and have no separate runtime fuzz group.}
+  stateful_example_contract:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: not_applicable, owner: self, reason_code: no_supported_authoring_surface, reason: This lifecycle component has no supported JSON or DSL authoring form in the current package.}
+    example: {state: required, evidence_group: examples}
+    property: {state: not_applicable, owner: self, reason_code: stateful_lifecycle, reason: "Deterministic lifecycle, isolation, recovery, and cleanup scenarios are the required proof for this stateful component."}
+    fuzz: {state: not_applicable, owner: self, reason_code: stateful_lifecycle, reason: Stateful process ownership needs deterministic barriers and cleanup checks instead of an uncoordinated fuzz loop.}
+  authoring_stateful_example_contract:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: required, evidence_group: authoring}
+    example: {state: required, evidence_group: examples}
     property: {state: not_applicable, owner: self, reason_code: stateful_lifecycle, reason: Executable authoring plus deterministic lifecycle scenarios are the required proof for this stateful component.}
     fuzz: {state: not_applicable, owner: self, reason_code: stateful_lifecycle, reason: Stateful process ownership needs deterministic barriers and cleanup checks instead of an uncoordinated fuzz loop.}
   signal_stateful:
@@ -513,20 +904,20 @@ performance_profiles:
     load: {state: not_applicable, owner: self, reason_code: no_supported_load_surface, reason: Offline ReAct proof uses bounded deterministic requests; external provider throughput is not a portable package load gate.}
     benchmark: {state: required, evidence_group: react_benchmark}
 components:
-  - {id: jido.agent, proof_profile: authoring_contract, performance_profile: no_performance_surface}
-  - {id: jido.agent_evaluation, proof_profile: closed_contract, performance_profile: no_performance_surface}
-  - {id: jido.agent_server, proof_profile: stateful_contract, performance_profile: runtime_load}
+  - {id: jido.agent, proof_profile: authoring_example_contract, performance_profile: no_performance_surface}
+  - {id: jido.agent_evaluation, proof_profile: closed_example_contract, performance_profile: no_performance_surface}
+  - {id: jido.agent_server, proof_profile: stateful_example_contract, performance_profile: runtime_load}
   - {id: jido.agent_server.activation, proof_profile: stateful_contract, performance_profile: no_performance_surface}
-  - {id: jido.agent_server.composition, proof_profile: stateful_contract, performance_profile: no_performance_surface}
-  - {id: jido.agent_server.durable, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.agent_server.composition, proof_profile: stateful_example_contract, performance_profile: no_performance_surface}
+  - {id: jido.agent_server.durable, proof_profile: stateful_example_contract, performance_profile: no_performance_surface}
   - {id: jido.agent_server.durable_turn, proof_profile: stateful_contract, performance_profile: no_performance_surface}
   - {id: jido.agent_server.effects, proof_profile: signal_stateful, performance_profile: signal_benchmark}
   - {id: jido.agent_server.handoff, proof_profile: stateful_contract, performance_profile: no_performance_surface}
   - {id: jido.agent_server.plugin_runtime, proof_profile: stateful_contract, performance_profile: no_performance_surface}
   - {id: jido.error, proof_profile: closed_contract, performance_profile: no_performance_surface}
   - {id: jido.instance, proof_profile: stateful_contract, performance_profile: no_performance_surface}
-  - {id: jido.persistence, proof_profile: stateful_contract, performance_profile: no_performance_surface}
-  - {id: jido.plugin, proof_profile: authoring_stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.persistence, proof_profile: stateful_example_contract, performance_profile: no_performance_surface}
+  - {id: jido.plugin, proof_profile: authoring_stateful_example_contract, performance_profile: no_performance_surface}
   - {id: jido.plugin.audit, proof_profile: stateful_contract, performance_profile: no_performance_surface}
   - {id: jido.plugin.bus, proof_profile: signal_stateful, performance_profile: signal_benchmark}
   - {id: jido.plugin.heartbeat, proof_profile: stateful_contract, performance_profile: no_performance_surface}
@@ -537,16 +928,16 @@ components:
   - {id: jido_action.authoring, proof_profile: signal_authoring, performance_profile: signal_benchmark}
   - {id: jido_action.boundary, proof_profile: signal_authoring, performance_profile: signal_benchmark}
   - {id: jido_action.codec, proof_profile: authoring_contract, performance_profile: no_performance_surface}
-  - {id: jido_action.execution, proof_profile: closed_contract, performance_profile: execution_performance}
+  - {id: jido_action.execution, proof_profile: closed_example_contract, performance_profile: execution_performance}
   - {id: jido_action.expression, proof_profile: expression_authoring, performance_profile: no_performance_surface}
-  - {id: jido_action.flow, proof_profile: authoring_contract, performance_profile: action_flow_benchmark}
+  - {id: jido_action.flow, proof_profile: authoring_example_contract, performance_profile: action_flow_benchmark}
   - {id: jido_action.inline, proof_profile: authoring_contract, performance_profile: no_performance_surface}
   - {id: jido_action.inline_flow, proof_profile: authoring_contract, performance_profile: no_performance_surface}
   - {id: jido_action.instruction, proof_profile: authoring_contract, performance_profile: action_flow_benchmark}
   - {id: jido_action.output, proof_profile: closed_contract, performance_profile: no_performance_surface}
   - {id: jido_action.validation, proof_profile: authoring_contract, performance_profile: no_performance_surface}
-  - {id: jido_ai.agent_authoring, proof_profile: authoring_contract, performance_profile: no_performance_surface}
-  - {id: jido_ai.conversation, proof_profile: authoring_contract, performance_profile: no_performance_surface}
+  - {id: jido_ai.agent_authoring, proof_profile: authoring_example_contract, performance_profile: no_performance_surface}
+  - {id: jido_ai.conversation, proof_profile: authoring_example_contract, performance_profile: no_performance_surface}
   - {id: jido_ai.model_execution, proof_profile: external_contract, performance_profile: no_performance_surface}
   - {id: jido_ai.observability, proof_profile: external_contract, performance_profile: no_performance_surface}
   - {id: jido_ai.react, proof_profile: closed_contract, performance_profile: react_benchmark}

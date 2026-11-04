@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("01_agent_basics/01_05_directive_agent/effects.ex")
 Loader.require_source!("01_agent_basics/01_05_directive_agent/directive_agent.ex")
 
-defmodule JidoTest.Examples.Basic.DirectiveAgentTest do
+defmodule Jido.Examples.Basic.DirectiveAgentTest do
   use Jido.Test.Agent.BasicSDKCase
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("01_agent_basics/01_05_directive_agent/directive_agent.ex")
+    Jido.Test.Examples.Loader.require_source!("01_agent_basics/01_05_directive_agent/directive_agent.ex")
     :ok
   end
 

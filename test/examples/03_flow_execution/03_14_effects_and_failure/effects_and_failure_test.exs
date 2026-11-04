@@ -1,10 +1,10 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Execution.EffectsAndFailureTest do
+defmodule Jido.Examples.Execution.EffectsAndFailureTest do
   use ExUnit.Case, async: true
   @moduletag :example
   setup_all do
-    JidoTest.Examples.Loader.require_source!("03_flow_execution/03_14_effects_and_failure/effects_and_failure.ex")
+    Jido.Test.Examples.Loader.require_source!("03_flow_execution/03_14_effects_and_failure/effects_and_failure.ex")
     :ok
   end
 

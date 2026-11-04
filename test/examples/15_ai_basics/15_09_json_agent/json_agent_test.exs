@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-JidoTest.Examples.Loader.require_source!("15_ai_basics/15_09_json_agent/json_agent.ex")
+Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_09_json_agent/json_agent.ex")
 
-defmodule JidoTest.Examples.AI.JSONAgentTest do
+defmodule Jido.Examples.AI.JSONAgentTest do
   use Jido.Test.Case, async: true
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("15_ai_basics/15_09_json_agent/json_agent.ex")
+    Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_09_json_agent/json_agent.ex")
     :ok
   end
 

@@ -1,10 +1,10 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Execution.SerialThenParallelTest do
+defmodule Jido.Examples.Execution.SerialThenParallelTest do
   use ExUnit.Case, async: true
   @moduletag :example
   setup_all do
-    JidoTest.Examples.Loader.require_source!("03_flow_execution/03_03_serial_then_parallel/serial_then_parallel.ex")
+    Jido.Test.Examples.Loader.require_source!("03_flow_execution/03_03_serial_then_parallel/serial_then_parallel.ex")
     :ok
   end
 

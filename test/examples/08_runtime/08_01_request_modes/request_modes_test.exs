@@ -1,9 +1,9 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_01_request_modes/request_modes.ex")
 
-defmodule JidoTest.Examples.Runtime.RequestModesBlockingAction do
+defmodule Jido.Test.Examples.Runtime.RequestModesBlockingAction do
   @moduledoc false
   use Jido.Action,
     name: "test_runtime_request_modes_blocking_action",
@@ -17,7 +17,7 @@ defmodule JidoTest.Examples.Runtime.RequestModesBlockingAction do
   end
 end
 
-defmodule JidoTest.Examples.Runtime.RequestModesBlockingAgent do
+defmodule Jido.Test.Examples.Runtime.RequestModesBlockingAgent do
   @moduledoc false
   use Jido.Agent, name: "test_runtime_request_modes_blocking_agent"
 
@@ -29,23 +29,23 @@ defmodule JidoTest.Examples.Runtime.RequestModesBlockingAgent do
     signal_source "/test/examples/runtime/request_modes"
 
     route "test.examples.runtime.request_modes.record",
-          JidoTest.Examples.Runtime.RequestModesBlockingAction do
+          Jido.Test.Examples.Runtime.RequestModesBlockingAction do
     end
   end
 end
 
-defmodule JidoTest.Examples.Runtime.RequestModesTest do
+defmodule Jido.Examples.Runtime.RequestModesTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_01_request_modes/request_modes.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_01_request_modes/request_modes.ex")
     :ok
   end
 
   alias Jido.AgentServer
   alias Jido.Examples.RequestModes
-  alias JidoTest.Examples.Runtime.RequestModesBlockingAgent
+  alias Jido.Test.Examples.Runtime.RequestModesBlockingAgent
   alias Jido.Test.AgentServer.RuntimeBarrier
 
   setup do

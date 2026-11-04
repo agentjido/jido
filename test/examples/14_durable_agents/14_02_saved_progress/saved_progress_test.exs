@@ -1,22 +1,22 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("14_durable_agents/14_02_saved_progress/advance.ex")
 Loader.require_source!("14_durable_agents/14_02_saved_progress/saved_progress.ex")
 Code.require_file("../../support/durable_step_probe.exs", __DIR__)
 
-defmodule JidoTest.Examples.Durable.SavedProgressTest do
+defmodule Jido.Examples.Durable.SavedProgressTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("14_durable_agents/14_02_saved_progress/saved_progress.ex")
+    Jido.Test.Examples.Loader.require_source!("14_durable_agents/14_02_saved_progress/saved_progress.ex")
     :ok
   end
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Durable.SavedProgress
-  alias JidoTest.Examples.Durable.{ObservedAgent, StepProbe}
+  alias Jido.Test.Examples.Durable.{ObservedAgent, StepProbe}
 
   test "the ten-step Flow adds ten" do
     assert {:ok, %{value: 10}} = Jido.Exec.run(SavedProgress, %{value: 0})

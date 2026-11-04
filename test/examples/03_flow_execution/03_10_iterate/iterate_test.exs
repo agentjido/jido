@@ -1,10 +1,10 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Execution.IterateTest do
+defmodule Jido.Examples.Execution.IterateTest do
   use ExUnit.Case, async: true
   @moduletag :example
   setup_all do
-    JidoTest.Examples.Loader.require_source!("03_flow_execution/03_10_iterate/iterate.ex")
+    Jido.Test.Examples.Loader.require_source!("03_flow_execution/03_10_iterate/iterate.ex")
     :ok
   end
 

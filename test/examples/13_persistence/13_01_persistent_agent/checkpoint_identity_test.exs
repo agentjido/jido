@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("13_persistence/13_01_persistent_agent/checkpoint_identity_probe.ex")
 Loader.require_source!("13_persistence/13_01_persistent_agent/persistent_agent.ex")
 
-defmodule JidoTest.Examples.Persistence.CheckpointIdentityTest do
+defmodule Jido.Examples.Persistence.CheckpointIdentityTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("13_persistence/13_01_persistent_agent/checkpoint_identity_probe.ex")
+    Jido.Test.Examples.Loader.require_source!("13_persistence/13_01_persistent_agent/checkpoint_identity_probe.ex")
 
     :ok
   end

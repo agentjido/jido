@@ -1,14 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("13_persistence/13_03_portable_checkpoint/checkpoint_portability_probe.ex")
 
-defmodule JidoTest.Examples.Persistence.PortableCheckpointTest do
+defmodule Jido.Examples.Persistence.PortableCheckpointTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("13_persistence/13_03_portable_checkpoint/checkpoint_portability_probe.ex")
+    Jido.Test.Examples.Loader.require_source!(
+      "13_persistence/13_03_portable_checkpoint/checkpoint_portability_probe.ex"
+    )
 
     :ok
   end

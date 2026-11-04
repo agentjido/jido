@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("01_agent_basics/01_07_data_defined_agent/data_defined_agent.ex")
 
-defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
+defmodule Jido.Examples.Basic.DataDefinedAgentTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("01_agent_basics/01_07_data_defined_agent/data_defined_agent.ex")
+    Jido.Test.Examples.Loader.require_source!("01_agent_basics/01_07_data_defined_agent/data_defined_agent.ex")
     :ok
   end
 

@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
-unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
+unless Code.ensure_loaded?(Jido.Test.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
 
-JidoTest.Examples.Loader.require_source!("15_ai_basics/15_02_tool_flow/agent.ex")
+Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_02_tool_flow/agent.ex")
 
-defmodule JidoTest.Examples.AI.ToolFlowTest do
+defmodule Jido.Examples.AI.ToolFlowTest do
   use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("15_ai_basics/15_02_tool_flow/agent.ex")
+    Jido.Test.Examples.Loader.require_source!("15_ai_basics/15_02_tool_flow/agent.ex")
     :ok
   end
 
@@ -18,7 +18,7 @@ defmodule JidoTest.Examples.AI.ToolFlowTest do
   setup :verify_on_exit!
 
   alias Jido.Examples.AI.ToolFlow
-  alias JidoTest.Examples.AIModel
+  alias Jido.Test.Examples.AIModel
 
   test "the Action and Flow have the same validated calculation" do
     assert {:ok, %{product: 12}} = Jido.Exec.run(ToolFlow.Multiply, %{left: 3, right: 4}, %{})

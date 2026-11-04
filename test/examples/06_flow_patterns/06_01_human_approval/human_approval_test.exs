@@ -1,11 +1,11 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Patterns.HumanApprovalTest do
+defmodule Jido.Examples.Patterns.HumanApprovalTest do
   use ExUnit.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("06_flow_patterns/06_01_human_approval/human_approval.ex")
+    Jido.Test.Examples.Loader.require_source!("06_flow_patterns/06_01_human_approval/human_approval.ex")
 
     :ok
   end

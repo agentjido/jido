@@ -1,10 +1,10 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Execution.LoopInvokeWaitTest do
+defmodule Jido.Examples.Execution.LoopInvokeWaitTest do
   use ExUnit.Case, async: false
   @moduletag :example
   setup_all do
-    JidoTest.Examples.Loader.require_source!("03_flow_execution/03_06_loop_invoke_wait/loop_invoke_wait.ex")
+    Jido.Test.Examples.Loader.require_source!("03_flow_execution/03_06_loop_invoke_wait/loop_invoke_wait.ex")
     :ok
   end
 

@@ -1,11 +1,11 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Compilation.AuthoringEquivalenceTest do
+defmodule Jido.Examples.Compilation.AuthoringEquivalenceTest do
   use ExUnit.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("02_flow_authoring/02_05_authoring_equivalence/authoring_equivalence.ex")
+    Jido.Test.Examples.Loader.require_source!("02_flow_authoring/02_05_authoring_equivalence/authoring_equivalence.ex")
 
     :ok
   end

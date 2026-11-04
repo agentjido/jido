@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("10_topologies/10_02_direct_connections/sink.ex")
 Loader.require_source!("10_topologies/10_02_direct_connections/worker.ex")
 Loader.require_source!("10_topologies/10_02_direct_connections/direct_connections.ex")
 
-defmodule JidoTest.Examples.Topology.DirectConnectionsTest do
+defmodule Jido.Examples.Topology.DirectConnectionsTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("10_topologies/10_02_direct_connections/direct_connections.ex")
+    Jido.Test.Examples.Loader.require_source!("10_topologies/10_02_direct_connections/direct_connections.ex")
     :ok
   end
 

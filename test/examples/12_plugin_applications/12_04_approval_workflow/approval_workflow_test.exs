@@ -1,6 +1,6 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("12_plugin_applications/12_04_approval_workflow/ports.ex")
 Loader.require_source!("12_plugin_applications/12_04_approval_workflow/support/adapters.ex")
 Loader.require_source!("12_plugin_applications/12_04_approval_workflow/booking_actions.ex")
@@ -8,12 +8,12 @@ Loader.require_source!("12_plugin_applications/12_04_approval_workflow/booking_p
 Loader.require_source!("12_plugin_applications/12_04_approval_workflow/search_flow.ex")
 Loader.require_source!("12_plugin_applications/12_04_approval_workflow/approval_workflow.ex")
 
-defmodule JidoTest.Examples.Applications.ApprovalWorkflowTest do
+defmodule Jido.Examples.Applications.ApprovalWorkflowTest do
   use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("12_plugin_applications/12_04_approval_workflow/approval_workflow.ex")
+    Jido.Test.Examples.Loader.require_source!("12_plugin_applications/12_04_approval_workflow/approval_workflow.ex")
     :ok
   end
 

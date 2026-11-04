@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_15_pending_job_recovery/job_runtime.ex")
 Loader.require_source!("08_runtime/08_15_pending_job_recovery/pending_job_recovery.ex")
 Code.require_file("../../support/job_runner.exs", __DIR__)
 
-defmodule JidoTest.Examples.Runtime.PendingJobRecoveryTest do
+defmodule Jido.Examples.Runtime.PendingJobRecoveryTest do
   use Jido.Test.Agent.FeatureSDKCase
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_15_pending_job_recovery/pending_job_recovery.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_15_pending_job_recovery/pending_job_recovery.ex")
     :ok
   end
 
@@ -39,7 +39,7 @@ defmodule JidoTest.Examples.Runtime.PendingJobRecoveryTest do
       Example.approve_job_signal(%{job_id: "job-1", attempt_id: "attempt-1"})
 
     assert {:ok, approved, _directives} =
-             Jido.AgentServer.call(server, route_signal_2, context: JidoTest.JobRunner.context(self()))
+             Jido.AgentServer.call(server, route_signal_2, context: Jido.Test.Examples.JobRunner.context(self()))
 
     assert approved.state.status == :running
     assert_receive {:job_work, first_task, 3}, 1000
@@ -59,7 +59,7 @@ defmodule JidoTest.Examples.Runtime.PendingJobRecoveryTest do
     {:ok, route_signal_3} = Example.retry_job_signal(%{job_id: "job-1", attempt_id: "attempt-2"})
 
     assert {:ok, retrying, _directives} =
-             Jido.AgentServer.call(restored, route_signal_3, context: JidoTest.JobRunner.context(self()))
+             Jido.AgentServer.call(restored, route_signal_3, context: Jido.Test.Examples.JobRunner.context(self()))
 
     assert retrying.state.attempts == ["attempt-1", "attempt-2"]
     assert_receive {:job_work, second_task, 3}, 1000

@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("12_plugin_applications/12_01_audit/audit.ex")
 
-defmodule JidoTest.Examples.Applications.AuditTest do
+defmodule Jido.Examples.Applications.AuditTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("12_plugin_applications/12_01_audit/audit.ex")
+    Jido.Test.Examples.Loader.require_source!("12_plugin_applications/12_01_audit/audit.ex")
     :ok
   end
 

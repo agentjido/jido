@@ -1,4 +1,4 @@
-defmodule JidoTest.Examples.Durable.PublicationProbe do
+defmodule Jido.Test.Examples.Durable.PublicationProbe do
   @moduledoc false
   use GenServer
   alias Jido.Examples.Durable.ExternalUncertainty.MemoryProvider

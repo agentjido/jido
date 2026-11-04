@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("14_durable_agents/14_05_saved_completion/saved_completion.ex")
 Code.require_file("../../support/durable_completion_probe.exs", __DIR__)
 
-defmodule JidoTest.Examples.Durable.SavedCompletionTest do
+defmodule Jido.Examples.Durable.SavedCompletionTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("14_durable_agents/14_05_saved_completion/saved_completion.ex")
+    Jido.Test.Examples.Loader.require_source!("14_durable_agents/14_05_saved_completion/saved_completion.ex")
     :ok
   end
 
@@ -17,7 +17,7 @@ defmodule JidoTest.Examples.Durable.SavedCompletionTest do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Durable.SavedCompletion, as: Example
-  alias JidoTest.Examples.Durable.{CompletionProbe, CompletionStorage}
+  alias Jido.Test.Examples.Durable.{CompletionProbe, CompletionStorage}
 
   test "a saved completion survives a lost storage reply without repeating Flow work", c do
     start_supervised!({CompletionProbe, self()})

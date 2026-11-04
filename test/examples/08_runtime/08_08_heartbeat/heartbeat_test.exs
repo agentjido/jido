@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_08_heartbeat/heartbeat.ex")
 
-defmodule JidoTest.Examples.Runtime.HeartbeatTest do
+defmodule Jido.Examples.Runtime.HeartbeatTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_08_heartbeat/heartbeat.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_08_heartbeat/heartbeat.ex")
     :ok
   end
 

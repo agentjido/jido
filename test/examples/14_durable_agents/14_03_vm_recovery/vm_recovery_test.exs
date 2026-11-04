@@ -1,17 +1,17 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("14_durable_agents/14_03_vm_recovery/support/dets_store.ex")
 Loader.require_source!("14_durable_agents/14_03_vm_recovery/vm_recovery.ex")
 Code.require_file("../../support/durable_step_probe.exs", __DIR__)
 Code.require_file("../../support/durable_peer.exs", __DIR__)
 
-defmodule JidoTest.Examples.Durable.VMRecoveryTest do
+defmodule Jido.Examples.Durable.VMRecoveryTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("14_durable_agents/14_03_vm_recovery/vm_recovery.ex")
+    Jido.Test.Examples.Loader.require_source!("14_durable_agents/14_03_vm_recovery/vm_recovery.ex")
     :ok
   end
 
@@ -20,7 +20,7 @@ defmodule JidoTest.Examples.Durable.VMRecoveryTest do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Durable.{SavedProgress, VMRecovery}
-  alias JidoTest.Examples.Durable.{ObservedAgent, Peer, StepProbe}
+  alias Jido.Test.Examples.Durable.{ObservedAgent, Peer, StepProbe}
 
   @instance VMRecovery.Instance
   @sources Path.wildcard(Path.expand("../../../../examples/14_durable_agents/14_02_saved_progress/*.ex", __DIR__)) ++

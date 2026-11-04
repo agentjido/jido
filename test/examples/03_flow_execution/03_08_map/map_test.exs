@@ -1,10 +1,10 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Execution.MapTest do
+defmodule Jido.Examples.Execution.MapTest do
   use ExUnit.Case, async: false
   @moduletag :example
   setup_all do
-    JidoTest.Examples.Loader.require_source!("03_flow_execution/03_08_map/map.ex")
+    Jido.Test.Examples.Loader.require_source!("03_flow_execution/03_08_map/map.ex")
     :ok
   end
 

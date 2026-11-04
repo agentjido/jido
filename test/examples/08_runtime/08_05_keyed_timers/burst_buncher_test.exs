@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_05_keyed_timers/timer.ex")
 Loader.require_source!("08_runtime/08_05_keyed_timers/burst_buncher.ex")
 
-defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
+defmodule Jido.Examples.Runtime.BurstBuncherTest do
   use Jido.Test.Agent.Case
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_05_keyed_timers/burst_buncher.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_05_keyed_timers/burst_buncher.ex")
     :ok
   end
 

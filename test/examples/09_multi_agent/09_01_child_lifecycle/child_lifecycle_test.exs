@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/support/keep_state.ex")
 Loader.require_source!("09_multi_agent/support/worker.ex")
 Loader.require_source!("09_multi_agent/09_01_child_lifecycle/child_lifecycle.ex")
 
-defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
+defmodule Jido.Examples.MultiAgent.ChildLifecycleTest do
   use Jido.Test.Agent.FeatureSDKCase
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("09_multi_agent/09_01_child_lifecycle/child_lifecycle.ex")
+    Jido.Test.Examples.Loader.require_source!("09_multi_agent/09_01_child_lifecycle/child_lifecycle.ex")
     :ok
   end
 

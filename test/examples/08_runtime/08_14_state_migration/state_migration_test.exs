@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("08_runtime/08_14_state_migration/state_migration.ex")
 
-defmodule JidoTest.Examples.Runtime.StateMigrationTest do
+defmodule Jido.Examples.Runtime.StateMigrationTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("08_runtime/08_14_state_migration/state_migration.ex")
+    Jido.Test.Examples.Loader.require_source!("08_runtime/08_14_state_migration/state_migration.ex")
     :ok
   end
 

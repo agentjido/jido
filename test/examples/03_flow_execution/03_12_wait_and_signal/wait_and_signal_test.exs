@@ -1,10 +1,10 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-defmodule JidoTest.Examples.Execution.WaitAndSignalTest do
+defmodule Jido.Examples.Execution.WaitAndSignalTest do
   use ExUnit.Case, async: false
   @moduletag :example
   setup_all do
-    JidoTest.Examples.Loader.require_source!("03_flow_execution/03_12_wait_and_signal/wait_and_signal.ex")
+    Jido.Test.Examples.Loader.require_source!("03_flow_execution/03_12_wait_and_signal/wait_and_signal.ex")
     :ok
   end
 

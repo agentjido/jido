@@ -1,15 +1,15 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("04_agent_workflows/04_09_flow_directives/effects.ex")
 Loader.require_source!("04_agent_workflows/04_09_flow_directives/flow_directives.ex")
 
-defmodule JidoTest.Examples.Workflow.FlowDirectivesTest do
+defmodule Jido.Examples.Workflow.FlowDirectivesTest do
   use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("04_agent_workflows/04_09_flow_directives/flow_directives.ex")
+    Jido.Test.Examples.Loader.require_source!("04_agent_workflows/04_09_flow_directives/flow_directives.ex")
     :ok
   end
 

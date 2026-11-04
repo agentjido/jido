@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
-unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
+unless Code.ensure_loaded?(Jido.Test.Examples.AIModel), do: Code.require_file("../../support/ai_model.exs", __DIR__)
 
-JidoTest.Examples.Loader.require_source!("16_ai_conversations/16_04_conversation_history/conversation_history.ex")
+Jido.Test.Examples.Loader.require_source!("16_ai_conversations/16_04_conversation_history/conversation_history.ex")
 
-defmodule JidoTest.Examples.AI.ConversationHistoryTest do
+defmodule Jido.Examples.AI.ConversationHistoryTest do
   use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("16_ai_conversations/16_04_conversation_history/conversation_history.ex")
+    Jido.Test.Examples.Loader.require_source!("16_ai_conversations/16_04_conversation_history/conversation_history.ex")
     :ok
   end
 
@@ -18,7 +18,7 @@ defmodule JidoTest.Examples.AI.ConversationHistoryTest do
   setup :verify_on_exit!
 
   alias Jido.Examples.AI.ConversationHistory
-  alias JidoTest.Examples.AIModel
+  alias Jido.Test.Examples.AIModel
 
   test "the second request includes the first committed exchange" do
     owner = self()

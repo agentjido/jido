@@ -41,6 +41,42 @@ defmodule Jido.Quality.ComponentProofTest do
     assert Enum.all?(behavior_claims, &(&1["covenant_obligations"] == "all"))
   end
 
+  test "each example owns one documentation claim and supplements its component behavior" do
+    proof = ComponentProof.load!(@proof_path)
+    {:ok, catalog} = YamlElixir.read_from_file(Path.join(@root, "test/examples/catalog.yml"))
+
+    example_claims =
+      proof["claims"]
+      |> Enum.filter(&String.starts_with?(&1["id"], "example."))
+      |> Map.new(&{&1["id"], &1})
+
+    assert map_size(example_claims) == length(catalog["examples"])
+
+    Enum.each(catalog["examples"], fn example ->
+      claim = Map.fetch!(example_claims, "example.#{example["id"]}.documentation")
+
+      assert claim["component"] == example["component"]
+      assert claim["canonical"]["mode"] == "example"
+      assert claim["canonical"]["evidence_group"] == "examples"
+      assert claim["canonical"]["owner"] == example["test"]
+    end)
+
+    example_components = catalog["examples"] |> Enum.map(& &1["component"]) |> Enum.uniq()
+    components = Map.new(proof["components"], &{&1["id"], &1})
+    behavior_claims = Map.new(proof["claims"], &{&1["id"], &1})
+
+    Enum.each(example_components, fn component ->
+      profile = proof["proof_profiles"][components[component]["proof_profile"]]
+      behavior = behavior_claims["#{component}.behavior"]
+
+      assert profile["example"] == %{"state" => "required", "evidence_group" => "examples"}
+
+      assert Enum.any?(behavior["supplemental"], fn supplement ->
+               supplement["mode"] == "example" and supplement["evidence_group"] == "examples"
+             end)
+    end)
+  end
+
   test "rejects two canonical owners for one claim" do
     proof = ComponentProof.load!(@proof_path)
     [first | _rest] = proof["claims"]

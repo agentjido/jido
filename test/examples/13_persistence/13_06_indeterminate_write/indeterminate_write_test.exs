@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("13_persistence/13_06_indeterminate_write/indeterminate_write_probe.ex")
 
-defmodule JidoTest.Examples.Persistence.IndeterminateWriteTest do
+defmodule Jido.Examples.Persistence.IndeterminateWriteTest do
   use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("13_persistence/13_06_indeterminate_write/indeterminate_write_probe.ex")
+    Jido.Test.Examples.Loader.require_source!("13_persistence/13_06_indeterminate_write/indeterminate_write_probe.ex")
 
     :ok
   end

@@ -1,16 +1,16 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("14_durable_agents/14_07_external_uncertainty/support/memory_provider.ex")
 Loader.require_source!("14_durable_agents/14_07_external_uncertainty/external_uncertainty.ex")
 Code.require_file("../../support/durable_publication_probe.exs", __DIR__)
 
-defmodule JidoTest.Examples.Durable.ExternalUncertaintyTest do
+defmodule Jido.Examples.Durable.ExternalUncertaintyTest do
   use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("14_durable_agents/14_07_external_uncertainty/external_uncertainty.ex")
+    Jido.Test.Examples.Loader.require_source!("14_durable_agents/14_07_external_uncertainty/external_uncertainty.ex")
     :ok
   end
 
@@ -19,7 +19,7 @@ defmodule JidoTest.Examples.Durable.ExternalUncertaintyTest do
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Durable.ExternalUncertainty, as: Example
   alias Example.MemoryProvider
-  alias JidoTest.Examples.Durable.PublicationProbe
+  alias Jido.Test.Examples.Durable.PublicationProbe
 
   setup c do
     provider = :"publication_#{System.unique_integer([:positive])}"

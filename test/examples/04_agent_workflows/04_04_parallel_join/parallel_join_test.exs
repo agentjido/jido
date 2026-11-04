@@ -1,14 +1,14 @@
 Code.require_file("../../support/loader.exs", __DIR__)
 
-alias JidoTest.Examples.Loader
+alias Jido.Test.Examples.Loader
 Loader.require_source!("04_agent_workflows/04_04_parallel_join/parallel_join.ex")
 
-defmodule JidoTest.Examples.Workflow.ParallelJoinTest do
+defmodule Jido.Examples.Workflow.ParallelJoinTest do
   use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do
-    JidoTest.Examples.Loader.require_source!("04_agent_workflows/04_04_parallel_join/parallel_join.ex")
+    Jido.Test.Examples.Loader.require_source!("04_agent_workflows/04_04_parallel_join/parallel_join.ex")
     :ok
   end
 
