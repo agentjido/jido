@@ -79,9 +79,9 @@ mix test.services
 JIDO_LIVE_OPENAI_API_KEY=... mix test.live
 ```
 
-The live command requires a dedicated test key. See
-`test/system/services/README.md` and `test/live/README.md` for setup and cleanup
-rules. The CI workflow runs each required offline surface as a named job. Its
+The live command requires a dedicated test key. See `test/external/README.md`
+and `test/external/jido_ai/README.md` for setup and cleanup rules. The CI
+workflow runs each required offline surface as a named job. Its
 scheduled or manual extended jobs run longer fuzz, load burn-in, and benchmark
 checks. Service and live jobs are manual only.
 
@@ -98,7 +98,7 @@ The default model is `openai:gpt-4o-mini`. Use `JIDO_LIVE_MODEL` and
 
 ## Runic ReAct memory benchmark
 
-[`test/bench/ai/react_memory.exs`](test/bench/ai/react_memory.exs) is one self-contained
+[`test/perf/jido_ai/react_memory.exs`](test/perf/jido_ai/react_memory.exs) is one self-contained
 reproduction and benchmark for the canonical graph-first ReAct path. It does
 not call a model provider. A deterministic local inference client emits known
 tool calls. A local Action returns an empty payload.

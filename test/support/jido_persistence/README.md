@@ -12,7 +12,7 @@ The profile registry is the source of truth for built-in persistence coverage.
 - `fixtures/persistent_probe.ex` is the shared Agent.
 - `fixtures/fault_adapter.ex` injects a rejected write or a lost reply after the Agent starts.
 
-`test/jido/persistence/conformance/local_test.exs` generates one ExUnit module for each active local profile. Active service modules use the same contract macros in `test/system/services/`.
+`test/jido/persistence/conformance/local_test.exs` generates one ExUnit module for each active local profile. Active service modules use the same contract macros in `test/external/`.
 
 ## Add an adapter
 

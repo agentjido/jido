@@ -174,11 +174,10 @@ defmodule Jido.Quality.ComponentProofTest do
 
   test "load and benchmark catalogs cover exactly the required performance components" do
     proof = ComponentProof.load!(@proof_path)
-    {:ok, load_catalog} = YamlElixir.read_from_file(Path.join(@root, "test/load/catalog.yml"))
-    {:ok, benchmark_catalog} = YamlElixir.read_from_file(Path.join(@root, "test/bench/catalog.yml"))
+    {:ok, catalog} = YamlElixir.read_from_file(Path.join(@root, "test/perf/catalog.yml"))
 
-    load_components = catalog_components(load_catalog)
-    benchmark_components = catalog_components(benchmark_catalog)
+    load_components = catalog_components(catalog, "load")
+    benchmark_components = catalog_components(catalog, "benchmark")
 
     assert load_components == required_performance_components(proof, "load")
     assert benchmark_components == required_performance_components(proof, "benchmark")
@@ -217,8 +216,9 @@ defmodule Jido.Quality.ComponentProofTest do
 
   defp component_ids(proof), do: Enum.map(proof["components"], & &1["id"])
 
-  defp catalog_components(catalog) do
+  defp catalog_components(catalog, mode) do
     catalog["families"]
+    |> Enum.filter(&(&1["mode"] == mode))
     |> Enum.flat_map(& &1["components"])
     |> MapSet.new()
   end

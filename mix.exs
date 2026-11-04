@@ -116,9 +116,9 @@ defmodule Jido.MixProject do
 
   defp aliases do
     [
-      bench: "run test/bench/ai/react_memory.exs",
-      "bench.ai.fresh_workflow": "run test/bench/ai/react_fresh_workflow.exs",
-      "bench.ai.state_growth": "run test/bench/ai/react_state_growth.exs",
+      bench: "run test/perf/jido_ai/react_memory.exs",
+      "bench.ai.fresh_workflow": "run test/perf/jido_ai/react_fresh_workflow.exs",
+      "bench.ai.state_growth": "run test/perf/jido_ai/react_state_growth.exs",
       ci: [
         "compile --warnings-as-errors",
         "format --check-formatted",
@@ -141,7 +141,7 @@ defmodule Jido.MixProject do
       ],
       "test.authoring": test_alias("test/authoring", :authoring),
       "test.all": "test.ci",
-      "test.bench": test_alias("test/bench", :bench),
+      "test.bench": test_alias("test/perf", :bench),
       "test.ci": &run_test_ci/1,
       "test.contracts": "covenant.check",
       "test.examples": test_alias("test/examples", :example),
@@ -149,14 +149,14 @@ defmodule Jido.MixProject do
         run_tagged_tests("test/property", :fuzz, args)
         check_property_report!(args, :fuzz)
       end,
-      "test.live": test_alias("test/live", :live),
-      "test.load": test_alias("test/load", :load),
+      "test.live": test_alias("test/external/jido_ai", :live),
+      "test.load": test_alias("test/perf", :load),
       "test.peer": test_alias("test", :peer),
       "test.property": fn args ->
         run_tagged_tests("test/property", :property, args)
         check_property_report!(args, :property)
       end,
-      "test.services": test_alias("test/system/services", :service),
+      "test.services": test_alias("test/external", :service),
       "test.system": test_alias("test/system", :system),
       "quality.contract": "test test/quality/quality_contract_test.exs --seed 0",
       "quality.coverage": fn args ->
@@ -239,12 +239,12 @@ defmodule Jido.MixProject do
       ~r/^test\/contracts\//,
       ~r/^test\/authoring\/support\//,
       ~r/^test\/examples\/support\//,
-      ~r{^test/bench/(?:action_flow/(?:dsl_compile|fixtures|flow_compile|flow_run|react_stress|support)|ai/(?:react_fresh_workflow|react_memory|react_state_growth|react_support)|signal/run)\.exs$},
-      ~r{^test/bench/(?:signal/support|support)/},
+      ~r{^test/perf/(?:jido_ai/(?:react_fresh_workflow|react_memory|react_state_growth|react_stress|react_support)|jido_exec/flow_run|jido_flow/(?:dsl_compile|flow_compile)|jido_signal/run)\.exs$},
+      ~r{^test/perf/(?:jido_signal/support|support)/},
       ~r/^test\/quality\/support\//,
       ~r{^test/property/(?:support|[^/]+/support)/},
-      ~r|^test/system/services/support/|,
-      ~r|^test/system/runtime/core/support/|
+      ~r{^test/external/(?:support|(?:minio|redis)/support\.exs)},
+      ~r|^test/system/jido_agent_server/support/|
     ]
   end
 

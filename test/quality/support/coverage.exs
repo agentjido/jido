@@ -9,9 +9,9 @@ defmodule Jido.Quality.Coverage do
     "property" => %{path: "test/property", tag: "property"},
     "fuzz" => %{path: "test/property", tag: "fuzz"},
     "system" => %{path: "test/system", tag: "system"},
-    "load" => %{path: "test/load", tag: "load"},
+    "load" => %{path: "test/perf", tag: "load"},
     "peer" => %{path: "test", tag: "peer"},
-    "benchmark_smoke" => %{path: "test/bench", tag: "bench"}
+    "benchmark_smoke" => %{path: "test/perf", tag: "bench"}
   }
 
   def aggregate(suites, baseline, thresholds, options \\ []) do

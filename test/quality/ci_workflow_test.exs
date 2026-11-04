@@ -49,11 +49,15 @@ defmodule JidoTest.Quality.CIWorkflowTest do
     assert jobs["live"]["if"] =~ "workflow_dispatch"
     assert jobs["live"]["if"] =~ "run_live"
 
-    extended_names =
-      jobs["extended"]["strategy"]["matrix"]["include"]
-      |> Enum.map(& &1["name"])
+    extended_entries = jobs["extended"]["strategy"]["matrix"]["include"]
+    extended_names = Enum.map(extended_entries, & &1["name"])
+    extended_commands = Map.new(extended_entries, &{&1["name"], &1["command"]})
 
     assert extended_names == ["Extended fuzz", "Load burn-in", "Extended benchmarks"]
+    assert extended_commands["Load burn-in"] =~ "test/perf/jido_exec/burn_in.sh"
+    assert extended_commands["Extended benchmarks"] =~ "test/perf/jido_flow/flow_compile.exs"
+    assert extended_commands["Extended benchmarks"] =~ "test/perf/jido_exec/flow_run.exs"
+    assert extended_commands["Extended benchmarks"] =~ "test/perf/jido_ai/react_stress.exs"
   end
 
   test "the objective quality job runs coverage and report gates and uploads evidence" do

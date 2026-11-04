@@ -93,11 +93,19 @@ evidence_groups:
   expression_property: [test/property/jido_expr]
   expression_fuzz: [test/property/jido_expr]
   agent_server_property: [test/property/jido_agent_server]
-  runtime_load: [test/load/runtime]
-  action_flow_load: [test/load/action_flow]
-  signal_benchmark: [test/bench/signal]
-  action_flow_benchmark: [test/bench/action_flow]
-  react_benchmark: [test/bench/ai]
+  system_agent_server: [test/system/jido_agent_server]
+  system_execution: [test/system/jido_exec]
+  system_persistence: [test/system/jido_persistence]
+  system_telemetry: [test/system/jido_telemetry]
+  external_ai: [test/external/jido_ai]
+  external_minio: [test/external/minio]
+  external_postgres: [test/external/postgres]
+  external_redis: [test/external/redis]
+  runtime_load: [test/perf/jido_agent_server]
+  action_flow_load: [test/perf/jido_exec]
+  signal_benchmark: [test/perf/jido_signal]
+  action_flow_benchmark: [test/perf/jido_flow, test/perf/jido_exec]
+  react_benchmark: [test/perf/jido_ai]
 claims:
   - id: jido.agent.behavior
     component: jido.agent
@@ -371,6 +379,63 @@ claims:
     canonical: {mode: property, evidence_group: signal_property, owner: test/property/jido_signal/bus_histories_test.exs, proves: "Generated bus histories own subscription, publication, observation, and cleanup invariants."}
     supplemental:
       - {mode: fuzz, evidence_group: signal_fuzz, proves: "The larger fuzz budget extends bus operation histories and lifecycle interleavings."}
+  - id: jido.agent_server.system_cleanup
+    component: jido.agent_server
+    canonical: {mode: system, evidence_group: system_agent_server, owner: test/system/jido_agent_server/cleanup_test.exs, proves: "Local supervised pressure cycles own full AgentServer tree, registry, activation, and dynamic-supervisor cleanup behavior."}
+  - id: jido_action.execution.system_lifecycle
+    component: jido_action.execution
+    canonical: {mode: system, evidence_group: system_execution, owner: test/system/jido_exec/exec_test.exs, proves: "Local system execution owns public target-form equivalence and supervised task cleanup after each Flow run."}
+  - id: jido.persistence.system_recovery
+    component: jido.persistence
+    canonical: {mode: system, evidence_group: system_persistence, owner: test/system/jido_persistence/recovery_test.exs, proves: "Local File persistence owns checkpoint restoration, corrupt-record rejection, stale compare-and-swap conflict, and registry cleanup behavior."}
+  - id: jido.telemetry.system_boundary
+    component: jido.telemetry
+    canonical: {mode: system, evidence_group: system_telemetry, owner: test/system/jido_telemetry/observability_test.exs, proves: "Local telemetry integration owns committed and rejected AgentServer turn events without private payload disclosure."}
+  - id: jido_ai.model_execution.external_provider
+    component: jido_ai.model_execution
+    canonical: {mode: external, evidence_group: external_ai, owner: test/external/jido_ai/reasoning_live_test.exs, proves: "The opt-in provider test owns real model usage, correlation, completion, and redacted trace behavior at the external AI boundary."}
+  - id: jido.persistence.external_minio
+    component: jido.persistence
+    canonical: {mode: external, evidence_group: external_minio, owner: test/external/minio/minio_test.exs, proves: "The opt-in MinIO contract owns object-store persistence behavior and complete cleanup against a dedicated external service."}
+  - id: jido.persistence.external_postgres
+    component: jido.persistence
+    canonical: {mode: external, evidence_group: external_postgres, owner: test/external/postgres/postgres_test.exs, proves: "The opt-in PostgreSQL contract owns migrated relational persistence behavior against an isolated external database."}
+  - id: jido.persistence.external_redis
+    component: jido.persistence
+    canonical: {mode: external, evidence_group: external_redis, owner: test/external/redis/redis_test.exs, proves: "The opt-in Redis contract owns conditional writes, concurrency, binary values, and cleanup against an isolated external service."}
+  - id: jido.agent_server.lifecycle_capacity
+    component: jido.agent_server
+    canonical: {mode: load, evidence_group: runtime_load, owner: test/perf/jido_agent_server/load_test.exs, proves: "Bounded load cycles own AgentServer command capacity and complete process and registry cleanup under concurrent stop pressure."}
+  - id: jido_action.execution.capacity
+    component: jido_action.execution
+    canonical: {mode: load, evidence_group: action_flow_load, owner: test/perf/jido_exec/load_test.exs, proves: "Bounded load owns concurrent execution input isolation and complete caller and supervised task cleanup."}
+  - id: jido_action.authoring.signal_capacity
+    component: jido_action.authoring
+    canonical: {mode: benchmark, evidence_group: signal_benchmark, owner: test/perf/jido_signal/signal_bench_test.exs, proves: "The Signal workload owns construction, codec, routing, dispatch, and retained-term measurement inventory without portable timing thresholds."}
+  - id: jido_action.boundary.signal_capacity
+    component: jido_action.boundary
+    canonical: {mode: benchmark, evidence_group: signal_benchmark, owner: test/perf/jido_signal/extended_bench_test.exs, proves: "Extended Signal workloads own serialization, invalid-input, selector, and boundary resource measurements."}
+  - id: jido.agent_server.effects.signal_capacity
+    component: jido.agent_server.effects
+    canonical: {mode: benchmark, evidence_group: signal_benchmark, owner: test/perf/jido_signal/extended_bench_test.exs, proves: "Extended Signal workloads own dispatch and process-effect resource measurements with cleanup checks."}
+  - id: jido.plugin.bus.signal_capacity
+    component: jido.plugin.bus
+    canonical: {mode: benchmark, evidence_group: signal_benchmark, owner: test/perf/jido_signal/candidate_bench_test.exs, proves: "Candidate Signal workloads own publish, replay, removal, retention, and Bus activity measurements."}
+  - id: jido_action.action.compile_capacity
+    component: jido_action.action
+    canonical: {mode: benchmark, evidence_group: action_flow_benchmark, owner: test/perf/jido_flow/runner_test.exs, proves: "Bounded Flow runners own Action normalization and generated DSL compile measurements with result validation."}
+  - id: jido_action.flow.compile_capacity
+    component: jido_action.flow
+    canonical: {mode: benchmark, evidence_group: action_flow_benchmark, owner: test/perf/jido_flow/runner_test.exs, proves: "Bounded Flow runners own normalization, graph compilation, and generated module cleanup measurements."}
+  - id: jido_action.instruction.compile_capacity
+    component: jido_action.instruction
+    canonical: {mode: benchmark, evidence_group: action_flow_benchmark, owner: test/perf/jido_flow/runner_test.exs, proves: "Bounded Flow runners own instruction-bearing DSL compilation and executable result measurements."}
+  - id: jido_action.execution.run_capacity
+    component: jido_action.execution
+    canonical: {mode: benchmark, evidence_group: action_flow_benchmark, owner: test/perf/jido_exec/runner_test.exs, proves: "The execution runner owns Action, Flow module, and Flow value measurements with supervised task cleanup."}
+  - id: jido_ai.react.capacity
+    component: jido_ai.react
+    canonical: {mode: benchmark, evidence_group: react_benchmark, owner: test/perf/jido_ai/react_bench_test.exs, proves: "Deterministic ReAct workloads own retained state, fresh workflow, isolated memory, and repeatable case inventory measurements."}
 proof_profiles:
   closed_contract:
     unit: {state: required, evidence_group: unit}

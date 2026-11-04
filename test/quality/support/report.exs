@@ -7,9 +7,9 @@ defmodule Jido.Quality.Report do
     "property" => "test/property",
     "fuzz" => "test/property",
     "system" => "test/system",
-    "load" => "test/load",
+    "load" => "test/perf",
     "peer" => "test",
-    "benchmark_smoke" => "test/bench"
+    "benchmark_smoke" => "test/perf"
   }
 
   def evaluate(contract, evidence, metadata) do

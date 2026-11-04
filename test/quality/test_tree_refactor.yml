@@ -104,12 +104,39 @@ u4_result:
     - Product namespaces own executable authoring and property tests.
     - Jido.Test namespaces own shared and family-specific helpers.
     - AgentServer generated lifecycle proof is supplemental to deterministic runtime proof.
+u5_result:
+  system_suite:
+    passed: 5
+    skipped: 14
+  load_suite:
+    passed: 5
+    excluded: 27
+  bench_suite:
+    passed: 30
+    excluded: 2
+  quality_contract:
+    passed: 8
+  component_proof:
+    claims: 66
+    validation_tests_passed: 16
+  perf_catalog:
+    families: 10
+    load_families: 2
+    benchmark_families: 8
+  active_roots:
+    system: test/system
+    perf: test/perf
+    external: test/external
+  deferred_probes:
+    system_execution: 14
+    signal_property: 1
+    quality_executable: 0
 deletions:
   - removed:
       - test/property/signal/support/fuzz.exs
       - test/property/action_flow/support/fuzz.exs
     reason: duplicate_infrastructure
-    surviving_proof: test/property/support/fuzz.exs and test/property/signal/fuzz_support_test.exs
+    surviving_proof: test/property/support/fuzz.exs and test/property/jido_signal/fuzz_support_test.exs
   - removed:
       - test/property/signal/support/report.exs
       - test/property/action_flow/support/report.exs
@@ -128,7 +155,7 @@ deletions:
   - removed:
       - test/bench/layout_test.exs
     reason: layout_enforcement_removed
-    surviving_proof: test/bench/catalog_test.exs validates registered benchmark evidence without enforcing a general tree shape.
+    surviving_proof: test/perf/catalog_test.exs validates registered performance evidence without enforcing a general tree shape.
   - removed:
       - Property BUS and EXPR contract tags and contract_cases tags
     reason: parallel_contract_vocabulary_removed
@@ -161,3 +188,19 @@ deletions:
       - JidoTest, JidoActionTest, Jido.AITest, and Jido.AI.Contract executable module roots below test/jido
     reason: legacy_structure_removed
     surviving_proof: Covenant-tagged executable tests now live under namespace owners in test/jido, and Covenant reports 323 of 323 active obligations at 100 percent.
+  - removed:
+      - test/load/catalog.yml
+      - test/load/catalog_test.exs
+      - test/bench/catalog.yml
+      - test/bench/catalog_test.exs
+    reason: duplicate_infrastructure
+    surviving_proof: test/perf/catalog.yml and test/perf/catalog_test.exs own one load and benchmark workload registry.
+  - removed:
+      - test/load/README.md
+      - test/bench/action_flow/README.md
+    reason: duplicate_documentation
+    surviving_proof: test/perf/README.md and namespace README files document the final commands and ownership paths.
+  - removed:
+      - test/quality/deferred
+    reason: legacy_structure_removed
+    surviving_proof: Deferred execution probes are skipped under test/system/jido_exec/gaps, and the diagnostic probe is skipped under test/property/jido_signal; source manifest records keep each gap disposition.
