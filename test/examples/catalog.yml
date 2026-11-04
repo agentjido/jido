@@ -26,12 +26,109 @@ categories:
     source_root: examples/ai
     test_root: test/examples/ai
 index_readmes:
+  - examples/agent/01_basic/README.md
+  - examples/agent/02_workflow/README.md
   - examples/flow/01_compilation/README.md
   - examples/flow/02_execution/README.md
   - examples/flow/03_durability/README.md
   - examples/flow/04_patterns/README.md
   - examples/flow/05_distribution/README.md
 examples:
+  - id: agent/01_01_minimal_agent
+    category: agent
+    readme: examples/agent/01_basic/01_01_minimal_agent/README.md
+    source: examples/agent/01_basic/01_01_minimal_agent/minimal_agent.ex
+    test: test/examples/agent/01_basic/01_01_minimal_agent/minimal_agent_test.exs
+  - id: agent/01_02_typed_command_agent
+    category: agent
+    readme: examples/agent/01_basic/01_02_typed_command_agent/README.md
+    source: examples/agent/01_basic/01_02_typed_command_agent/typed_command_agent.ex
+    test: test/examples/agent/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs
+  - id: agent/01_03_plugin_state_agent
+    category: agent
+    readme: examples/agent/01_basic/01_03_plugin_state_agent/README.md
+    source: examples/agent/01_basic/01_03_plugin_state_agent/plugin_state_agent.ex
+    auxiliary_sources:
+      - examples/agent/01_basic/01_03_plugin_state_agent/count_turns.ex
+    test: test/examples/agent/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs
+  - id: agent/01_04_directive_agent
+    category: agent
+    readme: examples/agent/01_basic/01_04_directive_agent/README.md
+    source: examples/agent/01_basic/01_04_directive_agent/directive_agent.ex
+    auxiliary_sources:
+      - examples/agent/01_basic/01_04_directive_agent/effects.ex
+    test: test/examples/agent/01_basic/01_04_directive_agent/directive_agent_test.exs
+  - id: agent/01_05_otp_supervision
+    category: agent
+    readme: examples/agent/01_basic/01_05_otp_supervision/README.md
+    source: examples/agent/01_basic/01_05_otp_supervision/application.ex
+    auxiliary_sources:
+      - examples/agent/01_basic/01_05_otp_supervision/example.ex
+    test: test/examples/agent/01_basic/01_05_otp_supervision/example_test.exs
+  - id: agent/01_06_route_selection
+    category: agent
+    readme: examples/agent/01_basic/01_06_route_selection/README.md
+    source: examples/agent/01_basic/01_06_route_selection/route_selection.ex
+    test: test/examples/agent/01_basic/01_06_route_selection/route_selection_test.exs
+  - id: agent/01_07_data_defined_agent
+    category: agent
+    readme: examples/agent/01_basic/01_07_data_defined_agent/README.md
+    source: examples/agent/01_basic/01_07_data_defined_agent/data_defined_agent.ex
+    test: test/examples/agent/01_basic/01_07_data_defined_agent/data_defined_agent_test.exs
+  - id: agent/01_09_authoring_plugin
+    category: agent
+    readme: examples/agent/01_basic/01_09_authoring_plugin/README.md
+    source: examples/agent/01_basic/01_09_authoring_plugin/authoring_plugin.ex
+    test: test/examples/agent/01_basic/01_09_authoring_plugin/authoring_plugin_test.exs
+  - id: agent/02_01_sequential_flow
+    category: agent
+    readme: examples/agent/02_workflow/02_01_sequential_flow/README.md
+    source: examples/agent/02_workflow/02_01_sequential_flow/sequential_flow.ex
+    test: test/examples/agent/02_workflow/02_01_sequential_flow/sequential_flow_test.exs
+  - id: agent/02_02_effectful_steps
+    category: agent
+    readme: examples/agent/02_workflow/02_02_effectful_steps/README.md
+    source: examples/agent/02_workflow/02_02_effectful_steps/effectful_steps.ex
+    auxiliary_sources:
+      - examples/agent/02_workflow/02_02_effectful_steps/read_service.ex
+    test: test/examples/agent/02_workflow/02_02_effectful_steps/effectful_steps_test.exs
+  - id: agent/02_03_conditional_routes
+    category: agent
+    readme: examples/agent/02_workflow/02_03_conditional_routes/README.md
+    source: examples/agent/02_workflow/02_03_conditional_routes/conditional_routes.ex
+    test: test/examples/agent/02_workflow/02_03_conditional_routes/conditional_routes_test.exs
+  - id: agent/02_04_parallel_join
+    category: agent
+    readme: examples/agent/02_workflow/02_04_parallel_join/README.md
+    source: examples/agent/02_workflow/02_04_parallel_join/parallel_join.ex
+    test: test/examples/agent/02_workflow/02_04_parallel_join/parallel_join_test.exs
+  - id: agent/02_05_ordered_batch
+    category: agent
+    readme: examples/agent/02_workflow/02_05_ordered_batch/README.md
+    source: examples/agent/02_workflow/02_05_ordered_batch/ordered_batch.ex
+    test: test/examples/agent/02_workflow/02_05_ordered_batch/ordered_batch_test.exs
+  - id: agent/02_06_bounded_iteration
+    category: agent
+    readme: examples/agent/02_workflow/02_06_bounded_iteration/README.md
+    source: examples/agent/02_workflow/02_06_bounded_iteration/bounded_iteration.ex
+    test: test/examples/agent/02_workflow/02_06_bounded_iteration/bounded_iteration_test.exs
+  - id: agent/02_07_nested_flow
+    category: agent
+    readme: examples/agent/02_workflow/02_07_nested_flow/README.md
+    source: examples/agent/02_workflow/02_07_nested_flow/nested_flow.ex
+    test: test/examples/agent/02_workflow/02_07_nested_flow/nested_flow_test.exs
+  - id: agent/02_08_executable_continuation
+    category: agent
+    readme: examples/agent/02_workflow/02_08_executable_continuation/README.md
+    source: examples/agent/02_workflow/02_08_executable_continuation/executable_continuation.ex
+    test: test/examples/agent/02_workflow/02_08_executable_continuation/executable_continuation_test.exs
+  - id: agent/02_09_flow_directives
+    category: agent
+    readme: examples/agent/02_workflow/02_09_flow_directives/README.md
+    source: examples/agent/02_workflow/02_09_flow_directives/flow_directives.ex
+    auxiliary_sources:
+      - examples/agent/02_workflow/02_09_flow_directives/effects.ex
+    test: test/examples/agent/02_workflow/02_09_flow_directives/flow_directives_test.exs
   - id: flow/01_01_single_step
     category: flow
     readme: examples/flow/01_compilation/01_01_single_step/README.md

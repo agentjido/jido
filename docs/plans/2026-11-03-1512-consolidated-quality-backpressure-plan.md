@@ -482,7 +482,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Dependencies:** U8, U2, and U5.
 
-**Files:** Read split core `examples/01_basic/**`, `examples/02_workflow/**`, and matching tests at `21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61`. Add `examples/agent/basic/**`, `examples/agent/workflow/**`, and matching tests. Change the manifest.
+**Files:** Read split core `examples/01_basic/**`, `examples/02_workflow/**`, and matching tests at `21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61`. Add `examples/agent/01_basic/**`, `examples/agent/02_workflow/**`, and matching tests. Change the manifest.
 
 **Directive:**
 
@@ -496,7 +496,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 - [ ] Ported examples use current Agent, Flow, Plugin, and application boundaries.
 - [ ] No example calls a provider.
 
-**Verification:** `mix test.examples test/examples/agent/basic test/examples/agent/workflow` exits with status `0`.
+**Verification:** `mix test.examples test/examples/agent/01_basic test/examples/agent/02_workflow` exits with status `0`.
 
 ### U13. Port core runtime and topology examples
 

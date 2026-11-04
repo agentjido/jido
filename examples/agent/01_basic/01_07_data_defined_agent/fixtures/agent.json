@@ -1,0 +1,98 @@
+{
+  "definition": {
+    "description": null,
+    "plugins": [
+      {
+        "data": {
+          "$type": "map",
+          "entries": []
+        },
+        "id": "Elixir.Jido.Examples.DataDefinedAgent.CountTurns",
+        "provider": {
+          "id": "plugins/count-turns",
+          "vsn": 1
+        },
+        "vsn": 1
+      },
+      {
+        "data": {
+          "$type": "map",
+          "entries": [
+            {
+              "key": {
+                "$type": "atom",
+                "id": "atoms/retry-delay",
+                "vsn": 1
+              },
+              "value": 25
+            }
+          ]
+        },
+        "id": "Elixir.Jido.Plugin.Scheduler",
+        "provider": {
+          "id": "plugins/scheduler",
+          "vsn": 1
+        },
+        "vsn": 1
+      }
+    ],
+    "initial_state": {
+      "$type": "map",
+      "entries": []
+    },
+    "metadata": {
+      "$type": "map",
+      "entries": []
+    },
+    "module": null,
+    "name": "basic_data_defined_agent",
+    "routes": [
+      {
+        "as": null,
+        "defaults": {
+          "$type": "map",
+          "entries": []
+        },
+        "handler": {
+          "kind": "action",
+          "target": {
+            "id": "actions/add",
+            "vsn": 1
+          }
+        },
+        "path": "examples.basic.data_defined.add",
+        "reply": null,
+        "state": {"source": "output", "path": []}
+      },
+      {
+        "as": null,
+        "defaults": {
+          "$type": "map",
+          "entries": []
+        },
+        "handler": {
+          "kind": "action",
+          "target": {
+            "id": "actions/schedule",
+            "vsn": 1
+          }
+        },
+        "path": "examples.basic.data_defined.schedule",
+        "reply": null,
+        "state": {"source": "output", "path": []}
+      }
+    ],
+    "schema": {
+      "id": "schemas/counter",
+      "vsn": 1
+    },
+    "signal_source": null,
+    "topology": {
+      "agents": [],
+      "connections": []
+    },
+    "vsn": 1
+  },
+  "type": "jido.agent.definition",
+  "vsn": 1
+}

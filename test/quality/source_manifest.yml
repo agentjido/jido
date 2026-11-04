@@ -626,19 +626,155 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/01_basic
-    target_path: examples/agent/basic
+    target_path: examples/agent/01_basic
     quality_surface: examples
     owner: jido.agent
-    disposition: deferred
-    reason: Scheduled for jido-07x.12.
+    disposition: ported
+    reason: Ported by jido-07x.12 as eight numbered, offline Agent lessons with 29 public-boundary tests.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/01_basic/01_01_minimal_agent
+    target_path: examples/agent/01_basic/01_01_minimal_agent
+    quality_surface: examples
+    owner: jido.agent
+    disposition: ported
+    reason: Ported by jido-07x.12 with direct and supervised execution checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/01_basic/01_02_typed_command_agent
+    target_path: examples/agent/01_basic/01_02_typed_command_agent
+    quality_surface: examples
+    owner: jido.agent
+    disposition: ported
+    reason: Ported by jido-07x.12 with typed input and complete-state validation checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/01_basic/01_03_plugin_state_agent
+    target_path: examples/agent/01_basic/01_03_plugin_state_agent
+    quality_surface: examples
+    owner: jido.plugin
+    disposition: ported
+    reason: Ported by jido-07x.12 with Plugin state ownership and atomic commit checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/01_basic/01_04_directive_agent
+    target_path: examples/agent/01_basic/01_04_directive_agent
+    quality_surface: examples
+    owner: jido.agent_server
+    disposition: ported
+    reason: Ported by jido-07x.12 with Directive validation, ordered dispatch, and failure checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/01_basic/01_05_otp_supervision
+    target_path: examples/agent/01_basic/01_05_otp_supervision
+    quality_surface: examples
+    owner: jido.agent_server
+    disposition: ported
+    reason: Ported by jido-07x.12 with current instance facade calls and supervised recovery checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/01_basic/01_06_route_selection
+    target_path: examples/agent/01_basic/01_06_route_selection
+    quality_surface: examples
+    owner: jido.agent
+    disposition: ported
+    reason: Ported by jido-07x.12 with exact, wildcard, fallback, and reorder checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/01_basic/01_07_data_defined_agent
+    target_path: examples/agent/01_basic/01_07_data_defined_agent
+    quality_surface: examples
+    owner: jido.agent
+    disposition: ported
+    reason: Ported by jido-07x.12 with current Catalog and Codec boundaries and local Scheduler proof.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/01_basic/01_09_authoring_plugin
+    target_path: examples/agent/01_basic/01_09_authoring_plugin
+    quality_surface: examples
+    owner: jido.plugin
+    disposition: ported
+    reason: Ported by jido-07x.12 with DSL and map authoring equivalence checks.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/02_workflow
-    target_path: examples/agent/workflow
+    target_path: examples/agent/02_workflow
     quality_surface: examples
     owner: jido.flow
-    disposition: deferred
-    reason: Scheduled for jido-07x.12.
+    disposition: ported
+    reason: Ported by jido-07x.12 as nine numbered, offline workflow lessons with 25 integration tests.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/02_workflow/02_01_sequential_flow
+    target_path: examples/agent/02_workflow/02_01_sequential_flow
+    quality_surface: examples
+    owner: jido.flow
+    disposition: ported
+    reason: Ported by jido-07x.12 with current Catalog, Codec, dependency, commit, and schema checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/02_workflow/02_02_effectful_steps
+    target_path: examples/agent/02_workflow/02_02_effectful_steps
+    quality_surface: examples
+    owner: jido.flow
+    disposition: ported
+    reason: Ported by jido-07x.12 with local adapter, guard, retry, caching, and context checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/02_workflow/02_03_conditional_routes
+    target_path: examples/agent/02_workflow/02_03_conditional_routes
+    quality_surface: examples
+    owner: jido.flow
+    disposition: ported
+    reason: Ported by jido-07x.12 with first-match and explicit fallback policy checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/02_workflow/02_04_parallel_join
+    target_path: examples/agent/02_workflow/02_04_parallel_join
+    quality_surface: examples
+    owner: jido.flow
+    disposition: ported
+    reason: Ported by jido-07x.12 with parallel join and branch-failure checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/02_workflow/02_05_ordered_batch
+    target_path: examples/agent/02_workflow/02_05_ordered_batch
+    quality_surface: examples
+    owner: jido.flow
+    disposition: ported
+    reason: Ported by jido-07x.12 with ordered Map, error collection, fail-fast, and Reduce checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/02_workflow/02_06_bounded_iteration
+    target_path: examples/agent/02_workflow/02_06_bounded_iteration
+    quality_surface: examples
+    owner: jido.flow
+    disposition: ported
+    reason: Ported by jido-07x.12 with current Iterate result and exhaustion contracts.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/02_workflow/02_07_nested_flow
+    target_path: examples/agent/02_workflow/02_07_nested_flow
+    quality_surface: examples
+    owner: jido.flow
+    disposition: ported
+    reason: Ported by jido-07x.12 with nested scope, context, and contract checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/02_workflow/02_08_executable_continuation
+    target_path: examples/agent/02_workflow/02_08_executable_continuation
+    quality_surface: examples
+    owner: jido.flow
+    disposition: ported
+    reason: Ported by jido-07x.12 with dynamic Invoke and bounded continuation checks.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/02_workflow/02_09_flow_directives
+    target_path: examples/agent/02_workflow/02_09_flow_directives
+    quality_surface: examples
+    owner: jido.agent_server
+    disposition: ported
+    reason: Ported by jido-07x.12 with ordered post-commit Directive dispatch and failure discard checks.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/03_llm
