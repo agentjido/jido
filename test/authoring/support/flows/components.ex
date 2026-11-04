@@ -280,6 +280,18 @@ defmodule JidoActionTest.Authoring.Components.InvokeFlow do
   end
 end
 
+defmodule JidoActionTest.Authoring.Components.ParallelFlow do
+  use Jido.Flow, name: "authoring_parallel"
+
+  flow do
+    parallel "tools" do
+      action "echo", JidoActionTest.Authoring.Components.Echo, params: %{value: input(:value)}
+    end
+
+    output %{tools: result("tools")}
+  end
+end
+
 defmodule JidoActionTest.Authoring.Components.HandoffFlow do
   use Jido.Flow, name: "authoring_handoff"
 
