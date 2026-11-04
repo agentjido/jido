@@ -21,16 +21,16 @@ The fixed source has 12 test files, nine support assets, one README, and 60 decl
 | `README.md` | `test/authoring/flows/README.md` | Adapted |
 | `adversarial_test.exs` | `test/authoring/flows/adversarial_test.exs` | Adapted |
 | `boundaries_test.exs` | `test/authoring/flows/boundaries_test.exs` | Adapted |
-| `components_test.exs` | `test/authoring/flows/components_test.exs` | Planned by `jido-nnq.2` |
-| `extension_test.exs` | `test/authoring/flows/extension_test.exs` | Planned by `jido-nnq.3` |
-| `flow_edges_test.exs` | `test/authoring/flows/flow_edges_test.exs` | Planned by `jido-nnq.2` |
-| `generated_graph_test.exs` | `test/authoring/flows/generated_graph_test.exs` | Planned by `jido-nnq.4` |
+| `components_test.exs` | `test/authoring/flows/components_test.exs` | Adapted |
+| `extension_test.exs` | `test/authoring/flows/extension_test.exs` | Adapted |
+| `flow_edges_test.exs` | `test/authoring/flows/flow_edges_test.exs` | Adapted |
+| `generated_graph_test.exs` | `test/authoring/flows/generated_graph_test.exs` | Adapted |
 | `greeting_test.exs` | `test/authoring/flows/greeting_test.exs` | Adapted |
 | `guides_test.exs` | `test/jido/flow/dsl/spark_surface_test.exs` and `test/examples/02_flow_authoring/**` | Superseded by current registered guide and example evidence |
-| `inline_hostile_test.exs` | `test/authoring/flows/inline_hostile_test.exs` | Planned by `jido-nnq.3` |
-| `rejections_test.exs` | `test/authoring/flows/rejections_test.exs` | Planned by `jido-nnq.3` |
-| `schema_pipeline_test.exs` | `test/authoring/flows/schema_pipeline_test.exs` | Planned by `jido-nnq.2` |
-| `source_boundary_test.exs` | `test/authoring/flows/source_boundary_test.exs` | Planned by `jido-nnq.3` |
+| `inline_hostile_test.exs` | `test/authoring/flows/inline_hostile_test.exs` | Adapted |
+| `rejections_test.exs` | `test/authoring/flows/rejections_test.exs` | Adapted |
+| `schema_pipeline_test.exs` | `test/authoring/flows/schema_pipeline_test.exs` | Adapted |
+| `source_boundary_test.exs` | `test/authoring/flows/source_boundary_test.exs` | Adapted |
 | `support/adversarial.ex` | `test/authoring/support/flows/adversarial.ex` | Adapted |
 | `support/boundaries.ex` | `test/authoring/support/flows/boundaries.ex` | Adapted |
 | `support/components.ex` | `test/authoring/support/flows/components.ex` | Adapted |
