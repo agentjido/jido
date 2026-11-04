@@ -664,9 +664,9 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Test scenarios and acceptance criteria:**
 
-- [ ] Default and offline CI runs never select the live test.
-- [ ] Selected live runs require an explicit test key.
-- [ ] Written traces contain no prompt or secret value.
+- [x] Default and offline CI runs never select the live test.
+- [x] Selected live runs require an explicit test key.
+- [x] Written traces contain no prompt or secret value.
 
 **Verification:** `mix test.live` exits with status `0` with approved test credentials, and trace scans find no prompt or secret value.
 

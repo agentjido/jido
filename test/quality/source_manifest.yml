@@ -973,8 +973,8 @@ assets:
     target_path: test/live/ai_reasoning_live_test.exs
     quality_surface: live
     owner: jido.ai.model_execution
-    disposition: deferred
-    reason: Scheduled for jido-07x.19.
+    disposition: ported
+    reason: Ported by jido-07x.19 as an explicit test-key-gated provider, usage, telemetry-correlation, and redacted-trace check.
   - source_repository: jido_ai
     source_commit: 2d3cac6700fcb850b632c2ce5f552ccfd0e5459e
     source_path: examples/00_graph_first
