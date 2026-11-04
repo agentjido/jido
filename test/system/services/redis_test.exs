@@ -2,12 +2,12 @@ Code.require_file("support/docker.exs", __DIR__)
 Code.require_file("support/redis.exs", __DIR__)
 
 defmodule JidoTest.System.Services.RedisTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   @moduletag :service
   @moduletag timeout: 120_000
 
-  use JidoTest.Persistence.Contracts.Store
+  use Jido.Test.Persistence.Contracts.Store
 
   setup_all do
     container =

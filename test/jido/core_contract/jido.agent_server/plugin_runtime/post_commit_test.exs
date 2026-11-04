@@ -1,11 +1,11 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.PluginRuntime.PostCommitTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.plugin_runtime", async: false
   alias Jido.AgentServer, as: Server
   alias JidoTest.AgentServer.Fixtures, as: F
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
   @moduletag capture_log: true
 
   defmodule Effect do
@@ -102,8 +102,8 @@ defmodule JidoTest.AgentServer.PluginRuntime.PostCommitTest do
         name: "commit_plugins",
         schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         plugins: [
-          JidoTest.AgentContract.contribution(plugin, %{observer: __MODULE__, mode: mode}),
-          JidoTest.AgentContract.contribution(Second, %{observer: __MODULE__, mode: second_mode})
+          Jido.Test.Agent.Contract.contribution(plugin, %{observer: __MODULE__, mode: mode}),
+          Jido.Test.Agent.Contract.contribution(Second, %{observer: __MODULE__, mode: second_mode})
         ],
         routes: [
           %{

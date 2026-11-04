@@ -8,7 +8,7 @@ defmodule Jido.Exec.HandoffTest do
   alias Jido.Flow
   alias Jido.Catalog
   alias Jido.Flow.Ref
-  alias JidoActionTest.FlowCodec, as: Codec
+  alias Jido.Test.Flow.Codec, as: Codec
   alias Jido.Instruction
 
   defmodule Echo do

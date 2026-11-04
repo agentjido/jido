@@ -1,5 +1,5 @@
 defmodule Jido.Agent.RouteProjectionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.Agent.Directive
@@ -209,7 +209,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     assert {:error, ^expected_error} = Agent.cmd(before, source)
     assert before.state == %{count: 0}
 
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
     assert {:error, ^expected_error} = AgentServer.call(server, source)
     assert AgentServer.agent(server) === before
     assert AgentServer.status(server).state_version == 0
@@ -294,7 +294,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     {source, _trace} = request(%{reply: %{value: 1}})
 
     assert {:ok, direct, [%Reply{signal: direct_reply}]} = Agent.cmd(before, source)
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
     assert {:ok, live, [%Reply{signal: live_reply}]} = AgentServer.call(server, source)
     assert_receive %Signal{} = delivered_reply
 
@@ -313,7 +313,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     before = agent([project_route()])
     stop = Jido.Agent.Directive.server_stop()
     {source, _trace} = request(%{reply: %{value: 1}, directives: [stop]})
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
     monitor = Process.monitor(server)
 
     assert {:ok, committed, [%Reply{signal: reply}, ^stop]} = AgentServer.call(server, source)
@@ -327,7 +327,7 @@ defmodule Jido.Agent.RouteProjectionTest do
   test "a cast with a generated reply fails before commit", %{jido: jido} do
     before = agent([project_route(), barrier_route()])
     {source, _trace} = request(%{reply: %{value: 1}})
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
 
     assert :ok = AgentServer.cast(server, source)
     barrier = Signal.new!("barrier", %{}, source: "/test")
@@ -345,7 +345,7 @@ defmodule Jido.Agent.RouteProjectionTest do
 
     before = agent([route])
     {source, _trace} = request(%{test_pid: self()})
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
     caller = Task.async(fn -> AgentServer.call(server, source) end)
 
     assert_receive {:route_projection_started, worker}, 1_000

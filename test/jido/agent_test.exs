@@ -6,7 +6,7 @@ defmodule Jido.AgentTest do
   alias Jido.Agent.Turn
   alias Jido.Signal
 
-  alias JidoTest.AgentFixtures.{
+  alias Jido.Test.AgentServer.Fixtures.{
     Add,
     BlockingAdd,
     CounterAgent,
@@ -22,11 +22,11 @@ defmodule Jido.AgentTest do
 
     flow do
       step "first",
-        action: JidoTest.AgentFixtures.Add,
+        action: Jido.Test.AgentServer.Fixtures.Add,
         params: %{by: input(:first_by), label: input(:first_label)}
 
       step "second",
-        action: JidoTest.AgentFixtures.Add,
+        action: Jido.Test.AgentServer.Fixtures.Add,
         params: %{state: result("first"), by: input(:second_by), label: input(:second_label)}
 
       output result("second")
@@ -49,7 +49,7 @@ defmodule Jido.AgentTest do
     end
 
     routes do
-      route "counter.add", JidoTest.AgentFixtures.Add
+      route "counter.add", Jido.Test.AgentServer.Fixtures.Add
     end
   end
 
@@ -66,7 +66,7 @@ defmodule Jido.AgentTest do
     end
 
     def handle_signal(%Jido.Signal{type: "custom.add", data: data}, _agent) do
-      Jido.Agent.Turn.new(JidoTest.AgentFixtures.Add, Map.put(data, :label, "custom"))
+      Jido.Agent.Turn.new(Jido.Test.AgentServer.Fixtures.Add, Map.put(data, :label, "custom"))
     end
 
     def handle_signal(
@@ -844,7 +844,7 @@ defmodule Jido.AgentTest do
     end
 
     test "validates Action and Flow turn input values" do
-      flow = JidoTest.AgentFixtures.two_step_flow()
+      flow = Jido.Test.AgentServer.Fixtures.two_step_flow()
       signal = Signal.new!("counter.add", %{by: 1}, source: "/test")
 
       assert {:ok,

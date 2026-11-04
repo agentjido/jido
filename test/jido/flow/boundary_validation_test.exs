@@ -31,7 +31,7 @@ defmodule Jido.Flow.BoundaryValidationTest do
   alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
   alias Jido.Flow.Value
-  alias JidoActionTest.Fixtures.Actions.{Add, MissingRun}
+  alias Jido.Test.Action.Fixtures.Actions.{Add, MissingRun}
 
   test "portable data rejects invalid containers, values, and keys" do
     assert {:error, _error} = Value.validate_object([])
@@ -302,7 +302,7 @@ defmodule Jido.Flow.BoundaryValidationTest do
   defp components do
     [
       %{kind: :step, name: "step", action: Add},
-      %{kind: :subflow, name: "child", flow: JidoActionTest.Fixtures.NestedFlow},
+      %{kind: :subflow, name: "child", flow: Jido.Test.Flow.Fixtures.NestedFlow},
       %{
         kind: :choice,
         name: "choice",

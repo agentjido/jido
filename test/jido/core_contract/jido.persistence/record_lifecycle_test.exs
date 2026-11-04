@@ -1,10 +1,10 @@
 defmodule JidoTest.Persistence.RecordLifecycleTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.persistence", async: false
 
   alias Jido.Persistence
   alias Jido.Persistence.ETS
-  alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
+  alias Jido.Test.AgentServer.RuntimeFixtures.RuntimeAgent
 
   defmodule BarrierAdapter do
     @behaviour Jido.Persistence.Store

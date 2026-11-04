@@ -1,6 +1,8 @@
 defmodule JidoTest.PluginContract.ApiTest do
   use Covenant.Case, component: "jido.plugin", async: true
 
+  import Jido.Test.PublicAPI
+
   alias Jido.Plugin
 
   alias Jido.Plugin.{
@@ -85,32 +87,11 @@ defmodule JidoTest.PluginContract.ApiTest do
     assert Plugin.behaviour_info(:optional_callbacks) |> Enum.sort() == expected
   end
 
-  defp documented_api(module) do
-    {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
-
-    docs
-    |> Enum.flat_map(fn
-      {{kind, name, arity}, _, _, doc, _}
-      when kind in [:function, :macro] and
-             doc not in [:hidden, :none] ->
-        [{kind, name, arity}]
-
-      _other ->
-        []
-    end)
-    |> Enum.sort()
-  end
-
   defp fields(module) do
     module
     |> struct()
     |> Map.from_struct()
     |> Map.keys()
     |> Enum.sort()
-  end
-
-  defp public_module?(module) do
-    {:docs_v1, _, _, _, module_doc, _, _} = Code.fetch_docs(module)
-    module_doc not in [:hidden, :none]
   end
 end

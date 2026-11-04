@@ -3,7 +3,7 @@ unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("..
 JidoTest.Examples.Loader.require_source!("00_quick_start/00_01_simple_ai_agent/simple_agent.ex")
 
 defmodule JidoTest.Examples.AI.SimpleAgentTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example

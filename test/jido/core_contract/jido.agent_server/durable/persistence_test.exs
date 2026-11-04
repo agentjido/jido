@@ -1,12 +1,12 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.Durable.PersistenceTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.durable", async: false
 
   alias Jido.AgentServer, as: Server
   alias JidoTest.AgentServer.Fixtures, as: F
-  alias JidoTest.Persistence.ProbeStore
+  alias Jido.Test.Persistence.ProbeStore
 
   defmodule Storage do
     use Elixir.Agent
@@ -64,20 +64,10 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     end
   end
 
-  defmodule Resource do
-    use GenServer
-    def start_link(init), do: GenServer.start_link(__MODULE__, init)
-
-    def init(init) do
-      send(init.options[:observer], {:resource, self(), init})
-      {:ok, init}
-    end
-  end
-
   defmodule Plugin do
     use Jido.Plugin
     def state_spec(_), do: {:resource, Jido.Joi.integer() |> Jido.Joi.default(7)}
-    def child_spec(init), do: %{start: {Resource, :start_link, [init]}}
+    def child_spec(init), do: %{start: {Jido.Test.AgentServer.Resource, :start_link, [init]}}
     def reduce(reduction, _), do: {:ok, reduction.plugin_state + 1}
 
     def dump(value, _, _), do: {:ok, %{saved_resource: value}}
@@ -207,7 +197,7 @@ defmodule JidoTest.AgentServer.Durable.PersistenceTest do
     {:ok, definition} =
       Jido.Agent.define(
         Map.put(Map.from_struct(definition), :plugins, [
-          JidoTest.AgentContract.contribution(Plugin, %{observer: c.observer})
+          Jido.Test.Agent.Contract.contribution(Plugin, %{observer: c.observer})
         ])
       )
 

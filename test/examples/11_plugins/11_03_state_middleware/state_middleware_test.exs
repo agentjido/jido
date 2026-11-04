@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("11_plugins/11_03_state_middleware/state_middleware.ex")
 
 defmodule JidoTest.Examples.Plugins.StateMiddlewareTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -29,7 +29,7 @@ defmodule JidoTest.Examples.Plugins.StateMiddlewareTest do
            }
 
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("state-middleware-live"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent, id: unique_id("state-middleware-live"))
 
     assert {:ok, committed, _directives} = Server.call(server, first)
     assert committed.state == candidate.state

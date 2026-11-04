@@ -4,8 +4,8 @@ defmodule Jido.Exec.StoredFlowTest do
   alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.{Codec, Ref}
-  alias JidoActionTest.FlowCodec, as: Codec
-  alias JidoActionTest.Fixtures.Actions.Add
+  alias Jido.Test.Flow.Codec, as: Codec
+  alias Jido.Test.Action.Fixtures.Actions.Add
 
   test "a JSON Flow keeps stable executable component identities" do
     flow = ten_step_flow()

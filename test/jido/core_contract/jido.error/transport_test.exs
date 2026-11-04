@@ -366,7 +366,7 @@ defmodule JidoTest.Error.TransportTest do
     test "contains exception message and inspection failures" do
       for message_failure <- [:raise, :throw, :exit],
           inspect_failure <- [:raise, :throw, :exit] do
-        error = %JidoTest.ErrorTransport.UnrenderableError{
+        error = %Jido.Test.Error.Transport.UnrenderableError{
           message_failure: message_failure,
           inspect_failure: inspect_failure
         }

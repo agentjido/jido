@@ -4,7 +4,7 @@ unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("..
 JidoTest.Examples.Loader.require_source!("16_ai_conversations/16_05_request_modes/request_modes.ex")
 
 defmodule JidoTest.Examples.AI.RequestModesTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example

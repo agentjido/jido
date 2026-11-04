@@ -14,7 +14,7 @@ defmodule JidoTest.AgentServer.Fixtures do
     @moduledoc false
     @behaviour Jido.Persistence.Store
 
-    def get(key, opts), do: JidoTest.Persistence.ProbeStore.get(key, opts)
+    def get(key, opts), do: Jido.Test.Persistence.ProbeStore.get(key, opts)
 
     def compare_and_swap(key, expected, value, opts) do
       case Elixir.Agent.get(opts[:control], & &1) do
@@ -42,7 +42,7 @@ defmodule JidoTest.AgentServer.Fixtures do
     end
 
     defp store(key, expected, value, opts),
-      do: JidoTest.Persistence.ProbeStore.compare_and_swap(key, expected, value, opts)
+      do: Jido.Test.Persistence.ProbeStore.compare_and_swap(key, expected, value, opts)
   end
 
   defmodule ShutdownResource do
@@ -276,10 +276,10 @@ defmodule JidoTest.AgentServer.Fixtures do
     do: Elixir.Agent.update(context.control, fn _ -> value end)
 
   def closed(server),
-    do: JidoTest.Eventually.eventually(fn -> Server.status(server).admission.mode == :quiescing end)
+    do: Jido.Test.Eventually.eventually(fn -> Server.status(server).admission.mode == :quiescing end)
 
   def replacement(root, old) do
-    JidoTest.Eventually.eventually(fn ->
+    Jido.Test.Eventually.eventually(fn ->
       pid = Server.Supervisor.worker(root)
       if is_pid(pid) and pid != old, do: pid
     end)

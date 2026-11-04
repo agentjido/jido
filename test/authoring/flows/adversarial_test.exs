@@ -5,8 +5,8 @@ defmodule JidoActionTest.Authoring.AdversarialTest do
   @moduletag :authoring
   alias Jido.{Exec, Flow}
   alias Jido.Flow.{Codec, Ref}
-  alias JidoActionTest.FlowCodec, as: Codec
-  alias JidoActionTest.FlowComponent
+  alias Jido.Test.Flow.Codec, as: Codec
+  alias Jido.Test.Flow.Component, as: FlowComponent
   alias JidoActionTest.Authoring.Adversarial.{Echo, Sum}
   @nodes ["load/α", "right.$ref", "left space", "combine"]
   test "unusual names and forward references keep the same result in all authoring forms" do
@@ -20,7 +20,7 @@ defmodule JidoActionTest.Authoring.AdversarialTest do
       Code.compile_string(source(module, name, order), "authoring_order_#{index}.ex")
 
       direct =
-        JidoActionTest.FlowBuilder.new!(
+        Jido.Test.Flow.Builder.new!(
           name: name,
           components: Enum.map(order, &step/1),
           output: output()
@@ -32,7 +32,7 @@ defmodule JidoActionTest.Authoring.AdversarialTest do
         name: name
       }
 
-      assert {:ok, built} = JidoActionTest.FlowBuilder.new(data)
+      assert {:ok, built} = Jido.Test.Flow.Builder.new(data)
       assert {:ok, document, registry} = Codec.encode(direct)
       assert {:ok, ^document, ^registry} = Codec.encode(direct)
 
@@ -57,7 +57,7 @@ defmodule JidoActionTest.Authoring.AdversarialTest do
     order = @nodes
 
     valid =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "adversarial_invalid",
         components: Enum.map(order, &step/1),
         output: output()
@@ -76,7 +76,7 @@ defmodule JidoActionTest.Authoring.AdversarialTest do
       components = invalid_components(FlowComponent.to_definition(valid.components), kind)
 
       assert {:error, %{message: ^expected_message}} =
-               JidoActionTest.FlowBuilder.new(
+               Jido.Test.Flow.Builder.new(
                  name: valid.name,
                  components: components,
                  output: output()
@@ -84,7 +84,7 @@ defmodule JidoActionTest.Authoring.AdversarialTest do
 
       data = %{output: output(), components: components, name: valid.name}
 
-      assert {:error, %{message: ^expected_message}} = JidoActionTest.FlowBuilder.new(data)
+      assert {:error, %{message: ^expected_message}} = Jido.Test.Flow.Builder.new(data)
 
       assert {:error, %{message: ^expected_message}} =
                Codec.decode(invalid_document(document, kind), registry)
@@ -105,7 +105,7 @@ defmodule JidoActionTest.Authoring.AdversarialTest do
 
   test "stored source cannot name an Action outside the trusted registry" do
     flow =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "adversarial_storage",
         components: Enum.map(@nodes, &step/1),
         output: output()
@@ -151,7 +151,7 @@ defmodule JidoActionTest.Authoring.AdversarialTest do
   end
 
   defp step("load/α") do
-    JidoActionTest.FlowComponent.step!(
+    Jido.Test.Flow.Component.step!(
       name: "load/α",
       action: Echo,
       params: %{
@@ -162,7 +162,7 @@ defmodule JidoActionTest.Authoring.AdversarialTest do
   end
 
   defp step("right.$ref") do
-    JidoActionTest.FlowComponent.step!(
+    Jido.Test.Flow.Component.step!(
       name: "right.$ref",
       action: Echo,
       params: %{value: Ref.input(:right)}
@@ -170,7 +170,7 @@ defmodule JidoActionTest.Authoring.AdversarialTest do
   end
 
   defp step("left space") do
-    JidoActionTest.FlowComponent.step!(
+    Jido.Test.Flow.Component.step!(
       name: "left space",
       action: Echo,
       params: %{value: Ref.context(:left)}
@@ -178,7 +178,7 @@ defmodule JidoActionTest.Authoring.AdversarialTest do
   end
 
   defp step("combine") do
-    JidoActionTest.FlowComponent.step!(
+    Jido.Test.Flow.Component.step!(
       name: "combine",
       action: Sum,
       params: %{

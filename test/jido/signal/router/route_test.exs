@@ -1,9 +1,9 @@
 defmodule Jido.Signal.Router.RouteTest do
-  use JidoSignalTest.Case, async: true
+  use Jido.Test.Signal.Case, async: true
 
   alias Jido.Signal.Router
   alias Jido.Signal.Router.Route
-  alias JidoSignalTest.Fixtures.Signals.UserCreated
+  alias Jido.Test.Signal.Fixtures.Signals.UserCreated
 
   defmodule WildcardType do
     use Jido.Signal, type: "user.*", default_source: "/test"

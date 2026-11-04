@@ -5,7 +5,7 @@ defmodule Jido.Persistence.BoundaryTest do
   alias Jido.Persistence.Checkpoint
   alias Jido.Persistence
   alias Jido.Persistence.{ETS, Record}
-  alias JidoTest.AgentFixtures.CounterAgent, as: Basic
+  alias Jido.Test.AgentServer.Fixtures.CounterAgent, as: Basic
 
   defmodule ReadAdapter do
     @behaviour Jido.Persistence.Store

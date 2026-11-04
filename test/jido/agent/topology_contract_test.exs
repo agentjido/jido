@@ -3,7 +3,7 @@ defmodule Jido.Agent.TopologyContractTest do
 
   alias Jido.Agent
   alias Jido.Agent.Topology
-  alias JidoTest.AgentContract, as: F
+  alias Jido.Test.Agent.Contract, as: F
 
   defp normalize_topology(topology, parent, opts),
     do: Topology.normalize(topology, parent, opts, &Agent.Validation.define/2)
@@ -25,9 +25,9 @@ defmodule Jido.Agent.TopologyContractTest do
     end
 
     routes do
-      route "work.one", JidoTest.AgentContract.Return
+      route "work.one", Jido.Test.Agent.Contract.Return
 
-      route "work.two", JidoTest.AgentContract.Return
+      route "work.two", Jido.Test.Agent.Contract.Return
     end
   end
 

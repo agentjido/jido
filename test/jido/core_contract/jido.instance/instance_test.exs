@@ -6,7 +6,7 @@ defmodule JidoTest.InstanceTest do
 
   setup :ensure_namespace_registry
 
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
 
   alias Jido.AgentServer, as: Server
   alias Jido.Persistence.Redis
@@ -378,13 +378,13 @@ defmodule JidoTest.InstanceTest do
   test "PID stop and hibernate require the exact explicit partition" do
     start_supervised!(TestInstance)
     {:ok, server} = Jido.start_agent(TestInstance, RedisTestAgent, id: "numeric", partition: "1")
-    before = JidoTest.AgentServerAssertions.committed(server)
+    before = Jido.Test.AgentServer.Assertions.committed(server)
 
     assert Jido.whereis_agent(TestInstance, "numeric", partition: "1") == server
     assert Jido.whereis_agent(TestInstance, "numeric", partition: "1.0") == nil
     assert {:error, :not_found} = Jido.stop_agent(TestInstance, server, partition: "1.0")
     assert {:error, :not_found} = Jido.hibernate(TestInstance, server, partition: "1.0")
-    assert JidoTest.AgentServerAssertions.committed(server) === before
+    assert Jido.Test.AgentServer.Assertions.committed(server) === before
     assert Jido.whereis_agent(TestInstance, "numeric", partition: "1") == server
 
     monitor = Process.monitor(server)

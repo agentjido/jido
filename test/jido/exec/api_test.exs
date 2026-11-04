@@ -3,7 +3,7 @@ defmodule Jido.Exec.ApiTest do
 
   alias Jido.Exec
   alias Jido.Instruction
-  alias JidoActionTest.Fixtures.Actions.{Add, BasicAction, ErrorAction, ExtrasAction}
+  alias Jido.Test.Action.Fixtures.Actions.{Add, BasicAction, ErrorAction, ExtrasAction}
 
   @tag obligation: "jido_action.boundary.I5"
   test "compile/2 returns a real one-node Runic Workflow" do

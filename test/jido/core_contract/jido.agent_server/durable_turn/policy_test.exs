@@ -1,10 +1,10 @@
 defmodule JidoTest.AgentServer.DurableTurn.PolicyTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: false
 
   alias Jido.AgentServer.Lifecycle
   alias Jido.Exec.Continuation
-  alias JidoTest.DurableFixtures, as: F
+  alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   defp prepared(agent, type, data) do
     signal = signal(type, data)

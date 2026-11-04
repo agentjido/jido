@@ -1,11 +1,11 @@
 defmodule JidoTest.AgentServer.DurableTurn.CheckpointStoreTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: true
 
   alias Jido.AgentServer.Lifecycle
   alias Jido.Persistence.ContinuationStore, as: Store
   alias Jido.Persistence.ContinuationStore.JoinCompletedRef
-  alias JidoTest.DurableFixtures, as: F
+  alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   defmodule Increment do
     use Jido.Action, name: "checkpoint_hydration_increment"

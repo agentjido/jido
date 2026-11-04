@@ -11,7 +11,7 @@ defmodule Jido.AI.ChainOfThoughtTest do
   import Mimic
 
   alias Jido.AI.Reasoning.ChainOfThought
-  alias Jido.AITest.ChainOfThoughtAgent
+  alias Jido.Test.AI.ChainOfThoughtAgent
   alias Jido.Agent.Directive.Reply
   alias Jido.AgentServer
 

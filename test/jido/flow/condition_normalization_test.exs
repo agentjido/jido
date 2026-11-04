@@ -4,10 +4,10 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
   alias Jido.Expr
   alias Jido.Flow
   alias Jido.Flow.{Codec, Ref}
-  alias JidoActionTest.FlowCodec, as: Codec
+  alias Jido.Test.Flow.Codec, as: Codec
   alias Jido.Flow.DSL.ValueParser
   alias Jido.Error.ValidationError
-  alias JidoActionTest.Fixtures.Actions.EchoParamsAction
+  alias Jido.Test.Action.Fixtures.Actions.EchoParamsAction
 
   test "Boolean literals and references keep one shape across authoring forms" do
     cases = [
@@ -127,7 +127,7 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
              Flow.Value.condition(Expr.new!(:or, [true, Ref.item()]), :iterate_completion)
 
     assert {:error, error} =
-             JidoActionTest.FlowBuilder.new(
+             Jido.Test.Flow.Builder.new(
                name: "unknown_skipped_result",
                components: [choice(Expr.new!(:and, [false, Ref.result("missing")]))],
                output: Ref.result("route")
@@ -216,7 +216,7 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
   end
 
   defp choice(condition) do
-    JidoActionTest.FlowComponent.choice!(
+    Jido.Test.Flow.Component.choice!(
       name: "route",
       options: [
         %{name: "yes", condition: condition, action: EchoParamsAction, params: %{selected: true}}
@@ -226,7 +226,7 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
   end
 
   defp choice_flow(condition) do
-    JidoActionTest.FlowBuilder.new!(
+    Jido.Test.Flow.Builder.new!(
       name: "condition_parity",
       components: [choice(condition)],
       output: Ref.result("route")
@@ -234,7 +234,7 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
   end
 
   defp data_flow(condition) do
-    JidoActionTest.FlowBuilder.new!(%{
+    Jido.Test.Flow.Builder.new!(%{
       name: "condition_parity",
       components: [
         %{
@@ -280,16 +280,16 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
   end
 
   defp output_flow(expression) do
-    JidoActionTest.FlowBuilder.new!(
+    Jido.Test.Flow.Builder.new!(
       name: "condition_output",
-      components: [JidoActionTest.FlowComponent.step!(name: "seed", action: EchoParamsAction)],
+      components: [Jido.Test.Flow.Component.step!(name: "seed", action: EchoParamsAction)],
       output: %{selected: expression}
     )
   end
 
   defp iterator_flow(completion) do
     iterator =
-      JidoActionTest.FlowComponent.iterate!(
+      Jido.Test.Flow.Component.iterate!(
         name: "loop",
         action: EchoParamsAction,
         state: [schema: Jido.Joi.map(), initial: %{done: false}, update: %{done: true}],
@@ -297,7 +297,7 @@ defmodule JidoActionTest.Flow.ConditionNormalizationTest do
         max_iterations: 1
       )
 
-    JidoActionTest.FlowBuilder.new!(
+    Jido.Test.Flow.Builder.new!(
       name: "condition_iterator",
       components: [iterator],
       output: Ref.result("loop")

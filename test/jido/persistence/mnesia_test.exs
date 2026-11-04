@@ -3,8 +3,8 @@ defmodule JidoTest.Persistence.MnesiaTest do
 
   alias Jido.Persistence
   alias Jido.Persistence.{Mnesia, Store}
-  alias JidoTest.Persistence.AdapterConformance
-  alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
+  alias Jido.Test.Persistence.AdapterConformance
+  alias Jido.Test.AgentServer.RuntimeFixtures.RuntimeAgent
 
   setup do
     {:ok, _started} = Application.ensure_all_started(:mnesia)

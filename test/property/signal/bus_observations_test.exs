@@ -121,7 +121,7 @@ defmodule JidoTest.Property.Signal.BusObservationsTest do
           subscription(token, name, :detached, "d", true)
           assert {:ok, "d"} = Bus.subscribe(bus, "**", durable: "d", target: target)
           subscription(token, name, :attached, "d", true)
-          JidoSignalTest.Case.terminate_and_wait(bus, target)
+          Jido.Test.Signal.Case.terminate_and_wait(bus, target)
           subscription(token, name, :detached, "d", true)
           assert {:ok, "d"} = Bus.subscribe(bus, "**", durable: "d")
           subscription(token, name, :attached, "d", true)

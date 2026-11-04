@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("08_runtime/08_03_failure_outcome/failure_outcome.ex")
 
 defmodule JidoTest.Examples.Runtime.FailureOutcomeTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
@@ -25,7 +25,7 @@ defmodule JidoTest.Examples.Runtime.FailureOutcomeTest do
     end
 
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, FailureOutcome,
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, FailureOutcome,
         id: unique_id("failure-outcome"),
         error_policy: policy
       )
@@ -70,7 +70,7 @@ defmodule JidoTest.Examples.Runtime.FailureOutcomeTest do
 
   test "the stopping policy terminates the Agent after a failure", %{jido: jido} do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, FailureOutcome,
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, FailureOutcome,
         id: unique_id("stopping-policy"),
         error_policy: :stop_on_error
       )
@@ -85,7 +85,7 @@ defmodule JidoTest.Examples.Runtime.FailureOutcomeTest do
 
   test "the emitted-Signal policy publishes bounded failure data", %{jido: jido} do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, FailureOutcome,
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, FailureOutcome,
         id: unique_id("emitted-policy"),
         error_policy: {:emit_signal, {:pid, target: self()}}
       )

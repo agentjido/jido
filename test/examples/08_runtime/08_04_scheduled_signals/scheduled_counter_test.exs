@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("08_runtime/08_04_scheduled_signals/scheduled_counter.ex")
 
 defmodule JidoTest.Examples.Runtime.ScheduledCounterTest do
-  use JidoTest.AgentCase
+  use Jido.Test.Agent.Case
   @moduletag :example
 
   setup_all do

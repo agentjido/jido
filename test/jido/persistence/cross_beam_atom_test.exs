@@ -1,10 +1,10 @@
 defmodule JidoTest.Persistence.CrossBeamAtomTest do
-  use JidoTest.PeerCase, async: false
+  use Jido.Test.AgentServer.PeerCase, async: false
 
   alias Jido.Persistence
   alias Jido.Persistence.ETS
-  alias JidoTest.Persistence.CheckpointPortabilityProbe, as: Probe
-  alias JidoTest.Persistence.StaticAtomAgent
+  alias Jido.Test.Persistence.CheckpointPortabilityProbe, as: Probe
+  alias Jido.Test.Persistence.StaticAtomAgent
 
   test "load brings in atoms defined by the trusted Agent module", c do
     source = {ETS, table: :cross_beam_static_atom_checkpoint}

@@ -2,8 +2,8 @@ defmodule JidoActionTest.Flow.DSL.ExprFlowTest do
   use ExUnit.Case, async: true
   alias Jido.Expr
   alias Jido.Flow.{Codec, Ref}
-  alias JidoActionTest.FlowCodec, as: Codec
-  alias JidoActionTest.Fixtures.Actions.EchoParamsAction
+  alias Jido.Test.Flow.Codec, as: Codec
+  alias Jido.Test.Action.Fixtures.Actions.EchoParamsAction
 
   defmodule Parity do
     use Jido.Flow, name: "calculated"
@@ -101,7 +101,7 @@ defmodule JidoActionTest.Flow.DSL.ExprFlowTest do
     output = %{total: expr(^load * ^price), label: expr(^prefix <> ^name)}
 
     assert {:ok, built} =
-             JidoActionTest.FlowBuilder.new(%{
+             Jido.Test.Flow.Builder.new(%{
                output: output,
                components: [
                  %{kind: :step, name: "load", action: EchoParamsAction, params: params}
@@ -110,10 +110,10 @@ defmodule JidoActionTest.Flow.DSL.ExprFlowTest do
              })
 
     direct =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "calculated",
         components: [
-          JidoActionTest.FlowComponent.step!(
+          Jido.Test.Flow.Component.step!(
             name: "load",
             action: EchoParamsAction,
             params: params
@@ -143,14 +143,14 @@ defmodule JidoActionTest.Flow.DSL.ExprFlowTest do
 
   test "Boolean expressions can supply calculated parameter values" do
     step =
-      JidoActionTest.FlowComponent.step!(
+      Jido.Test.Flow.Component.step!(
         name: "echo",
         action: EchoParamsAction,
         params: %{eligible: Expr.new!(:>=, [Expr.new!(:*, [Ref.input(:score), 2]), 80])}
       )
 
     flow =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "condition_value",
         components: [step],
         output: Ref.result("echo")
@@ -163,9 +163,9 @@ defmodule JidoActionTest.Flow.DSL.ExprFlowTest do
     flows =
       for {module, declaration} <- [
             {StepKeywordQuotedFields,
-             "step \"echo\",\n  action: JidoActionTest.Fixtures.Actions.EchoParamsAction,\n  params: %{value: input(:value) + 1, nested: [nil, %{}]}\n"},
+             "step \"echo\",\n  action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,\n  params: %{value: input(:value) + 1, nested: [nil, %{}]}\n"},
             {StepBlockQuotedFields,
-             "step \"echo\" do\n  action JidoActionTest.Fixtures.Actions.EchoParamsAction\n  params %{value: input(:value) + 1, nested: [nil, %{}]}\nend\n"}
+             "step \"echo\" do\n  action Jido.Test.Action.Fixtures.Actions.EchoParamsAction\n  params %{value: input(:value) + 1, nested: [nil, %{}]}\nend\n"}
           ] do
         Code.compile_string("defmodule #{inspect(module)} do
   use Jido.Flow, name: \"step_quoted_fields\"
@@ -185,9 +185,9 @@ end
   test "Map keyword and block fields preserve nested expressions and literal data" do
     declarations = [
       {MapKeywordFields,
-       "map \"mapped\",\n  collection: [input(:start) + 1, 2],\n  action: JidoActionTest.Fixtures.Actions.EchoParamsAction,\n  params: %{nested: [item() * 2, %{empty: [], absent: nil}]},\n  on_error: :collect_errors\n"},
+       "map \"mapped\",\n  collection: [input(:start) + 1, 2],\n  action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,\n  params: %{nested: [item() * 2, %{empty: [], absent: nil}]},\n  on_error: :collect_errors\n"},
       {MapBlockFields,
-       "map \"mapped\" do\n  collection [input(:start) + 1, 2]\n  action JidoActionTest.Fixtures.Actions.EchoParamsAction\n  params %{nested: [item() * 2, %{empty: [], absent: nil}]}\n  on_error :collect_errors\nend\n"}
+       "map \"mapped\" do\n  collection [input(:start) + 1, 2]\n  action Jido.Test.Action.Fixtures.Actions.EchoParamsAction\n  params %{nested: [item() * 2, %{empty: [], absent: nil}]}\n  on_error :collect_errors\nend\n"}
     ]
 
     flows =
@@ -224,9 +224,9 @@ end
   test "Map fields reject literal tuples instead of treating them as reference AST" do
     for {module, declaration} <- [
           {MapKeywordTuple,
-           "map \"mapped\", action: JidoActionTest.Fixtures.Actions.EchoParamsAction,\n  collection: [], params: %{value: {:input, [], []}}\n"},
+           "map \"mapped\", action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,\n  collection: [], params: %{value: {:input, [], []}}\n"},
           {MapBlockTuple,
-           "map \"mapped\" do\n  action JidoActionTest.Fixtures.Actions.EchoParamsAction\n  collection []\n  params %{value: {:input, [], []}}\nend\n"}
+           "map \"mapped\" do\n  action Jido.Test.Action.Fixtures.Actions.EchoParamsAction\n  collection []\n  params %{value: {:input, [], []}}\nend\n"}
         ] do
       assert_raise CompileError, ~r/unsupported Flow expression/, fn ->
         Code.compile_string("defmodule #{inspect(module)} do

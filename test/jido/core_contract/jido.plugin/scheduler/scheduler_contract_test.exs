@@ -8,7 +8,7 @@ defmodule JidoTest.Contract.PluginSchedulerTest do
   alias Jido.Plugin.Scheduler.{DSL, Occurrence, WallClock}
   alias Jido.Plugin.Normalizer
   alias Jido.Signal
-  alias JidoTest.AgentContract, as: F
+  alias Jido.Test.Agent.Contract, as: F
   alias Spark.Dsl.{Entity, Extension, Section}
 
   @scope {ExampleJido, "agent-1", "tenant-1"}

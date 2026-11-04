@@ -1,5 +1,5 @@
 defmodule Jido.Agent.FlowModesTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.AgentServer
   alias Jido.Persistence.ETS

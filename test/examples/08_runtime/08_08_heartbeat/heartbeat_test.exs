@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("08_runtime/08_08_heartbeat/heartbeat.ex")
 
 defmodule JidoTest.Examples.Runtime.HeartbeatTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
@@ -19,7 +19,7 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
 
   test "explicit ticks deliver the default and custom Signals", %{jido: jido} do
     {:ok, default_server} =
-      JidoTest.ExampleRuntime.start_agent(jido, DefaultAgent, id: unique_id("heartbeat-default"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, DefaultAgent, id: unique_id("heartbeat-default"))
 
     default_runtime = runtime(default_server)
     send(default_runtime, :tick)
@@ -35,7 +35,7 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
     end)
 
     {:ok, custom_server} =
-      JidoTest.ExampleRuntime.start_agent(jido, CustomAgent, id: unique_id("heartbeat-custom"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, CustomAgent, id: unique_id("heartbeat-custom"))
 
     custom_runtime = runtime(custom_server)
     send(custom_runtime, :tick)
@@ -72,7 +72,7 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
 
   test "the owner replaces a failed runtime and stops the replacement", %{jido: jido} do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, DefaultAgent, id: unique_id("heartbeat-lifecycle"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, DefaultAgent, id: unique_id("heartbeat-lifecycle"))
 
     activation = AgentServer.activation(server)
     old_runtime = runtime(server)
@@ -83,7 +83,7 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
 
     new_runtime =
       eventually(fn ->
-        case JidoTest.ExampleRuntime.plugin(activation, Heartbeat) do
+        case Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Heartbeat) do
           pid when is_pid(pid) and pid != old_runtime -> pid
           _pid -> false
         end
@@ -100,6 +100,6 @@ defmodule JidoTest.Examples.Runtime.HeartbeatTest do
   end
 
   defp runtime(server) do
-    JidoTest.ExampleRuntime.plugin(AgentServer.activation(server), Heartbeat)
+    Jido.Test.AgentServer.ExampleRuntime.plugin(AgentServer.activation(server), Heartbeat)
   end
 end

@@ -4,7 +4,7 @@ defmodule Jido.Flow.AccumulationTest do
   alias Jido.Catalog
   alias Jido.Error
   alias Jido.Flow.{Codec, Definition}
-  alias JidoActionTest.FlowCodec, as: Codec
+  alias Jido.Test.Flow.Codec, as: Codec
 
   defp document do
     registry =
@@ -14,9 +14,9 @@ defmodule Jido.Flow.AccumulationTest do
       })
 
     flow =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "ordered",
-        components: [JidoActionTest.FlowComponent.step!(name: "one", action: UnloadedAction)],
+        components: [Jido.Test.Flow.Component.step!(name: "one", action: UnloadedAction)],
         output: %{}
       )
 

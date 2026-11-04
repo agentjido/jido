@@ -6,7 +6,7 @@ Loader.require_source!("08_runtime/08_15_pending_job_recovery/pending_job_recove
 Code.require_file("../../support/job_runner.exs", __DIR__)
 
 defmodule JidoTest.Examples.Runtime.PendingJobRecoveryTest do
-  use JidoTest.FeatureSDKCase
+  use Jido.Test.Agent.FeatureSDKCase
   @moduletag :example
 
   setup_all do
@@ -17,7 +17,7 @@ defmodule JidoTest.Examples.Runtime.PendingJobRecoveryTest do
   @moduletag group: :runtime
 
   alias Jido.Examples.PendingJobRecovery, as: Example
-  alias JidoTest.Persistence.ProbeStore
+  alias Jido.Test.Persistence.ProbeStore
   alias Jido.Examples.PendingJobRecovery.JobRuntime, as: Jobs
   alias Jido.Examples.PendingJobRecovery.JobRuntime.Server, as: JobServer
 
@@ -54,7 +54,7 @@ defmodule JidoTest.Examples.Runtime.PendingJobRecoveryTest do
     restored = start_example(c, id, :required)
     assert Server.agent(restored).state.status == :running
     assert Server.agent(restored).state.approved?
-    assert JobServer.jobs(JidoTest.ExampleRuntime.plugin(Server.activation(restored), Jobs)) == []
+    assert JobServer.jobs(Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(restored), Jobs)) == []
 
     {:ok, route_signal_3} = Example.retry_job_signal(%{job_id: "job-1", attempt_id: "attempt-2"})
 
@@ -84,7 +84,7 @@ defmodule JidoTest.Examples.Runtime.PendingJobRecoveryTest do
 
   defp start_example(c, id, restore) do
     assert {:ok, server} =
-             JidoTest.ExampleRuntime.start_agent(c.jido, Example,
+             Jido.Test.AgentServer.ExampleRuntime.start_agent(c.jido, Example,
                id: id,
                persistence: c.store,
                persistence_mode: if(restore == false, do: :create, else: :restore)

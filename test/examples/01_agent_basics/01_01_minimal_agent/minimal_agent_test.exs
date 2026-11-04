@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("01_agent_basics/01_01_minimal_agent/minimal_agent.ex")
 
 defmodule JidoTest.Examples.Basic.MinimalAgentTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -71,7 +71,7 @@ defmodule JidoTest.Examples.Basic.MinimalAgentTest do
 
   defp start_counter(jido, opts \\ []) do
     opts = Keyword.put_new_lazy(opts, :id, &unique_id/0)
-    {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, MinimalAgent, opts)
+    {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, MinimalAgent, opts)
     assert :ok = Server.await_ready(server)
     server
   end

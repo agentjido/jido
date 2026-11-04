@@ -2,7 +2,7 @@ Code.require_file("../support.ex", __DIR__)
 Code.require_file("configuration_support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.PluginRuntime.ConfigurationTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.plugin_runtime", async: false
 
   alias Jido.Agent

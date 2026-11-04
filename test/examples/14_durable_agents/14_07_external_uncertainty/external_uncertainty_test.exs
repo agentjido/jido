@@ -6,7 +6,7 @@ Loader.require_source!("14_durable_agents/14_07_external_uncertainty/external_un
 Code.require_file("../../support/durable_publication_probe.exs", __DIR__)
 
 defmodule JidoTest.Examples.Durable.ExternalUncertaintyTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do

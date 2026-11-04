@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("04_agent_workflows/04_05_ordered_batch/ordered_batch.ex")
 
 defmodule JidoTest.Examples.Workflow.OrderedBatchTest do
-  use JidoTest.WorkflowSDKCase
+  use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do

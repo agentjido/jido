@@ -9,7 +9,7 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   alias Jido.Telemetry.Semantic
   alias Jido.Trace
   alias Jido.Trace.Context
-  alias JidoTest.OpenTelemetryTracer, as: TestTracer
+  alias Jido.Test.Telemetry.OpenTelemetryTracer, as: TestTracer
 
   defmodule NotifyFacet do
     @behaviour Jido.Plugin

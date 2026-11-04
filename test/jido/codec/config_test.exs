@@ -219,7 +219,7 @@ defmodule Jido.Instruction.ConfigTest do
 
         :flow ->
           {"Jido.Flow",
-           "flow do\nstep \"work\", action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1}\noutput %{}\nend"}
+           "flow do\nstep \"work\", action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1}\noutput %{}\nend"}
       end
 
     Code.compile_string(

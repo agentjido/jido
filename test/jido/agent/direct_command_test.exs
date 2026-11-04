@@ -362,7 +362,7 @@ defmodule Jido.Agent.DirectCommandTest do
 end
 
 defmodule Jido.Agent.ReplyDirectiveRuntimeTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent.DirectCommandTest.Leaf
   alias Jido.Agent.Directive
@@ -372,7 +372,7 @@ defmodule Jido.Agent.ReplyDirectiveRuntimeTest do
   test "live runtime delivers Reply to the current requester after commit", %{
     jido: jido
   } do
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, Leaf)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, Leaf)
     request = Signal.new!("work", %{}, source: "/test")
     output = Signal.new!("work.reply", %{}, source: "/direct")
     {:ok, output} = Signal.put_context(output, "jidocausationid", request.id)

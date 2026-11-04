@@ -9,7 +9,7 @@ defmodule JidoTest.Examples.Execution.LoopInvokeWaitTest do
   end
 
   test "a child wait resumes from one matching event" do
-    host = Jido.Exec.Test.WaitHost
+    host = Jido.Test.Exec.WaitHost
 
     assert {:ok, workflow} =
              host.start(

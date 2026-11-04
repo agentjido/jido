@@ -6,7 +6,7 @@ defmodule JidoTest.InstanceRefTest do
 
   setup :ensure_namespace_registry
 
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
 
   alias Jido.Agent.Ref
   alias Jido.Error
@@ -39,16 +39,9 @@ defmodule JidoTest.InstanceRefTest do
     def state_spec(_opts), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(9)}
   end
 
-  defmodule ReadyResource do
-    use GenServer
-    def start_link(init), do: GenServer.start_link(__MODULE__, init)
-    @impl true
-    def init(init), do: {:ok, init}
-  end
-
   defmodule ReadyPlugin do
     use Jido.Plugin
-    def child_spec(init), do: %{start: {ReadyResource, :start_link, [init]}}
+    def child_spec(init), do: %{start: {Jido.Test.AgentServer.Resource, :start_link, [init]}}
 
     def await_ready(root, opts) do
       send(opts[:observer], {:ready_gate, self(), root})

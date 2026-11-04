@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("04_agent_workflows/04_01_sequential_flow/sequential_flow.ex")
 
 defmodule JidoTest.Examples.Workflow.SequentialFlowTest do
-  use JidoTest.WorkflowSDKCase
+  use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do

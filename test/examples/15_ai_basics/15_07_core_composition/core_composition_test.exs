@@ -4,7 +4,7 @@ unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("..
 JidoTest.Examples.Loader.require_source!("15_ai_basics/15_07_core_composition/agent.ex")
 
 defmodule JidoTest.Examples.AI.CoreCompositionTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example

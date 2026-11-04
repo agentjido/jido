@@ -5,8 +5,8 @@ defmodule Jido.Flow.ComponentValidationTest do
   alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
   alias Jido.Flow.Value
-  alias JidoActionTest.Fixtures.Actions.Add
-  alias JidoActionTest.Fixtures.NestedFlow
+  alias Jido.Test.Action.Fixtures.Actions.Add
+  alias Jido.Test.Flow.Fixtures.NestedFlow
 
   test "legacy Condition records are rejected in condition and expression fields" do
     legacy = %{__struct__: Jido.Flow.Condition, operator: :==, operands: [1, 1]}

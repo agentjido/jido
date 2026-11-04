@@ -1,7 +1,7 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.LoggingTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server", async: false
 
   import ExUnit.CaptureLog

@@ -6,7 +6,7 @@ Loader.require_source!("14_durable_agents/14_01_saved_agent/saved_agent.ex")
 Code.require_file("../../support/durable_peer.exs", __DIR__)
 
 defmodule JidoTest.Examples.Durable.SavedAgentTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do

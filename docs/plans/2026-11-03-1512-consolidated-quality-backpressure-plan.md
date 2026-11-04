@@ -578,7 +578,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Dependencies:** U2, U3, and U6.
 
-**Files:** Read split core `test/property/**`, `test/system/runtime/**`, and peer-tagged tests at the core baseline. Add `test/property/runtime/**` and `test/system/runtime/core/**`. Reuse `test/support/persistence/**`. Change the manifest.
+**Files:** Read split core `test/property/**`, `test/system/runtime/**`, and peer-tagged tests at the core baseline. Add `test/property/runtime/**` and `test/system/runtime/core/**`. Reuse `test/support/jido_persistence/**`. Change the manifest.
 
 **Directive:**
 

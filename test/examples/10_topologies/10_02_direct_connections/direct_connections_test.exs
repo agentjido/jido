@@ -6,7 +6,7 @@ Loader.require_source!("10_topologies/10_02_direct_connections/worker.ex")
 Loader.require_source!("10_topologies/10_02_direct_connections/direct_connections.ex")
 
 defmodule JidoTest.Examples.Topology.DirectConnectionsTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -14,7 +14,7 @@ defmodule JidoTest.Examples.Topology.DirectConnectionsTest do
     :ok
   end
 
-  import JidoTest.AgentTopologyAssertions
+  import Jido.Test.AgentServer.TopologyAssertions
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.DirectConnections, as: Example
 

@@ -5,7 +5,7 @@ Loader.require_source!("04_agent_workflows/04_09_flow_directives/effects.ex")
 Loader.require_source!("04_agent_workflows/04_09_flow_directives/flow_directives.ex")
 
 defmodule JidoTest.Examples.Workflow.FlowDirectivesTest do
-  use JidoTest.WorkflowSDKCase
+  use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do

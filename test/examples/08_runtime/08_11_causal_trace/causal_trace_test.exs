@@ -7,7 +7,7 @@ Loader.require_source!("08_runtime/08_11_causal_trace/worker.ex")
 Loader.require_source!("08_runtime/08_11_causal_trace/causal_trace.ex")
 
 defmodule JidoTest.Examples.Runtime.CausalTraceTest do
-  use JidoTest.AgentCase
+  use Jido.Test.Agent.Case
   @moduletag :example
 
   setup_all do
@@ -26,7 +26,7 @@ defmodule JidoTest.Examples.Runtime.CausalTraceTest do
     probe = EventProbe.attach([id, id <> "/left", id <> "/right"])
 
     try do
-      assert {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, Example, id: id)
+      assert {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Example, id: id)
 
       {:ok, route_signal_1} = Example.start_work_signal(%{request_id: "request-1", value: 7})
 

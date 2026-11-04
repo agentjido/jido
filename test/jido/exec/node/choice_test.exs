@@ -4,7 +4,7 @@ defmodule Jido.Exec.Node.ChoiceTest do
   alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
-  alias JidoActionTest.Fixtures.Actions.Add
+  alias Jido.Test.Action.Fixtures.Actions.Add
 
   @tag obligation: "jido_action.execution.I17"
   test "an option named fallback remains separate from the default branch" do

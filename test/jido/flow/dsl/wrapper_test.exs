@@ -132,7 +132,7 @@ defmodule Jido.Flow.DSL.WrapperTest do
       """
       defmodule #{inspect(owner)} do
         use Jido.Flow, name: "wrapper_probe"
-        alias JidoActionTest.Fixtures.Actions.EchoParamsAction, as: Echo
+        alias Jido.Test.Action.Fixtures.Actions.EchoParamsAction, as: Echo
         flow do
           #{declarations}
         end

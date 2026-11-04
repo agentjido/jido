@@ -1,7 +1,7 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.ActivationRecoveryTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.activation", async: false
 
   alias Jido.Agent
@@ -35,20 +35,10 @@ defmodule JidoTest.AgentServer.ActivationRecoveryTest do
     end
   end
 
-  defmodule Resource do
-    use GenServer
-    def start_link(init), do: GenServer.start_link(__MODULE__, init)
-
-    def init(init) do
-      send(init.options[:observer], {:resource_init, self(), init})
-      {:ok, init}
-    end
-  end
-
   defmodule Plugin do
     use Jido.Plugin
     def state_spec(_), do: {:resource, Jido.Joi.integer() |> Jido.Joi.default(7)}
-    def child_spec(init), do: %{start: {Resource, :start_link, [init]}}
+    def child_spec(init), do: %{start: {Jido.Test.AgentServer.Resource, :start_link, [init]}}
     def reduce(reduction, _), do: {:ok, reduction.plugin_state + 1}
 
     def await_ready(root, opts) do
@@ -113,7 +103,12 @@ defmodule JidoTest.AgentServer.ActivationRecoveryTest do
         name: "recover_plugin",
         schema: c.agent.schema,
         plugins: [
-          %{id: Plugin.id(), provider: Plugin, vsn: Plugin.vsn(), data: %{observer: c.observer}}
+          %{
+            id: Plugin.id(),
+            provider: Plugin,
+            vsn: Plugin.vsn(),
+            data: %{observer: c.observer, resource_event: :resource_init}
+          }
         ],
         routes: [
           %{
@@ -235,7 +230,7 @@ defmodule JidoTest.AgentServer.ActivationRecoveryTest do
             c.agent
             | plugins:
                 c.agent.plugins ++
-                  [JidoTest.AgentContract.contribution(CommitPlugin, %{observer: c.observer})]
+                  [Jido.Test.Agent.Contract.contribution(CommitPlugin, %{observer: c.observer})]
           },
           else: c.agent
 

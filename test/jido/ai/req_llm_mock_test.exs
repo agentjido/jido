@@ -2,7 +2,7 @@ defmodule Jido.AI.ReqLLMMockTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Context.Snapshot
-  alias Jido.AITest.{ChainOfThoughtAgent, SimpleAgent}
+  alias Jido.Test.AI.{ChainOfThoughtAgent, SimpleAgent}
   alias Jido.Agent.Directive.Reply
 
   setup {Req.Test, :set_req_test_from_context}

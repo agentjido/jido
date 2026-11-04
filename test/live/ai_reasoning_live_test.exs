@@ -3,8 +3,8 @@ defmodule JidoTest.AI.ReasoningLiveTest do
 
   alias Jido.Agent.Directive.Reply
   alias Jido.AgentServer
-  alias Jido.AITest.ChainOfThoughtAgent
-  alias JidoTest.AI.LiveTrace
+  alias Jido.Test.AI.ChainOfThoughtAgent
+  alias Jido.Test.AI.LiveTrace
 
   @moduletag :live
   @test_key "JIDO_LIVE_OPENAI_API_KEY"

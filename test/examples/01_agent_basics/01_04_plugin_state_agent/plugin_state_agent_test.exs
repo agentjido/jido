@@ -5,7 +5,7 @@ Loader.require_source!("01_agent_basics/01_04_plugin_state_agent/count_turns.ex"
 Loader.require_source!("01_agent_basics/01_04_plugin_state_agent/plugin_state_agent.ex")
 
 defmodule JidoTest.Examples.Basic.PluginStateAgentTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -76,7 +76,7 @@ defmodule JidoTest.Examples.Basic.PluginStateAgentTest do
 
   defp start_agent!(jido, agent, opts \\ []) do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(
         jido,
         agent,
         Keyword.put_new(opts, :id, unique_id("plugin"))

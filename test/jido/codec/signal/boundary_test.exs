@@ -58,7 +58,7 @@ defmodule Jido.Signal.BoundaryTest do
     end
 
     test "bounds custom struct and exception module names" do
-      for value <- JidoSignalTest.Fixtures.Diagnostics.values(),
+      for value <- Jido.Test.Signal.Fixtures.Diagnostics.values(),
           {profile, limit} <- [telemetry: 160, transport: 1024] do
         key = if is_exception(value), do: :module, else: :__struct__
         key = if profile == :transport, do: Atom.to_string(key), else: key

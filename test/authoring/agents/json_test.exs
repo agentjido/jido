@@ -11,14 +11,14 @@ defmodule Jido.Agent.JSONTest do
     for module <- [Minimal, Named, Team, PluginState] do
       definition = module.definition()
       instance = Agent.instantiate!(definition, id: "json-1")
-      registry = JidoTest.AgentRegistry.for(definition)
+      registry = Jido.Test.AgentServer.Registry.for(definition)
 
       for value <- [definition, Agent.define!(Map.from_struct(definition)), instance] do
-        assert {:ok, document} = JidoTest.AgentRegistry.encode(value, registry)
-        assert {:ok, json} = JidoTest.AgentRegistry.encode_json(value, registry)
+        assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(value, registry)
+        assert {:ok, json} = Jido.Test.AgentServer.Registry.encode_json(value, registry)
         assert Jason.decode!(json) == document
-        assert {:ok, ^definition} = JidoTest.AgentRegistry.decode_json(json, registry)
-        assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry)
+        assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode_json(json, registry)
+        assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode(document, registry)
       end
     end
   end
@@ -37,25 +37,25 @@ defmodule Jido.Agent.JSONTest do
       })
 
     instance = Agent.instantiate!(definition, id: "leaf-1")
-    assert {:ok, json} = JidoTest.AgentRegistry.encode_json(instance, registry)
+    assert {:ok, json} = Jido.Test.AgentServer.Registry.encode_json(instance, registry)
     assert json =~ "\"id\":\"state\""
     assert json =~ "\"vsn\":1"
     refute json =~ "Joi.Types"
-    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode_json(json, registry)
+    assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode_json(json, registry)
 
     assert_raise ArgumentError, "Catalog is invalid: %{}", fn ->
-      JidoTest.AgentRegistry.decode_json(json, %{})
+      Jido.Test.AgentServer.Registry.decode_json(json, %{})
     end
 
     assert_raise ArgumentError, "Catalog is invalid: %{}", fn ->
-      JidoTest.AgentRegistry.encode_json(instance, %{})
+      Jido.Test.AgentServer.Registry.encode_json(instance, %{})
     end
   end
 
   test "import rejects unknown references, fields, versions, and invalid definitions" do
     instance = Agent.instantiate!(Minimal, id: "json-1")
-    registry = JidoTest.AgentRegistry.for(instance)
-    {:ok, document} = JidoTest.AgentRegistry.encode(instance, registry)
+    registry = Jido.Test.AgentServer.Registry.for(instance)
+    {:ok, document} = Jido.Test.AgentServer.Registry.encode(instance, registry)
 
     invalid = [
       Map.put(document, "vsn", 99),
@@ -76,22 +76,22 @@ defmodule Jido.Agent.JSONTest do
     ]
 
     for invalid <- invalid,
-        do: assert({:error, _} = JidoTest.AgentRegistry.decode(invalid, registry))
+        do: assert({:error, _} = Jido.Test.AgentServer.Registry.decode(invalid, registry))
 
     for json <- ["not json", "[]", "null", "{}"],
-        do: assert({:error, _} = JidoTest.AgentRegistry.decode_json(json, registry))
+        do: assert({:error, _} = Jido.Test.AgentServer.Registry.decode_json(json, registry))
   end
 
   test "unknown JSON names do not create atoms" do
-    registry = JidoTest.AgentRegistry.for(Minimal)
-    {:ok, document} = JidoTest.AgentRegistry.encode(Minimal, registry)
+    registry = Jido.Test.AgentServer.Registry.for(Minimal)
+    {:ok, document} = Jido.Test.AgentServer.Registry.encode(Minimal, registry)
     names = for n <- 1..50, do: "untrusted_agent_atom_#{System.unique_integer([:positive])}_#{n}"
 
     for name <- names do
       invalid =
         put_in(document, ["definition", "metadata"], %{"$type" => "atom", "id" => name})
 
-      assert {:error, _} = JidoTest.AgentRegistry.decode_json(Jason.encode!(invalid), registry)
+      assert {:error, _} = Jido.Test.AgentServer.Registry.decode_json(Jason.encode!(invalid), registry)
     end
 
     # Check the actual names because other tests can load modules in parallel.
@@ -99,8 +99,8 @@ defmodule Jido.Agent.JSONTest do
   end
 
   test "duplicate decoded keys, oversized documents, and obsolete Registry kinds are rejected" do
-    registry = JidoTest.AgentRegistry.for(Minimal)
-    {:ok, document} = JidoTest.AgentRegistry.encode(Minimal, registry)
+    registry = Jido.Test.AgentServer.Registry.for(Minimal)
+    {:ok, document} = Jido.Test.AgentServer.Registry.encode(Minimal, registry)
 
     map = %{
       "$type" => "map",
@@ -111,13 +111,13 @@ defmodule Jido.Agent.JSONTest do
     }
 
     assert {:error, _} =
-             JidoTest.AgentRegistry.decode(
+             Jido.Test.AgentServer.Registry.decode(
                put_in(document, ["definition", "metadata"], map),
                registry
              )
 
     assert {:error, _} =
-             JidoTest.AgentRegistry.decode_json(String.duplicate(" ", 8_388_609), registry)
+             Jido.Test.AgentServer.Registry.decode_json(String.duplicate(" ", 8_388_609), registry)
 
     assert {:error, _} =
              Jido.Catalog.from_targets(__MODULE__, :jido, %{

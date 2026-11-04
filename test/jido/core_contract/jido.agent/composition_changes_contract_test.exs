@@ -2,7 +2,7 @@ defmodule JidoTest.Contract.AgentCompositionChangesTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
   alias Jido.Agent.{Diff, Directive, Topology}
-  alias JidoTest.AgentContract, as: F
+  alias Jido.Test.Agent.Contract, as: F
 
   defmodule Worker do
     use Jido.Agent, name: "composition_worker"

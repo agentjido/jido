@@ -13,7 +13,7 @@ defmodule Jido.AI.OpenTelemetryTest do
 
   alias Jido.Telemetry.AI, as: Telemetry
   alias Jido.Telemetry.AI.CorrelationStore
-  alias Jido.AITest.OpenTelemetryTracer, as: TestTracer
+  alias Jido.Test.Telemetry.OpenTelemetryTracer, as: TestTracer
 
   defmodule TracedTool do
     use Jido.Action,
@@ -57,7 +57,7 @@ defmodule Jido.AI.OpenTelemetryTest do
     previous_jido_config = Application.fetch_env(:jido, :opentelemetry)
     previous_context = :otel_ctx.attach(:otel_ctx.new())
 
-    assert :opentelemetry.set_default_tracer({TestTracer, self()})
+    assert :opentelemetry.set_default_tracer({TestTracer, %{owner: self(), status: :code_and_message}})
     Application.delete_env(:jido, :ai_opentelemetry)
     Application.put_env(:jido, :opentelemetry, %{enabled: false})
     :telemetry.detach("jido-ai-open-telemetry")

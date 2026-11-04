@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("08_runtime/08_14_state_migration/state_migration.ex")
 
 defmodule JidoTest.Examples.Runtime.StateMigrationTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -66,7 +66,7 @@ defmodule JidoTest.Examples.Runtime.StateMigrationTest do
 
   defp start_wallet(c) do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(c.jido, StateMigration, id: unique_id("wallet"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(c.jido, StateMigration, id: unique_id("wallet"))
 
     assert :ok = Server.await_ready(server)
     server

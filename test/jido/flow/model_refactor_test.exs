@@ -3,8 +3,8 @@ defmodule Jido.Flow.ModelRefactorTest do
 
   alias Jido.{Exec, Expr, Flow}
   alias Jido.Flow.{Codec, Definition, Ref}
-  alias JidoActionTest.FlowCodec, as: Codec
-  alias JidoActionTest.Fixtures.Actions.{Add, EchoParamsAction}
+  alias Jido.Test.Flow.Codec, as: Codec
+  alias Jido.Test.Action.Fixtures.Actions.{Add, EchoParamsAction}
 
   test "compact data authoring produces an internal call record" do
     component = %{

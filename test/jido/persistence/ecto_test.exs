@@ -5,8 +5,8 @@ defmodule JidoTest.Persistence.EctoTest do
   alias Jido.Persistence.Ecto, as: EctoPersistence
   alias Jido.Persistence.Ecto.Migration
   alias Jido.Persistence.Ecto.Record
-  alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
-  alias JidoTest.Persistence.{EctoRepo, EctoSupport}
+  alias Jido.Test.AgentServer.RuntimeFixtures.RuntimeAgent
+  alias Jido.Test.Persistence.{EctoRepo, EctoSupport}
 
   defmodule MissingRecord do
     use Ecto.Schema

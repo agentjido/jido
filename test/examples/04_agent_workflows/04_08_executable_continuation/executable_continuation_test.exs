@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("04_agent_workflows/04_08_executable_continuation/executable_continuation.ex")
 
 defmodule JidoTest.Examples.Workflow.ExecutableContinuationTest do
-  use JidoTest.WorkflowSDKCase
+  use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do

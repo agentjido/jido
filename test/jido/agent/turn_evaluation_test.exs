@@ -1,12 +1,12 @@
 defmodule Jido.Agent.TurnEvaluationTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent.Runner
   alias Jido.Agent
   alias Jido.AgentServer.Command
   alias Jido.Agent.Turn
   alias Jido.Signal
-  alias JidoTest.AgentFixtures.Add
+  alias Jido.Test.AgentServer.Fixtures.Add
 
   defmodule CustomRouteAgent do
     @moduledoc false
@@ -27,8 +27,8 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
   test "route selection rejects malformed Signal types before callback", %{jido: jido} do
     agent = CustomRouteAgent.instantiate!(id: Jido.Id.uuid7())
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
-    before = JidoTest.AgentServerAssertions.committed(server)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
+    before = Jido.Test.AgentServer.Assertions.committed(server)
     source = Signal.new!("source.custom", %{observer: self()}, source: "/test")
 
     for type <- [:invalid, nil, 42] do
@@ -37,7 +37,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
       assert {:error, %Jido.Error.RoutingError{}} =
                Jido.AgentServer.call(server, %{source | type: type})
 
-      assert JidoTest.AgentServerAssertions.committed(server) == before
+      assert Jido.Test.AgentServer.Assertions.committed(server) == before
     end
   end
 
@@ -86,7 +86,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
     assert {:ok, direct, []} = Jido.Agent.cmd(agent, source)
     assert direct.state == %{count: 1, history: ["route"]}
 
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
     assert {:ok, live, _} = Jido.AgentServer.call(server, source)
     assert live.state == direct.state
   end

@@ -1,7 +1,7 @@
 Code.require_file("../support/fuzz.exs", __DIR__)
 
 defmodule JidoTest.Property.Runtime.LifecycleModelTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   @moduletag :tmp_dir
 
@@ -108,7 +108,7 @@ defmodule JidoTest.Property.Runtime.LifecycleModelTest do
     persistence = {Jido.Persistence.File, path: path}
 
     {:ok, server} =
-      JidoTest.AgentServerAssertions.start_agent(c.jido, Counter,
+      Jido.Test.AgentServer.Assertions.start_agent(c.jido, Counter,
         id: id,
         state: %{count: initial_count},
         persistence: persistence,

@@ -1,7 +1,7 @@
 defmodule JidoTest.Contract.AgentAuthoringTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias JidoTest.AgentContract, as: F
+  alias Jido.Test.Agent.Contract, as: F
 
   defmodule Leaf do
     use Jido.Agent, name: "contract_leaf"
@@ -13,7 +13,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     routes do
       signal_source "/contract"
 
-      route "work.request", JidoTest.AgentContract.Return, as: :work
+      route "work.request", Jido.Test.Agent.Contract.Return, as: :work
     end
   end
 
@@ -27,7 +27,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     routes do
       signal_source "/contract"
 
-      route "work.add", JidoTest.AgentContract.Add, as: :add
+      route "work.add", Jido.Test.Agent.Contract.Add, as: :add
     end
   end
 
@@ -49,7 +49,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     use Jido.Agent, name: "contract_child"
 
     routes do
-      route "work.request", JidoTest.AgentContract.Return
+      route "work.request", Jido.Test.Agent.Contract.Return
     end
   end
 
@@ -60,7 +60,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       id: "tests/agents/complete-dsl",
       vsn: 2,
       metadata: %{domain: "contracts"},
-      plugins: [{JidoTest.AgentContract.First, %{initial: 3}}]
+      plugins: [{Jido.Test.Agent.Contract.First, %{initial: 3}}]
 
     state do
       schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
@@ -70,7 +70,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     routes do
       signal_source "/contract/complete"
 
-      route "work.request", JidoTest.AgentContract.Return,
+      route "work.request", Jido.Test.Agent.Contract.Return,
         as: :work,
         defaults: %{mode: :ok}
     end
@@ -94,14 +94,14 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     routes do
       signal_source "/contract/routes"
 
-      route "route.action", JidoTest.AgentContract.Return do
+      route "route.action", Jido.Test.Agent.Contract.Return do
         state(:unchanged)
         reply("route.action.reply", from: output())
       end
 
-      route "route.flow", JidoTest.AgentContract.Flow
+      route "route.flow", Jido.Test.Agent.Contract.Flow
 
-      route "route.project", JidoTest.AgentContract.Project do
+      route "route.project", Jido.Test.Agent.Contract.Project do
         state(from: output(:state))
         reply("route.project.reply", from: output([:reply, :value]))
       end
@@ -115,7 +115,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       route "route.inline_flow" do
         flow schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}) do
           step "add",
-            action: JidoTest.AgentContract.Add,
+            action: Jido.Test.Agent.Contract.Add,
             params: %{amount: input(:amount)}
 
           output result("add")
@@ -309,7 +309,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
       F.with_agent(
         """
         routes do
-          route "work.request", JidoTest.AgentContract.Return, as: :"bad name"
+          route "work.request", Jido.Test.Agent.Contract.Return, as: :"bad name"
         end
         """,
         fn _module -> :ok end
@@ -378,14 +378,14 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     assert Jido.Agent.Codec.target() == Jido.Agent
 
     for value <- [Leaf.definition(), Leaf.instantiate!(id: "json")] do
-      registry = JidoTest.AgentRegistry.for(value)
-      assert {:ok, _document} = JidoTest.AgentRegistry.encode(value, registry)
-      assert {:ok, json} = JidoTest.AgentRegistry.encode_json(value, registry)
+      registry = Jido.Test.AgentServer.Registry.for(value)
+      assert {:ok, _document} = Jido.Test.AgentServer.Registry.encode(value, registry)
+      assert {:ok, json} = Jido.Test.AgentServer.Registry.encode_json(value, registry)
       expected = Agent.definition(value)
-      assert {:ok, ^expected} = JidoTest.AgentRegistry.decode_json(json, registry)
+      assert {:ok, ^expected} = Jido.Test.AgentServer.Registry.decode_json(json, registry)
     end
 
-    assert {:error, _} = JidoTest.AgentRegistry.decode_json("{}", %{})
+    assert {:error, _} = Jido.Test.AgentServer.Registry.decode_json("{}", %{})
   end
 
   @tag obligation: "jido.agent.I21"
@@ -396,7 +396,7 @@ defmodule JidoTest.Contract.AgentAuthoringTest do
     assert first.type == "work.request" and first.source == "/contract"
     assert first.data == %{} and second.data == %{count: 2}
     assert bang.data == %{amount: "target validation is deferred"}
-    assert {:error, _} = JidoTest.AgentContract.Add.validate_params(bang.data)
+    assert {:error, _} = Jido.Test.Agent.Contract.Add.validate_params(bang.data)
     assert first.id != second.id
     assert {:error, _} = Leaf.work_signal([])
     assert {:error, _} = Leaf.work_signal(%{}, type: "forged")

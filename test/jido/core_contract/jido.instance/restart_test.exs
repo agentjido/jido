@@ -6,7 +6,7 @@ defmodule JidoTest.InstanceSupervisionTest do
 
   setup :ensure_namespace_registry
 
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
 
   defp ensure_namespace_registry(context),
     do: JidoTest.InstanceContractSupport.ensure_namespace_registry(context)

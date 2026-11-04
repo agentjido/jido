@@ -2,7 +2,7 @@ defmodule Jido.Exec.ObservationTest do
   use ExUnit.Case, async: true
 
   alias Jido.Exec
-  alias JidoActionTest.Fixtures.Actions.Add
+  alias Jido.Test.Action.Fixtures.Actions.Add
   alias Runic.Workflow
 
   defmodule WithEffects do

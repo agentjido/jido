@@ -7,7 +7,7 @@ defmodule JidoActionTest.Authoring.ExtensionTest do
   @moduletag :authoring
 
   alias JidoActionTest.Authoring.Extension
-  alias JidoTest.AuthoringCompiler
+  alias Jido.Test.Flow.AuthoringCompiler
 
   test "a host extension expands to ordinary canonical source declarations" do
     assert Extension.Extended.flow() == Extension.Plain.flow()

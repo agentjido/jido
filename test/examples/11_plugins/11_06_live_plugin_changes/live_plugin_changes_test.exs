@@ -5,7 +5,7 @@ Loader.require_source!("11_plugins/11_06_live_plugin_changes/cache.ex")
 Loader.require_source!("11_plugins/11_06_live_plugin_changes/live_plugin_changes.ex")
 
 defmodule JidoTest.Examples.Plugins.LivePluginChangesTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -16,12 +16,12 @@ defmodule JidoTest.Examples.Plugins.LivePluginChangesTest do
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.LivePluginChanges, as: Example
   alias Example.{Cache, CacheRuntime}
-  import JidoTest.AgentServerAssertions, only: [plugin: 2]
+  import Jido.Test.AgentServer.Assertions, only: [plugin: 2]
 
   test "live changes replace the runtime and removal requires an owned-state decision", %{
     jido: jido
   } do
-    {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, Example, id: unique_id())
+    {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Example, id: unique_id())
     assert {:ok, install} = Example.install_signal()
     assert {:ok, _, _} = Server.call(server, install)
     assert :ok = Server.await_ready(server)
@@ -77,7 +77,7 @@ defmodule JidoTest.Examples.Plugins.LivePluginChangesTest do
     id = unique_id("saved-plugin")
 
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(c.jido, Example, id: id, persistence: persistence)
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(c.jido, Example, id: id, persistence: persistence)
 
     {:ok, install} = Example.install_signal()
     assert {:ok, _, _} = Server.call(server, install)

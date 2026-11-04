@@ -2,7 +2,7 @@ defmodule JidoTest.Persistence.S3Test do
   use ExUnit.Case, async: true
 
   alias Jido.Persistence.S3
-  alias JidoTest.Persistence.S3Client
+  alias Jido.Test.Persistence.S3Client
 
   setup do
     store = start_supervised!({Elixir.Agent, fn -> %{} end})

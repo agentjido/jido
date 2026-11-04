@@ -9,7 +9,7 @@ defmodule JidoTest.Examples.Execution.WaitAndSignalTest do
   end
 
   test "deterministic signals reject a miss and complete on one match" do
-    host = Jido.Exec.Test.WaitHost
+    host = Jido.Test.Exec.WaitHost
 
     assert {:ok, workflow} =
              host.start(

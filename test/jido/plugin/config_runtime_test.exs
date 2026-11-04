@@ -1,9 +1,9 @@
 defmodule Jido.Plugin.ConfigRuntimeTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
-  alias JidoTest.AgentServerAssertions
+  alias Jido.Test.AgentServer.Assertions, as: AgentServerAssertions
 
   defmodule Connection do
     use Jido.Plugin, id: "test.environment.connection"

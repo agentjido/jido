@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("11_plugins/11_02_runtime_admission/runtime_admission.ex")
 
 defmodule JidoTest.Examples.Plugins.RuntimeAdmissionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -20,7 +20,7 @@ defmodule JidoTest.Examples.Plugins.RuntimeAdmissionTest do
     source = authorization_signal("allow")
 
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("runtime-admission"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent, id: unique_id("runtime-admission"))
 
     assert :ok = Server.await_ready(server)
 
@@ -59,7 +59,7 @@ defmodule JidoTest.Examples.Plugins.RuntimeAdmissionTest do
               %Jido.Error.ValidationError{
                 message: "Runtime admission tokens are invalid",
                 details: %{tokens: ^tokens}
-              }} = JidoTest.ExampleRuntime.start_agent(jido, definition, id: id)
+              }} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, definition, id: id)
 
       assert Jido.whereis_agent(jido, id) == nil
     end

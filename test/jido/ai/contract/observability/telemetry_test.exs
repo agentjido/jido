@@ -12,7 +12,7 @@ defmodule Jido.Telemetry.AITest do
   import Mimic
 
   alias Jido.Telemetry.AI, as: Telemetry
-  alias Jido.AITest.SimpleAgent
+  alias Jido.Test.AI.SimpleAgent
   alias Jido.AgentServer
 
   setup :set_mimic_global

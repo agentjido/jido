@@ -1,14 +1,14 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.ControlTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server", async: false
 
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Lifecycle
   alias JidoTest.AgentServer.Fixtures, as: F
-  alias JidoTest.Persistence.ProbeStore
+  alias Jido.Test.Persistence.ProbeStore
 
   defmodule Probe do
     use Jido.Action,

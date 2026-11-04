@@ -88,7 +88,7 @@ defmodule Jido.Flow.DSL.SparkSurfaceTest do
       assert Jido.Exec.run(MyApp.Flows.DynamicRoute, %{
                mode: mode,
                value: 3,
-               target: JidoActionTest.Fixtures.Actions.EchoParamsAction
+               target: Jido.Test.Action.Fixtures.Actions.EchoParamsAction
              }) == {:ok, %{value: 3}}
     end
   end

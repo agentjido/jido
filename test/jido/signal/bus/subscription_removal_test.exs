@@ -1,5 +1,5 @@
 defmodule Jido.Signal.Bus.SubscriptionRemovalTest do
-  use JidoSignalTest.Case, async: true
+  use Jido.Test.Signal.Case, async: true
   alias Jido.Signal.{Bus, Router}
 
   test "removes only the selected shared route and preserves registration order" do

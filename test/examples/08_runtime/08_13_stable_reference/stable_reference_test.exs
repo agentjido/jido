@@ -12,11 +12,11 @@ defmodule JidoTest.Examples.Runtime.StableReferenceTest do
     :ok
   end
 
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
 
   alias Jido.Agent.Ref
   alias Jido.Examples.StableReference
-  alias JidoTest.Persistence.ProbeStore
+  alias Jido.Test.Persistence.ProbeStore
 
   setup do
     store = start_supervised!(ProbeStore)

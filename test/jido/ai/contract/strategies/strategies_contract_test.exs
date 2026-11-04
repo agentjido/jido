@@ -106,9 +106,9 @@ defmodule Jido.AI.Contract.StrategiesTest do
   @tag obligation: "jido_ai.strategies.I1"
   test "reasoning preflight rejects invalid request and Agent boundaries" do
     assert {:error, :invalid_input} =
-             Reasoning.preflight(Jido.AITest.SimpleAgent, [:not_a_keyword])
+             Reasoning.preflight(Jido.Test.AI.SimpleAgent, [:not_a_keyword])
 
-    assert {:error, :invalid_input} = Reasoning.preflight(Jido.AITest.SimpleAgent, :invalid)
+    assert {:error, :invalid_input} = Reasoning.preflight(Jido.Test.AI.SimpleAgent, :invalid)
 
     assert {:error, %ArgumentError{message: message}} =
              Reasoning.preflight(Jido.AI.Contract.NoReasoningAgent, %{})

@@ -5,7 +5,7 @@ Loader.require_source!("14_durable_agents/14_03_vm_recovery/support/dets_store.e
 Loader.require_source!("14_durable_agents/14_03_vm_recovery/vm_recovery.ex")
 
 defmodule JidoTest.Examples.Durable.DetsStoreTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do

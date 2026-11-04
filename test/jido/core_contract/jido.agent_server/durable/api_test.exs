@@ -1,6 +1,8 @@
 defmodule JidoTest.AgentServer.Durable.ApiTest do
   use Covenant.Case, component: "jido.agent_server.durable", async: true
 
+  import Jido.Test.PublicAPI
+
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Lifecycle
 
@@ -28,42 +30,5 @@ defmodule JidoTest.AgentServer.Durable.ApiTest do
            )
 
     refute public_module?(Lifecycle)
-  end
-
-  defp documented_api(module) do
-    module
-    |> docs()
-    |> Enum.flat_map(fn
-      {{kind, name, arity}, _, _, doc, _}
-      when kind in [:function, :macro] and doc not in [:hidden, :none] ->
-        [{kind, name, arity}]
-
-      _other ->
-        []
-    end)
-    |> Enum.sort()
-  end
-
-  defp documented_types(module) do
-    module
-    |> docs()
-    |> Enum.flat_map(fn
-      {{:type, name, arity}, _, _, doc, _} when doc not in [:hidden, :none] ->
-        [{:type, name, arity}]
-
-      _other ->
-        []
-    end)
-    |> Enum.sort()
-  end
-
-  defp docs(module) do
-    {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
-    docs
-  end
-
-  defp public_module?(module) do
-    {:docs_v1, _, _, _, module_doc, _, _} = Code.fetch_docs(module)
-    module_doc not in [:hidden, :none]
   end
 end

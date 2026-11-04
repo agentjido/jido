@@ -1,5 +1,5 @@
 defmodule Jido.Agent.AuthoringPortTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   alias Jido.Agent
   alias Jido.AgentServer
 

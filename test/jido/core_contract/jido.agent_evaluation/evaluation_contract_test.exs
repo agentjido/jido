@@ -4,7 +4,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
   alias Jido.Agent.{Directive, Runner, Turn}
   alias Jido.AgentServer.Command
   alias Jido.Signal
-  alias JidoTest.AgentContract, as: F
+  alias Jido.Test.Agent.Contract, as: F
 
   defmodule ForwardChild do
     use Jido.Agent, name: "evaluation_forward_child"
@@ -717,7 +717,7 @@ defmodule JidoTest.Contract.AgentEvaluationTest do
     end
     """
 
-    JidoTest.AuthoringCompiler.with_compiled(
+    Jido.Test.Flow.AuthoringCompiler.with_compiled(
       source,
       fn _ ->
         agent = host.instantiate!(id: "reload")

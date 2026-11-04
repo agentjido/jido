@@ -6,7 +6,7 @@ Loader.require_source!("08_runtime/08_07_managed_jobs/managed_jobs.ex")
 Code.require_file("../../support/job_runner.exs", __DIR__)
 
 defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
-  use JidoTest.FeatureSDKCase
+  use Jido.Test.Agent.FeatureSDKCase
   @moduletag :example
 
   setup_all do
@@ -64,7 +64,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     eventually(fn -> state(agent).status == :completed end)
     assert state(agent).result == "artifact:6"
     assert Server.snapshot(agent).state_version == 2
-    assert JobServer.jobs(JidoTest.ExampleRuntime.plugin(Server.activation(agent), Jobs)) == []
+    assert JobServer.jobs(Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(agent), Jobs)) == []
   end
 
   test "cancellation stops work and rejects its later result", %{jido: jido} do
@@ -97,13 +97,13 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     {agent, worker} = start_job(jido)
     ref = Process.monitor(worker)
     activation = Server.activation(agent)
-    old = JidoTest.ExampleRuntime.plugin(Server.activation(agent), Jobs)
+    old = Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(agent), Jobs)
     Process.exit(old, :kill)
     assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1000
 
     runtime =
       eventually(fn ->
-        case JidoTest.ExampleRuntime.plugin(activation, Jobs) do
+        case Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Jobs) do
           pid when is_pid(pid) and pid != old -> pid
           _ -> nil
         end

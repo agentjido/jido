@@ -5,7 +5,7 @@ Loader.require_source!("13_persistence/13_04_plugin_state_conversion/persisted_s
 Loader.require_source!("13_persistence/13_04_plugin_state_conversion/persisted_state.ex")
 
 defmodule JidoTest.Examples.Persistence.PluginStateConversionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do

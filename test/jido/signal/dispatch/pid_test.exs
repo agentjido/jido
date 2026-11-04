@@ -43,7 +43,7 @@ defmodule Jido.Signal.Dispatch.PidAdapterTest do
   end
 
   test "rejects remote PID targets at validation and dispatch boundaries" do
-    target = JidoSignalTest.Case.remote_pid()
+    target = Jido.Test.Signal.Case.remote_pid()
     assert {:error, _reason} = Dispatch.validate_opts({:pid, target: target})
     assert {:error, _reason} = Dispatch.dispatch(signal(), {:pid, target: target})
   end

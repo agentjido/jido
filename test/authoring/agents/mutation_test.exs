@@ -3,19 +3,19 @@ defmodule Jido.Agent.MutationAuthoringTest do
   @moduletag :authoring
   alias Jido.Agent
   alias Jido.Agent.Directive, as: D
-  alias JidoTest.AgentEvolutionFixtures, as: F
+  alias Jido.Test.Agent.EvolutionFixtures, as: F
 
   defmodule Authored do
     use Jido.Agent, name: "equivalent"
 
     routes do
-      route "first", JidoTest.AgentEvolutionFixtures.Work
+      route "first", Jido.Test.Agent.EvolutionFixtures.Work
 
-      route "second", JidoTest.AgentEvolutionFixtures.Work, defaults: %{value: 1}
+      route "second", Jido.Test.Agent.EvolutionFixtures.Work, defaults: %{value: 1}
     end
 
     topology do
-      agent :worker, JidoTest.AgentEvolutionFixtures.Worker
+      agent :worker, Jido.Test.Agent.EvolutionFixtures.Worker
     end
   end
 
@@ -66,12 +66,12 @@ defmodule Jido.Agent.MutationAuthoringTest do
              ])
 
     for value <- [agent, Agent.definition(agent)] do
-      registry = JidoTest.AgentRegistry.for(value)
-      assert {:ok, document} = JidoTest.AgentRegistry.encode(value, registry)
+      registry = Jido.Test.AgentServer.Registry.for(value)
+      assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(value, registry)
       expected = Agent.definition(value)
-      assert {:ok, ^expected} = JidoTest.AgentRegistry.decode(document, registry)
-      assert {:ok, json} = JidoTest.AgentRegistry.encode_json(value, registry)
-      assert {:ok, ^expected} = JidoTest.AgentRegistry.decode_json(json, registry)
+      assert {:ok, ^expected} = Jido.Test.AgentServer.Registry.decode(document, registry)
+      assert {:ok, json} = Jido.Test.AgentServer.Registry.encode_json(value, registry)
+      assert {:ok, ^expected} = Jido.Test.AgentServer.Registry.decode_json(json, registry)
     end
   end
 end

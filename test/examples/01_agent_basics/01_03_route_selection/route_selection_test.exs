@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("01_agent_basics/01_03_route_selection/route_selection.ex")
 
 defmodule JidoTest.Examples.Basic.RouteSelectionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -16,7 +16,7 @@ defmodule JidoTest.Examples.Basic.RouteSelectionTest do
 
   test "exact, wildcard, and fallback routes have equal direct and live selection", %{jido: jido} do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Router, id: unique_id("route-selection"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Router, id: unique_id("route-selection"))
 
     for {suffix, expected} <- [
           {"order.create", "create"},

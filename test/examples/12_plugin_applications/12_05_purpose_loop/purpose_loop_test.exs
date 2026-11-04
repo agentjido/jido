@@ -5,7 +5,7 @@ Loader.require_source!("12_plugin_applications/12_05_purpose_loop/clock.ex")
 Loader.require_source!("12_plugin_applications/12_05_purpose_loop/purpose_loop.ex")
 
 defmodule JidoTest.Examples.Applications.PurposeLoopTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
@@ -22,7 +22,7 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
     jido: jido
   } do
     {:ok, agent_server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("purpose-loop"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent, id: unique_id("purpose-loop"))
 
     assert {:ok, started, _directives} =
              Server.call(
@@ -94,7 +94,7 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
     persistence = {Jido.Persistence.ETS, table: table}
 
     {:ok, agent_server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Agent,
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent,
         id: id,
         persistence: persistence,
         persistence_mode: :create
@@ -199,7 +199,7 @@ defmodule JidoTest.Examples.Applications.PurposeLoopTest do
 
   defp scheduler_runtime(agent_server) do
     eventually(fn ->
-      case JidoTest.ExampleRuntime.plugin(Server.activation(agent_server), Scheduler) do
+      case Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(agent_server), Scheduler) do
         pid when is_pid(pid) -> pid
         _child -> nil
       end

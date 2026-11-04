@@ -1,10 +1,10 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.Effects.ReplyTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.effects", async: false
 
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
   alias Jido.Agent
   alias Jido.Agent.Directive
   alias Jido.AgentServer, as: Server

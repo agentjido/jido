@@ -6,7 +6,7 @@ Loader.require_source!("14_durable_agents/14_02_saved_progress/saved_progress.ex
 Code.require_file("../../support/durable_step_probe.exs", __DIR__)
 
 defmodule JidoTest.Examples.Durable.SavedProgressTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do

@@ -5,7 +5,7 @@ defmodule Jido.Flow.DSL.ExtensionTest.AddStep do
   defmacro add_step(name, value, amount) do
     quote do
       step(unquote(name),
-        action: JidoActionTest.Fixtures.Actions.Add,
+        action: Jido.Test.Action.Fixtures.Actions.Add,
         params: %{value: unquote(value), amount: unquote(amount)}
       )
     end
@@ -24,7 +24,7 @@ defmodule Jido.Flow.DSL.ExtensionTest.AddStep do
   defmacro dependent_step(name, dependency) do
     quote do
       step(unquote(name),
-        action: JidoActionTest.Fixtures.Actions.Add,
+        action: Jido.Test.Action.Fixtures.Actions.Add,
         params: %{value: 1, amount: 1},
         needs: [unquote(dependency)]
       )
@@ -34,7 +34,7 @@ defmodule Jido.Flow.DSL.ExtensionTest.AddStep do
   defmacro legacy_after_step(name, dependency) do
     quote do
       step(unquote(name),
-        action: JidoActionTest.Fixtures.Actions.Add,
+        action: Jido.Test.Action.Fixtures.Actions.Add,
         params: %{value: 1, amount: 1},
         after: [unquote(dependency)]
       )
@@ -77,7 +77,7 @@ defmodule Jido.Flow.DSL.ExtensionTest.PlainFlow do
 
   flow do
     step("add",
-      action: JidoActionTest.Fixtures.Actions.Add,
+      action: Jido.Test.Action.Fixtures.Actions.Add,
       params: %{value: input(:value), amount: value(2)}
     )
 
@@ -139,14 +139,14 @@ defmodule Jido.Flow.DSL.ExtensionTest do
         %{
           kind: :step,
           name: "add",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: Jido.Flow.Ref.input(:value), amount: 2}
         }
       ],
       name: "extended_flow"
     }
 
-    assert {:ok, flow} = JidoActionTest.FlowBuilder.new(data)
+    assert {:ok, flow} = Jido.Test.Flow.Builder.new(data)
     assert ExtendedFlow.flow() == flow
   end
 
@@ -226,7 +226,7 @@ end
 
   flow do
     step \"add\",
-      action: JidoActionTest.Fixtures.Actions.Add,
+      action: Jido.Test.Action.Fixtures.Actions.Add,
       params: %{value: value(1), amount: value(1)}
 
     output result(\"add\")

@@ -1,13 +1,13 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.StartupTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server", async: false
 
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Lifecycle
   alias JidoTest.AgentServer.Fixtures, as: F
-  alias JidoTest.ScheduledOccurrenceFixtures.FastRuntimeAgent
+  alias Jido.Test.AgentServer.ScheduledOccurrenceFixtures.FastRuntimeAgent
 
   setup do
     F.setup_runtime()

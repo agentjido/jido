@@ -2,7 +2,7 @@ defmodule Jido.Agent.ValidationAuthoringContractTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
   alias Jido.Agent.Schema
-  alias JidoTest.AgentFixtures.Add
+  alias Jido.Test.AgentServer.Fixtures.Add
 
   defmodule Factory do
     def new, do: Agent.define!(%{name: "factory"})
@@ -111,7 +111,7 @@ defmodule Jido.Agent.ValidationAuthoringContractTest do
       })
 
     assert {:error, %Jido.Codec.Error.InvalidError{code: :value}} =
-             JidoTest.AgentRegistry.encode(definition, JidoTest.AgentRegistry.for(definition))
+             Jido.Test.AgentServer.Registry.encode(definition, Jido.Test.AgentServer.Registry.for(definition))
 
     for entry <- [{:value, %URI{}}, {:route_match, &is_map/1}] do
       assert {:error, _error} =

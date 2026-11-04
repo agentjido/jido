@@ -1,5 +1,5 @@
 defmodule JidoTest.Contract.PluginSensorManagerTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.plugin.sensor_manager", async: true
 
   alias Jido.Agent.Directive
@@ -14,7 +14,7 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
   alias Jido.Plugin.SensorManager.Runtime.Controller
   alias Jido.Plugin.SensorManager.Start
   alias Jido.Plugin.SensorManager.Stop
-  alias JidoTest.Plugin.SensorManagerFixtures, as: F
+  alias Jido.Test.Plugin.SensorManagerFixtures, as: F
 
   defp reduction(plugin_state, directives) do
     %Reduction{
@@ -32,13 +32,13 @@ defmodule JidoTest.Contract.PluginSensorManagerTest do
 
   defp start_agent(jido, opts \\ []) do
     {:ok, server} =
-      JidoTest.AgentServerAssertions.start_agent(
+      Jido.Test.AgentServer.Assertions.start_agent(
         jido,
         F.Agent,
         Keyword.put_new(opts, :id, unique_id("sensor-manager-contract"))
       )
 
-    runtime = JidoTest.AgentServerAssertions.plugin(server, SensorManager).pid
+    runtime = Jido.Test.AgentServer.Assertions.plugin(server, SensorManager).pid
     {server, runtime}
   end
 

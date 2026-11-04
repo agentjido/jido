@@ -1,32 +1,24 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.ActivationRootTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.activation", async: false
 
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
   alias Jido.AgentServer, as: Server
   alias JidoTest.AgentServer.Fixtures, as: F
 
   @moduletag capture_log: true
 
-  defmodule Resource do
-    use GenServer
-    def start_link(init), do: GenServer.start_link(__MODULE__, init)
-
-    def init(init) do
-      if init.options[:observer], do: send(init.options[:observer], {:resource, self(), init})
-      {:ok, init}
-    end
-
-    def handle_call(:owner, _, init), do: {:reply, init.agent_server, init}
-  end
-
   defmodule WorkerPlugin do
     use Jido.Plugin
 
     def child_spec(init),
-      do: %{id: __MODULE__, start: {Resource, :start_link, [init]}, shutdown: 50}
+      do: %{
+        id: __MODULE__,
+        start: {Jido.Test.AgentServer.Resource, :start_link, [init]},
+        shutdown: 50
+      }
 
     def await_ready(root, opts) do
       send(opts[:observer], {:ready_gate, self(), root})
@@ -39,7 +31,7 @@ defmodule JidoTest.AgentServer.ActivationRootTest do
     def start_link(init), do: Supervisor.start_link(__MODULE__, init)
 
     def init(init) do
-      Supervisor.init([%{id: :leaf, start: {Resource, :start_link, [init]}}],
+      Supervisor.init([%{id: :leaf, start: {Jido.Test.AgentServer.Resource, :start_link, [init]}}],
         strategy: :one_for_one
       )
     end

@@ -1,5 +1,5 @@
 defmodule JidoTest.RuntimeStoreTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.instance", async: true
 
   alias Jido.Instance.RuntimeStore

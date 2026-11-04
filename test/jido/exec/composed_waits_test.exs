@@ -1,8 +1,8 @@
 defmodule Jido.Exec.ComposedWaitsTest do
   use ExUnit.Case, async: false
   @moduletag capture_log: true
-  alias Jido.Exec.Test.WaitHost, as: Waits
-  alias Jido.Exec.Test.WaitStore.Memory
+  alias Jido.Test.Exec.WaitHost, as: Waits
+  alias Jido.Test.Exec.WaitStore.Memory
   alias Jido.Flow
   alias Jido.Flow.Ref
 
@@ -470,8 +470,8 @@ defmodule Jido.Exec.ComposedWaitsTest do
         {"id", 1} => {:atom, :id}
       })
 
-    assert {:ok, document} = JidoActionTest.FlowCodec.encode(definition, registry)
-    assert {:ok, decoded} = JidoActionTest.FlowCodec.decode(document, registry)
+    assert {:ok, document} = Jido.Test.Flow.Codec.encode(definition, registry)
+    assert {:ok, decoded} = Jido.Test.Flow.Codec.decode(document, registry)
 
     results =
       for target <- [InvokeFlow, definition, decoded] do
@@ -536,8 +536,8 @@ defmodule Jido.Exec.ComposedWaitsTest do
         {"id", 1} => {:atom, :id}
       })
 
-    assert {:ok, encoded} = JidoActionTest.FlowCodec.encode(definition, registry)
-    assert {:ok, decoded} = JidoActionTest.FlowCodec.decode(encoded, registry)
+    assert {:ok, encoded} = Jido.Test.Flow.Codec.encode(definition, registry)
+    assert {:ok, decoded} = Jido.Test.Flow.Codec.decode(encoded, registry)
 
     for target <- [definition, decoded] do
       assert {:error, %{details: %{expected: :action, actual: :flow}}} =

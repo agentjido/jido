@@ -1,5 +1,5 @@
 defmodule JidoTest.Agent.ReplacementTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.AgentServer, as: Server
   alias Jido.Signal
@@ -35,7 +35,7 @@ defmodule JidoTest.Agent.ReplacementTest do
     assert updated.state == direct.state
     assert initial.state.config == %{a: 1}
 
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, initial)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, initial)
     assert {:ok, live, _} = Server.call(server, signal)
     assert live.state == direct.state
     assert Server.status(server).state_version == 1

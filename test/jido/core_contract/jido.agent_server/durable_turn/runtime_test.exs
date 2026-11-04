@@ -1,10 +1,10 @@
 defmodule JidoTest.AgentServer.DurableTurn.RuntimeTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: false
   @moduletag :tmp_dir
 
   alias Jido.AgentServer, as: Server
-  alias JidoTest.DurableFixtures, as: F
+  alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   setup do
     start_supervised!({F.Probe, self()})

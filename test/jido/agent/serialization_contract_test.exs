@@ -1,10 +1,10 @@
 defmodule Jido.Agent.SerializationContractTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Catalog
   alias Jido.Persistence
-  alias JidoTest.Persistence.CheckpointIdentityProbe, as: Probe
-  alias JidoTest.Persistence.ProbeStore, as: Store
+  alias Jido.Test.Persistence.CheckpointIdentityProbe, as: Probe
+  alias Jido.Test.Persistence.ProbeStore, as: Store
 
   test "Agent persistence uses a separate namespace and rejects an old envelope" do
     opts = [store: start_supervised!(Store)]
@@ -49,9 +49,9 @@ defmodule Jido.Agent.SerializationContractTest do
         {"schemas/probe", 1} => {:schema, definition.schema}
       })
 
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
-    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry)
-    assert_raise ArgumentError, fn -> JidoTest.AgentRegistry.decode(document, %{}) end
-    assert {:error, _} = JidoTest.AgentRegistry.decode(%{}, registry)
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
+    assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode(document, registry)
+    assert_raise ArgumentError, fn -> Jido.Test.AgentServer.Registry.decode(document, %{}) end
+    assert {:error, _} = Jido.Test.AgentServer.Registry.decode(%{}, registry)
   end
 end

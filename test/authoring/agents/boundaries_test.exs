@@ -44,12 +44,12 @@ defmodule JidoTest.Authoring.Agents.BoundariesTest do
 
   test "JSON round trips require the supplied Registry" do
     definition = Agent.define!(%{name: "no_json"})
-    registry = JidoTest.AgentRegistry.for(definition)
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
-    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry)
+    registry = Jido.Test.AgentServer.Registry.for(definition)
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
+    assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode(document, registry)
 
     assert_raise ArgumentError, "Catalog is invalid: %{}", fn ->
-      JidoTest.AgentRegistry.decode(document, %{})
+      Jido.Test.AgentServer.Registry.decode(document, %{})
     end
   end
 end

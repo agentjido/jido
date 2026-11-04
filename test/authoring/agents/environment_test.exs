@@ -64,7 +64,7 @@ defmodule JidoTest.Authoring.Agents.EnvironmentTest do
     agent = Agent.instantiate!(definition, id: "environment-agent")
 
     assert {:error, %Jido.Codec.Error.InvalidError{code: :value}} =
-             JidoTest.AgentRegistry.encode(agent, JidoTest.AgentRegistry.for(agent))
+             Jido.Test.AgentServer.Registry.encode(agent, Jido.Test.AgentServer.Registry.for(agent))
 
     assert {:ok, snapshot} = Jido.Persistence.snapshot(agent)
     System.delete_env(name)

@@ -4,8 +4,8 @@ defmodule JidoActionTest.Authoring.GeneratedGraphTest do
   @moduletag :authoring
   alias Jido.{Exec, Flow}
   alias Jido.Flow.{Codec, Ref}
-  alias JidoActionTest.FlowCodec, as: Codec
-  alias JidoActionTest.FlowComponent
+  alias Jido.Test.Flow.Codec, as: Codec
+  alias Jido.Test.Flow.Component, as: FlowComponent
 
   defmodule Add do
     use Jido.Action, name: "generated_graph_add"
@@ -48,7 +48,7 @@ defmodule JidoActionTest.Authoring.GeneratedGraphTest do
           output
         )
 
-      assert {:ok, built} = JidoActionTest.FlowBuilder.new(data)
+      assert {:ok, built} = Jido.Test.Flow.Builder.new(data)
       assert {:ok, document, registry} = Codec.encode(flow)
       json = JSON.encode!(document)
       assert {:ok, restored} = Codec.decode(JSON.decode!(json), registry)
@@ -115,7 +115,7 @@ defmodule JidoActionTest.Authoring.GeneratedGraphTest do
       expected_message = expected_error(fault)
 
       assert {:error, %{message: ^expected_message}} =
-               JidoActionTest.FlowBuilder.new(
+               Jido.Test.Flow.Builder.new(
                  name: valid.name,
                  components: components,
                  output: valid.output
@@ -123,7 +123,7 @@ defmodule JidoActionTest.Authoring.GeneratedGraphTest do
 
       data = %{output: valid.output, components: components, name: valid.name}
 
-      assert {:error, %{message: ^expected_message}} = JidoActionTest.FlowBuilder.new(data)
+      assert {:error, %{message: ^expected_message}} = Jido.Test.Flow.Builder.new(data)
       invalid_json = document |> invalid_document(fault) |> JSON.encode!() |> JSON.decode!()
       assert {:error, %{message: ^expected_message}} = Codec.decode(invalid_json, registry)
       run_ref = make_ref()
@@ -208,13 +208,13 @@ defmodule JidoActionTest.Authoring.GeneratedGraphTest do
   end
 
   defp build_flow(nodes) do
-    JidoActionTest.FlowBuilder.new!(
+    Jido.Test.Flow.Builder.new!(
       name: "generated_graph",
       components:
         nodes
         |> Enum.reverse()
         |> Enum.map(fn node ->
-          JidoActionTest.FlowComponent.step!(
+          Jido.Test.Flow.Component.step!(
             name: node.name,
             action: Add,
             params: params(node),

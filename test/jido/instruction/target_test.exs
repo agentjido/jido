@@ -1,13 +1,13 @@
-defmodule JidoActionTest.Instruction.TargetTest do
+defmodule Jido.Test.Action.InstructionTarget do
   use Covenant.Case, component: "jido_action.instruction", async: false
   @moduletag obligation: "jido_action.instruction.I5"
 
   alias Jido.{Exec, Instruction}
   alias Jido.Flow.Ref
-  alias JidoActionTest.Fixtures.MathFlow
-  alias JidoActionTest.Fixtures.Actions.{Add, MissingValidateParams, MissingValidateOutput}
+  alias Jido.Test.Flow.Fixtures.MathFlow
+  alias Jido.Test.Action.Fixtures.Actions.{Add, MissingValidateParams, MissingValidateOutput}
 
-  # These targets are defined in test/support/fixtures/action/missing_callbacks.exs.
+  # These targets are defined in test/support/jido_action/fixtures/missing_callbacks.exs.
   alias __MODULE__.{Ambiguous, MissingActionRun, MissingFlowDefinition}
 
   defmodule CallbackOnly do
@@ -110,10 +110,10 @@ defmodule JidoActionTest.Instruction.TargetTest do
     flow = Instruction.new!(target: MathFlow, params: %{value: 2})
 
     assert {:error, %Jido.Error.ValidationError{}} =
-             JidoActionTest.FlowComponent.step(name: "action", action: action)
+             Jido.Test.Flow.Component.step(name: "action", action: action)
 
     assert {:error, %Jido.Error.ValidationError{}} =
-             JidoActionTest.FlowComponent.subflow(name: "flow", flow: flow)
+             Jido.Test.Flow.Component.subflow(name: "flow", flow: flow)
   end
 
   test "callbacks without a target behaviour do not classify a module" do
@@ -285,10 +285,10 @@ defmodule JidoActionTest.Instruction.TargetTest do
     instruction = Instruction.new!(target: FlowWithoutRun, params: input)
 
     parent =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "flow_without_run_parent",
         components: [
-          JidoActionTest.FlowComponent.subflow!(
+          Jido.Test.Flow.Component.subflow!(
             name: "child",
             flow: FlowWithoutRun,
             params: Ref.input([])

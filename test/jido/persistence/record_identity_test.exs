@@ -4,8 +4,8 @@ defmodule Jido.Persistence.RecordIdentityTest do
   alias Jido.Agent.Ref
   alias Jido.Persistence
   alias Jido.Persistence.{ETS, File}
-  alias JidoTest.AgentFixtures.CounterAgent, as: Basic
-  alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
+  alias Jido.Test.AgentServer.Fixtures.CounterAgent, as: Basic
+  alias Jido.Test.AgentServer.RuntimeFixtures.RuntimeAgent
 
   defmodule BarrierAdapter do
     @behaviour Jido.Persistence.Store
@@ -92,7 +92,7 @@ defmodule Jido.Persistence.RecordIdentityTest do
 
     assert {{:shutdown, :stable_namespace_required}, _} =
              catch_exit(
-               JidoTest.AgentServerAssertions.start_agent(instance, Basic,
+               Jido.Test.AgentServer.Assertions.start_agent(instance, Basic,
                  id: c.agent.id,
                  persistence: c.store
                )

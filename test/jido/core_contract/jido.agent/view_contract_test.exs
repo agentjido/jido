@@ -5,8 +5,8 @@ defmodule JidoTest.Contract.AgentViewTest do
   alias Jido.Agent.View
   alias Jido.Catalog
   alias Jido.Codec.Document
-  alias JidoTest.AgentFixtures.{Add, CounterAgent}
-  alias JidoTest.AgentContract, as: F
+  alias Jido.Test.AgentServer.Fixtures.{Add, CounterAgent}
+  alias Jido.Test.Agent.Contract, as: F
 
   defp registry do
     Catalog.from_targets!(__MODULE__, :jido, %{
@@ -212,7 +212,7 @@ defmodule JidoTest.Contract.AgentViewTest do
           },
           %{
             path: "counter.two",
-            handler: %{kind: :action, target: JidoTest.TestActions.BasicAction},
+            handler: %{kind: :action, target: Jido.Test.Plugin.Actions.BasicAction},
             state: :unchanged
           }
         ]

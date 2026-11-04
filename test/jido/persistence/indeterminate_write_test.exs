@@ -1,11 +1,11 @@
 defmodule JidoTest.Persistence.IndeterminateWriteTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :research
   @moduletag capability: "PERSIST-03"
 
   alias Jido.Persistence
-  alias JidoTest.Persistence.IndeterminateWriteProbe, as: Probe
-  alias JidoTest.Persistence.ProbeStore, as: Store
+  alias Jido.Test.Persistence.IndeterminateWriteProbe, as: Probe
+  alias Jido.Test.Persistence.ProbeStore, as: Store
 
   defmodule LostReply do
     @behaviour Jido.Persistence.Store
@@ -49,7 +49,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
                     }},
                    5_000
 
-    assert JidoTest.AgentServerAssertions.committed(pid) == %{agent: agent, state_version: 1}
+    assert Jido.Test.AgentServer.Assertions.committed(pid) == %{agent: agent, state_version: 1}
 
     assert {:ok, ^agent, 1} =
              Persistence.load_agent_with_revision(c.store, Probe, c.id, instance: c.jido)
@@ -89,7 +89,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     {_store, opts} = c.store
 
     assert {:ok, pid} =
-             JidoTest.AgentServerAssertions.start_agent(c.jido, Probe,
+             Jido.Test.AgentServer.Assertions.start_agent(c.jido, Probe,
                id: c.id,
                persistence: {LostReply, opts},
                persistence_mode: :create
@@ -112,7 +112,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
   defp start_agent(c, write_result) do
     {Store, opts} = c.store
 
-    JidoTest.AgentServerAssertions.start_agent(c.jido, Probe,
+    Jido.Test.AgentServer.Assertions.start_agent(c.jido, Probe,
       id: c.id,
       persistence: {Store, Keyword.put(opts, :write_result, write_result)},
       persistence_mode: :create

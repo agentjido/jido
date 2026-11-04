@@ -1,5 +1,5 @@
 defmodule Jido.Signal.Bus.SelectorTest do
-  use JidoSignalTest.Case, async: true
+  use Jido.Test.Signal.Case, async: true
 
   alias Jido.Signal
   alias Jido.Signal.Bus
@@ -167,7 +167,7 @@ defmodule Jido.Signal.Bus.SelectorTest do
     subject = String.duplicate("s", 4_096)
 
     assert {:ok, _} =
-             Bus.subscribe(bus, JidoSignalTest.Fixtures.Signals.UserCreated,
+             Bus.subscribe(bus, Jido.Test.Signal.Fixtures.Signals.UserCreated,
                selector: [source: source, subject: subject]
              )
 

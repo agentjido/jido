@@ -7,55 +7,55 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
 
   alias Jido.{Exec, Flow}
   alias Jido.Flow.{Graph, Ref}
-  alias JidoActionTest.FlowComponent
+  alias Jido.Test.Flow.Component, as: FlowComponent
   alias JidoActionTest.Authoring.Components
   alias JidoActionTest.Authoring.Hostile
-  alias JidoTest.AuthoringCompiler
+  alias Jido.Test.Flow.AuthoringCompiler
 
   test "Action-only component slots reject a Flow target at executable validation" do
     child = Components.Child
 
     option =
-      JidoActionTest.FlowComponent.option!(name: "selected", condition: true, action: child)
+      Jido.Test.Flow.Component.option!(name: "selected", condition: true, action: child)
 
-    fallback = JidoActionTest.FlowComponent.fallback!(action: Components.Echo)
+    fallback = Jido.Test.Flow.Component.fallback!(action: Components.Echo)
 
     state =
       Components.IterateRepeat.flow().components |> Map.fetch!("counter") |> Map.fetch!(:state)
 
     components = [
-      {JidoActionTest.FlowComponent.map!(name: "node", collection: [], action: child), :action},
-      {JidoActionTest.FlowComponent.reduce!(
+      {Jido.Test.Flow.Component.map!(name: "node", collection: [], action: child), :action},
+      {Jido.Test.Flow.Component.reduce!(
          name: "node",
          collection: [],
          initial: %{},
          action: child
        ), :action},
-      {JidoActionTest.FlowComponent.iterate!(
+      {Jido.Test.Flow.Component.iterate!(
          name: "node",
          state: state,
          action: child,
          completion: true,
          max_iterations: 1
        ), :action},
-      {JidoActionTest.FlowComponent.choice!(name: "node", options: [option], fallback: fallback), "selected"},
-      {JidoActionTest.FlowComponent.choice!(
+      {Jido.Test.Flow.Component.choice!(name: "node", options: [option], fallback: fallback), "selected"},
+      {Jido.Test.Flow.Component.choice!(
          name: "node",
          options: [
-           JidoActionTest.FlowComponent.option!(
+           Jido.Test.Flow.Component.option!(
              name: "selected",
              condition: true,
              action: Components.Echo
            )
          ],
-         fallback: JidoActionTest.FlowComponent.fallback!(action: child)
+         fallback: Jido.Test.Flow.Component.fallback!(action: child)
        ), :fallback},
-      {JidoActionTest.FlowComponent.invoke!(
+      {Jido.Test.Flow.Component.invoke!(
          name: "node",
          decision: child,
          expander: Components.Expand
        ), :decision},
-      {JidoActionTest.FlowComponent.invoke!(
+      {Jido.Test.Flow.Component.invoke!(
          name: "node",
          decision: Components.Decide,
          expander: child
@@ -64,7 +64,7 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
 
     for {component, field} <- components do
       flow =
-        JidoActionTest.FlowBuilder.new!(
+        Jido.Test.Flow.Builder.new!(
           name: "wrong_target",
           components: [component],
           output: Ref.result("node")
@@ -81,7 +81,7 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
 
   test "Map, Reduce, and Iterate reject references outside each local scope" do
     assert {:error, map_error} =
-             JidoActionTest.FlowComponent.map(
+             Jido.Test.Flow.Component.map(
                name: "map",
                collection: Ref.item(),
                action: Components.MapItem
@@ -91,7 +91,7 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
     assert map_error.details.scope == :map_collection
 
     assert {:error, map_params_error} =
-             JidoActionTest.FlowComponent.map(
+             Jido.Test.Flow.Component.map(
                name: "map",
                collection: [],
                action: Components.MapItem,
@@ -102,7 +102,7 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
     assert map_params_error.details.scope == :map_params
 
     assert {:error, reduce_error} =
-             JidoActionTest.FlowComponent.reduce(
+             Jido.Test.Flow.Component.reduce(
                name: "reduce",
                collection: [],
                initial: Ref.accumulator(),
@@ -113,7 +113,7 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
     assert reduce_error.details.scope == :reduce_initial
 
     assert {:error, iterate_error} =
-             JidoActionTest.FlowComponent.state(initial: Ref.state(:count), update: %{})
+             Jido.Test.Flow.Component.state(initial: Ref.state(:count), update: %{})
 
     assert iterate_error.details.ref_type == :state
     assert iterate_error.details.scope == :iterate_initial
@@ -135,15 +135,15 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
 
   test "Choice rejects missing fallback and non-Boolean direct conditions" do
     valid_option =
-      JidoActionTest.FlowComponent.option!(name: "ready", condition: true, action: Hostile.Watch)
+      Jido.Test.Flow.Component.option!(name: "ready", condition: true, action: Hostile.Watch)
 
     assert {:error, missing} =
-             JidoActionTest.FlowComponent.choice(name: "route", options: [valid_option])
+             Jido.Test.Flow.Component.choice(name: "route", options: [valid_option])
 
     assert missing.details.path == [:fallback]
 
     assert {:error, condition} =
-             JidoActionTest.FlowComponent.option(
+             Jido.Test.Flow.Component.option(
                name: "ready",
                condition: :truthy,
                action: Hostile.Watch
@@ -231,13 +231,13 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
 
   test "Handoff rejects a second sink, a second Handoff, and a partial output" do
     handoff =
-      JidoActionTest.FlowComponent.handoff!(name: "route", selector: Components.Expand)
+      Jido.Test.Flow.Component.handoff!(name: "route", selector: Components.Expand)
 
     tail =
-      JidoActionTest.FlowComponent.step!(name: "tail", action: Components.Echo, needs: ["route"])
+      Jido.Test.Flow.Component.step!(name: "tail", action: Components.Echo, needs: ["route"])
 
     second =
-      JidoActionTest.FlowComponent.handoff!(
+      Jido.Test.Flow.Component.handoff!(
         name: "again",
         selector: Components.Expand
       )
@@ -250,7 +250,7 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
 
     for {components, output, message} <- cases do
       assert {:error, error} =
-               JidoActionTest.FlowBuilder.new(
+               Jido.Test.Flow.Builder.new(
                  name: "invalid_handoff",
                  components: components,
                  output: output
@@ -260,10 +260,10 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
     end
 
     parent =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "handoff_parent",
         components: [
-          JidoActionTest.FlowComponent.subflow!(
+          Jido.Test.Flow.Component.subflow!(
             name: "child",
             flow: Components.HandoffFlow
           )
@@ -329,7 +329,7 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
 
   test "Invoke decisions and ordinary Steps reject continuations" do
     invoke =
-      JidoActionTest.FlowComponent.invoke!(
+      Jido.Test.Flow.Component.invoke!(
         name: "route",
         decision: Hostile.Continues,
         expander: Hostile.Watch,
@@ -337,17 +337,17 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
       )
 
     invoke_flow =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "illegal_decision",
         components: [invoke],
         output: Ref.result("route")
       )
 
     step_flow =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "illegal_step",
         components: [
-          JidoActionTest.FlowComponent.step!(
+          Jido.Test.Flow.Component.step!(
             name: "early",
             action: Hostile.Continues,
             params: %{value: Ref.input(:value)}
@@ -369,7 +369,7 @@ defmodule JidoActionTest.Authoring.RejectionsTest do
     invoke = definition(Components.InvokeFlow, "route")
 
     strict_root =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "strict_invoke_root",
         components: [invoke],
         output: Ref.result("route"),

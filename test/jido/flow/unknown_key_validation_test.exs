@@ -2,11 +2,11 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
   use ExUnit.Case, async: true
 
   alias Jido.Flow
-  alias JidoActionTest.FlowCodec, as: Codec
+  alias Jido.Test.Flow.Codec, as: Codec
   alias Jido.Flow.Definition
   alias Jido.Error.ValidationError
   alias Jido.Catalog
-  alias JidoActionTest.Fixtures.Actions.Add
+  alias Jido.Test.Action.Fixtures.Actions.Add
 
   test "Flow.new preserves valid input and rejects unknown root keys" do
     attrs = %{
@@ -43,7 +43,7 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
       {%{
          kind: :subflow,
          name: "child",
-         flow: JidoActionTest.Fixtures.NestedFlow
+         flow: Jido.Test.Flow.Fixtures.NestedFlow
        }, "subflow"},
       {%{kind: :map, name: "map", collection: [], action: Add}, "map"},
       {%{kind: :parallel, name: "parallel", actions: [%{name: "add", action: Add}]}, "parallel"},
@@ -181,7 +181,7 @@ defmodule Jido.Flow.UnknownKeyDSLValidationTest do
       source = "defmodule #{inspect(module)} do
   use Jido.Flow, #{inspect(attrs)}
   flow do
-    step \"step\", action: JidoActionTest.Fixtures.Actions.Add, params: %{}
+    step \"step\", action: Jido.Test.Action.Fixtures.Actions.Add, params: %{}
     output %{}
   end
 end

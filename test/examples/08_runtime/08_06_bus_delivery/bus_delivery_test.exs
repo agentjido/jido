@@ -34,7 +34,7 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
       action %{value: value},
         schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
         context: context do
-        context.plugin_inputs[JidoTest.FeatureObserver].runtime.on_delivery.(%{
+        context.plugin_inputs[Jido.Test.Agent.FeatureObserver].runtime.on_delivery.(%{
           value: value
         })
 
@@ -56,7 +56,7 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
 end
 
 defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
-  use JidoTest.FeatureSDKCase
+  use Jido.Test.Agent.FeatureSDKCase
   @moduletag :example
 
   setup_all do
@@ -72,7 +72,7 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
 
   test "durable delivery waits for a commit before it sends the next record", %{jido: jido} do
     {:ok, agent} =
-      JidoTest.ExampleRuntime.start_agent(jido, observed(BusDeliveryFixture, :on_delivery),
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, observed(BusDeliveryFixture, :on_delivery),
         id: unique_id("bus-observer")
       )
 
@@ -98,7 +98,7 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
 
   test "a failed Turn retries the same record before later input", %{jido: jido} do
     {:ok, agent} =
-      JidoTest.ExampleRuntime.start_agent(jido, observed(BusDeliveryFixture, :on_delivery),
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, observed(BusDeliveryFixture, :on_delivery),
         id: unique_id("bus-observer"),
         error_policy: :log_only
       )
@@ -131,11 +131,11 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
     assert {:ok, [_]} = Bus.publish(bus, [event])
     eventually(fn -> state(agent).values == ~c"\a" end)
     activation = Server.activation(agent)
-    old = JidoTest.ExampleRuntime.plugin(Server.activation(agent), Client)
+    old = Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(agent), Client)
     Process.exit(old, :kill)
 
     eventually(fn ->
-      runtime = JidoTest.ExampleRuntime.plugin(activation, Client)
+      runtime = Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Client)
       is_pid(runtime) and runtime != old
     end)
 
@@ -166,8 +166,8 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
     eventually(fn -> state(agent).values == [5] end)
     assert Server.snapshot(agent).state_version == 1
     activation = Server.activation(agent)
-    client = JidoTest.ExampleRuntime.plugin(activation, Client)
-    manager = JidoTest.ExampleRuntime.plugin(activation, Manager)
+    client = Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Client)
+    manager = Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Manager)
     client_ref = Process.monitor(client)
     manager_ref = Process.monitor(manager)
     assert :ok = Jido.stop_agent(jido, agent)
@@ -181,8 +181,8 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
     assert {:ok, bus} = Bus.whereis(:example_commands, jido: jido)
 
     activation = Server.activation(agent)
-    assert JidoTest.ExampleRuntime.plugin(activation, Manager) == bus
-    client = JidoTest.ExampleRuntime.plugin(activation, Client)
+    assert Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Manager) == bus
+    client = Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Client)
     assert is_pid(client)
     bus
   end

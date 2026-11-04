@@ -1,7 +1,7 @@
 Code.require_file("support/counter.exs", __DIR__)
 
 defmodule JidoTest.System.Runtime.CleanupTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   @moduletag :system
   @moduletag timeout: 120_000
@@ -14,7 +14,7 @@ defmodule JidoTest.System.Runtime.CleanupTest do
       servers =
         for index <- 1..50 do
           id = unique_id("cleanup-#{cycle}-#{index}")
-          {:ok, server} = JidoTest.AgentServerAssertions.start_agent(c.jido, Counter, id: id)
+          {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(c.jido, Counter, id: id)
           assert {:ok, next, []} = Server.call(server, signal("system.runtime.add", %{delta: index}))
           assert next.state.count == index
           server

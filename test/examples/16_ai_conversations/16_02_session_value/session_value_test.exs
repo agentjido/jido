@@ -3,7 +3,7 @@ Code.require_file("../../support/loader.exs", __DIR__)
 JidoTest.Examples.Loader.require_source!("16_ai_conversations/16_02_session_value/session_value.ex")
 
 defmodule JidoTest.Examples.AI.SessionValueTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   @moduletag :example
 

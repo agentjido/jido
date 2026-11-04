@@ -4,7 +4,7 @@ defmodule Jido.Exec.Node.ActionTest do
   alias Jido.Exec.Node.Action
   alias Jido.Instruction
 
-  alias JidoActionTest.Fixtures.Actions.{
+  alias Jido.Test.Action.Fixtures.Actions.{
     Add,
     BasicAction,
     EchoParamsAction,
@@ -273,7 +273,7 @@ defmodule Jido.Exec.Node.ActionTest do
          "jido_action.boundary.I3"
        ]
   test "original callback and validator stacktraces remain in both documented fields" do
-    alias JidoActionTest.Fixtures.Actions.{StacktraceAction, StacktraceValidationAction}
+    alias Jido.Test.Action.Fixtures.Actions.{StacktraceAction, StacktraceValidationAction}
 
     for {action, mode, phase, frame} <- [
           {StacktraceAction, :raise, :run, :raise_from_action},

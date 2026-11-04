@@ -1,5 +1,5 @@
 defmodule Jido.Agent.ForwardTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.AgentServer
@@ -66,7 +66,7 @@ defmodule Jido.Agent.ForwardTest do
 
   test "forward sends to one declared Agent without default dispatch fallback", %{jido: jido} do
     {:ok, parent} =
-      JidoTest.AgentServerAssertions.start_agent(jido, Parent, default_dispatch: {:pid, target: self()})
+      Jido.Test.AgentServer.Assertions.start_agent(jido, Parent, default_dispatch: {:pid, target: self()})
 
     [worker] = AgentServer.members(parent, :worker)
     signal = Signal.new!("work.request", %{}, source: "/test")
@@ -79,7 +79,7 @@ defmodule Jido.Agent.ForwardTest do
   end
 
   test "forward sends to the current parent Agent", %{jido: jido} do
-    {:ok, parent} = JidoTest.AgentServerAssertions.start_agent(jido, Parent)
+    {:ok, parent} = Jido.Test.AgentServer.Assertions.start_agent(jido, Parent)
     [worker] = AgentServer.members(parent, :worker)
     signal = Signal.new!("work.completed", %{}, source: "/test")
 
@@ -101,7 +101,7 @@ defmodule Jido.Agent.ForwardTest do
                ]
              })
 
-    {:ok, worker} = JidoTest.AgentServerAssertions.start_agent(jido, Worker)
+    {:ok, worker} = Jido.Test.AgentServer.Assertions.start_agent(jido, Worker)
     signal = Signal.new!("work.completed", %{}, source: "/test")
 
     assert {:error, :parent_not_found} = AgentServer.call(worker, signal)

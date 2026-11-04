@@ -16,8 +16,8 @@ defmodule Jido.AI.Contract.TurnTest do
   }
 
   alias Jido.AI.Thread.Projection
-  alias Jido.AITest.DynamicToolSource
-  alias Jido.AITest.Tools.Add
+  alias Jido.Test.AI.DynamicToolSource
+  alias Jido.Test.AI.Tools.Add
   alias Jido.{Session, Thread}
 
   @outcome_keys [

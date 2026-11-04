@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("14_durable_agents/14_04_accepted_work/accepted_work.ex")
 
 defmodule JidoTest.Examples.Durable.AcceptedWorkTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do

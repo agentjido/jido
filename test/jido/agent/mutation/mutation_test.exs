@@ -3,7 +3,7 @@ defmodule Jido.Agent.MutationTest do
   alias Jido.Agent
   alias Jido.Agent.{Diff, Directive, Mutation, Route}
   alias Jido.Error.ValidationError, as: Error
-  alias JidoTest.AgentEvolutionFixtures, as: F
+  alias Jido.Test.Agent.EvolutionFixtures, as: F
 
   defmodule InvalidMigrations do
     def invalid(_value), do: :invalid
@@ -447,7 +447,7 @@ defmodule Jido.Agent.MutationTest do
     assert explicit.state.counter == 9
 
     assert {:ok, stateless, _} =
-             Agent.mutate(F.agent(), [Directive.plugin_add(JidoTest.AgentContract.Stateless)])
+             Agent.mutate(F.agent(), [Directive.plugin_add(Jido.Test.Agent.Contract.Stateless)])
 
     assert stateless.state === F.agent().state
 

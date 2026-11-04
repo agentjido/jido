@@ -8,7 +8,7 @@ Loader.require_source!("13_persistence/13_07_recoverable_delivery/delivery_worke
 Loader.require_source!("13_persistence/13_07_recoverable_delivery/recoverable_delivery.ex")
 
 defmodule JidoTest.Examples.Persistence.RecoverableDeliveryTest do
-  use JidoTest.AgentCase
+  use Jido.Test.Agent.Case
   @moduletag :example
 
   setup_all do
@@ -20,7 +20,7 @@ defmodule JidoTest.Examples.Persistence.RecoverableDeliveryTest do
   @moduletag group: :persistence
 
   alias Jido.AgentServer, as: Server
-  alias JidoTest.Persistence.ProbeStore
+  alias Jido.Test.Persistence.ProbeStore
   alias Jido.Examples.RecoverableDelivery, as: Example
   alias Jido.Examples.RecoverableDelivery.Deliver
   alias Jido.Examples.RecoverableDelivery.MemorySink, as: Sink
@@ -68,7 +68,7 @@ defmodule JidoTest.Examples.Persistence.RecoverableDeliveryTest do
 
   defp start_example(c, id, restore) do
     assert {:ok, server} =
-             JidoTest.ExampleRuntime.start_agent(c.jido, Example,
+             Jido.Test.AgentServer.ExampleRuntime.start_agent(c.jido, Example,
                id: id,
                persistence: c.store,
                persistence_mode: if(restore == false, do: :create, else: :restore)

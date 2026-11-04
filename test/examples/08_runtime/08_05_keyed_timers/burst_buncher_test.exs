@@ -5,7 +5,7 @@ Loader.require_source!("08_runtime/08_05_keyed_timers/timer.ex")
 Loader.require_source!("08_runtime/08_05_keyed_timers/burst_buncher.ex")
 
 defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
-  use JidoTest.AgentCase
+  use Jido.Test.Agent.Case
   @moduletag :example
 
   setup_all do

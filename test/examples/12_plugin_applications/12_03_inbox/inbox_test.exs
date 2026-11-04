@@ -5,7 +5,7 @@ Loader.require_source!("12_plugin_applications/12_03_inbox/inbox_sensor.ex")
 Loader.require_source!("12_plugin_applications/12_03_inbox/inbox.ex")
 
 defmodule JidoTest.Examples.Applications.InboxTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
@@ -19,7 +19,7 @@ defmodule JidoTest.Examples.Applications.InboxTest do
   alias Jido.Plugin.SensorManager.Runtime
 
   test "managed input survives duplicate events, failures, and runtime replacement", %{jido: jido} do
-    {:ok, agent_server} = JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("inbox"))
+    {:ok, agent_server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent, id: unique_id("inbox"))
     agent_id = Server.agent(agent_server).id
     manager = manager(agent_server)
 
@@ -64,7 +64,7 @@ defmodule JidoTest.Examples.Applications.InboxTest do
 
     next_manager =
       eventually(fn ->
-        case JidoTest.ExampleRuntime.plugin(activation, SensorManager) do
+        case Jido.Test.AgentServer.ExampleRuntime.plugin(activation, SensorManager) do
           pid when is_pid(pid) and pid != manager -> pid
           _ -> nil
         end
@@ -116,6 +116,6 @@ defmodule JidoTest.Examples.Applications.InboxTest do
   end
 
   defp manager(agent_server) do
-    JidoTest.ExampleRuntime.plugin(Server.activation(agent_server), SensorManager)
+    Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(agent_server), SensorManager)
   end
 end

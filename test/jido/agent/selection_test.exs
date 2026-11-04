@@ -1,5 +1,5 @@
 defmodule Jido.Agent.SelectionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.Agent.Runner
@@ -106,7 +106,7 @@ defmodule Jido.Agent.SelectionTest do
       assert_receive {:executed, ^input, ^source}
       assert direct.state == %{input: input, calls: 1}
 
-      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+      assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
       assert {:ok, live, _} = Server.call(server, source, context: %{observer: self()})
       assert_receive {:executed, ^input, execution_signal}
       assert execution_signal.data == source.data
@@ -135,7 +135,7 @@ defmodule Jido.Agent.SelectionTest do
 
       agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
       source = signal("selection.empty", data)
-      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+      assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
       assert {:ok, direct, []} = Agent.cmd(agent, source)
       assert {:ok, live, _} = Server.call(server, source)
       assert direct.state == %{input: %{}, calls: 1}
@@ -146,7 +146,7 @@ defmodule Jido.Agent.SelectionTest do
   test "invalid route data returns its Signal context before executable work", %{jido: jido} do
     for definition <- definitions() do
       agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
-      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+      assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
 
       for data <- ["hello", 3, [1, 2], [{"value", 3}], [{:value, 3} | :invalid]] do
         source = signal("selection.action", data)
@@ -190,7 +190,7 @@ defmodule Jido.Agent.SelectionTest do
       |> Agent.instantiate!(id: Jido.Id.uuid7())
 
     source = signal("selection.validated", value: "invalid")
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
     assert {:error, _error} = Agent.cmd(agent, source, context: %{observer: self()})
     assert {:error, _error} = Server.call(server, source, context: %{observer: self()})
     assert Server.agent(server).state == agent.state

@@ -3,7 +3,7 @@ defmodule Jido.AI.Contract.AgentPluginTest do
 
   alias Jido.AI.Agent.Plugin
   alias Jido.AI.Reasoning.ReAct
-  alias Jido.AITest.Tools.Add
+  alias Jido.Test.AI.Tools.Add
   alias Jido.Catalog
   alias Jido.Catalog.Error, as: CatalogError
 

@@ -4,7 +4,7 @@ defmodule JidoTest.InstanceNamespaceRegistryTest do
   use ExUnit.Case, async: false
   use Covenant.Case, component: "jido.instance", async: false
 
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
 
   alias Jido.Instance.NamespaceRegistry
 

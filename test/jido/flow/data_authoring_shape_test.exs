@@ -3,10 +3,10 @@ defmodule Jido.Flow.DataAuthoringShapeTest do
 
   alias Jido.Flow
   alias Jido.Flow.{Codec, Ref}
-  alias JidoActionTest.FlowCodec, as: Codec
+  alias Jido.Test.Flow.Codec, as: Codec
   alias Jido.Error.ValidationError
-  alias JidoActionTest.Fixtures.Actions.EchoParamsAction
-  alias JidoActionTest.Fixtures.NestedFlow
+  alias Jido.Test.Action.Fixtures.Actions.EchoParamsAction
+  alias Jido.Test.Flow.Fixtures.NestedFlow
 
   test "compact definitions produce valid canonical artifacts and one stored format" do
     for component <- components() do

@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("13_persistence/13_05_durable_delete/durable_delete.ex")
 
 defmodule JidoTest.Examples.Persistence.DurableDeleteTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -14,7 +14,7 @@ defmodule JidoTest.Examples.Persistence.DurableDeleteTest do
 
   alias Jido.Examples.DurableDelete
   alias Jido.Persistence.ETS
-  alias JidoTest.Persistence.ProbeStore
+  alias Jido.Test.Persistence.ProbeStore
 
   setup do
     store = {ProbeStore, store: start_supervised!(ProbeStore)}

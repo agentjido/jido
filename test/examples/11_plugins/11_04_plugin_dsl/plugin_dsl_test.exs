@@ -5,7 +5,7 @@ Loader.require_source!("11_plugins/11_04_plugin_dsl/thresholds.ex")
 Loader.require_source!("11_plugins/11_04_plugin_dsl/plugin_dsl.ex")
 
 defmodule JidoTest.Examples.Plugins.DSLTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -33,7 +33,7 @@ defmodule JidoTest.Examples.Plugins.DSLTest do
     agent = Agent.instantiate!(id: unique_id())
     assert {:ok, direct, []} = Agent.cmd(agent, signal)
     assert direct.state == %{count: 3, reached: [:first, :third]}
-    {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, agent)
+    {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, agent)
     assert {:ok, ^direct, []} = Server.call(server, signal)
     assert {:ok, again, []} = Server.call(server, signal)
     assert again.state == %{count: 6, reached: [:first, :third]}
@@ -42,15 +42,15 @@ defmodule JidoTest.Examples.Plugins.DSLTest do
   test "JSON import selects the trusted Plugin and preserves the same DSL data", %{jido: jido} do
     definition = Agent.definition()
     registry = Agent.registry()
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
-    assert {:ok, imported} = JidoTest.AgentRegistry.decode_json(Jason.encode!(document), registry)
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
+    assert {:ok, imported} = Jido.Test.AgentServer.Registry.decode_json(Jason.encode!(document), registry)
     assert imported == definition
-    {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, imported, id: unique_id())
+    {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, imported, id: unique_id())
     {:ok, signal} = Agent.add_signal(%{amount: 1})
     assert {:ok, %{state: %{count: 1, reached: [:first]}}, []} = Server.call(server, signal)
 
     assert {:error, _} =
-             JidoTest.AgentRegistry.decode_json(Jason.encode!(document), Catalog.new!([]))
+             Jido.Test.AgentServer.Registry.decode_json(Jason.encode!(document), Catalog.new!([]))
   end
 
   test "map authors use the same validation as DSL authors" do

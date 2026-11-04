@@ -5,7 +5,7 @@ Loader.require_source!("10_topologies/support/cell.ex")
 Loader.require_source!("10_topologies/10_06_connection_changes/connection_changes.ex")
 
 defmodule JidoTest.Examples.Topology.ConnectionChangesTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -13,7 +13,7 @@ defmodule JidoTest.Examples.Topology.ConnectionChangesTest do
     :ok
   end
 
-  import JidoTest.AgentTopologyAssertions
+  import Jido.Test.AgentServer.TopologyAssertions
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.ConnectionChanges, as: Example
 
@@ -60,7 +60,7 @@ defmodule JidoTest.Examples.Topology.ConnectionChangesTest do
     id = unique_id("saved-connections")
 
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Example, id: id, persistence: persistence)
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Example, id: id, persistence: persistence)
 
     assert {:ok, redirect} = Example.redirect_signal(%{value: 5})
     assert {:ok, accepted, _} = Server.call(server, redirect)

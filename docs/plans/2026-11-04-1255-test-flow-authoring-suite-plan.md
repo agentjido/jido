@@ -97,7 +97,7 @@ The earlier quality import recorded only the split-core Agent authoring corpus.
 
 - Fixed source: `agentjido/jido_action` commit `177e7a4ce4342a9a6b7bc668f540dafbd7169d54`, especially `test/authoring/**`.
 - Current authoring harness: `mix.exs`, `test/test_helper.exs`, and `test/authoring/agents/**`.
-- Current Flow helpers: `test/support/flow_component.ex`, `test/support/generated_flow_codec.ex`, `test/support/authoring_compiler.ex`, and `test/support/fixtures/codec/registry.ex`.
+- Current Flow helpers: `test/support/jido_flow/component.ex`, `test/support/jido_flow/generated_codec.ex`, `test/support/jido_flow/authoring_compiler.ex`, and `test/support/jido_codec/fixtures/registry.ex`.
 - Current focused evidence: `test/jido/flow/**`, `test/jido/exec/**`, `test/jido/flow/dsl/spark_surface_test.exs`, and `test/examples/02_flow_authoring/**`.
 - Quality evidence: `test/quality/source_manifest.yml`, `test/quality/component_proof.yml`, and `test/quality/quality_contract.yml`.
 
@@ -251,7 +251,7 @@ test/authoring/
   2. Replace removed exception-type assertions with stable current diagnostic fields.
   3. Preserve Action-only target rules, local reference scopes, condition and state validation, Handoff terminal rules, continuation rejection, and source ordering behavior.
 - **Execution note:** Use unique generated module namespaces and purge them after each case before enabling any concurrency.
-- **Patterns to follow:** `test/support/authoring_compiler.ex`, `test/jido/flow/dsl/extension_test.exs`, `test/jido/flow/dsl/inline_step_test.exs`, `test/jido/flow/dsl/source_map_test.exs`, `test/jido/flow/dsl/output_source_test.exs`.
+- **Patterns to follow:** `test/support/jido_flow/authoring_compiler.ex`, `test/jido/flow/dsl/extension_test.exs`, `test/jido/flow/dsl/inline_step_test.exs`, `test/jido/flow/dsl/source_map_test.exs`, `test/jido/flow/dsl/output_source_test.exs`.
 - **Test scenarios:**
   - An extension lowers to ordinary canonical declarations, and extension failures point to the extension call.
   - Invalid inline bindings, duplicate names, missing helpers, and recompilation retain exact source locations and current replacement behavior.

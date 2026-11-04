@@ -1,5 +1,5 @@
 defmodule JidoTest.Persistence.LiveStateTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
@@ -229,7 +229,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
         state: %{payload: self(), owned: %{bits: <<5::3>>}}
       )
 
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(c.jido, initial)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(c.jido, initial)
     port = Port.open({:spawn_executable, System.find_executable("true")}, [])
     on_exit(fn -> if Port.info(port), do: Port.close(port) end)
 
@@ -259,7 +259,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
           {PluginAgent, %{payload: :portable, owned: %{bits: <<5::3>>}}}
         ] do
       assert {:ok, server} =
-               JidoTest.AgentServerAssertions.start_agent(c.jido, module, persistence: c.persistence)
+               Jido.Test.AgentServer.Assertions.start_agent(c.jido, module, persistence: c.persistence)
 
       assert {:ok, committed, _} =
                Server.call(server, signal("local.update", Map.put(input, :observer, self())))
@@ -287,9 +287,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
       persistence = {adapter, elem(c.persistence, 1)}
 
       assert {:ok, server} =
-               JidoTest.AgentServerAssertions.start_agent(c.jido, module, persistence: persistence)
+               Jido.Test.AgentServer.Assertions.start_agent(c.jido, module, persistence: persistence)
 
-      before = JidoTest.AgentServerAssertions.committed(server)
+      before = Jido.Test.AgentServer.Assertions.committed(server)
       monitor = Process.monitor(server)
 
       assert {:error, %Jido.Error.ExecutionError{message: "Required durable commit failed"}} =

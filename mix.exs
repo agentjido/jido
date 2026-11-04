@@ -55,7 +55,7 @@ defmodule Jido.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support", "test/jido/support"]
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
 
   defp test_coverage do
@@ -64,8 +64,7 @@ defmodule Jido.MixProject do
       output: "tmp/quality/coverage/coverdata",
       ignore_modules: [
         ~r/^Inspect\.Jido/,
-        ~r/^JidoActionTest\./,
-        ~r/^JidoSignalTest\./,
+        ~r/^Jido\.Test\./,
         ~r/^Jido\.Flow\.DSL\.Forms\.Flow\./,
         ~r/^Jido\.Flow\.DSL\.(?:Entity|Step|Output)$/,
         ~r/^Jido\.Flow\.DSL\.Forms\.(?:Map|Reduce|Choice(?:\.Option|\.Otherwise)?|Parallel(?:\.Action)?|Iterate(?:\.State)?|Invoke|Wait\.(?:Await|Timer|Selection(?:\.Await|\.Timer)?))$/,
@@ -236,7 +235,7 @@ defmodule Jido.MixProject do
 
   defp test_ignore_filters do
     [
-      ~r/^test\/fixtures\//,
+      ~r/^test\/consumers\//,
       ~r/^test\/contracts\//,
       ~r/^test\/authoring\/support\//,
       ~r/^test\/examples\/support\//,

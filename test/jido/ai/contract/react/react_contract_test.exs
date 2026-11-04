@@ -12,7 +12,7 @@ defmodule Jido.AI.Contract.ReActTest do
     RecordToolResults
   }
 
-  alias Jido.AITest.Tools
+  alias Jido.Test.AI.Tools
 
   @routes %{
     model: ReAct.ModelRound,
@@ -156,7 +156,7 @@ defmodule Jido.AI.Contract.ReActTest do
     execution = %{
       version: 1,
       call: %{id: "add-1", name: "add", arguments: %{left: 2, right: 3}},
-      tool: %{kind: :action, name: "add", module: "Elixir.Jido.AITest.Tools.Add"},
+      tool: %{kind: :action, name: "add", module: "Elixir.Jido.Test.AI.Tools.Add"},
       outcome: %{status: :ok, value: %{sum: 5}},
       started_at_ms: 2,
       completed_at_ms: 3,

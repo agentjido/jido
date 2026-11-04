@@ -1,7 +1,7 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.Effects.RulesTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.agent_server.effects", async: true
 
   alias Jido.AgentServer.Effects

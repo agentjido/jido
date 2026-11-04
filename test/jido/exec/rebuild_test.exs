@@ -5,7 +5,7 @@ defmodule Jido.Exec.RebuildTest do
   alias Jido.Exec.Frame
   alias Jido.Flow.Ref
   alias Jido.Error.ValidationError
-  alias JidoActionTest.Fixtures.Actions.{Add, EchoParamsAction}
+  alias Jido.Test.Action.Fixtures.Actions.{Add, EchoParamsAction}
   alias Runic.Workflow
 
   defmodule Sum do

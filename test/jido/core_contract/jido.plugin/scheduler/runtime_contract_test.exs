@@ -1,5 +1,5 @@
 defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.plugin.scheduler", async: false
 
   alias Jido.AgentServer, as: Server
@@ -12,7 +12,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
   alias Jido.Signal.Context, as: SignalContext
   alias Jido.Trace
   alias Jido.Trace.Context
-  alias JidoTest.ScheduledOccurrenceFixtures.{Clock, FastRuntimeAgent, TimedAgent}
+  alias Jido.Test.AgentServer.ScheduledOccurrenceFixtures.{Clock, FastRuntimeAgent, TimedAgent}
 
   @instant ~U[2030-01-01 00:00:01Z]
 
@@ -459,7 +459,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
   @tag obligation: "jido.plugin.scheduler.I7"
   test "Scheduler runtime and cron job replacement restore committed definitions", %{jido: jido} do
     {:ok, server} =
-      JidoTest.AgentServerAssertions.start_agent(jido, FastRuntimeAgent, id: unique_id("scheduler-recovery"))
+      Jido.Test.AgentServer.Assertions.start_agent(jido, FastRuntimeAgent, id: unique_id("scheduler-recovery"))
 
     cron = Scheduler.cron(:heartbeat, "* * * * * * *", tick("cron.tick"))
 
@@ -469,7 +469,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
                signal("runtime.directive", %{event: :scheduled, directive: cron})
              )
 
-    scheduler = JidoTest.AgentServerAssertions.plugin(server, Scheduler)
+    scheduler = Jido.Test.AgentServer.Assertions.plugin(server, Scheduler)
 
     {_spec, old_job, _old_ref, _token} =
       eventually(fn -> Map.get(:sys.get_state(scheduler.pid).cron_jobs, :heartbeat) end)
@@ -492,11 +492,11 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
     root = Server.activation(server)
     Process.exit(scheduler.pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, _pid, :killed}
-    server = JidoTest.AgentServerAssertions.replacement(root, server)
+    server = Jido.Test.AgentServer.Assertions.replacement(root, server)
 
     replacement =
       eventually(fn ->
-        case JidoTest.AgentServerAssertions.plugin(server, Scheduler) do
+        case Jido.Test.AgentServer.Assertions.plugin(server, Scheduler) do
           %{pid: pid} when pid != scheduler.pid -> pid
           _ -> nil
         end
@@ -513,7 +513,7 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
     id = unique_id("timed-agent")
 
     {:ok, server} =
-      JidoTest.AgentServerAssertions.start_agent(jido, TimedAgent,
+      Jido.Test.AgentServer.Assertions.start_agent(jido, TimedAgent,
         id: id,
         persistence: persistence,
         persistence_mode: :create
@@ -533,13 +533,13 @@ defmodule JidoTest.Contract.PluginSchedulerRuntimeTest do
     assert :ok = Server.stop(server)
 
     {:ok, restored} =
-      JidoTest.AgentServerAssertions.start_agent(jido, TimedAgent,
+      Jido.Test.AgentServer.Assertions.start_agent(jido, TimedAgent,
         id: id,
         persistence: persistence,
         persistence_mode: :restore
       )
 
-    runtime = JidoTest.AgentServerAssertions.plugin(restored, Scheduler).pid
+    runtime = Jido.Test.AgentServer.Assertions.plugin(restored, Scheduler).pid
     {definition, job, _ref, _token} = :sys.get_state(runtime).cron_jobs["job-1"]
     assert Process.alive?(job)
     assert definition.generation == first.occurrence.generation

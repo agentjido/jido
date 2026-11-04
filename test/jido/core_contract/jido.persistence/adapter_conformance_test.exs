@@ -1,10 +1,10 @@
-defmodule JidoTest.Persistence.AdapterConformanceTest do
+defmodule Jido.Test.Persistence.AdapterConformanceTest do
   use Covenant.Case, component: "jido.persistence", async: false
 
   alias Jido.Persistence.{Ecto, ETS, Mnesia, Redis, S3}
   alias Jido.Persistence.File, as: FilePersistence
 
-  alias JidoTest.Persistence.{
+  alias Jido.Test.Persistence.{
     AdapterConformance,
     EctoRepo,
     EctoSupport,

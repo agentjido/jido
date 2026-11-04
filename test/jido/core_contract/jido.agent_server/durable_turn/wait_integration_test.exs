@@ -1,9 +1,9 @@
 defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: false
   @moduletag :tmp_dir
   alias Jido.AgentServer, as: Server
-  alias JidoTest.DurableFixtures.Probe
+  alias Jido.Test.AgentServer.DurableFixtures.Probe
 
   defmodule Approval do
     use Jido.Flow,
@@ -12,7 +12,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
 
     flow do
       step "before", input <- input() do
-        :ok = JidoTest.DurableFixtures.Probe.enter(:before_wait)
+        :ok = Jido.Test.AgentServer.DurableFixtures.Probe.enter(:before_wait)
         {:ok, input}
       end
 
@@ -23,7 +23,7 @@ defmodule JidoTest.AgentServer.DurableTurn.WaitIntegrationTest do
       end
 
       step "finish", decision <- result("decision") do
-        :ok = JidoTest.DurableFixtures.Probe.enter(:after_wait)
+        :ok = Jido.Test.AgentServer.DurableFixtures.Probe.enter(:after_wait)
         {:ok, %{count: if(decision.selected == "approved", do: 1, else: -1)}}
       end
 

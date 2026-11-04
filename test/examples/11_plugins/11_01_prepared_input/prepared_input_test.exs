@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("11_plugins/11_01_prepared_input/prepared_input.ex")
 
 defmodule JidoTest.Examples.Plugins.PreparedInputTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -30,7 +30,7 @@ defmodule JidoTest.Examples.Plugins.PreparedInputTest do
     assert direct.state.last_subject == source.subject
 
     live = Agent.instantiate!(id: unique_id("prepared-live"))
-    {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, live)
+    {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, live)
     assert {:ok, live, _directives} = Server.call(server, source)
     assert live.state.tenant == "acme"
     assert live.state.last_signal_id == source.id

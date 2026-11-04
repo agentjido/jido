@@ -1,5 +1,5 @@
 defmodule Jido.Agent.FlowExpressionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.Flow.Ref
@@ -95,11 +95,11 @@ defmodule Jido.Agent.FlowExpressionTest do
           ]
         })
 
-      registry = JidoTest.AgentRegistry.for(definition)
-      assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+      registry = Jido.Test.AgentServer.Registry.for(definition)
+      assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
 
       assert {:ok, decoded} =
-               JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
+               Jido.Test.AgentServer.Registry.decode(JSON.decode!(JSON.encode!(document)), registry)
 
       assert decoded == definition
       instance = Agent.instantiate!(decoded, id: Jido.Id.uuid7(), state: %{count: 10})
@@ -141,7 +141,7 @@ defmodule Jido.Agent.FlowExpressionTest do
       instance =
         Agent.instantiate!(definition, id: Jido.Id.uuid7(), state: %{count: 10})
 
-      {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, instance)
+      {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, instance)
 
       {:ok, route_signal_1} = Counter.add_signal(%{amount: 9})
 
@@ -177,13 +177,13 @@ defmodule Jido.Agent.FlowExpressionTest do
       })
 
     instance = Agent.instantiate!(definition, id: unique_id(), state: %{count: 10})
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, instance)
-    before = JidoTest.AgentServerAssertions.committed(server)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, instance)
+    before = Jido.Test.AgentServer.Assertions.committed(server)
     {:ok, input} = Counter.add_signal(%{})
     assert {:error, error} = Agent.cmd(instance, input)
     assert is_exception(error)
     assert {:error, _} = Jido.AgentServer.call(server, input)
-    assert JidoTest.AgentServerAssertions.committed(server) == before
+    assert Jido.Test.AgentServer.Assertions.committed(server) == before
     assert instance.state == %{count: 10}
 
     assert {:error, _} =

@@ -240,7 +240,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   @tag obligation: "jido.agent.I21"
   test "generated Signal helpers have tuple and raising forms" do
-    module = JidoTest.AuthoringDocsAgent
+    module = Jido.Test.Agent.AuthoringDocsAgent
     {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
 
     assert {{:function, :increment_signal, 2}, _, _, %{"en" => help}, _} =
@@ -497,7 +497,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     definition = RawCounter.definition()
 
     assert {:error, %Jido.Codec.Error.InvalidError{code: :value}} =
-             JidoTest.AgentRegistry.encode(definition, JidoTest.AgentRegistry.for(definition))
+             Jido.Test.AgentServer.Registry.encode(definition, Jido.Test.AgentServer.Registry.for(definition))
 
     refute function_exported?(RawCounter, :raw_signal, 1)
 
@@ -531,7 +531,7 @@ defmodule JidoTest.Agent.AuthoringTest do
           %{definition | id: "instance", state: %URI{}},
           %{definition | id: "instance", state: []}
         ] do
-      assert {:error, _error} = JidoTest.AgentRegistry.encode(malformed, catalog)
+      assert {:error, _error} = Jido.Test.AgentServer.Registry.encode(malformed, catalog)
     end
   end
 
@@ -711,14 +711,14 @@ defmodule JidoTest.Agent.AuthoringTest do
 end
 
 defmodule JidoTest.Agent.AuthoringRuntimeTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   alias Jido.AgentServer, as: Server
   alias JidoTest.Agent.AuthoringTest.{Counter, InlineCounter, PreparedCounter}
 
   test "generated Action and Flow helpers commit the direct candidate", %{jido: jido} do
     agent = Counter.instantiate!(id: Jido.Id.uuid7())
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
 
     {:ok, command_signal_1} = Counter.add_signal(%{amount: 3})
 
@@ -753,7 +753,7 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
   end
 
   test "generated inline helpers apply route defaults", %{jido: jido} do
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, InlineCounter)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, InlineCounter)
 
     {:ok, route_signal_3} = InlineCounter.add_inline_signal(%{amount: 4})
 
@@ -764,15 +764,15 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
   end
 
   test "a live helper forwards runtime validation without a commit", %{jido: jido} do
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, Counter)
-    before = JidoTest.AgentServerAssertions.committed(server)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, Counter)
+    before = Jido.Test.AgentServer.Assertions.committed(server)
 
     {:ok, route_signal_4} = Counter.add_signal(%{amount: 2})
 
     assert {:error, %{__exception__: true}} =
              Jido.AgentServer.call(server, route_signal_4, timeout: :invalid)
 
-    assert JidoTest.AgentServerAssertions.committed(server) == before
+    assert Jido.Test.AgentServer.Assertions.committed(server) == before
 
     {:ok, route_signal_5} = Counter.add_signal(%{amount: 0})
 
@@ -789,7 +789,7 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
     assert {:ok, candidate, []} = PreparedCounter.cmd(agent, signal)
     assert candidate.state.count == 2
 
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
 
     {:ok, route_signal_6} = PreparedCounter.add_signal(%{amount: 2})
 

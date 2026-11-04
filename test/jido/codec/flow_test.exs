@@ -5,15 +5,15 @@ defmodule Jido.Flow.CodecTest do
   alias Jido.Catalog
   alias Jido.Error.ValidationError
   alias Jido.Flow
-  alias JidoActionTest.FlowCodec, as: Codec
+  alias Jido.Test.Flow.Codec, as: Codec
   alias Jido.Error
   alias Jido.Flow.Ref
-  alias JidoActionTest.Fixtures.CodecRegistry
-  alias JidoActionTest.Fixtures.FlowAuthoring
-  alias JidoActionTest.Fixtures.InlineAuthoring
-  alias JidoActionTest.Fixtures.InlineParityFlow
-  alias JidoActionTest.Fixtures.NestedFlow
-  alias JidoActionTest.Fixtures.Actions.{Add, Multiply}
+  alias Jido.Test.Codec.Fixtures.CodecRegistry
+  alias Jido.Test.Flow.Fixtures.FlowAuthoring
+  alias Jido.Test.Flow.Fixtures.InlineAuthoring
+  alias Jido.Test.Flow.Fixtures.InlineParityFlow
+  alias Jido.Test.Flow.Fixtures.NestedFlow
+  alias Jido.Test.Action.Fixtures.Actions.{Add, Multiply}
 
   defmodule InlineProbeFlow do
     @moduledoc false
@@ -140,7 +140,7 @@ defmodule Jido.Flow.CodecTest do
         replace_component(
           document,
           0,
-          JidoActionTest.StoredFields.update(step, %{
+          Jido.Test.Action.StoredFields.update(step, %{
             "action" => %{"id" => identifier, "vsn" => 1}
           })
         )
@@ -341,7 +341,7 @@ defmodule Jido.Flow.CodecTest do
 
   test "encode/1 rejects a non-canonical Flow" do
     raw_flow =
-      JidoActionTest.FlowBuilder.new!(%{
+      Jido.Test.Flow.Builder.new!(%{
         name: "raw_codec",
         components: [%{kind: :step, name: "add", action: Add, params: %{a: 1, b: 2}}],
         output: Ref.result("add")
@@ -370,15 +370,15 @@ defmodule Jido.Flow.CodecTest do
     choice = component(document, "route")
     [option] = choice["options"]
 
-    step = step |> Map.put("needs", 42) |> JidoActionTest.StoredFields.target(42)
+    step = step |> Map.put("needs", 42) |> Jido.Test.Action.StoredFields.target(42)
 
     option =
       option
       |> Map.put("condition", "invalid")
-      |> JidoActionTest.StoredFields.target(42)
+      |> Jido.Test.Action.StoredFields.target(42)
 
     fallback =
-      JidoActionTest.StoredFields.target(
+      Jido.Test.Action.StoredFields.target(
         choice["fallback"],
         %{"id" => "actions/missing", "vsn" => 1}
       )
@@ -456,7 +456,7 @@ defmodule Jido.Flow.CodecTest do
     registry = CodecRegistry.mixed()
 
     handoff_flow =
-      JidoActionTest.FlowBuilder.new!(%{
+      Jido.Test.Flow.Builder.new!(%{
         name: "stored_handoff",
         components: [
           %{kind: :handoff, name: "next", selector: Add, params: %{value: 1}}
@@ -505,10 +505,10 @@ defmodule Jido.Flow.CodecTest do
     invalid = %{
       document
       | "components" => [
-          JidoActionTest.StoredFields.update(first, %{
+          Jido.Test.Action.StoredFields.update(first, %{
             "params" => stored_map.([{"x", stored_map.([{"y", item}])}])
           }),
-          JidoActionTest.StoredFields.update(second, %{
+          Jido.Test.Action.StoredFields.update(second, %{
             "params" => stored_map.([{"components", [stored_map.([]), item]}])
           })
         ],
@@ -535,10 +535,10 @@ defmodule Jido.Flow.CodecTest do
     choice = %{
       choice
       | "options" => [
-          JidoActionTest.StoredFields.update(option, %{"params" => item}),
-          JidoActionTest.StoredFields.update(option, %{"name" => "second", "params" => item})
+          Jido.Test.Action.StoredFields.update(option, %{"params" => item}),
+          Jido.Test.Action.StoredFields.update(option, %{"name" => "second", "params" => item})
         ],
-        "fallback" => JidoActionTest.StoredFields.update(choice["fallback"], %{"params" => item})
+        "fallback" => Jido.Test.Action.StoredFields.update(choice["fallback"], %{"params" => item})
     }
 
     invalid = replace_component(document, choice_index, choice)
@@ -675,7 +675,7 @@ defmodule Jido.Flow.CodecTest do
       |> Map.delete("meta")
       |> Map.put("extra", true)
 
-    subflow = JidoActionTest.StoredFields.update(subflow, %{"flow" => 42, "needs" => ~c"*"})
+    subflow = Jido.Test.Action.StoredFields.update(subflow, %{"flow" => 42, "needs" => ~c"*"})
     choice = choice |> Map.delete("options") |> Map.delete("fallback")
 
     map =
@@ -689,7 +689,7 @@ defmodule Jido.Flow.CodecTest do
       |> Map.delete("initial")
       |> Map.delete("call")
       |> Map.put("collection", %{"bad" => true})
-      |> JidoActionTest.StoredFields.target(42)
+      |> Jido.Test.Action.StoredFields.target(42)
 
     iterate =
       iterate
@@ -797,7 +797,7 @@ defmodule Jido.Flow.CodecTest do
     registry = CodecRegistry.mixed()
 
     flow =
-      JidoActionTest.FlowBuilder.new!(%{
+      Jido.Test.Flow.Builder.new!(%{
         name: "diagnostic_graph",
         components: [
           %{kind: :step, name: "first", action: Add},
@@ -834,7 +834,7 @@ defmodule Jido.Flow.CodecTest do
     registry = CodecRegistry.storage()
 
     flow =
-      JidoActionTest.FlowBuilder.new!(%{
+      Jido.Test.Flow.Builder.new!(%{
         name: "utf8_boundary",
         description: "valid",
         components: [
@@ -922,7 +922,7 @@ defmodule Jido.Flow.CodecTest do
 
   test "Action and Flow identifiers have distinct trusted kinds" do
     flow =
-      JidoActionTest.FlowBuilder.new!(%{
+      Jido.Test.Flow.Builder.new!(%{
         name: "one_subflow",
         components: [%{kind: :subflow, name: "child", flow: NestedFlow}],
         output: Ref.result("child")
@@ -972,7 +972,7 @@ defmodule Jido.Flow.CodecTest do
     document = %{
       document
       | "components" => [
-          JidoActionTest.StoredFields.update(step, %{
+          Jido.Test.Action.StoredFields.update(step, %{
             "action" => %{"id" => unknown_identifier, "vsn" => 1}
           })
           | rest
@@ -991,7 +991,7 @@ defmodule Jido.Flow.CodecTest do
     registry = CodecRegistry.storage()
 
     flow =
-      JidoActionTest.FlowBuilder.new!(%{
+      Jido.Test.Flow.Builder.new!(%{
         name: "stored_key_types",
         components: [
           %{
@@ -1176,7 +1176,7 @@ defmodule Jido.Flow.CodecTest do
 
   test "nested conditions use one tagged JSON grammar" do
     flow =
-      JidoActionTest.FlowBuilder.new!(%{
+      Jido.Test.Flow.Builder.new!(%{
         name: "nested_condition",
         components: [
           %{
@@ -1205,7 +1205,7 @@ defmodule Jido.Flow.CodecTest do
 
   test "the encoder reports a missing trusted action inside a Choice option" do
     flow =
-      JidoActionTest.FlowBuilder.new!(%{
+      Jido.Test.Flow.Builder.new!(%{
         name: "unregistered_choice_action",
         components: [
           %{
@@ -1292,7 +1292,7 @@ defmodule Jido.Flow.CodecTest do
       replace_component(
         document,
         step_index,
-        JidoActionTest.StoredFields.update(step, %{"action" => 42})
+        Jido.Test.Action.StoredFields.update(step, %{"action" => 42})
       ),
       %{document | "description" => 42},
       replace_component(document, step_index, %{step | "needs" => 42}),
@@ -1319,7 +1319,7 @@ defmodule Jido.Flow.CodecTest do
   end
 
   defp all_component_flow! do
-    JidoActionTest.FlowBuilder.new!(%{
+    Jido.Test.Flow.Builder.new!(%{
       name: "all_stored_components",
       components: [
         %{kind: :step, name: "step", action: Add},

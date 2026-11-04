@@ -9,4 +9,4 @@ Run the section:
 The tests use public Jido APIs and deterministic local stores. They cover exact
 byte replacement, Ref lifetime controls, idle thaw, and uncertain-write
 cleanup. Test-only record changes and uncertain write results stay in
-`test/support/persistence/`. Shared external adapter checks remain optional.
+`test/support/jido_persistence/`. Shared external adapter checks remain optional.

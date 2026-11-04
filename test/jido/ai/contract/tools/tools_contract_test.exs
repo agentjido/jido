@@ -2,7 +2,7 @@ defmodule Jido.AI.Contract.ToolsTest do
   use Covenant.Case, component: "jido_ai.tools", async: true
 
   alias Jido.AI.{ToolResult, ToolSource, Toolset}
-  alias Jido.AITest.{DynamicToolSource, Tools}
+  alias Jido.Test.AI.{DynamicToolSource, Tools}
 
   @tag obligation: ["jido_ai.tools.I1", "jido_ai.tools.I3", "jido_ai.tools.I4"]
   test "static tools form a protected allowlist and calls validate before use" do
@@ -62,7 +62,7 @@ defmodule Jido.AI.Contract.ToolsTest do
     assert ToolSource.identity(tool) == %{
              kind: :source,
              name: "dynamic_echo",
-             source: "Elixir.Jido.AITest.DynamicToolSource"
+             source: "Elixir.Jido.Test.AI.DynamicToolSource"
            }
 
     assert {:ok, %{echo: "contract:hello"}} =
@@ -101,7 +101,7 @@ defmodule Jido.AI.Contract.ToolsTest do
     assert ToolSource.identity(tool) == %{
              kind: :source,
              name: "dynamic_echo",
-             source: "Elixir.Jido.AITest.DynamicToolSource"
+             source: "Elixir.Jido.Test.AI.DynamicToolSource"
            }
 
     assert ToolSource.executor(tool) == %{

@@ -1,5 +1,5 @@
 defmodule Jido.Plugin.HeartbeatIntegrationTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   alias Jido.AgentServer
   alias Jido.Plugin.Heartbeat
@@ -32,7 +32,7 @@ defmodule Jido.Plugin.HeartbeatIntegrationTest do
 
   test "AgentServer starts the runtime and processes its Signals", %{jido: jido} do
     {:ok, server} =
-      JidoTest.AgentServerAssertions.start_agent(jido, Agent, id: unique_id("heartbeat"))
+      Jido.Test.AgentServer.Assertions.start_agent(jido, Agent, id: unique_id("heartbeat"))
 
     eventually(fn ->
       case AgentServer.agent(server).state.heartbeats do
@@ -41,7 +41,7 @@ defmodule Jido.Plugin.HeartbeatIntegrationTest do
       end
     end)
 
-    assert %{pid: runtime} = JidoTest.AgentServerAssertions.plugin(server, Heartbeat)
+    assert %{pid: runtime} = Jido.Test.AgentServer.Assertions.plugin(server, Heartbeat)
     assert is_pid(runtime)
   end
 end

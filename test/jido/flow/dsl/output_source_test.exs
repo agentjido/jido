@@ -20,7 +20,7 @@ defmodule Jido.Flow.DSL.OutputSourceTest do
           {value, following} <- [
             {"Date.utc_today()", ""},
             {"result(\"missing\")", ""},
-            {"%{}", "step \"late\", action: JidoActionTest.Fixtures.Actions.EchoParamsAction, params: %{}"}
+            {"%{}", "step \"late\", action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction, params: %{}"}
           ] do
         Code.compiler_options(debug_info: debug_info)
         module = Module.concat(__MODULE__, "Invalid#{System.unique_integer([:positive])}")
@@ -30,7 +30,7 @@ defmodule Jido.Flow.DSL.OutputSourceTest do
         defmodule #{inspect(module)} do
           use Jido.Flow, name: "output_source", extensions: [#{inspect(__MODULE__.Extension)}]
           flow do
-            step "first", action: JidoActionTest.Fixtures.Actions.EchoParamsAction, params: %{}
+            step "first", action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction, params: %{}
             #{declaration}(#{value})
             #{following}
           end
@@ -54,7 +54,7 @@ defmodule Jido.Flow.DSL.OutputSourceTest do
       defmodule #{inspect(module)} do
         use Jido.Flow, name: "output_source"
         flow do
-          step "first", action: JidoActionTest.Fixtures.Actions.EchoParamsAction, params: %{}
+          step "first", action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction, params: %{}
           output %{}
         end
       end
@@ -66,12 +66,12 @@ defmodule Jido.Flow.DSL.OutputSourceTest do
              %{file: "valid_output_source.ex", line: 5}
 
     expected =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "output_source",
         components: [
-          JidoActionTest.FlowComponent.step!(
+          Jido.Test.Flow.Component.step!(
             name: "first",
-            action: JidoActionTest.Fixtures.Actions.EchoParamsAction,
+            action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,
             params: %{}
           )
         ],
@@ -79,8 +79,8 @@ defmodule Jido.Flow.DSL.OutputSourceTest do
       )
 
     assert module.flow() == expected
-    assert {:ok, document, registry} = JidoActionTest.GeneratedFlowCodec.encode(module.flow())
-    assert {:ok, ^expected} = JidoActionTest.FlowCodec.decode(document, registry)
+    assert {:ok, document, registry} = Jido.Test.Flow.GeneratedCodec.encode(module.flow())
+    assert {:ok, ^expected} = Jido.Test.Flow.Codec.decode(document, registry)
   end
 
   test "a Flow with only output reports the shared component validation error" do

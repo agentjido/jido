@@ -272,7 +272,7 @@ defmodule Jido.Signal.RouterTest do
     end
 
     test "accepts a Jido.Signal module as a route path" do
-      alias JidoSignalTest.Fixtures.Signals.UserCreated
+      alias Jido.Test.Signal.Fixtures.Signals.UserCreated
 
       router = Router.new!({UserCreated, :created})
       signal = UserCreated.new!(%{user_id: "123"})

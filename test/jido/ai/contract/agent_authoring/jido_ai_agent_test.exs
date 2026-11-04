@@ -61,9 +61,9 @@ defmodule Jido.AITest do
   alias Jido.AI.Reasoning.Actions, as: SharedActions
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.Actions
-  alias Jido.AITest.ConfiguredAgent
-  alias Jido.AITest.SimpleAgent
-  alias Jido.AITest.Tools
+  alias Jido.Test.AI.ConfiguredAgent
+  alias Jido.Test.AI.SimpleAgent
+  alias Jido.Test.AI.Tools
 
   @moduletag :stable_smoke
   @moduletag obligation: [
@@ -491,8 +491,8 @@ defmodule Jido.AITest do
         reasoning Jido.AI.Reasoning.ReAct
 
         tools do
-          action Jido.AITest.Tools.Add
-          flow Jido.AITest.Tools.AddFlow
+          action Jido.Test.AI.Tools.Add
+          flow Jido.Test.AI.Tools.AddFlow
         end
       end
     end
@@ -575,11 +575,11 @@ defmodule Jido.AITest do
         reasoning Jido.AI.Reasoning.ReAct
 
         tools do
-          action Jido.AITest.Tools.Add
+          action Jido.Test.AI.Tools.Add
         end
 
         tools do
-          action Jido.AITest.Tools.Multiply
+          action Jido.Test.AI.Tools.Multiply
         end
       end
     end
@@ -616,7 +616,7 @@ defmodule Jido.AITest do
     fixture =
       File.read!(
         Path.expand(
-          "../../../../fixtures/jido_ai/agent.json",
+          "../../../../support/jido_ai/fixtures/agent.json",
           __DIR__
         )
       )
@@ -717,7 +717,7 @@ defmodule Jido.AITest do
   test "AI Agent authoring rejects an untrusted reasoning Flow" do
     fixture =
       Path.expand(
-        "../../../../fixtures/jido_ai/agent.json",
+        "../../../../support/jido_ai/fixtures/agent.json",
         __DIR__
       )
       |> File.read!()
@@ -741,7 +741,7 @@ defmodule Jido.AITest do
   test "AI Agent authoring rejects an untrusted tool Action" do
     fixture =
       Path.expand(
-        "../../../../fixtures/jido_ai/agent.json",
+        "../../../../support/jido_ai/fixtures/agent.json",
         __DIR__
       )
       |> File.read!()

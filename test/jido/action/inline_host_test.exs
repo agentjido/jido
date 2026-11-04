@@ -1,8 +1,8 @@
 defmodule Jido.Action.InlineHostTest do
   use Covenant.Case, component: "jido_action.inline", async: false
 
-  alias JidoActionTest.Fixtures.Action.InlineHost
-  alias JidoActionTest.Fixtures.Action.InlineHost.Field
+  alias Jido.Test.Action.Fixtures.Action.InlineHost
+  alias Jido.Test.Action.Fixtures.Action.InlineHost.Field
 
   defmodule DeclarationHooks do
     defmacro __before_compile__(env) do

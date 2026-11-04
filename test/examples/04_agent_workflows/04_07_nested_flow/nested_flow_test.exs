@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("04_agent_workflows/04_07_nested_flow/nested_flow.ex")
 
 defmodule JidoTest.Examples.Workflow.NestedFlowTest do
-  use JidoTest.WorkflowSDKCase
+  use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do

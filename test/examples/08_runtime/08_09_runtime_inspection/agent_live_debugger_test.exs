@@ -23,7 +23,7 @@ defmodule JidoTest.Examples.Runtime.InspectionFixture do
       action %{result: result},
         schema: Jido.Joi.object(%{result: Jido.Joi.string()}),
         context: context do
-        JidoTest.Examples.RuntimeBarrier.wait()
+        Jido.Test.AgentServer.RuntimeBarrier.wait()
         {:ok, %{context.agent_state | status: "complete", result: result}}
       end
     end
@@ -31,7 +31,7 @@ defmodule JidoTest.Examples.Runtime.InspectionFixture do
 end
 
 defmodule JidoTest.Examples.Runtime.AgentLiveDebuggerTest do
-  use JidoTest.FeatureSDKCase
+  use Jido.Test.Agent.FeatureSDKCase
   @moduletag :example
 
   setup_all do
@@ -44,7 +44,7 @@ defmodule JidoTest.Examples.Runtime.AgentLiveDebuggerTest do
 
   alias Jido.Examples.AgentLiveDebugger
   alias JidoTest.Examples.Runtime.InspectionFixture
-  alias JidoTest.Examples.RuntimeBarrier
+  alias Jido.Test.AgentServer.RuntimeBarrier
 
   setup do
     start_supervised!(RuntimeBarrier)

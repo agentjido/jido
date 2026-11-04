@@ -2,7 +2,7 @@ defmodule Jido.AI.Contract.ToolBoundariesTest do
   use Covenant.Case, component: "jido_ai.tools", async: true
 
   alias Jido.AI.{ToolResult, ToolSource, Toolset}
-  alias Jido.AITest.Tools
+  alias Jido.Test.AI.Tools
 
   defmodule VariableSource do
     @behaviour Jido.AI.ToolSource

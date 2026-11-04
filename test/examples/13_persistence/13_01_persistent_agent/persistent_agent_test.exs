@@ -5,7 +5,7 @@ Loader.require_source!("13_persistence/13_01_persistent_agent/checkpoint_identit
 Loader.require_source!("13_persistence/13_01_persistent_agent/persistent_agent.ex")
 
 defmodule JidoTest.Examples.Persistence.PersistentAgentTest do
-  use JidoTest.AgentCase
+  use Jido.Test.Agent.Case
   @moduletag :example
 
   setup_all do

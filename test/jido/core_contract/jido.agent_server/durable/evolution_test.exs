@@ -1,15 +1,15 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.Durable.EvolutionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.agent_server.durable", async: true
 
   alias Jido.Agent
   alias Jido.Agent.Directive, as: D
   alias Jido.AgentServer, as: Server
-  alias JidoTest.AgentEvolutionFixtures, as: E
+  alias Jido.Test.Agent.EvolutionFixtures, as: E
   alias JidoTest.AgentServer.Fixtures, as: F
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
 
   defmodule Upgrade do
     use Jido.Action,

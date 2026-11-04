@@ -39,7 +39,7 @@ defmodule JidoTest.Examples.Durable.ImmediateApproval do
 end
 
 defmodule JidoTest.Examples.Durable.DurableWaitTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
@@ -136,7 +136,7 @@ defmodule JidoTest.Examples.Durable.DurableWaitTest do
     id = unique_id("expired-approval")
 
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(c.jido, definition,
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(c.jido, definition,
         id: id,
         persistence: persistence,
         turn_timeout: :infinity

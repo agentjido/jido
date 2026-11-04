@@ -1,5 +1,5 @@
 defmodule Jido.Agent.StateBoundaryTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.AgentServer
@@ -32,8 +32,8 @@ defmodule Jido.Agent.StateBoundaryTest do
       })
 
     agent = Agent.instantiate!(definition, id: unique_id("defaults"))
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
-    before = JidoTest.AgentServerAssertions.committed(server)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
+    before = Jido.Test.AgentServer.Assertions.committed(server)
 
     for candidate <- [
           %{},
@@ -45,7 +45,7 @@ defmodule Jido.Agent.StateBoundaryTest do
       input = signal("state.replace", %{candidate: candidate})
       assert {:error, %{__exception__: true}} = Agent.cmd(agent, input)
       assert {:error, %{__exception__: true}} = AgentServer.call(server, input)
-      assert JidoTest.AgentServerAssertions.committed(server) === before
+      assert Jido.Test.AgentServer.Assertions.committed(server) === before
       assert Agent.validate(agent) === {:ok, agent}
     end
   end
@@ -87,14 +87,14 @@ defmodule Jido.Agent.StateBoundaryTest do
       })
 
     agent = Agent.instantiate!(definition, id: unique_id("owned-defaults"))
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
-    before = JidoTest.AgentServerAssertions.committed(server)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
+    before = Jido.Test.AgentServer.Assertions.committed(server)
 
     for owned <- [%{}, nil, %{count: "bad"}] do
       input = signal("owned.reduce", %{owned: owned})
       assert {:error, _} = Agent.cmd(agent, input)
       assert {:error, _} = AgentServer.call(server, input)
-      assert JidoTest.AgentServerAssertions.committed(server) === before
+      assert Jido.Test.AgentServer.Assertions.committed(server) === before
     end
 
     input = signal("owned.reduce", %{owned: %{count: nil}})

@@ -3,7 +3,7 @@ defmodule JidoTest.Authoring.Agents.DurableTest do
   @moduletag :authoring
 
   alias Jido.Agent
-  alias JidoTest.DurableFixtures, as: F
+  alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   defmodule Authored do
     use Jido.Agent, name: "authored_durable"
@@ -51,9 +51,9 @@ defmodule JidoTest.Authoring.Agents.DurableTest do
         }
       })
 
-    registry = JidoTest.AgentRegistry.for(definition)
-    assert {:ok, _document} = JidoTest.AgentRegistry.encode(definition, registry)
-    assert {:ok, json} = JidoTest.AgentRegistry.encode_json(definition, registry)
-    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode_json(json, registry)
+    registry = Jido.Test.AgentServer.Registry.for(definition)
+    assert {:ok, _document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
+    assert {:ok, json} = Jido.Test.AgentServer.Registry.encode_json(definition, registry)
+    assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode_json(json, registry)
   end
 end

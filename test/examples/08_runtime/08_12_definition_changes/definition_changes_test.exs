@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("08_runtime/08_12_definition_changes/definition_changes.ex")
 
 defmodule JidoTest.Examples.Runtime.DefinitionChangesTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -17,7 +17,7 @@ defmodule JidoTest.Examples.Runtime.DefinitionChangesTest do
   alias Jido.Examples.DefinitionChanges, as: Example
 
   test "pure evaluation returns a final Diff without changing the live Server", %{jido: jido} do
-    {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, Example, id: unique_id())
+    {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Example, id: unique_id())
     before = AgentServer.snapshot(server)
     assert {:ok, install} = Example.install_signal()
     assert {:ok, candidate, _} = Agent.cmd(before.agent, install)

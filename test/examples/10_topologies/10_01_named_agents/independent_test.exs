@@ -5,7 +5,7 @@ Loader.require_source!("10_topologies/10_01_named_agents/cell.ex")
 Loader.require_source!("10_topologies/10_01_named_agents/independent.ex")
 
 defmodule JidoTest.Examples.Topology.IndependentTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -13,7 +13,7 @@ defmodule JidoTest.Examples.Topology.IndependentTest do
     :ok
   end
 
-  import JidoTest.AgentTopologyAssertions
+  import Jido.Test.AgentServer.TopologyAssertions
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.Independent
   alias Independent.Cell
@@ -22,10 +22,10 @@ defmodule JidoTest.Examples.Topology.IndependentTest do
     definition = Jido.Examples.Topology.Independent.definition()
     registry = Independent.registry()
     assert %Jido.Catalog{} = registry
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
 
     assert {:ok, decoded} =
-             JidoTest.AgentRegistry.decode(Jason.decode!(Jason.encode!(document)), registry)
+             Jido.Test.AgentServer.Registry.decode(Jason.decode!(Jason.encode!(document)), registry)
 
     assert decoded == definition
     server = start_topology(jido, decoded)

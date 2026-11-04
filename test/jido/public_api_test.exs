@@ -1,5 +1,5 @@
 defmodule Jido.PublicAPITest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   test "builds instance supervisor names" do
     assert Jido.Instance.Names.agent_supervisor(MyApp.Jido) == MyApp.Jido.AgentSupervisor

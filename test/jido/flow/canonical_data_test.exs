@@ -4,8 +4,8 @@ defmodule JidoActionTest.Flow.CanonicalDataTest do
   alias Jido.Flow
   alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
-  alias JidoActionTest.Fixtures.Actions.Add
-  alias JidoActionTest.Fixtures.NestedFlow
+  alias Jido.Test.Action.Fixtures.Actions.Add
+  alias Jido.Test.Flow.Fixtures.NestedFlow
 
   test "constructs the canonical Flow data" do
     load = %{
@@ -270,12 +270,12 @@ defmodule JidoActionTest.Flow.CanonicalDataTest do
         Jido.Flow.new!(%{
           name: "needs_order",
           components: [
-            %{kind: :step, name: "a", action: JidoActionTest.Fixtures.Actions.EchoParamsAction},
-            %{kind: :step, name: "b", action: JidoActionTest.Fixtures.Actions.EchoParamsAction},
+            %{kind: :step, name: "a", action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction},
+            %{kind: :step, name: "b", action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction},
             %{
               kind: :step,
               name: "c",
-              action: JidoActionTest.Fixtures.Actions.EchoParamsAction,
+              action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,
               needs: needs
             }
           ],
@@ -300,7 +300,7 @@ defmodule JidoActionTest.Flow.CanonicalDataTest do
         Jido.Flow.new!(%{
           name: "ref_or_literal",
           components: [
-            %{kind: :step, name: "echo", action: JidoActionTest.Fixtures.Actions.EchoParamsAction}
+            %{kind: :step, name: "echo", action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction}
           ],
           output: output
         })

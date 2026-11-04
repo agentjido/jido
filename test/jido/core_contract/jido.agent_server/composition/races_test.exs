@@ -1,9 +1,9 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.Composition.RacesTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.composition", async: false
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
   alias Jido.AgentServer, as: Server
   alias JidoTest.AgentServer.Fixtures, as: F
   @moduletag capture_log: true

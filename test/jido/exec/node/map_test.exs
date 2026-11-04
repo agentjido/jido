@@ -4,7 +4,7 @@ defmodule Jido.Exec.Node.MapTest do
   alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
-  alias JidoActionTest.Fixtures.Actions.EchoParamsAction
+  alias Jido.Test.Action.Fixtures.Actions.EchoParamsAction
 
   defmodule FallibleAction do
     use Jido.Action, name: "exec_v2_fallible_map"

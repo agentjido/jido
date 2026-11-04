@@ -1,7 +1,7 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.plugin_runtime", async: false
   alias Jido.AgentServer, as: Server
   alias JidoTest.AgentServer.Fixtures, as: F
@@ -415,7 +415,7 @@ defmodule JidoTest.AgentServer.PluginRuntime.RuntimeTest do
       Jido.Agent.define!(%{
         name: "required_plugin",
         schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
-        plugins: [JidoTest.AgentContract.contribution(plugin)],
+        plugins: [Jido.Test.Agent.Contract.contribution(plugin)],
         routes: [
           %{
             path: "work",

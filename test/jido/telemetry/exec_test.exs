@@ -9,7 +9,7 @@ defmodule Jido.Telemetry.ExecTest do
   alias Jido.Instruction
   alias Runic.Workflow.SingleOutput.Context
 
-  alias JidoActionTest.Fixtures.Actions.{Add, ErrorAction, ExtrasAction}
+  alias Jido.Test.Action.Fixtures.Actions.{Add, ErrorAction, ExtrasAction}
 
   @action_start [:jido, :action, :start]
   @action_stop [:jido, :action, :stop]

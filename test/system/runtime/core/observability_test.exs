@@ -1,7 +1,7 @@
 Code.require_file("support/counter.exs", __DIR__)
 
 defmodule JidoTest.System.Runtime.ObservabilityTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   @moduletag :system
 
@@ -23,7 +23,7 @@ defmodule JidoTest.System.Runtime.ObservabilityTest do
       )
 
     on_exit(fn -> :telemetry.detach(handler) end)
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(c.jido, Counter)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(c.jido, Counter)
     secret = "PRIVATE_RUNTIME_#{unique_id()}"
 
     assert {:ok, saved, []} =

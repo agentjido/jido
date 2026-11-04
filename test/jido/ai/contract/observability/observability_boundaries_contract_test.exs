@@ -5,8 +5,8 @@ defmodule Jido.AI.Contract.ObservabilityBoundariesTest do
 
   alias Jido.Telemetry.AI, as: Telemetry
   alias Jido.Telemetry.AI.{CorrelationStore, OpenTelemetry}
-  alias Jido.AITest.OpenTelemetryTracer, as: TestTracer
-  alias Jido.AITest.{SimpleAgent, Tools}
+  alias Jido.Test.Telemetry.OpenTelemetryTracer, as: TestTracer
+  alias Jido.Test.AI.{SimpleAgent, Tools}
 
   defmodule CleanupProbe do
     def throw(_key, _value), do: throw(:cleanup_failed)
@@ -264,7 +264,7 @@ defmodule Jido.AI.Contract.ObservabilityBoundariesTest do
     previous_config = Application.fetch_env(:jido, :ai_opentelemetry)
     previous_context = :otel_ctx.attach(:otel_ctx.new())
 
-    assert :opentelemetry.set_default_tracer({TestTracer, self()})
+    assert :opentelemetry.set_default_tracer({TestTracer, %{owner: self(), status: :code_and_message}})
     Application.put_env(:jido, :ai_opentelemetry, %{enabled: true})
 
     on_exit(fn ->

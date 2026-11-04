@@ -2,7 +2,7 @@ defmodule Jido.Exec.WaitsTest do
   use Covenant.Case, component: "jido_action.execution", async: true
   @moduletag obligation: "jido_action.execution.I25"
   @moduletag capture_log: true
-  alias Jido.Exec.Test.WaitHost, as: Waits
+  alias Jido.Test.Exec.WaitHost, as: Waits
   alias Jido.Flow
   alias Jido.Flow.Ref
 
@@ -228,8 +228,8 @@ defmodule Jido.Exec.WaitsTest do
         {"id", 1} => {:atom, :id}
       })
 
-    assert {:ok, encoded} = JidoActionTest.FlowCodec.encode(data, registry)
-    assert {:ok, restored} = JidoActionTest.FlowCodec.decode(encoded, registry)
+    assert {:ok, encoded} = Jido.Test.Flow.Codec.encode(data, registry)
+    assert {:ok, restored} = Jido.Test.Flow.Codec.decode(encoded, registry)
     assert restored == data
 
     for target <- [SelectionFlow, data, restored] do

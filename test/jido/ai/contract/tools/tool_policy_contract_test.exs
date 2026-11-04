@@ -2,7 +2,7 @@ defmodule Jido.AI.Contract.ToolPolicyTest do
   use Covenant.Case, component: "jido_ai.tools", async: true
 
   alias Jido.AI.{ToolResult, Toolset}
-  alias Jido.AITest.Tools
+  alias Jido.Test.AI.Tools
 
   @tag obligation: ["jido_ai.tools.I1", "jido_ai.tools.I3", "jido_ai.tools.I4"]
   test "tool selection can only narrow the Agent allowlist" do
@@ -85,7 +85,7 @@ defmodule Jido.AI.Contract.ToolPolicyTest do
                 name: "add",
                 id: "jido.ai/examples/tools/add",
                 vsn: 1,
-                action: "Elixir.Jido.AITest.Tools.Add"
+                action: "Elixir.Jido.Test.AI.Tools.Add"
               },
               description: "Add two numbers."
             }} = Toolset.resolve_call([Tools.Add], call)

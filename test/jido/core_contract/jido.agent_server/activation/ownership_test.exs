@@ -1,10 +1,10 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.ActivationOwnershipTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.activation", async: false
 
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.RegistrationGuard
   alias Jido.Error.ValidationError

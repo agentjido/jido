@@ -66,13 +66,13 @@ defmodule Jido.Exec.Node.InvokeTest do
     end
 
     def run(%{mode: "invalid_input", value: value}, _context),
-      do: {:continue, %{value: value}, JidoActionTest.Fixtures.Actions.Add}
+      do: {:continue, %{value: value}, Jido.Test.Action.Fixtures.Actions.Add}
 
     def run(%{mode: "invalid_output", value: value}, _context),
-      do: {:continue, %{value: value}, JidoActionTest.Fixtures.Actions.InvalidOutput}
+      do: {:continue, %{value: value}, Jido.Test.Action.Fixtures.Actions.InvalidOutput}
 
     def run(%{mode: "target_error", value: value}, _context),
-      do: {:continue, %{value: value}, JidoActionTest.Fixtures.Actions.ErrorWithExtrasAction}
+      do: {:continue, %{value: value}, Jido.Test.Action.Fixtures.Actions.ErrorWithExtrasAction}
 
     def run(%{mode: "finish", value: value}, _context), do: {:ok, %{final: value}, [:expander]}
     def run(%{mode: "bad_target", value: value}, _context), do: {:continue, %{value: value}, Enum}

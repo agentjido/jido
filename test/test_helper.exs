@@ -1,11 +1,11 @@
 Mimic.copy(ReqLLM)
-Mimic.copy(Jido.AITest.Tools.Add)
+Mimic.copy(Jido.Test.AI.Tools.Add)
 
 ExUnit.start(capture_log: true)
 
 {_result, _expected_warnings} =
   Code.with_diagnostics(fn ->
-    Code.require_file("support/fixtures/action/missing_callbacks.exs", __DIR__)
+    Code.require_file("support/jido_action/fixtures/missing_callbacks.exs", __DIR__)
   end)
 
 special_quality_tags = [

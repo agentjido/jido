@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("13_persistence/13_02_hibernate_and_thaw/hibernate_and_thaw.ex")
 
 defmodule JidoTest.Examples.Persistence.HibernateAndThawTest do
-  use JidoTest.AgentCase
+  use Jido.Test.Agent.Case
   @moduletag :example
 
   setup_all do

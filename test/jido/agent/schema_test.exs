@@ -1,5 +1,5 @@
 defmodule Jido.Agent.SchemaTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   @moduletag :basic_contract
 
@@ -75,7 +75,7 @@ defmodule Jido.Agent.SchemaTest do
     end
 
     routes do
-      route "counter.add", JidoTest.AgentFixtures.Add
+      route "counter.add", Jido.Test.AgentServer.Fixtures.Add
     end
   end
 
@@ -89,7 +89,7 @@ defmodule Jido.Agent.SchemaTest do
     end
 
     routes do
-      route "counter.add", JidoTest.AgentFixtures.Add
+      route "counter.add", Jido.Test.AgentServer.Fixtures.Add
     end
   end
 
@@ -176,13 +176,13 @@ defmodule Jido.Agent.SchemaTest do
       agent_module: agent_module
     } do
       {:ok, server} =
-        JidoTest.AgentServerAssertions.start_agent(jido, agent_module, id: unique_id())
+        Jido.Test.AgentServer.Assertions.start_agent(jido, agent_module, id: unique_id())
 
-      before = JidoTest.AgentServerAssertions.committed(server)
+      before = Jido.Test.AgentServer.Assertions.committed(server)
       command = signal("counter.add", %{by: 2, label: "invalid"})
 
       assert {:error, %{__exception__: true}} = Server.call(server, command)
-      assert JidoTest.AgentServerAssertions.committed(server) == before
+      assert Jido.Test.AgentServer.Assertions.committed(server) == before
     end
 
     @tag agent_module: agent_module
@@ -191,7 +191,7 @@ defmodule Jido.Agent.SchemaTest do
       agent_module: agent_module
     } do
       {:ok, server} =
-        JidoTest.AgentServerAssertions.start_agent(jido, agent_module, id: unique_id())
+        Jido.Test.AgentServer.Assertions.start_agent(jido, agent_module, id: unique_id())
 
       initial = Server.agent(server).state
       expected = %{initial | count: 1, history: ["valid"]}
@@ -200,7 +200,7 @@ defmodule Jido.Agent.SchemaTest do
                Server.call(server, signal("counter.add", %{by: 1, label: "valid"}))
 
       assert agent.state == expected
-      assert %{agent: ^agent, state_version: 1} = JidoTest.AgentServerAssertions.committed(server)
+      assert %{agent: ^agent, state_version: 1} = Jido.Test.AgentServer.Assertions.committed(server)
     end
   end
 

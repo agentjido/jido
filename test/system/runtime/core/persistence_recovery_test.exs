@@ -1,7 +1,7 @@
 Code.require_file("support/counter.exs", __DIR__)
 
 defmodule JidoTest.System.Runtime.PersistenceRecoveryTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   @moduletag :system
   @moduletag :tmp_dir
@@ -14,7 +14,7 @@ defmodule JidoTest.System.Runtime.PersistenceRecoveryTest do
     persistence = {Jido.Persistence.File, path: c.tmp_dir}
 
     {:ok, server} =
-      JidoTest.AgentServerAssertions.start_agent(c.jido, Counter,
+      Jido.Test.AgentServer.Assertions.start_agent(c.jido, Counter,
         id: id,
         persistence: persistence,
         persistence_mode: :create
@@ -35,7 +35,7 @@ defmodule JidoTest.System.Runtime.PersistenceRecoveryTest do
     File.write!(record_path, corrupt)
 
     assert {:error, :invalid_persistence_record} =
-             JidoTest.AgentServerAssertions.start_result(c.jido, Counter,
+             Jido.Test.AgentServer.Assertions.start_result(c.jido, Counter,
                id: id,
                persistence: persistence,
                persistence_mode: :restore
@@ -51,7 +51,7 @@ defmodule JidoTest.System.Runtime.PersistenceRecoveryTest do
     store = {Jido.Persistence.File, path: c.tmp_dir}
 
     {:ok, server} =
-      JidoTest.AgentServerAssertions.start_agent(c.jido, Counter,
+      Jido.Test.AgentServer.Assertions.start_agent(c.jido, Counter,
         id: id,
         persistence: store,
         persistence_mode: :create

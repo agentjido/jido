@@ -16,7 +16,7 @@ defmodule Jido.Signal.PublicBoundaryErrorsTest do
               Jido.Signal.Codec.from_map(attrs),
               Signal.new(type: "event", source: "/test", extensions: attrs),
               Context.normalize(attrs),
-              JidoSignalTest.Fixtures.Signals.UserCreated.new(%{}, attrs),
+              Jido.Test.Signal.Fixtures.Signals.UserCreated.new(%{}, attrs),
               Jido.Signal.Codec.deserialize(:erlang.term_to_binary(attrs), format: :erlang_term)
             ] do
           assert {:error, _reason} = result

@@ -31,7 +31,7 @@ defmodule Jido.Flow.DSL.InlineStepTest do
       declaration =
         if inline?,
           do: "step #{expression}, value <- 1, do: {:ok, %{value: value + 1}}",
-          else: "step #{expression}, action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1}"
+          else: "step #{expression}, action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1}"
 
       compile_source(flow_source(owner, declaration, "require #{inspect(NameSource)}"))
       assert_received ^marker
@@ -43,7 +43,7 @@ defmodule Jido.Flow.DSL.InlineStepTest do
   @tag obligation: "jido_action.inline.I2"
   test "string attribute names survive conversion from explicit to inline Steps" do
     for declaration <- [
-          "step @step_name, action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1}",
+          "step @step_name, action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1}",
           "step @step_name, value <- 1, do: {:ok, %{value: value + 1}}"
         ] do
       owner = unique_owner("AttributeName")
@@ -92,7 +92,7 @@ defmodule Jido.Flow.DSL.InlineStepTest do
   @tag obligation: "jido_action.inline.I2"
   test "attribute names detect mixed duplicates at the second declaration" do
     inline = "step @step_name, [], do: {:ok, %{}}"
-    explicit = "step @step_name, action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1}"
+    explicit = "step @step_name, action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1}"
 
     for {first, second} <- [{inline, explicit}, {explicit, inline}, {inline, inline}] do
       owner = unique_owner("AttributeDuplicate")
@@ -141,7 +141,7 @@ defmodule Jido.Flow.DSL.InlineStepTest do
     defmodule #{inspect(owner)} do
       use Jido.Flow, name: "dynamic_duplicate"
       flow do
-        step #{inspect(NameSource)}.expression_name(), action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1}
+        step #{inspect(NameSource)}.expression_name(), action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1}
         step "expression_name", [], do: {:ok, %{}}
         output(%{})
       end
@@ -162,7 +162,7 @@ defmodule Jido.Flow.DSL.InlineStepTest do
   @tag obligation: "jido_action.inline.I2"
   test "a Step in a false authoring branch does not reserve its name" do
     for unused <- [
-          ~s(step "same", action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1}),
+          ~s(step "same", action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1}),
           ~s(step "same", [], do: {:ok, %{value: :unused}}),
           "step #{inspect(NameSource)}.expression_name(), [], do: {:ok, %{}}"
         ] do
@@ -188,10 +188,10 @@ defmodule Jido.Flow.DSL.InlineStepTest do
   test "duplicate Steps fail before a second inline target can replace the first" do
     inline = ~s(step :same, [], do: {:ok, %{value: :first}})
     replacement = ~s(step "same", [], do: {:ok, %{value: :second}})
-    keyword = ~s(step "same", action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1})
+    keyword = ~s(step "same", action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1})
 
     block =
-      "step \"same\" do\n action(JidoActionTest.Fixtures.Actions.Add)\n params(%{value: 1})\n end"
+      "step \"same\" do\n action(Jido.Test.Action.Fixtures.Actions.Add)\n params(%{value: 1})\n end"
 
     for {first, second} <- [
           {inline, replacement},
@@ -284,7 +284,7 @@ defmodule Jido.Flow.DSL.InlineStepTest do
         def step_action(_), do: :user_clause
         use Jido.Flow, name: "early_lookup"
         flow do
-          step "same", action: JidoActionTest.Fixtures.Actions.Add
+          step "same", action: Jido.Test.Action.Fixtures.Actions.Add
           output(%{})
         end
       end
@@ -401,7 +401,7 @@ defmodule Jido.Flow.DSL.InlineStepTest do
 
   @tag obligation: "jido_action.inline.I2"
   test "repeated runtime access creates no target modules or atoms from unknown names" do
-    owner = JidoActionTest.Fixtures.InlineGreetingFlow
+    owner = Jido.Test.Flow.Fixtures.InlineGreetingFlow
 
     unknown_names =
       for n <- 1..100, do: "unknown_inline_step_#{n}_#{System.unique_integer([:positive])}"
@@ -428,18 +428,18 @@ defmodule Jido.Flow.DSL.InlineStepTest do
 
   @tag obligation: "jido_action.inline.I2"
   test "inline bindings compile and run through ordinary Steps with inferred dependencies" do
-    flow = JidoActionTest.Fixtures.InlineGreetingFlow.flow()
+    flow = Jido.Test.Flow.Fixtures.InlineGreetingFlow.flow()
     assert %{call: %{target: action, params: params}} = flow.components["normalize"]
     assert %{kind: :call} = flow.components["greet"]
 
     assert is_atom(action)
     assert params == %{name: Ref.input(:name)}
 
-    assert Jido.Exec.run(JidoActionTest.Fixtures.InlineGreetingFlow, %{name: " Ada "}) ==
+    assert Jido.Exec.run(Jido.Test.Flow.Fixtures.InlineGreetingFlow, %{name: " Ada "}) ==
              {:ok, %{message: "Hello, Ada!"}}
 
     assert {:ok, dependencies} =
-             Jido.Flow.dependencies(JidoActionTest.Fixtures.InlineGreetingFlow.flow())
+             Jido.Flow.dependencies(Jido.Test.Flow.Fixtures.InlineGreetingFlow.flow())
 
     assert dependencies["greet"] == %{
              needs: [],
@@ -450,7 +450,7 @@ defmodule Jido.Flow.DSL.InlineStepTest do
 
   @tag obligation: "jido_action.inline.I2"
   test "bodies retain the declaration's aliases, imports, helpers, module, and attributes" do
-    module = JidoActionTest.Fixtures.InlineLexicalFlow
+    module = Jido.Test.Flow.Fixtures.InlineLexicalFlow
     assert {:ok, result} = Jido.Exec.run(module, %{name: " Ada "})
 
     assert result == %{
@@ -497,7 +497,7 @@ defmodule Jido.Flow.DSL.InlineStepTest do
 
   @tag obligation: "jido_action.inline.I2"
   test "canonical inline Steps contain only ordinary Action author data" do
-    flow = JidoActionTest.Fixtures.InlineGreetingFlow.flow()
+    flow = Jido.Test.Flow.Fixtures.InlineGreetingFlow.flow()
     map = Jido.Flow.to_map(flow)
 
     for {name, %{call: %{target: action, params: _params}} = node} <- flow.components do
@@ -790,10 +790,10 @@ defmodule Jido.Flow.DSL.InlineStepTest do
     """)
 
     direct =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "negative_literal",
         components: [
-          JidoActionTest.FlowComponent.step!(
+          Jido.Test.Flow.Component.step!(
             name: "echo",
             action: owner.step_action("echo"),
             params: %{amount: -1}
@@ -803,10 +803,10 @@ defmodule Jido.Flow.DSL.InlineStepTest do
       )
 
     assert owner.flow() == direct
-    assert {:ok, document, registry} = JidoActionTest.GeneratedFlowCodec.encode(direct)
+    assert {:ok, document, registry} = Jido.Test.Flow.GeneratedCodec.encode(direct)
 
     assert {:ok, restored} =
-             JidoActionTest.FlowCodec.decode(JSON.decode!(JSON.encode!(document)), registry)
+             Jido.Test.Flow.Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
 
     assert restored == direct
 

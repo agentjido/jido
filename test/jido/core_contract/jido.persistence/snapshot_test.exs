@@ -4,7 +4,7 @@ defmodule Jido.Persistence.SnapshotTest do
   alias Jido.Agent.Directive, as: D
   alias Jido.Persistence
   alias Jido.Persistence.{Record, Store}
-  alias JidoTest.AgentEvolutionFixtures, as: F
+  alias Jido.Test.Agent.EvolutionFixtures, as: F
 
   defmodule ContextUpgrade do
     use Jido.Action,
@@ -56,7 +56,7 @@ defmodule Jido.Persistence.SnapshotTest do
       name: "persistence_action_with_flow_function"
 
     def run(input, _context), do: {:ok, input}
-    def flow, do: JidoTest.AgentEvolutionFixtures.Flow.flow()
+    def flow, do: Jido.Test.Agent.EvolutionFixtures.Flow.flow()
   end
 
   defmodule InlineAgent do
@@ -75,7 +75,7 @@ defmodule Jido.Persistence.SnapshotTest do
 
       route "inline.flow" do
         flow do
-          step "work", action: JidoTest.AgentEvolutionFixtures.Work, params: %{}
+          step "work", action: Jido.Test.Agent.EvolutionFixtures.Work, params: %{}
           output result("work")
         end
       end

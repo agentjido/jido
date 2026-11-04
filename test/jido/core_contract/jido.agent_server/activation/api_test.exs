@@ -1,8 +1,10 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.ActivationApiTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.activation", async: false
+
+  import Jido.Test.PublicAPI
 
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.RegistrationGuard
@@ -27,7 +29,7 @@ defmodule JidoTest.AgentServer.ActivationApiTest do
         {:worker, 1}
       ])
 
-    assert MapSet.subset?(activation_api, MapSet.new(documented_api(Server)))
+    assert MapSet.subset?(activation_api, MapSet.new(documented_functions(Server)))
 
     for module <- [ServerSupervisor, RegistrationGuard] do
       refute public_module?(module)
@@ -52,25 +54,5 @@ defmodule JidoTest.AgentServer.ActivationApiTest do
     assert :ok = Server.stop(server)
     assert Server.worker(root) == nil
     assert Server.worker(self()) == nil
-  end
-
-  defp documented_api(module) do
-    {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
-
-    docs
-    |> Enum.flat_map(fn
-      {{kind, name, arity}, _, _, doc, _}
-      when kind in [:function, :macro] and doc not in [:hidden, :none] ->
-        [{name, arity}]
-
-      _other ->
-        []
-    end)
-    |> Enum.sort()
-  end
-
-  defp public_module?(module) do
-    {:docs_v1, _, _, _, module_doc, _, _} = Code.fetch_docs(module)
-    module_doc not in [:hidden, :none]
   end
 end

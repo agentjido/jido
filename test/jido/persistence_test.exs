@@ -1,13 +1,13 @@
 defmodule JidoTest.PersistenceTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
   alias Jido.Persistence
   alias Jido.Persistence.ETS
   alias Jido.Signal
-  alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
-  alias JidoTest.ScheduledOccurrenceFixtures.{Clock, FastRuntimeAgent}
+  alias Jido.Test.AgentServer.RuntimeFixtures.RuntimeAgent
+  alias Jido.Test.AgentServer.ScheduledOccurrenceFixtures.{Clock, FastRuntimeAgent}
 
   defmodule ConfiguredInstance do
     def __jido_persistence__, do: {ETS, table: __MODULE__}
@@ -340,7 +340,7 @@ defmodule JidoTest.PersistenceTest do
              Persistence.load_agent(persistence, FastRuntimeAgent, agent.id, namespace: "persistence-test")
 
     assert restored == agent
-    assert {:ok, pid} = JidoTest.AgentServerAssertions.start_agent(jido, restored)
+    assert {:ok, pid} = Jido.Test.AgentServer.Assertions.start_agent(jido, restored)
     assert Map.has_key?(Server.agent(pid).state.scheduler.cron, :heartbeat)
 
     eventually(fn -> Server.agent(pid).state.ticks > 4 end, timeout: 5_000)
@@ -370,7 +370,7 @@ defmodule JidoTest.PersistenceTest do
     assert Jido.Error.code(error) == :persistence_callback_failed
 
     assert {:error, {:indeterminate, %Jido.Error.ExecutionError{}}} =
-             JidoTest.AgentServerAssertions.start_result(jido, agent,
+             Jido.Test.AgentServer.Assertions.start_result(jido, agent,
                persistence: {RaisingAdapter, allow_read: true},
                persistence_mode: :create
              )
@@ -458,7 +458,7 @@ defmodule JidoTest.PersistenceTest do
     id = unique_id("commit")
 
     {:ok, pid} =
-      JidoTest.AgentServerAssertions.start_agent(jido, RuntimeAgent,
+      Jido.Test.AgentServer.Assertions.start_agent(jido, RuntimeAgent,
         id: id,
         persistence: persistence,
         persistence_mode: :create
@@ -480,7 +480,7 @@ defmodule JidoTest.PersistenceTest do
     id = unique_id("hibernate")
 
     {:ok, pid} =
-      JidoTest.AgentServerAssertions.start_agent(jido, RuntimeAgent,
+      Jido.Test.AgentServer.Assertions.start_agent(jido, RuntimeAgent,
         id: id,
         persistence: persistence,
         persistence_mode: :create
@@ -503,7 +503,7 @@ defmodule JidoTest.PersistenceTest do
     persistence = adapter(:stale_server)
     agent = RuntimeAgent.instantiate!(id: unique_id("stale-server"))
     opts = [persistence: persistence, persistence_mode: :create, error_policy: :log_only]
-    assert {:ok, stale} = JidoTest.AgentServerAssertions.start_agent(jido, agent, opts)
+    assert {:ok, stale} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent, opts)
     monitor = Process.monitor(stale)
     committed = %{agent | state: %{agent.state | events: [:winner]}}
 
@@ -554,7 +554,7 @@ defmodule JidoTest.PersistenceTest do
 
     assert :ok = Server.await_ready(pid)
     assert Server.agent(pid).state.events == [:saved]
-    assert %{state_version: 7} = JidoTest.AgentServerAssertions.committed(pid)
+    assert %{state_version: 7} = Jido.Test.AgentServer.Assertions.committed(pid)
 
     assert {:ok, _agent, _} =
              Server.call(pid, Signal.new!("runtime.record", %{event: :next}, source: "/test"))
@@ -571,14 +571,14 @@ defmodule JidoTest.PersistenceTest do
     assert :ok = Persistence.save_agent(persistence, agent, instance: jido, revision: 3)
 
     assert {:ok, pid} =
-             JidoTest.AgentServerAssertions.start_agent(jido, RestoreAgent,
+             Jido.Test.AgentServer.Assertions.start_agent(jido, RestoreAgent,
                id: id,
                persistence: persistence,
                persistence_mode: :restore
              )
 
     assert Server.agent(pid) == agent
-    assert %{state_version: 3} = JidoTest.AgentServerAssertions.committed(pid)
+    assert %{state_version: 3} = Jido.Test.AgentServer.Assertions.committed(pid)
   end
 
   test "deletes one persisted Agent", %{jido: jido} do
@@ -748,11 +748,11 @@ defmodule JidoTest.PersistenceTest do
 
   test "a live Server snapshot exposes no private process references", %{jido: jido} do
     {:ok, pid} =
-      JidoTest.AgentServerAssertions.start_agent(jido, RuntimeAgent, id: unique_id("snapshot"))
+      Jido.Test.AgentServer.Assertions.start_agent(jido, RuntimeAgent, id: unique_id("snapshot"))
 
-    assert %{agent: %Agent{}, state_version: 0} = JidoTest.AgentServerAssertions.committed(pid)
+    assert %{agent: %Agent{}, state_version: 0} = Jido.Test.AgentServer.Assertions.committed(pid)
 
-    snapshot = JidoTest.AgentServerAssertions.committed(pid)
+    snapshot = Jido.Test.AgentServer.Assertions.committed(pid)
     refute Map.has_key?(snapshot, :children)
     refute Map.has_key?(snapshot, :active)
     refute Map.has_key?(snapshot, :runtime)

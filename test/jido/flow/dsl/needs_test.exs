@@ -1,7 +1,7 @@
 defmodule Jido.Flow.DSL.NeedsTest do
   use ExUnit.Case, async: false
-  alias JidoActionTest.FlowCodec, as: Codec
-  alias JidoActionTest.Fixtures.Actions.Add
+  alias Jido.Test.Flow.Codec, as: Codec
+  alias Jido.Test.Action.Fixtures.Actions.Add
 
   test "keyword and block needs preserve defaults, nil, scalar, and list order" do
     for form <- [:keyword, :block],
@@ -41,7 +41,7 @@ defmodule Jido.Flow.DSL.NeedsTest do
 
     compile(
       owner,
-      "step \"child\", action: JidoActionTest.Fixtures.NestedFlow, params: %{}, needs: \"first\"\nmap \"mapped\", action: Add, collection: [], params: %{}, needs: \"first\"\nreduce \"reduced\", action: Add, collection: [], initial: %{}, params: %{}, needs: \"first\"\nchoice \"route\" do\n  needs \"first\"\n  option \"yes\", condition: true, action: Add, params: %{}\n  otherwise action: Add, params: %{}\nend\niterate \"loop\" do\n  needs \"first\"\n  state Jido.Joi.map(), initial: %{}\n  action Add\n  params %{}\n  repeat 1\nend\ninvoke \"next\", decision: Add, expander: Add, params: %{},\n  needs: [\"first\", \"second\", \"child\", \"mapped\", \"reduced\", \"route\", \"loop\"]\n",
+      "step \"child\", action: Jido.Test.Flow.Fixtures.NestedFlow, params: %{}, needs: \"first\"\nmap \"mapped\", action: Add, collection: [], params: %{}, needs: \"first\"\nreduce \"reduced\", action: Add, collection: [], initial: %{}, params: %{}, needs: \"first\"\nchoice \"route\" do\n  needs \"first\"\n  option \"yes\", condition: true, action: Add, params: %{}\n  otherwise action: Add, params: %{}\nend\niterate \"loop\" do\n  needs \"first\"\n  state Jido.Joi.map(), initial: %{}\n  action Add\n  params %{}\n  repeat 1\nend\ninvoke \"next\", decision: Add, expander: Add, params: %{},\n  needs: [\"first\", \"second\", \"child\", \"mapped\", \"reduced\", \"route\", \"loop\"]\n",
       "result(\"next\")"
     )
 
@@ -56,9 +56,9 @@ defmodule Jido.Flow.DSL.NeedsTest do
 
   test "direct, and Codec boundaries still reject invalid dependencies" do
     flow =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "needs",
-        components: [JidoActionTest.FlowComponent.step!(name: "first", action: Add)],
+        components: [Jido.Test.Flow.Component.step!(name: "first", action: Add)],
         output: %{}
       )
 
@@ -66,10 +66,10 @@ defmodule Jido.Flow.DSL.NeedsTest do
 
     for value <- ["first", ["first", "first"], ["first" | :tail], ~c"*"] do
       assert {:error, _} =
-               JidoActionTest.FlowComponent.step(name: "work", action: Add, needs: value)
+               Jido.Test.Flow.Component.step(name: "work", action: Add, needs: value)
 
       assert {:error, _} =
-               JidoActionTest.FlowBuilder.new(%{
+               Jido.Test.Flow.Builder.new(%{
                  output: %{},
                  components: [
                    %{kind: :step, name: "work", action: Add, params: %{}, needs: value}
@@ -160,7 +160,7 @@ end"
     Code.compile_string(
       "defmodule #{inspect(owner)} do
   use Jido.Flow, name: \"needs\"
-  alias JidoActionTest.Fixtures.Actions.Add
+  alias Jido.Test.Action.Fixtures.Actions.Add
   flow do
     step \"first\", action: Add, params: %{}
     step \"second\", action: Add, params: %{}

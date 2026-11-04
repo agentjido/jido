@@ -1,5 +1,5 @@
 defmodule Jido.Plugin.PreparationTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.AgentServer, as: Server
 
@@ -122,7 +122,7 @@ defmodule Jido.Plugin.PreparationTest do
   test "live execution uses the same pure preparation", %{jido: jido} do
     agent = agent(:ok)
     source = signal("prepare.run", %{value: 8})
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
 
     assert {:ok, next, _} = Server.call(server, source)
     assert next.state.value == 8

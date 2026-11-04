@@ -5,7 +5,7 @@ Loader.require_source!("12_plugin_applications/12_02_subscription/subscription_p
 Loader.require_source!("12_plugin_applications/12_02_subscription/subscription.ex")
 
 defmodule JidoTest.Examples.Applications.SubscriptionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -18,7 +18,7 @@ defmodule JidoTest.Examples.Applications.SubscriptionTest do
 
   test "committed state and version rebuild resources after replacement", %{jido: jido} do
     id = unique_id("subscription")
-    {:ok, agent_server} = JidoTest.ExampleRuntime.start_agent(jido, Agent, id: id)
+    {:ok, agent_server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent, id: id)
     runtime = plugin_runtime(agent_server)
     assert Runtime.info(runtime).bootstrap == %{plugin_state: %{desired: %{}}, state_version: 0}
 
@@ -71,7 +71,7 @@ defmodule JidoTest.Examples.Applications.SubscriptionTest do
 
     restarted =
       eventually(fn ->
-        next = JidoTest.ExampleRuntime.plugin(activation, Plugin)
+        next = Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Plugin)
         next != runtime && next
       end)
 
@@ -97,6 +97,6 @@ defmodule JidoTest.Examples.Applications.SubscriptionTest do
   end
 
   defp plugin_runtime(agent_server) do
-    JidoTest.ExampleRuntime.plugin(Server.activation(agent_server), Plugin)
+    Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(agent_server), Plugin)
   end
 end

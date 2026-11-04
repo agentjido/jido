@@ -285,7 +285,7 @@ defmodule Jido.Flow.DSL.NestedSourceTest do
     source = """
     defmodule #{inspect(module)} do
       use Jido.Flow, name: "nested_source", extensions: [#{inspect(__MODULE__.Extension)}]
-      alias JidoActionTest.Fixtures.Actions.EchoParamsAction, as: Echo
+      alias Jido.Test.Action.Fixtures.Actions.EchoParamsAction, as: Echo
       flow do
     #{declarations}
       end

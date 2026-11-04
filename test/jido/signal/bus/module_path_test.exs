@@ -1,8 +1,8 @@
 defmodule Jido.Signal.Bus.ModulePathTest do
-  use JidoSignalTest.Case, async: true
+  use Jido.Test.Signal.Case, async: true
 
   alias Jido.Signal.Bus
-  alias JidoSignalTest.Fixtures.Signals.UserCreated
+  alias Jido.Test.Signal.Fixtures.Signals.UserCreated
 
   test "uses a Signal module for publication, replay, and ephemeral removal" do
     bus = start_supervised!({Bus, name: unique_name("module_path")})

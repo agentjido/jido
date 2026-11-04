@@ -11,7 +11,7 @@ defmodule JidoTest.Examples.Patterns.HumanApprovalTest do
   end
 
   test "completes one addressed approval" do
-    host = Jido.Exec.Test.WaitHost
+    host = Jido.Test.Exec.WaitHost
 
     assert {:ok, workflow} =
              host.start(

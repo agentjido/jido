@@ -5,7 +5,7 @@ Loader.require_source!("01_agent_basics/01_05_directive_agent/effects.ex")
 Loader.require_source!("01_agent_basics/01_05_directive_agent/directive_agent.ex")
 
 defmodule JidoTest.Examples.Basic.DirectiveAgentTest do
-  use JidoTest.BasicSDKCase
+  use Jido.Test.Agent.BasicSDKCase
   @moduletag :example
 
   setup_all do

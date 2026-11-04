@@ -5,7 +5,7 @@ Loader.require_source!("08_runtime/support/event_probe.ex")
 Loader.require_source!("08_runtime/08_10_agent_observation/turn_observation.ex")
 
 defmodule JidoTest.Examples.Runtime.AgentObservationTest do
-  use JidoTest.AgentCase
+  use Jido.Test.Agent.Case
   @moduletag :example
 
   setup_all do
@@ -26,7 +26,7 @@ defmodule JidoTest.Examples.Runtime.AgentObservationTest do
     probe = EventProbe.attach(id)
 
     try do
-      assert {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, Example, id: id)
+      assert {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Example, id: id)
       {:ok, success} = Example.record_signal(%{value: 7})
 
       {:ok, delivery} =

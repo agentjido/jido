@@ -3,11 +3,11 @@ defmodule Jido.Flow.DSL.FlowTest.MixedFlow do
 
   use Jido.Flow, name: "mixed_dsl"
 
-  alias JidoActionTest.Fixtures.Actions.Multiply
+  alias Jido.Test.Action.Fixtures.Actions.Multiply
 
   flow do
     step("load",
-      action: JidoActionTest.Fixtures.Actions.Add,
+      action: Jido.Test.Action.Fixtures.Actions.Add,
       params: %{value: input(:value), amount: 1},
       meta: %{owner: "dsl"}
     )
@@ -15,7 +15,7 @@ defmodule Jido.Flow.DSL.FlowTest.MixedFlow do
     choice "route" do
       option "add" do
         condition(input(:kind) == :add)
-        action(JidoActionTest.Fixtures.Actions.Add)
+        action(Jido.Test.Action.Fixtures.Actions.Add)
         params(%{value: result("load", :value), amount: 1})
       end
 
@@ -24,7 +24,7 @@ defmodule Jido.Flow.DSL.FlowTest.MixedFlow do
 
     map("mapped",
       collection: input(:items),
-      action: JidoActionTest.Fixtures.Actions.Add,
+      action: Jido.Test.Action.Fixtures.Actions.Add,
       params: %{value: item(:value), amount: 1},
       on_error: :collect_errors
     )
@@ -32,13 +32,13 @@ defmodule Jido.Flow.DSL.FlowTest.MixedFlow do
     reduce "reduced" do
       collection(result("mapped"))
       initial(%{value: 1})
-      action(JidoActionTest.Fixtures.Actions.Multiply)
+      action(Jido.Test.Action.Fixtures.Actions.Multiply)
       params(%{value: accumulator(:value), amount: item(:value)})
     end
 
     iterate "loop" do
       state(Jido.Joi.map(), initial: %{count: 0})
-      action(JidoActionTest.Fixtures.Actions.Add)
+      action(Jido.Test.Action.Fixtures.Actions.Add)
       params(%{value: state(:count), amount: 1})
       update(%{count: body_result(:value)})
       repeat(1)
@@ -59,16 +59,16 @@ defmodule Jido.Flow.DSL.FlowTest.InlineAndExistingFlow do
     end
 
     step "keyword",
-      action: JidoActionTest.Fixtures.Actions.Add,
+      action: Jido.Test.Action.Fixtures.Actions.Add,
       params: %{value: 1, amount: 2}
 
     step "field_block" do
-      action(JidoActionTest.Fixtures.Actions.Multiply)
+      action(Jido.Test.Action.Fixtures.Actions.Multiply)
       params(%{value: result("keyword", :value), amount: 2})
     end
 
     step "child",
-      action: JidoActionTest.Fixtures.InlineGreetingFlow,
+      action: Jido.Test.Flow.Fixtures.InlineGreetingFlow,
       params: result("inline")
 
     output(%{message: result("child", :message), value: result("field_block", :value)})
@@ -110,8 +110,8 @@ defmodule Jido.Flow.DSL.FlowTest do
     end
 
     assert module.step_action(:inline) == inline.call.target
-    assert module.step_action(:keyword) == JidoActionTest.Fixtures.Actions.Add
-    assert module.step_action(:field_block) == JidoActionTest.Fixtures.Actions.Multiply
+    assert module.step_action(:keyword) == Jido.Test.Action.Fixtures.Actions.Add
+    assert module.step_action(:field_block) == Jido.Test.Action.Fixtures.Actions.Multiply
 
     for name <- ["child", "unknown", nil, "", 17, %{}, <<255>>, String.duplicate("x", 257)] do
       assert_raise ArgumentError, ~r/expected an Action-backed Step name/, fn ->
@@ -177,11 +177,11 @@ defmodule Jido.Flow.DSL.FlowTest do
 
       flow do
         step "first",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 1, amount: 1}
 
         step "second",
-          action: JidoActionTest.Fixtures.Actions.Multiply,
+          action: Jido.Test.Action.Fixtures.Actions.Multiply,
           params: %{value: result("first", :value), amount: 2}
       end
     end
@@ -199,7 +199,7 @@ defmodule Jido.Flow.DSL.FlowTest do
 
       flow do
         step "only",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 10, amount: 1}
       end
     end
@@ -217,11 +217,11 @@ defmodule Jido.Flow.DSL.FlowTest do
 
       flow do
         step "first",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 1, amount: 1}
 
         step "second",
-          action: JidoActionTest.Fixtures.Actions.Multiply,
+          action: Jido.Test.Action.Fixtures.Actions.Multiply,
           params: %{value: result("first", :value), amount: 2}
 
         output result("first")
@@ -246,7 +246,7 @@ defmodule Jido.Flow.DSL.FlowTest do
 
         flow do
           step "work",
-            action: JidoActionTest.Fixtures.Actions.Add,
+            action: Jido.Test.Action.Fixtures.Actions.Add,
             params: %{value: 1, amount: 1}
 
           #{output}
@@ -281,7 +281,7 @@ defmodule Jido.Flow.DSL.FlowTest do
 
         flow do
           step "echo",
-            action: JidoActionTest.Fixtures.Actions.EchoParamsAction,
+            action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,
             params: %{offset: -1, scale: -2.5, items: [-3]}
 
           output result("echo")
@@ -296,7 +296,7 @@ defmodule Jido.Flow.DSL.FlowTest do
           %{
             kind: :step,
             name: "echo",
-            action: JidoActionTest.Fixtures.Actions.EchoParamsAction,
+            action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,
             params: %{offset: -1, scale: -2.5, items: [-3]}
           }
         ],
@@ -314,13 +314,13 @@ defmodule Jido.Flow.DSL.FlowTest do
 
         flow do
           step :load,
-            action: JidoActionTest.Fixtures.Actions.EchoParamsAction,
+            action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,
             params: %{},
             meta: %{"ui" => %{"x" => 1}, 1 => :first}
 
           map :items,
             collection: input(:items),
-            action: JidoActionTest.Fixtures.Actions.EchoParamsAction,
+            action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,
             params: %{item: item()}
 
           output %{load: result("load"), items: result("items")}
@@ -335,7 +335,7 @@ defmodule Jido.Flow.DSL.FlowTest do
           %{
             kind: :step,
             name: "load",
-            action: JidoActionTest.Fixtures.Actions.EchoParamsAction,
+            action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,
             params: %{},
             meta: %{"ui" => %{"x" => 1}, 1 => :first}
           },
@@ -343,7 +343,7 @@ defmodule Jido.Flow.DSL.FlowTest do
             kind: :map,
             name: "items",
             collection: Jido.Flow.Ref.input(:items),
-            action: JidoActionTest.Fixtures.Actions.EchoParamsAction,
+            action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,
             params: %{item: Jido.Flow.Ref.item()}
           }
         ],
@@ -360,25 +360,25 @@ defmodule Jido.Flow.DSL.FlowTest do
 
       flow do
         step "echo",
-          action: JidoActionTest.Fixtures.Actions.EchoParamsAction,
+          action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,
           params: %{items: [], nested: [[], %{items: []}]},
           needs: []
 
         map "mapped",
           collection: [],
-          action: JidoActionTest.Fixtures.Actions.EchoParamsAction,
+          action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,
           params: %{item: item()}
 
         reduce "reduced" do
           collection([])
           initial(%{items: []})
-          action(JidoActionTest.Fixtures.Actions.EchoParamsAction)
+          action(Jido.Test.Action.Fixtures.Actions.EchoParamsAction)
           params(accumulator())
         end
 
         iterate "loop" do
           state(Jido.Joi.map(), initial: %{items: []})
-          action(JidoActionTest.Fixtures.Actions.EchoParamsAction)
+          action(Jido.Test.Action.Fixtures.Actions.EchoParamsAction)
           params(state())
           update(body_result())
           while(state(:items) != [])
@@ -415,7 +415,7 @@ defmodule Jido.Flow.DSL.FlowTest do
 
       flow do
         handoff "next",
-          selector: JidoActionTest.Fixtures.Actions.Add,
+          selector: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 1}
 
         output(%{value: result("next")})
@@ -444,11 +444,11 @@ defmodule Jido.Flow.DSL.FlowTest do
 
       flow do
         handoff "first",
-          selector: JidoActionTest.Fixtures.Actions.Add,
+          selector: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{}
 
         handoff "second",
-          selector: JidoActionTest.Fixtures.Actions.Add,
+          selector: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{}
 
         output(result("second"))
@@ -480,8 +480,8 @@ defmodule Jido.Flow.DSL.FlowTest do
 
       flow do
         step("add",
-          action: JidoActionTest.Fixtures.Actions.Add,
-          action: JidoActionTest.Fixtures.Actions.Add
+          action: Jido.Test.Action.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add
         )
 
         output(result("add"))
@@ -518,11 +518,11 @@ defmodule Jido.Flow.DSL.FlowTest do
         choice "route" do
           option "nested" do
             condition(1 == 1)
-            action(JidoActionTest.Fixtures.NestedFlow)
+            action(Jido.Test.Flow.Fixtures.NestedFlow)
             params(%{value: 1})
           end
 
-          otherwise action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1}
+          otherwise action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1}
         end
 
         output(result("route"))
@@ -545,11 +545,11 @@ defmodule Jido.Flow.DSL.FlowTest do
         choice "route" do
           option "valid" do
             condition(1 == 1)
-            action(JidoActionTest.Fixtures.Actions.Add)
+            action(Jido.Test.Action.Fixtures.Actions.Add)
             params(%{value: 1})
           end
 
-          otherwise action: JidoActionTest.Fixtures.NestedFlow, params: %{value: 1}
+          otherwise action: Jido.Test.Flow.Fixtures.NestedFlow, params: %{value: 1}
         end
 
         output(result("route"))
@@ -581,7 +581,7 @@ defmodule Jido.Flow.DSL.FlowTest do
 
       flow do
         output(%{})
-        step "add", action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1}
+        step "add", action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1}
       end
     end
     """
@@ -598,7 +598,7 @@ defmodule Jido.Flow.DSL.FlowTest do
 
       flow do
         choice "route" do
-          otherwise action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1}
+          otherwise action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1}
         end
 
         output(result("route"))
@@ -618,7 +618,7 @@ defmodule Jido.Flow.DSL.FlowTest do
         choice "route" do
           option "yes",
             condition: 1 == 1,
-            action: JidoActionTest.Fixtures.Actions.Add,
+            action: Jido.Test.Action.Fixtures.Actions.Add,
             params: %{value: 1}
         end
 
@@ -636,7 +636,7 @@ defmodule Jido.Flow.DSL.FlowTest do
     cases = [
       {"""
        iterate "loop" do
-         action(JidoActionTest.Fixtures.Actions.Add)
+         action(Jido.Test.Action.Fixtures.Actions.Add)
          params(%{value: 1})
          repeat(1)
        end
@@ -644,7 +644,7 @@ defmodule Jido.Flow.DSL.FlowTest do
       {"""
        iterate "loop" do
          state(Jido.Joi.map(), initial: %{})
-         action(JidoActionTest.Fixtures.Actions.Add)
+         action(Jido.Test.Action.Fixtures.Actions.Add)
          params(%{value: 1})
          while(1 == 1)
        end
@@ -652,7 +652,7 @@ defmodule Jido.Flow.DSL.FlowTest do
       {"""
        iterate "loop" do
          state(Jido.Joi.map(), initial: %{})
-         action(JidoActionTest.Fixtures.Actions.Add)
+         action(Jido.Test.Action.Fixtures.Actions.Add)
          params(%{value: 1})
          repeat(1)
          max_iterations(1)
@@ -661,7 +661,7 @@ defmodule Jido.Flow.DSL.FlowTest do
       {"""
        iterate "loop" do
          state(Jido.Joi.map(), initial: %{})
-         action(JidoActionTest.Fixtures.Actions.Add)
+         action(Jido.Test.Action.Fixtures.Actions.Add)
          params(%{value: 1})
        end
        """, "iterate requires exactly one of while or repeat"}
@@ -722,16 +722,16 @@ defmodule Jido.Flow.DSL.FlowTest do
       use Jido.Flow, name: "valid_while_and_needs"
 
       flow do
-        step "first", action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1}
+        step "first", action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1}
 
         step "second",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 1},
           needs: "first"
 
         iterate "loop" do
           state(Jido.Joi.map(), initial: %{value: 0})
-          action(JidoActionTest.Fixtures.Actions.Add)
+          action(Jido.Test.Action.Fixtures.Actions.Add)
           params(%{value: state(:value)})
           needs(["second", "first"])
           update(body_result())
@@ -764,10 +764,10 @@ defmodule Jido.Flow.DSL.FlowTest do
       use Jido.Flow, name: "legacy_after"
 
       flow do
-        step "first", action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 1}
+        step "first", action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 1}
 
         step "second",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 1},
           after: "first"
 

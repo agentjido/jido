@@ -1,27 +1,27 @@
 defmodule Jido.Plugin.AfterCommitTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.agent_server.plugin_runtime", async: true
   @moduletag obligation: "jido.agent_server.plugin_runtime.I6"
 
   alias Jido.AgentServer.Plugin.Callbacks
-  alias JidoTest.CommitProjection.Stateless
+  alias Jido.Test.AgentServer.CommitProjection.Stateless
 
   defmodule Mapped do
     @moduledoc false
     use Jido.Plugin, option_keys: [agent: [:key], agent_server: [:sink]]
 
     @impl true
-    defdelegate state_spec(opts), to: JidoTest.CommitProjection.AgentFacet
+    defdelegate state_spec(opts), to: Jido.Test.AgentServer.CommitProjection.AgentFacet
 
     @impl true
-    defdelegate directives(opts), to: JidoTest.CommitProjection.AgentFacet
+    defdelegate directives(opts), to: Jido.Test.AgentServer.CommitProjection.AgentFacet
 
     @impl true
-    defdelegate reduce(reduction, opts), to: JidoTest.CommitProjection.AgentFacet
+    defdelegate reduce(reduction, opts), to: Jido.Test.AgentServer.CommitProjection.AgentFacet
 
     @impl true
     defdelegate after_commit(runtime, commit, opts),
-      to: JidoTest.CommitProjection.NotificationFacet
+      to: Jido.Test.AgentServer.CommitProjection.NotificationFacet
   end
 
   defmodule Legacy do
@@ -63,13 +63,13 @@ defmodule Jido.Plugin.AfterCommitTest do
     use Jido.Plugin
 
     @impl true
-    defdelegate state_spec(opts), to: JidoTest.CommitProjection.AgentFacet
+    defdelegate state_spec(opts), to: Jido.Test.AgentServer.CommitProjection.AgentFacet
 
     @impl true
-    defdelegate directives(opts), to: JidoTest.CommitProjection.AgentFacet
+    defdelegate directives(opts), to: Jido.Test.AgentServer.CommitProjection.AgentFacet
 
     @impl true
-    defdelegate reduce(reduction, opts), to: JidoTest.CommitProjection.AgentFacet
+    defdelegate reduce(reduction, opts), to: Jido.Test.AgentServer.CommitProjection.AgentFacet
 
     @impl true
     defdelegate dump(value, context, opts), to: Jido.Plugin.AfterCommitTest.WrongPersistence

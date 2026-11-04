@@ -8,13 +8,13 @@ defmodule JidoActionTest.Flow.DSL.ConditionExamplesTest do
       name: "required_boolean_route",
       schema: Jido.Joi.object(%{enabled: Jido.Joi.boolean()})
 
-    alias JidoActionTest.Fixtures.Actions.EchoParamsAction
+    alias Jido.Test.Action.Fixtures.Actions.EchoParamsAction
 
     flow do
       choice "route" do
         option "disabled",
           condition: input(:enabled) == false,
-          action: JidoActionTest.Fixtures.Actions.EchoParamsAction,
+          action: Jido.Test.Action.Fixtures.Actions.EchoParamsAction,
           params: %{enabled: false}
 
         otherwise action: EchoParamsAction, params: %{enabled: true}

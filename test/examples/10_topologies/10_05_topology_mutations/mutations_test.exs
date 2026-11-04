@@ -5,7 +5,7 @@ Loader.require_source!("10_topologies/support/cell.ex")
 Loader.require_source!("10_topologies/10_05_topology_mutations/mutations.ex")
 
 defmodule JidoTest.Examples.Topology.MutationsTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -13,7 +13,7 @@ defmodule JidoTest.Examples.Topology.MutationsTest do
     :ok
   end
 
-  import JidoTest.AgentTopologyAssertions
+  import Jido.Test.AgentServer.TopologyAssertions
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.{Mutations, Cell}
 
@@ -122,7 +122,7 @@ defmodule JidoTest.Examples.Topology.MutationsTest do
     id = unique_id("saved-topology")
 
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Mutations,
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Mutations,
         id: id,
         persistence: persistence,
         persistence_mode: :create

@@ -1,5 +1,5 @@
 defmodule Jido.Plugin.OrderingTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.AgentServer.Command
   alias Jido.Plugin.Context

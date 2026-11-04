@@ -1,5 +1,5 @@
 defmodule Jido.Agent.SchedulerCodecTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
@@ -37,9 +37,9 @@ defmodule Jido.Agent.SchedulerCodecTest do
     test "an imported #{kind} route dispatches through the Scheduler Plugin", %{jido: jido} do
       definition = definition(unquote(kind))
       registry = registry(definition)
-      assert {:ok, json} = JidoTest.AgentRegistry.encode_json(definition, registry)
+      assert {:ok, json} = Jido.Test.AgentServer.Registry.encode_json(definition, registry)
       assert json =~ "plugins/scheduler"
-      assert {:ok, ^definition} = JidoTest.AgentRegistry.decode_json(json, registry)
+      assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode_json(json, registry)
       assert definition.id == nil
       assert definition.state == nil
 
@@ -47,7 +47,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
       instance = Agent.instantiate!(definition, id: unique_id("json-scheduler"))
       assert instance.state == %{count: 0, scheduler: %{cron: %{}}}
 
-      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, instance)
+      assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, instance)
       assert {:ok, %{cron: %{}}} = Server.plugin_state(server, Scheduler)
 
       assert {:ok, committed, [%Scheduler.Schedule{}]} =
@@ -57,7 +57,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
       eventually(fn -> Server.agent(server).state.count == 1 end)
       assert Server.snapshot(server).state_version == 2
 
-      scheduler = JidoTest.AgentServerAssertions.plugin(server, Scheduler).pid
+      scheduler = Jido.Test.AgentServer.Assertions.plugin(server, Scheduler).pid
       scheduler_monitor = Process.monitor(scheduler)
       server_monitor = Process.monitor(server)
       assert :ok = Jido.stop_agent(jido, server)
@@ -69,7 +69,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
   test "import requires the trusted Scheduler reference" do
     definition = definition(:action)
     registry = registry(definition)
-    assert {:ok, json} = JidoTest.AgentRegistry.encode_json(definition, registry)
+    assert {:ok, json} = Jido.Test.AgentServer.Registry.encode_json(definition, registry)
 
     missing_plugin =
       registry
@@ -83,22 +83,22 @@ defmodule Jido.Agent.SchedulerCodecTest do
                 details: %{identifier: "plugins/scheduler", kind: :plugin}
               }
             ]} =
-             JidoTest.AgentRegistry.decode_json(json, missing_plugin)
+             Jido.Test.AgentServer.Registry.decode_json(json, missing_plugin)
   end
 
   test "an imported instance becomes a definition and retains Plugin options" do
     definition = definition(:action)
     instance = Agent.instantiate!(definition, id: "stored-agent", state: %{count: 4})
-    assert {:ok, json} = JidoTest.AgentRegistry.encode_json(instance, registry(definition))
-    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode_json(json, registry(definition))
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(instance, registry(definition))
-    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry(definition))
+    assert {:ok, json} = Jido.Test.AgentServer.Registry.encode_json(instance, registry(definition))
+    assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode_json(json, registry(definition))
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(instance, registry(definition))
+    assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode(document, registry(definition))
   end
 
   test "import validates Scheduler options before startup" do
     definition = definition(:action)
     registry = registry(definition)
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
     [plugin] = document["definition"]["plugins"]
     option_key = %{"$type" => "atom", "id" => "atoms/retry-delay", "vsn" => 1}
 
@@ -116,7 +116,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
                 code: :invalid_document,
                 message: "Scheduler retry_delay_ms is invalid"
               }
-            ]} = JidoTest.AgentRegistry.decode_json(Jason.encode!(document), registry)
+            ]} = Jido.Test.AgentServer.Registry.decode_json(Jason.encode!(document), registry)
   end
 
   defp definition(kind) do

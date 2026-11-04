@@ -1,10 +1,10 @@
 defmodule Jido.Signal.Bus.DurableSubscriptionTest do
-  use JidoSignalTest.Case, async: true
+  use Jido.Test.Signal.Case, async: true
 
   alias Jido.Signal.Bus
   alias Jido.Signal.Bus.RecordedSignal
   alias Jido.Signal.Router
-  alias JidoSignalTest.Fixtures.Signals.UserCreated
+  alias Jido.Test.Signal.Fixtures.Signals.UserCreated
 
   defmodule SharedStore do
     @behaviour Jido.Signal.Bus.Store

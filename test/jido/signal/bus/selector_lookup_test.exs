@@ -1,5 +1,5 @@
 defmodule Jido.Signal.Bus.SelectorLookupTest do
-  use JidoSignalTest.Case, async: false
+  use Jido.Test.Signal.Case, async: false
 
   alias Jido.Error
   alias Jido.Signal

@@ -1,5 +1,5 @@
 defmodule Jido.Plugin.StateRuntimeTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   alias Jido.AgentServer, as: Server
   alias Jido.Signal
@@ -73,7 +73,7 @@ defmodule Jido.Plugin.StateRuntimeTest do
 
   test "state-only Plugin Directives update state without a Plugin runtime", %{jido: jido} do
     {:ok, pid} =
-      JidoTest.AgentServerAssertions.start_agent(jido, DataAgent, id: unique_id("plugin-data"))
+      Jido.Test.AgentServer.Assertions.start_agent(jido, DataAgent, id: unique_id("plugin-data"))
 
     signal = Signal.new!("plugin.credits.spend", %{amount: 1}, source: "/test")
 

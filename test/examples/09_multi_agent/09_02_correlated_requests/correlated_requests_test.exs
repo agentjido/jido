@@ -6,7 +6,7 @@ Loader.require_source!("09_multi_agent/support/worker.ex")
 Loader.require_source!("09_multi_agent/09_02_correlated_requests/correlated_requests.ex")
 
 defmodule JidoTest.Examples.MultiAgent.CorrelatedRequestsTest do
-  use JidoTest.FeatureSDKCase
+  use Jido.Test.Agent.FeatureSDKCase
   @moduletag :example
 
   setup_all do

@@ -2,9 +2,9 @@ defmodule JidoActionTest.InstructionTest do
   use Covenant.Case, component: "jido_action.instruction", async: true
 
   alias Jido.Instruction
-  alias JidoActionTest.Fixtures.MathFlow
+  alias Jido.Test.Flow.Fixtures.MathFlow
 
-  alias JidoActionTest.Fixtures.Actions.{
+  alias Jido.Test.Action.Fixtures.Actions.{
     Add,
     BasicAction,
     MissingRun,

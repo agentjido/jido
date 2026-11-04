@@ -1,7 +1,7 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.agent_server.composition", async: true
 
   alias Jido.Agent
@@ -10,9 +10,9 @@ defmodule JidoTest.AgentServer.Composition.RuntimeRulesTest do
   alias Jido.AgentServer, as: Server
   alias Jido.Agent.Topology, as: AgentTopology
   alias Jido.AgentServer.Topology
-  alias JidoTest.AgentEvolutionFixtures, as: E
+  alias Jido.Test.Agent.EvolutionFixtures, as: E
   alias JidoTest.AgentServer.Fixtures, as: F
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
 
   defmodule QueueProvider do
     use Jido.Plugin, id: "composition.queue"

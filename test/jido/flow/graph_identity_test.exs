@@ -4,14 +4,14 @@ defmodule Jido.Flow.GraphIdentityTest do
   alias Jido.Error.ValidationError
   alias Jido.Flow
   alias Jido.Flow.Ref
-  alias JidoActionTest.Fixtures.Actions.{Add, EchoParamsAction}
-  alias JidoActionTest.Fixtures.InlineAuthoring
-  alias JidoActionTest.Fixtures.InlineParityFlow
+  alias Jido.Test.Action.Fixtures.Actions.{Add, EchoParamsAction}
+  alias Jido.Test.Flow.Fixtures.InlineAuthoring
+  alias Jido.Test.Flow.Fixtures.InlineParityFlow
 
   test "equal inline DSL, and direct graph data has the same semantic identity" do
     dsl = InlineParityFlow.flow()
     direct = InlineAuthoring.direct_flow!()
-    assert {:ok, built} = JidoActionTest.FlowBuilder.new(InlineAuthoring.data())
+    assert {:ok, built} = Jido.Test.Flow.Builder.new(InlineAuthoring.data())
     assert {:ok, identity} = Flow.semantic_identity(dsl)
     assert %{version: 1, algorithm: :sha256, digest: digest, uuid: uuid} = identity
     assert is_binary(digest)
@@ -47,10 +47,10 @@ defmodule Jido.Flow.GraphIdentityTest do
                 Ref.result("echo")
               end
 
-            JidoActionTest.FlowBuilder.new!(
+            Jido.Test.Flow.Builder.new!(
               name: "reference_identity",
               components: [
-                JidoActionTest.FlowComponent.step!(
+                Jido.Test.Flow.Component.step!(
                   name: "echo",
                   action: EchoParamsAction,
                   params: params
@@ -69,8 +69,8 @@ defmodule Jido.Flow.GraphIdentityTest do
         refute workflow_log(reference_flow) == workflow_log(literal_flow)
 
         for flow <- flows do
-          assert {:ok, document, registry} = JidoActionTest.GeneratedFlowCodec.encode(flow)
-          assert {:ok, restored} = JidoActionTest.FlowCodec.decode(document, registry)
+          assert {:ok, document, registry} = Jido.Test.Flow.GeneratedCodec.encode(flow)
+          assert {:ok, restored} = Jido.Test.Flow.Codec.decode(document, registry)
           assert restored == flow
           assert Flow.semantic_identity(restored) == Flow.semantic_identity(flow)
 
@@ -86,20 +86,20 @@ defmodule Jido.Flow.GraphIdentityTest do
   end
 
   test "author order, reference order, and effective order stay separate" do
-    first = JidoActionTest.FlowComponent.step!(name: "first", action: Add)
+    first = Jido.Test.Flow.Component.step!(name: "first", action: Add)
 
     final =
-      JidoActionTest.FlowComponent.step!(
+      Jido.Test.Flow.Component.step!(
         name: "final",
         action: Add,
         params: %{value: Ref.result("first", :value)},
         needs: ["gate"]
       )
 
-    gate = JidoActionTest.FlowComponent.step!(name: "gate", action: Add)
+    gate = Jido.Test.Flow.Component.step!(name: "gate", action: Add)
 
     flow =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "dependencies",
         components: [first, final, gate],
         output: Ref.result("final")
@@ -115,20 +115,20 @@ defmodule Jido.Flow.GraphIdentityTest do
 
   test "unknown references and cycles fail without changing author data" do
     assert {:error, %ValidationError{}} =
-             JidoActionTest.FlowBuilder.new(
+             Jido.Test.Flow.Builder.new(
                name: "unknown",
                components: [
-                 JidoActionTest.FlowComponent.step!(name: "one", action: Add, needs: ["missing"])
+                 Jido.Test.Flow.Component.step!(name: "one", action: Add, needs: ["missing"])
                ],
                output: Ref.result("one")
              )
 
     assert {:error, %ValidationError{message: message}} =
-             JidoActionTest.FlowBuilder.new(
+             Jido.Test.Flow.Builder.new(
                name: "cycle",
                components: [
-                 JidoActionTest.FlowComponent.step!(name: "one", action: Add, needs: ["two"]),
-                 JidoActionTest.FlowComponent.step!(name: "two", action: Add, needs: ["one"])
+                 Jido.Test.Flow.Component.step!(name: "one", action: Add, needs: ["two"]),
+                 Jido.Test.Flow.Component.step!(name: "two", action: Add, needs: ["one"])
                ],
                output: Ref.result("one")
              )
@@ -139,7 +139,7 @@ defmodule Jido.Flow.GraphIdentityTest do
   test "description and component metadata do not change semantic identity" do
     flows =
       for {description, meta} <- [{nil, %{}}, {"Display text", %{note: "authored"}}] do
-        JidoActionTest.FlowBuilder.new!(%{
+        Jido.Test.Flow.Builder.new!(%{
           name: "metadata_identity",
           description: description,
           components: [
@@ -162,18 +162,18 @@ defmodule Jido.Flow.GraphIdentityTest do
   end
 
   test "source order does not change semantic identity" do
-    one = JidoActionTest.FlowComponent.step!(name: "one", action: Add)
-    two = JidoActionTest.FlowComponent.step!(name: "two", action: Add)
+    one = Jido.Test.Flow.Component.step!(name: "one", action: Add)
+    two = Jido.Test.Flow.Component.step!(name: "two", action: Add)
 
     first =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "identity",
         components: [one, two],
         output: %{one: Ref.result("one"), two: Ref.result("two")}
       )
 
     second =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "identity",
         components: [two, one],
         output: %{one: Ref.result("one"), two: Ref.result("two")}
@@ -196,7 +196,7 @@ defmodule Jido.Flow.GraphIdentityTest do
           %{
             kind: :step,
             name: "add",
-            action: JidoActionTest.Fixtures.Actions.Add,
+            action: Jido.Test.Action.Fixtures.Actions.Add,
             params: %{value: Jido.Flow.Ref.input(:value), amount: 1},
             needs: [],
             meta: %{owner: "ignored"}
@@ -210,6 +210,6 @@ defmodule Jido.Flow.GraphIdentityTest do
       })
 
     assert Jido.Flow.Identity.semantic_digest(flow) ==
-             "83f90a1df8f3b5e88efe8159e33dd6d590a6751290fd25c7b672861cd6d2cdd7"
+             "f021cb99d1bd929129210e7ab2f4456e4053e8e13cc5af3db5fd33132baa6b92"
   end
 end

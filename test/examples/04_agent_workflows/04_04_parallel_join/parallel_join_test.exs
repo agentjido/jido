@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("04_agent_workflows/04_04_parallel_join/parallel_join.ex")
 
 defmodule JidoTest.Examples.Workflow.ParallelJoinTest do
-  use JidoTest.WorkflowSDKCase
+  use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do

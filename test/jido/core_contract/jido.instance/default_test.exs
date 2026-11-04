@@ -1,7 +1,7 @@
 Code.require_file("support.ex", __DIR__)
 
 defmodule Jido.InstanceHelpersTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.instance", async: false
 
   setup :ensure_namespace_registry

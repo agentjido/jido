@@ -49,7 +49,7 @@ defmodule JidoTest.Property.Signal.PidLifecyclesTest do
              Dispatch.dispatch(signal, {:pid, [target: owner, delivery_mode: :sync]})
 
     assert {:error, _} =
-             Dispatch.validate_opts({:pid, [target: JidoSignalTest.Case.remote_pid()]})
+             Dispatch.validate_opts({:pid, [target: Jido.Test.Signal.Case.remote_pid()]})
 
     for invalid <- [0, -1, 4_294_967_296, "1000"],
         do: assert(match?({:error, _}, Dispatch.validate_opts({:pid, [target: owner, timeout: invalid]})))

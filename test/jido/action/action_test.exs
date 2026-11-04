@@ -1,15 +1,15 @@
 defmodule JidoActionTest.ActionTest do
   use Covenant.Case, component: "jido_action.action", async: true
-  import JidoActionTest.Case
+  import Jido.Test.Action.Case
   @moduletag obligation: "jido_action.action.I1"
 
   alias Jido.Action
   alias Jido.Instruction.Config
   alias Jido.Action.Output
-  alias JidoActionTest.Fixtures.Actions.FullAction
-  alias JidoActionTest.Fixtures.Actions.NoOutputSchemaAction
-  alias JidoActionTest.Fixtures.Actions.NoSchema
-  alias JidoActionTest.Fixtures.Actions.OutputSchemaAction
+  alias Jido.Test.Action.Fixtures.Actions.FullAction
+  alias Jido.Test.Action.Fixtures.Actions.NoOutputSchemaAction
+  alias Jido.Test.Action.Fixtures.Actions.NoSchema
+  alias Jido.Test.Action.Fixtures.Actions.OutputSchemaAction
 
   describe "action creation and metadata" do
     test "creates a valid action with retained metadata" do

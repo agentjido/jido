@@ -1,13 +1,13 @@
 defmodule JidoTest.AgentServer.HandoffTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.handoff", async: false
   @moduletag :tmp_dir
 
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
 
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Lifecycle
-  alias JidoTest.DurableFixtures.Probe
+  alias Jido.Test.AgentServer.DurableFixtures.Probe
 
   defmodule EventLog do
     use GenServer
@@ -91,7 +91,7 @@ defmodule JidoTest.AgentServer.HandoffTest do
     end
 
     def dispatch(_runtime, %Effect{mode: :block}, _context, _opts),
-      do: JidoTest.DurableFixtures.Probe.gate({:handoff_effect, __MODULE__})
+      do: Jido.Test.AgentServer.DurableFixtures.Probe.gate({:handoff_effect, __MODULE__})
 
     def dispatch(_runtime, %Effect{mode: :fail}, _context, _opts),
       do: {:error, :controlled_effect_failure}

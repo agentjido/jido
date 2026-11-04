@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("12_plugin_applications/12_01_audit/audit.ex")
 
 defmodule JidoTest.Examples.Applications.AuditTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
@@ -19,7 +19,7 @@ defmodule JidoTest.Examples.Applications.AuditTest do
 
   test "domain records commit with state, stay bounded, and exclude failed Flows", %{jido: jido} do
     {:ok, agent_server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Agent,
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent,
         id: unique_id("audit"),
         error_policy: :log_only
       )

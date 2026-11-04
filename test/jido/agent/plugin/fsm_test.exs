@@ -206,12 +206,12 @@ defmodule Jido.Agent.Plugin.FSMTest do
 
   test "Agent codec preserves the canonical FSM definition" do
     definition = Guide.definition()
-    registry = JidoTest.AgentRegistry.for(definition)
+    registry = Jido.Test.AgentServer.Registry.for(definition)
 
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
 
     assert {:ok, ^definition} =
-             JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
+             Jido.Test.AgentServer.Registry.decode(JSON.decode!(JSON.encode!(document)), registry)
   end
 
   test "Agent mutation keeps selector and route invariants" do

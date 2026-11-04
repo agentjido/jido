@@ -79,14 +79,14 @@ defmodule Jido.Exec.BoundaryRulesTest do
         Jido.Flow.new(%{
           name: "canonical",
           components: [
-            %{kind: :step, name: "a", action: JidoActionTest.Fixtures.Actions.Add},
+            %{kind: :step, name: "a", action: Jido.Test.Action.Fixtures.Actions.Add},
             %{
               kind: :choice,
               name: "c",
               options: [
-                %{name: "o", condition: true, action: JidoActionTest.Fixtures.Actions.Add}
+                %{name: "o", condition: true, action: Jido.Test.Action.Fixtures.Actions.Add}
               ],
-              fallback: %{action: JidoActionTest.Fixtures.Actions.Add}
+              fallback: %{action: Jido.Test.Action.Fixtures.Actions.Add}
             }
           ],
           output: %{}
@@ -113,7 +113,7 @@ defmodule Jido.Exec.BoundaryRulesTest do
 
   describe "data definitions" do
     test "default nil needs and meta and reject malformed choice parts" do
-      step = %{kind: :step, name: "a", action: JidoActionTest.Fixtures.Actions.Add}
+      step = %{kind: :step, name: "a", action: Jido.Test.Action.Fixtures.Actions.Add}
 
       assert {:ok, flow} =
                Jido.Flow.new(%{

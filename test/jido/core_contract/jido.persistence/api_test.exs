@@ -1,6 +1,8 @@
 defmodule JidoTest.Persistence.ApiTest do
   use Covenant.Case, component: "jido.persistence", async: true
 
+  import Jido.Test.PublicAPI
+
   alias Jido.Persistence
   alias Jido.Persistence.{Plugin, S3, Snapshot, Store}
   alias Jido.Plugin.Context.Persistence, as: Context
@@ -84,24 +86,5 @@ defmodule JidoTest.Persistence.ApiTest do
         ] do
       assert {:error, %Jido.Error.ValidationError{subject: Context}} = Context.validate(invalid)
     end
-  end
-
-  defp documented_functions(module) do
-    {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
-
-    docs
-    |> Enum.flat_map(fn
-      {{:function, name, arity}, _, _, doc, _} when doc not in [:hidden, :none] ->
-        [{name, arity}]
-
-      _other ->
-        []
-    end)
-    |> Enum.sort()
-  end
-
-  defp public_module?(module) do
-    {:docs_v1, _, _, _, module_doc, _, _} = Code.fetch_docs(module)
-    module_doc not in [:hidden, :none]
   end
 end

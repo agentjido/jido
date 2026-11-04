@@ -15,7 +15,7 @@ defmodule Jido.AI.ModelPrimitivesTest do
   alias Jido.AI.Actions.Embed
   alias Jido.AI.Context
   alias Jido.AI.Reasoning.Actions.{GuardInput, GuardOutput}
-  alias Jido.AITest.SimpleAgent
+  alias Jido.Test.AI.SimpleAgent
 
   setup :set_mimic_global
   setup :verify_on_exit!

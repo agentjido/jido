@@ -4,8 +4,8 @@ defmodule Jido.Flow.ValuePreparationContractTest do
   alias Jido.Flow.Definition
   alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
-  alias JidoActionTest.Fixtures.Actions.Add
-  alias JidoActionTest.Fixtures.NestedFlow
+  alias Jido.Test.Action.Fixtures.Actions.Add
+  alias Jido.Test.Flow.Fixtures.NestedFlow
 
   test "every call form normalizes nested result names and treats nil params as empty" do
     params = %{nested: [%Ref{source: :result, component: :source, path: []}]}

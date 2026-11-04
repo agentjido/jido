@@ -1,7 +1,7 @@
 defmodule Jido.Action.InlineHostBuildTest do
   use ExUnit.Case, async: false
 
-  alias JidoActionTest.InlineBuild, as: Build
+  alias Jido.Test.Action.InlineBuild, as: Build
 
   @moduletag :tmp_dir
   @moduletag timeout: 180_000

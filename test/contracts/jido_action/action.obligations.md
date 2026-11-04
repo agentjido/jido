@@ -8,7 +8,7 @@ modules: [Jido.Action, Jido.Instruction.Compiler, Jido.Instruction.Config]
 
 Check `use Jido.Action` with the existing Action tests. The API source remains
 the `Jido.Action` module documentation and `guides/actions.md`.
-The macro check recompiles `test/support/fixtures/action/definitions.ex`
+The macro check recompiles `test/support/jido_action/fixtures/definitions.ex`
 before the contract test file. Tests also compile their own Action modules.
 The shared authoring modules are checked through Action and Flow callers,
 using the existing authoring tests. This does not establish complete Flow

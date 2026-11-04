@@ -15,11 +15,11 @@ defmodule Jido.AI.RuntimeTest do
   import Mimic
 
   alias Jido.AI.Thread.Projection
-  alias Jido.AITest.ContentPartAgent
-  alias Jido.AITest.FlowToolAgent
-  alias Jido.AITest.LargeOutputAgent
-  alias Jido.AITest.SimpleAgent
-  alias Jido.AITest.Tools
+  alias Jido.Test.AI.ContentPartAgent
+  alias Jido.Test.AI.FlowToolAgent
+  alias Jido.Test.AI.LargeOutputAgent
+  alias Jido.Test.AI.SimpleAgent
+  alias Jido.Test.AI.Tools
   alias Jido.AgentServer, as: Server
 
   defmodule DateTimeTool do
@@ -648,14 +648,14 @@ defmodule Jido.AI.RuntimeTest do
              run(agent, %{input: "Use the dynamic tool"},
                context: %{
                  jido_ai_tool_sources: [
-                   {Jido.AITest.DynamicToolSource, %{prefix: "source"}}
+                   {Jido.Test.AI.DynamicToolSource, %{prefix: "source"}}
                  ]
                }
              )
 
     assert result.status == :completed
 
-    assert [%{tool: %{kind: :source, source: "Elixir.Jido.AITest.DynamicToolSource"}}] =
+    assert [%{tool: %{kind: :source, source: "Elixir.Jido.Test.AI.DynamicToolSource"}}] =
              result.tool_attempts
 
     assert [attempt] = Jido.Thread.filter_by_kind(agent.state.session.thread, :ai_tool_attempt)

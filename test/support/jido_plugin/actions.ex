@@ -1,0 +1,50 @@
+defmodule Jido.Test.Plugin.Action do
+  @moduledoc false
+  use Jido.Action, name: "plugin_test_action"
+
+  def run(_params, _context), do: {:ok, %{}}
+end
+
+defmodule Jido.Test.Plugin.AnotherAction do
+  @moduledoc false
+  use Jido.Action,
+    name: "plugin_test_another_action",
+    schema: Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
+
+  def run(%{value: value}, _context), do: {:ok, %{value: value}}
+end
+
+defmodule Jido.Test.Plugin.NotAnAction do
+  @moduledoc false
+  def some_function, do: :ok
+end
+
+defmodule Jido.Test.Plugin.Actions do
+  @moduledoc """
+  Shared test actions for Jido test suite.
+  """
+
+  alias Jido.Action
+
+  defmodule BasicAction do
+    @moduledoc false
+    use Action,
+      name: "basic_action",
+      description: "A basic action for testing",
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
+
+    def run(%{value: value}, _context) do
+      {:ok, %{value: value}}
+    end
+  end
+
+  defmodule NoSchema do
+    @moduledoc false
+    use Action,
+      name: "no_schema",
+      description: "Action with no schema"
+
+    def run(%{value: value}, _context), do: {:ok, %{result: value + 2}}
+    def run(_params, _context), do: {:ok, %{result: "No params"}}
+  end
+end

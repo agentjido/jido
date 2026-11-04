@@ -1,10 +1,10 @@
 defmodule JidoTest.Persistence.CheckpointPortabilityTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.persistence", async: true
 
   alias Jido.Persistence
-  alias JidoTest.Persistence.CheckpointPortabilityProbe, as: Probe
-  alias JidoTest.Persistence.ProbeStore, as: Store
+  alias Jido.Test.Persistence.CheckpointPortabilityProbe, as: Probe
+  alias Jido.Test.Persistence.ProbeStore, as: Store
 
   setup do
     {:ok, store: {Store, store: start_supervised!(Store)}, id: unique_id("checkpoint-portability")}

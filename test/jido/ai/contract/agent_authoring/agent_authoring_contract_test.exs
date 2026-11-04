@@ -2,7 +2,7 @@ defmodule Jido.AI.Contract.AgentAuthoringTest do
   use Covenant.Case, component: "jido_ai.agent_authoring", async: true
 
   alias Jido.AI.Reasoning.ReAct
-  alias Jido.AITest.Tools.Add
+  alias Jido.Test.AI.Tools.Add
 
   defmodule DefaultIdentityAgent do
     use Jido.AI.Agent, name: "jido_ai_default_identity"
@@ -21,7 +21,7 @@ defmodule Jido.AI.Contract.AgentAuthoringTest do
       reasoning Jido.AI.Reasoning.ReAct
 
       tools do
-        action Jido.AITest.Tools.Add
+        action Jido.Test.AI.Tools.Add
       end
     end
   end

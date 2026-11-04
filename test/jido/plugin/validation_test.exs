@@ -1,5 +1,5 @@
 defmodule Jido.Plugin.ValidationTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Plugin
   alias Jido.Plugin.{Context, Init}
@@ -391,7 +391,7 @@ defmodule Jido.Plugin.ValidationTest do
         routes: [
           %{
             path: "observe",
-            handler: %{kind: :action, target: JidoTest.AgentFixtures.ObserveExecutionBoundary},
+            handler: %{kind: :action, target: Jido.Test.AgentServer.Fixtures.ObserveExecutionBoundary},
             state: %{source: :output, path: []}
           }
         ]

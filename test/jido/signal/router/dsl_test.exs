@@ -1,10 +1,10 @@
 defmodule Jido.Signal.Router.DSLTest do
-  use JidoSignalTest.Case, async: true
+  use Jido.Test.Signal.Case, async: true
 
   alias Jido.Signal
   alias Jido.Signal.Router
   alias Jido.Signal.Router.Route
-  alias JidoSignalTest.Fixtures.Signals.UserCreated
+  alias Jido.Test.Signal.Fixtures.Signals.UserCreated
 
   defmodule UserRouter do
     use Jido.Signal.Router

@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("04_agent_workflows/04_03_conditional_routes/conditional_routes.ex")
 
 defmodule JidoTest.Examples.Workflow.ConditionalRoutesTest do
-  use JidoTest.WorkflowSDKCase
+  use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do
@@ -13,7 +13,7 @@ defmodule JidoTest.Examples.Workflow.ConditionalRoutesTest do
   end
 
   alias Jido.Examples.ConditionalRoutes, as: Example
-  alias JidoTest.WorkflowService, as: Service
+  alias Jido.Test.Agent.WorkflowService, as: Service
 
   test "Choice runs the first matching option and does not call the fallback", %{jido: jido} do
     client = start_supervised!({Service, %{primary: {:ok, %{answer: "primary"}}}})

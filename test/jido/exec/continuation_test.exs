@@ -2,7 +2,7 @@ defmodule Jido.Exec.ContinuationTest do
   use ExUnit.Case, async: true
 
   alias Jido.Exec.Continuation
-  alias JidoTest.DurableFixtures, as: F
+  alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   defp signal, do: Jido.Signal.new!("continuation.test", %{value: 1}, source: "/test")
 

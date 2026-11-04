@@ -262,7 +262,7 @@ defmodule JidoTest.Property.Signal.BusHistoriesTest do
       assert {:ok, "ephemeral-death"} =
                Bus.subscribe(state.bus, "**", subscription_id: "ephemeral-death", target: target)
 
-      JidoSignalTest.Case.terminate_and_wait(state.bus, target)
+      Jido.Test.Signal.Case.terminate_and_wait(state.bus, target)
       assert {:error, :subscription_not_found} = Bus.unsubscribe(state.bus, "ephemeral-death")
 
       assert {:ok, "death"} =

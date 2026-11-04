@@ -1,5 +1,5 @@
 defmodule JidoTest.Contract.PluginBusTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.plugin.bus", async: false
 
   alias Jido.Error.ValidationError, as: Error
@@ -13,7 +13,7 @@ defmodule JidoTest.Contract.PluginBusTest do
   alias Jido.Plugin.Normalizer
   alias Jido.Signal.Bus
   alias Jido.Signal.Bus.RecordedSignal
-  alias JidoTest.Plugin.BusFixtures, as: F
+  alias Jido.Test.Plugin.BusFixtures, as: F
   alias Spark.Dsl.{Extension, Section}
 
   defp plugin_init(jido, options, agent_server \\ self()) do
@@ -27,11 +27,11 @@ defmodule JidoTest.Contract.PluginBusTest do
   end
 
   defp start_agent(jido, module, prefix) do
-    JidoTest.AgentServerAssertions.start_agent(jido, module, id: unique_id(prefix))
+    Jido.Test.AgentServer.Assertions.start_agent(jido, module, id: unique_id(prefix))
   end
 
   defp client_runtime(server) do
-    JidoTest.AgentServerAssertions.plugin(server, Client).pid
+    Jido.Test.AgentServer.Assertions.plugin(server, Client).pid
   end
 
   defp recorded_signal(value \\ 1) do
@@ -111,7 +111,7 @@ defmodule JidoTest.Contract.PluginBusTest do
     agent_id = Server.agent(agent).id
 
     assert {:ok, bus} = Bus.whereis(agent_id, jido: jido)
-    assert JidoTest.AgentServerAssertions.plugin(agent, Manager).pid == bus
+    assert Jido.Test.AgentServer.Assertions.plugin(agent, Manager).pid == bus
 
     assert :ok = Jido.stop_agent(jido, agent)
     eventually(fn -> Bus.whereis(agent_id, jido: jido) == {:error, :not_found} end)
@@ -366,7 +366,7 @@ defmodule JidoTest.Contract.PluginBusTest do
   @tag obligation: ["jido.plugin.bus.I2", "jido.plugin.bus.I5"]
   test "one Agent can own a Bus and consume normal Signals from it", %{jido: jido} do
     {:ok, agent} = start_agent(jido, F.OwnedBusAgent, "owned-bus")
-    bus = JidoTest.AgentServerAssertions.plugin(agent, Manager).pid
+    bus = Jido.Test.AgentServer.Assertions.plugin(agent, Manager).pid
 
     assert {:ok, ^bus} = Bus.whereis(:owned_plugin_bus, jido: jido)
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.input", %{value: 11})])
@@ -488,7 +488,7 @@ defmodule JidoTest.Contract.PluginBusTest do
     runtime = client_runtime(agent)
     root = Server.activation(agent)
     Process.exit(runtime, :kill)
-    agent = JidoTest.AgentServerAssertions.replacement(root, agent, timeout: 2_000)
+    agent = Jido.Test.AgentServer.Assertions.replacement(root, agent, timeout: 2_000)
 
     replacement =
       eventually(
@@ -582,7 +582,7 @@ defmodule JidoTest.Contract.PluginBusTest do
     assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, :killed}, 2_000
     assert_receive {:DOWN, ^delivery_ref, :process, ^delivery, _reason}, 2_000
 
-    agent = JidoTest.AgentServerAssertions.replacement(root, agent)
+    agent = Jido.Test.AgentServer.Assertions.replacement(root, agent)
     action_ref = Process.monitor(action)
     assert :ok = Jido.stop_agent(jido, agent)
     assert_receive {:DOWN, ^action_ref, :process, ^action, _reason}, 2_000

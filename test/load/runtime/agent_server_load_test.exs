@@ -1,5 +1,5 @@
 defmodule JidoTest.Load.Runtime.AgentServerLoadTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   @moduletag :load
   @moduletag timeout: 180_000
@@ -35,7 +35,7 @@ defmodule JidoTest.Load.Runtime.AgentServerLoadTest do
         servers =
           for index <- 1..100 do
             {:ok, server} =
-              JidoTest.AgentServerAssertions.start_agent(c.jido, Counter, id: unique_id("load-#{cycle}-#{index}"))
+              Jido.Test.AgentServer.Assertions.start_agent(c.jido, Counter, id: unique_id("load-#{cycle}-#{index}"))
 
             if index <= 20 do
               assert {:ok, %{state: %{count: ^index}}, []} =

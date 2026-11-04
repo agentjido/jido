@@ -9,7 +9,7 @@ defmodule Jido.Flow.DSL.SourceMapTest do
     source = """
     defmodule #{inspect(module)} do
       use Jido.Flow, name: "indexed_sources"
-      alias JidoActionTest.Fixtures.Actions.EchoParamsAction, as: Echo
+      alias Jido.Test.Action.Fixtures.Actions.EchoParamsAction, as: Echo
       flow do
         choice "route" do
           option "selected", condition: true, action: Echo, params: %{}

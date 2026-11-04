@@ -1,7 +1,7 @@
 defmodule JidoTest.Quality.LiveTraceTest do
   use ExUnit.Case, async: true
 
-  alias JidoTest.AI.LiveTrace
+  alias Jido.Test.AI.LiveTrace
 
   test "the live trace allow-list removes prompts, outputs, and credentials" do
     prompt = "private-live-prompt-#{System.unique_integer([:positive])}"

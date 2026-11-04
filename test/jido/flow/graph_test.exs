@@ -2,7 +2,7 @@ defmodule Jido.Flow.GraphTest do
   use ExUnit.Case, async: true
 
   alias Jido.Flow.{Graph, Ref}
-  alias JidoActionTest.Fixtures.Actions.Add
+  alias Jido.Test.Action.Fixtures.Actions.Add
 
   test "dependency levels use longest paths and names break ties" do
     components =

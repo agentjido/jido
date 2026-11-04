@@ -4,7 +4,7 @@ defmodule JidoActionTest.Authoring.GreetingTest do
   use ExUnit.Case, async: false
   @moduletag :authoring
   alias Jido.Flow.{Codec, Ref}
-  alias JidoActionTest.FlowCodec, as: Codec
+  alias Jido.Test.Flow.Codec, as: Codec
   alias JidoActionTest.Authoring.Greeting.{Flow, Greet, Normalize}
 
   test "an authored Action validates input and carries caller context" do
@@ -47,20 +47,20 @@ defmodule JidoActionTest.Authoring.GreetingTest do
       output_schema: Flow.output_schema()
     }
 
-    assert {:ok, data_flow} = JidoActionTest.FlowBuilder.new(data)
+    assert {:ok, data_flow} = Jido.Test.Flow.Builder.new(data)
 
     direct_flow =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: Flow.name(),
         schema: Flow.schema(),
         output_schema: Flow.output_schema(),
         components: [
-          JidoActionTest.FlowComponent.step!(
+          Jido.Test.Flow.Component.step!(
             name: "normalize",
             action: Normalize,
             params: %{name: Ref.input(:name)}
           ),
-          JidoActionTest.FlowComponent.step!(
+          Jido.Test.Flow.Component.step!(
             name: "greet",
             action: Greet,
             params: %{name: Ref.result("normalize", :name)}

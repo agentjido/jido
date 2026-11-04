@@ -27,7 +27,7 @@ defmodule Jido.Flow.InlineTest.LateHook do
                       name: "late_inline_flow"
                     ) do
                       step "increment",
-                        action: JidoActionTest.Fixtures.Actions.Add,
+                        action: Jido.Test.Action.Fixtures.Actions.Add,
                         params: %{value: input(:value), amount: 1}
 
                       output result("increment")
@@ -51,7 +51,7 @@ defmodule Jido.Flow.InlineTest.Extension do
   defmacro add(name, value, amount) do
     quote do
       step unquote(name),
-        action: JidoActionTest.Fixtures.Actions.Add,
+        action: Jido.Test.Action.Fixtures.Actions.Add,
         params: %{value: unquote(value), amount: unquote(amount)}
     end
   end
@@ -144,7 +144,7 @@ defmodule Jido.Flow.InlineTest do
 
       Jido.Flow.InlineTest.Host.define #{inspect(path)}, [name: "first"] do
         step "first",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 1, amount: 1}
 
         output result("first")
@@ -152,7 +152,7 @@ defmodule Jido.Flow.InlineTest do
 
       Jido.Flow.InlineTest.Host.define #{inspect(path)}, [name: "second"] do
         step "second",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 1, amount: 1}
 
         output result("second")
@@ -186,7 +186,7 @@ defmodule Jido.Flow.InlineTest do
 
       Jido.Flow.InlineTest.Host.define #{inspect(path)}, [name: "invalid"] do
         step "increment",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: input(:value), amount: 1}
 
         output result("missing")
@@ -236,7 +236,7 @@ defmodule Jido.Flow.InlineTest do
         output_schema: @output_schema
       ) do
         step "increment",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: input(:value), amount: 1}
 
         output result("increment")
@@ -271,7 +271,7 @@ defmodule Jido.Flow.InlineTest do
 
       Jido.Flow.InlineTest.Host.define #{inspect(declaration_path)}, [name: "scope"] do
         step "owner_step",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: helper(), amount: 1}
 
         output result("owner_step")
@@ -301,7 +301,7 @@ defmodule Jido.Flow.InlineTest do
 
       Jido.Flow.InlineTest.Host.define #{inspect(attribute_path)}, [name: "scope"] do
         step @step_name,
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 1, amount: 1}
 
         output result(@step_name)
@@ -339,7 +339,7 @@ defmodule Jido.Flow.InlineTest do
 
       @first (Jido.Flow.InlineTest.Host.define #{inspect(first)}, [name: "first"] do
         step "first",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 0, amount: 1}
 
         output result("first")
@@ -347,7 +347,7 @@ defmodule Jido.Flow.InlineTest do
 
       @second (Jido.Flow.InlineTest.Host.define #{inspect(second)}, [name: "second"] do
         step "second",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 0, amount: 2}
 
         output result("second")
@@ -548,7 +548,7 @@ defmodule Jido.Flow.InlineTest do
           """
           Jido.Flow.InlineTest.Host.define #{inspect(declaration_path)}, [name: "shared"] do
             step "work",
-              action: JidoActionTest.Fixtures.Actions.Add,
+              action: Jido.Test.Action.Fixtures.Actions.Add,
               params: %{value: 0, amount: 1}
 
             output result("work")
@@ -841,7 +841,7 @@ defmodule Jido.Flow.InlineTest do
 
       @target (Jido.Flow.InlineTest.Host.define #{inspect(declaration_path)}, [name: #{inspect(name)}] do
         step "increment",
-          action: JidoActionTest.Fixtures.Actions.Add,
+          action: Jido.Test.Action.Fixtures.Actions.Add,
           params: %{value: 1, amount: #{amount}}
 
         #{output}

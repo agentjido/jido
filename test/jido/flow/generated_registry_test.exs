@@ -3,13 +3,13 @@ defmodule Jido.Flow.GeneratedRegistryTest do
   @moduletag obligation: "jido_action.codec.I6"
 
   alias Jido.Catalog
-  alias JidoActionTest.FlowCodec, as: Codec
+  alias Jido.Test.Flow.Codec, as: Codec
   alias Jido.Error.ValidationError
   alias Jido.Flow.Ref
-  alias JidoActionTest.Fixtures.FlowAuthoring
-  alias JidoActionTest.Fixtures.InlineParityFlow
-  alias JidoActionTest.Fixtures.NestedFlow
-  alias JidoActionTest.Fixtures.Actions.{Add, Multiply}
+  alias Jido.Test.Flow.Fixtures.FlowAuthoring
+  alias Jido.Test.Flow.Fixtures.InlineParityFlow
+  alias Jido.Test.Flow.Fixtures.NestedFlow
+  alias Jido.Test.Action.Fixtures.Actions.{Add, Multiply}
 
   test "encode builds one deterministic temporary Catalog" do
     flow = FlowAuthoring.mixed_flow!()
@@ -54,7 +54,7 @@ defmodule Jido.Flow.GeneratedRegistryTest do
       |> Enum.max_by(&Atom.to_string/1)
 
     subset =
-      JidoActionTest.FlowBuilder.new!(%{
+      Jido.Test.Flow.Builder.new!(%{
         name: "inline_registry_subset",
         components: [%{kind: :step, name: "only", action: action}],
         output: Ref.result("only")
@@ -70,7 +70,7 @@ defmodule Jido.Flow.GeneratedRegistryTest do
 
   test "generated Catalog leaves target contracts to Exec" do
     flow =
-      JidoActionTest.FlowBuilder.new!(%{
+      Jido.Test.Flow.Builder.new!(%{
         name: "invalid_target",
         components: [%{kind: :step, name: "invalid", action: String}],
         output: Ref.result("invalid")

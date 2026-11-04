@@ -3,7 +3,7 @@ defmodule JidoTest.Persistence.TokenTest do
 
   alias Jido.Persistence
   alias Jido.Persistence.Record
-  alias JidoTest.AgentFixtures.CounterAgent
+  alias Jido.Test.AgentServer.Fixtures.CounterAgent
 
   defmodule TokenAdapter do
     @behaviour Jido.Persistence.Store

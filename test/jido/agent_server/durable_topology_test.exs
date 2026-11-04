@@ -1,11 +1,11 @@
 defmodule JidoTest.AgentServer.DurableTopologyTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :tmp_dir
   @moduletag capture_log: true
 
   alias Jido.Agent.Directive, as: D
   alias Jido.AgentServer, as: Server
-  alias JidoTest.DurableFixtures, as: F
+  alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   setup do
     start_supervised!({F.Probe, self()})

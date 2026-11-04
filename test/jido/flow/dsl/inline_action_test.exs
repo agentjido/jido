@@ -4,7 +4,7 @@ defmodule Jido.Flow.DSL.InlineActionTest do
   alias Jido.Action.Inline
 
   defmodule Downstream do
-    use JidoActionTest.Fixtures.Action.InlineHost, mode: :callback
+    use Jido.Test.Action.Fixtures.Action.InlineHost, mode: :callback
 
     action "add", nil do
       %{value: value, amount: amount} -> {:ok, %{value: value + amount}}
@@ -226,7 +226,7 @@ defmodule Jido.Flow.DSL.InlineActionTest do
   @tag obligation: "jido_action.inline.I2"
   test "inline Step fields reject named Action fields" do
     for field <- [
-          "action: JidoActionTest.Fixtures.Actions.Add",
+          "action: Jido.Test.Action.Fixtures.Actions.Add",
           "params: %{value: 1}"
         ] do
       owner = unique_owner()
@@ -267,12 +267,12 @@ defmodule Jido.Flow.DSL.InlineActionTest do
           condition true
           action [], do: {:ok, %{value: 1}}
         end
-        otherwise action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 0}
+        otherwise action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 0}
       end
       """,
       """
       choice "increment" do
-        option "selected", condition: false, action: JidoActionTest.Fixtures.Actions.Add, params: %{value: 0}
+        option "selected", condition: false, action: Jido.Test.Action.Fixtures.Actions.Add, params: %{value: 0}
         otherwise do
           action [], do: {:ok, %{value: 1}}
         end
@@ -288,19 +288,19 @@ defmodule Jido.Flow.DSL.InlineActionTest do
       """
       invoke "increment" do
         decision value <- input(:value), do: {:ok, %{value: value}}
-        expander JidoActionTest.Fixtures.Actions.Add
+        expander Jido.Test.Action.Fixtures.Actions.Add
       end
       """,
       """
       invoke "increment" do
-        decision JidoActionTest.Fixtures.Actions.Add
+        decision Jido.Test.Action.Fixtures.Actions.Add
         params %{value: input(:value)}
         expander value, do: {:ok, value}
       end
       """,
       """
       invoke "increment" do
-        decision JidoActionTest.Fixtures.Actions.Add
+        decision Jido.Test.Action.Fixtures.Actions.Add
         params %{value: input(:value)}
         expander do
           {:ok, %{value: 1}}
@@ -309,7 +309,7 @@ defmodule Jido.Flow.DSL.InlineActionTest do
       """,
       """
       invoke "increment" do
-        decision JidoActionTest.Fixtures.Actions.Add
+        decision Jido.Test.Action.Fixtures.Actions.Add
         params %{value: input(:value)}
         expander do
           %{value: value} -> {:ok, %{value: value}}
@@ -338,7 +338,7 @@ defmodule Jido.Flow.DSL.InlineActionTest do
     end
   end
 
-  for target <- [JidoActionTest.Fixtures.Actions.Add, Downstream.action_target("add")] do
+  for target <- [Jido.Test.Action.Fixtures.Actions.Add, Downstream.action_target("add")] do
     @tag target: target
     @tag obligation: "jido_action.inline.I2"
     test "advanced components accept Action module #{inspect(target)}", %{target: target} do

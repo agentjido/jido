@@ -89,7 +89,7 @@ defmodule JidoTest.Property.Signal.DiagnosticsTest do
         ~T[12:00:00],
         ~N[2026-09-29 12:00:00],
         ~U[2026-09-29 12:00:00Z]
-      ] ++ JidoSignalTest.Fixtures.Diagnostics.values()
+      ] ++ Jido.Test.Signal.Fixtures.Diagnostics.values()
 
     for {profile, max_binary, max_items, max_depth} <- [
           {:telemetry, 160, 10, 3},

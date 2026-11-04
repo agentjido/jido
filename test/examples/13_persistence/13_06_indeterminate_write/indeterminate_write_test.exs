@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("13_persistence/13_06_indeterminate_write/indeterminate_write_probe.ex")
 
 defmodule JidoTest.Examples.Persistence.IndeterminateWriteTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -15,7 +15,7 @@ defmodule JidoTest.Examples.Persistence.IndeterminateWriteTest do
 
   alias Jido.Examples.Persistence.IndeterminateWrite, as: Probe
   alias Jido.Persistence
-  alias JidoTest.Persistence.ProbeStore
+  alias Jido.Test.Persistence.ProbeStore
 
   test "an uncertain stored write blocks output and later evaluation on stale state", %{
     jido: jido
@@ -27,7 +27,7 @@ defmodule JidoTest.Examples.Persistence.IndeterminateWriteTest do
     context = %{reply_to: observer}
 
     assert {:ok, server} =
-             JidoTest.ExampleRuntime.start_agent(jido, Probe,
+             Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Probe,
                id: id,
                persistence: {ProbeStore, Keyword.put(opts, :write_result, :indeterminate)},
                persistence_mode: :create

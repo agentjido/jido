@@ -1,5 +1,5 @@
 defmodule JidoTest.Persistence.MnesiaDiskRestartTest do
-  use JidoTest.PeerCase, async: false
+  use Jido.Test.AgentServer.PeerCase, async: false
 
   alias Jido.Persistence.{Mnesia, Store}
 

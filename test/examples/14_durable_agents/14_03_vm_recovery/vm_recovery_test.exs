@@ -7,7 +7,7 @@ Code.require_file("../../support/durable_step_probe.exs", __DIR__)
 Code.require_file("../../support/durable_peer.exs", __DIR__)
 
 defmodule JidoTest.Examples.Durable.VMRecoveryTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
@@ -107,7 +107,7 @@ defmodule JidoTest.Examples.Durable.VMRecoveryTest do
     eventually(
       fn ->
         records =
-          :peer.call(peer, StepProbe, :records, [], JidoTest.Eventually.remaining_timeout(5_000))
+          :peer.call(peer, StepProbe, :records, [], Jido.Test.Eventually.remaining_timeout(5_000))
 
         if List.last(records.started) == {6, 5} and records.completed == completed, do: records
       end,

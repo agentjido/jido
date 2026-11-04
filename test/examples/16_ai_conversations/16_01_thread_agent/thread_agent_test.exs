@@ -4,7 +4,7 @@ unless Code.ensure_loaded?(JidoTest.Examples.AIModel), do: Code.require_file("..
 JidoTest.Examples.Loader.require_source!("16_ai_conversations/16_01_thread_agent/thread_agent.ex")
 
 defmodule JidoTest.Examples.AI.ThreadAgentTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   import Mimic
 
   @moduletag :example

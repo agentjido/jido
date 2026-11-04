@@ -5,7 +5,7 @@ Loader.require_source!("09_multi_agent/support/worker.ex")
 Loader.require_source!("09_multi_agent/09_03_orphan_adoption/orphan_adoption.ex")
 
 defmodule JidoTest.Examples.MultiAgent.OrphanAdoptionTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
@@ -18,7 +18,7 @@ defmodule JidoTest.Examples.MultiAgent.OrphanAdoptionTest do
 
   test "the continue policy leaves a live unattached worker", %{jido: jido} do
     {:ok, parent} =
-      JidoTest.ExampleRuntime.start_agent(jido, Parent, id: unique_id("continue-parent"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Parent, id: unique_id("continue-parent"))
 
     assert {:ok, worker} = Parent.start_worker(parent, :continue)
     monitor = Process.monitor(worker)
@@ -31,7 +31,7 @@ defmodule JidoTest.Examples.MultiAgent.OrphanAdoptionTest do
 
   test "an orphan notification precedes adoption by a new owner", %{jido: jido} do
     {:ok, parent} =
-      JidoTest.ExampleRuntime.start_agent(jido, Parent, id: unique_id("former-parent"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Parent, id: unique_id("former-parent"))
 
     parent_id = Server.agent(parent).id
 
@@ -50,7 +50,7 @@ defmodule JidoTest.Examples.MultiAgent.OrphanAdoptionTest do
 
     eventually(fn -> Server.status(worker).parent == nil end)
 
-    {:ok, adopter} = JidoTest.ExampleRuntime.start_agent(jido, Parent, id: unique_id("adopter"))
+    {:ok, adopter} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Parent, id: unique_id("adopter"))
     assert :ok = Server.adopt_child(adopter, worker, :adopted)
     assert %{pid: ^worker, placement: :independent} = Server.children(adopter).adopted
     assert Server.status(worker).parent.agent_id == Server.agent(adopter).id

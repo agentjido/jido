@@ -2,8 +2,8 @@ defmodule Jido.Exec.DefaultConcurrencyTest do
   use Covenant.Case, component: "jido_action.boundary", async: false
 
   alias Jido.Exec
-  alias JidoActionTest.Fixtures.Actions.Add
-  alias JidoActionTest.Fixtures.ConcurrencyProbeAction
+  alias Jido.Test.Action.Fixtures.Actions.Add
+  alias Jido.Test.Action.Fixtures.ConcurrencyProbeAction
 
   setup do
     previous = Application.fetch_env(:jido, :max_concurrency)

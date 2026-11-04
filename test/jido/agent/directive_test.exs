@@ -92,18 +92,18 @@ defmodule Jido.Agent.DirectiveContractTest do
       Directive.reply(reply),
       Directive.parent_send(signal),
       Directive.agent_send(:child, signal),
-      Runtime.agent_start(JidoTest.AgentFixtures.CounterAgent, :child),
+      Runtime.agent_start(Jido.Test.AgentServer.Fixtures.CounterAgent, :child),
       Runtime.agent_stop(:child),
       Runtime.error_report(:failed, :action),
       Runtime.process_start({Elixir.Agent, fn -> 0 end}),
       Directive.server_stop(),
-      Directive.agent_add(:child, JidoTest.AgentFixtures.CounterAgent),
+      Directive.agent_add(:child, Jido.Test.AgentServer.Fixtures.CounterAgent),
       Directive.agent_remove(:child),
-      Directive.route_add("event", JidoTest.AgentContract.Add, state: %{source: :output, path: []}),
+      Directive.route_add("event", Jido.Test.Agent.Contract.Add, state: %{source: :output, path: []}),
       Directive.route_remove("event"),
       Directive.connection_add("event", from: :root, to: :child),
       Directive.connection_remove("event", from: :root, to: :child),
-      Directive.plugin_add(JidoTest.AgentContract.Stateless)
+      Directive.plugin_add(Jido.Test.Agent.Contract.Stateless)
     ]
 
     for directive <- directives do
@@ -237,25 +237,25 @@ defmodule Jido.Agent.DirectiveContractTest do
     assert {:error, _} = Directive.emit("event", [])
 
     assert %{count: 2, initial_state: %{count: 1}} =
-             Directive.agent_add(:child, JidoTest.AgentFixtures.CounterAgent,
+             Directive.agent_add(:child, Jido.Test.AgentServer.Fixtures.CounterAgent,
                count: 2,
                initial_state: %{count: 1}
              )
 
     assert %{count: 3, initial_state: %{count: 2}} =
-             Directive.agent_replace(:child, JidoTest.AgentFixtures.CounterAgent,
+             Directive.agent_replace(:child, Jido.Test.AgentServer.Fixtures.CounterAgent,
                count: 3,
                initial_state: %{count: 2}
              )
 
     assert %{as: :run, defaults: %{amount: 1}} =
-             Directive.route_add("run", JidoTest.AgentContract.Add,
+             Directive.route_add("run", Jido.Test.Agent.Contract.Add,
                as: :run,
                defaults: %{amount: 1}
              )
 
     assert %{as: :next, defaults: %{amount: 2}} =
-             Directive.route_replace("run", JidoTest.AgentContract.Add,
+             Directive.route_replace("run", Jido.Test.Agent.Contract.Add,
                as: :next,
                defaults: %{amount: 2}
              )
@@ -271,13 +271,13 @@ defmodule Jido.Agent.DirectiveContractTest do
              )
 
     assert %{options: [start: 1], initial: :default} =
-             Directive.plugin_add(JidoTest.AgentContract.First, start: 1)
+             Directive.plugin_add(Jido.Test.Agent.Contract.First, start: 1)
 
     assert %{options: [], initial: {:value, nil}} =
-             Directive.plugin_add(JidoTest.AgentContract.First, [], initial: nil)
+             Directive.plugin_add(Jido.Test.Agent.Contract.First, [], initial: nil)
 
     assert_raise ArgumentError, fn ->
-      Directive.plugin_add(JidoTest.AgentContract.First, [], initial: 1, initial: 2)
+      Directive.plugin_add(Jido.Test.Agent.Contract.First, [], initial: 1, initial: 2)
     end
   end
 end
@@ -306,7 +306,7 @@ defmodule Jido.AgentServer.DirectiveTest do
     assert {:error, message} = Jido.AgentServer.Directive.AgentStart.validate_options([])
     assert message =~ "opts must be a map"
     assert {:error, {:invalid_agent, 42}} = Jido.AgentServer.Directive.AgentStart.validate_target(42)
-    agent = JidoTest.AgentFixtures.CounterAgent.instantiate!(id: "invalid-target")
+    agent = Jido.Test.AgentServer.Fixtures.CounterAgent.instantiate!(id: "invalid-target")
     invalid = %{agent | state: %{count: :invalid, history: []}}
     assert {:error, _} = Jido.AgentServer.Directive.AgentStart.validate_target(invalid)
 
@@ -327,7 +327,7 @@ defmodule Jido.AgentServer.DirectiveTest do
           %{restart: :permanent}
         ] do
       assert_raise ArgumentError, fn ->
-        Jido.AgentServer.Directive.agent_start(JidoTest.AgentFixtures.CounterAgent, :child, opts)
+        Jido.AgentServer.Directive.agent_start(Jido.Test.AgentServer.Fixtures.CounterAgent, :child, opts)
       end
     end
   end
@@ -338,7 +338,7 @@ defmodule Jido.AgentServer.DirectiveTest do
           {[id: "child"], [role: :worker]}
         ] do
       directive =
-        Jido.AgentServer.Directive.agent_start(JidoTest.AgentFixtures.CounterAgent, :child,
+        Jido.AgentServer.Directive.agent_start(Jido.Test.AgentServer.Fixtures.CounterAgent, :child,
           node: node(),
           opts: opts,
           meta: meta,

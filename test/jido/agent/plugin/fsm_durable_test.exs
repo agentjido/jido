@@ -1,5 +1,5 @@
 defmodule Jido.Agent.Plugin.FSMDurableTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   @moduletag :tmp_dir
 

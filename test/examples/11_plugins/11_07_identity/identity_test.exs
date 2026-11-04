@@ -6,7 +6,7 @@ Loader.require_source!("11_plugins/11_07_identity/identity_plugin.ex")
 Loader.require_source!("11_plugins/11_07_identity/identity.ex")
 
 defmodule JidoTest.Examples.Plugins.IdentityTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
@@ -25,7 +25,7 @@ defmodule JidoTest.Examples.Plugins.IdentityTest do
     {agent_public, _agent_private} = Crypto.agent_key_pair()
 
     {:ok, agent_server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("identity"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent, id: unique_id("identity"))
 
     unsigned =
       Signal.new!(
@@ -54,14 +54,14 @@ defmodule JidoTest.Examples.Plugins.IdentityTest do
     assert Server.agent(agent_server).state.accepted == 1
 
     activation = Server.activation(agent_server)
-    old_runtime = JidoTest.ExampleRuntime.plugin(activation, Plugin)
+    old_runtime = Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Plugin)
     old_runtime_ref = Process.monitor(old_runtime)
     Process.exit(old_runtime, :kill)
     assert_receive {:DOWN, ^old_runtime_ref, :process, ^old_runtime, :killed}
 
     replacement_runtime =
       eventually(fn ->
-        case JidoTest.ExampleRuntime.plugin(activation, Plugin) do
+        case Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Plugin) do
           pid when is_pid(pid) and pid != old_runtime -> pid
           _child -> nil
         end

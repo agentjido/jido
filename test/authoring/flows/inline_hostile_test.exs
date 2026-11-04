@@ -3,7 +3,7 @@ defmodule JidoActionTest.Authoring.InlineHostileTest do
   @moduletag :authoring
 
   alias Jido.Exec
-  alias JidoTest.AuthoringCompiler
+  alias Jido.Test.Flow.AuthoringCompiler
 
   test "invalid bindings and duplicate inline names point to the source declaration" do
     cases = [

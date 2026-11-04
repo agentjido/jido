@@ -9,7 +9,7 @@ defmodule JidoTest.Examples.Runtime.TurnControlBlockingAction do
     name: "test_runtime_turn_control_blocking_action",
     schema: Jido.Joi.object(%{name: Jido.Joi.string() |> Jido.Joi.min(1)})
 
-  alias JidoTest.Examples.RuntimeBarrier
+  alias Jido.Test.AgentServer.RuntimeBarrier
 
   def run(%{name: name}, context) do
     :ok = RuntimeBarrier.wait()
@@ -35,7 +35,7 @@ defmodule JidoTest.Examples.Runtime.TurnControlBlockingAgent do
 end
 
 defmodule JidoTest.Examples.Runtime.TurnControlTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
@@ -45,7 +45,7 @@ defmodule JidoTest.Examples.Runtime.TurnControlTest do
 
   alias Jido.AgentServer
   alias JidoTest.Examples.Runtime.TurnControlBlockingAgent
-  alias JidoTest.Examples.RuntimeBarrier
+  alias Jido.Test.AgentServer.RuntimeBarrier
 
   setup do
     start_supervised!(RuntimeBarrier)
@@ -54,7 +54,7 @@ defmodule JidoTest.Examples.Runtime.TurnControlTest do
 
   test "public status identifies and cancels only the matching active Turn", %{jido: jido} do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, TurnControlBlockingAgent, id: unique_id("turn-control"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, TurnControlBlockingAgent, id: unique_id("turn-control"))
 
     :ok = RuntimeBarrier.arm(self())
 
@@ -89,7 +89,7 @@ defmodule JidoTest.Examples.Runtime.TurnControlTest do
 
   defp blocked(jido) do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, TurnControlBlockingAgent, id: unique_id())
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, TurnControlBlockingAgent, id: unique_id())
 
     :ok = RuntimeBarrier.arm(self())
     pending = AgentServer.submit(server, complete("active"))

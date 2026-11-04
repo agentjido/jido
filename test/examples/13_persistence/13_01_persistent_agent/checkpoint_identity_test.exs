@@ -5,7 +5,7 @@ Loader.require_source!("13_persistence/13_01_persistent_agent/checkpoint_identit
 Loader.require_source!("13_persistence/13_01_persistent_agent/persistent_agent.ex")
 
 defmodule JidoTest.Examples.Persistence.CheckpointIdentityTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -16,7 +16,7 @@ defmodule JidoTest.Examples.Persistence.CheckpointIdentityTest do
 
   alias Jido.Examples.Persistence.CheckpointIdentity, as: Probe
   alias Jido.Persistence
-  alias JidoTest.Persistence.ProbeStore
+  alias Jido.Test.Persistence.ProbeStore
 
   test "load rejects a checkpoint whose Agent ID differs from the requested ID" do
     store = {ProbeStore, store: start_supervised!(ProbeStore)}

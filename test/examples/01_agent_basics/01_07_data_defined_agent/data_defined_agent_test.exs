@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("01_agent_basics/01_07_data_defined_agent/data_defined_agent.ex")
 
 defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -21,12 +21,12 @@ defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
     {document, registry} = Example.encode()
 
     assert {:ok, definition} =
-             JidoTest.AgentRegistry.decode(Jason.decode!(Jason.encode!(document)), registry)
+             Jido.Test.AgentServer.Registry.decode(Jason.decode!(Jason.encode!(document)), registry)
 
     assert definition == Example.definition()
     direct = Agent.instantiate!(definition, id: unique_id("direct"))
     live = Agent.instantiate!(definition, id: unique_id("live"))
-    {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, live)
+    {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, live)
     assert :ok = Server.await_ready(server)
     assert {:ok, candidate, []} = Agent.cmd(direct, Example.signal!(3))
     assert {:ok, committed, []} = Server.call(server, Example.signal!(3))
@@ -48,7 +48,7 @@ defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
            ]
 
     instance = Agent.instantiate!(definition, id: unique_id("json-scheduler"))
-    assert {:ok, server} = JidoTest.ExampleRuntime.start_agent(jido, instance)
+    assert {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, instance)
     assert :ok = Server.await_ready(server)
     assert {:ok, %{cron: %{}}} = Server.plugin_state(server, Scheduler)
 
@@ -89,7 +89,7 @@ defmodule JidoTest.Examples.Basic.DataDefinedAgentTest do
     assert definition.id == nil and definition.state == nil
     instance = Agent.instantiate!(definition, id: "stored-counter")
     assert {:ok, changed, []} = Agent.cmd(instance, Example.signal!(3))
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(changed, Example.registry())
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(changed, Example.registry())
     assert {:ok, restored} = Example.from_json(Jason.encode!(document))
     assert restored == definition
     assert restored.id == nil and restored.state == nil

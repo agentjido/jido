@@ -3,7 +3,7 @@ Code.require_file("../../support/loader.exs", __DIR__)
 JidoTest.Examples.Loader.require_source!("15_ai_basics/15_09_json_agent/json_agent.ex")
 
 defmodule JidoTest.Examples.AI.JSONAgentTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   @moduletag :example
 

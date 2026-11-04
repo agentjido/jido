@@ -3,7 +3,7 @@ defmodule Jido.Flow.ParallelTest.DSLFlow do
 
   use Jido.Flow, name: "parallel_dsl"
 
-  alias JidoActionTest.Fixtures.Actions.{Add, Multiply}
+  alias Jido.Test.Action.Fixtures.Actions.{Add, Multiply}
 
   flow do
     parallel "tools" do
@@ -68,9 +68,9 @@ defmodule Jido.Flow.ParallelTest do
   alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
-  alias JidoActionTest.Fixtures.Actions.{Add, Multiply}
-  alias JidoActionTest.Fixtures.CodecRegistry
-  alias JidoActionTest.FlowCodec, as: Codec
+  alias Jido.Test.Action.Fixtures.Actions.{Add, Multiply}
+  alias Jido.Test.Codec.Fixtures.CodecRegistry
+  alias Jido.Test.Flow.Codec, as: Codec
   alias Runic.Workflow.SingleOutput.{Context, Result}
 
   defmodule Fail do
@@ -419,9 +419,9 @@ defmodule Jido.Flow.ParallelTest do
   @tag obligation: "jido_action.flow.I7"
   test "the Parallel DSL accepts only Action declarations" do
     for declaration <- [
-          ~s|step "nested", action: JidoActionTest.Fixtures.Actions.Add, params: %{}|,
-          ~s|map "nested", collection: [], action: JidoActionTest.Fixtures.Actions.Add, params: %{}|,
-          ~s|parallel "nested", do: action("work", JidoActionTest.Fixtures.Actions.Add, params: %{})|,
+          ~s|step "nested", action: Jido.Test.Action.Fixtures.Actions.Add, params: %{}|,
+          ~s|map "nested", collection: [], action: Jido.Test.Action.Fixtures.Actions.Add, params: %{}|,
+          ~s|parallel "nested", do: action("work", Jido.Test.Action.Fixtures.Actions.Add, params: %{})|,
           ~s|flow(do: output(%{}))|
         ] do
       ExUnit.CaptureIO.capture_io(:stderr, fn ->
@@ -452,7 +452,7 @@ defmodule Jido.Flow.ParallelTest do
       assert_raise CompileError, ~r/wrong target kind/, fn ->
         compile_parallel("""
         parallel "tools" do
-          action "nested", JidoActionTest.Fixtures.NestedFlow, params: %{}
+          action "nested", Jido.Test.Flow.Fixtures.NestedFlow, params: %{}
         end
         """)
       end

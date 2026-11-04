@@ -9,7 +9,7 @@ Loader.require_source!("12_plugin_applications/12_04_approval_workflow/search_fl
 Loader.require_source!("12_plugin_applications/12_04_approval_workflow/approval_workflow.ex")
 
 defmodule JidoTest.Examples.Applications.ApprovalWorkflowTest do
-  use JidoTest.WorkflowSDKCase
+  use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do

@@ -1,5 +1,5 @@
 defmodule Jido.Signal.Bus.CallTimeoutTest do
-  use JidoSignalTest.Case, async: false
+  use Jido.Test.Signal.Case, async: false
 
   alias Jido.Signal.Bus
   alias Jido.Signal.Bus.Store.Memory

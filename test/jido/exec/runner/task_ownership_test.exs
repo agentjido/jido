@@ -3,7 +3,7 @@ defmodule Jido.Exec.Runner.TaskOwnershipTest do
   @moduletag obligation: "jido_action.execution.I20"
 
   alias Jido.Exec
-  alias JidoActionTest.Fixtures.Actions.KillingAction
+  alias Jido.Test.Action.Fixtures.Actions.KillingAction
 
   defmodule BlockingAction do
     use Jido.Action, name: "exec_blocking"
@@ -128,7 +128,7 @@ defmodule Jido.Exec.Runner.TaskOwnershipTest do
     hooks = [on_idle: fn _state -> send(test_pid, :managed_idle) end]
 
     assert {:ok, worker} =
-             Exec.start(runner, execution_id, JidoActionTest.Fixtures.Actions.Add, params, %{}, hooks: hooks)
+             Exec.start(runner, execution_id, Jido.Test.Action.Fixtures.Actions.Add, params, %{}, hooks: hooks)
 
     assert_receive :managed_idle, 1_000
     assert %{executor_state: %{tasks: tasks}} = :sys.get_state(worker)

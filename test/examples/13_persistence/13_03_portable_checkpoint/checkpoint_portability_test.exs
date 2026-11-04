@@ -4,7 +4,7 @@ alias JidoTest.Examples.Loader
 Loader.require_source!("13_persistence/13_03_portable_checkpoint/checkpoint_portability_probe.ex")
 
 defmodule JidoTest.Examples.Persistence.PortableCheckpointTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -15,7 +15,7 @@ defmodule JidoTest.Examples.Persistence.PortableCheckpointTest do
 
   alias Jido.Examples.Persistence.PortableCheckpoint, as: Probe
   alias Jido.Persistence
-  alias JidoTest.Persistence.ProbeStore
+  alias Jido.Test.Persistence.ProbeStore
 
   test "load rejects a process handle inserted into a stored checkpoint" do
     store = {ProbeStore, store: start_supervised!(ProbeStore)}

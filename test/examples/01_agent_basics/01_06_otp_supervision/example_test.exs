@@ -5,7 +5,7 @@ Loader.require_source!("01_agent_basics/01_06_otp_supervision/example.ex")
 Loader.require_source!("01_agent_basics/01_06_otp_supervision/application.ex")
 
 defmodule Jido.Examples.OTPSupervisionTest do
-  use JidoTest.BasicSDKCase
+  use Jido.Test.Agent.BasicSDKCase
   @moduletag :example
 
   setup_all do

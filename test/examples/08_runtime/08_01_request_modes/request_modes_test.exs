@@ -9,7 +9,7 @@ defmodule JidoTest.Examples.Runtime.RequestModesBlockingAction do
     name: "test_runtime_request_modes_blocking_action",
     schema: Jido.Joi.object(%{label: Jido.Joi.string() |> Jido.Joi.min(1)})
 
-  alias JidoTest.Examples.RuntimeBarrier
+  alias Jido.Test.AgentServer.RuntimeBarrier
 
   def run(%{label: label}, context) do
     :ok = RuntimeBarrier.wait()
@@ -35,7 +35,7 @@ defmodule JidoTest.Examples.Runtime.RequestModesBlockingAgent do
 end
 
 defmodule JidoTest.Examples.Runtime.RequestModesTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do
@@ -46,7 +46,7 @@ defmodule JidoTest.Examples.Runtime.RequestModesTest do
   alias Jido.AgentServer
   alias Jido.Examples.RequestModes
   alias JidoTest.Examples.Runtime.RequestModesBlockingAgent
-  alias JidoTest.Examples.RuntimeBarrier
+  alias Jido.Test.AgentServer.RuntimeBarrier
 
   setup do
     start_supervised!(RuntimeBarrier)
@@ -55,7 +55,7 @@ defmodule JidoTest.Examples.Runtime.RequestModesTest do
 
   test "call, cast, and asynchronous request expose their result contracts", %{jido: jido} do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, RequestModes, id: unique_id("request-modes"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, RequestModes, id: unique_id("request-modes"))
 
     {:ok, call_signal} = RequestModes.record_signal(%{label: "call"})
     assert {:ok, called, _directives} = AgentServer.call(server, call_signal)
@@ -72,7 +72,7 @@ defmodule JidoTest.Examples.Runtime.RequestModesTest do
 
   test "several admitted asynchronous requests commit in serial order", %{jido: jido} do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, RequestModes, id: unique_id("request-order"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, RequestModes, id: unique_id("request-order"))
 
     requests =
       for label <- ~w[first second third] do
@@ -91,7 +91,9 @@ defmodule JidoTest.Examples.Runtime.RequestModesTest do
 
   test "a caller timeout does not cancel work that already started", %{jido: jido} do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, RequestModesBlockingAgent, id: unique_id("request-timeout"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, RequestModesBlockingAgent,
+        id: unique_id("request-timeout")
+      )
 
     :ok = RuntimeBarrier.arm(self())
 
@@ -120,7 +122,7 @@ defmodule JidoTest.Examples.Runtime.RequestModesTest do
 
   defp blocked(jido, opts \\ []) do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(
         jido,
         RequestModesBlockingAgent,
         Keyword.put_new(opts, :id, unique_id())

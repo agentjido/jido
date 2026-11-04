@@ -2,7 +2,7 @@ defmodule Jido.Exec.WaitHostTest do
   use ExUnit.Case, async: false
   @moduletag capture_log: true
   alias Jido.Exec
-  alias Jido.Exec.Test.WaitHost, as: Waits
+  alias Jido.Test.Exec.WaitHost, as: Waits
   alias Jido.Flow
   alias Jido.Flow.Ref
 
@@ -278,12 +278,12 @@ defmodule Jido.Exec.WaitHostTest do
   end
 
   test "a restored equal snapshot acknowledges an equal save retry" do
-    store = Jido.Exec.Test.WaitStore.Memory.new()
+    store = Jido.Test.Exec.WaitStore.Memory.new()
     {:ok, wf} = Waits.start("saved", wait_handoff(), %{}, %{}, now: 0)
-    assert {:ok, 1} = Jido.Exec.Test.WaitStore.Memory.save("saved", 0, wf, store)
-    {:ok, 1, restored} = Jido.Exec.Test.WaitStore.Memory.load("saved", store)
-    assert {:ok, 1} = Jido.Exec.Test.WaitStore.Memory.save("saved", 0, restored, store)
-    Jido.Exec.Test.WaitStore.Memory.close(store)
+    assert {:ok, 1} = Jido.Test.Exec.WaitStore.Memory.save("saved", 0, wf, store)
+    {:ok, 1, restored} = Jido.Test.Exec.WaitStore.Memory.load("saved", store)
+    assert {:ok, 1} = Jido.Test.Exec.WaitStore.Memory.save("saved", 0, restored, store)
+    Jido.Test.Exec.WaitStore.Memory.close(store)
   end
 
   test "an unsupported selected wait is rejected before child Action I/O" do

@@ -1,7 +1,7 @@
 defmodule Jido.Codec.CompilerTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Test.CodecFixtures.{Address, NamedMap, Person}
+  alias Jido.Test.Codec.Fixtures.{Address, NamedMap, Person}
 
   test "compiles nested struct decoding from one Joi schema" do
     input = %{

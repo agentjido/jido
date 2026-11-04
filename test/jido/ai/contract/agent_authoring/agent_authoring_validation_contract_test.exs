@@ -34,7 +34,7 @@ defmodule Jido.AI.Contract.AgentAuthoringValidationTest do
     ai do
       reasoning Jido.AI.Reasoning.ReAct
       tools do
-        unexpected Jido.AITest.Tools.Add
+        unexpected Jido.Test.AI.Tools.Add
       end
     end
     """)

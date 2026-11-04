@@ -1,10 +1,10 @@
 defmodule Jido.Agent.MutationServerTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   alias Jido.Agent.Directive, as: D
   alias Jido.AgentServer, as: Server
   alias Jido.Persistence
-  alias JidoTest.AgentEvolutionFixtures, as: F
-  import JidoTest.Eventually
+  alias Jido.Test.Agent.EvolutionFixtures, as: F
+  import Jido.Test.Eventually
 
   test "a committed route mutation changes the next Turn and invalid edits preserve it", %{
     jido: jido

@@ -5,7 +5,7 @@ Loader.require_source!("14_durable_agents/14_05_saved_completion/saved_completio
 Code.require_file("../../support/durable_completion_probe.exs", __DIR__)
 
 defmodule JidoTest.Examples.Durable.SavedCompletionTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   @moduletag :example
 
   setup_all do

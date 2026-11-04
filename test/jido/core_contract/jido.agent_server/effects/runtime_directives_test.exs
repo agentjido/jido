@@ -1,15 +1,15 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.Effects.RuntimeDirectivesTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.agent_server.effects", async: true
 
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
   alias Jido.Agent.Directive, as: D
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Directive, as: R
   alias Jido.AgentServer.Effects
-  alias JidoTest.AgentEvolutionFixtures, as: E
+  alias Jido.Test.Agent.EvolutionFixtures, as: E
 
   defmodule Initializer do
     use Jido.Agent, name: "effect_initializer"

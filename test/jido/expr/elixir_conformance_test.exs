@@ -4,8 +4,8 @@ defmodule Jido.Expr.ElixirConformanceTest do
   require Jido.Expr
   alias Jido.Expr
   alias Jido.Flow.{Codec, Ref}
-  alias JidoActionTest.FlowCodec, as: Codec
-  alias JidoActionTest.Fixtures.Actions.EchoParamsAction
+  alias Jido.Test.Flow.Codec, as: Codec
+  alias Jido.Test.Action.Fixtures.Actions.EchoParamsAction
 
   # Each entry owns one accepted Elixir spelling and arity.
   @syntax [
@@ -192,9 +192,9 @@ defmodule Jido.Expr.ElixirConformanceTest do
     output = %{member: Expr.new!(:in, [1, [1.0]]), value: Expr.new!(:and, [true, 123])}
 
     flow =
-      JidoActionTest.FlowBuilder.new!(
+      Jido.Test.Flow.Builder.new!(
         name: "native_expr",
-        components: [JidoActionTest.FlowComponent.step!(name: "seed", action: EchoParamsAction)],
+        components: [Jido.Test.Flow.Component.step!(name: "seed", action: EchoParamsAction)],
         output: output
       )
 

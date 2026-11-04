@@ -70,13 +70,13 @@ defmodule Jido.Agent.VersioningTest do
           VersionedAgent.instantiate!(id: "json"),
           Agent.define!(%{name: "data", vsn: 8})
         ] do
-      registry = JidoTest.AgentRegistry.for(value)
-      assert {:ok, document} = JidoTest.AgentRegistry.encode(value, registry)
+      registry = Jido.Test.AgentServer.Registry.for(value)
+      assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(value, registry)
       assert document["vsn"] == 1
       assert document["definition"]["vsn"] == value.vsn
       expected = Agent.definition(value)
-      assert {:ok, ^expected} = JidoTest.AgentRegistry.decode(document, registry)
-      assert {:error, _} = JidoTest.AgentRegistry.decode(%{document | "vsn" => 99}, registry)
+      assert {:ok, ^expected} = Jido.Test.AgentServer.Registry.decode(document, registry)
+      assert {:error, _} = Jido.Test.AgentServer.Registry.decode(%{document | "vsn" => 99}, registry)
     end
   end
 

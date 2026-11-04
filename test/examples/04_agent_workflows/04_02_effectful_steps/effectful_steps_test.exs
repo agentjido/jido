@@ -5,7 +5,7 @@ Loader.require_source!("04_agent_workflows/04_02_effectful_steps/read_service.ex
 Loader.require_source!("04_agent_workflows/04_02_effectful_steps/effectful_steps.ex")
 
 defmodule JidoTest.Examples.Workflow.EffectfulStepsTest do
-  use JidoTest.WorkflowSDKCase
+  use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :example
 
   setup_all do

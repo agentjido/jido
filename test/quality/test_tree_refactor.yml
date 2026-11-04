@@ -29,6 +29,38 @@ u1_result:
   ex_dna:
     clone_groups: 42
     duplicated_lines: 1592
+u2_result:
+  compiled_support_roots:
+    - test/support
+  default_suite:
+    passed: 3337
+    excluded: 508
+  covenant:
+    obligations_passed: 323
+    obligations_total: 323
+  authoring_suite:
+    passed: 134
+  property_suite:
+    passed: 37
+    excluded: 13
+  fuzz_suite:
+    passed: 13
+    excluded: 37
+  example_suite:
+    passed: 260
+  system_suite:
+    passed: 5
+    excluded: 7
+  load_suite:
+    passed: 3
+  peer_suite:
+    passed: 7
+    excluded: 3838
+  bench_suite:
+    passed: 28
+  ex_dna:
+    clone_groups: 39
+    duplicated_lines: 817
 deletions:
   - removed:
       - test/property/signal/support/fuzz.exs
@@ -58,3 +90,25 @@ deletions:
       - Property BUS and EXPR contract tags and contract_cases tags
     reason: parallel_contract_vocabulary_removed
     surviving_proof: Covenant obligation tags and test/contracts records remain the behavior ownership source.
+  - removed:
+      - test/support/jido/ai/open_telemetry_tracer.ex
+    reason: duplicate_infrastructure
+    surviving_proof: test/support/jido_telemetry/open_telemetry_tracer.ex supports both status message shapes and callback fault injection.
+  - removed:
+      - Local documented_api, documented_functions, documented_types, docs, and public_module? helpers in 14 API test modules
+    reason: duplicate_infrastructure
+    surviving_proof: test/support/jido/public_api.ex and the 22 focused API tests
+  - removed:
+      - JidoTest.AgentServer.ActivationRootTest.Resource
+      - JidoTest.AgentServer.Composition.ChildrenTest.Resource
+      - JidoTest.AgentServer.ActivationRecoveryTest.Resource
+      - JidoTest.AgentServer.Durable.PersistenceTest.Resource
+      - JidoTest.InstanceRefTest.ReadyResource
+    reason: duplicate_fixture
+    surviving_proof: test/support/jido_agent_server/resource.ex and the 89 focused AgentServer and Instance tests
+  - removed:
+      - test/jido/support as a compiled root
+      - test/fixtures as a mixed ordinary-fixture and isolated-consumer root
+      - JidoActionTest, JidoSignalTest, JidoTest, Jido.AITest, and Jido.Exec.Test compiled support namespaces
+    reason: legacy_structure_removed
+    surviving_proof: test/support is the only compiled support root, helpers use Jido.Test, and test/consumers/inline_consumer remains isolated.

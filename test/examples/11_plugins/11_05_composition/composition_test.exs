@@ -5,7 +5,7 @@ Loader.require_source!("11_plugins/11_05_composition/inputs.ex")
 Loader.require_source!("11_plugins/11_05_composition/composition.ex")
 
 defmodule JidoTest.Examples.Plugins.CompositionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   @moduletag :example
 
   setup_all do
@@ -19,7 +19,7 @@ defmodule JidoTest.Examples.Plugins.CompositionTest do
 
   test "pure and live package inputs remain isolated", %{jido: jido} do
     {:ok, server} =
-      JidoTest.ExampleRuntime.start_agent(jido, Agent, id: unique_id("plugin-composition"))
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent, id: unique_id("plugin-composition"))
 
     source =
       Signal.new!("examples.plugins.composition.accept", %{token: "allow"},

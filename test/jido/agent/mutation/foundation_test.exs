@@ -3,7 +3,7 @@ defmodule Jido.Agent.MutationFoundationTest do
   alias Jido.Agent
   alias Jido.Agent.{Diff, Mutation}
   alias Jido.Agent.Directive, as: D
-  alias JidoTest.AgentEvolutionFixtures, as: F
+  alias Jido.Test.Agent.EvolutionFixtures, as: F
 
   @tag obligation: "jido.agent.I27"
   test "Diff reports exact final values and order for each collection and state" do

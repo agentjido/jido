@@ -1,5 +1,5 @@
 defmodule Jido.Agent.StatelessDirectiveTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.AgentServer, as: Server
   alias Jido.Signal
@@ -89,7 +89,7 @@ defmodule Jido.Agent.StatelessDirectiveTest do
   end
 
   test "a handler without a Plugin process sends its result through another Turn", %{jido: jido} do
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, Agent)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, Agent)
     refute Map.has_key?(Server.children(server), {:plugin, Effects})
 
     assert {:ok, committed, _} =

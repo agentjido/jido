@@ -9,7 +9,7 @@ defmodule JidoTest.System.ActionFlow.ExecTest do
   defmodule MathFlow do
     use Jido.Flow, name: "system_math_flow"
 
-    alias JidoActionTest.Fixtures.Actions.{Add, Multiply}
+    alias Jido.Test.Action.Fixtures.Actions.{Add, Multiply}
 
     flow do
       step "add", action: Add, params: %{value: input(:value), amount: 1}

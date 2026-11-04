@@ -4,7 +4,7 @@ defmodule Jido.Exec.CompilerTest do
   alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
-  alias JidoActionTest.Fixtures.Actions.{Add, EchoParamsAction, FullAction, Multiply}
+  alias Jido.Test.Action.Fixtures.Actions.{Add, EchoParamsAction, FullAction, Multiply}
   alias Runic.Workflow
 
   defmodule Effect do
@@ -147,7 +147,7 @@ defmodule Jido.Exec.CompilerTest do
           %{
             kind: :subflow,
             name: "inner",
-            flow: JidoActionTest.Fixtures.NestedFlow,
+            flow: Jido.Test.Flow.Fixtures.NestedFlow,
             params: %{value: Ref.input(:value)}
           },
           step("after", Multiply, %{value: Ref.result("inner", :value), amount: 2})

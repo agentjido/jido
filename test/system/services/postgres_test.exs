@@ -1,12 +1,12 @@
 Code.require_file("support/docker.exs", __DIR__)
 
 defmodule JidoTest.System.Services.PostgresTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   @moduletag :service
   @moduletag timeout: 120_000
 
-  use JidoTest.Persistence.Contracts.Store
+  use Jido.Test.Persistence.Contracts.Store
 
   defmodule Repo do
     use Ecto.Repo, otp_app: :jido, adapter: Ecto.Adapters.Postgres

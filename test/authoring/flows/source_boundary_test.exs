@@ -8,7 +8,7 @@ defmodule JidoActionTest.Authoring.SourceBoundaryTest do
   alias Jido.Expr
   alias Jido.Flow.Ref
   alias JidoActionTest.Authoring.Hostile
-  alias JidoTest.AuthoringCompiler
+  alias Jido.Test.Flow.AuthoringCompiler
 
   test "scoped and malformed references, unknown operators, and unsafe source fail before work" do
     for {suffix, declaration, message} <- [
@@ -29,10 +29,10 @@ defmodule JidoActionTest.Authoring.SourceBoundaryTest do
     refute_received :unsafe_executed
     refute_received {:hostile_action, _}
 
-    step = JidoActionTest.FlowComponent.step!(name: "watch", action: Hostile.Watch)
+    step = Jido.Test.Flow.Component.step!(name: "watch", action: Hostile.Watch)
 
     assert {:error, invalid_path} =
-             JidoActionTest.FlowComponent.step(
+             Jido.Test.Flow.Component.step(
                name: "bad_path",
                action: Hostile.Watch,
                params: %{value: Ref.input([:payload, -1])}
@@ -41,7 +41,7 @@ defmodule JidoActionTest.Authoring.SourceBoundaryTest do
     assert invalid_path.message == "flow expression contains an invalid reference path"
 
     assert {:error, unknown_operator} =
-             JidoActionTest.FlowBuilder.new(
+             Jido.Test.Flow.Builder.new(
                name: "unknown_operation",
                components: [step],
                output: %Expr.Operation{operator: :unknown, operands: [Ref.result("watch")]}
@@ -112,10 +112,10 @@ defmodule JidoActionTest.Authoring.SourceBoundaryTest do
       assert source_line(source, error.line) =~ ~r/defmodule|flow|step|output/
     end
 
-    valid_step = JidoActionTest.FlowComponent.step!(name: "watch", action: Hostile.Watch)
+    valid_step = Jido.Test.Flow.Component.step!(name: "watch", action: Hostile.Watch)
 
     assert {:error, error} =
-             JidoActionTest.FlowBuilder.new(
+             Jido.Test.Flow.Builder.new(
                name: "no_inferred_output",
                components: [valid_step],
                output: nil

@@ -7,7 +7,7 @@ defmodule Jido.Exec.ErrorPathsTest do
   alias Jido.Flow
   alias Jido.Flow.Ref
 
-  alias JidoActionTest.Fixtures.Actions.{
+  alias Jido.Test.Action.Fixtures.Actions.{
     Add,
     AtomValidationAction,
     InvalidValidationResultAction,

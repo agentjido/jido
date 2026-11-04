@@ -1,15 +1,15 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.Composition.TopologyTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.agent_server.composition", async: true
   alias Jido.Agent
   alias Jido.Agent.Directive, as: D
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Directive, as: R
-  alias JidoTest.AgentEvolutionFixtures, as: E
+  alias Jido.Test.Agent.EvolutionFixtures, as: E
   alias JidoTest.AgentServer.Fixtures, as: F
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
 
   defp start(c, agent \\ nil, opts \\ []) do
     agent = agent || %{E.agent() | id: unique_id("evolution")}

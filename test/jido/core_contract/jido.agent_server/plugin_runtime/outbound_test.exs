@@ -1,14 +1,14 @@
 Code.require_file("../support.ex", __DIR__)
 
 defmodule JidoTest.AgentServer.OutboundTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
   use Covenant.Case, component: "jido.agent_server.plugin_runtime", async: false
   alias Jido.AgentServer, as: Server
   alias Jido.Agent.Directive.{Emit, Reply}
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext
   alias JidoTest.AgentServer.Fixtures, as: F
-  import JidoTest.Eventually
+  import Jido.Test.Eventually
   @moduletag obligation: "jido.agent_server.plugin_runtime.I8"
 
   setup do

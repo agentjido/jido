@@ -2,8 +2,8 @@ defmodule Jido.Agent.CodecTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
   alias Jido.Catalog
-  alias JidoTest.AgentContract, as: F
-  alias JidoTest.AgentFixtures.Add
+  alias Jido.Test.Agent.Contract, as: F
+  alias Jido.Test.AgentServer.Fixtures.Add
 
   defmodule Work do
     use Jido.Action, name: "codec_work", schema: Jido.Joi.object(%{})
@@ -74,7 +74,7 @@ defmodule Jido.Agent.CodecTest do
       registry = registry(definition, Add)
 
       for value <- [definition, Agent.instantiate!(definition, id: "encoded")] do
-        assert {:ok, document} = JidoTest.AgentRegistry.encode(value, registry)
+        assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(value, registry)
         assert document["type"] == "jido.agent.definition"
         refute Map.has_key?(document["definition"], "id")
         refute Map.has_key?(document["definition"], "state")
@@ -82,7 +82,7 @@ defmodule Jido.Agent.CodecTest do
         expected = Agent.definition(value)
 
         assert {:ok, ^expected} =
-                 JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
+                 Jido.Test.AgentServer.Registry.decode(JSON.decode!(JSON.encode!(document)), registry)
       end
 
       [route] = definition.routes
@@ -92,7 +92,7 @@ defmodule Jido.Agent.CodecTest do
                 %Jido.Codec.Error.InvalidError{
                   details: %{path: [:routes, 0, :defaults]}
                 }} =
-                 JidoTest.AgentRegistry.encode(
+                 Jido.Test.AgentServer.Registry.encode(
                    %{definition | routes: [%{route | defaults: invalid}]},
                    registry
                  )
@@ -117,7 +117,7 @@ defmodule Jido.Agent.CodecTest do
     registry = registry(definition, ChangingTarget)
     Process.put({ChangingTarget, :kind}, :flow)
 
-    for result <- [JidoTest.AgentRegistry.encode(definition, registry)] do
+    for result <- [Jido.Test.AgentServer.Registry.encode(definition, registry)] do
       assert {:error,
               %Jido.Codec.Error.InvalidError{
                 code: :invalid_executable,
@@ -132,7 +132,7 @@ defmodule Jido.Agent.CodecTest do
     registry = registry(definition, nil)
 
     assert {:error, _error} =
-             JidoTest.AgentRegistry.decode(
+             Jido.Test.AgentServer.Registry.decode(
                %{"type" => "jido.agent", "version" => 1, "agent" => %{}},
                registry
              )
@@ -157,8 +157,8 @@ defmodule Jido.Agent.CodecTest do
         ]
       })
 
-    registry = JidoTest.AgentRegistry.for(definition)
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    registry = Jido.Test.AgentServer.Registry.for(definition)
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
     assert document["vsn"] == 1
     [route] = document["definition"]["routes"]
     assert route["state"] == %{"source" => "output", "path" => ["state"]}
@@ -168,7 +168,7 @@ defmodule Jido.Agent.CodecTest do
              "from" => %{"source" => "output", "path" => ["reply", "value"]}
            }
 
-    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry)
+    assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode(document, registry)
 
     old_shape =
       update_in(document, ["definition", "routes"], fn [route] ->
@@ -176,12 +176,12 @@ defmodule Jido.Agent.CodecTest do
       end)
 
     assert {:error, [%Jido.Codec.Issue{code: :invalid_document}]} =
-             JidoTest.AgentRegistry.decode(old_shape, registry)
+             Jido.Test.AgentServer.Registry.decode(old_shape, registry)
 
     unsupported = %{document | "vsn" => 2}
 
     assert {:error, [%Jido.Codec.Issue{code: :unsupported_document}]} =
-             JidoTest.AgentRegistry.decode(unsupported, registry)
+             Jido.Test.AgentServer.Registry.decode(unsupported, registry)
 
     assert {:error,
             [
@@ -207,8 +207,8 @@ defmodule Jido.Agent.CodecTest do
         ]
       })
 
-    registry = JidoTest.AgentRegistry.for(definition)
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    registry = Jido.Test.AgentServer.Registry.for(definition)
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
     [route] = document["definition"]["routes"]
 
     ambiguous =
@@ -217,7 +217,7 @@ defmodule Jido.Agent.CodecTest do
       ])
 
     assert {:error, [%Jido.Codec.Issue{code: :ambiguous_output_field}]} =
-             JidoTest.AgentRegistry.decode(ambiguous, registry)
+             Jido.Test.AgentServer.Registry.decode(ambiguous, registry)
 
     key = "codec_missing_#{System.unique_integer([:positive])}"
     assert_raise ArgumentError, fn -> String.to_existing_atom(key) end
@@ -227,7 +227,7 @@ defmodule Jido.Agent.CodecTest do
         %{route | "state" => %{"source" => "output", "path" => [key]}}
       ])
 
-    assert {:error, _issues} = JidoTest.AgentRegistry.decode(unknown, registry)
+    assert {:error, _issues} = Jido.Test.AgentServer.Registry.decode(unknown, registry)
     assert_raise ArgumentError, fn -> String.to_existing_atom(key) end
 
     unsafe =
@@ -236,7 +236,7 @@ defmodule Jido.Agent.CodecTest do
       ])
 
     assert {:error, [%Jido.Codec.Issue{code: :invalid_document}]} =
-             JidoTest.AgentRegistry.decode(unsafe, registry)
+             Jido.Test.AgentServer.Registry.decode(unsafe, registry)
   end
 
   @tag obligation: "jido.agent.I20"
@@ -318,8 +318,8 @@ defmodule Jido.Agent.CodecTest do
         plugins: [F.contribution(F.First, %{initial: 2})]
       })
 
-    registry = JidoTest.AgentRegistry.for(definition)
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    registry = Jido.Test.AgentServer.Registry.for(definition)
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
     assert Map.keys(document["definition"]["schema"]) |> Enum.sort() == ["id", "vsn"]
 
     assert [provider] =
@@ -328,33 +328,33 @@ defmodule Jido.Agent.CodecTest do
     assert Map.keys(provider) |> Enum.sort() == ["id", "vsn"]
 
     assert {:ok, ^definition} =
-             JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
+             Jido.Test.AgentServer.Registry.decode(JSON.decode!(JSON.encode!(document)), registry)
 
-    assert {:ok, ^document} = JidoTest.AgentRegistry.encode(Map.from_struct(definition), registry)
+    assert {:ok, ^document} = Jido.Test.AgentServer.Registry.encode(Map.from_struct(definition), registry)
 
     assert {:ok, child_document} =
-             JidoTest.AgentRegistry.encode(Child, JidoTest.AgentRegistry.for(Child))
+             Jido.Test.AgentServer.Registry.encode(Child, Jido.Test.AgentServer.Registry.for(Child))
 
     assert child_document["definition"]["module"] != nil
 
     plugin_registry = registry
 
-    assert {:ok, plugin_document} = JidoTest.AgentRegistry.encode(definition, plugin_registry)
-    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(plugin_document, plugin_registry)
+    assert {:ok, plugin_document} = Jido.Test.AgentServer.Registry.encode(definition, plugin_registry)
+    assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode(plugin_document, plugin_registry)
     empty_catalog = Catalog.from_targets!(__MODULE__, :jido, %{})
 
     assert {:error, %{code: :unknown_reference}} =
-             JidoTest.AgentRegistry.encode(definition, empty_catalog)
+             Jido.Test.AgentServer.Registry.encode(definition, empty_catalog)
   end
 
   @tag obligation: "jido.agent.I20"
   test "Codec reads a version 1 definition without initial state" do
     definition = Agent.define!(%{name: "optional_initial_state"})
-    registry = JidoTest.AgentRegistry.for(definition)
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    registry = Jido.Test.AgentServer.Registry.for(definition)
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
     document = update_in(document["definition"], &Map.delete(&1, "initial_state"))
 
-    assert {:ok, ^definition} = JidoTest.AgentRegistry.decode(document, registry)
+    assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode(document, registry)
   end
 
   @tag obligation: "jido.agent.I20"
@@ -372,7 +372,7 @@ defmodule Jido.Agent.CodecTest do
       })
 
     registry = registry(definition, Work)
-    {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
 
     assert {:error,
             [
@@ -381,7 +381,7 @@ defmodule Jido.Agent.CodecTest do
                 path: ["definition", "name"]
               }
             ]} =
-             JidoTest.AgentRegistry.decode(put_in(document, ["definition", "name"], 42), registry)
+             Jido.Test.AgentServer.Registry.decode(put_in(document, ["definition", "name"], 42), registry)
 
     schema = Map.delete(document["definition"]["schema"], "id")
 
@@ -392,7 +392,7 @@ defmodule Jido.Agent.CodecTest do
                 path: ["definition", "schema", "id"]
               }
             ]} =
-             JidoTest.AgentRegistry.decode(
+             Jido.Test.AgentServer.Registry.decode(
                put_in(document, ["definition", "schema"], schema),
                registry
              )
@@ -407,7 +407,7 @@ defmodule Jido.Agent.CodecTest do
                 path: ["definition", "routes", 0, "handler", "target", "id"]
               }
             ]} =
-             JidoTest.AgentRegistry.decode(
+             Jido.Test.AgentServer.Registry.decode(
                put_in(document, ["definition", "routes"], [
                  put_in(route, ["handler", "target"], target)
                ]),
@@ -421,7 +421,7 @@ defmodule Jido.Agent.CodecTest do
                 path: ["definition", "metadata", "entries", 0, "value"]
               }
             ]} =
-             JidoTest.AgentRegistry.decode(
+             Jido.Test.AgentServer.Registry.decode(
                put_in(document, ["definition", "metadata"], %{
                  "$type" => "map",
                  "entries" => [
@@ -438,7 +438,7 @@ defmodule Jido.Agent.CodecTest do
                 path: ["definition", "metadata", "id"]
               }
             ]} =
-             JidoTest.AgentRegistry.decode(
+             Jido.Test.AgentServer.Registry.decode(
                put_in(document, ["definition", "metadata"], %{
                  "$type" => "atom",
                  "id" => "missing",
@@ -486,8 +486,8 @@ defmodule Jido.Agent.CodecTest do
         plugins: [F.contribution(F.First)]
       })
 
-    registry = JidoTest.AgentRegistry.for(definition)
-    {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    registry = Jido.Test.AgentServer.Registry.for(definition)
+    {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
 
     [route] = document["definition"]["routes"]
     [member] = document["definition"]["topology"]["agents"]
@@ -545,10 +545,10 @@ defmodule Jido.Agent.CodecTest do
       ])
     ]
 
-    for value <- invalid, do: assert({:error, _} = JidoTest.AgentRegistry.decode(value, registry))
+    for value <- invalid, do: assert({:error, _} = Jido.Test.AgentServer.Registry.decode(value, registry))
 
     for source <- [nil, [], %URI{}],
-        do: assert({:error, _} = JidoTest.AgentRegistry.encode(source, registry))
+        do: assert({:error, _} = Jido.Test.AgentServer.Registry.encode(source, registry))
 
     at_limit = Jason.encode!(String.duplicate("x", 8_388_606))
     over_limit = Jason.encode!(String.duplicate("x", 8_388_607))
@@ -556,7 +556,7 @@ defmodule Jido.Agent.CodecTest do
     assert byte_size(over_limit) == 8_388_609
 
     assert {:error, [%Jido.Codec.Issue{code: :invalid_document}]} =
-             JidoTest.AgentRegistry.decode_json(at_limit, registry)
+             Jido.Test.AgentServer.Registry.decode_json(at_limit, registry)
 
     assert {:error,
             [
@@ -564,10 +564,10 @@ defmodule Jido.Agent.CodecTest do
                 code: :invalid_json,
                 details: %{maximum_bytes: 8_388_608}
               }
-            ]} = JidoTest.AgentRegistry.decode_json(over_limit, registry)
+            ]} = Jido.Test.AgentServer.Registry.decode_json(over_limit, registry)
 
     for json <- [nil, "{"] do
-      assert {:error, _} = JidoTest.AgentRegistry.decode_json(json, registry)
+      assert {:error, _} = Jido.Test.AgentServer.Registry.decode_json(json, registry)
     end
   end
 
