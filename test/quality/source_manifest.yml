@@ -149,8 +149,8 @@ assets:
     target_path: test/examples/flow
     quality_surface: examples
     owner: jido.flow
-    disposition: deferred
-    reason: Scheduled across jido-07x.9 through jido-07x.11 as explicit post-baseline quality work.
+    disposition: ported
+    reason: Ported across jido-07x.9 through jido-07x.11 as numbered, registered, offline Flow lessons with paired tests.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/01_compilation
@@ -573,8 +573,8 @@ assets:
     target_path: test/examples
     quality_surface: examples
     owner: jido.agent
-    disposition: deferred
-    reason: Agent and runtime chapters were ported by jido-07x.12 and jido-07x.13. Plugin and persistence chapters remain scheduled for jido-07x.14.
+    disposition: ported
+    reason: Agent, runtime, topology, Plugin, persistence, and durable chapters were ported by jido-07x.12 through jido-07x.14 with numbered paths and paired offline tests.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: test/examples/catalog_test.exs
@@ -818,35 +818,43 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/08_applications
-    target_path: examples/plugin/applications
+    target_path: examples/plugin/08_applications
     quality_surface: examples
     owner: jido.plugin
-    disposition: deferred
-    reason: Scheduled for jido-07x.14.
+    disposition: ported
+    reason: Ported by jido-07x.14 as five numbered, registered application lessons with current Plugin and runtime APIs.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/09_plugins
-    target_path: examples/plugin
+    target_path: examples/plugin/09_plugins
     quality_surface: examples
     owner: jido.plugin
-    disposition: deferred
-    reason: Scheduled for jido-07x.14.
+    disposition: ported
+    reason: Ported by jido-07x.14 as eight numbered, registered Plugin lessons with current context, tracing, and Catalog APIs.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/10_persistence
-    target_path: examples/persistence
+    target_path: examples/persistence/10_persistence
     quality_surface: examples
     owner: jido.persistence
-    disposition: deferred
-    reason: Scheduled for jido-07x.14.
+    disposition: ported
+    reason: Ported by jido-07x.14 as eight numbered, registered persistence lessons with 20 focused tests.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/11_durable
-    target_path: examples/durable
+    target_path: examples/durable/11_durable
     quality_surface: examples
     owner: jido.agent_server.durable
-    disposition: deferred
-    reason: Supported examples are scheduled for jido-07x.14. Proposal folders remain excluded.
+    disposition: ported
+    reason: Ported by jido-07x.14 as seven numbered, registered durable lessons with process-loss and fresh-BEAM proof.
+  - source_repository: jido_v3_split
+    source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
+    source_path: examples/11_durable/proposals
+    target_path: test/quality/excluded/core_durable_proposals
+    quality_surface: examples
+    owner: jido.agent_server.durable
+    disposition: excluded
+    reason: Proposal-only documents are not supported lessons and are not part of the executable example catalog.
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: examples/99_research

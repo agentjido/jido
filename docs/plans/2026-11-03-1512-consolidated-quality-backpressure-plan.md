@@ -530,7 +530,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 
 **Dependencies:** U8 and U13.
 
-**Files:** Read split core example groups `08_applications/**`, `09_plugins/**`, `10_persistence/**`, and supported `11_durable/**` at the core baseline. Exclude `11_durable/proposals/**`. Add `examples/plugin/**`, `examples/persistence/**`, `examples/durable/**`, and matching tests. Change the manifest.
+**Files:** Read split core example groups `08_applications/**`, `09_plugins/**`, `10_persistence/**`, and supported `11_durable/**` at the core baseline. Exclude `11_durable/proposals/**`. Add `examples/plugin/08_applications/**`, `examples/plugin/09_plugins/**`, `examples/persistence/10_persistence/**`, `examples/durable/11_durable/**`, and matching numbered test paths. Change the manifest.
 
 **Directive:**
 
@@ -544,7 +544,7 @@ All units execute directly on `main` after their dependency tickets close, per K
 - [ ] Proposal folders are not presented as supported examples.
 - [ ] Persistence examples clean all temporary state.
 
-**Verification:** `mix test.examples test/examples/plugin test/examples/persistence test/examples/durable` exits with status `0`.
+**Verification:** `mix test.examples test/examples/plugin/08_applications test/examples/plugin/09_plugins test/examples/persistence/10_persistence test/examples/durable/11_durable` exits with status `0`.
 
 ### U15. Port offline AI examples
 

@@ -28,11 +28,15 @@ categories:
 index_readmes:
   - examples/agent/01_basic/README.md
   - examples/agent/02_workflow/README.md
+  - examples/durable/11_durable/README.md
   - examples/flow/01_compilation/README.md
   - examples/flow/02_execution/README.md
   - examples/flow/03_durability/README.md
   - examples/flow/04_patterns/README.md
   - examples/flow/05_distribution/README.md
+  - examples/persistence/10_persistence/README.md
+  - examples/plugin/08_applications/README.md
+  - examples/plugin/09_plugins/README.md
   - examples/runtime/04_runtime/README.md
   - examples/runtime/05_multi_agent/README.md
   - examples/topology/07_topology/README.md
@@ -132,6 +136,45 @@ examples:
     auxiliary_sources:
       - examples/agent/02_workflow/02_09_flow_directives/effects.ex
     test: test/examples/agent/02_workflow/02_09_flow_directives/flow_directives_test.exs
+  - id: durable/11_01_saved_agent
+    category: durable
+    readme: examples/durable/11_durable/11_01_saved_agent/README.md
+    source: examples/durable/11_durable/11_01_saved_agent/saved_agent.ex
+    auxiliary_sources:
+      - examples/durable/11_durable/11_01_saved_agent/request_report.ex
+    test: test/examples/durable/11_durable/11_01_saved_agent/saved_agent_test.exs
+  - id: durable/11_02_saved_progress
+    category: durable
+    readme: examples/durable/11_durable/11_02_saved_progress/README.md
+    source: examples/durable/11_durable/11_02_saved_progress/saved_progress.ex
+    auxiliary_sources:
+      - examples/durable/11_durable/11_02_saved_progress/advance.ex
+    test: test/examples/durable/11_durable/11_02_saved_progress/saved_progress_test.exs
+  - id: durable/11_03_vm_recovery
+    category: durable
+    readme: examples/durable/11_durable/11_03_vm_recovery/README.md
+    source: examples/durable/11_durable/11_03_vm_recovery/vm_recovery.ex
+    test: test/examples/durable/11_durable/11_03_vm_recovery/vm_recovery_test.exs
+  - id: durable/11_04_accepted_work
+    category: durable
+    readme: examples/durable/11_durable/11_04_accepted_work/README.md
+    source: examples/durable/11_durable/11_04_accepted_work/accepted_work.ex
+    test: test/examples/durable/11_durable/11_04_accepted_work/accepted_work_test.exs
+  - id: durable/11_05_saved_completion
+    category: durable
+    readme: examples/durable/11_durable/11_05_saved_completion/README.md
+    source: examples/durable/11_durable/11_05_saved_completion/saved_completion.ex
+    test: test/examples/durable/11_durable/11_05_saved_completion/saved_completion_test.exs
+  - id: durable/11_06_durable_wait
+    category: durable
+    readme: examples/durable/11_durable/11_06_durable_wait/README.md
+    source: examples/durable/11_durable/11_06_durable_wait/durable_wait.ex
+    test: test/examples/durable/11_durable/11_06_durable_wait/durable_wait_test.exs
+  - id: durable/11_07_external_uncertainty
+    category: durable
+    readme: examples/durable/11_durable/11_07_external_uncertainty/README.md
+    source: examples/durable/11_durable/11_07_external_uncertainty/external_uncertainty.ex
+    test: test/examples/durable/11_durable/11_07_external_uncertainty/external_uncertainty_test.exs
   - id: flow/01_01_single_step
     category: flow
     readme: examples/flow/01_compilation/01_01_single_step/README.md
@@ -292,6 +335,142 @@ examples:
     readme: examples/flow/04_patterns/04_04_compensation/README.md
     source: examples/flow/04_patterns/04_04_compensation/compensation.ex
     test: test/examples/flow/04_patterns/04_04_compensation/compensation_test.exs
+  - id: persistence/10_01_persistent_agent
+    category: persistence
+    readme: examples/persistence/10_persistence/10_01_persistent_agent/README.md
+    source: examples/persistence/10_persistence/10_01_persistent_agent/persistent_agent.ex
+    auxiliary_sources:
+      - examples/persistence/10_persistence/10_01_persistent_agent/checkpoint_identity_probe.ex
+    test: test/examples/persistence/10_persistence/10_01_persistent_agent/persistent_agent_test.exs
+  - id: persistence/10_02_hibernate_and_thaw
+    category: persistence
+    readme: examples/persistence/10_persistence/10_02_hibernate_and_thaw/README.md
+    source: examples/persistence/10_persistence/10_02_hibernate_and_thaw/hibernate_and_thaw.ex
+    test: test/examples/persistence/10_persistence/10_02_hibernate_and_thaw/hibernate_and_thaw_test.exs
+  - id: persistence/10_03_portable_checkpoint
+    category: persistence
+    readme: examples/persistence/10_persistence/10_03_portable_checkpoint/README.md
+    source: examples/persistence/10_persistence/10_03_portable_checkpoint/checkpoint_portability_probe.ex
+    test: test/examples/persistence/10_persistence/10_03_portable_checkpoint/checkpoint_portability_test.exs
+  - id: persistence/10_04_plugin_state_conversion
+    category: persistence
+    readme: examples/persistence/10_persistence/10_04_plugin_state_conversion/README.md
+    source: examples/persistence/10_persistence/10_04_plugin_state_conversion/persisted_state.ex
+    auxiliary_sources:
+      - examples/persistence/10_persistence/10_04_plugin_state_conversion/persisted_state_plugin.ex
+    test: test/examples/persistence/10_persistence/10_04_plugin_state_conversion/persisted_state_test.exs
+  - id: persistence/10_05_durable_delete
+    category: persistence
+    readme: examples/persistence/10_persistence/10_05_durable_delete/README.md
+    source: examples/persistence/10_persistence/10_05_durable_delete/durable_delete.ex
+    test: test/examples/persistence/10_persistence/10_05_durable_delete/durable_delete_test.exs
+  - id: persistence/10_06_indeterminate_write
+    category: persistence
+    readme: examples/persistence/10_persistence/10_06_indeterminate_write/README.md
+    source: examples/persistence/10_persistence/10_06_indeterminate_write/indeterminate_write_probe.ex
+    test: test/examples/persistence/10_persistence/10_06_indeterminate_write/indeterminate_write_test.exs
+  - id: persistence/10_07_recoverable_delivery
+    category: persistence
+    readme: examples/persistence/10_persistence/10_07_recoverable_delivery/README.md
+    source: examples/persistence/10_persistence/10_07_recoverable_delivery/recoverable_delivery.ex
+    auxiliary_sources:
+      - examples/persistence/10_persistence/10_07_recoverable_delivery/delivery_plugin.ex
+      - examples/persistence/10_persistence/10_07_recoverable_delivery/delivery_worker.ex
+      - examples/persistence/10_persistence/10_07_recoverable_delivery/demo.exs
+      - examples/persistence/10_persistence/10_07_recoverable_delivery/sink.ex
+    test: test/examples/persistence/10_persistence/10_07_recoverable_delivery/recoverable_delivery_test.exs
+  - id: persistence/10_08_definition_revision
+    category: persistence
+    readme: examples/persistence/10_persistence/10_08_definition_revision/README.md
+    source: examples/persistence/10_persistence/10_08_definition_revision/definition_revision.ex
+    test: test/examples/persistence/10_persistence/10_08_definition_revision/definition_revision_test.exs
+  - id: plugin/08_01_audit
+    category: plugin
+    readme: examples/plugin/08_applications/08_01_audit/README.md
+    source: examples/plugin/08_applications/08_01_audit/audit.ex
+    test: test/examples/plugin/08_applications/08_01_audit/audit_test.exs
+  - id: plugin/08_02_subscription
+    category: plugin
+    readme: examples/plugin/08_applications/08_02_subscription/README.md
+    source: examples/plugin/08_applications/08_02_subscription/subscription.ex
+    auxiliary_sources:
+      - examples/plugin/08_applications/08_02_subscription/subscription_plugin.ex
+    test: test/examples/plugin/08_applications/08_02_subscription/subscription_test.exs
+  - id: plugin/08_03_inbox
+    category: plugin
+    readme: examples/plugin/08_applications/08_03_inbox/README.md
+    source: examples/plugin/08_applications/08_03_inbox/inbox.ex
+    auxiliary_sources:
+      - examples/plugin/08_applications/08_03_inbox/inbox_sensor.ex
+    test: test/examples/plugin/08_applications/08_03_inbox/inbox_test.exs
+  - id: plugin/08_04_approval_workflow
+    category: plugin
+    readme: examples/plugin/08_applications/08_04_approval_workflow/README.md
+    source: examples/plugin/08_applications/08_04_approval_workflow/approval_workflow.ex
+    auxiliary_sources:
+      - examples/plugin/08_applications/08_04_approval_workflow/booking_actions.ex
+      - examples/plugin/08_applications/08_04_approval_workflow/booking_plugin.ex
+      - examples/plugin/08_applications/08_04_approval_workflow/ports.ex
+      - examples/plugin/08_applications/08_04_approval_workflow/search_flow.ex
+    test: test/examples/plugin/08_applications/08_04_approval_workflow/approval_workflow_test.exs
+  - id: plugin/08_06_purpose_loop
+    category: plugin
+    readme: examples/plugin/08_applications/08_06_purpose_loop/README.md
+    source: examples/plugin/08_applications/08_06_purpose_loop/purpose_loop.ex
+    auxiliary_sources:
+      - examples/plugin/08_applications/08_06_purpose_loop/clock.ex
+    test: test/examples/plugin/08_applications/08_06_purpose_loop/purpose_loop_test.exs
+  - id: plugin/09_01_prepared_input
+    category: plugin
+    readme: examples/plugin/09_plugins/09_01_prepared_input/README.md
+    source: examples/plugin/09_plugins/09_01_prepared_input/prepared_input.ex
+    test: test/examples/plugin/09_plugins/09_01_prepared_input/prepared_input_test.exs
+  - id: plugin/09_02_runtime_admission
+    category: plugin
+    readme: examples/plugin/09_plugins/09_02_runtime_admission/README.md
+    source: examples/plugin/09_plugins/09_02_runtime_admission/runtime_admission.ex
+    test: test/examples/plugin/09_plugins/09_02_runtime_admission/runtime_admission_test.exs
+  - id: plugin/09_03_identity
+    category: plugin
+    readme: examples/plugin/09_plugins/09_03_identity/README.md
+    source: examples/plugin/09_plugins/09_03_identity/identity.ex
+    auxiliary_sources:
+      - examples/plugin/09_plugins/09_03_identity/identity_plugin.ex
+    test: test/examples/plugin/09_plugins/09_03_identity/identity_test.exs
+  - id: plugin/09_04_secure_signal
+    category: plugin
+    readme: examples/plugin/09_plugins/09_04_secure_signal/README.md
+    source: examples/plugin/09_plugins/09_04_secure_signal/secure_signal.ex
+    auxiliary_sources:
+      - examples/plugin/09_plugins/09_04_secure_signal/identity_plugin.ex
+      - examples/plugin/09_plugins/09_04_secure_signal/secure_signal_plugin.ex
+    test: test/examples/plugin/09_plugins/09_04_secure_signal/secure_signal_test.exs
+  - id: plugin/09_05_composition
+    category: plugin
+    readme: examples/plugin/09_plugins/09_05_composition/README.md
+    source: examples/plugin/09_plugins/09_05_composition/composition.ex
+    auxiliary_sources:
+      - examples/plugin/09_plugins/09_05_composition/inputs.ex
+    test: test/examples/plugin/09_plugins/09_05_composition/composition_test.exs
+  - id: plugin/09_06_state_middleware
+    category: plugin
+    readme: examples/plugin/09_plugins/09_06_state_middleware/README.md
+    source: examples/plugin/09_plugins/09_06_state_middleware/state_middleware.ex
+    test: test/examples/plugin/09_plugins/09_06_state_middleware/state_middleware_test.exs
+  - id: plugin/09_09_live_plugin_changes
+    category: plugin
+    readme: examples/plugin/09_plugins/09_09_live_plugin_changes/README.md
+    source: examples/plugin/09_plugins/09_09_live_plugin_changes/live_plugin_changes.ex
+    auxiliary_sources:
+      - examples/plugin/09_plugins/09_09_live_plugin_changes/cache.ex
+    test: test/examples/plugin/09_plugins/09_09_live_plugin_changes/live_plugin_changes_test.exs
+  - id: plugin/09_10_plugin_dsl
+    category: plugin
+    readme: examples/plugin/09_plugins/09_10_plugin_dsl/README.md
+    source: examples/plugin/09_plugins/09_10_plugin_dsl/plugin_dsl.ex
+    auxiliary_sources:
+      - examples/plugin/09_plugins/09_10_plugin_dsl/thresholds.ex
+    test: test/examples/plugin/09_plugins/09_10_plugin_dsl/plugin_dsl_test.exs
   - id: runtime/04_01_scheduled_signals
     category: runtime
     readme: examples/runtime/04_runtime/04_01_scheduled_signals/README.md
@@ -430,6 +609,16 @@ examples:
 exclusions:
   - path: examples/00_graph_first
     reason: The numbered live-provider lesson is opt-in. U15 owns offline AI examples, and U19 owns live-provider proof.
+  - path: examples/durable/11_durable/11_03_vm_recovery/support
+    reason: The DETS Store is support for the VM recovery lesson and is not a standalone lesson.
+  - path: examples/durable/11_durable/11_07_external_uncertainty/support
+    reason: The memory provider is support for the external uncertainty lesson and is not a standalone lesson.
+  - path: examples/persistence/10_persistence/10_07_recoverable_delivery/support
+    reason: The memory sink is support for the recoverable delivery lesson and is not a standalone lesson.
+  - path: examples/plugin/08_applications/08_04_approval_workflow/support
+    reason: The adapters are support for the approval workflow lesson and are not a standalone lesson.
+  - path: examples/plugin/09_plugins/support
+    reason: The crypto helper is shared by numbered Plugin lessons and is not a standalone lesson.
   - path: examples/runtime/04_runtime/support
     reason: Shared observation support is loaded by numbered runtime lessons and is not a standalone lesson.
   - path: examples/runtime/05_multi_agent/support
@@ -438,3 +627,7 @@ exclusions:
     reason: The shared lifecycle Action is loaded by numbered runtime lessons and is not a standalone lesson.
   - path: examples/topology/07_topology/support
     reason: The shared Cell is loaded by numbered topology lessons and is not a standalone lesson.
+  - path: test/examples/durable/11_durable/11_03_vm_recovery/dets_store_test.exs
+    reason: The adapter test is auxiliary proof for the VM recovery lesson, which owns the catalog test path.
+  - path: test/examples/persistence/10_persistence/10_01_persistent_agent/checkpoint_identity_test.exs
+    reason: The identity test is auxiliary proof for the persistent Agent lesson, which owns the catalog test path.
