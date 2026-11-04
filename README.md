@@ -37,6 +37,9 @@ The main work is:
 The surrounding NewJido workspace keeps the architecture and consolidation
 decisions in `docs/aspirational-module-dependency-map.md`.
 
+Use the [documentation index](docs/README.md) for project documents, required
+fixed paths, and material that still needs review.
+
 ## Local checks
 
 ```sh
