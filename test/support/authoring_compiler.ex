@@ -4,6 +4,37 @@ defmodule JidoTest.AuthoringCompiler do
   # Each attempt reserves a unique module namespace. The caller stops any live
   # resources before its callback returns. Compiler exit is the verify barrier.
   def with_compiled(source, callback, options \\ []) when is_binary(source) do
+    with_result(
+      source,
+      fn
+        {{:ok, compiled}, []} ->
+          callback.(Enum.map(compiled, &elem(&1, 0)))
+
+        {{:ok, _compiled}, diagnostics} ->
+          raise "fixture compilation diagnostics: #{inspect(diagnostics)}"
+
+        {{:error, error, stacktrace}, _diagnostics} ->
+          reraise error, stacktrace
+      end,
+      options
+    )
+  end
+
+  def with_diagnostics(source, callback, options \\ []) when is_binary(source) do
+    with_result(
+      source,
+      fn
+        {{:ok, compiled}, diagnostics} ->
+          callback.({:ok, Enum.map(compiled, &elem(&1, 0)), diagnostics})
+
+        {{:error, error, _stacktrace}, diagnostics} ->
+          callback.({:error, error, diagnostics})
+      end,
+      options
+    )
+  end
+
+  defp with_result(source, callback, options) do
     modules = Keyword.fetch!(options, :modules)
     timeout = Keyword.get(options, :timeout, 10_000)
 
@@ -24,7 +55,11 @@ defmodule JidoTest.AuthoringCompiler do
         spawn_monitor(fn ->
           result =
             Code.with_diagnostics([log: false], fn ->
-              Code.compile_string(source, "authoring_fixture.ex")
+              try do
+                {:ok, Code.compile_string(source, "authoring_fixture.ex")}
+              rescue
+                error -> {:error, error, __STACKTRACE__}
+              end
             end)
 
           send(owner, {self(), :compiled, result})
@@ -55,9 +90,7 @@ defmodule JidoTest.AuthoringCompiler do
             raise "fixture compilation exceeded its budget"
         end
 
-      {compiled, diagnostics} = result
-      if diagnostics != [], do: raise("fixture compilation diagnostics: #{inspect(diagnostics)}")
-      callback.(Enum.map(compiled, &elem(&1, 0)))
+      callback.(result)
     after
       # Include generated nested inline Action modules and partially compiled
       # modules after an after_verify failure, without touching other tests.
