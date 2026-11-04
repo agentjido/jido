@@ -47,6 +47,11 @@ defmodule Jido.Quality.ComponentProof do
     )
   end
 
+  def coverage_owners(proof, root) do
+    active = active_components(root)
+    covenant_owners(proof, root, active)
+  end
+
   def ownership(proof, _root, options) do
     active = Keyword.fetch!(options, :active_components)
     inventory = Keyword.fetch!(options, :inventory)

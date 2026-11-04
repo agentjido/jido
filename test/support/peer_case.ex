@@ -149,12 +149,12 @@ defmodule JidoTest.PeerCase do
       facade = Path.join(root, "lib/jido.ex")
 
       for module <- :cover.modules(),
-          {:file, file} <- [:cover.is_compiled(module)],
-          beam = List.to_string(file),
+          {:file, _cover_file} <- [:cover.is_compiled(module)],
+          beam = Application.app_dir(:jido, ["ebin", "#{module}.beam"]) |> to_string(),
           File.regular?(beam),
-          source = module.module_info(:compile)[:source] |> List.to_string() |> Path.expand(),
+          source = module.module_info(:compile)[:source] |> to_string() |> Path.expand(),
           source == facade or String.starts_with?(source, lib_root <> "/"),
-          do: file
+          do: String.to_charlist(beam)
     else
       []
     end

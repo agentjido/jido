@@ -30,8 +30,11 @@ defmodule Jido.MixProject do
       preferred_envs: [
         bench: :prod,
         ci: :test,
+        coveralls: :test,
+        "coveralls.json": :test,
         quality: :test,
         "quality.contract": :test,
+        "quality.coverage": :test,
         "test.authoring": :test,
         "test.bench": :test,
         "test.ci": :test,
@@ -53,6 +56,8 @@ defmodule Jido.MixProject do
 
   defp test_coverage do
     [
+      tool: ExCoveralls,
+      output: "tmp/quality/coverage/coverdata",
       ignore_modules: [
         ~r/^Inspect\.Jido/,
         ~r/^JidoActionTest\./,
@@ -92,6 +97,7 @@ defmodule Jido.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_dna, "~> 1.5", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18.5", only: [:dev, :test]},
       {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
       {:reach, "~> 2.8", only: [:dev, :test], runtime: false},
 
@@ -153,7 +159,14 @@ defmodule Jido.MixProject do
       "test.property": test_alias("test/property", :property),
       "test.services": test_alias("test/system/services", :service),
       "test.system": test_alias("test/system", :system),
-      "quality.contract": "test test/quality/quality_contract_test.exs --seed 0"
+      "quality.contract": "test test/quality/quality_contract_test.exs --seed 0",
+      "quality.coverage": fn args ->
+        Mix.Task.run("app.start")
+        Code.require_file("test/quality/support/contract.exs")
+        Code.require_file("test/quality/support/component_proof.exs")
+        Code.require_file("test/quality/support/coverage.exs")
+        Jido.Quality.Coverage.run!(File.cwd!(), args)
+      end
     ]
   end
 
