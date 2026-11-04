@@ -357,16 +357,160 @@ assets:
     target_path: examples/flow/03_durability
     quality_surface: examples
     owner: jido.execution
+    disposition: ported
+    reason: Reviewed by jido-07x.11. Six current Runner lessons are ported and eight product gaps have executable deferred probes.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_01_run_identity
+    target_path: examples/flow/03_durability/03_01_run_identity
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.11 with current Runic execution identity and exact Jido result assertions.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_02_snapshot_and_resume
+    target_path: examples/flow/03_durability/03_02_snapshot_and_resume
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.11 with checkpoint, stop, resume, and no-repeat assertions.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_03_process_recovery
+    target_path: examples/flow/03_durability/03_03_process_recovery
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.11 with process monitors, a message barrier, and pending-work recovery.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_04_delivery_rules
+    target_path: test/quality/deferred/action_flow/examples/03_durability/03_04_delivery_rules_test.exs
+    quality_surface: examples
+    owner: jido.execution
     disposition: deferred
-    reason: Scheduled for jido-07x.11 as explicit post-baseline quality work.
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/03_durability/03_04_delivery_rules_test.exs --include skip --seed 0 fails because the public API does not expose stable dispatch-result acceptance with equal and conflicting retry classification."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_05_dets_recovery
+    target_path: test/quality/deferred/action_flow/examples/03_durability/03_05_dets_recovery_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/03_durability/03_05_dets_recovery_test.exs --include skip --seed 0 fails because Jido Exec has no supported DETS Runner Store."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_06_compaction
+    target_path: test/quality/deferred/action_flow/examples/03_durability/03_06_compaction_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/03_durability/03_06_compaction_test.exs --include skip --seed 0 fails because the public API has no atomic activation-history compaction contract."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_07_run_inspection
+    target_path: examples/flow/03_durability/03_07_run_inspection
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.11 with active admission, workflow snapshot, incomplete result, and complete result assertions.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_08_cancellation
+    target_path: examples/flow/03_durability/03_08_cancellation
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.11 with process monitors and an assertion that later Map work is not admitted.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_09_production_store
+    target_path: test/quality/deferred/action_flow/examples/03_durability/03_09_production_store_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/03_durability/03_09_production_store_test.exs --include skip --seed 0 fails because no production Runner Store provides discovery, leases, and fencing."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_10_automatic_recovery
+    target_path: test/quality/deferred/action_flow/examples/03_durability/03_10_automatic_recovery_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/03_durability/03_10_automatic_recovery_test.exs --include skip --seed 0 fails because application startup does not discover and resume incomplete executions."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_11_audit_trace
+    target_path: test/quality/deferred/action_flow/examples/03_durability/03_11_audit_trace_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/03_durability/03_11_audit_trace_test.exs --include skip --seed 0 fails because no public complete durable audit projection exists."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_12_telemetry
+    target_path: examples/flow/03_durability/03_12_telemetry
+    quality_surface: examples
+    owner: jido.telemetry
+    disposition: ported
+    reason: Ported by jido-07x.11 with correlated Runic workflow and Jido Action telemetry assertions.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_13_worker_claim
+    target_path: test/quality/deferred/action_flow/examples/03_durability/03_13_worker_claim_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/03_durability/03_13_worker_claim_test.exs --include skip --seed 0 fails because no public durable worker-claim contract exists."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/03_durability/03_14_fenced_worker_result
+    target_path: test/quality/deferred/action_flow/examples/03_durability/03_14_fenced_worker_result_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/03_durability/03_14_fenced_worker_result_test.exs --include skip --seed 0 fails because public worker lease renewal and fenced result acceptance are not available."
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/04_patterns
     target_path: examples/flow/04_patterns
     quality_surface: examples
     owner: jido.execution
+    disposition: ported
+    reason: Reviewed by jido-07x.11. Three current pattern lessons are ported and the durable static ReAct audit gap has an executable deferred probe.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/04_patterns/04_01_human_approval
+    target_path: examples/flow/04_patterns/04_01_human_approval
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.11 with deterministic addressed wait coordination and exact effects.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/04_patterns/04_02_batch_processing
+    target_path: examples/flow/04_patterns/04_02_batch_processing
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.11 with a four-task message barrier, ordered Map results, and exact Reduce output.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/04_patterns/04_03_static_react
+    target_path: test/quality/deferred/action_flow/examples/04_patterns/04_03_static_react_test.exs
+    quality_surface: examples
+    owner: jido.execution
     disposition: deferred
-    reason: Scheduled for jido-07x.11 as explicit post-baseline quality work.
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/04_patterns/04_03_static_react_test.exs --include skip --seed 0 fails because no public durable nested ReAct activation and audit projection provides the source assertion."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/04_patterns/04_04_compensation
+    target_path: examples/flow/04_patterns/04_04_compensation
+    quality_surface: examples
+    owner: jido.execution
+    disposition: ported
+    reason: Ported by jido-07x.11 with checkpointed manual execution, resume, idempotent reservation, and explicit compensation assertions. The source automatic-failure case remains outside the supported contract.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: examples/05_distribution
@@ -374,7 +518,47 @@ assets:
     quality_surface: examples
     owner: jido.execution
     disposition: deferred
-    reason: Scheduled for jido-07x.11 as explicit post-baseline quality work.
+    reason: Reviewed by jido-07x.11. All five source lessons are product gaps with executable deferred probes.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/05_distribution/05_01_remote_dispatch
+    target_path: test/quality/deferred/action_flow/examples/05_distribution/05_01_remote_dispatch_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/05_distribution/05_01_remote_dispatch_test.exs --include skip --seed 0 fails because no supported remote Runner executor adapter exists."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/05_distribution/05_02_worker_loss
+    target_path: test/quality/deferred/action_flow/examples/05_distribution/05_02_worker_loss_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/05_distribution/05_02_worker_loss_test.exs --include skip --seed 0 fails because remote worker monitoring and redelivery are not implemented."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/05_distribution/05_03_owner_failover
+    target_path: test/quality/deferred/action_flow/examples/05_distribution/05_03_owner_failover_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/05_distribution/05_03_owner_failover_test.exs --include skip --seed 0 fails because incomplete-execution discovery and cluster ownership do not exist."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/05_distribution/05_04_lease_and_fencing
+    target_path: test/quality/deferred/action_flow/examples/05_distribution/05_04_lease_and_fencing_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/05_distribution/05_04_lease_and_fencing_test.exs --include skip --seed 0 fails because cluster-wide execution-owner leases and fencing do not exist."
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: examples/05_distribution/05_05_cluster_concurrency
+    target_path: test/quality/deferred/action_flow/examples/05_distribution/05_05_cluster_concurrency_test.exs
+    quality_surface: examples
+    owner: jido.execution
+    disposition: deferred
+    reason: "Product gap: mix test test/quality/deferred/action_flow/examples/05_distribution/05_05_cluster_concurrency_test.exs --include skip --seed 0 fails because cluster-wide admission and concurrency controls do not exist."
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: test/authoring

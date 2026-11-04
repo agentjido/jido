@@ -28,6 +28,9 @@ categories:
 index_readmes:
   - examples/flow/01_compilation/README.md
   - examples/flow/02_execution/README.md
+  - examples/flow/03_durability/README.md
+  - examples/flow/04_patterns/README.md
+  - examples/flow/05_distribution/README.md
 examples:
   - id: flow/01_01_single_step
     category: flow
@@ -144,6 +147,51 @@ examples:
     readme: examples/flow/02_execution/02_15_dynamic_invoke/README.md
     source: examples/flow/02_execution/02_15_dynamic_invoke/dynamic_invoke.ex
     test: test/examples/flow/02_execution/02_15_dynamic_invoke/dynamic_invoke_test.exs
+  - id: flow/03_01_run_identity
+    category: flow
+    readme: examples/flow/03_durability/03_01_run_identity/README.md
+    source: examples/flow/03_durability/03_01_run_identity/run_identity.ex
+    test: test/examples/flow/03_durability/03_01_run_identity/run_identity_test.exs
+  - id: flow/03_02_snapshot_and_resume
+    category: flow
+    readme: examples/flow/03_durability/03_02_snapshot_and_resume/README.md
+    source: examples/flow/03_durability/03_02_snapshot_and_resume/snapshot_and_resume.ex
+    test: test/examples/flow/03_durability/03_02_snapshot_and_resume/snapshot_and_resume_test.exs
+  - id: flow/03_03_process_recovery
+    category: flow
+    readme: examples/flow/03_durability/03_03_process_recovery/README.md
+    source: examples/flow/03_durability/03_03_process_recovery/process_recovery.ex
+    test: test/examples/flow/03_durability/03_03_process_recovery/process_recovery_test.exs
+  - id: flow/03_07_run_inspection
+    category: flow
+    readme: examples/flow/03_durability/03_07_run_inspection/README.md
+    source: examples/flow/03_durability/03_07_run_inspection/run_inspection.ex
+    test: test/examples/flow/03_durability/03_07_run_inspection/run_inspection_test.exs
+  - id: flow/03_08_cancellation
+    category: flow
+    readme: examples/flow/03_durability/03_08_cancellation/README.md
+    source: examples/flow/03_durability/03_08_cancellation/cancellation.ex
+    test: test/examples/flow/03_durability/03_08_cancellation/cancellation_test.exs
+  - id: flow/03_12_telemetry
+    category: flow
+    readme: examples/flow/03_durability/03_12_telemetry/README.md
+    source: examples/flow/03_durability/03_12_telemetry/telemetry.ex
+    test: test/examples/flow/03_durability/03_12_telemetry/telemetry_test.exs
+  - id: flow/04_01_human_approval
+    category: flow
+    readme: examples/flow/04_patterns/04_01_human_approval/README.md
+    source: examples/flow/04_patterns/04_01_human_approval/human_approval.ex
+    test: test/examples/flow/04_patterns/04_01_human_approval/human_approval_test.exs
+  - id: flow/04_02_batch_processing
+    category: flow
+    readme: examples/flow/04_patterns/04_02_batch_processing/README.md
+    source: examples/flow/04_patterns/04_02_batch_processing/batch_processing.ex
+    test: test/examples/flow/04_patterns/04_02_batch_processing/batch_processing_test.exs
+  - id: flow/04_04_compensation
+    category: flow
+    readme: examples/flow/04_patterns/04_04_compensation/README.md
+    source: examples/flow/04_patterns/04_04_compensation/compensation.ex
+    test: test/examples/flow/04_patterns/04_04_compensation/compensation_test.exs
 exclusions:
   - path: examples/00_graph_first
     reason: The numbered live-provider lesson is opt-in. U15 owns offline AI examples, and U19 owns live-provider proof.
