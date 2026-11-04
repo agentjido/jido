@@ -2,6 +2,7 @@ schema_version: 1
 families:
   - id: jido.signal
     component: jido_action.authoring
+    components: [jido_action.authoring, jido_action.boundary, jido.agent_server.effects, jido.plugin.bus]
     owner: jido.signal
     workload: Signal construction, codec, routing, dispatch, Bus, selector, replay, and cleanup
     limiter: Caller CPU, scheduler work, process memory, mailbox growth, and retained term size
@@ -17,6 +18,7 @@ families:
       scale: {input_size: "2, 8, and 32 fixture units", concurrency: "case-specific and bounded", warmup: 5, sample_count: 30}
   - id: jido.action_flow.compile
     component: jido_action.flow
+    components: [jido_action.action, jido_action.flow, jido_action.instruction]
     owner: jido.flow
     workload: Normalize and compile wide Flow values
     limiter: Caller CPU and reductions during normalization and compilation
@@ -31,6 +33,7 @@ families:
       stress: {input_size: "Flow widths 64 and 256", concurrency: "1 caller", warmup: 3, sample_count: 10}
   - id: jido.action_flow.run
     component: jido_action.execution
+    components: [jido_action.execution]
     owner: jido.execution
     workload: Run an Action, a Flow module, and a normalized Flow value
     limiter: Execution CPU, reductions, and owned task cleanup
@@ -45,6 +48,7 @@ families:
       stress: {input_size: "Flow width 64", concurrency: "bounded by the Flow runtime", warmup: 5, sample_count: 30}
   - id: jido.action_flow.dsl_compile
     component: jido_action.flow
+    components: [jido_action.action, jido_action.flow, jido_action.instruction]
     owner: jido.flow
     workload: Compile generated Action and Flow DSL modules and run the Flow
     limiter: Elixir compiler CPU and generated module cleanup
@@ -59,6 +63,7 @@ families:
       stress: {input_size: "25 generated Flow modules", concurrency: "1 compiler caller", warmup: 1, sample_count: 25}
   - id: jido.action_flow.react_stress
     component: jido_ai.react
+    components: [jido_ai.react]
     owner: jido.ai.react
     workload: Run one isolated iterative ReAct request in a fresh BEAM VM
     limiter: ReAct execution CPU, process memory, and tool concurrency
@@ -73,6 +78,7 @@ families:
       stress: {input_size: "4 rounds and 4 tools per round", concurrency: "4 tools", warmup: 0, sample_count: 1}
   - id: jido.ai.react.state_growth
     component: jido_ai.react
+    components: [jido_ai.react]
     owner: jido.ai.react
     workload: Run sequential deterministic ReAct requests on one Agent
     limiter: Retained Agent, Session, and Thread size across requests
@@ -87,6 +93,7 @@ families:
       stress: {input_size: "100 requests", concurrency: "1 request", warmup: 0, sample_count: 100}
   - id: jido.ai.react.fresh_workflow
     component: jido_ai.react
+    components: [jido_ai.react]
     owner: jido.ai.react
     workload: Compile and run independent deterministic ReAct workflows
     limiter: Preflight compile CPU, execution CPU, and retained workflow size
@@ -101,6 +108,7 @@ families:
       stress: {input_size: "100 fresh Agents", concurrency: "1 request", warmup: 0, sample_count: 100}
   - id: jido.ai.react.memory
     component: jido_ai.react
+    components: [jido_ai.react]
     owner: jido.ai.react
     workload: Run isolated recursive and iterative ReAct scenarios and sample VM memory
     limiter: Runic graph work, process memory, allocator growth, and tool concurrency

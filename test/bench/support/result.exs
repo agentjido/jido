@@ -6,7 +6,7 @@ defmodule Jido.Bench.Result do
   alias Jido.Bench.Catalog
 
   @schema_version 1
-  @required_metadata ~w(benchmark_id component owner workload limiter profile input_size concurrency warmup sample_count metrics units git_revision checkout_dirty elixir otp seed)
+  @required_metadata ~w(benchmark_id component components owner workload limiter profile input_size concurrency warmup sample_count metrics units git_revision checkout_dirty elixir otp seed)
 
   def schema_version, do: @schema_version
 
@@ -17,6 +17,7 @@ defmodule Jido.Bench.Result do
     %{
       benchmark_id: benchmark_id,
       component: entry["component"],
+      components: entry["components"],
       owner: entry["owner"],
       workload: entry["workload"],
       limiter: entry["limiter"],

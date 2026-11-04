@@ -21,6 +21,8 @@ defmodule JidoTest.Bench.CatalogTest do
     for family <- catalog["families"] do
       assert readme =~ family["command"], "missing quick command for #{family["id"]}"
       assert family["component"] in components
+      assert family["component"] in family["components"]
+      assert Enum.all?(family["components"], &(&1 in components))
       assert family["quick_profile"] in family["supported_profiles"]
 
       for profile <- family["supported_profiles"] do

@@ -32,9 +32,10 @@ expiry date, and resolution condition.
 
 ## Component proof map
 
-`component_proof.yml` maps all active Covenant components to one proof profile. Each profile declares unit, Covenant,
-authoring, example, property, and fuzz evidence as required or not applicable. A not-applicable result needs a named
-owner, a controlled reason code, and a specific reason.
+`component_proof.yml` maps all active Covenant components to one functional proof profile and one performance proof
+profile. Functional profiles declare unit, Covenant, authoring, example, property, and fuzz evidence. Performance
+profiles declare load and benchmark evidence. Every proof is required or not applicable. A not-applicable result needs
+a named owner, a controlled reason code, and a specific reason.
 
 Module ownership starts with the `modules` frontmatter in active Covenant records. Three documented overlaps have an
 explicit primary owner. Fallback namespace rules cover modules that do not occur in Covenant frontmatter. The most

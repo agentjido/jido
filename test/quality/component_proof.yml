@@ -1,12 +1,15 @@
 version: 1
 schema:
   proof_types: [unit, covenant, authoring, example, property, fuzz]
+  performance_proof_types: [load, benchmark]
   proof_states: [required, not_applicable]
   not_applicable_reason_codes:
     - deterministic_contract_matrix
     - external_boundary
     - no_supported_authoring_surface
     - no_supported_example
+    - no_supported_load_surface
+    - no_supported_benchmark
     - stateful_lifecycle
 module_inventory:
   production_count: 463
@@ -88,6 +91,11 @@ evidence_groups:
   signal_fuzz: [test/property/signal]
   expression_property: [test/property/action_flow/expression]
   expression_fuzz: [test/property/action_flow/expression]
+  runtime_load: [test/load/runtime]
+  action_flow_load: [test/load/action_flow]
+  signal_benchmark: [test/bench/signal]
+  action_flow_benchmark: [test/bench/action_flow]
+  react_benchmark: [test/bench/ai]
 proof_profiles:
   closed_contract:
     unit: {state: required, evidence_group: unit}
@@ -145,44 +153,63 @@ proof_profiles:
     example: {state: not_applicable, owner: self, reason_code: no_supported_example, reason: No supported offline example catalog entry is registered for this external boundary.}
     property: {state: not_applicable, owner: self, reason_code: external_boundary, reason: Deterministic provider fixtures and Covenant cases own this external boundary without network-generated inputs.}
     fuzz: {state: not_applicable, owner: self, reason_code: external_boundary, reason: Provider and telemetry effects use deterministic fixtures; external fuzz execution is not an offline package gate.}
+performance_profiles:
+  no_performance_surface:
+    load: {state: not_applicable, owner: self, reason_code: no_supported_load_surface, reason: This component has no supported sustained-concurrency or throughput surface that needs a separate load suite.}
+    benchmark: {state: not_applicable, owner: self, reason_code: no_supported_benchmark, reason: This component has no stable workload or useful limiter that needs a separate benchmark family.}
+  runtime_load:
+    load: {state: required, evidence_group: runtime_load}
+    benchmark: {state: not_applicable, owner: self, reason_code: no_supported_benchmark, reason: AgentServer lifecycle throughput is checked under bounded load; no separate timing comparison has a stable useful limiter.}
+  signal_benchmark:
+    load: {state: not_applicable, owner: self, reason_code: no_supported_load_surface, reason: Signal boundary work is bounded per operation; sustained AgentServer and execution load are owned by their runtime components.}
+    benchmark: {state: required, evidence_group: signal_benchmark}
+  action_flow_benchmark:
+    load: {state: not_applicable, owner: self, reason_code: no_supported_load_surface, reason: This authoring component performs bounded construction or compilation; execution owns sustained load behavior.}
+    benchmark: {state: required, evidence_group: action_flow_benchmark}
+  execution_performance:
+    load: {state: required, evidence_group: action_flow_load}
+    benchmark: {state: required, evidence_group: action_flow_benchmark}
+  react_benchmark:
+    load: {state: not_applicable, owner: self, reason_code: no_supported_load_surface, reason: Offline ReAct proof uses bounded deterministic requests; external provider throughput is not a portable package load gate.}
+    benchmark: {state: required, evidence_group: react_benchmark}
 components:
-  - {id: jido.agent, proof_profile: authoring_contract}
-  - {id: jido.agent_evaluation, proof_profile: closed_contract}
-  - {id: jido.agent_server, proof_profile: stateful_contract}
-  - {id: jido.agent_server.activation, proof_profile: stateful_contract}
-  - {id: jido.agent_server.composition, proof_profile: stateful_contract}
-  - {id: jido.agent_server.durable, proof_profile: stateful_contract}
-  - {id: jido.agent_server.durable_turn, proof_profile: stateful_contract}
-  - {id: jido.agent_server.effects, proof_profile: signal_stateful}
-  - {id: jido.agent_server.handoff, proof_profile: stateful_contract}
-  - {id: jido.agent_server.plugin_runtime, proof_profile: stateful_contract}
-  - {id: jido.error, proof_profile: closed_contract}
-  - {id: jido.instance, proof_profile: stateful_contract}
-  - {id: jido.persistence, proof_profile: stateful_contract}
-  - {id: jido.plugin, proof_profile: authoring_stateful_contract}
-  - {id: jido.plugin.audit, proof_profile: stateful_contract}
-  - {id: jido.plugin.bus, proof_profile: signal_stateful}
-  - {id: jido.plugin.heartbeat, proof_profile: stateful_contract}
-  - {id: jido.plugin.scheduler, proof_profile: stateful_contract}
-  - {id: jido.plugin.sensor_manager, proof_profile: stateful_contract}
-  - {id: jido.telemetry, proof_profile: stateful_contract}
-  - {id: jido_action.action, proof_profile: authoring_contract}
-  - {id: jido_action.authoring, proof_profile: signal_authoring}
-  - {id: jido_action.boundary, proof_profile: signal_authoring}
-  - {id: jido_action.codec, proof_profile: authoring_contract}
-  - {id: jido_action.execution, proof_profile: closed_contract}
-  - {id: jido_action.expression, proof_profile: expression_authoring}
-  - {id: jido_action.flow, proof_profile: authoring_contract}
-  - {id: jido_action.inline, proof_profile: authoring_contract}
-  - {id: jido_action.inline_flow, proof_profile: authoring_contract}
-  - {id: jido_action.instruction, proof_profile: authoring_contract}
-  - {id: jido_action.output, proof_profile: closed_contract}
-  - {id: jido_action.validation, proof_profile: authoring_contract}
-  - {id: jido_ai.agent_authoring, proof_profile: authoring_contract}
-  - {id: jido_ai.conversation, proof_profile: authoring_contract}
-  - {id: jido_ai.model_execution, proof_profile: external_contract}
-  - {id: jido_ai.observability, proof_profile: external_contract}
-  - {id: jido_ai.react, proof_profile: closed_contract}
-  - {id: jido_ai.strategies, proof_profile: closed_contract}
-  - {id: jido_ai.tools, proof_profile: authoring_contract}
-  - {id: jido_ai.turn, proof_profile: closed_contract}
+  - {id: jido.agent, proof_profile: authoring_contract, performance_profile: no_performance_surface}
+  - {id: jido.agent_evaluation, proof_profile: closed_contract, performance_profile: no_performance_surface}
+  - {id: jido.agent_server, proof_profile: stateful_contract, performance_profile: runtime_load}
+  - {id: jido.agent_server.activation, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.agent_server.composition, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.agent_server.durable, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.agent_server.durable_turn, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.agent_server.effects, proof_profile: signal_stateful, performance_profile: signal_benchmark}
+  - {id: jido.agent_server.handoff, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.agent_server.plugin_runtime, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.error, proof_profile: closed_contract, performance_profile: no_performance_surface}
+  - {id: jido.instance, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.persistence, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.plugin, proof_profile: authoring_stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.plugin.audit, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.plugin.bus, proof_profile: signal_stateful, performance_profile: signal_benchmark}
+  - {id: jido.plugin.heartbeat, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.plugin.scheduler, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.plugin.sensor_manager, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido.telemetry, proof_profile: stateful_contract, performance_profile: no_performance_surface}
+  - {id: jido_action.action, proof_profile: authoring_contract, performance_profile: action_flow_benchmark}
+  - {id: jido_action.authoring, proof_profile: signal_authoring, performance_profile: signal_benchmark}
+  - {id: jido_action.boundary, proof_profile: signal_authoring, performance_profile: signal_benchmark}
+  - {id: jido_action.codec, proof_profile: authoring_contract, performance_profile: no_performance_surface}
+  - {id: jido_action.execution, proof_profile: closed_contract, performance_profile: execution_performance}
+  - {id: jido_action.expression, proof_profile: expression_authoring, performance_profile: no_performance_surface}
+  - {id: jido_action.flow, proof_profile: authoring_contract, performance_profile: action_flow_benchmark}
+  - {id: jido_action.inline, proof_profile: authoring_contract, performance_profile: no_performance_surface}
+  - {id: jido_action.inline_flow, proof_profile: authoring_contract, performance_profile: no_performance_surface}
+  - {id: jido_action.instruction, proof_profile: authoring_contract, performance_profile: action_flow_benchmark}
+  - {id: jido_action.output, proof_profile: closed_contract, performance_profile: no_performance_surface}
+  - {id: jido_action.validation, proof_profile: authoring_contract, performance_profile: no_performance_surface}
+  - {id: jido_ai.agent_authoring, proof_profile: authoring_contract, performance_profile: no_performance_surface}
+  - {id: jido_ai.conversation, proof_profile: authoring_contract, performance_profile: no_performance_surface}
+  - {id: jido_ai.model_execution, proof_profile: external_contract, performance_profile: no_performance_surface}
+  - {id: jido_ai.observability, proof_profile: external_contract, performance_profile: no_performance_surface}
+  - {id: jido_ai.react, proof_profile: closed_contract, performance_profile: react_benchmark}
+  - {id: jido_ai.strategies, proof_profile: closed_contract, performance_profile: no_performance_surface}
+  - {id: jido_ai.tools, proof_profile: authoring_contract, performance_profile: no_performance_surface}
+  - {id: jido_ai.turn, proof_profile: closed_contract, performance_profile: no_performance_surface}

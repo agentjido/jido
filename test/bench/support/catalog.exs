@@ -1,7 +1,7 @@
 defmodule Jido.Bench.Catalog do
   @moduledoc false
 
-  @required_family_fields ~w(id component owner workload limiter command quick_profile supported_profiles metrics units profiles)
+  @required_family_fields ~w(id component components owner workload limiter command quick_profile supported_profiles metrics units profiles)
   @required_profile_fields ~w(input_size concurrency warmup sample_count)
   @catalog_path Path.expand("../catalog.yml", __DIR__)
 

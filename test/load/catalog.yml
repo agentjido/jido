@@ -1,0 +1,18 @@
+schema_version: 1
+families:
+  - id: jido.agent_server.lifecycle
+    components: [jido.agent_server]
+    owner: jido.agent_server
+    command: mix test.load test/load/runtime
+    workload: Concurrent AgentServer commands with supervised startup and cleanup
+    limiter: AgentServer mailbox, command execution, and owned process cleanup
+    bounded_case: 3 cycles of 100 Agents; 20 calls per cycle; stop concurrency 32
+    evidence: test/load/runtime/agent_server_load_test.exs
+  - id: jido_action.execution
+    components: [jido_action.execution]
+    owner: jido_action.execution
+    command: mix test.load test/load/action_flow
+    workload: Concurrent Action and Flow execution with task and runtime cleanup
+    limiter: Execution task scheduling, workflow ownership, and process cleanup
+    bounded_case: 200 fixed concurrent workflows
+    evidence: test/load/action_flow/exec_load_test.exs

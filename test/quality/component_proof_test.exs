@@ -67,6 +67,50 @@ defmodule Jido.Quality.ComponentProofTest do
     assert "profile expression_authoring proof fuzz has no evidence group" in ComponentProof.validate(proof, @root)
   end
 
+  test "rejects missing load and benchmark evidence" do
+    proof = ComponentProof.load!(@proof_path)
+
+    invalid =
+      proof
+      |> put_in(["performance_profiles", "runtime_load", "load", "evidence_group"], "missing_load")
+      |> put_in(
+        [
+          "performance_profiles",
+          "react_benchmark",
+          "benchmark",
+          "evidence_group"
+        ],
+        "missing_benchmark"
+      )
+
+    errors = ComponentProof.validate(invalid, @root)
+    assert "profile runtime_load proof load has no evidence group" in errors
+    assert "profile react_benchmark proof benchmark has no evidence group" in errors
+  end
+
+  test "rejects a component without a known performance profile" do
+    proof = ComponentProof.load!(@proof_path)
+    [first | rest] = proof["components"]
+    invalid = Map.put(proof, "components", [Map.put(first, "performance_profile", "missing") | rest])
+
+    assert "component #{first["id"]} has unknown performance profile: \"missing\"" in ComponentProof.validate(
+             invalid,
+             @root
+           )
+  end
+
+  test "load and benchmark catalogs cover exactly the required performance components" do
+    proof = ComponentProof.load!(@proof_path)
+    {:ok, load_catalog} = YamlElixir.read_from_file(Path.join(@root, "test/load/catalog.yml"))
+    {:ok, benchmark_catalog} = YamlElixir.read_from_file(Path.join(@root, "test/bench/catalog.yml"))
+
+    load_components = catalog_components(load_catalog)
+    benchmark_components = catalog_components(benchmark_catalog)
+
+    assert load_components == required_performance_components(proof, "load")
+    assert benchmark_components == required_performance_components(proof, "benchmark")
+  end
+
   test "rejects a not-applicable proof without an owner and specific reason" do
     proof = ComponentProof.load!(@proof_path)
 
@@ -99,4 +143,20 @@ defmodule Jido.Quality.ComponentProofTest do
   end
 
   defp component_ids(proof), do: Enum.map(proof["components"], & &1["id"])
+
+  defp catalog_components(catalog) do
+    catalog["families"]
+    |> Enum.flat_map(& &1["components"])
+    |> MapSet.new()
+  end
+
+  defp required_performance_components(proof, type) do
+    proof["components"]
+    |> Enum.filter(fn component ->
+      profile = proof["performance_profiles"][component["performance_profile"]]
+      profile[type]["state"] == "required"
+    end)
+    |> Enum.map(& &1["id"])
+    |> MapSet.new()
+  end
 end

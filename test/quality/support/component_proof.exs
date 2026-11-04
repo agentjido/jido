@@ -17,13 +17,16 @@ defmodule Jido.Quality.ComponentProof do
 
     components = list(proof["components"])
     profiles = map(proof["proof_profiles"])
+    performance_profiles = map(proof["performance_profiles"])
     groups = map(proof["evidence_groups"])
     schema = map(proof["schema"])
+    performance_schema = Map.put(schema, "proof_types", list(schema["performance_proof_types"]))
 
     errors =
       []
-      |> validate_components(components, active, profiles)
+      |> validate_components(components, active, profiles, performance_profiles)
       |> validate_profiles(profiles, groups, schema, root)
+      |> validate_profiles(performance_profiles, groups, performance_schema, root)
       |> validate_inventory(proof["module_inventory"], inventory)
 
     {_owners, ownership_errors} =
@@ -117,7 +120,7 @@ defmodule Jido.Quality.ComponentProof do
     |> Base.encode16(case: :lower)
   end
 
-  defp validate_components(errors, components, active, profiles) do
+  defp validate_components(errors, components, active, profiles, performance_profiles) do
     ids = Enum.map(components, & &1["id"])
 
     duplicates =
@@ -134,7 +137,13 @@ defmodule Jido.Quality.ComponentProof do
           not Map.has_key?(profiles, component["proof_profile"]),
           do: "component #{component["id"]} has unknown proof profile: #{inspect(component["proof_profile"])}"
 
-    errors ++ duplicates ++ missing ++ unknown ++ bad_profiles
+    bad_performance_profiles =
+      for component <- components,
+          not Map.has_key?(performance_profiles, component["performance_profile"]),
+          do:
+            "component #{component["id"]} has unknown performance profile: #{inspect(component["performance_profile"])}"
+
+    errors ++ duplicates ++ missing ++ unknown ++ bad_profiles ++ bad_performance_profiles
   end
 
   defp validate_profiles(errors, profiles, groups, schema, root) do
@@ -203,7 +212,7 @@ defmodule Jido.Quality.ComponentProof do
   end
 
   defp validate_executable_evidence(errors, type, paths, root, prefix)
-       when type in ["authoring", "example", "property", "fuzz"] do
+       when type in ["authoring", "example", "property", "fuzz", "load", "benchmark"] do
     files =
       paths
       |> Enum.flat_map(fn path ->
