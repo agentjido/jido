@@ -45,16 +45,32 @@ assets:
     target_path: test/bench/signal
     quality_surface: benchmark_smoke
     owner: jido.signal
-    disposition: deferred
-    reason: Scheduled for jido-07x.4.
+    disposition: ported
+    reason: Ported by jido-07x.4 with result validation, cleanup checks, and no timing or memory pass threshold.
   - source_repository: jido_signal
     source_commit: 7b825f1d050a0e0159bb2a72ba79c100b5d362d3
     source_path: bench
     target_path: bench/signal
     quality_surface: benchmark
     owner: jido.signal
-    disposition: deferred
-    reason: Scheduled for jido-07x.4. Historical bench/results files are excluded.
+    disposition: ported
+    reason: Ported by jido-07x.4. Reports write only under tmp/bench/signal.
+  - source_repository: jido_signal
+    source_commit: 7b825f1d050a0e0159bb2a72ba79c100b5d362d3
+    source_path: bench/results
+    target_path: test/quality/excluded/signal_benchmark_results
+    quality_surface: benchmark_history
+    owner: jido.signal
+    disposition: excluded
+    reason: Historical benchmark results are not imported.
+  - source_repository: jido_signal
+    source_commit: 7b825f1d050a0e0159bb2a72ba79c100b5d362d3
+    source_path: bench/compare.exs
+    target_path: test/quality/excluded/signal_benchmark_compare
+    quality_surface: benchmark_comparison
+    owner: jido.signal
+    disposition: excluded
+    reason: The imported runner reports measurements without timing or memory pass thresholds.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/property
