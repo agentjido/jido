@@ -125,8 +125,24 @@ assets:
     target_path: test/bench/action_flow
     quality_surface: benchmark_smoke
     owner: jido.flow
-    disposition: deferred
-    reason: Scheduled for jido-07x.7 as explicit post-baseline quality work.
+    disposition: ported
+    reason: Ported by jido-07x.7 with quick, standard, and stress profiles for Flow compile, Flow run, DSL compile, and the current ReAct memory benchmark; generated reports stay under ignored tmp/bench/action_flow.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: test/bench/*.exs
+    target_path: bench/action_flow
+    quality_surface: benchmark
+    owner: jido.flow
+    disposition: ported
+    reason: Ported by jido-07x.7 as manual runners that use current Flow data and execution APIs and delegate ReAct measurement to bench/react_memory.exs.
+  - source_repository: jido_action
+    source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
+    source_path: test/bench/results
+    target_path: test/quality/excluded/action_flow_benchmark_results
+    quality_surface: benchmark_history
+    owner: jido.flow
+    disposition: excluded
+    reason: Historical benchmark result JSON is not imported; generated reports are ignored under tmp/bench/action_flow.
   - source_repository: jido_action
     source_commit: 40ec1f0af3a373bae5e6d869017cc229c85aef92
     source_path: test/examples
