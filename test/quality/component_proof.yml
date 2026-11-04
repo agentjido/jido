@@ -1,0 +1,188 @@
+version: 1
+schema:
+  proof_types: [unit, covenant, authoring, example, property, fuzz]
+  proof_states: [required, not_applicable]
+  not_applicable_reason_codes:
+    - deterministic_contract_matrix
+    - external_boundary
+    - no_supported_authoring_surface
+    - no_supported_example
+    - stateful_lifecycle
+module_inventory:
+  production_count: 463
+  production_sha256: d399e5eef21e8867f83d8df57e763cd700632c6e02cff0c6e198d7fef1ff2a1e
+  public_count: 221
+  public_sha256: 0a2bbf0270c46ba335263b6a34c8cfbd8d869a024a04560a29616c4049b14e20
+module_ownership:
+  covenant_records: test/contracts/**/*.obligations.md
+  overrides:
+    - module: Jido.Persistence
+      component: jido.persistence
+      reason: The persistence facade belongs to the persistence component, not its durable AgentServer consumer.
+    - module: Jido.Instruction.Config
+      component: jido_action.action
+      reason: Static instruction configuration is owned by Action compilation; Inline Action is a consumer.
+    - module: Jido.AgentServer.Lifecycle
+      component: jido.agent_server
+      reason: The lifecycle coordinator is the core AgentServer owner; durable components exercise focused paths through it.
+  fallback_rules:
+    - {prefix: Inspect.Jido.AgentServer, component: jido.agent_server}
+    - {prefix: Inspect.Jido.Signal, component: jido_action.authoring}
+    - {prefix: Jido.AI.InferenceClient, component: jido_ai.model_execution}
+    - {prefix: Jido.AI.Context, component: jido_ai.model_execution}
+    - {prefix: Jido.AI.Reasoning.ReAct, component: jido_ai.react}
+    - {prefix: Jido.AI.Agent, component: jido_ai.agent_authoring}
+    - {prefix: Jido.AI.Thread, component: jido_ai.conversation}
+    - {prefix: Jido.AI, component: jido_ai.agent_authoring}
+    - {prefix: Jido.AgentServer.Directive, component: jido.agent_server.effects}
+    - {prefix: Jido.AgentServer.Plugin, component: jido.agent_server.plugin_runtime}
+    - {prefix: Jido.AgentServer, component: jido.agent_server}
+    - {prefix: Jido.Agent, component: jido.agent}
+    - {prefix: Jido.Action, component: jido_action.action}
+    - {prefix: Jido.Catalog, component: jido_action.authoring}
+    - {prefix: Jido.Codec, component: jido_action.authoring}
+    - {prefix: Jido.Error, component: jido.error}
+    - {prefix: Jido.Exec, component: jido_action.execution}
+    - {prefix: Jido.Expr, component: jido_action.expression}
+    - {prefix: Jido.Flow.Codec, component: jido_action.codec}
+    - {prefix: Jido.Flow.Inline, component: jido_action.inline_flow}
+    - {prefix: Jido.Flow, component: jido_action.flow}
+    - {prefix: Jido.Instance, component: jido.instance}
+    - {prefix: Jido.Instruction, component: jido_action.instruction}
+    - {prefix: Jido.Joi, component: jido_action.validation}
+    - {prefix: Jido.Persistence, component: jido.persistence}
+    - {prefix: Jido.Plugin.Audit, component: jido.plugin.audit}
+    - {prefix: Jido.Plugin.Bus, component: jido.plugin.bus}
+    - {prefix: Jido.Plugin.Heartbeat, component: jido.plugin.heartbeat}
+    - {prefix: Jido.Plugin.Scheduler, component: jido.plugin.scheduler}
+    - {prefix: Jido.Plugin.SensorManager, component: jido.plugin.sensor_manager}
+    - {prefix: Jido.Plugin, component: jido.plugin}
+    - {prefix: Jido.Signal.Bus, component: jido.plugin.bus}
+    - {prefix: Jido.Signal.Dispatch, component: jido.agent_server.effects}
+    - {prefix: Jido.Signal, component: jido_action.authoring}
+    - {prefix: Jido.Telemetry.AI, component: jido_ai.observability}
+    - {prefix: Jido.Telemetry, component: jido.telemetry}
+    - {prefix: Jido.Trace, component: jido.telemetry}
+    - {prefix: Jido.Thread, component: jido_ai.conversation}
+    - {prefix: Jido.Session, component: jido_ai.conversation}
+    - {prefix: Jido.Id, component: jido_action.authoring}
+    - {prefix: Jido.Application, component: jido.agent_server.activation}
+    - {exact: Jido, component: jido.agent_server.activation}
+    - {prefix: Runic.Component.Jido.Exec, component: jido_action.execution}
+    - {prefix: Runic.Identity.Projectable.Jido.AI, component: jido_ai.model_execution}
+    - {prefix: Runic.Identity.Projectable.Jido.Exec, component: jido_action.execution}
+    - {prefix: Runic.Identity.Projectable.Jido.Flow, component: jido_action.flow}
+    - {prefix: Runic.Identity.Projectable.Jido.Instruction, component: jido_action.instruction}
+    - {prefix: Runic.Identity.Projectable.Jido.Session, component: jido_ai.conversation}
+    - {prefix: Runic.Identity.Projectable.Jido.Thread, component: jido_ai.conversation}
+    - {prefix: Runic.Transmutable.Jido.Exec, component: jido_action.execution}
+    - {prefix: Runic.Transmutable.Jido.Instruction, component: jido_action.instruction}
+    - {prefix: Runic.Workflow.EventApplicator.Jido.Persistence, component: jido.persistence}
+    - {prefix: Runic.Workflow.Invokable.Jido.Exec, component: jido_action.execution}
+    - {prefix: Zoi.Type.Jido.Joi, component: jido_action.validation}
+evidence_groups:
+  unit: [test]
+  covenant: [test/contracts/coverage.json]
+  authoring: [test/authoring]
+  signal_property: [test/property/signal]
+  signal_fuzz: [test/property/signal]
+  expression_property: [test/property/action_flow/expression]
+  expression_fuzz: [test/property/action_flow/expression]
+proof_profiles:
+  closed_contract:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: not_applicable, owner: self, reason_code: no_supported_authoring_surface, reason: This component has no supported JSON or DSL authoring form in the current package.}
+    example: {state: not_applicable, owner: self, reason_code: no_supported_example, reason: No supported example catalog entry is registered for this component in the current package.}
+    property: {state: not_applicable, owner: self, reason_code: deterministic_contract_matrix, reason: The component uses a finite deterministic contract matrix; unit and Covenant cases are its primary generated-input boundary.}
+    fuzz: {state: not_applicable, owner: self, reason_code: deterministic_contract_matrix, reason: The component uses a finite deterministic contract matrix with no separate unbounded parser or data generator.}
+  authoring_contract:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: required, evidence_group: authoring}
+    example: {state: not_applicable, owner: self, reason_code: no_supported_example, reason: No supported example catalog entry is registered for this component in the current package.}
+    property: {state: not_applicable, owner: self, reason_code: deterministic_contract_matrix, reason: The authored forms have a finite deterministic contract matrix covered by executable authoring and Covenant cases.}
+    fuzz: {state: not_applicable, owner: self, reason_code: deterministic_contract_matrix, reason: The authored forms use bounded static declarations and have no separate runtime fuzz group.}
+  stateful_contract:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: not_applicable, owner: self, reason_code: no_supported_authoring_surface, reason: This lifecycle component has no supported JSON or DSL authoring form in the current package.}
+    example: {state: not_applicable, owner: self, reason_code: no_supported_example, reason: No supported example catalog entry is registered for this component in the current package.}
+    property: {state: not_applicable, owner: self, reason_code: stateful_lifecycle, reason: "Deterministic lifecycle, isolation, recovery, and cleanup scenarios are the required proof for this stateful component."}
+    fuzz: {state: not_applicable, owner: self, reason_code: stateful_lifecycle, reason: Stateful process ownership needs deterministic barriers and cleanup checks instead of an uncoordinated fuzz loop.}
+  authoring_stateful_contract:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: required, evidence_group: authoring}
+    example: {state: not_applicable, owner: self, reason_code: no_supported_example, reason: No supported example catalog entry is registered for this component in the current package.}
+    property: {state: not_applicable, owner: self, reason_code: stateful_lifecycle, reason: Executable authoring plus deterministic lifecycle scenarios are the required proof for this stateful component.}
+    fuzz: {state: not_applicable, owner: self, reason_code: stateful_lifecycle, reason: Stateful process ownership needs deterministic barriers and cleanup checks instead of an uncoordinated fuzz loop.}
+  signal_stateful:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: not_applicable, owner: self, reason_code: no_supported_authoring_surface, reason: This runtime component has no separate supported JSON or DSL authoring form.}
+    example: {state: not_applicable, owner: self, reason_code: no_supported_example, reason: No supported example catalog entry is registered for this component in the current package.}
+    property: {state: required, evidence_group: signal_property}
+    fuzz: {state: required, evidence_group: signal_fuzz}
+  signal_authoring:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: required, evidence_group: authoring}
+    example: {state: not_applicable, owner: self, reason_code: no_supported_example, reason: No supported example catalog entry is registered for this component in the current package.}
+    property: {state: required, evidence_group: signal_property}
+    fuzz: {state: required, evidence_group: signal_fuzz}
+  expression_authoring:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: required, evidence_group: authoring}
+    example: {state: not_applicable, owner: self, reason_code: no_supported_example, reason: No supported example catalog entry is registered for this component in the current package.}
+    property: {state: required, evidence_group: expression_property}
+    fuzz: {state: required, evidence_group: expression_fuzz}
+  external_contract:
+    unit: {state: required, evidence_group: unit}
+    covenant: {state: required, evidence_group: covenant}
+    authoring: {state: not_applicable, owner: self, reason_code: no_supported_authoring_surface, reason: This provider or observation boundary has no supported JSON or DSL authoring form.}
+    example: {state: not_applicable, owner: self, reason_code: no_supported_example, reason: No supported offline example catalog entry is registered for this external boundary.}
+    property: {state: not_applicable, owner: self, reason_code: external_boundary, reason: Deterministic provider fixtures and Covenant cases own this external boundary without network-generated inputs.}
+    fuzz: {state: not_applicable, owner: self, reason_code: external_boundary, reason: Provider and telemetry effects use deterministic fixtures; external fuzz execution is not an offline package gate.}
+components:
+  - {id: jido.agent, proof_profile: authoring_contract}
+  - {id: jido.agent_evaluation, proof_profile: closed_contract}
+  - {id: jido.agent_server, proof_profile: stateful_contract}
+  - {id: jido.agent_server.activation, proof_profile: stateful_contract}
+  - {id: jido.agent_server.composition, proof_profile: stateful_contract}
+  - {id: jido.agent_server.durable, proof_profile: stateful_contract}
+  - {id: jido.agent_server.durable_turn, proof_profile: stateful_contract}
+  - {id: jido.agent_server.effects, proof_profile: signal_stateful}
+  - {id: jido.agent_server.handoff, proof_profile: stateful_contract}
+  - {id: jido.agent_server.plugin_runtime, proof_profile: stateful_contract}
+  - {id: jido.error, proof_profile: closed_contract}
+  - {id: jido.instance, proof_profile: stateful_contract}
+  - {id: jido.persistence, proof_profile: stateful_contract}
+  - {id: jido.plugin, proof_profile: authoring_stateful_contract}
+  - {id: jido.plugin.audit, proof_profile: stateful_contract}
+  - {id: jido.plugin.bus, proof_profile: signal_stateful}
+  - {id: jido.plugin.heartbeat, proof_profile: stateful_contract}
+  - {id: jido.plugin.scheduler, proof_profile: stateful_contract}
+  - {id: jido.plugin.sensor_manager, proof_profile: stateful_contract}
+  - {id: jido.telemetry, proof_profile: stateful_contract}
+  - {id: jido_action.action, proof_profile: authoring_contract}
+  - {id: jido_action.authoring, proof_profile: signal_authoring}
+  - {id: jido_action.boundary, proof_profile: signal_authoring}
+  - {id: jido_action.codec, proof_profile: authoring_contract}
+  - {id: jido_action.execution, proof_profile: closed_contract}
+  - {id: jido_action.expression, proof_profile: expression_authoring}
+  - {id: jido_action.flow, proof_profile: authoring_contract}
+  - {id: jido_action.inline, proof_profile: authoring_contract}
+  - {id: jido_action.inline_flow, proof_profile: authoring_contract}
+  - {id: jido_action.instruction, proof_profile: authoring_contract}
+  - {id: jido_action.output, proof_profile: closed_contract}
+  - {id: jido_action.validation, proof_profile: authoring_contract}
+  - {id: jido_ai.agent_authoring, proof_profile: authoring_contract}
+  - {id: jido_ai.conversation, proof_profile: authoring_contract}
+  - {id: jido_ai.model_execution, proof_profile: external_contract}
+  - {id: jido_ai.observability, proof_profile: external_contract}
+  - {id: jido_ai.react, proof_profile: closed_contract}
+  - {id: jido_ai.strategies, proof_profile: closed_contract}
+  - {id: jido_ai.tools, proof_profile: authoring_contract}
+  - {id: jido_ai.turn, proof_profile: closed_contract}

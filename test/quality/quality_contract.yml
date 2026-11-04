@@ -7,6 +7,7 @@ schema:
     - thresholds
     - fuzz
     - reports
+    - registries
     - waivers
     - stability_findings
   suite_required_fields:
@@ -168,6 +169,8 @@ reports:
   root: tmp/quality
   json: tmp/quality/quality.json
   text: tmp/quality/quality.txt
+registries:
+  component_proof: test/quality/component_proof.yml
 waivers: []
 stability_findings:
   - id: covenant-persistence-token-cleanup-race

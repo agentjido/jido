@@ -31,6 +31,7 @@ defmodule Jido.Quality.Contract do
     |> validate_thresholds(map(contract["thresholds"]))
     |> validate_fuzz(map(contract["fuzz"]))
     |> validate_reports(map(contract["reports"]), root)
+    |> validate_registries(map(contract["registries"]), root)
     |> validate_waivers(waivers, list(schema["waiver_required_fields"]), today)
     |> validate_stability_findings(
       findings,
@@ -181,6 +182,23 @@ defmodule Jido.Quality.Contract do
     |> add_unless(Enum.all?(values, &present?/1), "reports must declare root, json, and text paths")
     |> add_unless(reports["json"] != reports["text"], "JSON and text report paths must differ")
     |> validate_paths(values, root, "report path")
+  end
+
+  defp validate_registries(errors, registries, root) do
+    paths = Map.values(registries)
+
+    errors
+    |> add_unless(present?(registries["component_proof"]), "registries must declare component_proof")
+    |> validate_paths(paths, root, "registry path")
+    |> then(fn current ->
+      Enum.reduce(paths, current, fn path, path_errors ->
+        add_unless(
+          path_errors,
+          repository_path?(path, root) and File.regular?(Path.join(root, path)),
+          "registry does not exist: #{inspect(path)}"
+        )
+      end)
+    end)
   end
 
   defp validate_waivers(errors, waivers, fields, today) do

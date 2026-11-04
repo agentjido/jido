@@ -30,6 +30,17 @@ expired or incomplete waivers, unowned stability findings, and evidence paths ou
 failure remains in `stability_findings` until its cause is resolved or a versioned waiver records its owner, reason,
 expiry date, and resolution condition.
 
+## Component proof map
+
+`component_proof.yml` maps all active Covenant components to one proof profile. Each profile declares unit, Covenant,
+authoring, example, property, and fuzz evidence as required or not applicable. A not-applicable result needs a named
+owner, a controlled reason code, and a specific reason.
+
+Module ownership starts with the `modules` frontmatter in active Covenant records. Three documented overlaps have an
+explicit primary owner. Fallback namespace rules cover modules that do not occur in Covenant frontmatter. The most
+specific fallback prefix wins. The committed production and documented-public module counts and SHA-256 values make
+new modules fail closed until their ownership is reviewed.
+
 ## Focused commands
 
 Each command uses seed `0`. A command exits successfully with a clear message when its default target path does not exist.
