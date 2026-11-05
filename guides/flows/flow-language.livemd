@@ -1,0 +1,247 @@
+# Flow DSL Tour
+
+Run this Livebook to see each common Flow declaration work on an order-processing example. Each section defines one small Flow and shows its result. Run the cells from top to bottom.
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## An inline Step
+
+The smallest Flow has one component and an `output`. An inline Step binds Flow data in its header and runs Elixir in its body.
+
+```elixir
+defmodule Tour.Greeting do
+  use Jido.Flow, name: "tour_greeting"
+
+  flow do
+    step "greet", customer <- input(:customer) do
+      {:ok, %{message: "Thanks for your order, " <> customer <> "!"}}
+    end
+
+    output result("greet")
+  end
+end
+
+{:ok, %{message: "Thanks for your order, Ada!"}} =
+  Jido.Exec.run(Tour.Greeting, %{customer: "Ada"})
+```
+
+## Action Steps and result references
+
+A Step can call an Action module. `result("price", :subtotal)` reads a field of an earlier result. The reference also tells Jido that `"tax"` depends on `"price"`.
+
+```elixir
+defmodule Tour.PriceLine do
+  use Jido.Action,
+    name: "tour_price_line",
+    schema: Jido.Joi.object(%{quantity: Jido.Joi.integer(), unit_cents: Jido.Joi.integer()})
+
+  @impl true
+  def run(%{quantity: quantity, unit_cents: unit_cents}, _context) do
+    {:ok, %{subtotal: quantity * unit_cents}}
+  end
+end
+
+defmodule Tour.PricedLine do
+  use Jido.Flow, name: "tour_priced_line"
+
+  flow do
+    step "price",
+      action: Tour.PriceLine,
+      params: %{quantity: input(:quantity), unit_cents: input(:unit_cents)}
+
+    step "tax", subtotal <- result("price", :subtotal) do
+      {:ok, %{cents: div(subtotal, 10)}}
+    end
+
+    output %{
+      subtotal: result("price", :subtotal),
+      total: result("price", :subtotal) + result("tax", :cents)
+    }
+  end
+end
+
+{:ok, %{subtotal: 3000, total: 3300}} =
+  Jido.Exec.run(Tour.PricedLine, %{quantity: 3, unit_cents: 1000})
+```
+
+The `total` field is an expression. See [Expressions](flow-expressions.md) for the fixed operators it can use.
+
+## Choice
+
+A `choice` tests its options in order and runs one Action. The `otherwise` fallback is required.
+
+```elixir
+defmodule Tour.Route do
+  use Jido.Action, name: "tour_route"
+
+  @impl true
+  def run(params, _context), do: {:ok, params}
+end
+
+defmodule Tour.Shipping do
+  use Jido.Flow, name: "tour_shipping"
+
+  flow do
+    choice "ship" do
+      option "free",
+        condition: input(:total_cents) >= 5000,
+        action: Tour.Route,
+        params: %{method: :free}
+
+      otherwise action: Tour.Route, params: %{method: :standard}
+    end
+
+    output result("ship")
+  end
+end
+
+{:ok, %{method: :free}} = Jido.Exec.run(Tour.Shipping, %{total_cents: 7500})
+{:ok, %{method: :standard}} = Jido.Exec.run(Tour.Shipping, %{total_cents: 1200})
+```
+
+## Map and Reduce
+
+A `map` runs one Action for each item and keeps input order. A `reduce` folds a list one item at a time.
+
+```elixir
+defmodule Tour.AddLine do
+  use Jido.Action, name: "tour_add_line"
+
+  @impl true
+  def run(%{total: total, line: line}, _context) do
+    {:ok, %{total: total + line.subtotal}}
+  end
+end
+
+defmodule Tour.OrderTotal do
+  use Jido.Flow, name: "tour_order_total"
+
+  flow do
+    map "lines",
+      collection: input(:lines),
+      action: Tour.PriceLine,
+      params: %{quantity: item(:quantity), unit_cents: item(:unit_cents)}
+
+    reduce "sum",
+      collection: result("lines"),
+      initial: %{total: 0},
+      action: Tour.AddLine,
+      params: %{total: accumulator(:total), line: item()}
+
+    output %{lines: result("lines"), total: result("sum", :total)}
+  end
+end
+
+{:ok, %{lines: [%{subtotal: 2000}, %{subtotal: 500}], total: 2500}} =
+  Jido.Exec.run(Tour.OrderTotal, %{
+    lines: [
+      %{quantity: 2, unit_cents: 1000},
+      %{quantity: 1, unit_cents: 500}
+    ]
+  })
+```
+
+## Parallel
+
+A `parallel` runs different named Actions and returns their named results in declaration order. Its Actions can be modules or inline bodies.
+
+```elixir
+defmodule Tour.Lookups do
+  use Jido.Flow, name: "tour_lookups"
+
+  flow do
+    parallel "lookups" do
+      action "customer", Tour.Route, params: %{id: input(:customer_id)}
+
+      action "stock", sku <- input(:sku) do
+        {:ok, %{sku: sku, available: true}}
+      end
+    end
+
+    output %{lookups: result("lookups")}
+  end
+end
+
+{:ok,
+ %{
+   lookups: [
+     %{name: "customer", value: %{id: 9}},
+     %{name: "stock", value: %{sku: "A-1", available: true}}
+   ]
+ }} = Jido.Exec.run(Tour.Lookups, %{customer_id: 9, sku: "A-1"})
+```
+
+## Iterate
+
+An `iterate` calls one Action in a bounded loop and keeps local state between calls. This loop retries a payment check until it clears, up to five times.
+
+```elixir
+defmodule Tour.CheckPayment do
+  use Jido.Action, name: "tour_check_payment"
+
+  @impl true
+  def run(%{attempt: attempt}, _context) do
+    {:ok, %{attempt: attempt + 1, cleared: attempt + 1 >= 3}}
+  end
+end
+
+defmodule Tour.WaitForPayment do
+  use Jido.Flow, name: "tour_wait_for_payment"
+
+  flow do
+    iterate "payment" do
+      state Jido.Joi.map(), initial: %{attempt: 0, cleared: false}
+      action Tour.CheckPayment
+      params %{attempt: state(:attempt)}
+      while not state(:cleared)
+      max_iterations 5
+    end
+
+    output %{payment: result("payment")}
+  end
+end
+
+{:ok, %{payment: %{iterations: 3, state: %{attempt: 3, cleared: true}}}} =
+  Jido.Exec.run(Tour.WaitForPayment)
+```
+
+## Nested Flows
+
+A Step whose target is a Flow module runs that Flow as a child. The child's output becomes the Step result.
+
+```elixir
+defmodule Tour.Checkout do
+  use Jido.Flow, name: "tour_checkout"
+
+  flow do
+    step "total", action: Tour.OrderTotal, params: %{lines: input(:lines)}
+    step "ship", action: Tour.Shipping, params: %{total_cents: result("total", :total)}
+
+    output %{total: result("total", :total), shipping: result("ship", :method)}
+  end
+end
+
+{:ok, %{total: 6000, shipping: :free}} =
+  Jido.Exec.run(Tour.Checkout, %{lines: [%{quantity: 3, unit_cents: 2000}]})
+```
+
+## Inspect what you built
+
+The graph you declared is data. `Jido.Flow.dependencies/1` reports what each component depends on.
+
+```elixir
+{:ok, dependencies} = Jido.Flow.dependencies(Tour.Checkout.flow())
+
+%{effective: []} = dependencies["total"]
+%{effective: ["total"]} = dependencies["ship"]
+```
+
+## Next steps
+
+- [Steps and Output](flow-steps.md) lists every Step form and each component's result.
+- [References and Data](flow-references.livemd) covers each reference and where it is valid.
+- [Dynamic Flows](dynamic-flows.md) covers `invoke` and `handoff`, which this tour leaves out.

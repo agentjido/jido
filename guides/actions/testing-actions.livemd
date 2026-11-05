@@ -1,0 +1,256 @@
+# Test Actions
+
+In this tutorial you write ExUnit tests for an Action at each level: its body, its schemas, its failures, its retries, and its telemetry. You need no external service. For testing across Agents and Flows, see [Test Jido Code](../start-here/testing-jido-code.livemd).
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+Start ExUnit without its automatic run, so each cell can run its own tests.
+
+```elixir
+ExUnit.start(autorun: false)
+```
+
+## Write an Action to test
+
+This Action charges an invoice through a gateway module from context. Tests replace the gateway, so no network is involved.
+
+```elixir
+defmodule TestingActions.Gateway do
+  def charge(_customer_id, _amount_cents), do: {:error, :not_configured}
+end
+
+defmodule TestingActions.ChargeInvoice do
+  alias Jido.Joi
+
+  use Jido.Action,
+    name: "charge_invoice",
+    schema:
+      Joi.object(%{
+        customer_id: Joi.string() |> Joi.min(1),
+        amount_cents: Joi.integer() |> Joi.min(1),
+        currency: Joi.string() |> Joi.default("USD")
+      }),
+    output_schema:
+      Joi.object(%{
+        receipt_id: Joi.string(),
+        amount_cents: Joi.integer()
+      })
+
+  @impl true
+  def run(params, context) do
+    gateway = Map.get(context, :gateway, TestingActions.Gateway)
+
+    case gateway.charge(params.customer_id, params.amount_cents) do
+      {:ok, receipt_id} ->
+        {:ok, %{receipt_id: receipt_id, amount_cents: params.amount_cents},
+         [{:send_receipt, params.customer_id, receipt_id}]}
+
+      {:error, :card_declined} ->
+        {:error, Jido.Error.execution_error("card declined", %{retry: false})}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+end
+
+defmodule TestingActions.ApprovingGateway do
+  def charge(customer_id, _amount_cents), do: {:ok, "receipt-" <> customer_id}
+end
+
+defmodule TestingActions.DecliningGateway do
+  def charge(_customer_id, _amount_cents), do: {:error, :card_declined}
+end
+```
+
+## Test the body and the boundary
+
+Call `run/2` to test the function body with exact inputs. Call `Jido.Exec.run/4` to test what callers receive. Prefer `Jido.Exec.run/4` for most tests, because it applies validation and error handling.
+
+```elixir
+defmodule TestingActions.ChargeTest do
+  use ExUnit.Case, async: true
+
+  alias TestingActions.{ApprovingGateway, ChargeInvoice, DecliningGateway}
+
+  @params %{customer_id: "c-1", amount_cents: 500}
+
+  test "run/2 returns output and an effect request" do
+    params = Map.put(@params, :currency, "USD")
+
+    assert ChargeInvoice.run(params, %{gateway: ApprovingGateway}) ==
+             {:ok, %{receipt_id: "receipt-c-1", amount_cents: 500},
+              [{:send_receipt, "c-1", "receipt-c-1"}]}
+  end
+
+  test "Exec returns the validated result and the effects" do
+    assert {:ok, %{receipt_id: "receipt-c-1"}, [{:send_receipt, "c-1", "receipt-c-1"}]} =
+             Jido.Exec.run(ChargeInvoice, @params, %{gateway: ApprovingGateway})
+  end
+
+  @tag :capture_log
+  test "a declined card has no effects and is not retryable" do
+    assert {:error, %Jido.Error.ExecutionError{message: "card declined"} = error} =
+             Jido.Exec.run(ChargeInvoice, @params, %{gateway: DecliningGateway})
+
+    refute Jido.Error.retryable?(error)
+  end
+end
+
+%{failures: 0, total: 3} = ExUnit.run()
+```
+
+`@tag :capture_log` keeps the warning that Runic logs for a failed Action out of the test output. ExUnit shows the log only if the test fails.
+
+The Action body runs in a task, not in the test process, under `Jido.Exec.run/4`. The task carries the test process in `$callers`, which libraries such as Mox use to find ownership. Process dictionary values do not cross over. Use context for test doubles, or call `Jido.Exec.call_action/3` to stay in the test process.
+
+## Test the schemas
+
+Call the generated validators to test schema rules without running work. Match `code` and `path`, not the message.
+
+```elixir
+defmodule TestingActions.SchemaTest do
+  use ExUnit.Case, async: true
+
+  alias TestingActions.ChargeInvoice
+
+  test "applies defaults" do
+    assert {:ok, %{currency: "USD"}} =
+             ChargeInvoice.validate_params(%{customer_id: "c-1", amount_cents: 500})
+  end
+
+  test "reports every invalid field by path" do
+    assert {:error, %Jido.Error.ValidationError{details: %{errors: errors}}} =
+             ChargeInvoice.validate_params(%{customer_id: "", amount_cents: 0})
+
+    assert [[:amount_cents], [:customer_id]] == errors |> Enum.map(& &1.path) |> Enum.sort()
+  end
+
+  test "rejects output that breaks the contract" do
+    assert {:error, %Jido.Error.ValidationError{}} =
+             ChargeInvoice.validate_output(%{receipt_id: 42, amount_cents: 500})
+  end
+
+  test "publishes the contract" do
+    contract = ChargeInvoice.authoring_contract()
+
+    assert contract["name"] == "charge_invoice"
+    assert "amount_cents" in contract["input_schema"]["required"]
+  end
+end
+
+%{failures: 0, total: 4} = ExUnit.run()
+```
+
+## Test retries and timeouts
+
+Use a shared counter from `:counters` to count attempts across processes. Use a blocking `receive` to force a timeout without a real delay.
+
+```elixir
+defmodule TestingActions.FlakyGateway do
+  use Jido.Action, name: "flaky_gateway"
+
+  @impl true
+  def run(%{fail_times: fail_times}, %{attempts: attempts}) do
+    :counters.add(attempts, 1, 1)
+
+    if :counters.get(attempts, 1) <= fail_times,
+      do: {:error, :gateway_unavailable},
+      else: {:ok, %{attempts: :counters.get(attempts, 1)}}
+  end
+end
+
+defmodule TestingActions.StuckGateway do
+  use Jido.Action, name: "stuck_gateway"
+
+  @impl true
+  def run(_params, %{test_pid: test_pid}) do
+    send(test_pid, {:attempt_started, self()})
+
+    receive do
+      :never -> {:ok, %{}}
+    end
+  end
+end
+
+defmodule TestingActions.PolicyTest do
+  use ExUnit.Case, async: true
+
+  alias TestingActions.{FlakyGateway, StuckGateway}
+
+  setup do
+    {:ok, attempts: :counters.new(1, [])}
+  end
+
+  @tag :capture_log
+  test "retries until success", %{attempts: attempts} do
+    assert {:ok, %{attempts: 3}} =
+             Jido.Exec.run(FlakyGateway, %{fail_times: 2}, %{attempts: attempts}, max_attempts: 3)
+  end
+
+  @tag :capture_log
+  test "stops at max_attempts", %{attempts: attempts} do
+    assert {:error, %Jido.Error.ExecutionError{details: %{reason: :gateway_unavailable}}} =
+             Jido.Exec.run(FlakyGateway, %{fail_times: 9}, %{attempts: attempts}, max_attempts: 2)
+
+    assert :counters.get(attempts, 1) == 2
+  end
+
+  @tag :capture_log
+  test "kills the attempt at the timeout" do
+    assert {:error, %Jido.Error.TimeoutError{timeout: 20}} =
+             Jido.Exec.run(StuckGateway, %{}, %{test_pid: self()}, timeout: 20)
+
+    assert_received {:attempt_started, attempt_pid}
+    monitor = Process.monitor(attempt_pid)
+    assert_receive {:DOWN, ^monitor, :process, ^attempt_pid, _reason}
+  end
+end
+
+%{failures: 0, total: 3} = ExUnit.run()
+```
+
+Keep `:base_delay_ms` at its default in tests. Retries then run with no delay.
+
+## Test telemetry
+
+Attach a handler to `Jido.Telemetry.Exec.event_names/0`. Telemetry handlers run in the Action process, so send events to the test process. Give each test its own handler ID, and filter by Action, because other tests also emit events.
+
+```elixir
+defmodule TestingActions.TelemetryTest do
+  use ExUnit.Case, async: true
+
+  alias TestingActions.{ApprovingGateway, ChargeInvoice}
+
+  def forward(event, _measurements, metadata, test_pid) do
+    if metadata[:action] == ChargeInvoice, do: send(test_pid, {:telemetry, event, metadata})
+  end
+
+  test "reports the outcome and effect count", %{test: test} do
+    :ok = :telemetry.attach_many(test, Jido.Telemetry.Exec.event_names(), &__MODULE__.forward/4, self())
+    on_exit(fn -> :telemetry.detach(test) end)
+
+    assert {:ok, _output, [_effect]} =
+             Jido.Exec.run(
+               ChargeInvoice,
+               %{customer_id: "c-1", amount_cents: 500},
+               %{gateway: ApprovingGateway}
+             )
+
+    assert_received {:telemetry, [:jido, :action, :start], %{action_name: "charge_invoice", attempt: 0}}
+    assert_received {:telemetry, [:jido, :action, :stop], %{outcome: :ok, effect_count: 1}}
+  end
+end
+
+%{failures: 0, total: 1} = ExUnit.run()
+```
+
+## Next steps
+
+- [Test Jido Code](../start-here/testing-jido-code.livemd)
+- [Test Flows](../flow-runtime/testing-flows.livemd)
+- [Execution Policy](action-execution-policy.md)

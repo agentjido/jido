@@ -1,0 +1,150 @@
+# Getting Started
+
+This tutorial installs Jido and takes you from one Action to a running Agent that keeps a payment total. Each later tutorial in this section slows down on one of these pieces.
+
+You need Elixir 1.18 or later. Everything runs locally, with no external service or API key.
+
+## Install Jido
+
+Run this cell in Livebook.
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+In a Mix project, add the same tuple to `deps/0` in `mix.exs`, then run `mix deps.get`. Jido starts its own OTP application, so it needs no other setup before the next step.
+
+## Write an Action
+
+An Action is one named unit of work. This one adds a payment to an invoice balance. Its schema rejects a payment that is not a positive integer. It reads the current balance from the `:agent_state` key of its context and returns the complete next state.
+
+```elixir
+defmodule GettingStarted.ApplyPayment do
+  use Jido.Action,
+    name: "getting_started_apply_payment",
+    schema: Jido.Joi.object(%{amount_cents: Jido.Joi.integer() |> Jido.Joi.min(1)})
+
+  @impl true
+  def run(%{amount_cents: amount}, %{agent_state: state}) do
+    {:ok, %{state | paid_cents: state.paid_cents + amount}}
+  end
+end
+```
+
+## Run the Action
+
+`Jido.Exec.run/4` takes the Action, its input, and a context map. It validates the input, runs the Action, and returns the result. An Agent fills in `:agent_state` later. For now, pass it by hand.
+
+```elixir
+context = %{agent_state: %{paid_cents: 500}}
+
+Jido.Exec.run(GettingStarted.ApplyPayment, %{amount_cents: 1_500}, context)
+```
+
+The cell returns `{:ok, %{paid_cents: 2000}}`.
+
+Invalid input never reaches `run/2`. You get an error value that you can match on.
+
+```elixir
+{:error, %Jido.Error.ValidationError{} = error} =
+  Jido.Exec.run(GettingStarted.ApplyPayment, %{amount_cents: 0}, context)
+
+Exception.message(error)
+```
+
+The cell returns `"too small: must be at least 1, at amount_cents"`.
+
+## Define an Agent
+
+An Agent adds state that lasts across Signals. A route connects a Signal type to the Action. Jido supplies the current state in `:agent_state`, and the Action's output becomes the next state.
+
+```elixir
+defmodule GettingStarted.InvoiceAgent do
+  use Jido.Agent, name: "getting_started_invoice"
+
+  state do
+    schema Jido.Joi.object(%{
+             total_cents: Jido.Joi.integer(),
+             paid_cents: Jido.Joi.integer() |> Jido.Joi.default(0)
+           })
+  end
+
+  routes do
+    signal_source "/billing/invoice"
+
+    route "invoice.payment.apply", GettingStarted.ApplyPayment, as: :apply_payment
+  end
+end
+```
+
+`as: :apply_payment` generates `apply_payment_signal!/2`, which builds the Signal for this route.
+
+## Run one Turn without a process
+
+An instance is the definition plus an ID and state. It is a plain value. `cmd/3` runs one Turn and returns the next value with a list of Directives.
+
+```elixir
+invoice = GettingStarted.InvoiceAgent.instantiate!(id: "inv-1001", state: %{total_cents: 5_000})
+payment = GettingStarted.InvoiceAgent.apply_payment_signal!(%{amount_cents: 1_500})
+
+{:ok, paid, []} = GettingStarted.InvoiceAgent.cmd(invoice, payment)
+
+{invoice.state.paid_cents, paid.state.paid_cents}
+```
+
+The cell returns `{0, 1500}`. The source value did not change, and no process started.
+
+## Run the Agent live
+
+To keep the Agent running, start a Jido instance and start the Agent inside it. `Jido.AgentServer.call/3` sends a Signal and waits for the commit.
+
+```elixir
+{:ok, _instance} = Jido.start(name: GettingStarted.Jido)
+
+{:ok, server} =
+  Jido.start_agent(GettingStarted.Jido, GettingStarted.InvoiceAgent,
+    id: "inv-1001",
+    state: %{total_cents: 5_000}
+  )
+
+:ok = Jido.AgentServer.await_ready(server)
+
+{:ok, _agent, []} = Jido.AgentServer.call(server, payment)
+{:ok, _agent, []} = Jido.AgentServer.call(server, payment)
+
+Jido.AgentServer.agent(server).state
+```
+
+The cell returns `%{paid_cents: 3000, total_cents: 5000}`. The server kept the state between the two calls.
+
+A failed Turn leaves the committed state alone, and the server keeps running.
+
+```elixir
+bad_payment = GettingStarted.InvoiceAgent.apply_payment_signal!(%{amount_cents: -1})
+
+{:error, %Jido.Error.ValidationError{}} = Jido.AgentServer.call(server, bad_payment)
+
+Jido.AgentServer.agent(server).state.paid_cents
+```
+
+The cell returns `3000`.
+
+## Stop the instance
+
+`Jido.stop/1` stops the instance and every Agent in it.
+
+```elixir
+:ok = Jido.stop(GettingStarted.Jido)
+
+Process.alive?(server)
+```
+
+The cell returns `false`.
+
+## Next steps
+
+- [Start a Jido Instance](start-a-jido-instance.livemd) adds the instance to an application's supervision tree.
+- [Build Your First Action](first-action.livemd) covers schemas, failures, and context.
+- [Jido Mental Model](jido-mental-model.md) explains how the pieces relate.

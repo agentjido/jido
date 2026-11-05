@@ -1,0 +1,315 @@
+# ReAct Reasoning
+
+This tutorial runs `Jido.AI.Reasoning.ReAct` through each path it can take: tools, retries, fallback models, output repair, repeated tool calls, and streaming. A scripted local model makes each path repeat exactly.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## The shape of the loop
+
+The root Flow is fixed and short:
+
+1. `start_request` loads the Session, selects tools, and appends the user message.
+2. `input_guard` checks the input.
+3. `loop` is a Flow Iterate component. Each iteration runs one model call and acts on the result.
+4. `continuation` ends the loop, or waits for [Tool Review](tool-review.md).
+5. `finalize` records the outcome and returns the new state and the reply.
+
+```elixir
+Jido.AI.Reasoning.ReAct.flow().components |> Map.keys() |> Enum.sort()
+```
+
+The cell returns the component names in alphabetical order: `["continuation", "finalize", "initialize", "input_guard", "loop", "start_request"]`. `initialize` builds the loop's starting state.
+
+Each iteration calls `Jido.AI.Reasoning.ReAct.Actions.Advance`. It projects the conversation, calls the model, applies the output guard, records the attempt, checks for repeated tool calls, and decides what comes next. Then one of these happens:
+
+| Decision | Next |
+| --- | --- |
+| Final answer accepted | The loop ends with `:completed`. |
+| Tool calls accepted | A tool round runs, and the loop continues. |
+| Retryable model error, attempts left | The same model is called again. |
+| Retryable model error, no attempts left | The next fallback model is called, or the request ends. |
+| Non-retryable model error | The request ends with `:failed`. |
+| Output rejected | The model gets a repair instruction, within the same attempt limits. |
+| A limit reached | The request ends with `:blocked` and reason code `:limits`. |
+| Tool review required | The loop ends, and the Flow waits. |
+
+The Iterate component allows at most 17 iterations. `limits.model_calls` has a maximum of 16, so that limit always comes first.
+
+## Script the model
+
+The script holds one step per model call. A step is text, `{:tools, calls}`, or `{:error, reason}`. The client also stores the model and the messages of each call.
+
+```elixir
+defmodule ReActGuide.Script do
+  @behaviour Jido.AI.InferenceClient
+
+  def play(steps) do
+    case Process.whereis(__MODULE__) do
+      nil -> :ok
+      pid -> Agent.stop(pid)
+    end
+
+    {:ok, _pid} = Agent.start_link(fn -> %{steps: steps, calls: []} end, name: __MODULE__)
+  end
+
+  def calls, do: Agent.get(__MODULE__, &Enum.reverse(&1.calls))
+
+  @impl true
+  def generate_text(model, context, _options), do: next_step(model, context) |> respond(model, context)
+
+  @impl true
+  def stream_text(model, context, _options) do
+    {:ok, response} = next_step(model, context) |> respond(model, context)
+    {:ok, ReqLLM.Cache.stream_response(response, ReqLLM.model!(model), context)}
+  end
+
+  defp next_step(model, context) do
+    messages = ReqLLM.Context.to_list(context)
+
+    Agent.get_and_update(__MODULE__, fn %{steps: [step | rest], calls: calls} ->
+      {step, %{steps: rest, calls: [%{model: model, messages: messages} | calls]}}
+    end)
+  end
+
+  defp respond({:error, reason}, _model, _context), do: {:error, reason}
+
+  defp respond({:tools, calls}, model, context) do
+    tool_calls =
+      Enum.map(calls, fn {id, name, arguments} ->
+        ReqLLM.ToolCall.new(id, name, JSON.encode!(arguments))
+      end)
+
+    response(model, context, ReqLLM.Context.assistant("", tool_calls: tool_calls), :tool_calls, nil)
+  end
+
+  defp respond({:object, object}, model, context) do
+    response(model, context, ReqLLM.Context.assistant(JSON.encode!(object)), :stop, object)
+  end
+
+  defp respond(text, model, context) when is_binary(text) do
+    response(model, context, ReqLLM.Context.assistant(text), :stop, nil)
+  end
+
+  defp response(model, context, message, finish_reason, object) do
+    {:ok,
+     %ReqLLM.Response{
+       id: "local",
+       model: model,
+       context: context,
+       message: message,
+       finish_reason: finish_reason,
+       object: object,
+       usage: %{input_tokens: 4, output_tokens: 3}
+     }}
+  end
+
+  @impl true
+  def evaluation_models, do: []
+
+  for {name, arity} <- Jido.AI.InferenceClient.behaviour_info(:callbacks),
+      {name, arity} not in [generate_text: 3, stream_text: 3, evaluation_models: 0] do
+    @impl true
+    def unquote(name)(unquote_splicing(Macro.generate_arguments(arity, __MODULE__))),
+      do: {:error, :not_supported}
+  end
+end
+
+defmodule ReActGuide.ShippingQuote do
+  use Jido.Action,
+    name: "shipping_quote",
+    description: "Quote shipping for one region",
+    schema: Jido.Joi.object(%{region: Jido.Joi.string()})
+
+  @impl true
+  def run(%{region: region}, _context), do: {:ok, %{region: region, cents: 900}}
+end
+
+defmodule ReActGuide.ShippingAgent do
+  use Jido.AI.Agent, name: "shipping_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      instructions "Quote shipping costs."
+    end
+
+    tools do
+      action ReActGuide.ShippingQuote
+    end
+  end
+end
+
+defmodule ReActGuide do
+  def run(steps, params \\ %{}) do
+    ReActGuide.Script.play(steps)
+    agent = ReActGuide.ShippingAgent.instantiate!(id: "shipping-#{System.unique_integer([:positive])}")
+    request = ReActGuide.ShippingAgent.request_signal!(Map.put_new(params, :input, "Quote shipping."))
+
+    {:ok, _agent, [%{signal: reply}]} =
+      ReActGuide.ShippingAgent.cmd(agent, request, context: %{jido_ai_inference_client: ReActGuide.Script})
+
+    reply.data
+  end
+
+  def summary(reply) do
+    Map.take(reply, [:status, :output, :reason_code, :reason, :model_calls, :tool_rounds, :tool_calls, :retries])
+  end
+end
+```
+
+## Run a tool round
+
+The model asks for tools. The tools run and their results join the conversation. The model then writes the answer.
+
+```elixir
+reply =
+  ReActGuide.run([
+    {:tools, [{"call-1", "shipping_quote", %{region: "EU"}}, {"call-2", "shipping_quote", %{region: "US"}}]},
+    "EU and US shipping both cost 900 cents."
+  ])
+
+roles = ReActGuide.Script.calls() |> List.last() |> Map.fetch!(:messages) |> Enum.map(& &1.role)
+
+{ReActGuide.summary(reply), roles}
+```
+
+The summary shows `:completed`, 2 model calls, 1 tool round, and 2 tool calls. The second model call saw `[:system, :user, :assistant, :tool, :tool]`. The tool calls ran in parallel, and the results stayed in order. See [Tool Calls and Results](tool-calls-and-results.md).
+
+## Retry and fall back
+
+`limits.retries` is the number of extra attempts on one model. After a tool round, the attempt count starts over. When the attempts run out on a retryable error, the next model in `fallback_models` starts with a fresh count. Model calls still count against `limits.model_calls`.
+
+```elixir
+reply =
+  ReActGuide.run(
+    [{:error, :timeout}, {:error, :timeout}, "Served by the fallback."],
+    %{model: "openai:gpt-4o-mini", fallback_models: ["anthropic:claude-haiku-4-5"]}
+  )
+
+{ReActGuide.summary(reply), Enum.map(ReActGuide.Script.calls(), & &1.model)}
+```
+
+The status is `:completed`, with 3 model calls and 2 retries. The models called were `"openai:gpt-4o-mini"`, `"openai:gpt-4o-mini"`, and `"anthropic:claude-haiku-4-5"`.
+
+A non-retryable error ends the request at once. It does not try a fallback model.
+
+```elixir
+reply =
+  ReActGuide.run(
+    [{:error, :invalid_api_key}],
+    %{fallback_models: ["anthropic:claude-haiku-4-5"]}
+  )
+
+ReActGuide.summary(reply)
+```
+
+The status is `:failed`, the reason code is `:model`, the reason is `"invalid_api_key"`, and there was 1 model call. [Inference Clients](inference-clients.md) lists which errors are retryable.
+
+## Repair a rejected answer
+
+`Jido.AI.Reasoning.Actions.GuardOutput` checks each response. A rejected response is not an error. Jido adds a system message that names the problem and calls the model again. The guard rejects a final answer when:
+
+- `finish_reason` reports an abnormal end, such as `:length` or `:content_filter`.
+- It is empty, or longer than 4,000 characters. This limit is fixed. Use a tool or several requests for longer output.
+- A tool is still required by `tool_policy`.
+- `output_schema` is set and the response has no object.
+
+```elixir
+schema = %{
+  "type" => "object",
+  "properties" => %{"cents" => %{"type" => "integer"}},
+  "required" => ["cents"],
+  "additionalProperties" => false
+}
+
+reply = ReActGuide.run(["About nine dollars.", {:object, %{"cents" => 900}}], %{output_schema: schema})
+
+repair = ReActGuide.Script.calls() |> List.last() |> Map.fetch!(:messages) |> List.last()
+
+{ReActGuide.summary(reply), repair.role, hd(repair.content).text}
+```
+
+The output is `%{"cents" => 900}`, with 2 model calls and 1 retry. The last message of the second call has role `:system` and text `"Repair the previous response. model output is missing required structured data. Return a valid final answer."`
+
+The first response stays out of the Thread as a message. Its attempt record keeps `output_allowed: false` and the reason. When attempts run out, the request ends with `:blocked` and reason code `:output`.
+
+## Watch for repeated tool calls
+
+`Jido.AI.Reasoning.ReAct.Actions.DetectToolCycle` compares each batch of tool calls with the previous batch, by names and arguments. A repeat still runs, because the tools may have changed the world. The next model call also gets a system message that tells it to stop repeating, and `tool_cycles` goes up.
+
+```elixir
+same_call = {:tools, [{"call-1", "shipping_quote", %{region: "EU"}}]}
+same_again = {:tools, [{"call-2", "shipping_quote", %{region: "EU"}}]}
+
+reply = ReActGuide.run([same_call, same_again, "EU shipping costs 900 cents."])
+
+warning = ReActGuide.Script.calls() |> List.last() |> Map.fetch!(:messages) |> List.last()
+
+{reply.status, reply.tool_calls, reply.tool_cycles, warning.role}
+```
+
+The cell returns `{:completed, 2, 1, :system}`. The limits on rounds and calls are what finally stop a model that keeps repeating.
+
+## Guard the input
+
+`Jido.AI.Reasoning.Actions.GuardInput` runs before any model call. It blocks with reason code `:input` when:
+
+- The input is empty.
+- A string input is longer than 2,000 characters, or a list input is larger than 2 MB. These limits are fixed.
+- The text contains `ignore previous instructions` or `reveal your system prompt`, in any letter case.
+
+These two phrases are a fixed list and a minimal check. Treat them as a floor, not as prompt-injection protection, and check input in your own Action if you need more. It blocks with reason code `:review` when review is required on a host without waits. See [Tool Review](tool-review.md).
+
+```elixir
+reply = ReActGuide.run([], %{input: String.duplicate("x", 2_001)})
+
+ReActGuide.summary(reply)
+```
+
+The status is `:blocked`, the reason is `"input is longer than 2000 characters"`, and there were 0 model calls.
+
+## Stream the answer
+
+Set `stream: true` to call `stream_text/3`. Give a dispatch target in the `:jido_ai_dispatch` context to receive Signals. The reply is the same as without streaming.
+
+```elixir
+ReActGuide.Script.play(["Shipping costs 900 cents."])
+agent = ReActGuide.ShippingAgent.instantiate!(id: "stream-1")
+
+{:ok, _agent, [%{signal: reply}]} =
+  ReActGuide.ShippingAgent.cmd(
+    agent,
+    ReActGuide.ShippingAgent.request_signal!(%{input: "Quote shipping.", stream: true}),
+    context: %{
+      jido_ai_inference_client: ReActGuide.Script,
+      jido_ai_dispatch: {:pid, target: self()}
+    }
+  )
+
+collect = fn collect, signals ->
+  receive do
+    {:signal, signal} -> collect.(collect, [signal | signals])
+  after
+    200 -> Enum.reverse(signals)
+  end
+end
+
+signals = collect.(collect, [])
+
+{reply.data.output, Enum.map(signals, &{&1.type, &1.data.sequence})}
+```
+
+The output is `"Shipping costs 900 cents."`. The Signals in order are `jido.ai.model.stream.started` with sequence 0, `jido.ai.model.stream.chunk` with sequence 1, and `jido.ai.model.stream.completed` with sequence 2. A failed stream ends with `jido.ai.model.stream.failed`. Each Signal also has the Session, Thread, request, run, model, and stream IDs.
+
+Without a `:jido_ai_dispatch` value, the Flow still streams and emits no Signals. A dispatch value with a PID is not portable, so a durable Turn ends with an error when given one. Use a named process or another portable target there.
+
+## Next steps
+
+- [Model Budgets and Usage](budgets-and-usage.md) covers each limit.
+- [Reasoning Strategies](reasoning-strategies.md) compares the other Flows.
+- [Custom Reasoning Flows](custom-reasoning-flows.livemd) builds from the same Actions.

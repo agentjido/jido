@@ -1,0 +1,286 @@
+# Signal Bus Plugin
+
+This tutorial connects an Agent to a `Jido.Signal.Bus` with two Plugins. `Jido.Plugin.Bus.Manager` starts a Bus that the Agent owns. `Jido.Plugin.Bus.Client` subscribes the Agent to a path on a Bus, so that each matching Signal starts a Turn.
+
+For the Bus API itself, see [Signal Bus](../signals/signal-bus-and-subscriptions.md).
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Start a Jido instance
+
+Both Plugins run supervised processes, so the Agent must start through an instance. The small `Wait` helper polls until live state reaches the value the next cell expects.
+
+```elixir
+{:ok, _instance} = Jido.start_link(name: BusGuide.Jido)
+
+defmodule BusGuide.Wait do
+  def until(check, attempts \\ 200) do
+    cond do
+      check.() -> :ok
+      attempts == 0 -> raise "condition was not met in time"
+      true ->
+        Process.sleep(10)
+        until(check, attempts - 1)
+    end
+  end
+end
+```
+
+## Own a Bus and subscribe to it
+
+This Agent owns a Bus named `:orders` and subscribes to every Signal under `order.`. Declare `Manager` before `Client`, so that the Bus exists when the Client starts. Plugin options in `use Jido.Agent` are a plain map.
+
+```elixir
+defmodule BusGuide.OrderDesk do
+  use Jido.Agent,
+    name: "bus_guide_order_desk",
+    plugins: [
+      {Jido.Plugin.Bus.Manager, %{name: :orders}},
+      {Jido.Plugin.Bus.Client, %{bus: :orders, path: "order.**"}}
+    ]
+
+  state do
+    schema Jido.Joi.object(%{order_ids: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+  end
+
+  routes do
+    route "order.placed" do
+      action %{order_id: order_id},
+        schema: Jido.Joi.object(%{order_id: Jido.Joi.string()}),
+        context: context do
+        state = context.agent_state
+        {:ok, %{state | order_ids: state.order_ids ++ [order_id]}}
+      end
+    end
+  end
+end
+
+{:ok, desk} = Jido.start_agent(BusGuide.Jido, BusGuide.OrderDesk, id: "desk-1")
+:ok = Jido.AgentServer.await_ready(desk)
+```
+
+`Jido.AgentServer.await_ready/2` returns once the Plugin runtimes are ready. A Turn submitted before that point can fail with `{:error, :not_ready}`.
+
+The Manager registers the Bus under the Agent's Jido instance. Pass `jido:` to look it up:
+
+```elixir
+{:ok, bus} = Jido.Signal.Bus.whereis(:orders, jido: BusGuide.Jido)
+is_pid(bus)
+# => true
+```
+
+## Publish Signals
+
+Publish one Signal inside the path and one outside it. Only the first starts a Turn.
+
+```elixir
+{:ok, [_, _]} =
+  Jido.Signal.Bus.publish(bus, [
+    Jido.Signal.new!("order.placed", %{order_id: "ord-100"}, source: "/shop"),
+    Jido.Signal.new!("invoice.sent", %{invoice_id: "inv-7"}, source: "/billing")
+  ])
+
+:ok = BusGuide.Wait.until(fn -> Jido.AgentServer.agent(desk).state.order_ids == ["ord-100"] end)
+
+Jido.AgentServer.agent(desk).state.order_ids
+# => ["ord-100"]
+```
+
+This is a normal subscription. The Client casts each Signal to the Agent and does not wait. A failed Turn logs a warning and the Signal is not retried. A Signal that matches the path but has no route also fails its Turn, so keep the path and the routes aligned.
+
+The Bus stops with its Agent:
+
+```elixir
+:ok = Jido.stop_agent(BusGuide.Jido, desk)
+
+:ok =
+  BusGuide.Wait.until(fn ->
+    Jido.Signal.Bus.whereis(:orders, jido: BusGuide.Jido) == {:error, :not_found}
+  end)
+```
+
+## Subscribe with retries
+
+Set `:durable` to a stable string to use a durable subscription. The Client then calls the Agent and acknowledges the Bus record only after the Turn commits. A failed Turn retries the same record after `:retry_delay_ms`, and later records wait until it succeeds.
+
+Delivery is at least once, so the handler must tolerate a repeat. This Agent tracks Signal IDs and returns success for a repeat, so that the repeat can still be acknowledged. The first attempt for `ord-200` fails on purpose, using an ETS counter as the stub for a failing dependency.
+
+```elixir
+:ets.new(:bus_guide_attempts, [:named_table, :public])
+
+defmodule BusGuide.RecordPayment do
+  use Jido.Action,
+    name: "bus_guide_record_payment",
+    schema: Jido.Joi.object(%{order_id: Jido.Joi.string()})
+
+  @impl Jido.Action
+  def run(%{order_id: order_id}, context) do
+    attempt = :ets.update_counter(:bus_guide_attempts, order_id, 1, {order_id, 0})
+    state = context.agent_state
+    signal_id = context.signal.id
+
+    cond do
+      order_id == "ord-200" and attempt == 1 ->
+        {:error, :payment_service_unavailable}
+
+      signal_id in state.seen ->
+        {:ok, state}
+
+      true ->
+        {:ok, %{state | seen: state.seen ++ [signal_id], paid: state.paid ++ [order_id]}}
+    end
+  end
+end
+
+defmodule BusGuide.PaymentDesk do
+  use Jido.Agent,
+    name: "bus_guide_payment_desk",
+    plugins: [
+      {Jido.Plugin.Bus.Manager, %{name: :payments}},
+      {Jido.Plugin.Bus.Client,
+       %{
+         bus: :payments,
+         path: "payment.**",
+         durable: "payment-desk",
+         start_from: :origin,
+         retry_delay_ms: 20
+       }}
+    ]
+
+  state do
+    schema Jido.Joi.object(%{
+             seen: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
+             paid: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
+           })
+  end
+
+  routes do
+    route "payment.captured", BusGuide.RecordPayment
+  end
+end
+
+{:ok, payments} = Jido.start_agent(BusGuide.Jido, BusGuide.PaymentDesk, id: "payments-1")
+:ok = Jido.AgentServer.await_ready(payments)
+{:ok, payment_bus} = Jido.Signal.Bus.whereis(:payments, jido: BusGuide.Jido)
+```
+
+Publish two records. The first fails once, and the second waits behind it. Both then commit in order.
+
+```elixir
+captured = fn order_id ->
+  Jido.Signal.new!("payment.captured", %{order_id: order_id}, source: "/payments")
+end
+
+first = captured.("ord-200")
+{:ok, [_, _]} = Jido.Signal.Bus.publish(payment_bus, [first, captured.("ord-201")])
+
+:ok =
+  BusGuide.Wait.until(fn ->
+    Jido.AgentServer.agent(payments).state.paid == ["ord-200", "ord-201"]
+  end)
+
+{:ets.lookup(:bus_guide_attempts, "ord-200"), Jido.AgentServer.agent(payments).state.paid}
+# => {[{"ord-200", 2}], ["ord-200", "ord-201"]}
+```
+
+Publish the first Signal again, with the same ID. The Turn succeeds and the state does not gain a second entry.
+
+```elixir
+{:ok, [_]} = Jido.Signal.Bus.publish(payment_bus, [first])
+
+:ok =
+  BusGuide.Wait.until(fn ->
+    match?([{_, 3}], :ets.lookup(:bus_guide_attempts, "ord-200"))
+  end)
+
+:ok = Jido.AgentServer.await_ready(payments)
+Jido.AgentServer.agent(payments).state.paid
+# => ["ord-200", "ord-201"]
+```
+
+A record that always fails blocks every later record for that subscription, because the Client retries it with no limit. Handle permanent failures in the Action and return success, for example by recording the rejected Signal in state.
+
+```elixir
+:ok = Jido.stop_agent(BusGuide.Jido, payments)
+```
+
+## Use a Bus that the Agent does not own
+
+Use the Client alone when another part of your application owns the Bus. Start the Bus first. The Client resolves `:bus` under the Agent's Jido instance unless you set `:jido`. Set `jido: nil` to look up a global Bus.
+
+```elixir
+defmodule BusGuide.ShippingDesk do
+  use Jido.Agent,
+    name: "bus_guide_shipping_desk",
+    plugins: [{Jido.Plugin.Bus.Client, %{bus: :shipping_events, path: "shipment.**"}}]
+
+  state do
+    schema Jido.Joi.object(%{tracking: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+  end
+
+  routes do
+    route "shipment.sent" do
+      action %{tracking: tracking},
+        schema: Jido.Joi.object(%{tracking: Jido.Joi.string()}),
+        context: context do
+        state = context.agent_state
+        {:ok, %{state | tracking: state.tracking ++ [tracking]}}
+      end
+    end
+  end
+end
+
+{:ok, shipping_bus} =
+  Jido.Signal.Bus.start_link(name: :shipping_events, jido: BusGuide.Jido)
+
+{:ok, shipping} = Jido.start_agent(BusGuide.Jido, BusGuide.ShippingDesk, id: "shipping-1")
+:ok = Jido.AgentServer.await_ready(shipping)
+
+{:ok, [_]} =
+  Jido.Signal.Bus.publish(shipping_bus, [
+    Jido.Signal.new!("shipment.sent", %{tracking: "1Z-42"}, source: "/warehouse")
+  ])
+
+:ok = BusGuide.Wait.until(fn -> Jido.AgentServer.agent(shipping).state.tracking == ["1Z-42"] end)
+Jido.AgentServer.agent(shipping).state.tracking
+# => ["1Z-42"]
+```
+
+The named Bus must exist when the Client starts. `Jido.start_agent/3` still returns `{:ok, pid}` in that case, but the Client runtime stops with `{:bus_subscription_failed, :not_found}`, its restarts fail the same way, and the Agent shuts down. Once connected, the Client monitors the Bus and resubscribes after a replacement, trying again every `:retry_delay_ms`.
+
+## Bus crashes
+
+A Bus started by the Manager is a child of the Agent's activation. If it crashes, the activation starts a new Bus and a new AgentServer process. Committed Agent state survives, but a stored PID goes stale, for both the Bus and the Agent. Look them up again with `Jido.Signal.Bus.whereis/2` and `Jido.whereis_agent/2`.
+
+## Plugin options
+
+`Jido.Plugin.Bus.Client` options:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `:bus` | required | Name of the Bus. |
+| `:path` | `"**"` | Non-empty subscription path. |
+| `:jido` | the Agent's instance | Instance scope for the lookup. `nil` selects a global Bus. |
+| `:durable` | `nil` | Non-empty durable subscription ID. `nil` selects a normal subscription. |
+| `:start_from` | `nil` | `:origin`, `:current`, or a non-negative cursor. Requires `:durable`. |
+| `:retry_delay_ms` | `1_000` | Positive delay before a record retry or a reconnect. |
+| `:timeout` | `5_000` | Positive timeout, in milliseconds, for the durable call to the Agent. |
+
+`Jido.Plugin.Bus.Manager` passes its options to `Jido.Signal.Bus.child_spec/1`. `:name` defaults to the Agent ID and `:jido` defaults to the Agent's instance. Set `jido: nil` for a global Bus. The other accepted options are `:registry`, `:store`, `:store_opts`, and `:max_log_size`.
+
+The default memory store does not survive a Bus or Agent restart. A durable subscription survives only as long as its store does. Configure a store that implements `Jido.Signal.Bus.Store` when records and cursors must outlast the Agent. See [Durable Subscriptions](../signals/durable-subscriptions.md).
+
+## The `signal_bus` section
+
+`Jido.Plugin.Bus.DSL` is a different tool. It adds a `signal_bus` section that declares one local Bus as an endpoint for Agent topology connections, with `bus(:name)` references. That Bus is private to the topology, so `Jido.Signal.Bus.whereis/2` does not find it by the declared name. Use the Manager when other code must publish to the Bus by name. Use the section when only topology connections reach it. See [Connect Agent Outputs](../composition/connect-agent-outputs.livemd).
+
+## Next steps
+
+- [Durable Subscriptions](../signals/durable-subscriptions.md)
+- [Supervised Resources](../plugins/plugin-supervised-resources.livemd)

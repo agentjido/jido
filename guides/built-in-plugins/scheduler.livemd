@@ -1,0 +1,352 @@
+# Schedules
+
+This tutorial uses `Jido.Plugin.Scheduler` to send an Agent delayed and recurring Signals. An Action requests a schedule by returning a Directive, and each delivery runs as a normal Turn.
+
+Use this Plugin when the Agent decides what to schedule, or when work must land on a clock slot. For a fixed delay between ticks, [Agent Heartbeats](heartbeats.livemd) is smaller.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Start a Jido instance
+
+The Plugin runs a supervised process that owns its timers, so the Agent must start through an instance.
+
+```elixir
+{:ok, _instance} = Jido.start_link(name: ScheduleGuide.Jido)
+
+defmodule ScheduleGuide.Wait do
+  def until(check, attempts \\ 400) do
+    cond do
+      check.() ->
+        :ok
+
+      attempts == 0 ->
+        raise "condition was not met in time"
+
+      true ->
+        Process.sleep(10)
+        until(check, attempts - 1)
+    end
+  end
+end
+```
+
+## Define the Agent
+
+This Agent sends invoice reminders. One route accepts a Scheduler Directive, as a small stand-in for your own Actions, and the other handles the reminder Signal. A real Action would build the Directive from its input.
+
+```elixir
+defmodule ScheduleGuide.Reminders do
+  use Jido.Agent,
+    name: "schedule_guide_reminders",
+    plugins: [Jido.Plugin.Scheduler]
+
+  state do
+    schema Jido.Joi.object(%{sent: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+  end
+
+  routes do
+    route "reminder.schedule" do
+      action %{directive: directive}, context: context do
+        {:ok, context.agent_state, [directive]}
+      end
+    end
+
+    route "reminder.due" do
+      action %{invoice_id: invoice_id}, context: context do
+        {:ok, %{context.agent_state | sent: context.agent_state.sent ++ [invoice_id]}}
+      end
+    end
+  end
+end
+
+{:ok, reminders} = Jido.start_agent(ScheduleGuide.Jido, ScheduleGuide.Reminders, id: "reminders-1")
+:ok = Jido.AgentServer.await_ready(reminders)
+
+request = fn directive ->
+  Jido.Signal.new!("reminder.schedule", %{directive: directive}, source: "/billing/reminders")
+end
+
+due = fn invoice_id ->
+  Jido.Signal.new!("reminder.due", %{invoice_id: invoice_id}, source: "/billing/reminders")
+end
+```
+
+## Send one delayed Signal
+
+`Jido.Plugin.Scheduler.schedule/2` takes a delay in milliseconds and a Signal. The delay can be 0 or more.
+
+```elixir
+{:ok, _agent, _directives} =
+  Jido.AgentServer.call(reminders, request.(Jido.Plugin.Scheduler.schedule(10, due.("inv-1"))))
+
+:ok = ScheduleGuide.Wait.until(fn -> Jido.AgentServer.agent(reminders).state.sent == ["inv-1"] end)
+
+Jido.AgentServer.plugin_state(reminders, Jido.Plugin.Scheduler)
+# => {:ok, %{cron: %{}}}
+```
+
+The delayed Signal is not in Agent state. It lives only in a timer, so a Scheduler, Agent, or VM restart can discard it. The timer starts after the Turn commits, and no API cancels it.
+
+## Run a recurring schedule
+
+`Jido.Plugin.Scheduler.cron/4` takes a job ID, a cron expression, the Signal to send, and options. The job ID is any portable term that is local to the Agent. Using an existing job ID replaces that job. This job fires every second.
+
+```elixir
+{:ok, _agent, _directives} =
+  Jido.AgentServer.call(
+    reminders,
+    request.(Jido.Plugin.Scheduler.cron("overdue-sweep", "* * * * * *", due.("inv-2")))
+  )
+
+{:ok, %{cron: cron}} = Jido.AgentServer.plugin_state(reminders, Jido.Plugin.Scheduler)
+Map.take(cron["overdue-sweep"], [:cron_expression, :timezone])
+# => %{cron_expression: "* * * * * *", timezone: "Etc/UTC"}
+```
+
+Wait for a delivery, then remove the job with `Jido.Plugin.Scheduler.cancel/1`:
+
+```elixir
+:ok = ScheduleGuide.Wait.until(fn -> "inv-2" in Jido.AgentServer.agent(reminders).state.sent end)
+
+{:ok, _agent, _directives} =
+  Jido.AgentServer.call(reminders, request.(Jido.Plugin.Scheduler.cancel("overdue-sweep")))
+
+Jido.AgentServer.plugin_state(reminders, Jido.Plugin.Scheduler)
+# => {:ok, %{cron: %{}}}
+```
+
+Each delivery is a fresh Signal with a new ID, built from the stored Signal.
+
+### Cron expressions
+
+The field count selects the format. Check an expression with `Jido.Plugin.Scheduler.next_occurrence/3`, which returns the next UTC time after the instant you give it.
+
+| Fields | Order | Example |
+|---|---|---|
+| 5 | minute, hour, day, month, weekday | `"0 9 * * 1"` |
+| 6 | second, then the five above | `"30 0 9 * * *"` |
+| 7 | the six above, then year | `"0 0 9 1 1 * 2031"` |
+
+```elixir
+for expression <- ["0 9 * * 1", "30 0 9 * * *", "0 0 9 1 1 * 2031"] do
+  Jido.Plugin.Scheduler.next_occurrence(expression, "Etc/UTC", ~U[2030-01-01 00:00:00Z])
+end
+# => [{:ok, ~U[2030-01-07 09:00:00Z]}, {:ok, ~U[2030-01-01 09:00:30Z]}, {:ok, ~U[2031-01-01 09:00:00Z]}]
+```
+
+An expression with no future slot, such as a year in the past, is valid. The job stays dormant in state and you can still cancel or replace it.
+
+### Time zones
+
+Pass `timezone:` to evaluate the expression in a zone. The default is `"Etc/UTC"`. Elixir ships only with a UTC database, so any other zone needs a time zone database such as `tzdata`, set in your configuration. Without one, the Directive fails with `{:invalid_timezone, :utc_only_time_zone_database}`.
+
+<!-- partial -->
+```elixir
+Jido.Plugin.Scheduler.cron("daily-report", "0 9 * * *", signal, timezone: "America/Chicago")
+```
+
+## Reject invalid requests
+
+Directives are checked before the Turn commits. An invalid request fails the Turn, and neither Agent state nor the timers change.
+
+```elixir
+{:error, {:invalid_cron, reason}} =
+  Jido.AgentServer.call(
+    reminders,
+    request.(Jido.Plugin.Scheduler.cron("broken", "every morning", due.("inv-3")))
+  )
+
+reason
+# => "Can't parse every as minute."
+```
+
+The other checks cover a negative delay and a job ID that is not portable. `cron/4` accepts only `:timezone` and `:generation`, and raises `ArgumentError` for any other option.
+
+## Identify an occurrence
+
+A fresh Signal ID does not tell you which slot a tick belongs to. Pass `generation:` to tag each tick with a stable identity, then read it with `Jido.Plugin.Scheduler.Occurrence.from_signal/1`. The ID comes from the instance, Agent ID, partition, job ID, generation, and scheduled time, so repeating those values gives the same ID. Use it to deduplicate work. Use a new generation when you replace or recreate a schedule, and keep the value across a restore.
+
+The next Agent also shows `:time_scale`, which replaces the clock for recurring schedules. This `SchedEx.TimeScale` module starts at a fixed instant and runs at 120 times real speed, so a one-minute cron fires every half second. Use it for controlled time in tests.
+
+```elixir
+defmodule ScheduleGuide.FastClock do
+  @behaviour SchedEx.TimeScale
+  @speedup 120
+
+  def reset, do: :persistent_term.put(__MODULE__, System.monotonic_time(:millisecond))
+
+  @impl true
+  def speedup, do: @speedup
+
+  @impl true
+  def now(timezone) do
+    elapsed = System.monotonic_time(:millisecond) - :persistent_term.get(__MODULE__)
+
+    ~U[2030-01-01 00:00:00Z]
+    |> DateTime.add(elapsed * @speedup, :millisecond)
+    |> DateTime.shift_zone!(timezone)
+  end
+end
+
+defmodule ScheduleGuide.Statements do
+  use Jido.Agent,
+    name: "schedule_guide_statements",
+    plugins: [{Jido.Plugin.Scheduler, %{time_scale: ScheduleGuide.FastClock}}]
+
+  state do
+    schema Jido.Joi.object(%{slots: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+  end
+
+  routes do
+    route "statement.schedule" do
+      action %{directive: directive}, context: context do
+        {:ok, context.agent_state, [directive]}
+      end
+    end
+
+    route "statement.due" do
+      action _input, context: context do
+        {:ok, occurrence} = Jido.Plugin.Scheduler.Occurrence.from_signal(context.signal)
+        {:ok, %{context.agent_state | slots: context.agent_state.slots ++ [occurrence.scheduled_at]}}
+      end
+    end
+  end
+end
+
+{:ok, statements} = Jido.start_agent(ScheduleGuide.Jido, ScheduleGuide.Statements, id: "statements-1")
+:ok = Jido.AgentServer.await_ready(statements)
+
+tick = Jido.Signal.new!("statement.due", %{}, source: "/billing/statements")
+directive = Jido.Plugin.Scheduler.cron("statement-run", "* * * * *", tick, generation: 1)
+arm = Jido.Signal.new!("statement.schedule", %{directive: directive}, source: "/billing/statements")
+
+ScheduleGuide.FastClock.reset()
+{:ok, _agent, _directives} = Jido.AgentServer.call(statements, arm)
+
+:ok = ScheduleGuide.Wait.until(fn -> length(Jido.AgentServer.agent(statements).state.slots) >= 2 end)
+
+Jido.AgentServer.agent(statements).state.slots |> Enum.take(2)
+# => ["2030-01-01T00:01:00.000000Z", "2030-01-01T00:02:00.000000Z"]
+```
+
+`from_signal/1` returns `{:error, :not_found}` for a Signal with no occurrence metadata, which includes every tick from a job without a generation. Signal data stays unchanged, because the metadata travels in Signal context attributes.
+
+```elixir
+Jido.Plugin.Scheduler.Occurrence.from_signal(tick)
+# => {:error, :not_found}
+```
+
+```elixir
+:ok = Jido.stop_agent(ScheduleGuide.Jido, statements)
+:ok = Jido.stop_agent(ScheduleGuide.Jido, reminders)
+```
+
+## Restarts and durability
+
+- Recurring definitions live in the `:scheduler` key of Agent state. When the Plugin process restarts or a durable Agent restores, future timers start again from that state.
+- Slots that pass while the runtime is offline are not replayed.
+- One-shot Signals are never saved and are lost on a restart.
+- Timer failures are retried from the latest committed definitions after `:retry_delay_ms`. This option defaults to `1_000` and must be an integer from 1 through 4,294,967,295.
+
+## Hand delivery to an external host
+
+Set `:delivery_adapter` when delivery must survive a restart. The adapter implements `Jido.Plugin.Scheduler.DeliveryAdapter`, and the Agent then starts no local delivery timers. The adapter owns storage, leases, delivery, and acknowledgement. Delivery is at least once.
+
+- `reconcile/2` receives the full recurring definition set for one Agent and must replace what is stored.
+- `schedule/3` must persist one delayed Signal before it returns `:ok`.
+- Both must accept the same input more than once.
+
+This stub reports each call to the process that started it. Install an adapter for every Agent of an instance with the `:agent_server` instance option, or per start with `:plugin_runtime_options`.
+
+```elixir
+defmodule ScheduleGuide.Adapter do
+  @behaviour Jido.Plugin.Scheduler.DeliveryAdapter
+
+  @impl true
+  def reconcile(context, definitions) do
+    send(:schedule_guide_host, {:reconcile, context.agent_id, Map.keys(definitions)})
+    :ok
+  end
+
+  @impl true
+  def schedule(_context, 13, _signal), do: {:error, :store_offline}
+
+  def schedule(context, delay_ms, signal) do
+    send(:schedule_guide_host, {:schedule, context.agent_id, delay_ms, signal.type})
+    :ok
+  end
+end
+
+Process.register(self(), :schedule_guide_host)
+
+{:ok, _instance} =
+  Jido.start_link(
+    name: ScheduleGuide.HostedJido,
+    agent_server: [
+      plugin_runtime_options: [{Jido.Plugin.Scheduler, [delivery_adapter: ScheduleGuide.Adapter]}]
+    ]
+  )
+
+{:ok, hosted} = Jido.start_agent(ScheduleGuide.HostedJido, ScheduleGuide.Reminders, id: "hosted-1")
+:ok = Jido.AgentServer.await_ready(hosted)
+
+{:ok, _agent, _directives} =
+  Jido.AgentServer.call(hosted, request.(Jido.Plugin.Scheduler.schedule(60_000, due.("inv-9"))))
+
+{:ok, _agent, _directives} =
+  Jido.AgentServer.call(hosted, request.(Jido.Plugin.Scheduler.cron("nightly", "0 2 * * *", due.("inv-9"))))
+
+receive do
+  {:schedule, agent_id, delay_ms, type} -> {agent_id, delay_ms, type}
+after
+  1_000 -> raise "the adapter was not called"
+end
+# => {"hosted-1", 60000, "reminder.due"}
+```
+
+The adapter is called after the Turn commits, so it cannot fail the Turn. The call still returns `{:ok, ...}`, and the failure appears in `last_effect_outcome` from `Jido.AgentServer.status/2`. A failed `reconcile/2` retries after `:retry_delay_ms`. A failed `schedule/3` does not retry, and that Signal is lost unless your host recovers it.
+
+```elixir
+{:ok, _agent, _directives} =
+  Jido.AgentServer.call(hosted, request.(Jido.Plugin.Scheduler.schedule(13, due.("inv-10"))))
+
+:ok =
+  ScheduleGuide.Wait.until(fn ->
+    match?(%{status: :failed}, Jido.AgentServer.status(hosted).last_effect_outcome)
+  end)
+```
+
+A process failure between the Agent commit and a successful callback can lose the new schedule. A host that needs atomic storage must add an outbox at its storage boundary.
+
+When your host delivers a recurring slot, build the Signal with `Jido.Plugin.Scheduler.occurrence_signal/5`. It adds the same occurrence metadata as local delivery, using generation 0 when a definition has none. Pass the `scope` value from the adapter context.
+
+```elixir
+{:ok, slot_signal} =
+  Jido.Plugin.Scheduler.occurrence_signal(
+    due.("inv-9"),
+    {ScheduleGuide.HostedJido, "hosted-1", nil},
+    "nightly",
+    nil,
+    ~U[2030-01-01 02:00:00Z]
+  )
+
+{:ok, occurrence} = Jido.Plugin.Scheduler.Occurrence.from_signal(slot_signal)
+{occurrence.generation, occurrence.scheduled_at}
+# => {0, "2030-01-01T02:00:00.000000Z"}
+```
+
+## The `schedules` section
+
+`Jido.Plugin.Scheduler.DSL` adds a `schedules` section to an Agent definition. It validates each entry at compile time and stores it in the definition as data, but it starts no timers and sends no Signals. Add `Jido.Plugin.Scheduler` and return Directives when you want Signals to fire.
+
+## Next steps
+
+- [Agent Heartbeats](heartbeats.livemd)
+- [Runtime Directives and Effects](../agent-servers/runtime-directives-and-effects.md)
+- [Make an Agent Durable](../durability/make-an-agent-durable.livemd)

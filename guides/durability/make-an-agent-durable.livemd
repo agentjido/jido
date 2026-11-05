@@ -1,0 +1,227 @@
+# Make an Agent Durable
+
+In this tutorial you save an invoice Agent to files, kill its server, stop the whole Jido instance, and restore the same state and revision. You need an Agent with a schema and a route. [Define an Agent](../agents/define-and-instantiate-an-agent.livemd) covers those.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Define the Agent
+
+A durable Agent needs no special code. This one records payments against an invoice.
+
+```elixir
+defmodule MakeDurableGuide.RecordPayment do
+  use Jido.Action,
+    name: "make_durable_record_payment",
+    schema: Jido.Joi.object(%{cents: Jido.Joi.integer() |> Jido.Joi.min(1)})
+
+  @impl Jido.Action
+  def run(%{cents: cents}, %{agent_state: state}) do
+    {:ok, %{state | paid_cents: state.paid_cents + cents}}
+  end
+end
+
+defmodule MakeDurableGuide.Invoice do
+  use Jido.Agent, name: "make_durable_invoice"
+
+  state do
+    schema Jido.Joi.object(%{paid_cents: Jido.Joi.integer() |> Jido.Joi.default(0)})
+  end
+
+  routes do
+    signal_source "/guides/make_durable"
+    route "invoice.record_payment", MakeDurableGuide.RecordPayment, as: :record_payment
+  end
+end
+```
+
+## Start an instance with a store
+
+A persistent Agent needs two instance settings. `:namespace` is the stable part of the record key, and `:persistence` selects the adapter. `Jido.Persistence.File` writes one file per record, and one BEAM must own its directory.
+
+```elixir
+store_path = Path.join(System.tmp_dir!(), "jido-make-durable-guide")
+File.rm_rf!(store_path)
+
+instance_options = [
+  name: MakeDurableGuide.Jido,
+  namespace: "guides/make-durable",
+  persistence: {Jido.Persistence.File, path: store_path}
+]
+
+{:ok, _} = Jido.start_link(instance_options)
+```
+
+## Start the Agent with persistence
+
+Pass `persistence: :inherit` to use the instance adapter. An adapter tuple also works here and overrides the instance default.
+
+The server writes revision zero before it reports ready, so wait with `Jido.AgentServer.await_ready/2` before you send work.
+
+```elixir
+alias Jido.AgentServer, as: Server
+alias MakeDurableGuide.Invoice
+
+{:ok, server} =
+  Jido.start_agent(MakeDurableGuide.Jido, Invoice, id: "invoice-42", persistence: :inherit)
+
+:ok = Server.await_ready(server)
+
+%{state_version: 0} = Server.snapshot(server)
+store_path |> Path.join("**/*") |> Path.wildcard() |> Enum.count(&File.regular?/1)
+```
+
+The cell returns `1`, the one file that holds this Agent's record.
+
+## Commit a Turn
+
+A successful Turn saves the new state before the call returns. If the save fails, the caller gets an error and the activation stops, so an `{:ok, agent, directives}` result means the record holds that state.
+
+```elixir
+alias Jido.AgentServer, as: Server
+alias MakeDurableGuide.Invoice
+
+{:ok, signal} = Invoice.record_payment_signal(%{cents: 1_500})
+{:ok, agent, []} = Server.call(server, signal)
+
+{agent.state, Server.snapshot(server).state_version}
+```
+
+The cell returns `{%{paid_cents: 1500}, 1}`.
+
+## Kill the server
+
+The activation supervisor starts a replacement. The replacement reads the record, so it has the same state and revision. Look it up by ID, because the old PID is gone.
+
+```elixir
+alias Jido.AgentServer, as: Server
+alias MakeDurableGuide.Invoice
+
+monitor = Process.monitor(server)
+Process.exit(server, :kill)
+
+receive do
+  {:DOWN, ^monitor, :process, ^server, :killed} -> :ok
+end
+
+replacement =
+  Enum.find_value(1..200, fn _attempt ->
+    case Jido.whereis_agent(MakeDurableGuide.Jido, "invoice-42") do
+      pid when is_pid(pid) ->
+        pid
+
+      nil ->
+        Process.sleep(10)
+        nil
+    end
+  end)
+
+:ok = Server.await_ready(replacement)
+
+{replacement != server, Server.agent(replacement).state, Server.snapshot(replacement).state_version}
+```
+
+The cell returns `{true, %{paid_cents: 1500}, 1}`.
+
+## Stop everything and restore
+
+Now remove every live process. `Jido.stop/1` stops the instance and its Agents. A normal stop does not change the record, because each commit already saved it.
+
+Start a new instance with the same namespace and store. `Jido.thaw/4` requires an existing record and restores it.
+
+```elixir
+alias Jido.AgentServer, as: Server
+alias MakeDurableGuide.Invoice
+
+:ok = Jido.stop(MakeDurableGuide.Jido)
+nil = Process.whereis(MakeDurableGuide.Jido)
+
+{:ok, _} = Jido.start_link(instance_options)
+{:ok, restored} = Jido.thaw(MakeDurableGuide.Jido, Invoice, "invoice-42")
+:ok = Server.await_ready(restored)
+
+{Server.agent(restored).state, Server.snapshot(restored).state_version}
+```
+
+The cell returns `{%{paid_cents: 1500}, 1}`. A new BEAM follows the same steps. It needs the same namespace, the same store, and compatible code. Loading the record does not rebuild the definition from source, so changed code needs an explicit upgrade. [Checkpoints and Upgrades](checkpoints-and-data-upgrades.md) shows how.
+
+## Continue working
+
+The restored Agent takes new Turns from the saved revision.
+
+```elixir
+alias Jido.AgentServer, as: Server
+alias MakeDurableGuide.Invoice
+
+{:ok, signal} = Invoice.record_payment_signal(%{cents: 500})
+{:ok, agent, []} = Server.call(restored, signal)
+
+{agent.state, Server.snapshot(restored).state_version}
+```
+
+The cell returns `{%{paid_cents: 2000}, 2}`.
+
+## Read the record without a server
+
+`Jido.Persistence.load_agent_with_revision/4` reads and restores the record as a value and starts no process. Pass the instance as the source to use its adapter and namespace.
+
+```elixir
+alias Jido.AgentServer, as: Server
+alias MakeDurableGuide.Invoice
+
+:ok = Server.stop(restored)
+
+{:ok, saved, revision} =
+  Jido.Persistence.load_agent_with_revision(MakeDurableGuide.Jido, Invoice, "invoice-42")
+
+{saved.state, revision}
+```
+
+The cell returns `{%{paid_cents: 2000}, 2}`.
+
+## Choose a start mode
+
+`Jido.start_agent/3` defaults to `persistence_mode: :create`, which fails if the record exists. The server starts, reads the record, and stops with `{:shutdown, :conflict}`. Wait for readiness to see that reason. A fast failure can instead make the start return `{:error, :worker_unavailable}`, so the code handles both forms.
+
+```elixir
+alias Jido.AgentServer, as: Server
+alias MakeDurableGuide.Invoice
+
+result =
+  case Jido.start_agent(MakeDurableGuide.Jido, Invoice, id: "invoice-42", persistence: :inherit) do
+    {:ok, pid} ->
+      try do
+        Server.await_ready(pid)
+      catch
+        :exit, {reason, _call} -> {:stopped, reason}
+      end
+
+    {:error, reason} ->
+      {:error, reason}
+  end
+
+true = match?({:stopped, _reason}, result) or match?({:error, _reason}, result)
+{:ok, _agent, 2} = Jido.Persistence.load_agent_with_revision(MakeDurableGuide.Jido, Invoice, "invoice-42")
+
+result
+```
+
+The existing record stays at revision 2. For an Agent that may or may not exist yet, use `Jido.activate_agent/4`.
+
+## Clean up
+
+```elixir
+:ok = Jido.stop(MakeDurableGuide.Jido)
+File.rm_rf!(store_path)
+```
+
+## Next steps
+
+- [Durable Agent Activation](durable-agent-activation.livemd) uses one call for first start and every later start.
+- [Durable Turns and Flows](durable-turns-and-flows.livemd) resumes interrupted work.
+- [Start a Jido Instance](../start-here/start-a-jido-instance.livemd) shows the supervised `use Jido` form.

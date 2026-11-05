@@ -1,0 +1,313 @@
+# Test Flows
+
+In this tutorial you write ExUnit tests for a Flow: its output and effects, its failures, a stubbed Action, retry behavior, its telemetry, and a managed run. Every test runs offline.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+Start ExUnit without its automatic run, so each cell can run its own tests.
+
+```elixir
+ExUnit.start(autorun: false)
+```
+
+## Define the Flow under test
+
+The Flow approves an expense by scoring it, then records the decision. The score comes from an Action module that a test can replace.
+
+```elixir
+defmodule TestFlowsTour.ScoreExpense do
+  use Jido.Action,
+    name: "test_flows_tour_score_expense",
+    schema: Jido.Joi.object(%{cents: Jido.Joi.integer()})
+
+  @impl true
+  def run(%{cents: cents}, _context) when cents < 0 do
+    {:error, Jido.Error.execution_error("negative amount", %{reason: :negative_amount, retry: false})}
+  end
+
+  def run(%{cents: cents}, _context), do: {:ok, %{score: if(cents > 100_000, do: 10, else: 90)}}
+end
+
+defmodule TestFlowsTour.RecordDecision do
+  use Jido.Action, name: "test_flows_tour_record_decision"
+
+  @impl true
+  def run(%{expense_id: expense_id, score: score}, _context) do
+    decision = if score >= 50, do: "approved", else: "review"
+    {:ok, %{expense_id: expense_id, decision: decision}, [{:notify_finance, expense_id, decision}]}
+  end
+end
+
+defmodule TestFlowsTour.ApproveExpense do
+  use Jido.Flow,
+    name: "test_flows_tour_approve_expense",
+    schema: Jido.Joi.object(%{expense_id: Jido.Joi.string(), cents: Jido.Joi.integer()})
+
+  flow do
+    step "score", action: TestFlowsTour.ScoreExpense, params: %{cents: input(:cents)}
+
+    step "record",
+      action: TestFlowsTour.RecordDecision,
+      params: %{expense_id: input(:expense_id), score: result("score", :score)}
+
+    output result("record")
+  end
+end
+
+{:ok, _output, [{:notify_finance, "e-0", "approved"}]} =
+  Jido.Exec.run(TestFlowsTour.ApproveExpense, %{expense_id: "e-0", cents: 500})
+```
+
+## Run the tests
+
+This helper runs the test modules defined so far, then forgets them. In a Mix project, you would put each module in a file under `test/` and run `mix test`.
+
+```elixir
+run_tests = fn ->
+  result = ExUnit.run()
+  %{total: result.total, failures: result.failures}
+end
+```
+
+## Assert outputs and effects
+
+Call `Jido.Exec.run/4` and match the whole return value. Comparing the full tuple catches an effect you did not expect, because effects change the shape of the result.
+
+```elixir
+defmodule TestFlowsTour.OutputTest do
+  use ExUnit.Case, async: true
+
+  test "a small expense is approved and notifies finance" do
+    assert Jido.Exec.run(TestFlowsTour.ApproveExpense, %{expense_id: "e-1", cents: 2_000}) ==
+             {:ok, %{expense_id: "e-1", decision: "approved"}, [{:notify_finance, "e-1", "approved"}]}
+  end
+
+  test "a large expense goes to review" do
+    assert {:ok, %{decision: "review"}, _effects} =
+             Jido.Exec.run(TestFlowsTour.ApproveExpense, %{expense_id: "e-2", cents: 500_000})
+  end
+end
+
+%{total: 2, failures: 0} = run_tests.()
+```
+
+## Assert failures
+
+Match on the struct and on `details`, not the message. Name the component so the test fails if the failure moves. An Action test proves the Action fails, and this proves the failure stops the Flow and drops its effects.
+
+```elixir
+defmodule TestFlowsTour.FailureTest do
+  use ExUnit.Case, async: true
+  @moduletag capture_log: true
+
+  test "a negative amount fails at the score step" do
+    assert {:error, %Jido.Error.ExecutionError{details: details}} =
+             Jido.Exec.run(TestFlowsTour.ApproveExpense, %{expense_id: "e-3", cents: -5})
+
+    assert details.reason == :negative_amount
+    assert details.node == "score"
+  end
+
+  test "invalid input never reaches an Action" do
+    assert {:error, %Jido.Error.ValidationError{details: details}} =
+             Jido.Exec.run(TestFlowsTour.ApproveExpense, %{expense_id: "e-4", cents: "lots"})
+
+    assert details.phase == :flow_input
+    assert [%{path: [:cents]}] = details.errors
+  end
+end
+
+%{total: 2, failures: 0} = run_tests.()
+```
+
+`@moduletag capture_log: true` hides the warning that Runic logs for each failed node.
+
+## Replace an Action with a stub
+
+A Flow names its Action modules, so a module Flow cannot swap one at runtime. Pass a dependency through context when the Action can use one. To replace the Action itself, build the same graph as data with `Jido.Flow.new!/1`. The stub is an ordinary Action.
+
+```elixir
+defmodule TestFlowsTour.LowScore do
+  use Jido.Action, name: "test_flows_tour_low_score"
+
+  @impl true
+  def run(_params, _context), do: {:ok, %{score: 1}}
+end
+
+defmodule TestFlowsTour.StubTest do
+  use ExUnit.Case, async: true
+  alias Jido.Flow.Ref
+
+  defp flow_with(scorer) do
+    Jido.Flow.new!(%{
+      name: "test_flows_tour_stubbed",
+      components: [
+        %{kind: :step, name: "score", action: scorer, params: %{cents: Ref.input(:cents)}},
+        %{
+          kind: :step,
+          name: "record",
+          action: TestFlowsTour.RecordDecision,
+          params: %{expense_id: Ref.input(:expense_id), score: Ref.result("score", :score)}
+        }
+      ],
+      output: Ref.result("record")
+    })
+  end
+
+  test "a low score sends an expense to review" do
+    assert {:ok, %{decision: "review"}, _effects} =
+             Jido.Exec.run(flow_with(TestFlowsTour.LowScore), %{expense_id: "e-5", cents: 1})
+  end
+end
+
+%{total: 1, failures: 0} = run_tests.()
+```
+
+## Test retries
+
+Count attempts with a process you start in the test, and pass it through context. The default delay is 0, so the test stays fast. These tests also show that `retry: false` stops further attempts.
+
+```elixir
+defmodule TestFlowsTour.Gateway do
+  use Jido.Action, name: "test_flows_tour_gateway"
+
+  @impl true
+  def run(%{fail_times: fail_times, retry: retry}, %{calls: calls}) do
+    case Agent.get_and_update(calls, &{&1 + 1, &1 + 1}) do
+      call when call <= fail_times ->
+        {:error, Jido.Error.execution_error("gateway busy", %{reason: :busy, retry: retry})}
+
+      call ->
+        {:ok, %{call: call}}
+    end
+  end
+end
+
+defmodule TestFlowsTour.RetryTest do
+  use ExUnit.Case, async: true
+  @moduletag capture_log: true
+
+  setup do
+    {:ok, calls: start_supervised!({Agent, fn -> 0 end})}
+  end
+
+  test "a retryable failure runs again", %{calls: calls} do
+    params = %{fail_times: 2, retry: true}
+
+    assert {:ok, %{call: 3}} =
+             Jido.Exec.run(TestFlowsTour.Gateway, params, %{calls: calls}, max_attempts: 3)
+
+    assert Agent.get(calls, & &1) == 3
+  end
+
+  test "retry: false stops after one attempt", %{calls: calls} do
+    params = %{fail_times: 2, retry: false}
+
+    assert {:error, %{details: %{reason: :busy}}} =
+             Jido.Exec.run(TestFlowsTour.Gateway, params, %{calls: calls}, max_attempts: 3)
+
+    assert Agent.get(calls, & &1) == 1
+  end
+end
+
+%{total: 2, failures: 0} = run_tests.()
+```
+
+## Assert telemetry
+
+Attach with a unique handler ID, send events to the test process, and detach in `on_exit`. Use `async: false`, because a telemetry handler sees events from every process.
+
+```elixir
+defmodule TestFlowsTour.TelemetryTest do
+  use ExUnit.Case, async: false
+
+  def forward(event, _measurements, metadata, {owner, tag}), do: send(owner, {tag, event, metadata})
+
+  test "each component reports one Action span" do
+    tag = make_ref()
+    handler = {__MODULE__, tag}
+
+    :ok = :telemetry.attach_many(handler, [[:jido, :action, :stop], [:jido, :flow, :stop]], &__MODULE__.forward/4, {self(), tag})
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    assert {:ok, _output, _effects} =
+             Jido.Exec.run(TestFlowsTour.ApproveExpense, %{expense_id: "e-6", cents: 10})
+
+    assert_receive {^tag, [:jido, :action, :stop], %{node_name: "score", outcome: :ok}}
+    assert_receive {^tag, [:jido, :action, :stop], %{node_name: "record", outcome: :ok}}
+    assert_receive {^tag, [:jido, :flow, :stop], %{flow: "test_flows_tour_approve_expense", effect_count: 1}}
+  end
+end
+
+%{total: 1, failures: 0} = run_tests.()
+```
+
+## Test a managed run
+
+Start a Runner with `start_supervised!/1`, so it stops with the test. Use `dispatch_mode: :manual` to control each unit, and a hook to know when a unit has finished. Then assert that a stepped run and an immediate run agree.
+
+Build a unique run ID for each test, since a live ID cannot start twice.
+
+```elixir
+defmodule TestFlowsTour.ManagedTest do
+  use ExUnit.Case, async: false
+
+  setup do
+    runner = Module.concat(__MODULE__, "Runner#{System.unique_integer([:positive])}")
+    start_supervised!({Runic.Runner, name: runner})
+    {:ok, runner: runner}
+  end
+
+  test "manual steps reach the same result as an immediate run", %{runner: runner} do
+    input = %{expense_id: "e-7", cents: 10}
+    owner = self()
+    hooks = [on_complete: fn _runnable, _duration, _state -> send(owner, :unit_done) end]
+    id = "expense-#{System.unique_integer([:positive])}"
+
+    assert {:ok, _worker} =
+             Jido.Exec.start(runner, id, TestFlowsTour.ApproveExpense, input, %{},
+               dispatch_mode: :manual,
+               max_concurrency: 1,
+               hooks: hooks
+             )
+
+    assert {:error, %{details: %{reason: :execution_active}}} = Jido.Exec.result(runner, id)
+
+    step_until_complete(runner, id)
+
+    assert Jido.Exec.result(runner, id) == Jido.Exec.run(TestFlowsTour.ApproveExpense, input)
+  end
+
+  defp step_until_complete(runner, id) do
+    case Jido.Exec.step(runner, id) do
+      {:ok, %Runic.Workflow{}} ->
+        assert_receive :unit_done, 1_000
+        step_until_complete(runner, id)
+
+      {:complete, %Runic.Workflow{}} ->
+        :ok
+    end
+  end
+end
+
+%{total: 1, failures: 0} = run_tests.()
+```
+
+## Avoid common test problems
+
+- Do not sleep and hope. Wait on a message from an Action or hook with `assert_receive`.
+- A blocking Action under `Jido.Exec.run/4` blocks your test, because the call has no caller-side timeout. Pass `:timeout`, or send the Action a release message.
+- Managed runs reject PIDs in context. Pass a registered name, then look it up in the Action with `Process.whereis/1`.
+- To test waits, start a durable Agent as shown in [Flow Waits](flow-waits.md#host-the-flow-in-an-agent). Set `after_ms: 0` on a `timer` to test expiry without a delay.
+
+## Next steps
+
+- [Test Actions](../actions/testing-actions.livemd) covers the Actions on their own.
+- [Debug Flows](debugging-flows.md) helps when a test fails for a reason you cannot see.
+- [Test Agent Definitions](../agents/testing-agent-definitions.livemd) covers Flows behind an Agent route.

@@ -1,0 +1,306 @@
+# Routes and Handlers
+
+This tutorial builds an order Agent that uses each executable route form, then shows how a Signal selects a route and how a route maps output to state and a reply.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Write the Actions
+
+`SubmitOrder` returns complete next state, which is the default contract for a route. `PriceOrder` returns a larger output with named parts, so its route must say which part to use. A route can select a field only when the output schema declares it.
+
+```elixir
+defmodule RoutesGuide.SubmitOrder do
+  use Jido.Action,
+    name: "routes_guide_submit_order",
+    schema:
+      Jido.Joi.object(%{
+        sku: Jido.Joi.string(),
+        channel: Jido.Joi.string()
+      })
+
+  @impl Jido.Action
+  def run(%{sku: sku, channel: channel}, %{agent_state: state}) do
+    {:ok, %{state | last_sku: sku, channel: channel, handled_by: "submit"}}
+  end
+end
+
+defmodule RoutesGuide.PriceOrder do
+  use Jido.Action,
+    name: "routes_guide_price_order",
+    schema: Jido.Joi.object(%{quantity: Jido.Joi.integer()}),
+    output_schema:
+      Jido.Joi.object(%{
+        next_state: Jido.Joi.map(),
+        quote: Jido.Joi.object(%{total_cents: Jido.Joi.integer()})
+      })
+
+  @impl Jido.Action
+  def run(%{quantity: quantity}, %{agent_state: state}) do
+    {:ok,
+     %{
+       next_state: %{state | quotes: state.quotes + 1},
+       quote: %{total_cents: quantity * 250}
+     }}
+  end
+end
+
+defmodule RoutesGuide.AddNote do
+  use Jido.Action,
+    name: "routes_guide_add_note",
+    schema: Jido.Joi.object(%{note: Jido.Joi.string()})
+
+  @impl Jido.Action
+  def run(%{note: note}, %{agent_state: state}) do
+    {:ok, %{state | notes: [note | state.notes]}}
+  end
+end
+```
+
+## Declare the routes
+
+Routes live in the `routes` section. The first argument is a Signal type, or a path with wildcards.
+
+```elixir
+defmodule RoutesGuide.OrderAgent do
+  use Jido.Agent, name: "order"
+
+  state do
+    schema Jido.Joi.object(%{
+             last_sku: Jido.Joi.string() |> Jido.Joi.nullable() |> Jido.Joi.default(nil),
+             channel: Jido.Joi.string() |> Jido.Joi.default("none"),
+             handled_by: Jido.Joi.string() |> Jido.Joi.default("none"),
+             quotes: Jido.Joi.integer() |> Jido.Joi.default(0),
+             notes: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
+           })
+  end
+
+  routes do
+    signal_source "/shop/order"
+
+    # An Action module, a Signal helper, and a default for omitted input.
+    route "order.submit", RoutesGuide.SubmitOrder,
+      as: :submit,
+      defaults: %{channel: "web"}
+
+    # An Action module whose output needs a selected state and a reply.
+    route "order.price", RoutesGuide.PriceOrder, as: :price do
+      state from: output(:next_state)
+      reply "order.priced", from: output(:quote)
+    end
+
+    # An inline Action. The pattern matches validated input.
+    route "order.cancel", as: :cancel do
+      action %{reason: reason},
+        schema: Jido.Joi.object(%{reason: Jido.Joi.string()}),
+        context: context do
+        {:ok, %{context.agent_state | handled_by: "cancel:" <> reason}}
+      end
+    end
+
+    # An inline Flow. Its output is the next state.
+    route "order.annotate", as: :annotate do
+      flow schema: Jido.Joi.object(%{note: Jido.Joi.string()}) do
+        step "add_note", action: RoutesGuide.AddNote, params: %{note: input(:note)}
+        output result("add_note")
+      end
+    end
+
+    # A read that keeps the current state.
+    route "order.inspect", RoutesGuide.PriceOrder, as: :inspect, defaults: %{quantity: 0} do
+      state :unchanged
+    end
+
+    # One wildcard segment, then a fallback for everything else.
+    route "order.audit.*", RoutesGuide.AddNote, defaults: %{note: "audited"}
+
+    route "**", RoutesGuide.AddNote, defaults: %{note: "unrouted"}
+  end
+end
+
+order = RoutesGuide.OrderAgent.instantiate!(id: "order-1")
+order.state.quotes
+```
+
+The cell returns `0`. A route has exactly one handler. It can be an Action or Flow module, an inline `action`, an inline `flow`, a `transform`, or a `forward`. See [Transforms and Forwards](route-transforms-and-forwards.md) for the last two.
+
+A positional module can be an Action or a Flow. Jido resolves which one it is. The route for `order.submit` would look the same with a Flow module.
+
+## Merge defaults and input
+
+Route defaults merge once with the Signal data, and the Signal wins. The merge is shallow.
+
+```elixir
+{:ok, %{state: from_default}, []} =
+  RoutesGuide.OrderAgent.cmd(order, RoutesGuide.OrderAgent.submit_signal!(%{sku: "A-1"}))
+
+{:ok, %{state: from_signal}, []} =
+  RoutesGuide.OrderAgent.cmd(
+    order,
+    RoutesGuide.OrderAgent.submit_signal!(%{sku: "A-1", channel: "phone"})
+  )
+
+{from_default.channel, from_signal.channel}
+```
+
+The cell returns `{"web", "phone"}`. Only Action and Flow routes accept `:defaults`.
+
+## Run the inline handlers
+
+```elixir
+{:ok, cancelled, []} =
+  RoutesGuide.OrderAgent.cmd(order, RoutesGuide.OrderAgent.cancel_signal!(%{reason: "duplicate"}))
+
+{:ok, annotated, []} =
+  RoutesGuide.OrderAgent.cmd(order, RoutesGuide.OrderAgent.annotate_signal!(%{note: "gift wrap"}))
+
+{cancelled.state.handled_by, annotated.state.notes}
+```
+
+The cell returns `{"cancel:duplicate", ["gift wrap"]}`.
+
+## Select state and a reply
+
+By default, the complete output of an Action or Flow becomes the next state. Two declarations change that:
+
+- `state from: output(path)` selects one output field as the next state. `state :unchanged` keeps the current state and ignores the output.
+- `reply type, from: output(path)` adds a `Jido.Agent.Directive.Reply` to the Turn with the selected data.
+
+`output()` selects the whole output. `output(:field)` or `output([:field, :nested])` selects a path.
+
+```elixir
+{:ok, priced, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  RoutesGuide.OrderAgent.cmd(order, RoutesGuide.OrderAgent.price_signal!(%{quantity: 4}))
+
+{priced.state.quotes, reply.type, reply.data}
+```
+
+The cell returns `{1, "order.priced", %{total_cents: 1000}}`. A reply route needs a `signal_source`, because that becomes the reply's source.
+
+```elixir
+{:ok, inspected, []} =
+  RoutesGuide.OrderAgent.cmd(order, RoutesGuide.OrderAgent.inspect_signal!())
+
+inspected === order
+```
+
+The cell returns `true`, because `state :unchanged` kept the source state. [Agent Turns and Replies](turns-state-and-replies.md) explains how a caller receives a reply.
+
+## Select one route
+
+Selection takes the first declared route that matches. An exact path has no priority over a wildcard, so put the specific route first. `*` matches one segment, and `**` matches any number.
+
+`Jido.Agent.Route.select/2` shows the choice without running a handler.
+
+```elixir
+definition = RoutesGuide.OrderAgent.definition()
+
+for type <- ["order.submit", "order.audit.weekly", "invoice.created"] do
+  {:ok, route} = Jido.Agent.Route.select(definition, type)
+  {type, route.path}
+end
+```
+
+The cell returns:
+
+```text
+[
+  {"order.submit", "order.submit"},
+  {"order.audit.weekly", "order.audit.*"},
+  {"invoice.created", "**"}
+]
+```
+
+Selection happens before the handler runs. A failing handler returns its error, and Jido does not try the next route.
+
+Without a matching route, a Turn returns an error. This Agent has a `**` fallback, so a separate definition shows that case.
+
+```elixir
+strict =
+  Jido.Agent.define!(%{
+    name: "strict_order",
+    schema: Jido.Joi.object(%{notes: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])}),
+    routes: [%{path: "order.note", handler: %{kind: :action, target: RoutesGuide.AddNote}}]
+  })
+  |> Jido.Agent.instantiate!(id: "strict-1")
+
+other = Jido.Signal.new!("order.ship", %{}, source: "/shop")
+{:error, %Jido.Error.ValidationError{code: code}} = Jido.Agent.cmd(strict, other)
+code
+```
+
+The cell returns `:unmatched_input`.
+
+A Plugin that implements route selection can choose a different matching route. See [Plugin Routing](../plugins/plugin-input-and-routes.md).
+
+## Declare routes as data
+
+The same fields work in `Jido.Agent.define/1`. The `state` and `reply` selectors use `%{source: :output, path: [...]}`. Omit `state` for the default.
+
+```elixir
+{:ok, pricing} =
+  Jido.Agent.define(%{
+    name: "pricing",
+    signal_source: "/shop/pricing",
+    schema: Jido.Joi.object(%{quotes: Jido.Joi.integer() |> Jido.Joi.default(0)}),
+    routes: [
+      %{
+        path: "order.price",
+        handler: %{kind: :action, target: RoutesGuide.PriceOrder},
+        as: :price,
+        defaults: %{quantity: 1},
+        state: %{source: :output, path: [:next_state]},
+        reply: %{type: "order.priced", from: %{source: :output, path: [:quote]}}
+      }
+    ]
+  })
+
+hd(pricing.routes).state
+```
+
+The cell returns `%{path: [:next_state], source: :output}`.
+
+## Route validation errors
+
+Definition checks run at compile time for a module, and in `Jido.Agent.define/1` for a Map. Each one has a `code` and a `path`.
+
+```elixir
+price = %{kind: :action, target: RoutesGuide.PriceOrder}
+
+cases = [
+  # The output schema does not declare this field.
+  [%{path: "order.price", handler: price, state: %{source: :output, path: [:missing]}}],
+  # A path can appear once.
+  [%{path: "order.price", handler: price}, %{path: "order.price", handler: price}],
+  # A helper requires an exact path.
+  [%{path: "order.*", handler: price, as: :price}],
+  # A helper name starts with a lowercase letter.
+  [%{path: "order.price", handler: price, as: :Price}],
+  # A reply route needs an Agent signal_source.
+  [
+    %{
+      path: "order.price",
+      handler: price,
+      reply: %{type: "order.priced", from: %{source: :output, path: [:quote]}}
+    }
+  ]
+]
+
+for routes <- cases do
+  {:error, error} = Jido.Agent.define(%{name: "bad_order", routes: routes})
+  error.code
+end
+```
+
+The cell returns `[:unknown_output_field, :duplicate, :wildcard_helper, :invalid_helper_name, :reply_source_required]`.
+
+## Next steps
+
+- [Transforms and Forwards](route-transforms-and-forwards.md) covers routes that change or pass on a Signal.
+- [Agent Turns and Replies](turns-state-and-replies.md) covers the path from Signal to committed state.
+- [Inline Actions](../flows/inline-actions.md) covers the inline Action syntax.

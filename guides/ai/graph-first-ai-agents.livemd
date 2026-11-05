@@ -1,0 +1,222 @@
+# Graph-First AI Agents
+
+This tutorial builds an AI Agent that answers invoice questions with one tool, inspects its graph without a model, and runs a request against a local model stub. No provider or API key is involved.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Define a tool and an Agent
+
+A tool is a Jido Action or Flow. The Action `name` is the name the model sees, and the schema is the argument contract the model must meet.
+
+```elixir
+defmodule GraphFirstGuide.LookupInvoice do
+  use Jido.Action,
+    name: "lookup_invoice",
+    description: "Look up the status of one invoice",
+    schema: Jido.Joi.object(%{invoice_id: Jido.Joi.string()})
+
+  @impl true
+  def run(%{invoice_id: invoice_id}, _context) do
+    {:ok, %{invoice_id: invoice_id, status: "paid"}}
+  end
+end
+```
+
+`use Jido.AI.Agent` defines a normal Agent with one route, `jido.ai.request`. The `ai` block names the root reasoning Flow, which is the direct target of that route. `Jido.AI.Reasoning.ReAct` is the model and tool loop.
+
+```elixir
+defmodule GraphFirstGuide.BillingAgent do
+  use Jido.AI.Agent, name: "billing_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      instructions "Answer billing questions. Use tools to check facts."
+
+      limits do
+        model_calls 4
+        tool_rounds 2
+      end
+    end
+
+    tools do
+      action GraphFirstGuide.LookupInvoice
+    end
+  end
+end
+```
+
+## Inspect the graph without a model
+
+Three generated functions read the definition. None of them runs a model or a tool.
+
+```elixir
+alias GraphFirstGuide.BillingAgent
+
+explained = BillingAgent.explain()
+
+%{
+  reasoning: BillingAgent.reasoning(),
+  tools: explained.tools,
+  route: Enum.map(BillingAgent.definition().routes, & &1.path),
+  model_call_limit: explained.defaults.limits.model_calls
+}
+```
+
+The cell returns `Jido.AI.Reasoning.ReAct`, the `GraphFirstGuide.LookupInvoice` tool, the single `"jido.ai.request"` route, and a limit of 4 model calls.
+
+`preflight/1` validates one request against the Flow schema and compiles the Flow. Use it to reject a bad request before you spend a model call.
+
+```elixir
+alias GraphFirstGuide.BillingAgent
+
+{:ok, preflight} = BillingAgent.preflight(%{input: "Is invoice INV-1042 paid?"})
+{:error, missing_input} = BillingAgent.preflight(%{})
+
+%{
+  model: preflight.params.model,
+  tool_round_limit: preflight.params.limits.tool_rounds,
+  error: Exception.message(missing_input)
+}
+```
+
+The model is the ReAct default, `"openai:gpt-4o-mini"`. The tool round limit comes from the Agent, and the empty request fails with `"is required, at input"`.
+
+## Write a local model
+
+Every model call goes through a `Jido.AI.InferenceClient`. This client answers from a script. It asks for the tool on the first call. After a tool result arrives, it writes the final answer.
+
+```elixir
+defmodule GraphFirstGuide.LocalModel do
+  @behaviour Jido.AI.InferenceClient
+
+  @impl true
+  def generate_text(model, context, _options) do
+    message =
+      case context |> ReqLLM.Context.to_list() |> List.last() do
+        %{role: :tool} ->
+          ReqLLM.Context.assistant("Invoice INV-1042 is paid.")
+
+        %{role: :user} ->
+          call = ReqLLM.ToolCall.new("call-1", "lookup_invoice", ~s({"invoice_id":"INV-1042"}))
+          ReqLLM.Context.assistant("", tool_calls: [call])
+      end
+
+    {:ok,
+     %ReqLLM.Response{
+       id: "local",
+       model: model,
+       context: context,
+       message: message,
+       finish_reason: if(message.tool_calls in [nil, []], do: :stop, else: :tool_calls),
+       usage: %{input_tokens: 10, output_tokens: 5}
+     }}
+  end
+
+  @impl true
+  def evaluation_models, do: []
+
+  # This guide calls generate_text/3 only.
+  for {name, arity} <- Jido.AI.InferenceClient.behaviour_info(:callbacks),
+      {name, arity} not in [generate_text: 3, evaluation_models: 0] do
+    @impl true
+    def unquote(name)(unquote_splicing(Macro.generate_arguments(arity, __MODULE__))),
+      do: {:error, :not_supported}
+  end
+end
+```
+
+## Run one request
+
+`request_signal!/1` builds the `jido.ai.request` Signal. `cmd/3` runs the whole Flow in the calling process and returns the next Agent value with a Reply Directive. The `:context` option selects the local client for this call.
+
+```elixir
+alias GraphFirstGuide.BillingAgent
+
+agent = BillingAgent.instantiate!(id: "billing-1")
+context = %{jido_ai_inference_client: GraphFirstGuide.LocalModel}
+request = BillingAgent.request_signal!(%{input: "Is invoice INV-1042 paid?"})
+
+{:ok, agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  BillingAgent.cmd(agent, request, context: context)
+
+%{
+  type: reply.type,
+  status: reply.data.status,
+  output: reply.data.output,
+  model_calls: reply.data.model_calls,
+  tool_calls: reply.data.tool_calls,
+  tool_output: hd(reply.data.tool_attempts).output
+}
+```
+
+The reply has type `"jido.ai.response"` and status `:completed`. The output is `"Invoice INV-1042 is paid."`. The run took 2 model calls and 1 tool call, and the tool attempt recorded `%{"invoice_id" => "INV-1042", "status" => "paid"}`.
+
+## Read the Session
+
+The Flow records its work in a `Jido.Session` value in Agent state. Each entry in its Thread is a message or an observation.
+
+```elixir
+Enum.map(agent.state.session.thread.entries, fn entry ->
+  {entry.seq, entry.kind, entry.payload["role"]}
+end)
+```
+
+The cell lists the user message, the first model attempt, the assistant tool request, the tool attempt, the tool message, the second model attempt, the final assistant message, and the request outcome. There are 8 entries, numbered 0 to 7.
+
+No process is holding this data. The Agent is a plain value, and the next `cmd/3` continues from it.
+
+```elixir
+alias GraphFirstGuide.BillingAgent
+
+follow_up = BillingAgent.request_signal!(%{input: "Check it again."})
+
+{:ok, agent, [%Jido.Agent.Directive.Reply{signal: second}]} =
+  BillingAgent.cmd(agent, follow_up, context: context)
+
+{second.data.status, agent.state.session.thread.rev, second.data.thread_rev}
+```
+
+The status is `:completed`. The Thread revision is now 16, and the reply reports the same revision.
+
+## Define the root Flow inline
+
+The reasoning target can be any Flow whose output has `:state` and `:response`. A small Agent can write it inline. This one calls no model.
+
+```elixir
+defmodule GraphFirstGuide.EchoAgent do
+  use Jido.AI.Agent, name: "echo_agent"
+
+  ai do
+    reasoning do
+      step "answer", question <- input(:question), inline: [context: context] do
+        {:ok, %{state: context.agent_state, response: %{answer: "You asked: #{question}"}}}
+      end
+
+      output result("answer")
+    end
+  end
+end
+
+echo = GraphFirstGuide.EchoAgent.instantiate!(id: "echo-1")
+echo_request = GraphFirstGuide.EchoAgent.request_signal!(%{question: "Is it paid?"})
+
+{:ok, _echo, [%Jido.Agent.Directive.Reply{signal: echo_reply}]} =
+  GraphFirstGuide.EchoAgent.cmd(echo, echo_request)
+
+echo_reply.data
+```
+
+The reply data is `%{answer: "You asked: Is it paid?"}`. Jido adds nothing around the Flow you select, so this reply has none of the ReAct fields.
+
+## Next steps
+
+- [Reasoning Setup](reasoning-flows-models-and-limits.md) lists the fields you can set on a reasoning Flow.
+- [AI Requests and Sessions](requests-responses-and-sessions.livemd) covers the reply fields and live requests.
+- [ReAct Reasoning](react-reasoning.livemd) follows the loop through retries and repairs.
+- [Configure ReqLLM](req-llm-configuration.livemd) connects a real provider.

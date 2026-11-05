@@ -1,0 +1,201 @@
+# Build Your First Flow
+
+This tutorial connects Actions into a Flow that prices an invoice and decides how to route it. A Flow is a named graph of Action calls, and Jido derives its run order from the data each component reads.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Write the Actions
+
+Each Action does one job. These two come from the same invoice domain as [Build Your First Action](first-action.livemd).
+
+```elixir
+defmodule FirstFlow.SumLines do
+  use Jido.Action,
+    name: "first_flow_sum_lines",
+    schema: Jido.Joi.object(%{lines: Jido.Joi.list(Jido.Joi.integer())})
+
+  @impl true
+  def run(%{lines: lines}, _context), do: {:ok, %{subtotal_cents: Enum.sum(lines)}}
+end
+
+defmodule FirstFlow.AddTax do
+  use Jido.Action,
+    name: "first_flow_add_tax",
+    schema:
+      Jido.Joi.object(%{
+        subtotal_cents: Jido.Joi.integer(),
+        tax_percent: Jido.Joi.integer()
+      })
+
+  @impl true
+  def run(%{subtotal_cents: subtotal, tax_percent: tax_percent}, _context) do
+    {:ok, %{total_cents: subtotal + div(subtotal * tax_percent, 100)}}
+  end
+end
+```
+
+## Connect them with a Flow
+
+`input(:lines)` reads from the Flow's input. `result("sum", :subtotal_cents)` reads from another component, and that reference makes `"tax"` wait for `"sum"`. `output` is required, and it must come last.
+
+```elixir
+defmodule FirstFlow.PriceInvoice do
+  use Jido.Flow,
+    name: "first_flow_price_invoice",
+    schema: Jido.Joi.object(%{lines: Jido.Joi.list(Jido.Joi.integer())})
+
+  flow do
+    step "tax",
+      action: FirstFlow.AddTax,
+      params: %{subtotal_cents: result("sum", :subtotal_cents), tax_percent: context(:tax_percent)}
+
+    step "sum",
+      action: FirstFlow.SumLines,
+      params: %{lines: input(:lines)}
+
+    output result("tax")
+  end
+end
+
+Jido.Exec.run(FirstFlow.PriceInvoice, %{lines: [1_200, 300]}, %{tax_percent: 10})
+```
+
+The cell returns `{:ok, %{total_cents: 1650}}`. `"tax"` appears first in the source and still ran second, because source order creates no dependency.
+
+## Read the Flow as data
+
+The module compiles to a `Jido.Flow` value. That value holds each component's target and parameters, and no executable code of its own.
+
+```elixir
+%Jido.Flow{name: name, components: components} = FirstFlow.PriceInvoice.flow()
+
+{name, components |> Map.keys() |> Enum.sort()}
+```
+
+The cell returns `{"first_flow_price_invoice", ["sum", "tax"]}`.
+
+## Add an inline step and a choice
+
+An inline step holds a small body in the Flow itself. A `choice` runs the Action of the first option whose condition is true, and it needs a fallback. This version sends large invoices to a review queue.
+
+```elixir
+defmodule FirstFlow.AssignQueue do
+  use Jido.Action, name: "first_flow_assign_queue"
+
+  @impl true
+  def run(%{queue: queue, total_cents: total}, _context) do
+    {:ok, %{queue: queue, total_cents: total}}
+  end
+end
+
+defmodule FirstFlow.RouteInvoice do
+  use Jido.Flow,
+    name: "first_flow_route_invoice",
+    schema:
+      Jido.Joi.object(%{
+        invoice_id: Jido.Joi.string(),
+        lines: Jido.Joi.list(Jido.Joi.integer())
+      })
+
+  flow do
+    step "sum", action: FirstFlow.SumLines, params: %{lines: input(:lines)}
+
+    step "tax",
+      action: FirstFlow.AddTax,
+      params: %{subtotal_cents: result("sum", :subtotal_cents), tax_percent: context(:tax_percent)}
+
+    choice "route" do
+      option "review",
+        condition: result("tax", :total_cents) > 100_000,
+        action: FirstFlow.AssignQueue,
+        params: %{queue: "review", total_cents: result("tax", :total_cents)}
+
+      otherwise action: FirstFlow.AssignQueue,
+                params: %{queue: "auto_approve", total_cents: result("tax", :total_cents)}
+    end
+
+    step "summary", invoice_id <- input(:invoice_id) do
+      {:ok, %{label: "Invoice " <> invoice_id}}
+    end
+
+    output %{
+      label: result("summary", :label),
+      queue: result("route", :queue),
+      total_cents: result("route", :total_cents)
+    }
+  end
+end
+
+context = %{tax_percent: 10}
+
+small = %{invoice_id: "inv-1001", lines: [1_200, 300]}
+large = %{invoice_id: "inv-1002", lines: [200_000]}
+
+{:ok, routed_small} = Jido.Exec.run(FirstFlow.RouteInvoice, small, context)
+{:ok, routed_large} = Jido.Exec.run(FirstFlow.RouteInvoice, large, context)
+
+{routed_small.queue, routed_large.queue}
+```
+
+The cell returns `{"auto_approve", "review"}`. `"summary"` reads only the input, so it does not wait for the other components.
+
+## Handle a failure
+
+Bad input stops the run before any Action starts.
+
+```elixir
+{:error, %Jido.Error.ValidationError{details: invalid}} =
+  Jido.Exec.run(FirstFlow.RouteInvoice, %{invoice_id: 1001, lines: []}, context)
+
+{invalid.phase, Enum.map(invalid.errors, & &1.path)}
+```
+
+The cell returns `{:flow_input, [[:invoice_id]]}`.
+
+A missing context value fails when a component needs it. The error names that component.
+
+```elixir
+{:error, %Jido.Error.ExecutionError{details: details}} =
+  Jido.Exec.run(FirstFlow.RouteInvoice, small, %{})
+
+details.node
+```
+
+The cell returns `"tax"`.
+
+## The compiler checks the graph
+
+A reference to a component that does not exist fails at compile time. So does a cycle, a duplicate name, or a missing `output`.
+
+```elixir
+broken = """
+defmodule FirstFlow.Broken do
+  use Jido.Flow, name: "first_flow_broken"
+
+  flow do
+    step "tax", action: FirstFlow.AddTax, params: %{subtotal_cents: result("missing", :cents)}
+    output result("tax")
+  end
+end
+"""
+
+try do
+  Code.compile_string(broken)
+rescue
+  error in CompileError -> Exception.message(error)
+end
+```
+
+The cell returns a message that ends with `Flow reference points to an unknown component`.
+
+## Next steps
+
+- [Build Your First Agent](first-agent.livemd) runs this kind of Flow from an Agent route.
+- [Flows](../flows/flows.md) lists every component and when to use one.
+- [Execute Flows](../flow-runtime/flow-execution.livemd) covers effects, concurrency, and retries.

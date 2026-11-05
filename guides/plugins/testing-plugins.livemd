@@ -1,0 +1,331 @@
+# Test Plugins
+
+This tutorial writes ExUnit tests for a Plugin at three levels: its callbacks as functions, its Agent on the pure path, and its runtime in a live AgentServer. Run the cells in order.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+Start ExUnit in its own cell, and turn off the automatic run so the last cell can run the tests.
+
+```elixir
+ExUnit.start(autorun: false)
+```
+
+## The Plugin under test
+
+This Plugin counts refunds in an owned field, rejects Signals with no currency, owns a Directive, and keeps a runtime that receives a commit notification. Its `:observer` option is a process name, so a test can see what the Plugin does.
+
+```elixir
+defmodule PluginTestGuide.Note do
+  use Jido.Agent.Directive
+
+  @schema Jido.Joi.struct(__MODULE__, %{text: Jido.Joi.string() |> Jido.Joi.min(1)}, coerce: true)
+  @enforce_keys Jido.Joi.enforce_keys(@schema)
+  defstruct Jido.Joi.struct_fields(@schema)
+
+  def schema, do: @schema
+end
+
+defmodule PluginTestGuide.Ledger do
+  use GenServer
+
+  def start_link(init), do: GenServer.start_link(__MODULE__, init)
+
+  @impl true
+  def init(init), do: {:ok, %{last: init.plugin_state}}
+
+  @impl true
+  def handle_call({:committed, value}, _from, state), do: {:reply, :ok, %{state | last: value}}
+  def handle_call(:last, _from, state), do: {:reply, state.last, state}
+end
+
+defmodule PluginTestGuide.Refunds do
+  use Jido.Plugin, option_keys: [agent_server: [:observer, :fail_hook]]
+
+  alias Jido.Agent.Plugin.{Preparation, Reduction}
+  alias PluginTestGuide.{Ledger, Note}
+
+  @impl true
+  def state_spec(_opts), do: {:refund_count, Jido.Joi.integer() |> Jido.Joi.default(0)}
+
+  @impl true
+  def directives(_opts), do: [Note]
+
+  @impl true
+  def prepare(%Preparation{signal: %{data: %{currency: currency}}}, _opts), do: {:ok, %{currency: currency}}
+  def prepare(%Preparation{}, _opts), do: {:error, :currency_required}
+
+  @impl true
+  def reduce(%Reduction{} = reduction, _opts) do
+    notes = for %Note{} <- reduction.directives, do: :note
+    {:ok, reduction.plugin_state + length(notes)}
+  end
+
+  @impl true
+  def child_spec(init), do: %{id: __MODULE__, start: {Ledger, :start_link, [init]}}
+
+  @impl true
+  def after_commit(runtime, commit, opts) do
+    if opts[:fail_hook] do
+      {:error, :hook_failed}
+    else
+      :ok = GenServer.call(runtime, {:committed, commit.plugin_state})
+      send(opts[:observer], {:committed, commit.plugin_state, commit.state_version})
+      :ok
+    end
+  end
+
+  @impl true
+  def dispatch(_runtime, %Note{text: text}, _context, opts) do
+    send(opts[:observer], {:note, text})
+    :ok
+  end
+end
+
+defmodule PluginTestGuide.Desk do
+  use Jido.Agent, name: "refund_desk", plugins: [PluginTestGuide.Refunds]
+
+  state do
+    schema Jido.Joi.object(%{currency: Jido.Joi.string() |> Jido.Joi.default("")})
+  end
+
+  routes do
+    signal_source "/billing/desk"
+
+    route "refund.issue", as: :issue do
+      action %{note: note},
+        schema: Jido.Joi.object(%{currency: Jido.Joi.string(), note: Jido.Joi.string()}),
+        context: context do
+        currency = context.plugin_inputs[PluginTestGuide.Refunds].prepared.currency
+        {:ok, %{context.agent_state | currency: currency}, [%PluginTestGuide.Note{text: note}]}
+      end
+    end
+  end
+end
+```
+
+## Test callbacks as functions
+
+Agent callbacks are pure, and their input is a plain struct. A direct call needs no Agent and gives the most exact failure. The structs enforce their keys, so this helper fills the fields the callback does not read.
+
+```elixir
+defmodule PluginTestGuide.CallbackTest do
+  use ExUnit.Case, async: true
+
+  alias Jido.Agent.Plugin.Reduction
+  alias PluginTestGuide.{Note, Refunds}
+
+  defp reduction(plugin_state, directives) do
+    %Reduction{
+      plugin: Refunds,
+      agent_id: "desk",
+      agent_module: PluginTestGuide.Desk,
+      signal: Jido.Signal.new!("refund.issue", %{}, source: "/test"),
+      state_before: %{},
+      candidate_state: %{},
+      plugin_state: plugin_state,
+      prepared_input: nil,
+      directives: directives
+    }
+  end
+
+  test "reduce counts its own Directives and ignores others" do
+    other = Jido.Agent.Directive.server_stop(:normal)
+    assert {:ok, 3} = Refunds.reduce(reduction(2, [%Note{text: "goodwill"}, other]), [])
+  end
+
+  test "reduce keeps the value when the batch is empty" do
+    assert {:ok, 2} = Refunds.reduce(reduction(2, []), [])
+  end
+end
+```
+
+## Test the contract
+
+Jido checks a Plugin's contract when it normalizes the declaration. `Jido.Agent.define/1` runs that check and returns an error, so a test can cover a broken Plugin without a compile failure. Use this form to test a Plugin's own option or state rules.
+
+```elixir
+defmodule PluginTestGuide.ContractTest do
+  use ExUnit.Case, async: true
+
+  defmodule Unpaired do
+    use Jido.Plugin
+
+    @impl true
+    def state_spec(_opts), do: {:audit, Jido.Joi.integer() |> Jido.Joi.default(0)}
+
+    @impl true
+    def dump(value, _context, _opts), do: {:ok, value}
+  end
+
+  defp entry(plugin, data \\ %{}), do: %{id: plugin.id(), provider: plugin, vsn: plugin.vsn(), data: data}
+
+  test "the Plugin under test passes" do
+    assert {:ok, _definition} =
+             Jido.Agent.define(%{name: "contract_ok", plugins: [entry(PluginTestGuide.Refunds)]})
+  end
+
+  test "persistence needs both callbacks" do
+    assert {:error, %{message: "Persistence Plugin facet must define dump/3 and load/3"}} =
+             Jido.Agent.define(%{name: "contract_bad", plugins: [entry(Unpaired)]})
+  end
+end
+```
+
+## Test on the pure path
+
+`Jido.Agent.cmd/3` runs `prepare/2`, `select_route/2`, the handler, and `reduce/2` with no process. Use it for Plugin state and for Directive validation. It does not call `admit/3`, `after_commit/3`, or `dispatch/4`, and it returns the Directives instead of running them.
+
+```elixir
+defmodule PluginTestGuide.PureTest do
+  use ExUnit.Case, async: true
+
+  alias PluginTestGuide.{Desk, Note}
+
+  setup do
+    %{desk: Desk.instantiate!(id: "desk-pure")}
+  end
+
+  test "a Turn reduces the owned field and returns its Directive", %{desk: desk} do
+    signal = Desk.issue_signal!(%{currency: "EUR", note: "goodwill"})
+
+    assert {:ok, next, [%Note{text: "goodwill"}]} = Desk.cmd(desk, signal)
+    assert next.state == %{currency: "EUR", refund_count: 1}
+  end
+
+  test "prepare rejects a Signal before the handler runs", %{desk: desk} do
+    signal = Jido.Signal.new!("refund.issue", %{note: "goodwill"}, source: "/test")
+
+    assert {:error, :currency_required} = Desk.cmd(desk, signal)
+  end
+
+  test "an invalid Directive fails the Turn", %{desk: desk} do
+    signal = Desk.issue_signal!(%{currency: "EUR", note: ""})
+
+    assert {:error, [_issue]} = Desk.cmd(desk, signal)
+  end
+end
+```
+
+## Test on the live path
+
+Give each test its own Jido instance with `start_supervised!/1`, and register the test process as the observer. `Jido.AgentServer.call/3` returns at commit, so wait for post-commit results with `assert_receive`, and read the outcome only after the server returns to `:idle`.
+
+The child id `{:plugin, module}` under `Jido.AgentServer.activation/1` finds the Plugin's process.
+
+```elixir
+defmodule PluginTestGuide.LiveTest do
+  use ExUnit.Case, async: false
+
+  alias Jido.AgentServer, as: Server
+  alias PluginTestGuide.{Desk, Refunds}
+
+  setup do
+    observer = :"plugin_test_guide_observer_#{System.unique_integer([:positive])}"
+    Process.register(self(), observer)
+    instance = :"plugin_test_guide_jido_#{System.unique_integer([:positive])}"
+    start_supervised!({Jido, name: instance})
+    %{instance: instance, observer: observer}
+  end
+
+  defp start_desk(context, options \\ []) do
+    runtime = [{Refunds, [observer: context.observer] ++ options}]
+
+    {:ok, server} =
+      Jido.start_agent(context.instance, Desk,
+        id: "desk-#{System.unique_integer([:positive])}",
+        plugin_runtime_options: runtime
+      )
+
+    :ok = Server.await_ready(server)
+    server
+  end
+
+  defp runtime(server) do
+    {_id, pid, _kind, _modules} =
+      server |> Server.activation() |> Supervisor.which_children() |> List.keyfind({:plugin, Refunds}, 0)
+
+    pid
+  end
+
+  defp wait_for_idle(server) do
+    Enum.find(1..200, fn _attempt ->
+      Process.sleep(5)
+      Server.status(server).phase == :idle
+    end)
+  end
+
+  test "the hook runs first, the Directive follows, and the runtime sees the commit", context do
+    server = start_desk(context)
+
+    assert {:ok, %{state: %{refund_count: 1}}, [_note]} =
+             Server.call(server, Desk.issue_signal!(%{currency: "EUR", note: "goodwill"}))
+
+    assert_receive {:committed, 1, 1}, 1_000
+    assert_receive {:note, "goodwill"}, 1_000
+    assert GenServer.call(runtime(server), :last) == 1
+    assert {:ok, 1} = Server.plugin_state(server, Refunds)
+  end
+
+  test "a failed hook keeps the commit and skips the Directive", context do
+    server = start_desk(context, fail_hook: true)
+
+    assert {:ok, saved, [_note]} =
+             Server.call(server, Desk.issue_signal!(%{currency: "EUR", note: "goodwill"}))
+
+    wait_for_idle(server)
+
+    status = Server.status(server)
+    assert status.last_outcome.status == :succeeded
+    assert status.last_effect_outcome.status == :failed
+    assert status.last_effect_outcome.stage == :after_commit
+    assert Server.agent(server) == saved
+    refute_received {:note, _text}
+  end
+
+  test "runtime loss restarts the Agent from the last commit", context do
+    server = start_desk(context)
+    {:ok, _agent, [_note]} = Server.call(server, Desk.issue_signal!(%{currency: "EUR", note: "goodwill"}))
+    assert_receive {:committed, 1, 1}, 1_000
+    wait_for_idle(server)
+
+    agent_id = Server.agent(server).id
+    monitor = Process.monitor(server)
+    Process.exit(runtime(server), :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000
+
+    replacement =
+      Enum.find_value(1..200, fn _attempt ->
+        Process.sleep(5)
+        pid = Jido.whereis_agent(context.instance, agent_id)
+        if pid not in [nil, server], do: pid
+      end)
+
+    :ok = Server.await_ready(replacement)
+    assert {:ok, 1} = Server.plugin_state(replacement, Refunds)
+    assert GenServer.call(runtime(replacement), :last) == 1
+  end
+end
+```
+
+Test a runtime without a real external service by naming a local stand-in in its options, as `:observer` does here. A Plugin option holds static data, so pass a name in the declaration, or pass a pid through `plugin_runtime_options`.
+
+## Run the tests
+
+```elixir
+result = ExUnit.run()
+Map.take(result, [:failures, :total])
+```
+
+The cell returns `%{total: 10, failures: 0}`. In a Mix project, put these modules in `test/` and run `mix test`. Skip `ExUnit.start/1` and `ExUnit.run/0`, because Mix and your test helper handle them.
+
+## Next steps
+
+- [Plugin Design](plugin-design.md) lists every callback and when it runs.
+- [Test Agent Definitions](../agents/testing-agent-definitions.livemd) covers an Agent without a Plugin.
+- [Test Jido Code](../start-here/testing-jido-code.livemd) gives the wider testing approach.

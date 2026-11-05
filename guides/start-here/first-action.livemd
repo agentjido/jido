@@ -1,0 +1,172 @@
+# Build Your First Action
+
+This tutorial builds an Action that totals an invoice, then adds a schema, an output contract, a failure case, runtime context, and an effect request. An Action is one named unit of work, and it runs without an Agent or a Jido instance.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Write the smallest Action
+
+`use Jido.Action` needs a `:name`. `run/2` receives the input and a context map, and it returns `{:ok, map}`.
+
+```elixir
+defmodule FirstAction.TotalDraft do
+  use Jido.Action, name: "first_action_total_draft"
+
+  @impl true
+  def run(%{lines: lines}, _context) do
+    {:ok, %{subtotal_cents: Enum.sum(lines)}}
+  end
+end
+
+Jido.Exec.run(FirstAction.TotalDraft, %{lines: [1_200, 300]})
+```
+
+The cell returns `{:ok, %{subtotal_cents: 1500}}`.
+
+`Jido.Exec.run/4` is the normal way to run an Action. Calling `run/2` directly skips validation and error handling.
+
+## Add a schema
+
+This Action has no contract yet, so bad input reaches `run/2`. Add an input schema and an output schema with `Jido.Joi`. Exec checks both, and a default in the input schema fills in a missing value.
+
+```elixir
+defmodule FirstAction.TotalInvoice do
+  alias Jido.Joi
+
+  use Jido.Action,
+    name: "first_action_total_invoice",
+    description: "Adds tax to the invoice lines",
+    schema:
+      Joi.object(%{
+        lines: Joi.list(Joi.integer() |> Joi.min(0)),
+        tax_percent: Joi.integer() |> Joi.default(10)
+      }),
+    output_schema: Joi.object(%{total_cents: Joi.integer()})
+
+  @impl true
+  def run(%{lines: lines, tax_percent: tax_percent}, _context) do
+    subtotal = Enum.sum(lines)
+    {:ok, %{total_cents: subtotal + div(subtotal * tax_percent, 100)}}
+  end
+end
+
+Jido.Exec.run(FirstAction.TotalInvoice, %{lines: [1_200, 300]})
+```
+
+The cell returns `{:ok, %{total_cents: 1650}}`. The default tax of 10 percent applied.
+
+Invalid input stops before `run/2`. The error is a value with a path to the field.
+
+```elixir
+{:error, %Jido.Error.ValidationError{details: %{errors: [invalid]}}} =
+  Jido.Exec.run(FirstAction.TotalInvoice, %{lines: "none"})
+
+invalid.path
+```
+
+The cell returns `[:lines]`.
+
+The same schemas describe the Action to other code. `authoring_contract/0` returns them in JSON Schema form.
+
+```elixir
+FirstAction.TotalInvoice.authoring_contract()["input_schema"]["properties"] |> Map.keys()
+```
+
+The cell returns `["lines", "tax_percent"]`.
+
+## Return a failure
+
+Return `{:error, reason}` when the work cannot finish. Exec wraps the reason in a `Jido.Error.ExecutionError`. Use `Jido.Error.execution_error/2` to add your own details and to mark the failure as not worth retrying.
+
+```elixir
+defmodule FirstAction.ChargeInvoice do
+  alias Jido.Joi
+
+  use Jido.Action,
+    name: "first_action_charge_invoice",
+    schema: Joi.object(%{total_cents: Joi.integer()})
+
+  @impl true
+  def run(%{total_cents: total}, %{credit_limit_cents: limit}) when total > limit do
+    {:error, Jido.Error.execution_error("over credit limit", %{reason: :over_limit, retry: false})}
+  end
+
+  def run(%{total_cents: total}, _context), do: {:ok, %{charged_cents: total}}
+end
+```
+
+## Pass context
+
+The third argument to `Jido.Exec.run/4` is the context. Put runtime dependencies and caller data there, and keep input for the work itself. Context is not validated by the Action's schema.
+
+```elixir
+{:ok, %{charged_cents: 1650}} =
+  Jido.Exec.run(FirstAction.ChargeInvoice, %{total_cents: 1_650}, %{credit_limit_cents: 5_000})
+
+{:error, %Jido.Error.ExecutionError{message: message, details: %{reason: reason}}} =
+  Jido.Exec.run(FirstAction.ChargeInvoice, %{total_cents: 9_000}, %{credit_limit_cents: 5_000})
+
+{message, reason}
+```
+
+The cell returns `{"over credit limit", :over_limit}`. Match on the struct and on `details`, because messages can change.
+
+## Request an effect
+
+An Action can perform I/O itself. It can also return a third element that lists work for its caller. Exec carries the list and does not act on it.
+
+```elixir
+defmodule FirstAction.SendInvoice do
+  use Jido.Action,
+    name: "first_action_send_invoice",
+    schema: Jido.Joi.object(%{invoice_id: Jido.Joi.string()})
+
+  @impl true
+  def run(%{invoice_id: invoice_id}, _context) do
+    {:ok, %{status: "sent"}, [{:email_customer, invoice_id}]}
+  end
+end
+
+Jido.Exec.run(FirstAction.SendInvoice, %{invoice_id: "inv-1001"})
+```
+
+The cell returns `{:ok, %{status: "sent"}, [email_customer: "inv-1001"]}`. Nothing has sent an email. Your code decides what to do with the request.
+
+## Set a timeout and retries
+
+The caller chooses execution policy, so the Action stays the same. This Action fails twice before it succeeds, and `max_attempts: 3` lets Exec run it three times. A failure with `retry: false`, like the credit limit above, does not retry.
+
+```elixir
+defmodule FirstAction.FetchExchangeRate do
+  use Jido.Action, name: "first_action_fetch_exchange_rate"
+
+  @impl true
+  def run(_params, %{attempts: attempts}) do
+    :counters.add(attempts, 1, 1)
+
+    case :counters.get(attempts, 1) do
+      attempt when attempt < 3 -> {:error, :rate_service_busy}
+      attempt -> {:ok, %{usd_to_eur: 0.92, attempt: attempt}}
+    end
+  end
+end
+
+Jido.Exec.run(FirstAction.FetchExchangeRate, %{}, %{attempts: :counters.new(1, [])},
+  max_attempts: 3,
+  timeout: 1_000
+)
+```
+
+The cell returns `{:ok, %{attempt: 3, usd_to_eur: 0.92}}`.
+
+## Next steps
+
+- [Build Your First Flow](build-your-first-flow.livemd) connects Actions into a graph.
+- [Actions](../actions/actions.md) lists every option and result shape.
+- [Execution Policy](../actions/action-execution-policy.md) covers timeouts and retries in detail.

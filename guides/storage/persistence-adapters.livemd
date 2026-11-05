@@ -1,0 +1,227 @@
+# Persistence Adapters
+
+This tutorial starts a Jido instance with a persistence adapter, saves an Agent, restores it, and then moves to a different adapter without changing the Agent. It runs with no external service.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Define an Agent
+
+The Agent knows nothing about storage. It holds a paid amount and adds to it on each payment Signal.
+
+```elixir
+defmodule AdaptersGuide.ApplyPayment do
+  use Jido.Action,
+    name: "adapters_guide_apply_payment",
+    schema: Jido.Joi.object(%{cents: Jido.Joi.integer()})
+
+  @impl true
+  def run(%{cents: cents}, %{agent_state: state}),
+    do: {:ok, %{state | paid_cents: state.paid_cents + cents}}
+end
+
+defmodule AdaptersGuide.Invoice do
+  use Jido.Agent, name: "adapters_guide_invoice"
+
+  state do
+    schema Jido.Joi.object(%{paid_cents: Jido.Joi.integer() |> Jido.Joi.default(0)})
+  end
+
+  routes do
+    route "invoice.pay", AdaptersGuide.ApplyPayment
+  end
+end
+
+payment = Jido.Signal.new!("invoice.pay", %{cents: 250}, source: "/billing")
+payment.type
+```
+
+The cell returns `"invoice.pay"`.
+
+## Check an adapter declaration
+
+An adapter declaration is a module or a `{module, options}` tuple. `Jido.Persistence.resolve_config/2` checks the declaration without starting anything. It requires the `get/2` and `compare_and_swap/4` callbacks and runs the adapter's option validation.
+
+```elixir
+results = %{
+  ets: Jido.Persistence.resolve_config({Jido.Persistence.ETS, table: :adapters_guide}, nil),
+  file_without_path: Jido.Persistence.resolve_config(Jido.Persistence.File, nil),
+  disabled: Jido.Persistence.resolve_config(false, nil)
+}
+
+{:ok, {Jido.Persistence.ETS, [table: :adapters_guide]}} = results.ets
+
+{:error, {:invalid_persistence_options, Jido.Persistence.File, ":path must be a non-empty string"}} =
+  results.file_without_path
+
+{:ok, nil} = results.disabled
+
+results
+```
+
+The file adapter needs `:path`, and `false` or `nil` disables persistence. A successful result does not prove the storage is durable or shared across nodes.
+
+## Start an instance with ETS
+
+Configure the adapter on the instance. A persistent Agent also needs a stable namespace, because the namespace is part of its durable key.
+
+```elixir
+{:ok, _instance} =
+  Jido.start_link(
+    name: AdaptersGuide.EtsJido,
+    namespace: "billing",
+    persistence: {Jido.Persistence.ETS, table: :adapters_guide}
+  )
+
+{:ok, invoice} =
+  Jido.start_agent(AdaptersGuide.EtsJido, AdaptersGuide.Invoice,
+    id: "inv-1001",
+    persistence: :inherit
+  )
+
+:ok = Jido.AgentServer.await_ready(invoice)
+
+{:ok, agent, _directives} = Jido.AgentServer.call(invoice, payment)
+snapshot = Jido.AgentServer.snapshot(invoice)
+
+{agent.state, snapshot.state_version}
+```
+
+The cell returns `{%{paid_cents: 250}, 1}`. Revision zero was written before `await_ready/1` returned. The successful Turn wrote revision one.
+
+## Restore from storage
+
+Read the record, hibernate the Agent, and thaw it. `Jido.thaw/4` starts a new process that requires the saved record.
+
+```elixir
+{:ok, stored, 1} =
+  Jido.Persistence.load_agent_with_revision(
+    AdaptersGuide.EtsJido,
+    AdaptersGuide.Invoice,
+    "inv-1001"
+  )
+
+:ok = Jido.hibernate(AdaptersGuide.EtsJido, invoice)
+
+{:ok, thawed} = Jido.thaw(AdaptersGuide.EtsJido, AdaptersGuide.Invoice, "inv-1001")
+:ok = Jido.AgentServer.await_ready(thawed)
+
+{stored.state, Jido.AgentServer.agent(thawed).state, Jido.AgentServer.snapshot(thawed).state_version}
+```
+
+The cell returns `{%{paid_cents: 250}, %{paid_cents: 250}, 1}`.
+
+Passing the instance name as the source makes `Jido.Persistence` use that instance's adapter and namespace. You can also pass `{adapter, options}` with `:namespace` to read the same record without an instance.
+
+## Stop the instance
+
+Stop the Agent and the instance. The next section starts a new instance with the same namespace.
+
+```elixir
+:ok = Jido.stop_agent(AdaptersGuide.EtsJido, thawed)
+Supervisor.stop(AdaptersGuide.EtsJido)
+```
+
+ETS data survives a stopped instance because a supervised process in the Jido application inherits the table. It does not survive a BEAM restart.
+
+## Swap to files
+
+Change the declaration and nothing else. The Agent and its Signals stay the same.
+
+```elixir
+path = Path.join(System.tmp_dir!(), "adapters-guide-#{System.unique_integer([:positive])}")
+file_store = {Jido.Persistence.File, path: path}
+
+{:ok, _instance} =
+  Jido.start_link(name: AdaptersGuide.FileJido, namespace: "billing", persistence: file_store)
+
+{:ok, invoice} =
+  Jido.start_agent(AdaptersGuide.FileJido, AdaptersGuide.Invoice,
+    id: "inv-2001",
+    persistence: :inherit
+  )
+
+:ok = Jido.AgentServer.await_ready(invoice)
+{:ok, _agent, _directives} = Jido.AgentServer.call(invoice, payment)
+:ok = Jido.stop_agent(AdaptersGuide.FileJido, invoice)
+Supervisor.stop(AdaptersGuide.FileJido)
+
+path |> Path.join("records") |> File.ls!() |> length()
+```
+
+The cell returns `1`, the one file for this Agent. Its name is a hash of the storage key.
+
+The instance is gone, but the record remains on disk. A new instance with the same namespace can read it:
+
+```elixir
+{:ok, _instance} =
+  Jido.start_link(name: AdaptersGuide.RestartedJido, namespace: "billing", persistence: file_store)
+
+{:ok, restored} = Jido.thaw(AdaptersGuide.RestartedJido, AdaptersGuide.Invoice, "inv-2001")
+:ok = Jido.AgentServer.await_ready(restored)
+state = Jido.AgentServer.agent(restored).state
+
+:ok = Jido.stop_agent(AdaptersGuide.RestartedJido, restored)
+Supervisor.stop(AdaptersGuide.RestartedJido)
+File.rm_rf!(path)
+
+state
+```
+
+The cell returns `%{paid_cents: 250}`. The instance name changed and the record still loaded, because the key uses the namespace.
+
+## Override per Agent
+
+`:persistence` on `Jido.start_agent/3` also accepts a declaration, which replaces the instance default for that Agent. The Agent still takes its namespace from the instance.
+
+```elixir
+{:ok, _instance} =
+  Jido.start_link(name: AdaptersGuide.MixedJido, namespace: "billing")
+
+{:ok, invoice} =
+  Jido.start_agent(AdaptersGuide.MixedJido, AdaptersGuide.Invoice,
+    id: "inv-3001",
+    persistence: {Jido.Persistence.ETS, table: :adapters_guide_override}
+  )
+
+:ok = Jido.AgentServer.await_ready(invoice)
+
+{:ok, %{id: "inv-3001"}} =
+  Jido.Persistence.load_agent(
+    {Jido.Persistence.ETS, table: :adapters_guide_override},
+    AdaptersGuide.Invoice,
+    "inv-3001",
+    namespace: "billing"
+  )
+
+:ok = Jido.stop_agent(AdaptersGuide.MixedJido, invoice)
+Supervisor.stop(AdaptersGuide.MixedJido)
+```
+
+The cell returns `:ok`.
+
+## Choose an adapter
+
+Jido ships these adapters. All of them implement `Jido.Persistence.Store`.
+
+| Adapter | Storage | Survives a BEAM restart | Shared across BEAM instances | Extra dependency | Guide |
+| --- | --- | --- | --- | --- | --- |
+| `Jido.Persistence.ETS` | Memory | No | No | None | [Local Stores](local-persistence-adapters.md) |
+| `Jido.Persistence.File` | One file per key | Yes | No. One BEAM must own the directory | None | [Local Stores](local-persistence-adapters.md) |
+| `Jido.Persistence.Mnesia` | An application-owned Mnesia table | Depends on your table copies | Depends on your table copies | `:mnesia` in `extra_applications` | [Local Stores](local-persistence-adapters.md) |
+| `Jido.Persistence.Ecto` | One SQL table on PostgreSQL or SQLite | Yes | Yes on PostgreSQL | `:ecto_sql` and a driver | [Ecto Storage](ecto-persistence.md) |
+| `Jido.Persistence.Redis` | Redis keys, through your client function | Depends on your Redis setup | Yes | A Redis client | [Redis and S3 Stores](redis-and-s3-persistence.md) |
+| `Jido.Persistence.S3` | One object per key, through your request function | Yes | Yes | An S3 client | [Redis and S3 Stores](redis-and-s3-persistence.md) |
+| `Jido.Persistence.Bedrock` | A Bedrock cluster | Depends on your cluster's durability profile | Yes | `:bedrock` and `:bedrock_raft` | [Bedrock and Raft Storage](bedrock-persistence.md) |
+
+For anything else, see [Custom Adapters](custom-persistence-adapter.md). No adapter gives you exclusive ownership of an Agent across a cluster. Revision checks reject stale writes, and they do not elect a single owner.
+
+## Next steps
+
+- [Storage Model](persistence-storage-model.md): what these adapters store and what each write result means.
+- [Make an Agent Durable](../durability/make-an-agent-durable.livemd): the runtime side of the same setup.
