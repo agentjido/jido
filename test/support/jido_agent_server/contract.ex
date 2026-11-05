@@ -66,7 +66,7 @@ defmodule Jido.Test.AgentServer.Contract do
     use Jido.Plugin
 
     def child_spec(init),
-      do: %{start: {ShutdownResource, :start_link, [init]}, shutdown: 5_000}
+      do: Supervisor.child_spec({ShutdownResource, init}, shutdown: 5_000)
   end
 
   defmodule Work do

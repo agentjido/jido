@@ -84,11 +84,13 @@ defmodule Jido.Codec.Issue do
     do: not List.improper?(value) and Enum.all?(value, &unique_json_keys?/1)
 
   defp unique_json_keys?(value) when is_map(value) and not is_struct(value) do
-    with {:ok, names} <- json_key_names(Map.keys(value)) do
-      length(names) == MapSet.size(MapSet.new(names)) and
-        Enum.all?(Map.values(value), &unique_json_keys?/1)
-    else
-      :error -> false
+    case json_key_names(Map.keys(value)) do
+      {:ok, names} ->
+        length(names) == MapSet.size(MapSet.new(names)) and
+          Enum.all?(Map.values(value), &unique_json_keys?/1)
+
+      :error ->
+        false
     end
   end
 
