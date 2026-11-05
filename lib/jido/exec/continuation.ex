@@ -211,8 +211,22 @@ defmodule Jido.Exec.Continuation do
   def validate(_continuation), do: invalid()
 
   @doc "Checks that a continuation contains only storage-safe terms."
-  @spec portable(t()) :: :ok | {:error, term()}
-  def portable(continuation), do: Jido.Codec.Term.validate(continuation, :continuation)
+  @spec portable(t()) :: :ok | {:error, Jido.Error.ValidationError.t()}
+  def portable(continuation) do
+    with {:error, path} <- Jido.Codec.Term.validate(continuation, :continuation) do
+      Jido.Error.validation_result(
+        :non_portable_term,
+        path,
+        "Durable Turn #{non_portable_subject(path)} is not portable. Stored data cannot hold " <>
+          "PIDs, ports, references, functions, improper lists, or partial bitstrings."
+      )
+    end
+  end
+
+  defp non_portable_subject([:continuation, :context, key | _path]),
+    do: "context key #{inspect(key)}"
+
+  defp non_portable_subject(path), do: "value at #{inspect(path)}"
 
   @doc false
   @spec compatible(t(), Jido.Instruction.t()) :: :ok | {:error, :execution_definition_changed}

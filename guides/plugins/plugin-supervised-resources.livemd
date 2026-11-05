@@ -150,7 +150,7 @@ The cell returns `{"TCK-1", "TCK-2", 2}`.
 
 A Plugin with `child_spec/1` needs an Activation. `Jido.start_agent/3`, `Jido.AgentServer.start/1`, and `Jido.AgentServer.child_spec/1` provide one. `Jido.AgentServer.start_link/1` returns an error for such an Agent.
 
-A startup failure stops the Activation. That covers an invalid child specification, a failed start, an `await_ready/2` that returns anything other than `:ok`, and a readiness timeout. `Jido.start_agent/3` can return `{:ok, pid}` first, and `Jido.AgentServer.await_ready/2` then exits, so always call it before relying on a new server. The runtime root must use the default `:permanent` restart. Any other value is an invalid specification.
+A startup failure stops the Activation. That covers an invalid child specification, a failed start, an `await_ready/2` that returns anything other than `:ok`, and a readiness timeout. `Jido.start_agent/3` can return `{:ok, pid}` first, and `Jido.AgentServer.await_ready/2` then returns `{:error, reason}`, so always call it before relying on a new server. The runtime root must use the default `:permanent` restart. Any other value is an invalid specification.
 
 ## See it recover
 

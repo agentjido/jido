@@ -96,15 +96,11 @@ end
 
 Run the Action through `Jido.Exec.run/4` to test what callers receive. Pass a stub through context. Match on the error struct and its `details`, not on the message.
 
-A failed Action under `Jido.Exec.run/4` logs a warning. `@moduletag :capture_log` keeps it out of the test output, and ExUnit shows it only when a test fails.
-
 ```elixir
 defmodule TestingJido.ChargeCardTest do
   use ExUnit.Case, async: true
 
   alias TestingJido.{ApprovingGateway, ChargeCard, DecliningGateway}
-
-  @moduletag :capture_log
 
   test "returns a receipt when the gateway approves" do
     assert Jido.Exec.run(ChargeCard, %{amount_cents: 500}, %{gateway: ApprovingGateway}) ==
@@ -137,8 +133,6 @@ defmodule TestingJido.PayInvoiceTest do
 
   alias TestingJido.{ApprovingGateway, DecliningGateway, PayInvoice}
 
-  @moduletag :capture_log
-
   test "records the charged amount" do
     context = %{gateway: ApprovingGateway, agent_state: %{paid_cents: 100}}
 
@@ -170,8 +164,6 @@ defmodule TestingJido.InvoiceTurnTest do
   use ExUnit.Case, async: true
 
   alias TestingJido.{ApprovingGateway, DecliningGateway, InvoiceAgent}
-
-  @moduletag :capture_log
 
   setup do
     %{invoice: InvoiceAgent.instantiate!(id: "inv-test")}
@@ -213,8 +205,6 @@ defmodule TestingJido.InvoiceServerTest do
 
   alias Jido.AgentServer
   alias TestingJido.{ApprovingGateway, DecliningGateway, InvoiceAgent}
-
-  @moduletag :capture_log
 
   setup do
     jido = :"testing_jido_#{System.unique_integer([:positive])}"

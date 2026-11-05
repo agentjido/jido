@@ -76,19 +76,30 @@ defmodule Jido.Codec do
     with {:ok, document} <- encode(value, opts), do: {:ok, JSON.encode!(document)}
   end
 
-  @doc "Decodes one trusted runtime JSON document."
+  @doc """
+  Decodes one trusted runtime JSON document.
+
+  Routing by document `type` needs the published codec index, and resolving
+  references without `:catalog` needs the published Catalog. Until Discovery
+  publishes them, this returns an Issue with the code `:catalog_not_initialized`
+  or `:catalog_initialization_failed`.
+  """
   @spec decode_json(String.t(), keyword()) :: {:ok, struct()} | {:error, [Issue.t()]}
   def decode_json(json, opts \\ []) do
     opts = options!(opts)
     maximum_bytes = maximum_json_bytes!(opts)
 
     case Document.decode_json(json, maximum_bytes) do
-      {:ok, document} -> route(document, opts)
+      {:ok, document} -> route_published(document, opts)
       {:error, %Document.Error{} = error} -> document_error(error)
     end
   end
 
-  @doc "Decodes one trusted runtime document."
+  @doc """
+  Decodes one trusted runtime document.
+
+  Returns the same publication Issues as `decode_json/2`.
+  """
   @spec decode(term(), keyword()) :: {:ok, struct()} | {:error, [Issue.t()]}
   def decode(document, opts \\ []) do
     opts = options!(opts)
@@ -99,7 +110,7 @@ defmodule Jido.Codec do
 
   defp decode_checked(document, opts, check) do
     with :ok <- check.(document),
-         {:ok, value} <- route(document, opts) do
+         {:ok, value} <- route_published(document, opts) do
       {:ok, value}
     else
       {:error, %Document.Error{} = error} ->
@@ -108,6 +119,12 @@ defmodule Jido.Codec do
       {:error, issues} when is_list(issues) ->
         {:error, issues}
     end
+  end
+
+  defp route_published(document, opts) do
+    route(document, opts)
+  rescue
+    error in Error.InternalError -> issue(error.code, [], error.message, error.details)
   end
 
   defp route(%{"type" => type, "vsn" => vsn} = document, opts)

@@ -616,7 +616,7 @@ defmodule Jido.Agent.EvaluationContractTest do
 
     assert {:error,
             %Jido.Error.ExecutionError{
-              details: %{code: :plugin_state_owner_violation, keys: [:first]}
+              details: %{code: :plugin_state_owner_violation, keys: [:first], plugin: F.First}
             }} = Agent.cmd(source, F.signal(%{output: %{source.state | first: 99}}))
   end
 

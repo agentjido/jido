@@ -79,7 +79,7 @@ Each callback receives a `Jido.Plugin.Context.Persistence`:
 | `:plugin_vsn` | The current version from `use Jido.Plugin`. |
 | `:record_format` | The persistence record format, a positive integer. |
 | `:direction` | `:dump` or `:load`. |
-| `:reason` | Why the conversion runs, such as `:snapshot`, `:manual`, or `:restore`. |
+| `:reason` | Why the conversion runs: `:snapshot`, `:manual`, `:restore`, `:stored_upgrade`, or, in an AgentServer, `:activate`, `:commit`, or `:hibernate`. |
 
 `:plugin_vsn` is the version of the code that is running, not the version that stored the value. To tell old stored forms apart, put a marker in the stored value.
 

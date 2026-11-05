@@ -8,6 +8,13 @@ defmodule Jido.Signal.PublicBoundaryErrorsTest do
   alias Jido.Trace
 
   describe "Signal error boundaries" do
+    test "names only the extension value kinds the check accepts" do
+      for value <- [URI.parse("https://example.com"), DateTime.utc_now(), 1.5] do
+        assert {:error, message} = Signal.new(%{type: "event", source: "/test", myext: value})
+        assert message =~ "Boolean, signed 32-bit Integer, String, or Binary; got:"
+      end
+    end
+
     test "returns validation errors for struct attribute maps" do
       for attrs <- [%URI{}, MapSet.new([:item])] do
         for result <- [

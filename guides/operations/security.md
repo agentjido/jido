@@ -65,7 +65,7 @@ Choose from your own list in code. Do not turn a Signal's text into a module, an
 Keep secrets out of Agent state, Signal data, Turn context, and Flow input. These values reach places that you may not protect:
 
 - **Agent state** is written to your store as it is, and Jido does not encrypt records. Encrypt in your store if you need that.
-- **Crash reports.** `Jido.AgentServer` does not filter its data from OTP crash reports, so a process crash can log Agent state.
+- **Crash reports.** `Jido.AgentServer` removes its data, queued events, and the values in its exit reason from OTP crash reports and `:sys.get_status/1`. The stacktrace is not filtered. A `FunctionClauseError` in Jido code can print its arguments there, and those can include Agent state.
 - **Action failures.** A failed step can log its node. A direct `Jido.Exec.run/4` call can include its params and context. See [Flow Security](../flow-runtime/flow-security.md).
 - **Emitted Signals** go to wherever you dispatch them.
 

@@ -56,7 +56,7 @@ defmodule Jido.Agent.Directive do
       # `use` can precede `defstruct`; do not expand the struct here.
       def validate(%{__struct__: __MODULE__} = directive) do
         if function_exported?(__MODULE__, :schema, 0) do
-          Jido.Joi.parse(apply(__MODULE__, :schema, []), Map.from_struct(directive))
+          Jido.Agent.Directive.parse(apply(__MODULE__, :schema, []), Map.from_struct(directive))
         else
           {:ok, directive}
         end
@@ -81,13 +81,13 @@ defmodule Jido.Agent.Directive do
   @spec validate(struct()) :: {:ok, struct()} | {:error, term()}
   def validate(%{__struct__: module, signal: %Signal{} = signal} = directive)
       when module in [Emit, Reply, ParentSend, AgentSend] do
-    with {:ok, signal} <- Joi.parse(Signal.schema(), signal),
-         {:ok, extensions} <- SignalContext.normalize(signal.extensions),
+    with {:ok, signal} <- parse(Signal.schema(), signal),
+         {:ok, extensions} <- normalize_context(signal.extensions),
          {:ok, directive} <-
            directive
            |> Map.from_struct()
            |> Map.put(:signal, %{signal | extensions: extensions})
-           |> then(&Joi.parse(module.schema(), &1)),
+           |> then(&parse(module.schema(), &1)),
          :ok <- validate_reply_causation(directive) do
       {:ok, directive}
     end
@@ -102,7 +102,7 @@ defmodule Jido.Agent.Directive do
   end
 
   def validate(%{__struct__: module} = directive) when module in @core_modules do
-    Joi.parse(module.schema(), Map.from_struct(directive))
+    parse(module.schema(), Map.from_struct(directive))
   end
 
   def validate(%{__struct__: module} = directive) do
@@ -118,6 +118,31 @@ defmodule Jido.Agent.Directive do
      )}
   end
 
+  @doc false
+  @spec parse(Joi.schema(), term()) :: {:ok, term()} | {:error, Exception.t()}
+  def parse(schema, value) do
+    with {:error, issues} <- Joi.parse(schema, value), do: invalid_schema(issues)
+  end
+
+  defp invalid_schema(issues) do
+    issues =
+      Enum.map(issues, fn issue ->
+        %{code: Joi.error_code(issue), path: Joi.error_path(issue), message: Joi.error_message(issue)}
+      end)
+
+    Error.validation_result(:invalid_directive, [], "Agent Directive does not match its schema", %{
+      issues: issues
+    })
+  end
+
+  defp normalize_context(extensions) do
+    with {:error, reason} <- SignalContext.normalize(extensions) do
+      Error.validation_result(:invalid_directive, [:signal, :extensions], "Signal context is invalid", %{
+        reason: reason
+      })
+    end
+  end
+
   defp validate_custom(module, directive) do
     try do
       case module.validate(directive) do
@@ -129,6 +154,9 @@ defmodule Jido.Agent.Directive do
            Jido.Error.validation_error("Agent Directive validation changed its type",
              details: %{expected: module, actual: actual}
            )}
+
+        {:error, [%{code: _, path: _, message: _} | _] = issues} ->
+          invalid_schema(issues)
 
         {:error, _reason} = error ->
           error

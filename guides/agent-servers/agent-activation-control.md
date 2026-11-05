@@ -24,7 +24,7 @@ The children of an activation restart together. A worker restart therefore also 
 
 `Jido.start_agent/3` returns when the worker is registered. Two steps can still be in progress: restoring saved state, and starting Plugin runtimes and topology members. During them, the `phase` in `Jido.AgentServer.status/2` is `:initializing`, Turns are rejected with `:not_ready`, and `Jido.whereis_agent/3` returns `nil`.
 
-Call `Jido.AgentServer.await_ready/2` before you send work. It returns `:ok` when the server is ready. If startup fails, the worker stops with `{:shutdown, reason}`, and `await_ready/2` exits with that reason. A caller timeout does not stop startup.
+Call `Jido.AgentServer.await_ready/2` before you send work. It returns `:ok` when the server is ready. If startup fails, the worker stops with `{:shutdown, reason}`, and `await_ready/2` returns `{:error, reason}`. A caller timeout does not stop startup.
 
 `:readiness_timeout` bounds Plugin startup, and `:persistence_timeout` bounds the restore. Each has a default of 5,000 ms. On expiry, the worker stops with `{:shutdown, :readiness_timeout}` or `{:shutdown, :persistence_timeout}`.
 
@@ -187,7 +187,6 @@ Monitor the worker to read its exit reason. All of these reasons except the last
 | `{:shutdown, :execution_lifecycle_failed}` | The runtime lost track of a Turn: its execution, the Runner, the instance, or a required durable save. |
 | `{:shutdown, :effect_lifecycle_failed}` | An effect task died, or a composition change did not become ready. |
 | `{:shutdown, :orphan_dispatch_failed}`, `{:shutdown, :orphan_dispatch_timeout}` | The orphan Signal could not be sent. |
-| `{:shutdown, {:topology_delivery_failed, reason}}` | A topology connection could not deliver a Signal. |
 | `{:durable_worker_lost, reason}` | The execution of a durable Turn was lost. This is an abnormal exit, so the activation restarts the worker and recovers the Turn. |
 
 ## Run under your own supervisor

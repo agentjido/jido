@@ -722,7 +722,9 @@ defmodule Jido.AgentServer do
   `type` selects the event, and `data` must be a portable plain Map payload.
   `:ok` confirms saved acceptance, not completion. A caller timeout does not
   cancel delivery. Retry the same Signal and wait ID. Delivery is available
-  only while the Worker is suspended.
+  only while the Worker is suspended. Accepted input is not remembered after
+  the Worker resumes, so a retry then returns `{:error, :not_waiting}` even if
+  the earlier delivery succeeded. Read `status/2` to tell these cases apart.
   """
   @spec deliver_wait(server(), Jido.Exec.Wait.id(), Signal.t(), timeout()) ::
           :ok | {:error, term()}
@@ -738,10 +740,23 @@ defmodule Jido.AgentServer do
   def deliver_wait(_server, _wait_id, _signal, _timeout),
     do: invalid_options("wait input must be a Signal")
 
-  @doc "Waits for Plugin startup and readiness. Caller timeout does not stop startup."
+  @doc """
+  Waits for Plugin startup and readiness. Caller timeout does not stop startup.
+
+  Returns `{:error, reason}` when the worker failed to start, for example
+  `:not_found`, `:conflict`, or `:deleted`, and `{:error, :timeout}` when the
+  wait ends first. `{:error, :noproc}` means the process is gone and no start
+  failure is recorded for it.
+  """
   @spec await_ready(server(), timeout()) :: :ok | {:error, term()}
   def await_ready(server, timeout \\ 5_000) do
-    with :ok <- Lifecycle.validate_wait(timeout), do: :gen_statem.call(server, :await_ready, timeout)
+    with :ok <- Lifecycle.validate_wait(timeout) do
+      try do
+        :gen_statem.call(server, :await_ready, timeout)
+      catch
+        :exit, reason -> Lifecycle.ready_exit(server, reason)
+      end
+    end
   end
 
   @doc "Returns terminal summaries in chronological order when debug is enabled."
@@ -1321,14 +1336,14 @@ defmodule Jido.AgentServer do
   def handle_event(:cast, {:topology_output, tag, signal}, _phase, data) do
     case Topology.member_output(Map.put(data, :server, self()), tag, signal) do
       :ok -> :keep_state_and_data
-      {:error, reason} -> {:stop, {:shutdown, {:topology_delivery_failed, reason}}, data}
+      {:error, reason} -> {:keep_state, topology_delivery_failed(data, signal, reason)}
     end
   end
 
   def handle_event(:cast, {:topology_bus, name, signal}, _phase, data) do
     case Topology.output(Map.put(data, :server, self()), %{kind: :bus, name: name}, signal) do
       :ok -> :keep_state_and_data
-      {:error, reason} -> {:stop, {:shutdown, {:topology_delivery_failed, reason}}, data}
+      {:error, reason} -> {:keep_state, topology_delivery_failed(data, signal, reason)}
     end
   end
 
@@ -1942,6 +1957,9 @@ defmodule Jido.AgentServer do
 
   def handle_event(:info, _message, _phase, _data), do: :keep_state_and_data
 
+  # Without this clause a FunctionClauseError puts the data in the stacktrace.
+  def handle_event(_type, _event, phase, _data), do: {:stop, {:unexpected_event, phase}}
+
   defp bootstrap_timeout(%{bootstrap: %{kind: :persistence}}), do: :persistence_timeout
   defp bootstrap_timeout(_data), do: :readiness_timeout
 
@@ -1979,8 +1997,38 @@ defmodule Jido.AgentServer do
     idle_transition(%{data | bootstrap: nil, plugin_refs: refs, ready_waiters: []}, replies)
   end
 
-  defp finish_bootstrap({:error, reason}, data),
-    do: {:stop, {:shutdown, reason}, data}
+  defp finish_bootstrap({:error, reason}, data) do
+    # A Plugin or topology start fails after Lifecycle.start/2 has returned.
+    Lifecycle.record_start_failure(reason, [data.activation, self()])
+    {:stop, {:shutdown, reason}, data}
+  end
+
+  # OTP crash reports and :sys.get_status/1 read these terms. Agent state and
+  # Signal data must not reach them.
+  @impl true
+  def format_status(status), do: Map.new(status, &redact_status/1)
+
+  defp redact_status({:data, %{agent: agent} = data}) do
+    {:data,
+     %{
+       agent_id: agent.id,
+       agent_module: agent.module,
+       state_version: data.state_version,
+       redacted: true
+     }}
+  end
+
+  defp redact_status({:data, _data}), do: {:data, :redacted}
+
+  defp redact_status({key, events}) when key in [:queue, :postponed, :timeouts] and is_list(events),
+    do: {key, Enum.map(events, &redact_event/1)}
+
+  defp redact_status({:log, _log}), do: {:log, []}
+  defp redact_status({:reason, reason}), do: {:reason, log_reason(reason)}
+  defp redact_status(entry), do: entry
+
+  defp redact_event({type, _content}), do: {type, :redacted}
+  defp redact_event(_event), do: :redacted
 
   @impl true
   def terminate(_reason, phase, data) do
@@ -3088,7 +3136,9 @@ defmodule Jido.AgentServer do
         {:error, reason} ->
           if is_nil(data.active.from),
             do:
-              Logger.warning("AgentServer cast turn failed",
+              Logger.warning(
+                "AgentServer cast turn failed: signal type #{data.active.signal_type}, " <>
+                  "reason #{inspect(log_reason(reason))}",
                 agent_id: data.agent.id,
                 turn_id: data.active.turn_id
               )
@@ -3259,6 +3309,36 @@ defmodule Jido.AgentServer do
 
     data |> Map.put(:last_effect_outcome, outcome) |> put_in([:active, :effect_outcome], outcome)
   end
+
+  # A connection destination can be mid-restart. Treat this as a failed effect,
+  # as a root output does. No Turn owns this delivery, so turn_id is nil.
+  defp topology_delivery_failed(data, signal, reason) do
+    Logger.warning(
+      "AgentServer topology delivery failed: signal type #{signal.type}, " <>
+        "reason #{inspect(log_reason(reason))}",
+      agent_id: data.agent.id
+    )
+
+    %{
+      data
+      | last_effect_outcome: %{
+          turn_id: nil,
+          status: :failed,
+          completed: 0,
+          total: 1,
+          committed_version: data.state_version,
+          stage: :directive
+        }
+    }
+  end
+
+  # Logs name a failure without carrying the values inside its reason.
+  defp log_reason(reason) when is_atom(reason), do: reason
+  defp log_reason(%{code: code}) when is_atom(code) and not is_nil(code), do: code
+  defp log_reason(%{details: %{code: code}}) when is_atom(code) and not is_nil(code), do: code
+  defp log_reason(%{__struct__: module}), do: module
+  defp log_reason(reason) when is_tuple(reason) and is_atom(elem(reason, 0)), do: elem(reason, 0)
+  defp log_reason(_reason), do: :unknown
 
   defp finish_effects(data, status) do
     Process.cancel_timer(data.active.effect_timer)

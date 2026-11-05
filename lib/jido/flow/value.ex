@@ -116,6 +116,9 @@ defmodule Jido.Flow.Value do
   def to_map(%Jido.Expr.Operation{} = expr),
     do: %{expr | operands: Enum.map(expr.operands, &to_map/1)}
 
+  # A Joi state schema stays a Joi value, like the Flow's own schemas.
+  def to_map(%_{} = struct), do: struct
+
   def to_map(%{} = map) do
     Map.new(map, fn {key, value} -> {key, to_map(value)} end)
   end

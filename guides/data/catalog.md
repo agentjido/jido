@@ -163,7 +163,7 @@ true = View.revision(view) == Jido.Catalog.revision(catalog)
 
 ## Publish one application Catalog
 
-`Jido.Catalog.Discovery` builds a Catalog and a codec index, and publishes both as one atomic value. Jido starts one scan of all loaded applications when it starts. The scan runs in the background and takes a moment, so check `Jido.Catalog.Discovery.ready?/0` before you depend on it. Until the first build finishes, `Jido.Catalog.Discovery.catalog/0` raises `Jido.Codec.Error.InternalError` with the code `:catalog_not_initialized`.
+`Jido.Catalog.Discovery` builds a Catalog and a codec index, and publishes both as one atomic value. Jido starts one scan of all loaded applications when it starts. The scan runs in the background and takes a moment, so check `Jido.Catalog.Discovery.ready?/0` before you depend on it. Until the first build finishes, `Jido.Catalog.Discovery.catalog/0` raises `Jido.Codec.Error.InternalError` with the code `:catalog_not_initialized`. `Jido.Codec.decode/2` and `Jido.Codec.decode_json/2` return an issue with the same code when they need the published value.
 
 ```elixir
 alias Jido.Catalog.Discovery
@@ -221,7 +221,7 @@ alias Jido.Catalog.Discovery
 "billing/atoms/void" = Discovery.get("billing/atoms/void", 1).id
 ```
 
-The last two lines show that a failed refresh returns an error and keeps the last published value. Wait for `Jido.Catalog.Discovery.ready?/0` before your first refresh, because the first scan publishes when it finishes and would replace your result.
+The last two lines show that a failed refresh returns an error and keeps the last published value. A refresh that publishes before the first scan finishes is kept, and the scan discards its own result. So a narrow refresh at that point leaves out the rest of the loaded applications until you refresh again.
 
 If the first scan itself fails, Jido logs a warning, and later reads raise with the code `:catalog_initialization_failed`. A later successful refresh replaces that state.
 

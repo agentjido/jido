@@ -277,7 +277,7 @@ Use `code` and `path` in program logic. Validation errors are not retryable by d
 
 `authoring_contract/0` projects both schemas with `Jido.Joi.to_json_schema/1`. The projection has limits to check before you give it to another system:
 
-- A field with `Jido.Joi.default/2` appears in `required`, although validation accepts input that omits it.
+- A field with `Jido.Joi.default/2` is not in `required`, because validation accepts input that omits it.
 - Refinements and transforms do not appear in the projection.
 - A schema with no JSON Schema form makes `authoring_contract/0` raise `ArgumentError`.
 

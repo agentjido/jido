@@ -139,7 +139,7 @@ Each member is a complete activation under the owner's activation. Its restart p
 
 | What crashed | Member processes | Member state |
 | --- | --- | --- |
-| A member's worker | That member restarts and the other members keep running, unless a member output finds no live destination during the restart. That stops the owner. See [Connect Agent Outputs](connect-agent-outputs.livemd). | Kept. The worker restarts from its activation's committed checkpoint. |
+| A member's worker | That member restarts and the other members keep running. A member output that finds no live destination during the restart is dropped and recorded on the owner. See [Connect Agent Outputs](connect-agent-outputs.livemd). | Kept. The worker restarts from its activation's committed checkpoint. |
 | The owner's worker | The owner's activation restarts as a group, and every member stops and starts again through reconciliation. | Reset to `initial_state`, unless the member restores from persistence. The owner keeps its committed state and revision. |
 
 An activation allows 3 worker restarts in 5 seconds. A member's activation restarts from its bound `initial_state` when it passes that limit. If this repeats, the crashes can exceed the limit of the owner's supervisor and stop the owner too.
@@ -195,8 +195,8 @@ Binding failures reject the Turn, so they never reach this stage. A member can s
 
 | Stage | Result |
 | --- | --- |
-| Startup | `Jido.start_agent/3` already returned `{:ok, pid}`. The server stops with the failure as its reason, and `await_ready/2` exits. |
-| After commit | The caller already has `{:ok, ...}`. The owner stops with `{:shutdown, :effect_lifecycle_failed}`, its activation shuts down, and `await_ready/2` exits. The change is not rolled back. |
+| Startup | `Jido.start_agent/3` already returned `{:ok, pid}`. The server stops with the failure as its reason, and `await_ready/2` returns `{:error, reason}`. |
+| After commit | The caller already has `{:ok, ...}`. The owner stops with `{:shutdown, :effect_lifecycle_failed}`, its activation shuts down, and `await_ready/2` returns an error. The change is not rolled back. |
 
 Jido does not retry and does not return to the previous definition. Supervise or restart the owner according to what your application needs. A persistent owner keeps its stored revision, as [Recovery Limits](../durability/recovery-and-effect-limits.md) explains.
 

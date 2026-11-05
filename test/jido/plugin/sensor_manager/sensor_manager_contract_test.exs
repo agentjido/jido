@@ -16,6 +16,29 @@ defmodule Jido.Plugin.SensorManager.ContractTest do
   alias Jido.Plugin.SensorManager.Stop
   alias Jido.Test.Plugin.SensorManagerFixtures, as: F
 
+  defmodule CrashLoopSensor do
+    @moduledoc false
+    use GenServer
+
+    def start_link(%Jido.Plugin.SensorManager.Init{} = init), do: GenServer.start_link(__MODULE__, init)
+
+    @impl true
+    def init(init) do
+      send(init.config.test, {:sensor_started, System.monotonic_time(:millisecond)})
+      {:ok, init, {:continue, :crash}}
+    end
+
+    @impl true
+    def handle_continue(:crash, init), do: {:stop, :normal, init}
+  end
+
+  defmodule SlowRetryAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "sensor_manager_slow_retry",
+      plugins: [{Jido.Plugin.SensorManager, %{retry_delay_ms: 150}}]
+  end
+
   defp reduction(plugin_state, directives) do
     %Reduction{
       plugin: SensorManager,
@@ -349,6 +372,46 @@ defmodule Jido.Plugin.SensorManager.ContractTest do
     send(controller, {:retry_reconcile, make_ref(), -1})
     send(controller, {:DOWN, make_ref(), :process, self(), :normal})
     assert Runtime.sensors(runtime) == %{source: replacement}
+  end
+
+  @tag obligation: "jido.plugin.sensor_manager.I7"
+  test "a crash-looping sensor waits for the retry delay before each restart", %{jido: jido} do
+    {:ok, server} =
+      Jido.Test.AgentServer.Assertions.start_agent(jido, SlowRetryAgent, id: unique_id("sensor-crash-loop"))
+
+    runtime = Jido.Test.AgentServer.Assertions.plugin(server, SensorManager).pid
+    desired = %{source: %{module: CrashLoopSensor, config: %{test: self()}}}
+
+    assert :ok = Runtime.reconcile(runtime, desired, 1, 1_000)
+
+    started =
+      for _ <- 1..3 do
+        assert_receive {:sensor_started, at}, 5_000
+        at
+      end
+
+    for [earlier, later] <- Enum.chunk_every(started, 2, 1, :discard) do
+      assert later - earlier >= 150
+    end
+
+    assert Process.alive?(server)
+  end
+
+  @tag obligation: "jido.plugin.sensor_manager.I7"
+  test "sensors that crash during one retry delay restart together", %{jido: jido} do
+    {:ok, server} =
+      Jido.Test.AgentServer.Assertions.start_agent(jido, SlowRetryAgent, id: unique_id("sensor-crash-pair"))
+
+    runtime = Jido.Test.AgentServer.Assertions.plugin(server, SensorManager).pid
+    spec = %{module: CrashLoopSensor, config: %{test: self()}}
+
+    assert :ok = Runtime.reconcile(runtime, %{first: spec, second: spec}, 1, 1_000)
+
+    for _ <- 1..4 do
+      assert_receive {:sensor_started, _at}, 5_000
+    end
+
+    assert Process.alive?(server)
   end
 
   @tag obligation: "jido.plugin.sensor_manager.I8"

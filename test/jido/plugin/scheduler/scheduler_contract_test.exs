@@ -193,12 +193,12 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
 
     try do
       for value <- [self(), make_ref(), port, fn -> :ok end, [1 | :tail]] do
-        assert {:error, {:invalid_job_id, :nonportable_term}} =
+        assert {:error, %Jido.Error.ValidationError{code: :invalid_job_id, details: %{reason: :nonportable_term}}} =
                  Agent.Directive.validate(Scheduler.cron({:job, %{nested: value}}, "* * * * *", tick()))
 
         invalid = %{tick() | data: %{nested: {:value, [value]}}}
 
-        assert {:error, {:invalid_message, :nonportable_term}} =
+        assert {:error, %Jido.Error.ValidationError{code: :invalid_message, details: %{reason: :nonportable_term}}} =
                  Agent.Directive.validate(Scheduler.cron(:job, "* * * * *", invalid))
 
         assert {:error, :nonportable_occurrence_scope} =
@@ -210,7 +210,7 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
 
     {:ok, tagged} = Occurrence.attach(tick(), @scope, "job-1", 1, @instant)
 
-    assert {:error, :reserved_occurrence_metadata} =
+    assert {:error, %Jido.Error.ValidationError{code: :reserved_occurrence_metadata}} =
              Agent.Directive.validate(Scheduler.cron("job-1", "* * * * *", tagged, generation: 1))
   end
 

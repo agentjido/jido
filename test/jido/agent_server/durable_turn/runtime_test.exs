@@ -374,11 +374,12 @@ defmodule Jido.AgentServer.DurableTurn.RuntimeTest do
     assert {:error, _} = Server.await(pending)
     update_receipt(c, id, &%{&1 | fingerprint: "changed-code"})
 
-    assert {:ok, restored} =
-             Jido.thaw(c.jido, F.Worker, id, persistence: {Jido.Persistence.File, path: c.tmp_dir})
-
-    assert {{:shutdown, :execution_definition_changed}, _} =
-             catch_exit(Server.await_ready(restored))
+    assert {:error, :execution_definition_changed} =
+             with(
+               {:ok, restored} <-
+                 Jido.thaw(c.jido, F.Worker, id, persistence: {Jido.Persistence.File, path: c.tmp_dir}),
+               do: Server.await_ready(restored)
+             )
 
     assert F.Probe.records() == Enum.to_list(1..6)
   end

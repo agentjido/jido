@@ -21,7 +21,7 @@ classify the content of those documents.
 
 - [Architecture decision records](adr/README.md)
 - [Supported examples](../examples/README.md)
-- [Dynamic Flows guide](../guides/dynamic-flows.md)
+- [Dynamic Flows guide](../guides/flows/dynamic-flows.md)
 - [Workspace module dependency map](../../docs/aspirational-module-dependency-map.md)
 - [Workspace package vision](../../docs/package-vision.md)
 

@@ -94,8 +94,11 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
 
     assert :ok = ETS.put(key, <<0, 1, 2>>, opts)
 
-    assert {:ok, server} = PersistentAgent.restore(jido, id, persistence)
-    assert catch_exit(Server.await_ready(server))
+    assert {:error, _reason} =
+             with(
+               {:ok, server} <- PersistentAgent.restore(jido, id, persistence),
+               do: Server.await_ready(server)
+             )
   end
 
   defp start_counter(jido, id, persistence) do

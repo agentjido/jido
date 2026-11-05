@@ -3,6 +3,7 @@ defmodule Jido.Plugin.Scheduler.CronRules do
 
   alias Crontab.CronExpression.Parser
   alias Jido.Codec.Term
+  alias Jido.Error
   alias Jido.Plugin.Scheduler.Occurrence
   alias Jido.Signal
 
@@ -60,6 +61,22 @@ defmodule Jido.Plugin.Scheduler.CronRules do
   @spec validate_occurrence(Signal.t(), non_neg_integer() | nil) :: :ok | {:error, term()}
   def validate_occurrence(_signal, nil), do: :ok
   def validate_occurrence(signal, _generation), do: Occurrence.validate_template(signal)
+
+  @doc "Converts a rule failure to the public Directive error. Other results pass through."
+  @spec to_error(term()) :: term()
+  def to_error({:error, {code, reason}}),
+    do: Error.validation_result(code, [], error_message(code), %{reason: reason})
+
+  def to_error({:error, code}) when is_atom(code),
+    do: Error.validation_result(code, [], error_message(code))
+
+  def to_error(result), do: result
+
+  defp error_message(:invalid_cron), do: "Invalid cron expression"
+  defp error_message(:invalid_timezone), do: "Invalid timezone"
+  defp error_message(:invalid_job_id), do: "Cron job ID must be portable data"
+  defp error_message(:invalid_message), do: "Cron Signal must be portable data"
+  defp error_message(:reserved_occurrence_metadata), do: "Cron Signal uses reserved occurrence metadata"
 
   defp validate_cron_syntax(cron_expression) do
     extended? = length(String.split(cron_expression)) > 5

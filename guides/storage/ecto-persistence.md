@@ -49,7 +49,7 @@ Version 1 creates `jido_persistence_records` with three binary, non-null columns
 
 ## Configure an instance
 
-Set the adapter on your Jido module and give it a stable namespace. A persistent Agent cannot start without one.
+Set the adapter on your Jido module and give it a stable namespace. Without one, starting a persistent Agent returns a `Jido.Error.ValidationError`.
 
 <!-- partial -->
 ```elixir
@@ -159,11 +159,12 @@ A direct `Jido.Persistence.save_agent/3` call runs in the calling process. Insid
 | Invalid `:repo`, `:schema`, or `:repo_options` | `{:error, {:invalid_persistence_options, Jido.Persistence.Ecto, reason}}` |
 | Unsupported Ecto adapter | The same error, with a reason that names the adapter |
 | Read fails, including a missing table | `{:error, {:ecto, exception_module, message}}` |
-| A database or connection failure during a write | `{:error, {:indeterminate, {:ecto, exception_module, message}}}` |
+| A write to a missing table or column on SQLite or Postgres | `{:error, {:rejected, {:ecto, exception_module, message}}}` |
+| Any other database or connection failure during a write | `{:error, {:indeterminate, {:ecto, exception_module, message}}}` |
 
-Validation checks configuration only. It does not query the database, so a missing table appears on the first read or write. A persistent Agent then fails during startup, and `Jido.AgentServer.await_ready/2` exits.
+Validation checks configuration only. It does not query the database, so a missing table appears on the first read or write. A persistent Agent then fails during startup, and `Jido.AgentServer.await_ready/2` returns `{:error, reason}`.
 
-A failed write is uncertain even when the database seems to have rejected it, because the connection can drop after a commit. The runtime stops the activation and a new one reads the stored row. See [Recovery Limits](../durability/recovery-and-effect-limits.md).
+Other than a missing table or column, a failed write is uncertain even when the database seems to have rejected it, because the connection can drop after a commit. The runtime stops the activation and a new one reads the stored row. See [Recovery Limits](../durability/recovery-and-effect-limits.md).
 
 ## Related
 

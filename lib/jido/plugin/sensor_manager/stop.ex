@@ -22,7 +22,7 @@ defmodule Jido.Plugin.SensorManager.Stop do
   @doc "Validates one desired sensor removal."
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive) do
-    with {:ok, directive} <- Joi.parse(@schema, Map.from_struct(directive)),
+    with {:ok, directive} <- Jido.Agent.Directive.parse(@schema, Map.from_struct(directive)),
          :ok <- Start.validate_tag(directive.tag) do
       {:ok, directive}
     end

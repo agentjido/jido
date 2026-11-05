@@ -43,7 +43,7 @@ runtime component has no separate DSL.
 ### jido.agent_server.composition.I4 — Child admission and cleanup
 
 - **scope:** child start, stop, and adoption
-- **must:** Validate the complete child, unique tag, placement, restart policy, parent-loss policy, server options, relationship metadata, instance, and orphan dispatch before ownership changes. Child server options accept runtime settings only and cannot replace identity or ownership. Adoption cannot reconfigure the existing child server. Reserve each tag once. Release reservations, caller monitors, roots, and terminal child records after failure or confirmed stop. A dead startup caller cannot attach an old child after tag reuse. If a new root has no live worker, stop it and return worker_unavailable.
+- **must:** Validate the complete child, unique tag, placement, restart policy, parent-loss policy, server options, relationship metadata, instance, and orphan dispatch before ownership changes. Child server options accept runtime settings only and cannot replace identity or ownership. Adoption cannot reconfigure the existing child server. Reserve each tag once. Release reservations, caller monitors, roots, and terminal child records after failure or confirmed stop. A dead startup caller cannot attach an old child after tag reuse. If a new root has no live worker, stop it and return its recorded start failure, or worker_unavailable when no reason is recorded.
 - **why:** Failed or concurrent child operations must not leak ownership.
 - **kind:** ordering
 - **status:** active
@@ -75,7 +75,7 @@ runtime component has no separate DSL.
 ### jido.agent_server.composition.I8 — Connection and Bus ownership
 
 - **scope:** accepted topology connections and declared local Buses
-- **must:** Deliver outputs through accepted connections, including counted broadcast, child-to-root, and Bus routes. Accepted connections take priority over default dispatch. Create local Buses only from explicit Bus declarations. Own their bridge, Bus, and subscription under the activation and remove them with it.
+- **must:** Deliver outputs through accepted connections, including counted broadcast, child-to-root, and Bus routes. Accepted connections take priority over default dispatch. Create local Buses only from explicit Bus declarations. Own their bridge, Bus, and subscription under the activation and remove them with it. A member output or Bus delivery that finds no live destination marks an effect failed and logs its Signal type and reason. The owner keeps running.
 - **why:** Connection delivery must use the same accepted resource generation.
 - **kind:** functional
 - **status:** active

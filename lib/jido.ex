@@ -246,7 +246,10 @@ defmodule Jido do
     - `:namespace` - Nonempty stable namespace for Ref-first functions.
       Required for persistent Agents.
     - `:max_tasks` - Task Supervisor child limit; defaults to `1_000`
-    - `:persistence` - Optional default persistence adapter
+    - `:persistence` - Optional persistence adapter for `thaw/4`,
+      `activate_agent/4`, and `persistence: :inherit`. `start_agent/3` ignores
+      it unless you pass `persistence: :inherit`. Without that option, the Agent
+      does not read or save the adapter's records.
     - `:agent_server` - Optional AgentServer runtime defaults
 
   ## Example
@@ -630,6 +633,10 @@ defmodule Jido do
   and partition. Starting a duplicate returns an error and leaves the existing
   Agent unchanged.
 
+  This function ignores the instance's `:persistence` adapter unless you pass
+  `persistence: :inherit`. Without that option, the Agent starts with fresh
+  state over any saved record, and its commits are not saved.
+
   This is the standard example startup API. Domain command functions can stay
   in the Agent module; they do not need a matching startup wrapper.
   """
@@ -730,6 +737,9 @@ defmodule Jido do
     else
       invalid_runtime_input(:list_agents, %{opts: opts})
     end
+  rescue
+    # Registry.select/2 raises when the instance is not running.
+    ArgumentError -> invalid_runtime_input(:list_agents, %{instance: instance})
   end
 
   def list_agents(_instance, opts), do: invalid_runtime_input(:list_agents, %{opts: opts})
@@ -772,7 +782,7 @@ defmodule Jido do
   def hibernate(instance, server, opts \\ [])
       when is_atom(instance) and is_list(opts) do
     with {:ok, pid} <- owned_agent_server(instance, server, opts) do
-      Jido.AgentServer.hibernate(pid, opts)
+      Jido.AgentServer.hibernate(pid, Keyword.delete(opts, :partition))
     end
   end
 

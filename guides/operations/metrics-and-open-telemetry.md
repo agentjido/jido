@@ -79,7 +79,7 @@ Each counter counts events. `jido.agent_server.directives.returned.count` counts
 
 Tags hold fixed words only, so these metrics are safe for a time series database. Do not add `agent_id`, `turn_id`, or `signal_type` as tags. Their values are unbounded. Put them on traces and logs.
 
-`persistence_reason` currently reports `:manual` for AgentServer writes too, so it does not separate commits from manual saves. Use `operation` instead.
+`persistence_reason` separates the writers: `:activate` when an AgentServer starts, `:commit` for a Turn commit, `:hibernate` for a hibernate save, `:stored_upgrade` for `Jido.Persistence.upgrade_agent/5`, and `:manual` for a direct save. A direct save can set its own value with `:reason`.
 
 ### AI metrics
 

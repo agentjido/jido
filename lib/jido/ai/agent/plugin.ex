@@ -163,15 +163,25 @@ defmodule Jido.AI.Agent.Plugin do
   @impl true
   def prepare(_preparation, options) do
     tools = Keyword.get(options, :tools, [])
-    with :ok <- Jido.AI.Toolset.validate(tools), do: {:ok, tools}
+    defaults = Keyword.get(options, :defaults, %{})
+    with :ok <- Jido.AI.Toolset.validate(tools), do: {:ok, %{tools: tools, defaults: defaults}}
   end
 
   @doc false
   @spec prepared_tools(map()) :: [module()]
   def prepared_tools(context) when is_map(context) do
     case get_in(context, [:plugin_inputs, __MODULE__]) do
-      %Jido.Plugin.Input{prepared: tools} when is_list(tools) -> tools
+      %Jido.Plugin.Input{prepared: %{tools: tools}} -> tools
       _other -> []
+    end
+  end
+
+  @doc false
+  @spec prepared_defaults(map()) :: map()
+  def prepared_defaults(context) when is_map(context) do
+    case get_in(context, [:plugin_inputs, __MODULE__]) do
+      %Jido.Plugin.Input{prepared: %{defaults: defaults}} -> defaults
+      _other -> %{}
     end
   end
 

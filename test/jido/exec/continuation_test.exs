@@ -29,6 +29,33 @@ defmodule Jido.Exec.ContinuationTest do
     assert completed.status == :completed
   end
 
+  test "a non-portable context value is a Jido error naming the key and why" do
+    assert {:error, %Jido.Error.ValidationError{} = error} =
+             Continuation.running(%{
+               id: "turn-3",
+               signal: signal(),
+               admitted_signal: signal(),
+               context: %{dispatch: {:pid, target: self()}},
+               plugin_inputs: %{},
+               target: F.Flow,
+               expires_at: 100
+             })
+
+    assert Exception.message(error) =~ "context key :dispatch is not portable"
+    assert Exception.message(error) =~ "PIDs"
+    assert error.code == :non_portable_term
+    assert [:continuation, :context, :dispatch | _] = error.path
+    assert Jido.Error.code(error) == :non_portable_term
+    assert %{type: :validation_error} = Jido.Error.to_map(error)
+  end
+
+  test "a non-portable value outside context names its path" do
+    continuation = %{signal: signal(), plugin_inputs: %{probe: make_ref()}}
+
+    assert {:error, %Jido.Error.ValidationError{} = error} = Continuation.portable(continuation)
+    assert Exception.message(error) =~ "[:continuation, :plugin_inputs, :probe]"
+  end
+
   test "a Handoff gains resume data only when it is released" do
     instruction = Jido.Instruction.new!(target: F.Step, params: %{step: 1, value: 0})
 

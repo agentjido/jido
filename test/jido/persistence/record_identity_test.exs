@@ -90,12 +90,10 @@ defmodule Jido.Persistence.RecordIdentityTest do
     instance = :"unnamespaced_#{System.unique_integer([:positive])}"
     start_supervised!({Jido, name: instance})
 
-    assert {{:shutdown, :stable_namespace_required}, _} =
-             catch_exit(
-               Jido.Test.AgentServer.Assertions.start_agent(instance, Basic,
-                 id: c.agent.id,
-                 persistence: c.store
-               )
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Jido.Test.AgentServer.Assertions.start_agent(instance, Basic,
+               id: c.agent.id,
+               persistence: c.store
              )
 
     assert Jido.agent_count(instance) == 0

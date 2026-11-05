@@ -22,5 +22,5 @@ defmodule Jido.Plugin.Scheduler.Schedule do
   @doc "Validates one delayed Signal request."
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive),
-    do: Joi.parse(@schema, Map.from_struct(directive))
+    do: Jido.Agent.Directive.parse(@schema, Map.from_struct(directive))
 end

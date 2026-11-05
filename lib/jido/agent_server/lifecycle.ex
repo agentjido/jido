@@ -44,6 +44,8 @@ defmodule Jido.AgentServer.Lifecycle do
   ]
   @error_signal "jido.agent_server.error"
   @wait_input_limit 1_024
+  @start_failure_table Jido.AgentServer.StartFailures
+  @start_failure_slots 1_024
 
   require Logger
 
@@ -51,6 +53,7 @@ defmodule Jido.AgentServer.Lifecycle do
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
   alias Jido.Exec.{Continuation, Runtime, Wait}
   alias Jido.Persistence.ContinuationStore
+  alias Jido.Persistence.ETS, as: ETSStore
   alias Jido.Trace.Context, as: TraceContext
   alias Runic.Runner
   alias Runic.Workflow
@@ -119,11 +122,20 @@ defmodule Jido.AgentServer.Lifecycle do
              opts[:persistence_mode] in [:create, :restore, :restore_or_create],
              :persistence_mode
            ),
-         do:
+         :ok <-
            validate_setting(
              opts[:idle_policy] != :hibernate or persistence_enabled?(opts[:persistence]),
              :idle_policy
-           )
+           ),
+         do: validate_namespace(opts)
+  end
+
+  # Instance defaults have no :jido here. They are checked when an Agent starts.
+  defp validate_namespace(opts) do
+    if persistence_enabled?(opts[:persistence]) and not is_nil(opts[:jido]) and
+         is_nil(Jido.Instance.NamespaceRegistry.namespace(opts[:jido])),
+       do: invalid_options("persistence requires a Jido instance with a stable namespace"),
+       else: :ok
   end
 
   def validate_timeout(opts, key, finite? \\ true) do
@@ -344,10 +356,69 @@ defmodule Jido.AgentServer.Lifecycle do
   def failure_decision(_policy, _count, _signal_type), do: :run
 
   def start(data, mode) do
+    data |> open_activation(mode) |> remember_start_failure(data)
+  end
+
+  @doc false
+  # A failed start can stop the worker and its root before the caller reaches
+  # them. Keep the reason by pid in a fixed set of slots, so it stays readable
+  # after both exit and the storage stays bounded. A later failure in the same
+  # slot replaces it.
+  def start_failure(pid) when is_pid(pid) do
+    with {:ok, value} <- ETSStore.get(start_failure_slot(pid), table: @start_failure_table),
+         {^pid, reason} <- :erlang.binary_to_term(value) do
+      {:ok, reason}
+    else
+      _other -> :error
+    end
+  end
+
+  @doc false
+  def ready_exit(_server, {:timeout, _call}), do: {:error, :timeout}
+  def ready_exit(_server, {{:shutdown, reason}, _call}), do: {:error, reason}
+
+  def ready_exit(server, {:noproc, _call}) when is_pid(server) do
+    case start_failure(server) do
+      {:ok, reason} -> {:error, reason}
+      :error -> {:error, :noproc}
+    end
+  end
+
+  def ready_exit(_server, {reason, _call}), do: {:error, reason}
+  def ready_exit(_server, reason), do: {:error, reason}
+
+  @doc false
+  @spec record_start_failure(term(), [term()]) :: :ok
+  def record_start_failure(reason, pids) when is_list(pids) do
+    for pid <- pids, is_pid(pid) do
+      value = :erlang.term_to_binary({pid, reason})
+      :ok = ETSStore.put(start_failure_slot(pid), value, table: @start_failure_table)
+    end
+
+    :ok
+  end
+
+  defp start_failure_slot(pid),
+    do: pid |> :erlang.phash2(@start_failure_slots) |> Integer.to_string()
+
+  # Bootstrap runs in a Task, so the first caller is the worker.
+  defp remember_start_failure({:error, reason} = error, data) do
+    record_start_failure(reason, [data.activation | Enum.take(Process.get(:"$callers", []), 1)])
+    error
+  end
+
+  defp remember_start_failure(result, _data), do: result
+
+  defp open_activation(data, mode) do
     with :ok <- ServerSupervisor.close_execution(data.activation_state),
          {:ok, config} <- Jido.Persistence.resolve_config(data.persistence, data.jido),
          {:ok, agent, revision, turn} <-
-           Jido.Persistence.open_agent(config, data.agent, mode, persistence_options(data)),
+           Jido.Persistence.open_agent(
+             config,
+             data.agent,
+             mode,
+             [reason: :activate] ++ persistence_options(data)
+           ),
          {:ok, agent} <- Validation.validate_instance(agent),
          {:ok, revision, turn} <- settle_unreleased_handoff(data, config, agent, revision, turn),
          :ok <- validate_continuation(agent, turn) do
@@ -363,7 +434,9 @@ defmodule Jido.AgentServer.Lifecycle do
         [
           revision: revision,
           expected_revision: expected_revision,
-          server_turn: server_turn
+          server_turn: server_turn,
+          # Only hibernation saves without a new revision.
+          reason: if(revision == expected_revision, do: :hibernate, else: :commit)
         ]
     )
   end

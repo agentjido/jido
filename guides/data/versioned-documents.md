@@ -84,9 +84,16 @@ The dumped map omits `"note"` because of `omit: nil`.
 | `from_map/1` | Decoded JSON map | `{:error, errors}` |
 | `from_map!/1` | Decoded JSON map | Raises |
 | `dump/1` | Codec value | Returns a JSON-shaped map |
-| `json_schema/0` | None | Returns the schema from `Jido.Joi.to_json_schema/1` |
+| `json_schema/0` | None | Returns the JSON Schema of the dumped JSON form |
 
-A struct codec also implements `JSON.Encoder`, so `JSON.encode!/1` calls `dump/1`. `json_schema/0` describes the Joi schema, so it lists Elixir field names, not the names you set with `:as`.
+A struct codec also implements `JSON.Encoder`, so `JSON.encode!/1` calls `dump/1`. `json_schema/0` uses the names you set with `:as`, and its `required` list leaves out fields with `omit: nil` or a default. A field without `:as` keeps its atom key.
+
+```elixir
+schema = CodecGuide.Customer.json_schema()
+
+%{"postalCode" => %{type: :string}} = schema.properties.address.properties
+false = :note in schema.required
+```
 
 ### Field options
 

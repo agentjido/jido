@@ -92,7 +92,6 @@ defmodule TestingActions.ChargeTest do
              Jido.Exec.run(ChargeInvoice, @params, %{gateway: ApprovingGateway})
   end
 
-  @tag :capture_log
   test "a declined card has no effects and is not retryable" do
     assert {:error, %Jido.Error.ExecutionError{message: "card declined"} = error} =
              Jido.Exec.run(ChargeInvoice, @params, %{gateway: DecliningGateway})
@@ -103,8 +102,6 @@ end
 
 %{failures: 0, total: 3} = ExUnit.run()
 ```
-
-`@tag :capture_log` keeps the warning that Runic logs for a failed Action out of the test output. ExUnit shows the log only if the test fails.
 
 The Action body runs in a task, not in the test process, under `Jido.Exec.run/4`. The task carries the test process in `$callers`, which libraries such as Mox use to find ownership. Process dictionary values do not cross over. Use context for test doubles, or call `Jido.Exec.call_action/3` to stay in the test process.
 
@@ -186,13 +183,11 @@ defmodule TestingActions.PolicyTest do
     {:ok, attempts: :counters.new(1, [])}
   end
 
-  @tag :capture_log
   test "retries until success", %{attempts: attempts} do
     assert {:ok, %{attempts: 3}} =
              Jido.Exec.run(FlakyGateway, %{fail_times: 2}, %{attempts: attempts}, max_attempts: 3)
   end
 
-  @tag :capture_log
   test "stops at max_attempts", %{attempts: attempts} do
     assert {:error, %Jido.Error.ExecutionError{details: %{reason: :gateway_unavailable}}} =
              Jido.Exec.run(FlakyGateway, %{fail_times: 9}, %{attempts: attempts}, max_attempts: 2)
@@ -200,7 +195,6 @@ defmodule TestingActions.PolicyTest do
     assert :counters.get(attempts, 1) == 2
   end
 
-  @tag :capture_log
   test "kills the attempt at the timeout" do
     assert {:error, %Jido.Error.TimeoutError{timeout: 20}} =
              Jido.Exec.run(StuckGateway, %{}, %{test_pid: self()}, timeout: 20)

@@ -68,7 +68,7 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
     case Enum.find(state.sensors, fn {_tag, sensor} -> sensor.ref == ref end) do
       {tag, _sensor} ->
         state = %{state | sensors: Map.delete(state.sensors, tag)}
-        restart_sensor(state, tag)
+        {:noreply, schedule_restart(state)}
 
       nil ->
         {:noreply, state}
@@ -103,16 +103,10 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
 
   defp same_spec?(left, right), do: left === right
 
-  defp restart_sensor(state, tag) do
-    restart_sensor(state, tag, Map.fetch!(state.desired, tag))
-  end
-
-  defp restart_sensor(state, tag, spec) do
-    case start_sensor(state, tag, spec) do
-      {:ok, state} -> {:noreply, state}
-      {:error, _reason, state} -> {:noreply, schedule_retry(state, state.last_reconciled_version)}
-    end
-  end
+  # Reconciliation restarts every missing desired sensor when the timer fires.
+  # A pending retry already does that, and it may hold a newer revision.
+  defp schedule_restart(%{retry_timer: nil} = state), do: schedule_retry(state, state.last_reconciled_version)
+  defp schedule_restart(state), do: state
 
   defp reconcile_sensor({tag, spec}, {:ok, state}) do
     case Map.get(state.sensors, tag) do

@@ -3,6 +3,7 @@ defmodule Jido.AI.ModelExecution.InferenceClientTest do
 
   alias Jido.AI.InferenceClient
   alias Jido.AI.InferenceClient.Selection
+  alias Jido.Test.AI.{ChainOfThoughtAgent, SimpleAgent}
 
   defmodule CompleteClient do
     @behaviour InferenceClient
@@ -105,6 +106,44 @@ defmodule Jido.AI.ModelExecution.InferenceClientTest do
   test "rejects an incomplete client" do
     assert_raise ArgumentError, ~r/invalid Jido AI inference client/, fn ->
       Selection.client!(%{jido_ai_inference_client: IncompleteClient})
+    end
+  end
+
+  describe "an invalid client inside an Agent turn" do
+    defmodule FailingClient do
+      @behaviour InferenceClient
+
+      for {name, arity} <- InferenceClient.behaviour_info(:callbacks) do
+        @impl true
+        def unquote(name)(unquote_splicing(Macro.generate_arguments(arity, __MODULE__))),
+          do: {:error, :provider_down}
+      end
+    end
+
+    defp reply(agent_module, data, client) do
+      agent = agent_module.instantiate!(id: "invalid-client-#{System.unique_integer([:positive])}")
+      request = agent_module.request_signal!(data)
+
+      assert {:ok, _agent, [%{signal: reply}]} =
+               agent_module.cmd(agent, request, context: %{jido_ai_inference_client: client})
+
+      reply.data
+    end
+
+    test "gives the same failed reply as a model error" do
+      for {agent, data} <- [
+            {SimpleAgent, %{input: "Hello"}},
+            {SimpleAgent, %{input: "Hello", stream: true}},
+            {ChainOfThoughtAgent, %{input: "Hello"}}
+          ] do
+        invalid = reply(agent, data, IncompleteClient)
+        model_error = reply(agent, data, FailingClient)
+
+        assert %{status: :failed, reason: reason} = invalid
+        assert reason == "invalid Jido AI inference client: #{inspect(IncompleteClient)}"
+        assert model_error.status == :failed
+        assert Map.keys(invalid) == Map.keys(model_error)
+      end
     end
   end
 

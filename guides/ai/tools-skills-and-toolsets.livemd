@@ -88,7 +88,7 @@ Enum.map(definitions, &{&1.name, &1.description})
 
 The cell returns `[{"lookup_order", "Look up one order by ID"}, {"discount_order", "Look up an order and compute its 10 percent discount"}]`.
 
-The definitions have no working callback. Tools run as graph nodes in the Flow, never from inside ReqLLM. Definitions are strict, and their JSON Schema lists a field with a default as required, so the model must send it.
+The definitions have no working callback. Tools run as graph nodes in the Flow, never from inside ReqLLM. Definitions are strict. Their JSON Schema does not list a field with a default as required. ReqLLM's OpenAI strict mode still makes every field required, so the model must send it there.
 
 ## Record the tools each request sends
 
@@ -209,10 +209,9 @@ unknown = run_orders.(%{input: "Delete it.", tool_policy: %{visible: ["delete_or
 | --- | --- | --- |
 | `:optional` | not set | Always |
 | `:required` | `:required` before the first tool round, then `:auto` | After at least one tool round |
-| `:per_turn` | `:required` on every call | Never, while any tool is selected |
 | `:disabled` | `:none` | Always, and no tools are offered |
 
-With `:per_turn`, the output guard rejects every final answer while a tool is selected. The request can only end as `:blocked`, either with reason code `:output` after a final answer or `:limits` when tool calls run out. Use `:required` when you want one tool round and then an answer. A `:required` or `:per_turn` requirement with no selected tool returns an error before any model call.
+A `:required` requirement with no selected tool returns an error before any model call.
 
 ```elixir
 required = run_orders.(%{input: "Show order ORD-5.", tool_policy: %{requirement: :required}}, %{})

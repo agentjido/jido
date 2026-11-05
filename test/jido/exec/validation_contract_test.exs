@@ -11,6 +11,25 @@ defmodule Jido.Exec.ValidationContractTest do
 
   @moduletag capture_log: true
 
+  defmodule TypedInputAction do
+    use Jido.Action,
+      name: "validation_typed_input_action",
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
+
+    def run(params, _context), do: {:ok, params}
+  end
+
+  defmodule TypedInputFlow do
+    use Jido.Flow,
+      name: "validation_typed_input_flow",
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
+
+    flow do
+      step "a", action: TypedInputAction, params: %{count: input(:count)}
+      output result("a")
+    end
+  end
+
   defmodule PassThrough do
     use Jido.Action, name: "validation_pass_through"
     def run(value, _context), do: {:ok, value}
@@ -205,6 +224,15 @@ defmodule Jido.Exec.ValidationContractTest do
 
     assert error.message == "Flow output validation must return a map"
     assert error.details == Map.put(details, :value, 42)
+  end
+
+  @tag obligation: "jido_action.boundary.I1"
+  test "a Flow module input error reports Flow context" do
+    assert {:error, %Error.ValidationError{details: %{context: "Flow", module: TypedInputFlow}}} =
+             Jido.Exec.run(TypedInputFlow, %{count: "not an integer"})
+
+    assert {:error, %Error.ValidationError{details: %{context: "Action"}}} =
+             Jido.Exec.run(TypedInputAction, %{count: "not an integer"})
   end
 
   @tag obligation: "jido_action.boundary.I1"

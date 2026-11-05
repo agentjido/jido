@@ -15,7 +15,7 @@ defmodule Jido.Telemetry.Semantic do
   @kind_values ~w(error throw exit)a
   @operation_values ~w(activate stop hibernate thaw load compare_and_swap delete)a
   @admission_values ~w(deadline_expired overloaded)a
-  @persistence_values ~w(commit activate stop hibernate thaw manual topology)a
+  @persistence_values ~w(commit activate stop hibernate thaw manual topology stored_upgrade)a
   @topology_values ~w(activate repair update place cleanup)a
 
   @signed_measurements [:system_time, :monotonic_time]

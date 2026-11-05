@@ -36,6 +36,10 @@ defmodule Jido.AI.Agent do
         end
       end
 
+  A request can narrow these defaults for `instructions`, `limits`,
+  `review_tools`, and `tool_policy`, but it cannot widen or remove them. See
+  `Jido.AI.RequestPolicy`.
+
   Small Agents can define the root Flow inline:
 
       ai do

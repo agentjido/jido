@@ -68,6 +68,7 @@ defmodule Jido.Codec.Value do
         {:ok, %{"$type" => "atom", "id" => id, "vsn" => vsn}}
 
       {:error, %CatalogError{} = exception} ->
+        exception = %{exception | details: Map.put(exception.details, :target, value)}
         prefix_catalog_error({:error, exception}, path)
     end
   end

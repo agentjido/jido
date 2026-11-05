@@ -166,7 +166,7 @@ pending = Jido.AgentServer.submit(pid, MigrationGuide.Counter.increment_signal!(
 | `state(server)` | `Jido.AgentServer.agent/2` for the Agent, `Jido.AgentServer.status/2` for runtime state, `Jido.AgentServer.snapshot/2` for both from one event |
 | `await_completion/2`, Jido.Await | `Jido.AgentServer.submit/3` and `Jido.AgentServer.await/2` for one Turn |
 | `stream_status/2`, `recent_events/2` | Start with `debug: true`, then read `Jido.AgentServer.history/1` |
-| `set_debug/2`, Jido.debug, Jido.Debug | The `:debug` AgentServer option for history, and the `:debug` instance option for logs. A hidden `set_debug/2` on `Jido.Telemetry` changes log detail at run time. |
+| `set_debug/2`, Jido.debug, Jido.Debug | The `:debug` AgentServer option for history, and the `:debug` instance option for logs. A hidden `set_debug/2` on `Jido.Telemetry` changes log detail for persistence events at run time. |
 | `whereis(registry, id)`, `via_tuple/2` | `Jido.whereis_agent/3` or `Jido.AgentServer.whereis/3` |
 | `MyApp.Jido.whereis(id)` | `Jido.whereis_agent(MyApp.Jido, id)` |
 | `attach/2`, `detach/2`, `touch/1` | Kept. `Jido.AgentServer.attach/3` and `Jido.AgentServer.detach/3` add a timeout. |

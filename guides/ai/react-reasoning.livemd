@@ -306,7 +306,7 @@ signals = collect.(collect, [])
 
 The output is `"Shipping costs 900 cents."`. The Signals in order are `jido.ai.model.stream.started` with sequence 0, `jido.ai.model.stream.chunk` with sequence 1, and `jido.ai.model.stream.completed` with sequence 2. A failed stream ends with `jido.ai.model.stream.failed`. Each Signal also has the Session, Thread, request, run, model, and stream IDs.
 
-Without a `:jido_ai_dispatch` value, the Flow still streams and emits no Signals. A dispatch value with a PID is not portable, so a durable Turn ends with an error when given one. Use a named process or another portable target there.
+Without a `:jido_ai_dispatch` value, the Flow still streams and emits no Signals. A dispatch value with a PID is not portable, so a durable Turn ends with a `Jido.Error.ValidationError` that names the context key. Use a named process or another portable target there.
 
 ## Next steps
 

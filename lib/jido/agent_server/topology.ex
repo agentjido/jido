@@ -6,8 +6,13 @@ defmodule Jido.AgentServer.Topology do
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.{Lifecycle, Effects}
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
+  alias Jido.Signal
   alias Jido.Signal.Bus
 
+  require Logger
+
+  @self_emit_hops "jidoselfemithops"
+  @max_self_emit_hops 32
   @child_options ~w(placement on_parent_exit orphan_dispatch restart server_options meta)a
   @adoption_options ~w(placement on_parent_exit orphan_dispatch restart meta)a
 
@@ -341,7 +346,7 @@ defmodule Jido.AgentServer.Topology do
         true ->
           case context.default_dispatch do
             nil ->
-              Server.cast(context.server, signal)
+              emit_to_self(context, signal)
 
             dispatch ->
               Jido.Signal.Dispatch.dispatch(
@@ -350,6 +355,24 @@ defmodule Jido.AgentServer.Topology do
               )
           end
       end
+    end
+  end
+
+  # Each self-emit counts its hops from the Signal that started the chain, so a
+  # route that re-emits a matching type ends instead of looping without limit.
+  defp emit_to_self(context, signal) do
+    hops = Signal.get_context(context[:source_signal], @self_emit_hops) || 0
+
+    if hops >= @max_self_emit_hops do
+      Logger.warning(
+        "AgentServer self emit refused: signal type #{signal.type}, reason :self_emit_limit",
+        agent_id: context.agent.id
+      )
+
+      {:error, :self_emit_limit}
+    else
+      with {:ok, signal} <- Signal.put_context(signal, @self_emit_hops, hops + 1),
+           do: Server.cast(context.server, signal)
     end
   end
 
@@ -573,8 +596,7 @@ defmodule Jido.AgentServer.Topology do
   defp live_children(state) do
     Map.new(
       for {{:child, tag}, %{root: root}} <- ServerSupervisor.records(state),
-          Process.alive?(root),
-          pid = ServerSupervisor.worker(root),
+          pid = ServerSupervisor.live_worker(root),
           is_pid(pid),
           do: {tag, pid}
     )

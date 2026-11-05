@@ -82,8 +82,10 @@ defmodule Jido.Exec.Node.Action do
   @spec run(t(), term(), Context.t()) :: Result.t()
   def run(%__MODULE__{} = node, input, %Context{} = context) do
     result =
-      Telemetry.span(:action, Telemetry.action_metadata(node, context), fn ->
-        execute(node, Jido.Exec.Fact.unwrap(input), context.runtime, context.input_metadata)
+      Runtime.with_application_logging(fn ->
+        Telemetry.span(:action, Telemetry.action_metadata(node, context), fn ->
+          execute(node, Jido.Exec.Fact.unwrap(input), context.runtime, context.input_metadata)
+        end)
       end)
 
     case result do
@@ -201,9 +203,16 @@ defmodule Jido.Exec.Node.Action do
         {:ok, {on_error, {:error, error}}, []}
 
       {:error, error} ->
-        {:error, error}
+        {:error, map_item_error(error)}
     end
   end
+
+  # The item fact holds a reference failure as portable data.
+  defp map_item_error(%{message: message, details: details} = error)
+       when not is_exception(error),
+       do: %{Error.execution_error(message) | details: details}
+
+  defp map_item_error(error), do: error
 
   # A reference failure keeps its own details. An Action failure names its item.
   defp collected_error(
@@ -402,12 +411,9 @@ defmodule Jido.Exec.Node.Action do
 
   # Invoke and Handoff are the only components that accept control returns.
   defp call_action(action, params, context, control \\ :none) do
-    case Validation.apply(
-           action,
-           :run,
-           [params, Runtime.user_context(context)],
-           :run
-         ) do
+    case action
+         |> Validation.apply(:run, [params, Runtime.user_context(context)], :run)
+         |> tap(&record_effect_count/1) do
       {:ok, {:ok, output}} ->
         {:ok, output, []}
 
@@ -463,6 +469,12 @@ defmodule Jido.Exec.Node.Action do
         {:error, error}
     end
   end
+
+  defp record_effect_count({:ok, {:ok, _output, effects}}) when is_list(effects) do
+    unless List.improper?(effects), do: Telemetry.record_effect_count(length(effects))
+  end
+
+  defp record_effect_count(_result), do: Telemetry.record_effect_count(0)
 
   defp normalize_action_error(_action, error) when is_exception(error), do: error
 

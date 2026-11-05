@@ -211,9 +211,40 @@ defmodule Jido.Joi do
   @doc false
   def unrecognized_key_issue(key), do: Zoi.Error.unrecognized_key(key)
 
-  @doc "Project a Joi schema to the common Jido JSON Schema form."
+  @doc """
+  Project a Joi schema to the common Jido JSON Schema form.
+
+  `required` leaves out fields with a default, because parsing fills them in.
+  """
   @spec to_json_schema(schema()) :: map()
-  def to_json_schema(schema), do: Zoi.to_json_schema(schema)
+  def to_json_schema(schema), do: schema |> Zoi.to_json_schema() |> drop_defaulted_required()
+
+  defp drop_defaulted_required(json) when is_map(json) do
+    json
+    |> Map.new(fn
+      {key, schemas} when key in [:properties, :patternProperties, :"$defs"] and is_map(schemas) ->
+        {key, Map.new(schemas, fn {name, child} -> {name, drop_defaulted_required(child)} end)}
+
+      {key, schemas} when key in [:anyOf, :oneOf, :allOf, :prefixItems] and is_list(schemas) ->
+        {key, Enum.map(schemas, &drop_defaulted_required/1)}
+
+      {key, child} when key in [:items, :additionalProperties] and is_map(child) ->
+        {key, drop_defaulted_required(child)}
+
+      other ->
+        other
+    end)
+    |> reject_defaulted_required()
+  end
+
+  defp drop_defaulted_required(json), do: json
+
+  defp reject_defaulted_required(%{required: required, properties: properties} = json)
+       when is_list(required) and is_map(properties) do
+    %{json | required: Enum.reject(required, &match?(%{default: _}, properties[&1]))}
+  end
+
+  defp reject_defaulted_required(json), do: json
 
   defp validate_static_value(term, path) when is_function(term),
     do: static_error("anonymous functions are not supported", path)

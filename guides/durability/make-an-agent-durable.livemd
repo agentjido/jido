@@ -186,7 +186,7 @@ The cell returns `{%{paid_cents: 2000}, 2}`.
 
 ## Choose a start mode
 
-`Jido.start_agent/3` defaults to `persistence_mode: :create`, which fails if the record exists. The server starts, reads the record, and stops with `{:shutdown, :conflict}`. Wait for readiness to see that reason. A fast failure can instead make the start return `{:error, :worker_unavailable}`, so the code handles both forms.
+`Jido.start_agent/3` defaults to `persistence_mode: :create`, which fails if the record exists. The server starts, reads the record, and stops with `{:shutdown, :conflict}`. `Jido.AgentServer.await_ready/2` returns that reason as `{:error, :conflict}`. A fast failure can make the start itself return the error, so the code handles both forms.
 
 ```elixir
 alias Jido.AgentServer, as: Server
@@ -194,18 +194,11 @@ alias MakeDurableGuide.Invoice
 
 result =
   case Jido.start_agent(MakeDurableGuide.Jido, Invoice, id: "invoice-42", persistence: :inherit) do
-    {:ok, pid} ->
-      try do
-        Server.await_ready(pid)
-      catch
-        :exit, {reason, _call} -> {:stopped, reason}
-      end
-
-    {:error, reason} ->
-      {:error, reason}
+    {:ok, pid} -> Server.await_ready(pid)
+    {:error, reason} -> {:error, reason}
   end
 
-true = match?({:stopped, _reason}, result) or match?({:error, _reason}, result)
+true = match?({:error, _reason}, result)
 {:ok, _agent, 2} = Jido.Persistence.load_agent_with_revision(MakeDurableGuide.Jido, Invoice, "invoice-42")
 
 result

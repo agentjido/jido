@@ -84,7 +84,7 @@ defmodule Jido.Telemetry.SemanticTest do
       kind: [:error, :throw, :exit],
       operation: [:activate, :stop, :hibernate, :thaw, :load, :compare_and_swap, :delete],
       admission_reason: [:deadline_expired, :overloaded],
-      persistence_reason: [:commit, :activate, :stop, :hibernate, :thaw, :manual, :topology],
+      persistence_reason: [:commit, :activate, :stop, :hibernate, :thaw, :manual, :topology, :stored_upgrade],
       topology_operation: [:activate, :repair, :update, :place, :cleanup]
     ]
 

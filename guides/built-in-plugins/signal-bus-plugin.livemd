@@ -252,7 +252,7 @@ Jido.AgentServer.agent(shipping).state.tracking
 # => ["1Z-42"]
 ```
 
-The named Bus must exist when the Client starts. `Jido.start_agent/3` still returns `{:ok, pid}` in that case, but the Client runtime stops with `{:bus_subscription_failed, :not_found}`, its restarts fail the same way, and the Agent shuts down. Once connected, the Client monitors the Bus and resubscribes after a replacement, trying again every `:retry_delay_ms`.
+The named Bus must exist when the Client starts. `Jido.start_agent/3` still returns `{:ok, pid}` in that case, but the Client runtime stops with `{:bus_subscription_failed, :not_found}`, its restarts fail the same way, and the Agent shuts down. `Jido.AgentServer.await_ready/2` then returns `{:error, reason}`. Once connected, the Client monitors the Bus and resubscribes after a replacement, trying again every `:retry_delay_ms`.
 
 ## Bus crashes
 

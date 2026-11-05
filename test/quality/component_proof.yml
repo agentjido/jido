@@ -13,10 +13,10 @@ schema:
     - no_supported_benchmark
     - stateful_lifecycle
 module_inventory:
-  production_count: 463
-  production_sha256: d399e5eef21e8867f83d8df57e763cd700632c6e02cff0c6e198d7fef1ff2a1e
-  public_count: 221
-  public_sha256: 0a2bbf0270c46ba335263b6a34c8cfbd8d869a024a04560a29616c4049b14e20
+  production_count: 464
+  production_sha256: 5e51f2183449ff25b66f8d846a53b3ae9c0c17ea0733bca3e6c94f51e20486c1
+  public_count: 222
+  public_sha256: 651a477cd7e3a25a0bcfc2957dd8c36282a5943b04b1064e45cd4ae91792fdf5
 module_ownership:
   covenant_records: test/contracts/**/*.obligations.md
   overrides:

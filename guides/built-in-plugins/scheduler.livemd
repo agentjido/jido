@@ -156,7 +156,7 @@ Jido.Plugin.Scheduler.cron("daily-report", "0 9 * * *", signal, timezone: "Ameri
 Directives are checked before the Turn commits. An invalid request fails the Turn, and neither Agent state nor the timers change.
 
 ```elixir
-{:error, {:invalid_cron, reason}} =
+{:error, %Jido.Error.ValidationError{code: :invalid_cron, details: %{reason: reason}}} =
   Jido.AgentServer.call(
     reminders,
     request.(Jido.Plugin.Scheduler.cron("broken", "every morning", due.("inv-3")))

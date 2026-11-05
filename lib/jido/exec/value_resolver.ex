@@ -72,7 +72,9 @@ defmodule Jido.Exec.ValueResolver do
   end
 
   def resolve(%Ref{source: :input} = ref, state), do: resolve_path(ref, state.input)
-  def resolve(%Ref{source: :context} = ref, state), do: resolve_path(ref, state.context)
+
+  def resolve(%Ref{source: :context} = ref, state),
+    do: resolve_path(ref, Jido.Exec.Runtime.caller_context(state.context))
 
   def resolve(%Ref{source: :result, component: component} = ref, state) do
     case Map.fetch(state.results, component) do

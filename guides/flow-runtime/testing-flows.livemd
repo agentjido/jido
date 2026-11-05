@@ -126,7 +126,7 @@ end
 %{total: 2, failures: 0} = run_tests.()
 ```
 
-`@moduletag capture_log: true` hides the warning that Runic logs for each failed node.
+`@moduletag capture_log: true` keeps log lines from your Actions out of the test output, and prints them when a test fails.
 
 ## Replace an Action with a stub
 

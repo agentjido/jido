@@ -93,7 +93,7 @@ The `Init` value has these fields:
 
 ## Add the Plugin and manage sensors from an Action
 
-`Jido.Plugin.SensorManager.start/3` and `Jido.Plugin.SensorManager.stop/1` build Directives. Return them from an Action like any other Directive. `:retry_delay_ms` is the wait before retrying a failed start. It defaults to `1_000`, and it must be an integer from 1 through 4,294,967,295.
+`Jido.Plugin.SensorManager.start/3` and `Jido.Plugin.SensorManager.stop/1` build Directives. Return them from an Action like any other Directive. `:retry_delay_ms` is the wait before retrying a failed start or restarting a crashed sensor. It defaults to `1_000`, and it must be an integer from 1 through 4,294,967,295.
 
 ```elixir
 defmodule SensorGuide.ManageMailbox do
@@ -203,7 +203,7 @@ Jido.AgentServer.agent(inbox).state.message_ids
 # => ["msg-1", "msg-2", "msg-3"]
 ```
 
-A sensor that starts and then crashes restarts at once, with no delay and no limit. Only a failed start waits for `:retry_delay_ms`. Handle a repeating fault inside the sensor, for example with its own backoff.
+A sensor that crashes restarts after `:retry_delay_ms`, the same wait as a failed start. A sensor that keeps crashing therefore starts at most once per delay, and it keeps restarting while its tag stays desired. The delay is fixed. For a longer backoff, handle the fault inside the sensor.
 
 ## Change a sensor
 

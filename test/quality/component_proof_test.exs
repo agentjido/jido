@@ -17,7 +17,7 @@ defmodule Jido.Quality.ComponentProofTest do
     {owners, errors} = ComponentProof.ownership(proof, @root)
 
     assert errors == []
-    assert map_size(owners) == 463
+    assert map_size(owners) == 464
     assert Enum.all?(inventory.public_modules, &Map.has_key?(owners, &1))
   end
 

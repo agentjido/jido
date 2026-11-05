@@ -81,8 +81,15 @@ defmodule Jido.Action do
           {:ok, map()} | {:error, term()}
   def validate_params_for(params, module) do
     with {:ok, params} <- prepare_params(params, module) do
-      Validation.schema(module.schema(), params, %{context: "Action", module: module})
+      Validation.schema(module.schema(), params, %{context: input_context(module), module: module})
     end
+  end
+
+  defp input_context(module) do
+    if function_exported?(module, :__jido_codec_kind__, 0) and
+         module.__jido_codec_kind__() == :flow,
+       do: "Flow",
+       else: "Action"
   end
 
   @doc false

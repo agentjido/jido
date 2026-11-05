@@ -434,8 +434,16 @@ defmodule Jido.Persistence do
   end
 
   @doc false
-  def load_agent_with_server_turn(source, agent_module, agent_id, opts) do
-    PersistenceTelemetry.observe(:load, source, agent_module, agent_id, opts, fn ->
+  def load_agent_with_server_turn(source, agent_module, agent_id, opts),
+    do: observed_load(source, agent_module, agent_id, opts, opts)
+
+  # An activation reports :reason on its load. Public load options do not accept it.
+  defp open_load(source, agent, opts) do
+    observed_load(source, agent.module, agent.id, Keyword.delete(opts, :reason), opts)
+  end
+
+  defp observed_load(source, agent_module, agent_id, opts, telemetry_opts) do
+    PersistenceTelemetry.observe(:load, source, agent_module, agent_id, telemetry_opts, fn ->
       Store.protect(:get, fn ->
         with :ok <- validate_operation_options(opts, @identity_options),
              {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
@@ -462,10 +470,10 @@ defmodule Jido.Persistence do
   end
 
   def open_agent(source, %Agent{} = agent, :restore, opts),
-    do: load_agent_with_server_turn(source, agent.module, agent.id, opts)
+    do: open_load(source, agent, opts)
 
   def open_agent(source, %Agent{} = agent, :restore_or_create, opts) do
-    case load_agent_with_server_turn(source, agent.module, agent.id, opts) do
+    case open_load(source, agent, opts) do
       {:ok, _agent, _revision, _turn} = restored ->
         restored
 
@@ -483,7 +491,7 @@ defmodule Jido.Persistence do
         created
 
       {:error, :conflict} ->
-        load_agent_with_server_turn(source, agent.module, agent.id, opts)
+        open_load(source, agent, opts)
 
       {:error, _reason} = error ->
         error

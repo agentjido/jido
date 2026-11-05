@@ -97,6 +97,9 @@ defmodule Jido.Agent.DSL do
       @spec definition() :: Jido.Agent.definition()
       def definition, do: Jido.Agent.DSL.definition!(@agent_definition)
 
+      @doc false
+      def __jido_definition__(opts), do: Jido.Agent.DSL.definition(@agent_definition, opts)
+
       @doc "Builds and validates one instance of this Agent."
       @spec instantiate(keyword() | map()) ::
               {:ok, Jido.Agent.instance()} | {:error, term()}
@@ -106,6 +109,8 @@ defmodule Jido.Agent.DSL do
       @spec instantiate!(keyword() | map()) :: Jido.Agent.instance() | no_return()
       def instantiate!(opts \\ []), do: Jido.Agent.instantiate!(__MODULE__, opts)
       unquote(helpers)
+      @doc false
+      def __jido_location__, do: {__ENV__.file, __ENV__.line}
       @after_verify {Jido.Agent.DSL, :verify!}
     end
   end
@@ -116,8 +121,23 @@ defmodule Jido.Agent.DSL do
   def verify!(module) do
     case Jido.Agent.validate(module.definition()) do
       {:ok, _} -> :ok
-      {:error, error} -> raise error
+      {:error, error} -> compile_error!(module, error)
     end
+  rescue
+    error in Error.ValidationError -> compile_error!(module, error)
+  end
+
+  # Elixir runs @after_verify after compilation, so report the source location here.
+  defp compile_error!(module, error) do
+    {file, line} = module.__jido_location__()
+
+    raise CompileError,
+      file: file,
+      line: line,
+      description:
+        "#{inspect(module)}: #{Exception.message(error)} " <>
+          "(code: #{inspect(Map.get(error, :code))}, path: #{inspect(Map.get(error, :path))}, " <>
+          "details: #{inspect(Map.get(error, :details))})"
   end
 
   @doc false
@@ -133,7 +153,10 @@ defmodule Jido.Agent.DSL do
     Keyword.delete(options, :plugins) ++ [plugins: plugins]
   end
 
-  def definition!(draft) do
+  def definition!(draft), do: draft |> definition(related?: true) |> Error.unwrap!()
+
+  @doc false
+  def definition(draft, opts) do
     routes =
       Enum.map(draft.routes, fn
         %{handler: %{kind: :executable, target: target}} = route ->
@@ -143,7 +166,7 @@ defmodule Jido.Agent.DSL do
           route
       end)
 
-    draft |> Map.put(:routes, routes) |> Validation.define(related?: true) |> Error.unwrap!()
+    draft |> Map.put(:routes, routes) |> Validation.define(opts)
   end
 
   def build!(dsl, opts, module) do

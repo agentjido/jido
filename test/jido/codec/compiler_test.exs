@@ -68,7 +68,49 @@ defmodule Jido.Codec.CompilerTest do
   end
 
   test "compiles the JSON Schema from Joi" do
-    assert Person.json_schema() == Jido.Joi.to_json_schema(Person.schema())
     assert get_in(Person.json_schema(), [:properties, :state, :enum]) == [:active, :disabled]
+  end
+
+  test "the JSON Schema describes the wire shape" do
+    schema = Person.json_schema()
+    address = schema.properties.address
+
+    assert %{"postalCode" => %{type: :string}} = address.properties
+    refute Map.has_key?(address.properties, :postal_code)
+    assert "postalCode" in address.required
+    refute :postal_code in address.required
+
+    assert Map.has_key?(schema.properties, :nickname)
+    refute :nickname in schema.required
+
+    for name <- [:name, :address, :state, :tag], do: assert(name in schema.required)
+  end
+
+  defmodule WireNames do
+    alias Jido.Joi
+
+    @schema Joi.object(%{
+              first_name: Joi.string(),
+              leaves: Joi.array(Address.schema()),
+              maybe: Joi.nullable(Address.schema()),
+              rows: Joi.array(Joi.object(%{cell: Joi.string()})),
+              region: Joi.string() |> Joi.default("us")
+            })
+    use Jido.Codec, schema: @schema
+    codec(:first_name, as: "firstName")
+  end
+
+  test "the JSON Schema applies wire names inside arrays and unions" do
+    schema = WireNames.json_schema()
+
+    assert %{required: required, properties: %{"firstName" => %{type: :string}} = properties} =
+             schema
+
+    assert "firstName" in required
+    assert Map.has_key?(properties, :region)
+    refute :region in required
+    assert %{"postalCode" => _} = properties.leaves.items.properties
+    assert [%{type: :null}, %{properties: %{"postalCode" => _}}] = properties.maybe.anyOf
+    assert %{cell: _} = properties.rows.items.properties
   end
 end

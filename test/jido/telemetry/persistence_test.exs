@@ -5,9 +5,15 @@ defmodule Jido.Telemetry.PersistenceTest do
 
   alias Jido.Telemetry
   alias Jido.Telemetry.Persistence
+  alias Jido.Test.AgentServer.RuntimeFixtures.RuntimeAgent
 
   defmodule InstanceSource do
     def __jido_persistence__, do: nil
+  end
+
+  defmodule UpgradeAction do
+    use Jido.Action, name: "telemetry_reason_upgrade"
+    def run(%{snapshot: snapshot}, _context), do: {:ok, %{snapshot: snapshot}}
   end
 
   defmodule AdapterSource do
@@ -238,6 +244,72 @@ defmodule Jido.Telemetry.PersistenceTest do
     end
 
     refute_received :ran
+  end
+
+  describe "persistence reasons from real writers" do
+    setup do
+      table = :"telemetry_reason_#{System.unique_integer([:positive])}"
+      instance = :"telemetry_reason_instance_#{System.unique_integer([:positive])}"
+
+      start_supervised!(
+        {Jido, name: instance, namespace: "tests/#{instance}", persistence: {Jido.Persistence.ETS, table: table}}
+      )
+
+      attach(self())
+      %{instance: instance}
+    end
+
+    @tag obligation: ["jido.telemetry.I2", "jido.telemetry.I3"]
+    test "create, commit, hibernate, and upgrade writes report distinct reasons", c do
+      id = "reasons-#{System.unique_integer([:positive])}"
+
+      {:ok, pid} = Jido.start_agent(c.instance, RuntimeAgent, id: id, persistence: :inherit)
+      :ok = Jido.AgentServer.await_ready(pid)
+      assert write_reason(id) == :activate
+
+      {:ok, _, _} =
+        Jido.AgentServer.call(pid, Jido.Signal.new!("runtime.record", %{event: :saved}, source: "/test"))
+
+      assert write_reason(id) == :commit
+
+      :ok = Jido.AgentServer.hibernate(pid)
+      assert write_reason(id) == :hibernate
+
+      assert {:ok, _upgraded, _revision} =
+               Jido.Persistence.upgrade_agent(c.instance, RuntimeAgent, id, UpgradeAction, instance: c.instance)
+
+      assert write_reason(id) == :stored_upgrade
+    end
+  end
+
+  @tag obligation: ["jido.telemetry.I2", "jido.telemetry.I3"]
+  test "every load function reports revision_after" do
+    attach(self())
+    store = {Jido.Persistence.ETS, table: :"telemetry_load_#{System.unique_integer([:positive])}"}
+    opts = [namespace: "tests/telemetry-load"]
+    agent = RuntimeAgent.instantiate!(id: "loaded-#{System.unique_integer([:positive])}")
+    :ok = Jido.Persistence.save_agent(store, agent, opts ++ [revision: 4])
+
+    for load <- [
+          &Jido.Persistence.load_agent/4,
+          &Jido.Persistence.load_agent_with_revision/4,
+          &Jido.Persistence.load_agent_with_server_turn/4
+        ] do
+      assert :ok == load.(store, RuntimeAgent, agent.id, opts) |> elem(0)
+
+      assert_receive {:persistence_event, [:jido, :persistence, :operation, :stop], %{revision_after: 4},
+                      %{operation: :load, status: :ok}}
+    end
+  end
+
+  defp write_reason(id) do
+    receive do
+      {:persistence_event, [:jido, :persistence, :operation, :stop], _measurements,
+       %{operation: :compare_and_swap, agent_id: ^id} = metadata} ->
+        metadata[:persistence_reason]
+    after
+      2_000 -> flunk("no write event for #{id}")
+    end
   end
 
   defp attach(owner) do

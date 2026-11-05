@@ -120,8 +120,6 @@ end
 {:error, %Jido.Error.ValidationError{}} = Jido.Exec.run(ActionEffects.BadOutputWithEffects)
 ```
 
-A failed Action logs a warning through Runic, so this cell prints log lines.
-
 ## Return a value that is not a map
 
 Use `Jido.Action.Output` when a successful result must not be a map. The envelope states the intent, so a stray bare value still fails.

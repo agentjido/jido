@@ -49,7 +49,7 @@ defmodule Jido.AI.Toolset do
         selected_names = names(selected)
 
         cond do
-          requirement in [:required, :per_turn] and selected == [] ->
+          requirement == :required and selected == [] ->
             {:error, {:tool_requirement_without_visible_tools, requirement}}
 
           Enum.any?(review, &(&1 not in selected_names)) ->
@@ -73,6 +73,35 @@ defmodule Jido.AI.Toolset do
 
   def select(_actions, _policy), do: {:error, :invalid_tool_policy}
 
+  @doc """
+  Combines an Agent tool policy with one request tool policy.
+
+  The request can only narrow the Agent's policy. Hidden and review names add
+  up, visible names intersect, and a reviewed tool stays reviewed while it is
+  selected. A `:required` or `:disabled` requirement set by the Agent stays.
+  """
+  @spec narrow_policy(map(), map()) :: map()
+  def narrow_policy(agent, request) when is_map(agent) and is_map(request) do
+    agent_visible = field(agent, :visible) || []
+    agent_hidden = field(agent, :hidden) || []
+    request_visible = field(request, :visible) || []
+    {visible, unavailable} = narrow_visible(agent_visible, request_visible)
+    hidden = add_names(agent_hidden, field(request, :hidden) || []) ++ unavailable
+
+    kept_review =
+      Enum.filter(field(agent, :review) || [], fn name ->
+        name not in hidden and (visible == [] or name in visible)
+      end)
+
+    %{
+      visible: visible,
+      hidden: hidden,
+      review: add_names(kept_review, (field(request, :review) || []) -- (field(agent, :review) || [])),
+      requirement: narrow_requirement(field(agent, :requirement), field(request, :requirement)),
+      reason: field(request, :reason) || field(agent, :reason)
+    }
+  end
+
   @doc "Lowers semantic tool-use policy to one provider tool-choice value."
   @spec provider_tool_choice(atom(), non_neg_integer(), [runtime_tool()]) :: atom() | nil
   def provider_tool_choice(:disabled, _tool_rounds, _tools), do: :none
@@ -80,12 +109,10 @@ defmodule Jido.AI.Toolset do
   def provider_tool_choice(:optional, _tool_rounds, _tools), do: nil
   def provider_tool_choice(:required, 0, _tools), do: :required
   def provider_tool_choice(:required, _tool_rounds, _tools), do: :auto
-  def provider_tool_choice(:per_turn, _tool_rounds, _tools), do: :required
 
   @doc "Checks whether one final answer satisfies semantic tool-use policy."
   @spec requirement_satisfied?(atom(), non_neg_integer(), [runtime_tool()]) :: boolean()
   def requirement_satisfied?(:required, 0, [_ | _]), do: false
-  def requirement_satisfied?(:per_turn, _tool_rounds, [_ | _]), do: false
   def requirement_satisfied?(_requirement, _tool_rounds, _tools), do: true
 
   @doc "Builds ReqLLM definitions for an Agent Toolset."
@@ -167,13 +194,29 @@ defmodule Jido.AI.Toolset do
     ReqLLM.Tool.new(
       name: target.name(),
       description: target.description() || "",
-      parameter_schema: target.schema(),
+      parameter_schema: target.schema() |> ReqLLM.Schema.to_json() |> optional_defaults(),
       callback: {__MODULE__, :execution_boundary},
       strict: true
     )
   end
 
   defp definition(%{kind: :source} = tool), do: ToolSource.definition(tool)
+
+  # Parsing fills in a defaulted field, so a model does not have to send it.
+  defp optional_defaults(%{} = json) when not is_struct(json) do
+    json = Map.new(json, fn {key, value} -> {key, optional_defaults(value)} end)
+
+    case json do
+      %{"required" => required, "properties" => properties} when is_list(required) and is_map(properties) ->
+        %{json | "required" => Enum.reject(required, &match?(%{"default" => _}, properties[&1]))}
+
+      _other ->
+        json
+    end
+  end
+
+  defp optional_defaults(json) when is_list(json), do: Enum.map(json, &optional_defaults/1)
+  defp optional_defaults(json), do: json
 
   defp build_definitions(tools) do
     Enum.reduce_while(tools, {:ok, []}, fn tool, {:ok, definitions} ->
@@ -208,6 +251,22 @@ defmodule Jido.AI.Toolset do
       {:error, _reason} -> {:error, {:invalid_tool_arguments, tool_name(tool)}}
     end
   end
+
+  defp narrow_visible([], request), do: {request, []}
+  defp narrow_visible(agent, []), do: {agent, []}
+
+  defp narrow_visible(agent, request) do
+    case Enum.filter(agent, &(&1 in request)) do
+      # An empty visible list means every tool, so an empty result hides the Agent's list.
+      [] -> {agent, agent}
+      visible -> {visible, []}
+    end
+  end
+
+  defp add_names(names, added), do: names ++ (added -- names)
+
+  defp narrow_requirement(agent, request) when agent in [nil, :optional], do: request
+  defp narrow_requirement(agent, _request), do: agent
 
   defp select_tools(_tools, _visible, _hidden, :disabled), do: []
 
@@ -289,7 +348,7 @@ defmodule Jido.AI.Toolset do
   end
 
   defp validate_requirement(requirement)
-       when requirement in [:optional, :required, :per_turn, :disabled],
+       when requirement in [:optional, :required, :disabled],
        do: :ok
 
   defp validate_requirement(requirement), do: {:error, {:invalid_tool_requirement, requirement}}

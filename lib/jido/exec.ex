@@ -335,6 +335,8 @@ defmodule Jido.Exec do
         |> Jido.Exec.Runtime.context()
         |> Map.put(:__jido_exec_max_concurrency__, Keyword.get(react_opts, :max_concurrency, 1))
 
+      Runtime.quiet_failure_log()
+
       {workflow, observation} =
         workflow
         |> Workflow.enable_event_emission()
@@ -649,7 +651,12 @@ defmodule Jido.Exec do
                :ok <- validate_worker_options(worker_opts) do
             policy = %{policy | execution_mode: :durable}
 
-            {:ok, policy, Keyword.put(worker_opts, :runnable_order, &observation_order/1)}
+            worker_opts =
+              worker_opts
+              |> quiet_failure_log()
+              |> Keyword.put(:runnable_order, &observation_order/1)
+
+            {:ok, policy, worker_opts}
           end
 
         unknown ->
@@ -665,6 +672,23 @@ defmodule Jido.Exec do
 
   defp managed_options(_runner, _execution_id, _opts),
     do: {:error, Jido.Error.config_error("execution options must be a keyword list")}
+
+  # The worker applies a failed runnable after this hook. See
+  # `Jido.Exec.Runtime.quiet_failure_log/0`.
+  defp quiet_failure_log(worker_opts) do
+    hooks = Keyword.get(worker_opts, :hooks, [])
+    failed = Keyword.get(hooks, :on_failed)
+
+    on_failed = fn runnable, error, state ->
+      try do
+        if failed, do: failed.(runnable, error, state)
+      after
+        Logger.put_process_level(self(), :error)
+      end
+    end
+
+    Keyword.put(worker_opts, :hooks, Keyword.put(hooks, :on_failed, on_failed))
+  end
 
   defp resume_options(runner, opts) when is_list(opts) do
     if Keyword.keyword?(opts) do

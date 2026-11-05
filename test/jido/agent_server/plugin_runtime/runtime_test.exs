@@ -509,7 +509,7 @@ defmodule Jido.AgentServer.PluginRuntime.RuntimeTest do
   test "caller readiness timeout does not cancel bootstrap", c do
     {server, _} = start_live(c, ready_mode: :gate)
     assert_receive {:readiness, task, _}, 1_000
-    assert catch_exit(Server.await_ready(server, 0))
+    assert Server.await_ready(server, 0) == {:error, :timeout}
     assert Server.agent(server).state.count == 0
     send(task, :release)
     assert Server.await_ready(server) == :ok

@@ -109,7 +109,7 @@ Set these in the instance's `:agent_server` option, or per Agent. Each timeout a
 | `:default_dispatch` | `nil` | `nil` or a dispatch target | The target for an Emit with no target. |
 | `:readiness_timeout` | `5_000` | A finite timeout | The bound on Plugin startup and composition changes. |
 | `:commit_timeout` | `5_000` | A finite timeout | The bound on Plugin `after_commit/3` callbacks in one Turn. |
-| `:persistence` | `false` | A store, `{store, options}`, `:inherit`, `nil`, or `false` | Whether and where the Agent saves. The instance must have a `:namespace`. If it does not, the worker stops with `:stable_namespace_required` after start. |
+| `:persistence` | `false` | A store, `{store, options}`, `:inherit`, `nil`, or `false` | Whether and where the Agent saves. The instance must have a `:namespace`. If it does not, the start returns a `Jido.Error.ValidationError` and starts no worker. |
 | `:persistence_mode` | `:create` | `:create`, `:restore`, `:restore_or_create` | What startup does with a stored record. |
 | `:persistence_timeout` | `5_000` | A finite timeout | The bound on one durable save or restore. |
 | `:idle_timeout` | `:infinity` | A timeout or `:infinity` | The idle budget. |

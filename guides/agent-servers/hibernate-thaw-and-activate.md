@@ -35,7 +35,7 @@ end
 
 ## Hibernate an Agent
 
-Start the Agent with `persistence: :inherit` to use the instance's store. With persistence on, each commit also saves.
+Start the Agent with `persistence: :inherit` to use the instance's store. With persistence on, each commit also saves. `Jido.start_agent/3` ignores the instance's store unless you pass this option: the Agent starts with fresh state over any save, and its commits are not saved.
 
 ```elixir
 {:ok, cart} = Jido.start_agent(HibernateGuide.Jido, HibernateGuide.Cart, id: "cart-1", persistence: :inherit)
@@ -55,7 +55,7 @@ Start the Agent with `persistence: :inherit` to use the instance's store. With p
 - `:active` is `:finish` by default. `:cancel` cancels pre-commit work.
 - `:timeout` is the finite drain budget, with a default of 5,000 ms. Cleanup has a further wait of the same length. `:persistence_timeout` bounds the save itself.
 
-Use `Jido.AgentServer.hibernate/2` with a PID or name, and `Jido.hibernate_ref/3` with a `Jido.Agent.Ref`. An Agent in a partition should use a Ref: `Jido.hibernate/3` passes its options on to the drain, which rejects `:partition`.
+Use `Jido.AgentServer.hibernate/2` with a PID or name, and `Jido.hibernate_ref/3` with a `Jido.Agent.Ref`. With `Jido.hibernate/3`, pass `:partition` for an Agent in a partition. A wrong partition returns `{:error, :not_found}`.
 
 A durable Flow Turn suspended on a wait can hibernate with its progress saved. See [Durable Turns and Flows](../durability/durable-turns-and-flows.livemd).
 
@@ -72,21 +72,16 @@ A durable Flow Turn suspended on a wait can hibernate with its progress saved. S
 
 The revision continues from the save. A thawed Agent uses the definition in its save, not the current source of the module. See [Upgrade Live Agents](upgrade-live-agents.md) when the two differ.
 
-Restoring happens after `thaw` returns, so check the result with `Jido.AgentServer.await_ready/2`. When the Agent has no save, the new worker stops with `{:shutdown, :not_found}`, and `await_ready/2` exits with that reason. The worker can also stop before `thaw` returns, which gives `{:error, :worker_unavailable}`. Handle all three results:
+Restoring happens after `thaw` returns, so check the result with `Jido.AgentServer.await_ready/2`. When the Agent has no save, the new worker stops with `{:shutdown, :not_found}`, and `await_ready/2` returns `{:error, :not_found}`. The worker can also stop before `thaw` returns. Then `thaw` itself returns `{:error, :not_found}`. Handle both results with one `with`:
 
 ```elixir
 thaw_cart = fn id ->
-  with {:ok, pid} <- Jido.thaw(HibernateGuide.Jido, HibernateGuide.Cart, id) do
-    try do
-      with :ok <- Jido.AgentServer.await_ready(pid), do: {:ok, pid}
-    catch
-      :exit, {{:shutdown, reason}, _call} -> {:error, reason}
-    end
-  end
+  with {:ok, pid} <- Jido.thaw(HibernateGuide.Jido, HibernateGuide.Cart, id),
+       :ok <- Jido.AgentServer.await_ready(pid),
+       do: {:ok, pid}
 end
 
-{:error, reason} = thaw_cart.("cart-404")
-reason in [:not_found, :worker_unavailable]
+{:error, :not_found} = thaw_cart.("cart-404")
 ```
 
 ## Choose a start mode

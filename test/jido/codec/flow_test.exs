@@ -339,6 +339,42 @@ defmodule Jido.Flow.CodecTest do
     end
   end
 
+  test "encode/2 names the component, field, and target a Catalog cannot reference" do
+    flow =
+      Flow.new!(%{
+        name: "missing_reference",
+        components: [
+          %{kind: :step, name: "first", action: Add, params: %{value: 1}},
+          %{kind: :step, name: "second", action: Multiply, params: %{value: 2, mode: :fast}}
+        ],
+        output: %{}
+      })
+
+    missing_action =
+      Catalog.from_targets!(__MODULE__, :jido, %{
+        {"codec_test/add", 1} => {:action, Add},
+        {"codec_test/fast", 1} => {:atom, :fast},
+        {"codec_test/value", 1} => {:atom, :value},
+        {"codec_test/mode", 1} => {:atom, :mode}
+      })
+
+    assert {:error, %ValidationError{} = error} = Codec.encode(flow, missing_action)
+    assert error.details.path == [:components, "second", :call]
+    assert error.message =~ inspect(Multiply)
+
+    missing_atom =
+      Catalog.from_targets!(__MODULE__, :jido, %{
+        {"codec_test/add", 1} => {:action, Add},
+        {"codec_test/multiply", 1} => {:action, Multiply},
+        {"codec_test/value", 1} => {:atom, :value},
+        {"codec_test/mode", 1} => {:atom, :mode}
+      })
+
+    assert {:error, %ValidationError{} = error} = Codec.encode(flow, missing_atom)
+    assert error.details.path == [:components, "second", :call, :params, :mode]
+    assert error.message =~ ":fast"
+  end
+
   test "encode/1 rejects a non-canonical Flow" do
     raw_flow =
       Jido.Test.Flow.Builder.new!(%{

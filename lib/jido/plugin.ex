@@ -93,10 +93,13 @@ defmodule Jido.Plugin do
   replace state or return Directives. Startup, restore, and direct Agent
   commands do not invoke it.
 
-  Agent Server runs each hook in an owned task with the finite
-  `directive_timeout`, or 5,000 milliseconds when that option is `:infinity`.
-  Failure or timeout skips later hooks and Directives and uses the Server error
-  policy. The commit and the result already sent to the caller stay intact.
+  Agent Server runs each hook in an owned task. All hooks of one Turn share the
+  finite `commit_timeout`. Failure or timeout skips later hooks and Directives.
+  It does not use the Server error policy, and the Server stays ready for the
+  next Turn. Read the failure from `last_effect_outcome` in
+  `Jido.AgentServer.status/2`, with stage `:after_commit`, or from the
+  `[:jido, :agent_server, :effects, :stop]` Telemetry event. The commit and the
+  result already sent to the caller stay intact.
   Hooks are not replayed. Rebuild live state from `Jido.Plugin.Init` on startup
   and runtime replacement. Use Telemetry for optional observation.
   """

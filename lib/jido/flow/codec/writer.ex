@@ -14,8 +14,7 @@ defmodule Jido.Flow.Codec.Writer do
   def encode(flow, registry) do
     case do_encode(flow, registry) do
       {:error, %CatalogError{} = error} ->
-        message = String.replace(error.message, "Catalog", "flow catalog")
-        {:error, Error.validation_error(message, error.details)}
+        {:error, Value.catalog_error(error)}
 
       result ->
         result
@@ -29,13 +28,13 @@ defmodule Jido.Flow.Codec.Writer do
            sequence(Graph.canonical_components(flow.components), fn {name, node} ->
              record = Map.put(node, :name, name)
 
-             with {:ok, values} <-
-                    record(
-                      record,
-                      Component.common_fields() ++ Component.fields(node.kind),
-                      registry
-                    ) do
-               {:ok, Map.put(values, "kind", Atom.to_string(node.kind))}
+             case record(
+                    record,
+                    Component.common_fields() ++ Component.fields(node.kind),
+                    registry
+                  ) do
+               {:ok, values} -> {:ok, Map.put(values, "kind", Atom.to_string(node.kind))}
+               {:error, error} -> {:error, Error.prefix_path(error, [:components, name])}
              end
            end),
          {:ok, output} <- Value.encode_expression(flow.output, registry, 0) do
@@ -60,7 +59,7 @@ defmodule Jido.Flow.Codec.Writer do
   defp encode_schema(schema, registry) do
     if schema == Jido.Joi.map(),
       do: {:ok, nil},
-      else: Reference.encode(registry, :schema, schema)
+      else: reference(registry, :schema, schema)
   end
 
   defp put_schema(document, _field, nil), do: document
@@ -81,12 +80,12 @@ defmodule Jido.Flow.Codec.Writer do
   defp field(:meta, value, registry), do: Value.encode_data(value, registry, 0)
 
   defp field(:schema, value, registry) do
-    Reference.encode(registry, :schema, value)
+    reference(registry, :schema, value)
   end
 
   defp field({:call, _, _}, call, registry) do
     with {:ok, target} <- target(call, registry),
-         {:ok, params} <- Value.encode_expression(call.params, registry, 0) do
+         {:ok, params} <- encode_params(call.params, registry) do
       {:ok, Map.put(target, "params", params)}
     end
   end
@@ -106,9 +105,21 @@ defmodule Jido.Flow.Codec.Writer do
   defp field(:on_error, value, _registry), do: {:ok, Atom.to_string(value)}
   defp field(_type, value, _registry), do: {:ok, value}
 
+  defp encode_params(params, registry) do
+    with {:error, error} <- Value.encode_expression(params, registry, 0) do
+      {:error, Error.prefix_path(error, [:params])}
+    end
+  end
+
   defp target(target, registry) do
-    with {:ok, reference} <- Reference.encode(registry, target.kind, target.target) do
+    with {:ok, reference} <- reference(registry, target.kind, target.target) do
       {:ok, %{"kind" => Atom.to_string(target.kind), "target" => reference}}
+    end
+  end
+
+  defp reference(registry, kind, target) do
+    with {:error, %CatalogError{} = error} <- Reference.encode(registry, kind, target) do
+      {:error, %{error | details: Map.put(error.details, :target, target)}}
     end
   end
 

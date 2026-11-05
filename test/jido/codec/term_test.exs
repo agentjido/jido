@@ -18,7 +18,15 @@ defmodule Jido.Codec.TermTest do
 
   test "portable validation rejects every local runtime value" do
     port = Port.open({:spawn_executable, System.find_executable("true")}, [])
-    on_exit(fn -> if Port.info(port), do: Port.close(port) end)
+
+    on_exit(fn ->
+      try do
+        Port.close(port)
+      rescue
+        # The spawned program can exit at any moment, which closes the port.
+        ArgumentError -> :ok
+      end
+    end)
 
     values = [
       {self(), [:payload]},

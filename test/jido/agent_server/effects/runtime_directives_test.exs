@@ -67,6 +67,7 @@ defmodule Jido.AgentServer.Effects.RuntimeDirectivesTest do
           R.agent_start(E.Worker, :worker, node: :remote@invalid),
           R.agent_start(E.Worker, :worker, opts: %{unknown: true}),
           R.agent_start(E.Worker, :worker, opts: %{partition: "other"}),
+          R.agent_start(E.Worker, :worker, opts: %{name: :worker_name}),
           R.agent_start(E.Worker, :worker, opts: %{agent: E.agent()}),
           R.agent_start(E.Worker, nil),
           R.agent_start(E.Worker, "$topology/worker"),

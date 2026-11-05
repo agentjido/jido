@@ -15,11 +15,14 @@ defmodule Jido.AI.Agent.PluginContractTest do
              option_keys: %{agent: [:reasoning, :defaults, :tools]}
            } = Plugin.__jido_plugin__()
 
-    assert {:ok, [Add]} = Plugin.prepare(%{}, reasoning: ReAct, defaults: %{}, tools: [Add])
+    assert {:ok, %{tools: [Add], defaults: %{model: "contract:model"}} = prepared} =
+             Plugin.prepare(%{}, reasoning: ReAct, defaults: %{model: "contract:model"}, tools: [Add])
 
-    input = %Jido.Plugin.Input{prepared: [Add], runtime: nil}
+    input = %Jido.Plugin.Input{prepared: prepared, runtime: nil}
     assert Plugin.prepared_tools(%{plugin_inputs: %{Plugin => input}}) == [Add]
+    assert Plugin.prepared_defaults(%{plugin_inputs: %{Plugin => input}}) == %{model: "contract:model"}
     assert Plugin.prepared_tools(%{}) == []
+    assert Plugin.prepared_defaults(%{}) == %{}
 
     assert {:ok, normalized} =
              Plugin.normalize(%{reasoning: ReAct, defaults: %{model: "contract:model"}, tools: [Add]})

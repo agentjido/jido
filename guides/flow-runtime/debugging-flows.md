@@ -60,7 +60,7 @@ Each Flow failure names its component, and each DSL Flow names its source line. 
 
 This says `assign` read `result("lookup", :owner)`, and the value has no `:owner` key. [Flow Errors](flow-errors.md) lists the fields for every failure.
 
-A failed `Jido.Exec.run/4` also logs a warning from Runic with the failing node and the error. A Turn in a live AgentServer does not log this warning. See [Flow Security](flow-security.md#keep-secrets-out-of-logs) before you ship those logs anywhere.
+A failed run does not log the node or the error, so read the returned error. See [Flow Security](flow-security.md#keep-secrets-out-of-logs) before you ship your logs anywhere.
 
 ## Inspect the definition
 
@@ -177,7 +177,6 @@ To go through a run one unit at a time, start it with `dispatch_mode: :manual` a
 | `:missing_key` with `ref_type: :result` | The Action output lacks the field | `details.path`, the Action's `output_schema` |
 | `:missing_key` with `ref_type: :context` | Context was not passed, or not passed again on resume | `details.path` |
 | `"Action output validation must return a map"` from the Flow | `output` is a list or scalar | Wrap it: `output %{items: result("items")}` |
-| `"Runic execution failed"` with a map in `details.reason` | A Map item's reference failed | The nested `details.reason.details` |
 | `:unsupported_host` | A Flow with a wait ran outside a durable Agent | [Flow Waits](flow-waits.md) |
 | `:execution_active` forever | A manual run needs another `step`, or an Action is blocked | `Runic.Runner.admission_status/2` |
 | `:admission_stopped` | A failure elsewhere in the run stopped new units | `causes` from `Runic.Runner.admission_status/2` |

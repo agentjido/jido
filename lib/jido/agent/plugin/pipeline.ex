@@ -46,20 +46,22 @@ defmodule Jido.Agent.Plugin.Pipeline do
 
   defp protect_owned_state(state, original_state, specs) do
     changed =
-      for %{state_key: key} <- specs,
+      for %{state_key: key} = spec <- specs,
           not is_nil(key),
           Map.fetch(state, key) !== Map.fetch(original_state, key),
-          do: key
+          do: spec
 
-    if changed == [] do
-      :ok
-    else
-      {:error,
-       PluginBoundary.execution_error(
-         "Agent executable changed Plugin-owned state",
-         :core,
-         %{keys: changed, code: :plugin_state_owner_violation}
-       )}
+    case changed do
+      [] ->
+        :ok
+
+      [%{package: plugin} | _other] ->
+        {:error,
+         PluginBoundary.execution_error(
+           "Agent executable changed Plugin-owned state",
+           plugin,
+           %{keys: Enum.map(changed, & &1.state_key), code: :plugin_state_owner_violation}
+         )}
     end
   end
 

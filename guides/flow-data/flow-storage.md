@@ -136,7 +136,10 @@ partial_catalog =
 {:error, error} =
   Jido.Codec.encode(OrderStore.Definitions.charge_flow(), catalog: partial_catalog)
 
-"flow catalog has no reference for the required target" = Exception.message(error)
+"flow catalog has no reference for the required target: OrderStore.LoadOrder" =
+  Exception.message(error)
+
+[:components, "load", :call] = error.details.path
 ```
 
 ## Use the published Catalog
@@ -172,7 +175,7 @@ With a published Catalog, you can drop both options:
 {:ok, restored} = Jido.Codec.decode_json(json)
 ```
 
-The first scan runs asynchronously when `:jido` starts. Until it finishes, these calls raise a `Jido.Codec.Error.InternalError` with the message `Catalog is not initialized`. Decoding without `:codec` needs the published index even when you pass `:catalog`.
+The first scan runs asynchronously when `:jido` starts. Until it finishes, encoding without `:catalog` raises a `Jido.Codec.Error.InternalError` with the message `Catalog is not initialized`. Decoding returns `{:error, [issue]}` with the code `:catalog_not_initialized`. Decoding without `:codec` needs the published index even when you pass `:catalog`, so it returns this issue too.
 
 Call `Jido.Catalog.Discovery.ready?/0` to check the scan. Call `Jido.Catalog.Discovery.refresh/1` to rebuild the Catalog after loading more applications.
 

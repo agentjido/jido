@@ -178,7 +178,7 @@ Exec strips these keys from the context it passes to `run/2`:
 - `:__jido_wait_host__`
 - `:__jido_wait_result__`
 
-This applies only to the `run/2` argument. In a Flow, a `context()` reference still exposes `:__jido_exec_max_concurrency__` and `:__jido_exec_durable__`.
+A `context()` reference in a Flow reads the same context without these keys.
 
 A caller cannot grant a capability by setting the key. Only the execution host can set it. Ask for a capability with `Jido.Exec.supports?/2`.
 
@@ -206,7 +206,7 @@ Prefer a registered name or a module to a pid when an Action can move to managed
 
 ## Keep secrets out of context
 
-When an Action fails under `Jido.Exec.run/4`, Runic logs a warning that prints the Instruction, including its params and context. Do not place API keys or tokens in either one. Pass a module or a name, and have the Action read the secret from its own store.
+`Jido.Exec.run/4` does not write Runic's failure warning to the logs, so a failed Action does not print its params or context. The returned error, Runic Workflows, and stored data can still hold them. Do not place API keys or tokens in either one. Pass a module or a name, and have the Action read the secret from its own store.
 
 Telemetry metadata for Actions does not include params, context, or results. See [Telemetry and Tracing](../operations/telemetry-tracing-and-logs.md).
 

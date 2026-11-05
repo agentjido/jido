@@ -34,7 +34,6 @@ defmodule Jido.AI.Tools.PolicyContractTest do
     assert Toolset.provider_tool_choice(:optional, 0, actions) == nil
     assert Toolset.provider_tool_choice(:required, 0, actions) == :required
     assert Toolset.provider_tool_choice(:required, 1, actions) == :auto
-    assert Toolset.provider_tool_choice(:per_turn, 1, actions) == :required
     assert Toolset.provider_tool_choice(:disabled, 0, actions) == :none
 
     refute Toolset.requirement_satisfied?(:required, 0, actions)

@@ -26,7 +26,7 @@ defmodule Jido.Plugin.Audit.Record do
   @doc "Validates one portable audit record."
   @spec validate(term()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = record) do
-    with {:ok, record} <- Joi.parse(@schema, Map.from_struct(record)),
+    with {:ok, record} <- Jido.Agent.Directive.parse(@schema, Map.from_struct(record)),
          true <- Jido.Id.uuid7?(record.id) do
       case Jido.Codec.Term.validate(record, :record) do
         :ok -> {:ok, record}

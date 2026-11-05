@@ -122,10 +122,6 @@ The map is for Elixir code. References stay `Jido.Flow.Ref` structs and schemas 
 
 The `version` key is the version of this inspection format. The `identity` value equals the result of `Jido.Flow.semantic_identity/1`. See [Flow Identity](flow-identity-and-versioning.md).
 
-> #### Iterate components {: .warning}
->
-> `Jido.Flow.to_map/1` and `Jido.Flow.explain/1` currently raise `Protocol.UndefinedError` for a Flow with an `:iterate` component, because they do not handle its state schema. `Jido.Flow.validate/1`, `Jido.Flow.dependencies/1`, and `Jido.Flow.semantic_identity/1` work for these Flows.
-
 ## Check a value
 
 `Jido.Flow.validate/1` checks the exact canonical structure, including schemas, expressions, references, and cycles. It catches a struct that was edited by hand.

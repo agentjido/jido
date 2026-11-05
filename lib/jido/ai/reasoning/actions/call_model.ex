@@ -120,9 +120,15 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
   defp model_tools(_turn, false), do: {:ok, nil}
 
   defp generate(request, context) do
-    context
-    |> Selection.client!()
-    |> then(& &1.generate_text(request.model, request.context, request.options))
+    with {:ok, client} <- selected_client(context) do
+      client.generate_text(request.model, request.context, request.options)
+    end
+  end
+
+  defp selected_client(context) do
+    {:ok, Selection.client!(context)}
+  rescue
+    error in ArgumentError -> {:error, error}
   end
 
   defp tool_choice(turn) do
@@ -190,15 +196,12 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     end
 
     result =
-      with {:ok, response} <-
-             context
-             |> Selection.client!()
-             |> then(
-               & &1.stream_text(
-                 request_data.model,
-                 request_data.context,
-                 request_data.options
-               )
+      with {:ok, client} <- selected_client(context),
+           {:ok, response} <-
+             client.stream_text(
+               request_data.model,
+               request_data.context,
+               request_data.options
              ) do
         ReqLLM.StreamResponse.process_stream(response, on_chunk: on_chunk)
       end
@@ -433,6 +436,7 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     :timeout
   ]
 
+  defp retryable?(%ArgumentError{}), do: false
   defp retryable?(%ReqLLM.Error.API.Timeout{}), do: true
   defp retryable?(%ReqLLM.Error.API.Request{retryable: true}), do: true
 
@@ -458,6 +462,7 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     )
   end
 
+  defp category(%ArgumentError{}), do: :provider_error
   defp category(%ReqLLM.Error.API.Timeout{}), do: :timeout
   defp category(%ReqLLM.Error.API.Request{status: 429}), do: :rate_limit
 

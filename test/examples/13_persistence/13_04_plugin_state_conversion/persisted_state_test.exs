@@ -84,8 +84,8 @@ defmodule Jido.Examples.Persistence.PluginStateConversionTest do
            persistence: persistence,
            persistence_mode: :restore
          ) do
-      {:ok, server} -> assert catch_exit(Jido.AgentServer.await_ready(server))
-      {:error, :worker_unavailable} -> :ok
+      {:ok, server} -> assert {:error, _reason} = Jido.AgentServer.await_ready(server)
+      {:error, _reason} -> :ok
     end
 
     eventually(fn -> Jido.whereis_agent(jido, id) == nil and Jido.agent_count(jido) == 0 end)

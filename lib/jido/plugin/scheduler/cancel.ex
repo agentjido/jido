@@ -21,8 +21,8 @@ defmodule Jido.Plugin.Scheduler.Cancel do
   @doc "Validates one recurring schedule cancellation."
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive) do
-    with {:ok, directive} <- Joi.parse(@schema, Map.from_struct(directive)),
-         :ok <- CronRules.validate_job_id(directive.job_id) do
+    with {:ok, directive} <- Jido.Agent.Directive.parse(@schema, Map.from_struct(directive)),
+         :ok <- CronRules.to_error(CronRules.validate_job_id(directive.job_id)) do
       {:ok, directive}
     end
   end

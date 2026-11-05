@@ -149,18 +149,13 @@ Two other functions keep narrower meanings. Use them when a wrong answer should 
 | `Jido.start_agent_ref/4` with `persistence: :inherit` | `:create` | Creates revision 0 | Stops with `:conflict` | Stops with `:conflict` |
 | `Jido.thaw/4` | `:restore` | Stops with `:not_found` | Restores | Stops with `:deleted` |
 
-These reasons arrive after the start call, because the read happens in the new server. The helper below turns each outcome into a value. A start that loses the race with a fast failure can return `{:error, :worker_unavailable}`, and `Jido.AgentServer.await_ready/2` can exit with `:noproc`, so the reason you see depends on timing. Treat any of these as a failed start, and read the record to learn why.
+These reasons arrive after the start call, because the read happens in the new server. The helper below turns each outcome into a value. A fast failure can make the start itself return `{:error, reason}`. Otherwise `Jido.AgentServer.await_ready/2` returns `{:error, reason}`. Handle both forms. `{:error, :worker_unavailable}` and `{:error, :noproc}` mean that no reason was recorded, so read the record to learn why.
 
 ```elixir
 defmodule ActivationGuide.Outcome do
   alias Jido.AgentServer, as: Server
 
-  def of({:ok, pid}) do
-    Server.await_ready(pid)
-  catch
-    :exit, {reason, _call} -> {:stopped, reason}
-  end
-
+  def of({:ok, pid}), do: Server.await_ready(pid)
   def of({:error, reason}), do: {:error, reason}
 end
 ```

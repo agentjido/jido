@@ -217,6 +217,10 @@ defmodule Jido.Agent.Topology do
           module: module
         })
 
+      # definition/0 starts with an empty :seen, so a DSL module continues this walk instead.
+      Code.ensure_loaded?(module) and function_exported?(module, :__jido_definition__, 1) ->
+        module.__jido_definition__(related?: true, seen: [module | seen])
+
       Code.ensure_loaded?(module) and function_exported?(module, :definition, 0) ->
         resolver.(module.definition(), Keyword.put(opts, :seen, [module | seen]))
 

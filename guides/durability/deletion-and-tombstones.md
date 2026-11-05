@@ -67,7 +67,7 @@ alias TombstonesGuide.Order
 | `Jido.thaw/4` and `Jido.activate_agent/4` | Activation stops with `{:shutdown, :deleted}` |
 | `Jido.start_agent_ref/4` with persistence | Activation stops with `{:shutdown, :conflict}` |
 
-The last two rows return from the start call first. Wait with `Jido.AgentServer.await_ready/2` to see the reason. A fast failure can also make the start return `{:error, :worker_unavailable}`, or make the wait exit with `:noproc`. Read the record to get a stable answer.
+The last two rows usually return from the start call first. Wait with `Jido.AgentServer.await_ready/2` to see the reason as `{:error, reason}`. A fast failure can make the start call itself return `{:error, reason}`, so handle both forms.
 
 ```elixir
 alias Jido.AgentServer, as: Server
@@ -80,15 +80,8 @@ late_order = Order.instantiate!(id: "order-1")
 
 outcome =
   case Jido.activate_agent(TombstonesGuide.Jido, ref, Order) do
-    {:ok, pid} ->
-      try do
-        Server.await_ready(pid)
-      catch
-        :exit, {reason, _call} -> {:stopped, reason}
-      end
-
-    {:error, reason} ->
-      {:error, reason}
+    {:ok, pid} -> Server.await_ready(pid)
+    {:error, reason} -> {:error, reason}
   end
 
 true = outcome != :ok

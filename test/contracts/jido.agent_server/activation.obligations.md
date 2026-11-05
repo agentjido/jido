@@ -29,7 +29,7 @@ Activation has no separate DSL. Its public operations stay on
 ### jido.agent_server.activation.I2 — Selected instance ownership
 
 - **scope:** `Jido.AgentServer.start/1`, `Jido.AgentServer.RegistrationGuard`
-- **must:** Attach the activation to the selected live instance supervisor, Runner, Registry, and registration guard. Claim at most one live activation per instance, partition, and Agent ID. Isolate equal identities across instances and partitions. Reject cross-instance Runners and partitions without an instance. Stop the worker when its Registry or registration guard is lost.
+- **must:** Attach the activation to the selected live instance supervisor, Runner, Registry, and registration guard. Claim at most one live activation per instance, partition, and Agent ID. Isolate equal identities across instances and partitions. Reject cross-instance Runners and partitions without an instance. Stop the worker when its Registry or registration guard is lost. Reject a persistent start on an instance with no namespace in the start call, and start no worker.
 - **why:** An activation must not run under an uncertain instance owner.
 - **kind:** functional
 - **status:** active
@@ -45,7 +45,7 @@ Activation has no separate DSL. Its public operations stay on
 ### jido.agent_server.activation.I4 — Registration and readiness publication
 
 - **scope:** `Jido.AgentServer.start_link/1`, `Jido.AgentServer.await_ready/2`, `Jido.AgentServer.alive?/1`
-- **must:** Support valid local, global, and via OTP names without treating an unrelated process as an AgentServer. Reject duplicate or unknown lookup options. Publish an instance registration as starting until worker cleanup, state restore, and required Plugin readiness finish. Publish ready only after all startup gates pass. Keep reads available while starting and reject admitted work as not ready. A caller readiness timeout must not cancel startup.
+- **must:** Support valid local, global, and via OTP names without treating an unrelated process as an AgentServer. Reject duplicate or unknown lookup options. Publish an instance registration as starting until worker cleanup, state restore, and required Plugin readiness finish. Publish ready only after all startup gates pass. Keep reads available while starting and reject admitted work as not ready. A caller readiness timeout must not cancel startup. `await_ready/2` returns `{:error, reason}` and does not exit. A failed persistent start keeps its reason after the worker has stopped, and the start call returns that reason when the worker stops first.
 - **why:** Lookup must not expose an activation as ready before it can accept work.
 - **kind:** ordering
 - **status:** active

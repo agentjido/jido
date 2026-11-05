@@ -72,7 +72,16 @@ defmodule ToolReviewGuide.LocalModel do
 end
 ```
 
-A policy set on the Agent is a default, and a request can replace it. A request that sends its own `tool_policy` drops the Agent's review list. Build the Signal from allowed fields when request data comes from an untrusted source.
+A request can narrow a `tool_policy` set on the Agent, but it cannot widen or remove it. A request that sends its own `tool_policy` keeps the Agent's review list:
+
+| Field | Effect of a request value |
+| --- | --- |
+| `review` | Adds names to the Agent's list. A reviewed tool stays reviewed while it is selected. |
+| `hidden` | Adds names to the Agent's list. |
+| `visible` | Selects from the tools that the Agent leaves visible. |
+| `requirement` | Applies only when the Agent's requirement is `:optional`. |
+
+A request also cannot turn off `review_tools: true` set on the Agent.
 
 ## Know where review works
 
@@ -131,7 +140,7 @@ pending =
 
 The model call runs, and it requests the tool. A batch waits as one unit if any of its calls needs review. The Flow then publishes `jido.ai.review.requested` to the `:jido_ai_dispatch` target and opens the wait.
 
-Durable Turn context must be portable, so the target is a registered name, not a PID. With a PID target, `await/2` returns an error and the request does not run.
+Durable Turn context must be portable, so the target is a registered name, not a PID. With a PID target, `await/2` returns a `Jido.Error.ValidationError` with the code `:non_portable_term`, and the request does not run.
 
 ```elixir
 review =

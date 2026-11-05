@@ -188,7 +188,7 @@ A `Jido.Agent.cmd/3` call only returns the `Emit`. An AgentServer delivers it af
 3. The AgentServer's `:default_dispatch` option.
 4. The Agent's own AgentServer, as a new cast.
 
-The last case means an Agent can receive its own output. Give the output a type that does not match the transform route, or the route runs again. See [Connect Agent Outputs](../composition/connect-agent-outputs.livemd).
+The last case means an Agent can receive its own output. Give the output a type that does not match the transform route, or the route runs again. A chain of these casts stops after 32 hops: the next `Emit` fails as an effect, and the server logs a warning with the Signal type and `:self_emit_limit`. See [Connect Agent Outputs](../composition/connect-agent-outputs.livemd).
 
 ## Limits of terminal routes
 

@@ -89,13 +89,13 @@ The cell returns `%{open: true, labels: ["billing"]}`. The pure path still retur
 Jido validates every Directive before commit. One invalid Directive fails the whole Turn with no state change. Here an empty name breaks the schema's `min(1)` rule.
 
 ```elixir
-{:error, [issue]} =
+{:error, %Jido.Error.ValidationError{code: :invalid_directive, details: %{issues: [issue]}}} =
   PluginDirectiveGuide.Ticket.cmd(ticket, PluginDirectiveGuide.Ticket.label_signal!(%{name: ""}))
 
 issue.code
 ```
 
-The cell returns `:greater_than_or_equal_to`. The error is the reason that `validate/1` returned, here the schema's list of issues.
+The cell returns `:greater_than_or_equal_to`. A schema failure returns a `Jido.Error.ValidationError`, and `details.issues` lists each failed rule with its `code`, `path`, and `message`. A custom `validate/1` returns its own `{:error, reason}`, and the Turn fails with that reason.
 
 A Directive with no owner on this Agent fails the same way. This Agent returns `AddLabel` but does not declare the `Labels` Plugin.
 

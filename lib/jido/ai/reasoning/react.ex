@@ -50,7 +50,7 @@ defmodule Jido.AI.Reasoning.ReAct do
                 hidden: Joi.list(Joi.string()) |> Joi.default([]),
                 review: Joi.list(Joi.string()) |> Joi.default([]),
                 requirement:
-                  Joi.enum([:optional, :required, :per_turn, :disabled])
+                  Joi.enum([:optional, :required, :disabled])
                   |> Joi.default(:optional),
                 reason: Joi.string() |> Joi.nullable() |> Joi.default(nil)
               },

@@ -35,15 +35,13 @@ defmodule Jido.Plugin.Scheduler.Cron do
   @doc "Validates one recurring schedule request."
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive) do
-    with {:ok, directive} <- Joi.parse(@schema, Map.from_struct(directive)),
-         :ok <- CronRules.validate_job_id(directive.job_id),
+    with {:ok, directive} <- Jido.Agent.Directive.parse(@schema, Map.from_struct(directive)),
+         :ok <- CronRules.to_error(CronRules.validate_job_id(directive.job_id)),
          {:ok, timezone} <-
-           CronRules.validate_spec(
-             directive.cron,
-             directive.signal,
-             directive.timezone
-           ),
-         :ok <- CronRules.validate_occurrence(directive.signal, directive.generation) do
+           directive.cron
+           |> CronRules.validate_spec(directive.signal, directive.timezone)
+           |> CronRules.to_error(),
+         :ok <- CronRules.to_error(CronRules.validate_occurrence(directive.signal, directive.generation)) do
       {:ok, %{directive | timezone: timezone}}
     end
   end

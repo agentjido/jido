@@ -202,7 +202,7 @@ length(Jido.AgentServer.members(team, :packers))
 
 The cell returns `2`.
 
-Do not declare a cycle. A module that lists itself as a member does not return from `definition/0`.
+Do not declare a cycle. A module that lists itself as a member, or two modules that list each other, fail to compile. The `CompileError` names the file, the line, and `:recursive_membership`.
 
 ## Stop the owner
 

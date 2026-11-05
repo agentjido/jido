@@ -76,4 +76,67 @@ defmodule Jido.JoiTest do
 
   def mutate(value, opts),
     do: %{opts[:ctx] | valid?: true, parsed: value + 1}
+
+  describe "to_json_schema/1 required fields" do
+    test "leaves out fields that validation fills from a default" do
+      schema =
+        Joi.object(%{
+          id: Joi.string(),
+          currency: Joi.string() |> Joi.default("usd"),
+          flag: Joi.boolean() |> Joi.default(false),
+          note: Joi.string() |> Joi.nullable() |> Joi.default(nil),
+          kept: Joi.string() |> Joi.default("x") |> Joi.required()
+        })
+
+      json = Joi.to_json_schema(schema)
+
+      assert json.required == [:id]
+      assert json.properties.currency.default == "usd"
+
+      assert {:ok, %{id: "a", currency: "usd", flag: false, note: nil, kept: "x"}} =
+               Joi.parse(schema, %{id: "a"})
+    end
+
+    test "keeps a field whose default sits inside a nullable branch, as validation requires it" do
+      schema = Joi.object(%{inner: Joi.nullable(Joi.default(Joi.string(), "a"))})
+
+      assert Joi.to_json_schema(schema).required == [:inner]
+      assert {:error, [%{code: :required}]} = Joi.parse(schema, %{})
+    end
+
+    test "applies to nested objects and treats a field named default as data" do
+      nested = Joi.object(%{default: Joi.string(), city: Joi.string() |> Joi.default("x")})
+
+      json =
+        Joi.to_json_schema(
+          Joi.object(%{
+            one: nested,
+            many: Joi.array(nested),
+            maybe: Joi.nullable(nested)
+          })
+        )
+
+      assert json.required |> Enum.sort() == [:many, :maybe, :one]
+      assert json.properties.one.required == [:default]
+      assert json.properties.many.items.required == [:default]
+      assert [%{type: :null}, %{required: [:default]}] = json.properties.maybe.anyOf
+    end
+  end
+
+  test "an Action authoring contract does not require a defaulted field" do
+    defmodule DefaultedFieldAction do
+      use Jido.Action,
+        name: "defaulted_field_action",
+        schema:
+          Jido.Joi.object(%{
+            order_id: Jido.Joi.string(),
+            note: Jido.Joi.string() |> Jido.Joi.default("n")
+          })
+
+      @impl true
+      def run(params, _context), do: {:ok, params}
+    end
+
+    assert DefaultedFieldAction.authoring_contract()["input_schema"]["required"] == ["order_id"]
+  end
 end

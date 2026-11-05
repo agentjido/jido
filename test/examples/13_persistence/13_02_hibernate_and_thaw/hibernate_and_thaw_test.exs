@@ -53,8 +53,11 @@ defmodule Jido.Examples.Persistence.HibernateAndThawTest do
 
   test "thaw rejects a missing required record", %{jido: jido} do
     id = unique_id("missing-thaw")
-    assert {:ok, server} = Example.thaw(jido, id, persistence())
-    assert {{:shutdown, :not_found}, _} = catch_exit(Server.await_ready(server))
+
+    # A fast failure can return its reason from the start call itself.
+    assert {:error, :not_found} =
+             with({:ok, server} <- Example.thaw(jido, id, persistence()), do: Server.await_ready(server))
+
     assert Jido.whereis_agent(jido, id) == nil
   end
 

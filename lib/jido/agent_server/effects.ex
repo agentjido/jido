@@ -213,7 +213,7 @@ defmodule Jido.AgentServer.Effects do
          :ok <- validate_start_source(directive.agent, opts),
          :ok <-
            opts
-           |> Keyword.drop([:id, :state, :name])
+           |> Keyword.drop([:id, :state])
            |> Keyword.put_new(:persistence, false)
            |> Server.validate_defaults() do
       :ok

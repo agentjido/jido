@@ -163,13 +163,37 @@ defmodule Jido.Persistence.EctoTest do
     end
   end
 
-  test "classifies database failures during CAS as indeterminate", %{opts: opts} do
+  test "a missing table during CAS is a definite rejection", %{opts: opts} do
     missing_opts = Keyword.put(opts, :schema, MissingRecord)
 
     assert {:error, {:ecto, _, _message}} = EctoPersistence.get("key", missing_opts)
 
-    assert {:error, {:indeterminate, {:ecto, _, _message}}} =
+    assert {:error, {:rejected, {:ecto, Exqlite.Error, _message}}} =
              EctoPersistence.compare_and_swap("key", :not_found, "value", missing_opts)
+  end
+
+  test "only a statement the database never ran is definite during CAS" do
+    cas = fn error ->
+      opts = [repo: FaultRepo, repo_options: [reply: fn -> raise error end]]
+      EctoPersistence.compare_and_swap("key", :not_found, "value", opts)
+    end
+
+    postgres = fn code -> %Postgrex.Error{postgres: %{code: code, message: "failed"}} end
+
+    assert {:error, {:rejected, {:ecto, Postgrex.Error, _}}} = cas.(postgres.(:undefined_table))
+    assert {:error, {:rejected, {:ecto, Postgrex.Error, _}}} = cas.(postgres.(:undefined_column))
+
+    for error <- [
+          %DBConnection.ConnectionError{message: "tcp recv: closed"},
+          %Exqlite.Error{message: "database is locked"},
+          %Exqlite.Error{message: "disk I/O error"},
+          postgres.(:admin_shutdown),
+          postgres.(:serialization_failure),
+          %Postgrex.Error{message: "connection lost"},
+          %RuntimeError{message: "no such table"}
+        ] do
+      assert {:error, {:indeterminate, {:ecto, _, _}}} = cas.(error)
+    end
   end
 
   test "does not classify an unrelated unique constraint as a key conflict", %{opts: opts} do
@@ -214,6 +238,9 @@ defmodule Jido.Persistence.EctoTest do
 
   test "configuration callback faults and non-module schemas return validation errors" do
     assert {:error, _} = EctoPersistence.validate_options(repo: __MODULE__.Missing)
+
+    assert {:error, ":repo must implement Ecto.Repo with a supported SQL adapter"} =
+             EctoPersistence.validate_options(repo: String)
 
     assert {:error, ":schema must be an Ecto schema module"} =
              EctoPersistence.validate_options(repo: FaultRepo, schema: "schema")

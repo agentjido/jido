@@ -93,7 +93,7 @@ defmodule Jido.Flow.Codec.Value do
 
       case result do
         {:ok, entry} -> {:cont, {:ok, [entry | encoded]}}
-        {:error, error} -> {:halt, {:error, error}}
+        {:error, error} -> {:halt, {:error, Error.prefix_path(error, [key])}}
       end
     end)
   end
@@ -390,9 +390,18 @@ defmodule Jido.Flow.Codec.Value do
   defp reference_error_field(%{details: %{field: field}}) when is_binary(field), do: field
   defp reference_error_field(_error), do: "id"
 
-  defp authoring_result({:error, %CatalogError{} = exception}) do
+  @doc false
+  @spec catalog_error(CatalogError.t()) :: Exception.t()
+  def catalog_error(%CatalogError{} = exception) do
     message = String.replace(exception.message, "Catalog", "flow catalog")
-    {:error, Error.validation_error(message, exception.details)}
+    Error.validation_error(message <> missing_target(exception.details), exception.details)
+  end
+
+  defp missing_target(%{target: target}), do: ": #{inspect(target)}"
+  defp missing_target(_details), do: ""
+
+  defp authoring_result({:error, %CatalogError{} = exception}) do
+    {:error, catalog_error(exception)}
   end
 
   defp authoring_result({:error, %AuthoringValueError{} = exception}) do

@@ -194,7 +194,7 @@ Flow Turns write more than the Agent record. Acceptance and completion use Agent
 
 ## Telemetry
 
-`Jido.Persistence` emits `[:jido, :persistence, :operation, :start | :stop]`. Its metadata includes `operation`, `agent_id`, `agent_module`, `agent_namespace`, `adapter_module`, and `persistence_reason`. Its stop measurements include `revision_after` on a successful write.
+`Jido.Persistence` emits `[:jido, :persistence, :operation, :start | :stop]`. Its metadata includes `operation`, `agent_id`, `agent_module`, `agent_namespace`, `adapter_module`, and `persistence_reason`. Its stop measurements include `revision_after` on a successful write or load.
 
 `Jido.Persistence.Store` emits `[:jido, :persistence, :store, :start | :stop]` with `operation`, `adapter_module`, and `status`. It does not report keys, values, tokens, or adapter options.
 

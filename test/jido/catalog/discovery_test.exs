@@ -101,6 +101,16 @@ defmodule Jido.Catalog.DiscoveryTest do
     end
   end
 
+  defmodule BlockingManifest do
+    def __jido_catalog_manifest__ do
+      send(Jido.Catalog.DiscoveryTest, {:scan_started, self()})
+
+      receive do
+        :continue -> [%{id: "discovery_test/scanned", kind: :atom, vsn: 1, target: :scanned}]
+      end
+    end
+  end
+
   defmodule InvalidManifest do
     def __jido_catalog_manifest__, do: %{kind: :atom}
   end
@@ -429,6 +439,63 @@ defmodule Jido.Catalog.DiscoveryTest do
 
     assert {:error, {:invalid_discovery_config, {:unknown_options, [:unknown]}}} =
              Discovery.refresh()
+  end
+
+  test "a refresh before the first scan publishes survives the scan" do
+    :persistent_term.erase({:jido, :catalog_snapshot})
+    Process.register(self(), __MODULE__)
+
+    scan =
+      Task.async(fn ->
+        Discovery.initialize(applications: [], modules: [{BlockingManifest, :jido}])
+      end)
+
+    assert_receive {:scan_started, scanner}, 5_000
+    assert :ok = Discovery.refresh(applications: [], modules: [{AlphaAction, :jido}])
+    send(scanner, :continue)
+    assert :ok = Task.await(scan, 5_000)
+
+    assert %{target: AlphaAction} = Discovery.get_by_target(:action, AlphaAction)
+    assert Discovery.get("discovery_test/scanned", 1) == nil
+  end
+
+  test "a scan with no competing refresh replaces the published Catalog" do
+    assert :ok = Discovery.refresh(applications: [], modules: [{AlphaAction, :jido}])
+    Process.register(self(), __MODULE__)
+
+    scan =
+      Task.async(fn ->
+        Discovery.initialize(applications: [], modules: [{BlockingManifest, :jido}])
+      end)
+
+    assert_receive {:scan_started, scanner}, 5_000
+    send(scanner, :continue)
+    assert :ok = Task.await(scan, 5_000)
+
+    assert %{target: :scanned} = Discovery.get("discovery_test/scanned", 1)
+    assert Discovery.get_by_target(:action, AlphaAction) == nil
+  end
+
+  test "Codec decode returns Issues until a Catalog publishes" do
+    catalog = Jido.Catalog.from_targets!(__MODULE__, :jido, %{})
+    document = %{"type" => "jido.flow", "vsn" => 2}
+
+    assert_publication_issue = fn code ->
+      for opts <- [[], [catalog: catalog]],
+          result <- [
+            Jido.Codec.decode(document, opts),
+            Jido.Codec.decode_json(JSON.encode!(document), opts),
+            Jido.Codec.decode(%{"type" => "jido.flow"}, opts)
+          ] do
+        assert {:error, [%Jido.Codec.Issue{code: ^code, path: []}]} = result
+      end
+    end
+
+    :persistent_term.erase({:jido, :catalog_snapshot})
+    assert_publication_issue.(:catalog_not_initialized)
+
+    :persistent_term.put({:jido, :catalog_snapshot}, {:error, :scan_failed})
+    assert_publication_issue.(:catalog_initialization_failed)
   end
 
   test "the default startup scan includes all loaded applications" do

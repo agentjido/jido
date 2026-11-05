@@ -640,8 +640,7 @@ defmodule Jido.Signal do
   defp validate_extension_value(value) when is_binary(value), do: :ok
 
   defp validate_extension_value(value) do
-    {:error,
-     "extension values must be a Boolean, signed 32-bit Integer, String, Binary, URI, URI-reference, or Timestamp; got: #{inspect(value)}"}
+    {:error, "extension values must be a Boolean, signed 32-bit Integer, String, or Binary; got: #{inspect(value)}"}
   end
 
   defp valid_context_characters?(<<>>), do: true

@@ -60,7 +60,7 @@ Both families are spans with `:start` and `:stop`. An adapter raise, throw, or e
 
 | Event prefix | Emitted around | Measurements | Metadata |
 | --- | --- | --- | --- |
-| `[:jido, :persistence, :operation]` | `Jido.Persistence` load, compare-and-swap, and delete | Start: `monotonic_time`, `system_time`, `expected_revision`. Stop: `duration`, and `revision_after` except on load. | `operation`, `persistence_reason`, `status`, `adapter_module`, `agent_id`, `agent_module`, `agent_namespace`, `agent_partition`, and error fields |
+| `[:jido, :persistence, :operation]` | `Jido.Persistence` load, compare-and-swap, and delete | Start: `monotonic_time`, `system_time`, `expected_revision`. Stop: `duration`, and `revision_after`. | `operation`, `persistence_reason`, `status`, `adapter_module`, `agent_id`, `agent_module`, `agent_namespace`, `agent_partition`, and error fields |
 | `[:jido, :persistence, :store]` | One adapter call in `Jido.Persistence.Store` | Start: `monotonic_time`, `system_time`. Stop: `duration`. | `operation`, `adapter_module`, `status`, and error fields |
 
 `status` comes from the result:
@@ -173,7 +173,7 @@ AgentServer and persistence events are the only ones that pass through this allo
 | `stage` | `:evaluate`, `:commit`, `:after_commit`, `:directive` |
 | `kind` | `:error`, `:throw`, `:exit` |
 | `operation` | `:activate`, `:stop`, `:hibernate`, `:thaw`, `:load`, `:compare_and_swap`, `:delete` |
-| `persistence_reason` | `:commit`, `:activate`, `:stop`, `:hibernate`, `:thaw`, `:manual`, `:topology` |
+| `persistence_reason` | `:commit`, `:activate`, `:stop`, `:hibernate`, `:thaw`, `:manual`, `:topology`, `:stored_upgrade` |
 | `admission_reason` | `:deadline_expired`, `:overloaded` |
 | `topology_operation` | `:activate`, `:repair`, `:update`, `:place`, `:cleanup` |
 | `component_kind`, `error_type` | A non-nil atom |

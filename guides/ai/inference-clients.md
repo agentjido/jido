@@ -121,7 +121,7 @@ Run it as a route target or a Flow step, the same as any other Action.
 
 ## Invalid clients
 
-A client that is not loaded, or that lacks a callback, raises `ArgumentError` in `Jido.AI.InferenceClient.Selection.client!/1` with `"invalid Jido AI inference client: ..."`. Inside an Agent turn, the execution layer catches the raise. `cmd/3` then returns `{:error, %Jido.Error.ExecutionError{}}` and no reply, and the Agent value does not advance.
+A client that is not loaded, or that lacks a callback, raises `ArgumentError` in `Jido.AI.InferenceClient.Selection.client!/1` with `"invalid Jido AI inference client: ..."`. Inside an Agent turn, the model call records this as a model error that cannot be retried. `cmd/3` returns a reply with `status: :failed`, the same shape as any other model error, and the reason holds the message.
 
 ```elixir
 true = Jido.AI.InferenceClient.Selection.client!(%{jido_ai_inference_client: InferenceGuide.CannedReplies}) == InferenceGuide.CannedReplies
@@ -132,6 +132,15 @@ true = Jido.AI.InferenceClient.Selection.client!(%{jido_ai_inference_client: Inf
   rescue
     error in ArgumentError -> error.message
   end
+
+{:ok, _agent, [%{signal: failed}]} =
+  InferenceGuide.Agent.cmd(
+    agent,
+    InferenceGuide.Agent.request_signal!(%{input: "Hello"}),
+    context: %{jido_ai_inference_client: InferenceGuide.Missing}
+  )
+
+%{status: :failed, reason: "invalid Jido AI inference client: InferenceGuide.Missing"} = failed.data
 ```
 
 ## Related

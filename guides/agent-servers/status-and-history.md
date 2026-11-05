@@ -143,7 +143,7 @@ The Turn outcome reports the commit. `last_effect_outcome` reports the work afte
 
 History and `last_outcome` live in the worker process. A worker restart clears them, and the instance does not save them. Use telemetry for a lasting record.
 
-The `:debug` option controls history only. `set_debug/2` on `Jido.Telemetry` changes log detail for an instance.
+The `:debug` option controls history only. `set_debug/2` on `Jido.Telemetry` changes log detail for an instance, and today it affects only persistence events.
 
 ## Read committed data
 

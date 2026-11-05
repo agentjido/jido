@@ -469,12 +469,9 @@ defmodule Jido.Instance.RefTest do
 
     case Jido.activate_agent(second, ref, Counter) do
       {:ok, deleted} ->
-        exit = catch_exit(Jido.AgentServer.await_ready(deleted))
+        assert Jido.AgentServer.await_ready(deleted) == {:error, :deleted}
 
-        assert match?({{:shutdown, :deleted}, _}, exit) or
-                 match?({:noproc, _}, exit)
-
-      {:error, :worker_unavailable} ->
+      {:error, :deleted} ->
         assert Jido.whereis_agent(second, ref.id, partition: ref.partition) == nil
     end
   end

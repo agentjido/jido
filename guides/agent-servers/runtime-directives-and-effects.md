@@ -246,7 +246,7 @@ With `:stop_on_error`, the same report stops the worker after the commit. See [A
 
 ## Set a default dispatch
 
-An `Emit` with no target goes to connections, then a topology parent, then the `:default_dispatch` option, and otherwise back to the Agent itself. `:default_dispatch` takes a Signal dispatch configuration. See [Signal Dispatch Adapters](../signals/dispatch-adapters.md).
+An `Emit` with no target goes to connections, then a topology parent, then the `:default_dispatch` option, and otherwise back to the Agent itself. A chain of Emits back to the Agent stops after 32 hops with a failed effect and a warning that names the Signal type and `:self_emit_limit`. `:default_dispatch` takes a Signal dispatch configuration. See [Signal Dispatch Adapters](../signals/dispatch-adapters.md).
 
 ```elixir
 routed = start_orders.("orders-4", default_dispatch: {:pid, target: self()})

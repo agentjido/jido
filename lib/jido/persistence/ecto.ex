@@ -186,7 +186,7 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
            true <- function_exported?(repo, :delete_all, 2) do
         {:ok, adapter}
       else
-        adapter when is_atom(adapter) ->
+        adapter when is_atom(adapter) and not is_boolean(adapter) ->
           {:error, "Ecto adapter #{inspect(adapter)} is not supported"}
 
         _other ->
@@ -253,10 +253,26 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
     defp protect_write(fun) do
       fun.()
     rescue
-      error -> {:error, {:indeterminate, ecto_failure(:error, error)}}
+      error ->
+        if statement_never_ran?(error),
+          do: {:error, {:rejected, ecto_failure(:error, error)}},
+          else: {:error, {:indeterminate, ecto_failure(:error, error)}}
     catch
       kind, reason -> {:error, {:indeterminate, ecto_failure(kind, reason)}}
     end
+
+    # The database refused to plan the statement, so nothing was written. Every
+    # other failure, including a lost connection, stays indeterminate.
+    defp statement_never_ran?(%{__struct__: Exqlite.Error, message: "no such table" <> _}),
+      do: true
+
+    defp statement_never_ran?(%{__struct__: Exqlite.Error, message: "no such column" <> _}),
+      do: true
+
+    defp statement_never_ran?(%{__struct__: Postgrex.Error, postgres: %{code: code}}),
+      do: code in [:undefined_table, :undefined_column]
+
+    defp statement_never_ran?(_error), do: false
 
     defp ecto_failure(:error, error) do
       {:ecto, error.__struct__, Exception.message(error)}
@@ -297,7 +313,9 @@ defmodule Jido.Persistence.Ecto do
   Compare-and-swap uses one `INSERT` for an absent expected value or one
   conditional `UPDATE` for expected bytes. It never implements CAS as a read
   followed by a write. Database or connection failures during CAS have an
-  indeterminate result.
+  indeterminate result. The exception is a missing table or column on SQLite or
+  Postgres, which the database refuses before it runs the statement. That result
+  is `{:error, {:rejected, reason}}`.
 
   Ecto SQL is an optional dependency. Add `:ecto_sql` and the database driver
   to the host application. The adapter reports invalid configuration when Ecto

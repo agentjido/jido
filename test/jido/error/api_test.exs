@@ -489,6 +489,26 @@ defmodule Jido.Error.ApiTest do
       assert unknown.message == "plain failure"
     end
 
+    test "Codec internal errors keep an internal type" do
+      error = Jido.Codec.Error.internal(:catalog_not_initialized, "Catalog is not initialized")
+
+      assert Error.type(error) == :internal
+      assert %{type: :internal, retryable?: true} = Error.to_map(error)
+      assert Error.retryable?(error)
+    end
+
+    test "to_map/1 keeps stack frames out of class error messages" do
+      class_error =
+        Error.to_class([Error.execution_error("First"), Error.execution_error("Second")])
+
+      assert Exception.message(class_error) =~ ".ex:"
+
+      assert %{message: "First; Second"} = Error.to_map(class_error)
+
+      assert %{details: %{cause: %{message: "First; Second"}}} =
+               Error.to_map(%{details: %{cause: class_error}})
+    end
+
     test "to_class/1 handles unknown values without raising" do
       class_error = Error.to_class("plain failure")
 

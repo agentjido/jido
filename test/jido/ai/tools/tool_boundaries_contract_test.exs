@@ -173,6 +173,7 @@ defmodule Jido.AI.Tools.BoundariesContractTest do
     assert {:error, :invalid_tool_policy} = Toolset.select([Tools.Add], %{visible: :invalid})
     assert {:error, :duplicate_tool_policy_names} = Toolset.select([Tools.Add], %{visible: ["add", "add"]})
     assert {:error, {:invalid_tool_requirement, :always}} = Toolset.select([Tools.Add], %{requirement: :always})
+    assert {:error, {:invalid_tool_requirement, :per_turn}} = Toolset.select([Tools.Add], %{requirement: :per_turn})
 
     assert {:error, {:tool_requirement_without_visible_tools, :required}} =
              Toolset.select([Tools.Add], %{hidden: ["add"], requirement: :required})
@@ -188,9 +189,7 @@ defmodule Jido.AI.Tools.BoundariesContractTest do
     assert Toolset.provider_tool_choice(:optional, 0, [Tools.Add]) == nil
     assert Toolset.provider_tool_choice(:required, 0, [Tools.Add]) == :required
     assert Toolset.provider_tool_choice(:required, 1, [Tools.Add]) == :auto
-    assert Toolset.provider_tool_choice(:per_turn, 1, [Tools.Add]) == :required
     refute Toolset.requirement_satisfied?(:required, 0, [Tools.Add])
-    refute Toolset.requirement_satisfied?(:per_turn, 1, [Tools.Add])
     assert Toolset.requirement_satisfied?(:optional, 0, [Tools.Add])
 
     assert {:error, {:unknown_tool, "missing"}} =

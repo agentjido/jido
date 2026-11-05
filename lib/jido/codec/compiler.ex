@@ -53,7 +53,7 @@ defmodule Jido.Codec.Compiler do
     field_options = field_options!(field_declarations, env)
     validate_schema!(schema, env)
     plan = compile_plan!(schema, field_options, env)
-    json_schema = Joi.to_json_schema(schema)
+    json_schema = schema |> Joi.to_json_schema() |> wire_json_schema(plan, env.module)
     functions = functions_ast(schema, plan, json_schema)
     encoder = encoder_ast(schema, env.module, env)
 
@@ -106,7 +106,7 @@ defmodule Jido.Codec.Compiler do
         Jido.Codec.Compiler.dump(value, unquote(Macro.escape(plan)), __MODULE__)
       end
 
-      @doc "Returns the JSON Schema compiled from this module's Joi schema."
+      @doc "Returns the JSON Schema of this module's wire shape."
       @spec json_schema() :: map()
       def json_schema, do: unquote(Macro.escape(json_schema))
 
@@ -114,6 +114,54 @@ defmodule Jido.Codec.Compiler do
       def __jido_codec__, do: true
     end
   end
+
+  defp wire_json_schema(json, {:struct, module, fields, _unknown}, owner) do
+    if module != owner and compiled_codec?(module),
+      do: Map.delete(module.json_schema(), :"$schema"),
+      else: wire_fields(json, fields, owner)
+  end
+
+  defp wire_json_schema(json, {:object, fields, _unknown}, owner),
+    do: wire_fields(json, fields, owner)
+
+  defp wire_json_schema(%{items: items} = json, {:array, inner}, owner),
+    do: %{json | items: wire_json_schema(items, inner, owner)}
+
+  defp wire_json_schema(%{anyOf: variants} = json, {:union, branches}, owner)
+       when length(variants) == length(branches) do
+    variants =
+      variants
+      |> Enum.zip(branches)
+      |> Enum.map(fn {variant, {_schema, plan}} -> wire_json_schema(variant, plan, owner) end)
+
+    %{json | anyOf: variants}
+  end
+
+  defp wire_json_schema(json, _plan, _owner), do: json
+
+  defp wire_fields(%{properties: properties, required: required} = json, fields, owner) do
+    wire_names = Map.new(fields, fn {field, key, _plan, _opts} -> {field, wire_name(field, key)} end)
+
+    properties =
+      Map.new(fields, fn {field, _key, plan, _opts} ->
+        {wire_names[field], wire_json_schema(properties[field], plan, owner)}
+      end)
+
+    omitted = for {field, _key, _plan, opts} <- fields, Keyword.get(opts, :omit, false) == nil, do: field
+
+    %{
+      json
+      | properties: properties,
+        required: for(field <- required, field not in omitted, do: wire_names[field])
+    }
+  end
+
+  defp wire_fields(json, _fields, _owner), do: json
+
+  defp wire_name(field, key), do: if(default_json_key(field) == key, do: field, else: key)
+
+  defp compiled_codec?(module),
+    do: match?({:module, ^module}, Code.ensure_compiled(module)) and codec_module?(module)
 
   defp field_options!(declarations, env) do
     options = Map.new(declarations)

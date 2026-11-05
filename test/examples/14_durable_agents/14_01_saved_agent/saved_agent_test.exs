@@ -65,8 +65,14 @@ defmodule Jido.Examples.Durable.SavedAgentTest do
   test "restore requires an existing record and never creates fresh state", c do
     persistence = {Jido.Persistence.File, path: c.tmp_dir}
     id = unique_id("missing-report")
-    assert {:ok, server} = Jido.thaw(c.jido, Example, id, persistence: persistence)
-    assert {{:shutdown, :not_found}, _} = catch_exit(Server.await_ready(server))
+
+    # A fast failure can return its reason from the start call itself.
+    assert {:error, :not_found} =
+             with(
+               {:ok, server} <- Jido.thaw(c.jido, Example, id, persistence: persistence),
+               do: Server.await_ready(server)
+             )
+
     assert Jido.whereis_agent(c.jido, id) == nil
   end
 

@@ -20,6 +20,7 @@ defmodule Jido.Exec.Runtime do
   ]
 
   @max_concurrency_key {__MODULE__, :max_concurrency}
+  @quiet_failure_log_key {__MODULE__, :quiet_failure_log}
 
   @doc false
   @spec user_context(map()) :: map()
@@ -56,6 +57,34 @@ defmodule Jido.Exec.Runtime do
       if is_nil(previous),
         do: Process.delete(@max_concurrency_key),
         else: Process.put(@max_concurrency_key, previous)
+    end
+  end
+
+  # Runic logs each failed runnable at `:warning` with its node and error, and
+  # both can hold caller values. The caller already receives the error, so the
+  # process that applies runnables keeps that line out of the logs.
+  @doc false
+  @spec quiet_failure_log() :: :ok
+  def quiet_failure_log do
+    Process.put(@quiet_failure_log_key, true)
+    Logger.put_process_level(self(), :error)
+  end
+
+  # Action callbacks and telemetry handlers can run in that same process. They
+  # keep the application's log level.
+  @doc false
+  @spec with_application_logging((-> result)) :: result when result: term()
+  def with_application_logging(work) when is_function(work, 0) do
+    if Process.delete(@quiet_failure_log_key) do
+      Logger.delete_process_level(self())
+
+      try do
+        work.()
+      after
+        quiet_failure_log()
+      end
+    else
+      work.()
     end
   end
 

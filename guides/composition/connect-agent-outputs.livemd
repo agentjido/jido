@@ -272,7 +272,7 @@ Delivery uses best-effort casts, and each destination commits on its own. Nothin
 
 - A destination Turn that fails stays at the destination. The sender is not told.
 - A failed delivery of an output from `:root` marks that Turn's effects as failed. See `last_effect_outcome` in `Jido.AgentServer.status/1`. The Agent keeps running with its commit.
-- A member output or Bus delivery that finds no live destination stops the owner with `{:shutdown, {:topology_delivery_failed, reason}}`. This can happen while the destination member restarts. The stop is permanent: all members stop, and nothing restarts them.
+- A member output or Bus delivery that finds no live destination is dropped. This can happen while the destination member restarts. The owner keeps running, logs a warning with the Signal type and reason, and sets `last_effect_outcome` to `status: :failed` with `turn_id: nil`, because no Turn of the owner sent it.
 
 ## Clean up
 

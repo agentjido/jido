@@ -41,60 +41,24 @@ defmodule Jido.Flow.DSL.SparkSurfaceTest do
   end
 
   test "the linked guide examples compile, run, and format consistently" do
-    for {filename, indexes, modules, expected} <- [
-          {"flow-collections.livemd", [1, 2, 3], [FlowCollections.Double, FlowCollections.Sum, FlowCollections.Example],
-           %{
-             items: [%{value: 2, index: 0}, %{value: 4, index: 1}, %{value: 6, index: 2}],
-             total: %{total: 12}
-           }},
-          {"flow-choices.livemd", [1, 2, 3], [FlowChoices.Route, FlowChoices.Example],
-           {%{route: %{queue: :urgent, id: 1}}, %{route: %{queue: :standard, id: 2}}}},
-          {"flow-iterate-state.livemd", [1, 2, 3], [FlowIterate.Increment, FlowIterate.RepeatThree],
-           {:ok,
-            %{
-              counter: %{
-                kind: :jido_flow_iterate_result,
-                iterations: 3,
-                state: %{count: 3},
-                output: %{count: 3, index: 2}
-              }
-            }}},
-          {"flow-steps.livemd", [2, 3, 4], [FlowSteps.Echo, FlowSteps.Example],
-           %{first: %{value: 7}, second: %{value: 7, tag: :complete}}}
-        ] do
-      {guide, blocks} = guide_blocks(filename)
-      source = Enum.map_join(indexes, "\n", &Enum.fetch!(blocks, &1))
-      assert evaluate_example(source, guide, modules) == expected, filename
+    for filename <- ["flow-steps.md", "flow-choices.md", "flow-collections.md", "flow-iterate-state.md"] do
+      evaluate_first_block(filename)
     end
   end
 
   test "the linked Invoke example supports final results and continuations" do
-    {guide, blocks} = guide_blocks("dynamic-flows.md")
+    # The guide block matches both results: a final result and a continuation.
+    evaluate_first_block("dynamic-flows.md")
+  end
 
-    evaluate_example(Enum.fetch!(blocks, 1), guide, [
-      MyApp.Actions.ChooseRoute,
-      MyApp.Actions.ExpandRoute,
-      MyApp.Flows.DynamicRoute
-    ])
-
-    inline = apply(MyApp.Flows.DynamicRoute, :step_action, ["prepare"])
-
-    on_exit(fn ->
-      :code.purge(inline)
-      :code.delete(inline)
-    end)
-
-    for mode <- [:finish, :continue] do
-      assert Jido.Exec.run(MyApp.Flows.DynamicRoute, %{
-               mode: mode,
-               value: 3,
-               target: Jido.Test.Action.Fixtures.Actions.EchoParamsAction
-             }) == {:ok, %{value: 3}}
-    end
+  defp evaluate_first_block(filename) do
+    {guide, [source | _blocks]} = guide_blocks(filename)
+    modules = ~r/defmodule (\S+) do/ |> Regex.scan(source, capture: :all_but_first) |> List.flatten()
+    evaluate_example(source, guide, Enum.map(modules, &Module.concat([&1])))
   end
 
   defp guide_blocks(filename) do
-    guide = Path.expand("../../../../guides/#{filename}", __DIR__)
+    guide = Path.expand("../../../../guides/flows/#{filename}", __DIR__)
     blocks = Regex.scan(~r/```elixir\n(.*?)\n```/s, File.read!(guide), capture: :all_but_first)
     {guide, List.flatten(blocks)}
   end

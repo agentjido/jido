@@ -283,6 +283,35 @@ defmodule Jido.Exec.Node.MapTest do
   end
 
   @tag obligation: "jido_action.boundary.I7"
+  test "a fail_fast parameter reference failure is a Jido error with the node details" do
+    flow = map_flow(EchoParamsAction, %{value: Ref.item(:value)}, :fail_fast)
+
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              message: "flow reference path does not exist",
+              details: %{
+                node: "items",
+                node_path: ["items"],
+                item_index: 0,
+                reason: :missing_key,
+                ref_type: :item,
+                retry: false
+              }
+            }} = Exec.run(flow, %{items: [%{}]})
+  end
+
+  @tag obligation: "jido_action.boundary.I7"
+  test "a non-enumerable collection is a Jido error with the node details" do
+    flow = map_flow(EchoParamsAction, %{value: Ref.item()}, :fail_fast)
+
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              message: "Map collection is not enumerable",
+              details: %{node: "items", node_path: ["items"], retry: false}
+            }} = Exec.run(flow, %{items: 42})
+  end
+
+  @tag obligation: "jido_action.boundary.I7"
   test "Map handles a large collection read from Flow input" do
     flow = map_flow(EchoParamsAction, %{value: Ref.item()}, :fail_fast)
     items = Enum.to_list(1..1_000)

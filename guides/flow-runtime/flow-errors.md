@@ -76,7 +76,7 @@ end
 | A reference path is missing | `ExecutionError` | `details.reason: :missing_key`, `details.ref_type`, `details.path`, `retry: false` |
 | Attempt exceeds `:timeout` | `TimeoutError` | `error.timeout` |
 | Task exits, for example with `:kill` | `ExecutionError` | `phase: :execution_task`, `details.reason` |
-| A Map item's `params` reference is missing, with `:fail_fast` | `ExecutionError` | `message: "Runic execution failed"`, and the reference error as a map in `details.reason` |
+| A Map item's `params` reference is missing, with `:fail_fast` | `ExecutionError` | `message: "flow reference path does not exist"`, with `details.node`, `details.node_path`, and `details.item_index` |
 | Iterate runs out of attempts | `ExecutionError` | `message: "flow iterator exhausted maximum iterations"` |
 | Waits under `Jido.Exec.run/4` | `ValidationError` | `details.reason: :unsupported_host`, `details.capability: :waits` |
 | Action code changes after the graph is built | `ValidationError` | `details.reason: :incompatible_target` |

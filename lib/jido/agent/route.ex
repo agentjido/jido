@@ -242,9 +242,14 @@ defmodule Jido.Agent.Route do
           {:ok, declared_key, child_schema}
 
         [] ->
-          Error.validation_result(:unknown_output_field, [:path, index], "Output path field is not declared", %{
-            key: key
-          })
+          Error.validation_result(
+            :unknown_output_field,
+            [:path, index],
+            "Output path field is not declared in the target output_schema",
+            %{
+              key: key
+            }
+          )
 
         _many ->
           Error.validation_result(
@@ -259,7 +264,7 @@ defmodule Jido.Agent.Route do
         Error.validation_result(
           :unsupported_output_path,
           [:path, index],
-          "Output paths can traverse only object or struct fields",
+          "Output paths can traverse only object or struct fields. Declare the field in the target output_schema",
           %{key: key}
         )
     end

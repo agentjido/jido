@@ -1,5 +1,6 @@
 ---
 modules:
+  - Jido.AI.RequestPolicy
   - Jido.AI.Skill
   - Jido.AI.ToolResult
   - Jido.AI.ToolSource
@@ -31,8 +32,8 @@ model-visible results. It does not own ReAct routing or approval waits.
 
 ### jido_ai.tools.I3 — Request policy only reduces capability
 
-- **scope:** `Jido.AI.Toolset.select/2`
-- **must:** Apply visible, hidden, review, and requirement policy only to known static or trusted dynamic tools. Reject unknown names and never create a new tool.
+- **scope:** `Jido.AI.Toolset.select/2`, `narrow_policy/2`, `Jido.AI.RequestPolicy`
+- **must:** Apply visible, hidden, review, and requirement policy only to known static or trusted dynamic tools. Reject unknown names and never create a new tool. A request can narrow Agent-level AI policy but cannot widen or remove it: it cannot drop Agent review, replace instructions set on the Agent, raise a limit above the Agent's value, or lose a limit it leaves out.
 - **kind:** security
 - **status:** active
 

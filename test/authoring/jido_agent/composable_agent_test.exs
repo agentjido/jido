@@ -672,7 +672,7 @@ defmodule Jido.Agent.Authoring.ComposableAgentTest do
            "Destination does not accept"}
         ] do
       {pid, monitor} = spawn_monitor(fn -> Compiler.compile(body) end)
-      assert_receive {:DOWN, ^monitor, :process, ^pid, {%Error{message: error}, _stack}}, 5000
+      assert_receive {:DOWN, ^monitor, :process, ^pid, {%CompileError{description: error}, _stack}}, 5000
       assert error =~ message
     end
   end

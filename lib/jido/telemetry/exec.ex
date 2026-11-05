@@ -15,6 +15,7 @@ defmodule Jido.Telemetry.Exec do
   alias Runic.Workflow.SingleOutput.Context
 
   @flow_module Module.concat(["Jido", "Flow"])
+  @effect_count_key {__MODULE__, :effect_count}
 
   @type kind :: :action | :flow
 
@@ -36,9 +37,28 @@ defmodule Jido.Telemetry.Exec do
   def span(kind, metadata, work)
       when kind in [:action, :flow] and is_map(metadata) and is_function(work, 0) do
     :telemetry.span([:jido, kind], metadata, fn ->
+      if kind == :action, do: Process.put(@effect_count_key, 0)
       result = work.()
-      {result, Map.merge(metadata, result_metadata(kind, result))}
+      stop = Map.merge(metadata, result_metadata(kind, result))
+      {result, if(kind == :action, do: put_recorded_effect_count(stop), else: stop)}
     end)
+  end
+
+  # A Flow component returns its Action's effects inside the Flow fact, so the
+  # node records the count when the Action returns.
+  @doc false
+  @spec record_effect_count(non_neg_integer()) :: :ok
+  def record_effect_count(count) do
+    if Process.get(@effect_count_key), do: Process.put(@effect_count_key, count)
+    :ok
+  end
+
+  defp put_recorded_effect_count(%{effect_count: _count} = stop),
+    do: %{stop | effect_count: Process.delete(@effect_count_key)}
+
+  defp put_recorded_effect_count(stop) do
+    Process.delete(@effect_count_key)
+    stop
   end
 
   @doc false

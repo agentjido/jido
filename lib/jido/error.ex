@@ -929,6 +929,13 @@ defmodule Jido.Error do
   defp transport_string(%{"message" => message}, depth), do: transport_string(message, depth - 1)
   defp transport_string(value, _depth), do: value |> sanitize_transport() |> safe_inspect()
 
+  defp safe_exception_message(%{class: _class, errors: errors} = error)
+       when is_exception(error) and is_list(errors) do
+    errors
+    |> Enum.map_join("; ", &safe_exception_message/1)
+    |> truncate_string()
+  end
+
   defp safe_exception_message(error) do
     error
     |> Exception.message()
@@ -1023,6 +1030,8 @@ defmodule Jido.Error do
   defp unified_type(%{code: :unmatched_input, path: path}) when is_list(path),
     do: :routing_error
 
+  defp unified_type(%{class: :internal}), do: :internal
+
   defp unified_type(%{code: code, path: path}) when is_atom(code) and is_list(path),
     do: :validation_error
 
@@ -1032,7 +1041,6 @@ defmodule Jido.Error do
   defp unified_type(%{class: :execution}), do: :execution_error
   defp unified_type(%{class: :routing}), do: :routing_error
   defp unified_type(%{class: :timeout}), do: :timeout
-  defp unified_type(%{class: :internal}), do: :internal
 
   defp unified_type(%{type: type}) when is_atom(type), do: unified_type_from_atom(type)
   defp unified_type(%{type: type}) when is_binary(type), do: unified_type_from_string(type)

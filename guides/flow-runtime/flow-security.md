@@ -180,7 +180,7 @@ A Handoff target cannot carry bound context or metadata. A context bound in an I
 
 Jido's telemetry start and stop metadata omits params, context, results, and full errors. Other outputs can include your values:
 
-- **Failure logs.** When a node fails, Runic logs a warning with the node and the error at `:warning` level. When you run an Action directly with `Jido.Exec.run/4`, that node holds the Instruction, including its params and context. A Flow's nodes do not hold your input, but the error can.
+- **Failure logs.** When a node fails, Runic logs a warning that prints the node and the error, and both can hold your values. `Jido.Exec.run/4`, `Jido.Exec.start/6`, `Jido.Exec.resume/4`, `cmd/3`, and a live AgentServer keep this line out of the logs. Code that calls `Runic.Workflow.execute/3` itself still gets it.
 - **Error details.** An exception message, `details.return` for an invalid return, and `details.reason` can hold values from your code. For a raised exception, `details.stacktrace` can hold call arguments, for example after a `FunctionClauseError`. `Jido.Error.to_map/1` omits the stacktrace and bounds the other details.
 - **Stored data.** A managed run or durable Turn stores Flow input and Action results. Runic does not persist runtime context. A durable Turn saves its caller context in its continuation record, and Instruction context on an Action target is cleared from a managed Workflow. A value copied from context into an Action's output is stored as a result. A live Workflow from `Runic.Runner.get_workflow/2` holds the run's context in memory, so do not log it.
 

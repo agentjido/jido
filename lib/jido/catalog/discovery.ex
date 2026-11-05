@@ -21,7 +21,8 @@ defmodule Jido.Catalog.Discovery do
 
   `jido` starts one asynchronous scan of all loaded applications. This
   happens once when the consolidated package starts.
-  Applications loaded after this scan can call `refresh/1`.
+  Applications loaded after this scan can call `refresh/1`. A refresh that
+  publishes before the scan finishes is kept, and the scan discards its result.
   """
 
   require Logger
@@ -111,20 +112,39 @@ defmodule Jido.Catalog.Discovery do
   @doc "Rebuilds and atomically replaces the complete Catalog and Codec index."
   @spec refresh(keyword()) :: :ok | {:error, term()}
   def refresh(opts \\ []) do
+    with {:ok, snapshot} <- build_snapshot(opts) do
+      locked(fn -> :persistent_term.put(@snapshot_key, snapshot) end)
+      :ok
+    end
+  end
+
+  # A refresh that publishes while this scan runs is newer, so it is kept.
+  @doc false
+  @spec initialize(keyword()) :: :ok | {:error, term()}
+  def initialize(opts \\ []) do
+    scan_base = published()
+
+    with {:ok, snapshot} <- build_snapshot(opts) do
+      locked(fn ->
+        if published() == scan_base, do: :persistent_term.put(@snapshot_key, snapshot)
+      end)
+
+      :ok
+    end
+  end
+
+  defp build_snapshot(opts) do
     with {:ok, sources} <- discovery_modules(opts),
          {:ok, entries, codecs} <- discover_all(sources),
          {:ok, base_entry} <- Entry.new(@base_entry),
          entries = [base_entry | entries],
          {:ok, catalog} <- Catalog.new(entries),
          {:ok, index} <- Index.new(codecs) do
-      :persistent_term.put(@snapshot_key, %{catalog: catalog, codecs: index})
-      :ok
+      {:ok, %{catalog: catalog, codecs: index}}
     end
   end
 
-  @doc false
-  @spec initialize(keyword()) :: :ok | {:error, term()}
-  def initialize(opts \\ []), do: refresh(opts)
+  defp locked(publish), do: :global.trans({__MODULE__, self()}, publish, [node()])
 
   defp initialize_child(opts) do
     case initialize(opts) do
@@ -132,8 +152,10 @@ defmodule Jido.Catalog.Discovery do
         :ok
 
       {:error, reason} ->
-        unless match?(%{catalog: %Catalog{}, codecs: %Index{}}, published()),
-          do: :persistent_term.put(@snapshot_key, {:error, reason})
+        locked(fn ->
+          unless match?(%{catalog: %Catalog{}, codecs: %Index{}}, published()),
+            do: :persistent_term.put(@snapshot_key, {:error, reason})
+        end)
 
         Logger.warning("Jido Catalog Discovery did not refresh: #{inspect(reason)}")
     end

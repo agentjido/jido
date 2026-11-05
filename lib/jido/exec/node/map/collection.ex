@@ -70,7 +70,7 @@ defmodule Jido.Exec.Node.Map.Collection do
 
   defp enumerable(value) do
     if is_nil(Enumerable.impl_for(value)) do
-      {:error, ArgumentError.exception("Map collection is not enumerable")}
+      {:error, Jido.Error.execution_error("Map collection is not enumerable", %{retry: false})}
     else
       {:ok, Enum.to_list(value)}
     end

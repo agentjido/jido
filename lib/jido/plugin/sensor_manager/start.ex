@@ -24,7 +24,7 @@ defmodule Jido.Plugin.SensorManager.Start do
   @doc "Validates one portable desired sensor declaration."
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive) do
-    with {:ok, directive} <- Joi.parse(@schema, Map.from_struct(directive)),
+    with {:ok, directive} <- Jido.Agent.Directive.parse(@schema, Map.from_struct(directive)),
          :ok <- validate_tag(directive.tag),
          :ok <- validate_sensor(directive.sensor) do
       case Jido.Codec.Term.validate(directive.config, :config) do

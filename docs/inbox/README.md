@@ -22,7 +22,7 @@ item at a required path. It does not mean that setup verified the content.
 | `docs/adr/*.md` (5 files) | `docs/adr/*.md` | 2026-11-04 | `placed` | Project instructions require architecture decisions and their index at this path. |
 | `docs/plans/2026-11-04-1255-test-flow-authoring-suite-plan.md` | Same as original path | 2026-11-04 | `placed` | The test tree refactor plan links to this plan. |
 | `docs/plans/2026-11-04-1314-refactor-jido-test-tree-plan.md` | Same as original path | 2026-11-04 | `placed` | `test/quality/test_tree_refactor.yml` requires this path. |
-| `guides/dynamic-flows.md` | `guides/dynamic-flows.md` | 2026-11-04 | `placed` | A public module link and an executable guide test require this path. |
+| `guides/dynamic-flows.md` | `guides/flows/dynamic-flows.md` | 2026-11-04 | `placed` | A public module link and an executable guide test require this path. |
 | `examples/**/README.md` (136 files) | Same as original paths | 2026-11-04 | `placed` | These files are part of the supported example tree and its relative link graph. |
 
 ## Next action
