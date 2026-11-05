@@ -72,6 +72,7 @@ defmodule Jido.MixProject do
       main: "Jido",
       api_reference: true,
       extra_section: "Guides",
+      skip_code_autolink_to: &skip_internal_doc_link?/1,
       extras: for({_section, guides} <- published_guides, {title, path} <- guides, do: {path, title: title}),
       groups_for_extras:
         for(
@@ -80,6 +81,20 @@ defmodule Jido.MixProject do
         )
     ]
   end
+
+  defp skip_internal_doc_link?("c:Jido.Agent.Extension." <> _callback), do: true
+
+  defp skip_internal_doc_link?(reference)
+       when reference in [
+              "Jido.Exec.Runtime",
+              "Jido.Instruction.Compiler",
+              "Jido.Instruction.Config",
+              "Jido.Persistence.Record",
+              "Jido.Telemetry.set_debug/2"
+            ],
+       do: true
+
+  defp skip_internal_doc_link?(_reference), do: false
 
   # This exact list is the guide backlog. Add content at a listed path to
   # publish it. Do not replace the list with a guides/ wildcard: files that are
