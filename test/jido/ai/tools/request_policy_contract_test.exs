@@ -263,4 +263,22 @@ defmodule Jido.AI.Tools.RequestPolicyContractTest do
       assert %{requirement: :disabled} = Toolset.narrow_policy(%{requirement: :optional}, %{requirement: :disabled})
     end
   end
+
+  @tag obligation: "jido_ai.tools.I3"
+  test "an Agent's output_chars is an upper bound for its requests" do
+    agent_limits = %{limits: %{output_chars: 100_000}}
+
+    assert %{limits: %{output_chars: 2_000}} =
+             RequestPolicy.narrow(%{limits: %{output_chars: 2_000}}, agent_limits, %{
+               limits: %{output_chars: 2_000}
+             })
+
+    assert %{limits: %{output_chars: 100_000}} =
+             RequestPolicy.narrow(%{limits: %{output_chars: 500_000}}, agent_limits, %{
+               limits: %{output_chars: 500_000}
+             })
+
+    assert %{limits: %{output_chars: 100_000}} =
+             RequestPolicy.narrow(%{limits: %{}}, agent_limits, %{})
+  end
 end

@@ -189,6 +189,7 @@ defmodule Jido.AI.Turn.ContractTest do
              :previous_tool_signature,
              :max_tool_calls,
              :max_tool_output_bytes,
+             :max_output_chars,
              :tools,
              :tool_requirement,
              :model_outcome,
@@ -227,6 +228,7 @@ defmodule Jido.AI.Turn.ContractTest do
              previous_tool_signature: nil,
              max_tool_calls: 8,
              max_tool_output_bytes: 1_024,
+             max_output_chars: 32_000,
              tools: [],
              tool_requirement: :optional,
              model_outcome: nil,
@@ -428,6 +430,7 @@ defmodule Jido.AI.Turn.ContractTest do
     assert generated.max_tool_rounds == 0
     assert generated.max_tool_calls == 0
     assert generated.max_tool_output_bytes == 16_384
+    assert generated.max_output_chars == 32_000
 
     source_context = %{jido_ai_tool_sources: [{DynamicToolSource, %{prefix: "contract"}}]}
 
@@ -878,6 +881,27 @@ defmodule Jido.AI.Turn.ContractTest do
     assert reason =~ "invalid tool call"
   end
 
+  @tag obligation: "jido_ai.turn.I6"
+  test "every core strategy accepts limits.output_chars with one default" do
+    strategies = [
+      Jido.AI.Reasoning.ReAct,
+      Jido.AI.Reasoning.ChainOfThought,
+      Jido.AI.Reasoning.ChainOfDraft,
+      Jido.AI.Reasoning.AlgorithmOfThoughts,
+      Jido.AI.Reasoning.TreeOfThoughts,
+      Jido.AI.Reasoning.GraphOfThoughts,
+      Jido.AI.Reasoning.TRM
+    ]
+
+    for strategy <- strategies do
+      limits = strategy.authoring_contract()["input_schema"]["properties"]["limits"]
+
+      assert limits["default"]["output_chars"] == 32_000
+      assert limits["properties"]["output_chars"]["minimum"] == 1
+      assert limits["properties"]["output_chars"]["maximum"] == 1_000_000
+    end
+  end
+
   @tag obligation: "jido_ai.turn.I4"
   test "output guards describe every provider stop reason" do
     turn = %{tool_requirement: :optional, tool_rounds: 0, tools: [], output_schema: nil}
@@ -923,19 +947,27 @@ defmodule Jido.AI.Turn.ContractTest do
              guard_final_output(optional, " \n ")
 
     assert {:ok, %{allowed: true, reason: ""}} =
-             guard_final_output(optional, String.duplicate("x", 4_000))
+             guard_final_output(optional, String.duplicate("x", 32_000))
 
-    assert {:ok, %{allowed: false, reason: "model output is too long"}} =
-             guard_final_output(optional, String.duplicate("x", 4_001))
+    assert {:ok, %{allowed: false, reason: "model output is longer than 32000 characters"}} =
+             guard_final_output(optional, String.duplicate("x", 32_001))
 
-    assert {:ok, %{allowed: false, reason: "model output is too long"}} =
+    limited = Map.put(optional, :max_output_chars, 100)
+
+    assert {:ok, %{allowed: true, reason: ""}} =
+             guard_final_output(limited, String.duplicate("x", 100))
+
+    assert {:ok, %{allowed: false, reason: "model output is longer than 100 characters"}} =
+             guard_final_output(limited, String.duplicate("x", 101))
+
+    assert {:ok, %{allowed: false, reason: "model output is longer than 100 characters"}} =
              GuardOutput.run(
                %{
-                 turn: optional,
+                 turn: limited,
                  outcome: %{
                    kind: :final_answer,
                    text: "short",
-                   output: %{"value" => String.duplicate("x", 4_001)},
+                   output: %{"value" => String.duplicate("x", 101)},
                    finish_reason: :stop
                  }
                },
@@ -1076,6 +1108,7 @@ defmodule Jido.AI.Turn.ContractTest do
       :previous_tool_signature,
       :max_tool_calls,
       :max_tool_output_bytes,
+      :max_output_chars,
       :tools,
       :tool_selection,
       :tool_requirement,

@@ -75,6 +75,7 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
       session_id: session.id,
       thread_id: session.thread.id,
       reason_code: result.reason_code,
+      reason: result.reason,
       model_calls: turn.model_calls,
       tool_rounds: turn.tool_rounds,
       tool_calls: turn.tool_call_count,

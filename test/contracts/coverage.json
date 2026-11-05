@@ -21,9 +21,9 @@
       "covered": 52
     },
     "jido_ai": {
-      "active": 43,
+      "active": 44,
       "coverage": 1.0,
-      "covered": 43
+      "covered": 44
     }
   },
   "components": {
@@ -5574,10 +5574,13 @@
         "jido_ai.observability.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 15,
+          "passing": 18,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a request blocked by a limit or the output guard logs a warning",
+            "test an AgentServer request over a budget names the limit in its warning",
+            "test an output limit reports a warning without the model output",
             "test cleanup failures do not affect the runtime",
             "test expired span correlations close the span and restore a local context",
             "test failed owned spans emit error type, status message, and restore context",
@@ -5598,10 +5601,13 @@
         "jido_ai.observability.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 10,
+          "passing": 13,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a request blocked by a limit or the output guard logs a warning",
+            "test an AgentServer request over a budget names the limit in its warning",
+            "test an output limit reports a warning without the model output",
             "test expired span correlations close the span and restore a local context",
             "test failed owned spans emit error type, status message, and restore context",
             "test one AgentServer request correlates Agent, model, and tool telemetry",
@@ -5631,11 +5637,14 @@
         "jido_ai.observability.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 14,
+          "passing": 17,
           "status": "active",
           "testable": true,
           "tests": [
             "test OpenTelemetry owns agent, reasoning, and tool span lifecycle without leaking context",
+            "test a request blocked by a limit or the output guard logs a warning",
+            "test an AgentServer request over a budget names the limit in its warning",
+            "test an output limit reports a warning without the model output",
             "test cleanup failures do not affect the runtime",
             "test expired span correlations close the span and restore a local context",
             "test failed owned spans emit error type, status message, and restore context",
@@ -5654,10 +5663,13 @@
         "jido_ai.observability.I5": {
           "failing": 0,
           "kind": "security",
-          "passing": 15,
+          "passing": 18,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a request blocked by a limit or the output guard logs a warning",
+            "test an AgentServer request over a budget names the limit in its warning",
+            "test an output limit reports a warning without the model output",
             "test cleanup failures do not affect the runtime",
             "test correlation sweep handles throwing cleanup callbacks and reports a bounded size",
             "test expired span correlations close the span and restore a local context",
@@ -5687,7 +5699,7 @@
         "jido_ai.react.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 32,
+          "passing": 34,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5704,6 +5716,8 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test an answer over limits.output_chars starts a repair that names the limit",
+            "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
@@ -5728,7 +5742,7 @@
         "jido_ai.react.I2": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 32,
+          "passing": 34,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5745,6 +5759,8 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test an answer over limits.output_chars starts a repair that names the limit",
+            "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
@@ -5769,7 +5785,7 @@
         "jido_ai.react.I3": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 32,
+          "passing": 34,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5786,6 +5802,8 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test an answer over limits.output_chars starts a repair that names the limit",
+            "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
@@ -5810,7 +5828,7 @@
         "jido_ai.react.I4": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 31,
+          "passing": 33,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5827,6 +5845,8 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test an answer over limits.output_chars starts a repair that names the limit",
+            "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
@@ -5850,7 +5870,7 @@
         "jido_ai.react.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 31,
+          "passing": 33,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5867,6 +5887,8 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test an answer over limits.output_chars starts a repair that names the limit",
+            "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test cycle signatures ignore provider call IDs",
@@ -5890,7 +5912,7 @@
         "jido_ai.react.I6": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 31,
+          "passing": 33,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5907,6 +5929,8 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test an answer over limits.output_chars starts a repair that names the limit",
+            "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
@@ -5930,7 +5954,7 @@
         "jido_ai.react.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 31,
+          "passing": 33,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5947,6 +5971,8 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test an answer over limits.output_chars starts a repair that names the limit",
+            "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
@@ -5970,7 +5996,7 @@
         "jido_ai.react.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 31,
+          "passing": 33,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5987,6 +6013,8 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test an answer over limits.output_chars starts a repair that names the limit",
+            "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
             "test conversation projection removes an incomplete tool exchange but keeps later messages",
             "test disabled tool policy sends no definitions and forbids provider tool use",
@@ -6166,7 +6194,7 @@
         "jido_ai.tools.I3": {
           "failing": 0,
           "kind": "security",
-          "passing": 19,
+          "passing": 20,
           "status": "active",
           "testable": true,
           "tests": [
@@ -6182,6 +6210,7 @@
             "test a request against Agent review cannot use string keys to get around the policy",
             "test a request against Agent review keeps review through an empty or unrelated tool_policy",
             "test a request against Agent review keeps review_tools set on the Agent",
+            "test an Agent's output_chars is an upper bound for its requests",
             "test narrow_policy/2 is unchanged by narrowing a policy with itself",
             "test narrow_policy/2 keeps a requirement that the Agent sets",
             "test narrow_policy/2 never widens visibility",
@@ -6241,10 +6270,10 @@
       }
     },
     "jido_ai.turn": {
-      "active": 5,
+      "active": 6,
       "app": "jido_ai",
       "coverage": 1.0,
-      "covered": 5,
+      "covered": 6,
       "form": "light",
       "obligations": {
         "jido_ai.turn.I1": {
@@ -6312,14 +6341,24 @@
             "test a blocked turn returns and stores one versioned terminal outcome",
             "test request setup and finalization preserve the common response fields"
           ]
+        },
+        "jido_ai.turn.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test every core strategy accepts limits.output_chars with one default"
+          ]
         }
       }
     }
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 323,
+    "active": 324,
     "coverage": 1.0,
-    "covered": 323
+    "covered": 324
   }
 }

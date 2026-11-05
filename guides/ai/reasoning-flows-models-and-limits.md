@@ -113,7 +113,10 @@ Unknown top-level fields are errors. The other reasoning Flows share `input`, `i
 | `output_tokens` | `nil` (no limit) | 1 or more |
 | `total_tokens` | `nil` (no limit) | 1 or more |
 | `total_cost` | `nil` (no limit) | 0 or more |
+| `output_chars` | 32,000 | 1 to 1,000,000 |
 | `tool_output_bytes` | 16,384 | 256 to 1,000,000 |
+
+`output_chars` caps each final answer, and it is the limit to raise for long documents. Raise `options.max_tokens` and `elapsed_ms` with it. See [Output limits](budgets-and-usage.md#output-limits).
 
 `context.max_messages` must be 1 to 512. `context.max_bytes` must be 1,024 to 2,000,000.
 

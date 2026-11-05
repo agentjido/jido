@@ -88,9 +88,12 @@ Jido's semantic logger is off by default. Turn it on so that failures reach your
 ```elixir
 config :jido, :telemetry,
   semantic_log_mode: :errors
+
+config :jido, :ai_telemetry,
+  semantic_log_mode: :errors
 ```
 
-Failures log at `:warning`. Other events log at `:debug`, so your `Logger` level also has to allow them. [Telemetry and Tracing](telemetry-tracing-and-logs.md#log-modes) describes each mode.
+Failures log at `:warning`. So do AI requests that hit a limit, under `:ai_telemetry`. See [Limit warnings](telemetry-tracing-and-logs.md#limit-warnings). Other events log at `:debug`, so your `Logger` level also has to allow them. [Telemetry and Tracing](telemetry-tracing-and-logs.md#log-modes) describes each mode.
 
 ## Export metrics and traces
 
@@ -156,7 +159,8 @@ These settings apply to the whole node. Set them under `config :jido`.
 - The namespace is set and final, and the instance starts after its dependencies.
 - The adapter keeps data outside the BEAM, and you have tested a restart against it.
 - Each limit in the table above has a value you chose or accepted.
-- `semantic_log_mode` is on, and failures reach your log system.
+- `semantic_log_mode` is on for `:telemetry` and `:ai_telemetry`, and failures reach your log system.
+- AI Agents that write long answers set `limits.output_chars` and `options.max_tokens`.
 - A reporter receives `Jido.Telemetry.metrics/0`, with alerts on Turn and effect failures.
 - Your application knows which durable Agents to activate at boot.
 - Your release drains before it stops, and your platform's stop timeout allows for that.

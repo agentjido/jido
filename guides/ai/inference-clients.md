@@ -98,7 +98,7 @@ For `generate_text/3`, return `{:ok, %ReqLLM.Response{}}` with these fields:
 | --- | --- |
 | `:id`, `:model`, `:context` | Identify the call. They are recorded on the model attempt. |
 | `:message` | An assistant message from `ReqLLM.Context.assistant/2`. Pass `tool_calls:` to request tools. |
-| `:finish_reason` | `:stop` or `:tool_calls` proceed. Other values fail the output guard. |
+| `:finish_reason` | `:stop` or `:tool_calls` proceed. Other values fail the output guard. `:length` means the response hit a token limit, such as `options.max_tokens`. |
 | `:usage` | Input and output token counts, plus any cost facts. Use `nil` when the source has none. |
 | `:object` | The decoded structured output, as a map with string keys, when the request has an `output_schema`. |
 

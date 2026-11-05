@@ -137,6 +137,7 @@ Jido derives these from the AgentServer and Action events above. They do not pas
 | `[:jido, :ai, :reasoning, :stop]` | It returns | `duration` |
 | `[:jido, :ai, :reasoning, :exception]` | A raise, throw, or exit leaves it | `duration` |
 | `[:jido, :ai, :tool, :start]`, `:stop`, `:exception` | A tool Action in the Flow's `tools` component runs | That Action's measurements |
+| `[:jido, :ai, :limit, :exceeded]` | A model response breaks an output limit | `value`, `maximum`. Neither is present for `limit: :token_limit`. |
 | `[:jido, :ai, :telemetry, :correlation, :cleanup]` | A sweep expired at least one entry | `expired`, `size` |
 
 Metadata:
@@ -146,6 +147,8 @@ Metadata:
 | `agent_id`, `agent_module`, `agent_name`, `agent_definition_id`, `agent_description`, `agent_version`, `reasoning`, `reasoning_name`, `request_id`, `turn_id`, `trace_id`, `span_id`, `parent_span_id` | Agent, reasoning, and tool |
 | `run_id`, `session_id`, `thread_id` | Agent stop, reasoning, and tool |
 | `status`, `committed?`, `reason_code`, `error_type`, `error_code` | Agent stop. `status` is the request status, such as `:completed`. |
+| `reason` | Agent stop, when `reason_code` is `:limits`. A fixed budget message. |
+| `limit`, `model`, `request_id`, `run_id`, `agent_id`, `turn_id` | Limit exceeded. `limit` is `:output_chars`, `:token_limit`, or `:tool_calls_per_response`. It also carries the Agent fields when the Turn runs in an AgentServer. |
 | `reasoning_method`, `reasoning_operation_id` | Reasoning |
 | `status`, `req_llm_request_id`, `error_type` | Reasoning stop. `status` is `:ok`, `:error`, or `:unknown`. |
 | `action`, `tool_name`, `tool_call_id`, `tool_description`, `node_name`, `activation_id`, `attempt_id`, `attempt`, `status`, `error_type`, `retryable?` | Tool |

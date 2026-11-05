@@ -60,7 +60,8 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
                 input_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.default(nil),
                 output_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.default(nil),
                 total_tokens: Joi.integer(gte: 1) |> Joi.nullable() |> Joi.default(nil),
-                total_cost: Joi.number(gte: 0) |> Joi.nullable() |> Joi.default(nil)
+                total_cost: Joi.number(gte: 0) |> Joi.nullable() |> Joi.default(nil),
+                output_chars: Joi.integer(gte: 1, lte: 1_000_000) |> Joi.default(32_000)
               },
               unrecognized_keys: :error
             )
@@ -69,7 +70,8 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
               input_tokens: nil,
               output_tokens: nil,
               total_tokens: nil,
-              total_cost: nil
+              total_cost: nil,
+              output_chars: 32_000
             })
         },
         unrecognized_keys: :error
@@ -119,7 +121,8 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
         max_input_tokens: input([:limits, :input_tokens]),
         max_output_tokens: input([:limits, :output_tokens]),
         max_total_tokens: input([:limits, :total_tokens]),
-        max_total_cost: input([:limits, :total_cost])
+        max_total_cost: input([:limits, :total_cost]),
+        max_output_chars: input([:limits, :output_chars])
       }
 
     step "input_guard",

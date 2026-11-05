@@ -53,7 +53,7 @@ Set these with `config :jido, ...`. Each key is read at runtime, each time it is
 | `:telemetry` | `:semantic_log_mode` | `:off` | The default telemetry handler | `:off`, `:errors`, `:interesting`, or `:all`. See [Log modes](../operations/telemetry-tracing-and-logs.md#log-modes). |
 | `:telemetry` | `:semantic_slow_threshold_ms` | `1_000` | The default telemetry handler | With `:interesting`, also logs events at least this slow. |
 | `:opentelemetry` | `:enabled` | Enabled unless `false` | `Jido.Telemetry.open_telemetry?/0` | Set `false` to stop mapping events to spans. See [Metrics and OTel](../operations/metrics-and-open-telemetry.md). |
-| `:ai_telemetry` | `:semantic_log_mode` | `:off` | `Jido.Telemetry.AI` | The same modes, for AI and model events. |
+| `:ai_telemetry` | `:semantic_log_mode` | `:off` | `Jido.Telemetry.AI` | The same modes, for AI and model events. Any mode except `:off` logs [limit warnings](../operations/telemetry-tracing-and-logs.md#limit-warnings). |
 | `:ai_telemetry` | `:semantic_slow_threshold_ms` | `1_000` | `Jido.Telemetry.AI` | The same rule, for AI and model events. |
 | `:ai_telemetry` | `:correlation_ttl_ms` | `3_600_000` | The AI correlation store | The lifetime of correlation entries. A value that is not a positive integer uses the default. |
 | `:ai_telemetry` | `:correlation_sweep_interval_ms` | `60_000` | The AI correlation store | How often the store expires entries. Same validation. |

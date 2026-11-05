@@ -819,6 +819,50 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     assert Enum.map(assistant_messages, & &1.payload["content"]) == ["Complete answer"]
   end
 
+  test "an answer over limits.output_chars starts a repair that names the limit" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 2, fn model, context, _options ->
+      case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
+        1 ->
+          {:ok, response(model, context, String.duplicate("x", 11), "long")}
+
+        2 ->
+          repair = context |> ReqLLM.Context.to_list() |> List.last()
+          assert message_text(repair) =~ "model output is longer than 10 characters"
+          {:ok, response(model, context, "Short", "short")}
+      end
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "output-chars-repair-agent")
+
+    assert {:ok, result, _agent} =
+             run(agent, %{input: "Answer", limits: %{output_chars: 10}})
+
+    assert result.status == :completed
+    assert result.output == "Short"
+    assert result.retries == 1
+  end
+
+  test "an answer that stays over limits.output_chars blocks and keeps the attempt text" do
+    long = String.duplicate("x", 11)
+
+    expect(ReqLLM, :generate_text, 2, fn model, context, _options ->
+      {:ok, response(model, context, long, "long")}
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "output-chars-blocked-agent")
+
+    assert {:ok, result, _agent} =
+             run(agent, %{input: "Answer", limits: %{output_chars: 10}})
+
+    assert result.status == :blocked
+    assert result.reason_code == :output
+    assert result.reason == "model output is longer than 10 characters"
+    assert result.output == ""
+    assert List.last(result.model_attempts).outcome.text == long
+  end
+
   test "conversation projection removes an incomplete tool exchange but keeps later messages" do
     session = Jido.Session.new(id: "session:projection", now: 1)
 

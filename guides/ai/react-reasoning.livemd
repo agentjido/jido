@@ -215,7 +215,7 @@ The status is `:failed`, the reason code is `:model`, the reason is `"invalid_ap
 `Jido.AI.Reasoning.Actions.GuardOutput` checks each response. A rejected response is not an error. Jido adds a system message that names the problem and calls the model again. The guard rejects a final answer when:
 
 - `finish_reason` reports an abnormal end, such as `:length` or `:content_filter`.
-- It is empty, or longer than 4,000 characters. This limit is fixed. Use a tool or several requests for longer output.
+- It is empty, or longer than `limits.output_chars`, which defaults to 32,000 characters. See [Output limits](budgets-and-usage.md#output-limits).
 - A tool is still required by `tool_policy`.
 - `output_schema` is set and the response has no object.
 

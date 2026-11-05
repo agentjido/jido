@@ -56,6 +56,7 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
          max_output_tokens: Map.get(params, :max_output_tokens),
          max_total_tokens: Map.get(params, :max_total_tokens),
          max_total_cost: Map.get(params, :max_total_cost),
+         max_output_chars: Map.get(params, :max_output_chars, 32_000),
          max_retries: Map.get(params, :max_retries, 0),
          retries: 0,
          options: params.options,

@@ -28,7 +28,8 @@ defmodule Jido.AI.RequestPolicy do
     output_tokens: :max_output_tokens,
     total_tokens: :max_total_tokens,
     total_cost: :max_total_cost,
-    tool_output_bytes: :max_tool_output_bytes
+    tool_output_bytes: :max_tool_output_bytes,
+    output_chars: :max_output_chars
   }
 
   @doc "Applies Agent defaults to validated Flow input, given the raw request data."

@@ -19,7 +19,9 @@ This guide shows how a request's budgets stop work, and where to read the tokens
 
 Each limit stops at "used >= limit" for the checked values. `tool_calls` stops when the running count plus this batch would pass the limit.
 
-A limit ends the request with status `:blocked` and reason code `:limits`. Its messages stay in the Thread but leave later model context. See [Thread Projection](thread-projection.md).
+[Output limits](#output-limits) work differently, because the guard checks them after a response arrives.
+
+A limit in this table ends the request with status `:blocked` and reason code `:limits`. Its messages stay in the Thread but leave later model context. See [Thread Projection](thread-projection.md).
 
 ## See a limit stop a request
 
@@ -117,6 +119,151 @@ The first call used 150 tokens, under the limit, so its tool round started. The 
 %{status: :blocked, reason: "maximum total cost reached", model_calls: 2} =
   BudgetsGuide.ask(%{total_cost: 0.003})
 ```
+
+## Output limits
+
+Several limits bound what a model returns. They act at different points, and they cost different amounts when they trigger.
+
+| Limit | What it bounds | Default | When it is passed |
+| --- | --- | --- | --- |
+| `options.max_tokens` | One model call. The provider enforces it. | `ReAct`: not set, so the provider's default applies. Structured Flows: 256 to 1,536, by Flow. | The provider stops early with `finish_reason: :length`. The guard rejects the response with `model output stopped at its token limit`. |
+| `limits.output_chars` | One final answer. `GuardOutput` checks it after the response arrives. | 32,000 characters | The guard rejects the response with `model output is longer than N characters`. |
+| `limits.output_tokens` | Output tokens added across all calls in the request. | `nil` (no limit) | The next budget check blocks the request with `maximum output tokens reached`. |
+| `limits.tool_output_bytes` | One tool result. `ReAct` only. | 16,384 bytes | A notice replaces the result. The request continues. See [Tool Calls and Results](tool-calls-and-results.md). |
+| Tool calls per response | One model response. Fixed at 4. | 4 | The guard rejects the response with `one model response can contain at most 4 tool calls`. |
+
+`limits.output_chars` accepts 1 to 1,000,000. It has no `nil` value, so every final answer has a cap. All reasoning Flows accept it.
+
+Input has a separate limit. A string input longer than 2,000 characters is blocked before any model call, and that limit is fixed. See [ReAct Reasoning](react-reasoning.livemd).
+
+### How characters are counted
+
+The count uses `String.length/1`, so it counts graphemes, not bytes.
+
+With no `output_schema`, the guard measures the response text. With an `output_schema`, it measures the object encoded as JSON, including keys, punctuation, and escapes. A newline in a Markdown field encodes as `\n`, so it counts as two characters. Leave room for this when you set a limit for a structured answer.
+
+In a multi-call Flow, the guard checks the response from every phase, not only the last one.
+
+### Choose a value
+
+The default fits about 8,000 tokens, or about 5,000 words of English. This uses the rule of thumb of 4 characters per token, which varies by language and model.
+
+The character limit runs after the provider has returned the whole response, so you have already paid for a rejected answer. For that reason, set `options.max_tokens` as well. It stops the model while it is writing.
+
+To allow longer answers, change these values together:
+
+| Value | Why |
+| --- | --- |
+| `limits.output_chars` | The answer has to fit. |
+| `options.max_tokens` | Set it to about a quarter of `output_chars`. The structured Flows' defaults stop well below 32,000 characters. |
+| `limits.elapsed_ms` | The default of 120,000 ms also sets the call's `total_timeout`, and long answers take longer to write. |
+| `context.max_bytes` | A completed answer stays in the Thread and counts against this window on later requests. |
+
+This Agent writes long documents:
+
+```elixir
+defmodule BudgetsGuide.MemoAgent do
+  use Jido.AI.Agent, name: "memo_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      options %{max_tokens: 25_000}
+
+      limits do
+        output_chars 100_000
+        elapsed_ms 300_000
+      end
+    end
+  end
+end
+
+%{limits: %{output_chars: 100_000}} = BudgetsGuide.MemoAgent.explain().defaults
+```
+
+### Agent and request values
+
+Set the upper value on the Agent. A request can lower a limit that the Agent sets, but it cannot raise it. See [Reasoning Setup](reasoning-flows-models-and-limits.md#change-a-default-on-one-request).
+
+```elixir
+{:ok, %{params: %{limits: %{output_chars: 2_000}}}} =
+  BudgetsGuide.MemoAgent.preflight(%{input: "Summarize it.", limits: %{output_chars: 2_000}})
+
+{:ok, %{params: %{limits: %{output_chars: 100_000}}}} =
+  BudgetsGuide.MemoAgent.preflight(%{input: "Write it.", limits: %{output_chars: 500_000}})
+
+{:error, _too_big} =
+  BudgetsGuide.MemoAgent.preflight(%{input: "Write it.", limits: %{output_chars: 2_000_000}})
+```
+
+An Agent with a `limits` block holds the 32,000 default as its upper value, even if the block does not name `output_chars`. An Agent with no `limits` block sets no upper value, so a request can use any value in the range.
+
+### What happens to a rejected answer
+
+The Flow decides what comes next:
+
+- `ReAct` adds a system message that names the limit and calls the model again. It tries up to `limits.retries` times, which defaults to 1, and then moves to any `fallback_models`. Each try is a paid call. The new call does not include the rejected answer, so the model writes the answer again. If no try succeeds, the request ends `:blocked` with reason code `:output`.
+- The other built-in Flows end the request right away with `:blocked` and reason code `:output`.
+
+A blocked reply has `output: ""`. The rejected response stays in `model_attempts`, and in the Session's `:ai_model_attempt` entries. It does not enter later model context.
+
+```elixir
+defmodule BudgetsGuide.LongAnswerModel do
+  @behaviour Jido.AI.InferenceClient
+
+  @impl true
+  def generate_text(model, context, _options) do
+    message = ReqLLM.Context.assistant(String.duplicate("word ", 40))
+
+    {:ok,
+     %ReqLLM.Response{
+       id: "long",
+       model: model,
+       context: context,
+       message: message,
+       finish_reason: :stop,
+       usage: %{input_tokens: 10, output_tokens: 50}
+     }}
+  end
+
+  @impl true
+  def evaluation_models, do: []
+
+  for {name, arity} <- Jido.AI.InferenceClient.behaviour_info(:callbacks),
+      {name, arity} not in [generate_text: 3, evaluation_models: 0] do
+    @impl true
+    def unquote(name)(unquote_splicing(Macro.generate_arguments(arity, __MODULE__))),
+      do: {:error, :not_supported}
+  end
+end
+
+agent = BudgetsGuide.MemoAgent.instantiate!(id: "memo-1")
+
+request =
+  BudgetsGuide.MemoAgent.request_signal!(%{input: "Write the memo.", limits: %{output_chars: 100}})
+
+{:ok, _agent, [%{signal: %{data: reply}}]} =
+  BudgetsGuide.MemoAgent.cmd(agent, request,
+    context: %{jido_ai_inference_client: BudgetsGuide.LongAnswerModel}
+  )
+
+%{
+  status: :blocked,
+  reason_code: :output,
+  reason: "model output is longer than 100 characters",
+  output: "",
+  model_calls: 2,
+  retries: 1,
+  usage: %{output_tokens: 100}
+} = reply
+
+200 = String.length(List.last(reply.model_attempts).outcome.text)
+```
+
+The request paid for both answers. Read an answer from `model_attempts` only when you know why it was rejected. The guard may have rejected it for a reason that still matters, such as a content filter. A structured answer is under `outcome.output`.
+
+### See limits in your logs
+
+Limit hits log at `:warning` when the AI semantic logger is on. It is off by default. See [Telemetry and Tracing](../operations/telemetry-tracing-and-logs.md#limit-warnings).
 
 ## Read usage
 

@@ -19,6 +19,10 @@ defmodule Jido.Telemetry.AI do
   Prompts, model output, reasoning text, tool arguments, tool results, Agent
   state, and raw errors are not logged.
 
+  Any mode other than `:off` logs a warning when a model response breaks an
+  output limit (`[:jido, :ai, :limit, :exceeded]`) and when a request ends
+  `:blocked` with reason code `:limits` or `:output`.
+
   If the optional `opentelemetry_api` dependency and a host-managed SDK are
   active, Jido AI maps Agent, reasoning, and tool operations to portable
   OpenTelemetry GenAI spans and enables ReqLLM's model span bridge. Standard
@@ -59,6 +63,10 @@ defmodule Jido.Telemetry.AI do
     [:jido, :ai, :telemetry, :correlation, :cleanup]
   ]
 
+  @limit_events [
+    [:jido, :ai, :limit, :exceeded]
+  ]
+
   @owned_events @agent_events ++ @reasoning_events ++ @tool_events
 
   @model_log_events [
@@ -85,6 +93,7 @@ defmodule Jido.Telemetry.AI do
   @spec events() :: [event_name()]
   def events do
     (@owned_events ++
+       @limit_events ++
        @correlation_events ++
        @runtime_events ++
        Jido.Telemetry.Exec.event_names() ++
@@ -114,6 +123,7 @@ defmodule Jido.Telemetry.AI do
         tags: [:reasoning_name, :reasoning_method, :status],
         unit: {:native, :millisecond}
       ),
+      Telemetry.Metrics.counter("jido.ai.limit.exceeded.count", tags: [:limit]),
       Telemetry.Metrics.counter("jido.ai.tool.stop.count", tags: [:status, :tool_name]),
       Telemetry.Metrics.summary("jido.ai.tool.stop.duration",
         tags: [:status, :tool_name],
@@ -172,7 +182,7 @@ defmodule Jido.Telemetry.AI do
 
     attach_once(
       @semantic_handler_id,
-      @owned_events ++ @model_log_events,
+      @owned_events ++ @limit_events ++ @model_log_events,
       &__MODULE__.handle_semantic_event/4
     )
 
@@ -250,6 +260,23 @@ defmodule Jido.Telemetry.AI do
       _other ->
         :ok
     end
+  end
+
+  @doc false
+  @spec limit_exceeded(map(), atom(), map(), map()) :: :ok
+  def limit_exceeded(context, limit, measurements, values)
+      when is_map(context) and is_atom(limit) and is_map(measurements) and is_map(values) do
+    agent = context |> Map.get(:turn_id) |> agent_context() || %{}
+
+    metadata =
+      agent
+      |> Map.merge(Map.take(context, [:agent_id, :turn_id]))
+      |> Map.merge(values)
+      |> Map.put(:limit, limit)
+      |> Map.update(:model, nil, &model_label/1)
+      |> compact()
+
+    :telemetry.execute([:jido, :ai, :limit, :exceeded], measurements, metadata)
   end
 
   @doc false
@@ -589,6 +616,7 @@ defmodule Jido.Telemetry.AI do
     metadata =
       summary
       |> Map.take([:status, :run_id, :session_id, :thread_id, :reason_code])
+      |> Map.merge(limit_reason(summary))
       |> compact()
 
     %{measurements: measurements, metadata: metadata}
@@ -598,6 +626,13 @@ defmodule Jido.Telemetry.AI do
     do: true
 
   defp ai_turn?(_metadata), do: false
+
+  # Budget reasons are fixed strings. Other reasons can carry request data.
+  defp limit_reason(%{reason_code: :limits, reason: reason}), do: %{reason: reason}
+  defp limit_reason(_summary), do: %{}
+
+  defp model_label(nil), do: nil
+  defp model_label(model), do: model_name(model)
 
   defp agent_context(turn_id) when is_binary(turn_id),
     do: CorrelationStore.get({:agent, turn_id})
@@ -751,6 +786,12 @@ defmodule Jido.Telemetry.AI do
       semantic_error?(event, metadata) or interesting_outcome?(event, metadata) or
         slow_semantic?(measurements)
 
+  defp semantic_error?([:jido, :ai, :limit, :exceeded], _metadata), do: true
+
+  defp semantic_error?([:jido, :ai, :agent, :stop], %{status: :blocked, reason_code: code})
+       when code in [:limits, :output],
+       do: true
+
   defp semantic_error?(event, metadata) do
     List.last(event) == :exception or metadata[:status] in [:error, :failed] or
       metadata[:outcome] == :error or error_http_status?(metadata[:http_status])
@@ -826,6 +867,9 @@ defmodule Jido.Telemetry.AI do
       :tool_name,
       :status,
       :reason_code,
+      :reason,
+      :limit,
+      :model,
       :error_type,
       :error_code,
       :retryable?
@@ -833,6 +877,8 @@ defmodule Jido.Telemetry.AI do
     |> Map.merge(
       Map.take(measurements, [
         :duration,
+        :value,
+        :maximum,
         :model_calls,
         :tool_rounds,
         :tool_calls,

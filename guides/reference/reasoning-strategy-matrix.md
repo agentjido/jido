@@ -89,6 +89,7 @@ Set limits per request or in the `reasoning` block. See [Model Budgets and Usage
 | `elapsed_ms` | `120_000` | `120_000` | 1 to 3,600,000 |
 | `input_tokens`, `output_tokens`, `total_tokens` | `nil` (no limit) | `nil` (no limit) | 1 or more |
 | `total_cost` | `nil` (no limit) | `nil` (no limit) | 0 or more |
+| `output_chars` | `32_000` | `32_000` | 1 to 1,000,000 |
 | `model_calls` | `8` | Rejected | 1 to 16 |
 | `tool_rounds` | `4` | Rejected | 0 to 8 |
 | `tool_calls` | `8` | Rejected | 1 to 16 |

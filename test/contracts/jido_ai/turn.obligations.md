@@ -53,3 +53,10 @@ outcome observation. It does not own strategy-specific routing.
 - **must:** Use version 1 portable fields for flow identity, status, output, reasons, timing, model and tool counts, retries, budgets, reasoning-step count, and usage across all core strategies.
 - **kind:** persisted-format
 - **status:** active
+
+### jido_ai.turn.I6 — Output limits are configurable and observable
+
+- **scope:** `Jido.AI.Reasoning.Actions.GuardOutput`, `limits.output_chars`
+- **must:** Reject a final answer longer than `limits.output_chars`, name the limit in the rejection reason, and emit `[:jido, :ai, :limit, :exceeded]` without model output.
+- **kind:** functional
+- **status:** active

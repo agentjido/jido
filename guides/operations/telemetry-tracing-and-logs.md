@@ -172,6 +172,30 @@ Jido reads the mode for each event, so you can change it on a running node with 
 
 AI events have their own settings under `config :jido, :ai_telemetry`, with the same modes. Prompts, model output, tool arguments, and tool results are not logged. See `Jido.Telemetry.AI`.
 
+### Limit warnings
+
+Under `:ai_telemetry`, the modes `:errors`, `:interesting`, and `:all` log a `:warning` when a model or request hits a limit. With `:off`, these lines do not appear, so turn the mode on to see them. They contain sizes and IDs, and never model output.
+
+The first line reports one model response. A `ReAct` request can recover from it through a repair round, so one line does not mean that a request failed. Many of them mean that you are paying for answers you reject.
+
+```text
+[warning] [jido.ai.semantic] event=ai.limit.exceeded agent_id=memo-1 limit=output_chars maximum=32000 model=openai:gpt-4o-mini request_id=... run_id=... value=41250
+```
+
+| `limit` | Meaning | What to change |
+| --- | --- | --- |
+| `output_chars` | The answer passed `limits.output_chars`. `value` is its length, and `maximum` is the limit. | Raise `limits.output_chars`, or ask for shorter answers in `instructions`. |
+| `token_limit` | The provider stopped at a token limit, with `finish_reason: :length`. It carries no `value`. | Raise `options.max_tokens`. |
+| `tool_calls_per_response` | One response asked for more than 4 tool calls. | This limit is fixed. Ask for fewer calls in `instructions`. |
+
+The second line reports the end of a request that stayed blocked. It logs when the status is `:blocked` and the reason code is `:limits` or `:output`. A `:limits` line also carries the budget's reason. Other blocked requests, such as those with reason code `:input`, stay at `:debug`, because the caller controls them.
+
+```text
+[warning] [jido.ai.semantic] event=ai.agent.stop agent_id=memo-1 reason=maximum tool rounds reached reason_code=limits status=blocked ...
+```
+
+To alert on these, count `[:jido, :ai, :limit, :exceeded]` by its `limit` field. `Jido.Telemetry.AI.metrics/0` includes the counter `jido.ai.limit.exceeded.count`. [Output limits](../ai/budgets-and-usage.md#output-limits) explains how to choose values.
+
 ### Debug one instance
 
 `set_debug/2` on `Jido.Telemetry` raises the log mode for one instance. `:on` selects `:interesting`, `:verbose` selects `:all`, and `:off` removes the override. The instance option `debug: true` or `debug: :verbose` sets the same value at start.

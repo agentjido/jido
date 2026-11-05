@@ -113,10 +113,10 @@ defmodule Jido.AI.ModelExecution.PrimitivesTest do
       kind: :final_answer,
       finish_reason: :stop,
       text: "short provider text",
-      output: %{"answer" => String.duplicate("x", 4_001)}
+      output: %{"answer" => String.duplicate("x", 32_001)}
     }
 
-    assert {:ok, %{allowed: false, reason: "model output is too long"}} =
+    assert {:ok, %{allowed: false, reason: "model output is longer than 32000 characters"}} =
              GuardOutput.run(%{turn: turn, outcome: outcome}, %{})
   end
 

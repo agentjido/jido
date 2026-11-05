@@ -11,6 +11,7 @@ defmodule Jido.AI.Observability.TelemetryTest do
   import ExUnit.CaptureLog
   import Mimic
 
+  alias Jido.AI.Reasoning.Actions.GuardOutput
   alias Jido.Telemetry.AI, as: Telemetry
   alias Jido.Test.AI.SimpleAgent
   alias Jido.AgentServer
@@ -141,6 +142,147 @@ defmodule Jido.AI.Observability.TelemetryTest do
     assert log =~ "status=failed"
     assert log =~ "error_type=provider_error"
     refute log =~ "must-not-be-logged"
+  end
+
+  test "an output limit reports a warning without the model output" do
+    restore_telemetry_config_on_exit()
+    Application.put_env(:jido, :ai_telemetry, semantic_log_mode: :errors)
+
+    owner = self()
+    handler_id = "jido-ai-limit-#{System.unique_integer([:positive])}"
+
+    assert :ok =
+             :telemetry.attach(
+               handler_id,
+               [:jido, :ai, :limit, :exceeded],
+               fn _event, measurements, metadata, _config ->
+                 send(owner, {:limit, measurements, metadata})
+               end,
+               nil
+             )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    turn = %{
+      request_id: "req-1",
+      run_id: "run-1",
+      tool_requirement: :optional,
+      tool_rounds: 0,
+      tools: [],
+      max_output_chars: 10
+    }
+
+    outcome = %{
+      kind: :final_answer,
+      text: "private answer text",
+      finish_reason: :stop,
+      model: "openai:gpt-4o-mini"
+    }
+
+    log =
+      capture_log(fn ->
+        assert {:ok, %{allowed: false}} =
+                 GuardOutput.run(%{turn: turn, outcome: outcome}, %{agent_id: "limit-agent"})
+      end)
+
+    assert_receive {:limit, %{value: 19, maximum: 10}, metadata}
+    assert metadata.limit == :output_chars
+    assert metadata.agent_id == "limit-agent"
+    assert metadata.request_id == "req-1"
+    assert metadata.model == "openai:gpt-4o-mini"
+
+    assert log =~ "[warning]"
+    assert log =~ "event=ai.limit.exceeded"
+    assert log =~ "limit=output_chars"
+    assert log =~ "value=19"
+    assert log =~ "maximum=10"
+    refute log =~ "private answer text"
+
+    truncated = %{outcome | finish_reason: :length, text: "cut off"}
+
+    log =
+      capture_log(fn ->
+        assert {:ok, %{allowed: false, reason: "model output stopped at its token limit"}} =
+                 GuardOutput.run(%{turn: turn, outcome: truncated}, %{})
+      end)
+
+    assert log =~ "limit=token_limit"
+
+    calls = for index <- 1..5, do: %{id: "call-#{index}", name: "add", arguments: %{}}
+    too_many = %{kind: :tool_calls, tool_calls: calls, finish_reason: :tool_calls}
+
+    log =
+      capture_log(fn ->
+        assert {:ok, %{allowed: false}} = GuardOutput.run(%{turn: turn, outcome: too_many}, %{})
+      end)
+
+    assert log =~ "limit=tool_calls_per_response"
+    assert log =~ "value=5"
+
+    Application.put_env(:jido, :ai_telemetry, semantic_log_mode: :off)
+
+    assert capture_log(fn -> GuardOutput.run(%{turn: turn, outcome: outcome}, %{}) end) == ""
+  end
+
+  test "a request blocked by a limit or the output guard logs a warning" do
+    restore_telemetry_config_on_exit()
+    Application.put_env(:jido, :ai_telemetry, semantic_log_mode: :errors)
+
+    for code <- [:limits, :output] do
+      log =
+        capture_log(fn ->
+          :telemetry.execute(
+            [:jido, :ai, :agent, :stop],
+            %{duration: 10},
+            %{agent_name: "blocked_agent", status: :blocked, reason_code: code}
+          )
+        end)
+
+      assert log =~ "[warning]"
+      assert log =~ "reason_code=#{code}"
+    end
+
+    assert capture_log(fn ->
+             :telemetry.execute(
+               [:jido, :ai, :agent, :stop],
+               %{duration: 10},
+               %{agent_name: "blocked_agent", status: :blocked, reason_code: :input}
+             )
+           end) == ""
+  end
+
+  test "an AgentServer request over a budget names the limit in its warning" do
+    restore_telemetry_config_on_exit()
+    Application.put_env(:jido, :ai_telemetry, semantic_log_mode: :errors)
+
+    stub(ReqLLM, :generate_text, fn model, context, _options ->
+      calls = [ReqLLM.ToolCall.new("sum-#{System.unique_integer([:positive])}", "add", ~s({"left":1,"right":2}))]
+      {:ok, tool_response(model, context, calls, "tool-request")}
+    end)
+
+    instance = String.to_atom("jido_ai_limit_log_#{System.unique_integer([:positive])}")
+    start_supervised!({Jido, name: instance, namespace: Atom.to_string(instance)}, id: instance)
+
+    assert {:ok, server} = Jido.start_agent(instance, SimpleAgent, id: "limit-log-agent")
+    assert :ok = AgentServer.await_ready(server)
+
+    log =
+      capture_log(fn ->
+        assert {:ok, _agent, [%{signal: reply}]} =
+                 AgentServer.call(
+                   server,
+                   SimpleAgent.request_signal!(%{input: "Keep going", limits: %{tool_rounds: 0}})
+                 )
+
+        assert reply.data.status == :blocked
+        assert reply.data.reason_code == :limits
+
+        Process.sleep(50)
+      end)
+
+    assert log =~ "event=ai.agent.stop"
+    assert log =~ "reason_code=limits"
+    assert log =~ "reason=maximum tool rounds reached"
   end
 
   test "reasoning errors carry a low-cardinality error type" do

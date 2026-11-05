@@ -36,8 +36,8 @@ All strategies other than `ReAct` work the same way:
 - They have no retries and no `fallback_models`. A failed call ends the request with `:failed`.
 - An Agent's tools are not offered to the model, even if the Agent declares them.
 - A response that fails the output guard ends the request with `:blocked` and reason code `:output`. There is no repair round.
-- They accept `input`, `instructions`, `model`, `options`, `prompt_cache`, `context`, and `limits`. Their `limits` allow only `elapsed_ms`, `input_tokens`, `output_tokens`, `total_tokens`, and `total_cost`. The Flow fixes the model call count, so `limits.model_calls` is an error.
-- Their `options` default differs per Flow, in `temperature` and `max_tokens`. Check the Flow's source for the values.
+- They accept `input`, `instructions`, `model`, `options`, `prompt_cache`, `context`, and `limits`. Their `limits` allow only `elapsed_ms`, `input_tokens`, `output_tokens`, `total_tokens`, `total_cost`, and `output_chars`. The Flow fixes the model call count, so `limits.model_calls` is an error.
+- Their `options` default differs per Flow, in `temperature` and `max_tokens`. Check the Flow's source for the values. These `max_tokens` defaults stop an answer well below `limits.output_chars`, so raise both for long output. See [Output limits](budgets-and-usage.md#output-limits).
 - Multi-call Flows keep only the final message in the conversation. Earlier phases are recorded as `:ai_model_attempt` entries with a `phase`.
 
 The model reply's `reasoning` field holds the strategy data, and `reasoning_steps` holds its count.

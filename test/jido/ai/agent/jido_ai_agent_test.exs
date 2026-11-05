@@ -335,6 +335,7 @@ defmodule Jido.AI.AgentTest do
                output_tokens: nil,
                total_tokens: nil,
                total_cost: nil,
+               output_chars: 32_000,
                tool_output_bytes: 16_384
              },
              context: %{max_messages: 32, max_bytes: 100_000},
