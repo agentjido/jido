@@ -6047,7 +6047,7 @@
         "jido_ai.strategies.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 20,
+          "passing": 21,
           "status": "active",
           "testable": true,
           "tests": [
@@ -6068,6 +6068,7 @@
             "test reasoning inspection and adaptive defaults remain explicit",
             "test reasoning preflight rejects invalid request and Agent boundaries",
             "test standard strategies accept the common request and expose explicit Flows",
+            "test standard strategies expose their default instructions",
             "test the Agent exposes one explicit Chain of Thought graph",
             "test the Agent round-trips through the shared Agent authoring codec",
             "test the V2 reasoning set is represented by normal Flow graphs"
@@ -6076,7 +6077,7 @@
         "jido_ai.strategies.I2": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 18,
+          "passing": 19,
           "status": "active",
           "testable": true,
           "tests": [
@@ -6095,6 +6096,7 @@
             "test missing structured output stops before another phase",
             "test one model call returns structured steps and clean correlated telemetry",
             "test standard strategies accept the common request and expose explicit Flows",
+            "test standard strategies expose their default instructions",
             "test the Agent exposes one explicit Chain of Thought graph",
             "test the Agent round-trips through the shared Agent authoring codec",
             "test the V2 reasoning set is represented by normal Flow graphs"
@@ -6103,7 +6105,7 @@
         "jido_ai.strategies.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 18,
+          "passing": 19,
           "status": "active",
           "testable": true,
           "tests": [
@@ -6121,6 +6123,7 @@
             "test linear strategies consume validated structured objects",
             "test missing structured output stops before another phase",
             "test one model call returns structured steps and clean correlated telemetry",
+            "test standard strategies expose their default instructions",
             "test strategy-specific rounds keep model attempts and completion visible",
             "test the Agent exposes one explicit Chain of Thought graph",
             "test the Agent round-trips through the shared Agent authoring codec",
@@ -6130,7 +6133,7 @@
         "jido_ai.strategies.I4": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 18,
+          "passing": 19,
           "status": "active",
           "testable": true,
           "tests": [
@@ -6148,6 +6151,7 @@
             "test linear strategies consume validated structured objects",
             "test missing structured output stops before another phase",
             "test one model call returns structured steps and clean correlated telemetry",
+            "test standard strategies expose their default instructions",
             "test strategy-specific rounds keep model attempts and completion visible",
             "test the Agent exposes one explicit Chain of Thought graph",
             "test the Agent round-trips through the shared Agent authoring codec",

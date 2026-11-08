@@ -86,6 +86,21 @@ defmodule Jido.AI.Reasoning.StrategiesTest do
     end
   end
 
+  test "standard strategies expose their default instructions" do
+    expected_phrases = [
+      {AlgorithmOfThoughts, "algorithmic search"},
+      {ChainOfDraft, "five words"},
+      {ChainOfThought, "step by step"},
+      {GraphOfThoughts, "small graph"},
+      {TreeOfThoughts, "candidate paths"},
+      {TRM, "Produce a draft"}
+    ]
+
+    for {strategy, phrase} <- expected_phrases do
+      assert strategy.default_instructions() =~ phrase
+    end
+  end
+
   test "core strategies expose one portable request outcome" do
     cases = [
       {ReAct, %{}, "jido.ai/reasoning/react"},
