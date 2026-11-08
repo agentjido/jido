@@ -356,7 +356,9 @@ defmodule Jido.Agent.Mutation do
              %{module: module} -> module in changed
              _ -> false
            end
-         end), do: error(:plugin_change_with_owned_directive), else: :ok
+         end),
+         do: error(:plugin_change_with_owned_directive),
+         else: :ok
     end
   end
 

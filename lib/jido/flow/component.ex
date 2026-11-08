@@ -497,7 +497,8 @@ defmodule Jido.Flow.Component do
     do: failure("parallel actions must be a list")
 
   defp validate(:maximum_iterations, value, _mode)
-       when is_integer(value) and value in 1..@maximum_iterations, do: {:ok, value}
+       when is_integer(value) and value in 1..@maximum_iterations,
+       do: {:ok, value}
 
   defp validate(:maximum_iterations, _value, _mode),
     do: failure("iterate max_iterations must be an integer from 1 to 10000")
