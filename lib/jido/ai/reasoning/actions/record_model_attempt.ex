@@ -93,16 +93,37 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
 
   defp maybe_append_assistant(
          session,
+         %{status: :ok, kind: :final_answer, output: output} = outcome,
+         %Context{result: {:ok, %ReqLLM.Response{message: %ReqLLM.Message{} = message}}},
+         true,
+         refs,
+         at
+       )
+       when not is_nil(output) do
+    if structured_output_message?(message),
+      do: append_outcome_assistant(session, outcome, refs, at),
+      else: append_response_assistant(session, message, refs, at)
+  end
+
+  defp maybe_append_assistant(
+         session,
          %{status: :ok},
          %Context{result: {:ok, %ReqLLM.Response{message: %ReqLLM.Message{} = message}}},
          true,
          refs,
          at
        ) do
-    Projection.append(session, message, refs, at)
+    append_response_assistant(session, message, refs, at)
   end
 
   defp maybe_append_assistant(session, %{status: :ok} = outcome, _context, true, refs, at) do
+    append_outcome_assistant(session, outcome, refs, at)
+  end
+
+  defp maybe_append_assistant(session, _outcome, _context, _allowed, _refs, _at),
+    do: {:ok, session}
+
+  defp append_outcome_assistant(session, outcome, refs, at) do
     Projection.append(
       session,
       %{
@@ -122,8 +143,18 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
     )
   end
 
-  defp maybe_append_assistant(session, _outcome, _context, _allowed, _refs, _at),
-    do: {:ok, session}
+  defp append_response_assistant(session, message, refs, at),
+    do: Projection.append(session, message, refs, at)
+
+  defp structured_output_message?(message) do
+    calls = Map.get(message, :tool_calls, []) || []
+    calls != [] and Enum.all?(calls, &structured_output_call?/1)
+  end
+
+  defp structured_output_call?(call) do
+    Map.get(call, :name) == "structured_output" or
+      call |> Map.get(:function, %{}) |> Map.get(:name) == "structured_output"
+  end
 
   defp portable_outcome(%{status: :ok} = outcome) do
     Map.take(outcome, [

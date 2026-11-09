@@ -295,7 +295,11 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
          context,
          observed_request_id
        ) do
-    classified = ReqLLM.Response.classify(response)
+    classified =
+      response
+      |> ReqLLM.Response.classify()
+      |> normalize_structured_output(response, turn)
+
     call_metadata = ReqLLM.Response.call_metadata(response)
     usage = Usage.normalize(ReqLLM.Response.usage(response))
     next_turn = record_call(turn, usage)
@@ -359,6 +363,19 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     |> Map.update!(:model_attempt, &(&1 + 1))
     |> Map.update!(:usage, &Usage.add(&1, usage))
   end
+
+  defp normalize_structured_output(classified, response, turn) do
+    output = Map.get(response, :object)
+
+    if not is_nil(Map.get(turn, :output_schema)) and not is_nil(output) and
+         Enum.all?(classified.tool_calls, &structured_output_call?/1) do
+      %{classified | type: :final_answer, tool_calls: []}
+    else
+      classified
+    end
+  end
+
+  defp structured_output_call?(call), do: Map.get(call, :name) == "structured_output"
 
   defp apply_prompt_cache_options(options, model, turn) do
     config = turn.prompt_cache

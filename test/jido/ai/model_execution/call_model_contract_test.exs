@@ -145,6 +145,40 @@ defmodule Jido.AI.ModelExecution.CallModelContractTest do
     assert context.stage == :completed
   end
 
+  @tag obligation: ["jido_ai.model_execution.I1", "jido_ai.model_execution.I3"]
+  test "structured objects do not hide actionable agent tool calls" do
+    stub(ReqLLM, :generate_text, fn model, context, _options ->
+      call = ReqLLM.ToolCall.new("call-1", "add", ~s({"left":1,"right":2}))
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "response-1",
+         model: model,
+         context: context,
+         finish_reason: :tool_calls,
+         message: ReqLLM.Context.assistant("", tool_calls: [call]),
+         object: %{"summary" => "ready"},
+         usage: %{input_tokens: 1, output_tokens: 1}
+       }}
+    end)
+
+    turn =
+      turn("contract:tool-call",
+        tools: [Jido.Test.AI.Tools.Add],
+        output_schema: %{
+          "type" => "object",
+          "properties" => %{"summary" => %{"type" => "string"}}
+        }
+      )
+
+    assert {:ok, %{outcome: outcome}} =
+             CallModel.run(%{turn: turn, context: model_context()}, %{})
+
+    assert outcome.kind == :tool_calls
+    assert [%{name: "add"}] = outcome.tool_calls
+    assert outcome.output == %{"summary" => "ready"}
+  end
+
   defp turn(model, overrides \\ []) do
     session = Jido.Session.new(id: "session:call-model", now: 1)
 

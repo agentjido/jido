@@ -119,6 +119,55 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     assert messages == ["user", "assistant", "user", "assistant"]
   end
 
+  test "a validated structured output tool response completes as a final answer" do
+    object = %{"summary" => "It works."}
+
+    expect(ReqLLM, :generate_text, fn model, context, _options ->
+      call =
+        ReqLLM.ToolCall.new(
+          "structured-output-1",
+          "structured_output",
+          JSON.encode!(object)
+        )
+
+      response = tool_response(model, context, [call], "structured-output-response")
+      {:ok, %{response | object: object}}
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "structured-output-agent")
+
+    assert {:ok, result, agent} =
+             run(agent, %{
+               input: "Summarize.",
+               output_schema: %{
+                 "type" => "object",
+                 "properties" => %{"summary" => %{"type" => "string"}},
+                 "required" => ["summary"],
+                 "additionalProperties" => false
+               },
+               tool_policy: %{requirement: :disabled},
+               limits: %{model_calls: 1}
+             })
+
+    assert result.status == :completed
+    assert result.output == object
+    assert result.model_calls == 1
+    assert result.tool_calls == 0
+
+    assert [attempt] = result.model_attempts
+    assert attempt.outcome.kind == :final_answer
+    assert attempt.outcome.output == object
+    assert attempt.outcome.tool_calls == []
+
+    assistant =
+      agent.state.session.thread.entries
+      |> Enum.filter(&(&1.kind == :ai_message and &1.payload["role"] == "assistant"))
+      |> List.last()
+
+    assert assistant.payload["content"] == JSON.encode!(object)
+    assert assistant.payload["tool_calls"] == []
+  end
+
   test "provider prompt-cache usage remains in the model attempt and aggregate usage" do
     usage = %{
       input_tokens: 100,

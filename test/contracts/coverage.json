@@ -5441,7 +5441,7 @@
         "jido_ai.model_execution.I1": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 10,
+          "passing": 11,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5453,6 +5453,7 @@
             "test multimodal support preserves the plain-text input limit",
             "test one embedding Action accepts one value or a batch",
             "test provider cache and timeout options are derived only from the portable turn",
+            "test structured objects do not hide actionable agent tool calls",
             "test the embedding Action returns provider errors",
             "test the output guard applies the size limit to structured objects"
           ]
@@ -5472,7 +5473,7 @@
         "jido_ai.model_execution.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 11,
+          "passing": 12,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5483,6 +5484,7 @@
             "test multimodal support preserves the plain-text input limit",
             "test one embedding Action accepts one value or a batch",
             "test provider cache and timeout options are derived only from the portable turn",
+            "test structured objects do not hide actionable agent tool calls",
             "test the embedding Action returns provider errors",
             "test the output guard applies the size limit to structured objects",
             "test usage combines cache semantics and records cache write expiry for every TTL form",
@@ -5699,7 +5701,7 @@
         "jido_ai.react.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 34,
+          "passing": 35,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5716,6 +5718,7 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test a validated structured output tool response completes as a final answer",
             "test an answer over limits.output_chars starts a repair that names the limit",
             "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
@@ -5742,7 +5745,7 @@
         "jido_ai.react.I2": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 34,
+          "passing": 35,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5759,6 +5762,7 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test a validated structured output tool response completes as a final answer",
             "test an answer over limits.output_chars starts a repair that names the limit",
             "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
@@ -5785,7 +5789,7 @@
         "jido_ai.react.I3": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 34,
+          "passing": 35,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5802,6 +5806,7 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test a validated structured output tool response completes as a final answer",
             "test an answer over limits.output_chars starts a repair that names the limit",
             "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
@@ -5828,7 +5833,7 @@
         "jido_ai.react.I4": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 33,
+          "passing": 34,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5845,6 +5850,7 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test a validated structured output tool response completes as a final answer",
             "test an answer over limits.output_chars starts a repair that names the limit",
             "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
@@ -5870,7 +5876,7 @@
         "jido_ai.react.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 33,
+          "passing": 34,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5887,6 +5893,7 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test a validated structured output tool response completes as a final answer",
             "test an answer over limits.output_chars starts a repair that names the limit",
             "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
@@ -5912,7 +5919,7 @@
         "jido_ai.react.I6": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 33,
+          "passing": 34,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5929,6 +5936,7 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test a validated structured output tool response completes as a final answer",
             "test an answer over limits.output_chars starts a repair that names the limit",
             "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
@@ -5954,7 +5962,7 @@
         "jido_ai.react.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 33,
+          "passing": 34,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5971,6 +5979,7 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test a validated structured output tool response completes as a final answer",
             "test an answer over limits.output_chars starts a repair that names the limit",
             "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",
@@ -5996,7 +6005,7 @@
         "jido_ai.react.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 33,
+          "passing": 34,
           "status": "active",
           "testable": true,
           "tests": [
@@ -6013,6 +6022,7 @@
             "test a tool review wait survives restart and resumes the same graph",
             "test a truncated model response starts repair and is not committed as an assistant message",
             "test a trusted runtime tool source extends the canonical ReAct Toolset",
+            "test a validated structured output tool response completes as a final answer",
             "test an answer over limits.output_chars starts a repair that names the limit",
             "test an answer that stays over limits.output_chars blocks and keeps the attempt text",
             "test conversation projection keeps complete recent turns within its configured window",

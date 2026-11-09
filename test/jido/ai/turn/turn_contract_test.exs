@@ -699,7 +699,7 @@ defmodule Jido.AI.Turn.ContractTest do
              RecordModelAttempt.run(
                %{
                  turn: attempt_turn("response-attempt"),
-                 outcome: ok_outcome("fallback", nil),
+                 outcome: ok_outcome("fallback", %{"summary" => "ready"}),
                  context: context,
                  output_allowed: true,
                  output_reason: ""
