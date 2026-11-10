@@ -362,10 +362,10 @@ claims:
       - {mode: covenant, evidence_group: covenant, proves: "Stable Covenant IDs trace turn obligations to the canonical behavior tests."}
   - id: jido.agent.authoring
     component: jido.agent
-    canonical: {mode: authoring, evidence_group: authoring, owner: test/authoring/jido_agent, proves: "Executable Agent DSL cases own compilation, metadata, extension, serialization, and generated-module authoring behavior."}
+    canonical: {mode: authoring, evidence_group: authoring, owner: test/authoring/agent_equivalence_test.exs, proves: "Agent DSL, independent Map, and fixed JSON inputs produce the same complete canonical definition."}
   - id: jido_action.flow.authoring
     component: jido_action.flow
-    canonical: {mode: authoring, evidence_group: authoring, owner: test/authoring/jido_flow, proves: "Executable Flow DSL cases own declaration, graph, extension, rejection, stored-form, and source-boundary authoring behavior."}
+    canonical: {mode: authoring, evidence_group: authoring, owner: test/authoring/flow_equivalence_test.exs, proves: "Flow DSL, independent Map, and JSON inputs produce the same canonical definition across public component types."}
   - id: jido_action.expression.generated_invariants
     component: jido_action.expression
     canonical: {mode: property, evidence_group: expression_property, owner: test/property/jido_expr/expression_contract_test.exs, proves: "Generated expression trees own operator, short-circuit, parser-limit, and evaluation invariants beyond the deterministic contract matrix."}

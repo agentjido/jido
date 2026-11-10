@@ -105,7 +105,7 @@ defmodule Jido.Quality.ComponentProofTest do
       "canonical" => %{
         "mode" => "authoring",
         "evidence_group" => "authoring",
-        "owner" => "test/authoring/jido_agent",
+        "owner" => "test/authoring/agent_equivalence_test.exs",
         "proves" => "Executable Agent authoring tests own this distinct synthetic DSL claim."
       }
     }

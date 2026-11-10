@@ -74,11 +74,11 @@ assets:
   - source_repository: jido_action
     source_commit: 177e7a4ce4342a9a6b7bc668f540dafbd7169d54
     source_path: test/authoring
-    target_path: test/authoring/jido_flow
+    target_path: test/authoring/flow_equivalence_test.exs
     quality_surface: authoring
     owner: jido.flow
     disposition: ported
-    reason: Ported by jido-nnq as 11 adapted Flow authoring test files, nine support assets, and one README. The guide runner has a separate superseded record.
+    reason: The source corpus was reduced to focused DSL, independent Map, fixed JSON, rejection, and safety equivalence checks. Runtime-only cases were removed.
   - source_repository: jido_action
     source_commit: 177e7a4ce4342a9a6b7bc668f540dafbd7169d54
     source_path: test/authoring/guides_test.exs
@@ -578,7 +578,7 @@ assets:
   - source_repository: jido_v3_split
     source_commit: 21d0dd4c4da2f9c096fbd1cec9ad1d22dce95e61
     source_path: test/authoring
-    target_path: test/authoring
+    target_path: test/authoring/agent_equivalence_test.exs
     quality_surface: authoring
     owner: jido.agent
     disposition: ported
