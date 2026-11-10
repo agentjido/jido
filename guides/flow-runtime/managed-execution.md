@@ -77,8 +77,9 @@ Jido.
 {:ok, output} = Jido.Exec.result(current, observation)
 ```
 
-Runic observations are process-local. After recovery, use
-`Jido.Exec.result/1` on a completed restored workflow.
+Runic observations are process-local. `Jido.Exec.result/2` does not project a
+restored workflow without an observation. Use `Jido.Durable` when Jido must
+restore and project the result after a process or VM restart.
 
 ## Step through a run
 

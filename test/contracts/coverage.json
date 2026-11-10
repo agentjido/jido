@@ -4363,13 +4363,13 @@
             "test manual execution resumes from durable Runic state",
             "test missing managed executions keep the Runner lookup error",
             "test native Map selects the first item after a later task crash and recovery",
-            "test result/1 projects managed failures to public Jido errors",
             "test resume/4 falls back to full recovery for a native Batch",
             "test resume/4 keeps historical facts as references by default",
             "test resume/4 restores context, policy, and the managed result",
             "test resume/4 uses full recovery for a Store without fact storage",
             "test resumed execution keeps snapshot results and rejects active recovery",
             "test serial managed admission selects the same first failure as concurrent admission",
+            "test snapshot projection retains Jido errors for durable internals",
             "test stopped admission stays busy until already admitted work completes",
             "test the default executor uses a partitioned Runner Task Supervisor"
           ]

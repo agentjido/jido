@@ -44,7 +44,7 @@ defmodule Jido.Exec.Node.ChoiceTest do
           scheduler_policies: [{:default, %{on_failure: :halt}}]
         )
 
-      assert Exec.result(workflow) == {:ok, %{value: 2 + amount}}
+      assert Jido.Exec.Result.project(workflow) == {:ok, %{value: 2 + amount}}
     end
   end
 

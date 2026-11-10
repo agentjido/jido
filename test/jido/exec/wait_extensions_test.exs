@@ -52,7 +52,7 @@ defmodule Jido.Exec.WaitExtensionsTest do
     assert {:ok, ^restored} = Runtime.resolve_wait(restored, request.id, [candidate("one", 101)], 103)
 
     assert {:ok, %{selected: "approved", value: %{id: 7}, input_id: "one"}} =
-             restored |> Workflow.react_until_satisfied() |> Jido.Exec.result()
+             restored |> Workflow.react_until_satisfied() |> Jido.Exec.Result.project()
   end
 
   test "selection uses time, timer priority, receipt order, and option order" do
@@ -68,13 +68,13 @@ defmodule Jido.Exec.WaitExtensionsTest do
     assert {:ok, resolved} = Runtime.resolve_wait(workflow, request.id, candidates, 103)
 
     assert {:ok, %{input_id: "first"}} =
-             resolved |> Workflow.react_until_satisfied() |> Jido.Exec.result()
+             resolved |> Workflow.react_until_satisfied() |> Jido.Exec.Result.project()
 
     assert {:ok, resolved} =
              Runtime.resolve_wait(workflow, request.id, [candidate("tie", 1_100)], 1_100)
 
     assert {:ok, %{selected: "expired", value: %{fired_at: 1_100}, input_id: nil}} =
-             resolved |> Workflow.react_until_satisfied() |> Jido.Exec.result()
+             resolved |> Workflow.react_until_satisfied() |> Jido.Exec.Result.project()
   end
 
   test "future or unmatched candidates leave the wait open and malformed candidates fail" do
@@ -154,7 +154,7 @@ defmodule Jido.Exec.WaitExtensionsTest do
     assert Runtime.pending_waits(resolved) == []
 
     assert {:ok, %{selected: "approved"}} =
-             resolved |> Workflow.react_until_satisfied() |> Jido.Exec.result()
+             resolved |> Workflow.react_until_satisfied() |> Jido.Exec.Result.project()
   end
 
   test "an in-memory host can resolve local values without durable portability checks" do
@@ -184,7 +184,7 @@ defmodule Jido.Exec.WaitExtensionsTest do
     assert {:ok, workflow} = Runtime.resolve_wait(workflow, request.id, [candidate], 101)
 
     assert {:ok, %{pid: ^pid}} =
-             workflow |> Workflow.react_until_satisfied() |> Jido.Exec.result()
+             workflow |> Workflow.react_until_satisfied() |> Jido.Exec.Result.project()
   end
 
   test "independent waits retain partial joins through replay" do
@@ -219,6 +219,6 @@ defmodule Jido.Exec.WaitExtensionsTest do
              Runtime.resolve_wait(workflow, right.id, [event.("right", 2)], 102)
 
     assert {:ok, %{left: %{value: 1}, right: %{value: 2}}} =
-             workflow |> Workflow.react_until_satisfied() |> Jido.Exec.result()
+             workflow |> Workflow.react_until_satisfied() |> Jido.Exec.Result.project()
   end
 end

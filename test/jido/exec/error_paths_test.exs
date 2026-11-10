@@ -178,12 +178,12 @@ defmodule Jido.Exec.ErrorPathsTest do
     @tag obligation: "jido_action.boundary.I6"
     test "result reports missing and failed output" do
       assert {:error, %ExecutionError{message: "Exec produced no result"}} =
-               Exec.result(Runic.Workflow.new())
+               Jido.Exec.Result.project(Runic.Workflow.new())
 
       failed = %Runic.Workflow.RunnableFailed{error: :odd_failure}
 
       assert {:error, %ExecutionError{details: %{reason: :odd_failure}}} =
-               Exec.result(%{Runic.Workflow.new() | runnable_events: [failed]})
+               Jido.Exec.Result.project(%{Runic.Workflow.new() | runnable_events: [failed]})
     end
   end
 

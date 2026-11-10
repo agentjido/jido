@@ -42,7 +42,7 @@ callers. This does not establish complete Flow contract coverage.
 - **status:** active
 
 ### jido_action.boundary.I6 — Call options and targets reject malformed policy
-- **scope:** `Jido.Exec.compile/2`, `Jido.Exec.run/4`, `Jido.Exec.result/1`, `Jido.Exec.result/2`
+- **scope:** `Jido.Exec.compile/2`, `Jido.Exec.run/4`, `Jido.Exec.result/2`
 - **must:** Return documented configuration errors for invalid executable targets and supported option containers, including root component options, concurrency, and Task Supervisor values. Retain useful option and value details. A missing Task Supervisor cannot start Action work. Direct Runic lookup and control errors remain Runic values.
 - **kind:** functional
 - **status:** active

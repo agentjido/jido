@@ -400,7 +400,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
     vertices = Map.values(restored.graph.vertices)
     assert Enum.any?(vertices, &is_struct(&1, Runic.Workflow.FactRef))
     assert Enum.any?(vertices, &is_struct(&1, Runic.Workflow.Fact))
-    assert Jido.Exec.result(restored) == {:ok, %{value: 2}}
+    assert Jido.Exec.Result.project(restored) == {:ok, %{value: 2}}
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
@@ -432,7 +432,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
              is_struct(vertex, Runic.Workflow.FactRef)
            end)
 
-    assert Jido.Exec.result(restored) ==
+    assert Jido.Exec.Result.project(restored) ==
              {:ok, %{items: [%{value: 2}, %{value: 3}]}}
   end
 

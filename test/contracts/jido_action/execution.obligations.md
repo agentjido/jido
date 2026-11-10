@@ -42,7 +42,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 - **status:** active
 
 ### jido_action.execution.I19 — Effects retain canonical order without dispatch
-- **scope:** `Jido.Exec.run/4, Jido.Exec.result/1, Jido.Exec.result/2`
+- **scope:** `Jido.Exec.run/4, Jido.Exec.result/2`
 - **must:** Return successful component effects in dependency then component order, with nested Flows at their parent position and collections in input or iteration order. Preserve duplicates. Failed output, failed items, cancellation, and uncertain execution expose no executable effect batch. Exec never performs the requests.
 - **kind:** ordering
 - **status:** active
@@ -54,7 +54,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 - **status:** active
 
 ### jido_action.execution.I21 — Runic results respect input scope and progress
-- **scope:** `Jido.Exec.compile/2, Jido.Exec.result/1, Jido.Exec.result/2, Runic.Runner`
+- **scope:** `Jido.Exec.compile/2, Jido.Exec.result/2, Runic.Runner`
 - **must:** Project the selected Runic input observation, rejecting active, stopped, failed, foreign, or uncertain work as documented. Later input occurrences cannot replace its result. Keep local Elixir values, including structs, equivalent to immediate execution without expanding their identity document. Direct Runner steps dispatch one scheduler unit. Computed success is separate from Store acknowledgement. Runner control and lookup errors retain Runic values.
 - **kind:** functional
 - **status:** active

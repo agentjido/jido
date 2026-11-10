@@ -386,7 +386,6 @@ Compiles and runs Jido Actions and Flows with Runic.
 | `Jido.Exec.compile/2` | Compiles an Action, Instruction, Flow module, or Flow value to Runic. |
 | `Jido.Exec.compile!/2` | Compiles an executable target to Runic or raises its error. |
 | `Jido.Exec.effect_id/4` | Derives a stable identity for one deferred effect in a completed Runic output. |
-| `Jido.Exec.result/1` | Projects a Runic workflow to the `run/4` result contract. |
 | `Jido.Exec.result/2` | Projects one Runic execution observation to the `run/4` result contract. |
 | `Jido.Exec.run/4` | Runs an Action or Flow to completion with the in-memory Runic runtime. |
 | `Jido.Exec.supports?/2` | Returns true when an Action context supports the specified host capability. |

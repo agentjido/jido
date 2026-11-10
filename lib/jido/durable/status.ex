@@ -39,7 +39,7 @@ defmodule Jido.Durable.Status do
   defp state(_workflow, [_ | _], false), do: :waiting
 
   defp state(workflow, [], false) do
-    case Jido.Exec.result(workflow) do
+    case Jido.Exec.Result.project(workflow) do
       {:ok, _value} -> :completed
       {:ok, _value, _effects} -> :completed
       {:handoff, _instruction, _effects} -> :completed

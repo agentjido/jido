@@ -319,7 +319,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
     assert Jido.Test.Exec.RunnerHarness.result(workflow) == {:ok, %{value: 3, seen: false}}
   end
 
-  test "result/1 projects managed failures to public Jido errors" do
+  test "snapshot projection retains Jido errors for durable internals" do
     runner = start_runner!(__MODULE__.FailureRunner)
 
     for {target, opts, error} <- [

@@ -130,7 +130,7 @@ defmodule Jido.Durable do
          {:ok, _execution} <- load_execution(jido, ref, config),
          {:ok, workflow} when not is_nil(workflow) <-
            Runtime.workflow(jido, Ref.execution_id(ref), config) do
-      Jido.Exec.result(workflow)
+      Jido.Exec.Result.project(workflow)
     else
       {:ok, nil} -> {:error, :not_found}
       error -> error

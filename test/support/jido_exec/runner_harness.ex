@@ -76,7 +76,7 @@ defmodule Jido.Test.Exec.RunnerHarness do
     end
   end
 
-  def result(%Workflow{} = workflow), do: Jido.Exec.result(workflow)
+  def result(%Workflow{} = workflow), do: Jido.Exec.Result.project(workflow)
 
   def result(%Workflow{} = workflow, %Workflow.Execution{} = observation),
     do: Jido.Exec.result(workflow, observation)
@@ -94,7 +94,7 @@ defmodule Jido.Test.Exec.RunnerHarness do
           if status.active_units > 0 or
                (status.status == :open and Workflow.is_runnable?(workflow)),
              do: {:error, incomplete(id, :execution_active)},
-             else: Jido.Exec.result(workflow)
+             else: Jido.Exec.Result.project(workflow)
         end
     end
   end

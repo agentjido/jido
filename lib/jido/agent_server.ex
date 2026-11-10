@@ -2821,7 +2821,7 @@ defmodule Jido.AgentServer do
     result =
       if active.durable do
         with {:ok, workflow} <- Runner.get_workflow(runner, active.worker_id),
-             do: Jido.Exec.result(workflow)
+             do: Jido.Exec.Result.project(workflow)
       else
         with {:ok, observation} <- Runner.execution(runner, active.worker_id, active.execution_id),
              {:ok, workflow} <- Runner.get_workflow(runner, active.worker_id),

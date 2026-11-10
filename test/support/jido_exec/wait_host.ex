@@ -83,7 +83,7 @@ defmodule Jido.Test.Exec.WaitHost do
   def status(workflow) do
     state = state(workflow)
     pending = pending(workflow)
-    result = Jido.Exec.result(workflow)
+    result = Jido.Exec.Result.project(workflow)
 
     cond do
       state.cancelled? -> :cancelled

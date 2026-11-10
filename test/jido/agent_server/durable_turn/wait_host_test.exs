@@ -98,7 +98,7 @@ defmodule Jido.AgentServer.DurableTurn.WaitHostTest do
     assert {:ok, ^resolved} = WaitHost.resolve_wait_inputs(resolved, 103)
 
     assert {:ok, %{input_id: "one"}} =
-             resolved |> Workflow.react_until_satisfied() |> Jido.Exec.result()
+             resolved |> Workflow.react_until_satisfied() |> Jido.Exec.Result.project()
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I7"
@@ -126,7 +126,7 @@ defmodule Jido.AgentServer.DurableTurn.WaitHostTest do
     assert {:ok, workflow} = WaitHost.resolve_wait_inputs(workflow, 151)
 
     assert {:ok, %{input_id: "first", accepted_at: 200}} =
-             workflow |> Workflow.react_until_satisfied() |> Jido.Exec.result()
+             workflow |> Workflow.react_until_satisfied() |> Jido.Exec.Result.project()
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I7"
