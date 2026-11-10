@@ -91,13 +91,13 @@ defmodule Jido.Exec.Node.Invoke do
   def expansion(node, target, input, frame, runtime) do
     with {:ok, target_instruction} <- Instruction.resolve(target),
          {:ok, instruction} <- Instruction.resolve(target_instruction, input) do
-      target_id = target_id(node, target_instruction)
-
       case instruction do
         %Instruction{kind: :action} ->
+          target_id = target_id(node, target_instruction)
           action_target(node, instruction, frame, target_id)
 
         %Instruction{kind: :flow} ->
+          target_id = target_id(node, instruction)
           {{:jido_invoke_flow_target, target_id, frame}, flow_target(node, instruction, runtime, target_id)}
       end
     else

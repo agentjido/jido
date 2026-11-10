@@ -277,7 +277,13 @@ defmodule Jido.Exec do
     case Runic.Runner.execution(runner, execution_id, managed_identity(execution_id)) do
       {:ok, observation} ->
         with {:ok, workflow} <- Runic.Runner.get_workflow(runner, execution_id) do
-          result(workflow, observation)
+          project_managed_result(
+            runner,
+            execution_id,
+            workflow,
+            result_error(observation, workflow),
+            observation
+          )
         end
 
       {:error, :not_found} ->
@@ -286,7 +292,14 @@ defmodule Jido.Exec do
           if status.active_units > 0 or
                (status.status == :open and Workflow.is_runnable?(workflow)),
              do: {:error, incomplete_error(execution_id, :execution_active)},
-             else: result(workflow)
+             else:
+               project_managed_result(
+                 runner,
+                 execution_id,
+                 workflow,
+                 result_error(workflow),
+                 nil
+               )
         end
     end
   end
@@ -398,33 +411,88 @@ defmodule Jido.Exec do
 
   defp map_item_index(_fact), do: 0
 
-  defp result_fact(workflow, nil) do
+  defp result_fact(workflow, nil, resolver) do
     case Workflow.results(workflow, nil, facts: true) do
-      %{result: %Fact{} = fact} -> fact
+      %{result: fact} -> resolve_result_fact(fact, resolver)
       _ports -> nil
     end
   end
 
-  defp result_fact(workflow, input_fact_id) do
+  defp result_fact(workflow, input_fact_id, resolver) do
     case Workflow.results(workflow, nil, facts: true, all: true) do
       %{result: facts} when is_list(facts) ->
-        Enum.find(facts, &(Workflow.root_ancestor_hash(workflow, &1) == input_fact_id))
+        facts
+        |> Enum.find(&(Workflow.root_ancestor_hash(workflow, &1) == input_fact_id))
+        |> resolve_result_fact(resolver)
 
       _ports ->
         nil
     end
   end
 
-  defp project_result(workflow, nil, observation) do
-    fact = result_fact(workflow, if(observation, do: observation.input_fact_id))
+  defp resolve_result_fact(%Fact{} = fact, _resolver), do: fact
 
-    if is_nil(fact) and not is_nil(observation) and not is_nil(result_fact(workflow, nil)),
-      do: {:error, incomplete_error(observation.id, :foreign_execution)},
-      else: project(fact)
+  defp resolve_result_fact(
+         %Runic.Workflow.FactRef{} = fact,
+         %Runic.Workflow.FactResolver{} = resolver
+       ) do
+    case Runic.Workflow.FactResolver.resolve(fact, resolver) do
+      {:ok, fact} -> fact
+      {:error, reason} -> {:error, reason}
+    end
   end
 
-  defp project_result(_workflow, error, _observation),
+  defp resolve_result_fact(_fact, _resolver), do: nil
+
+  defp project_result(workflow, error, observation),
+    do: project_result(workflow, error, observation, nil)
+
+  defp project_result(workflow, nil, observation, resolver) do
+    fact = result_fact(workflow, if(observation, do: observation.input_fact_id), resolver)
+
+    case fact do
+      %Fact{} ->
+        project(fact)
+
+      {:error, reason} ->
+        {:error, result_load_error(reason)}
+
+      nil ->
+        case result_fact(workflow, nil, resolver) do
+          {:error, reason} ->
+            {:error, result_load_error(reason)}
+
+          result when not is_nil(observation) and not is_nil(result) ->
+            {:error, incomplete_error(observation.id, :foreign_execution)}
+
+          _missing ->
+            project(nil)
+        end
+    end
+  end
+
+  defp project_result(_workflow, error, _observation, _resolver),
     do: {:error, normalize_runtime_error(error)}
+
+  defp project_managed_result(runner, execution_id, workflow, error, observation) do
+    project_result(workflow, error, observation, result_resolver(runner, execution_id))
+  end
+
+  defp result_resolver(runner, execution_id) do
+    {store, state} = Runic.Runner.get_store(runner)
+
+    if function_exported?(store, :load_fact, 2) do
+      state = Runic.Runner.Store.for_workflow(store, execution_id, state)
+      Runic.Workflow.FactResolver.new({store, state})
+    end
+  end
+
+  defp result_load_error(reason) do
+    Jido.Error.execution_error("Exec result could not be loaded", %{
+      phase: :rehydration,
+      reason: reason
+    })
+  end
 
   defp project(%Fact{meta: meta} = fact) do
     value = Jido.Exec.Fact.value(fact)
@@ -676,19 +744,59 @@ defmodule Jido.Exec do
   # The worker applies a failed runnable after this hook. See
   # `Jido.Exec.Runtime.quiet_failure_log/0`.
   defp quiet_failure_log(worker_opts) do
-    hooks = Keyword.get(worker_opts, :hooks, [])
+    hooks = worker_opts |> Keyword.get(:hooks, []) |> wrap_worker_hooks()
     failed = Keyword.get(hooks, :on_failed)
 
     on_failed = fn runnable, error, state ->
       try do
         if failed, do: failed.(runnable, error, state)
       after
-        Logger.put_process_level(self(), :error)
+        Runtime.quiet_failure_log()
       end
     end
 
-    Keyword.put(worker_opts, :hooks, Keyword.put(hooks, :on_failed, on_failed))
+    worker_opts
+    |> Keyword.put(:hooks, Keyword.put(hooks, :on_failed, on_failed))
+    |> wrap_worker_completion()
   end
+
+  defp wrap_worker_hooks(hooks) do
+    Enum.map(hooks, fn {key, hook} -> {key, wrap_worker_hook(key, hook)} end)
+  end
+
+  defp wrap_worker_hook(:on_idle, hook) when is_function(hook, 1),
+    do: fn state -> application_callback(hook, [state]) end
+
+  defp wrap_worker_hook(key, hook)
+       when key in [:on_dispatch, :transform_runnables] and is_function(hook, 2),
+       do: fn first, second -> application_callback(hook, [first, second]) end
+
+  defp wrap_worker_hook(key, hook)
+       when key in [:on_complete, :on_failed, :on_persistence_error] and is_function(hook, 3),
+       do: fn first, second, third -> application_callback(hook, [first, second, third]) end
+
+  defp wrap_worker_hook(_key, hook), do: hook
+
+  defp wrap_worker_completion(worker_opts) do
+    case Keyword.fetch(worker_opts, :on_complete) do
+      {:ok, callback} -> Keyword.put(worker_opts, :on_complete, wrap_completion(callback))
+      :error -> worker_opts
+    end
+  end
+
+  defp wrap_completion(callback) when is_function(callback, 2),
+    do: fn id, workflow -> application_callback(callback, [id, workflow]) end
+
+  defp wrap_completion({module, function, args}) when is_atom(module) and is_atom(function) and is_list(args),
+    do: fn id, workflow -> application_callback({module, function, args}, [id, workflow]) end
+
+  defp wrap_completion(callback), do: callback
+
+  defp application_callback({module, function, extra}, args),
+    do: Runtime.with_application_logging(fn -> apply(module, function, args ++ extra) end)
+
+  defp application_callback(callback, args),
+    do: Runtime.with_application_logging(fn -> apply(callback, args) end)
 
   defp resume_options(runner, opts) when is_list(opts) do
     if Keyword.keyword?(opts) do

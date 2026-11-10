@@ -177,10 +177,13 @@ defmodule Jido.Flow.DSL.ValueParser do
     do: Enum.map(values, &literal!(&1, negative_numbers?))
 
   defp literal!({:%{}, _, pairs}, negative_numbers?) do
-    if length(Enum.uniq_by(pairs, &elem(&1, 0))) != length(pairs),
-      do: raise(ArgumentError, "duplicate Flow map key")
+    Enum.reduce(pairs, %{}, fn {key, value}, values ->
+      key = literal!(key)
 
-    Map.new(pairs, fn {key, value} -> {literal!(key), literal!(value, negative_numbers?)} end)
+      if Map.has_key?(values, key), do: raise(ArgumentError, "duplicate Flow map key")
+
+      Map.put(values, key, literal!(value, negative_numbers?))
+    end)
   end
 
   defp literal!(_, _negative_numbers?), do: raise(ArgumentError, "invalid literal")

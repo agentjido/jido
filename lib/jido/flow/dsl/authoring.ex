@@ -27,6 +27,8 @@ defmodule Jido.Flow.DSL.Authoring do
 
     case Keyword.pop(options, :do) do
       {nil, short_options} ->
+        short_options = expand_aliases(short_options, caller)
+
         quote generated: true, line: caller.line, file: caller.file do
           require unquote(module)
 
@@ -37,6 +39,8 @@ defmodule Jido.Flow.DSL.Authoring do
         end
 
       {block, []} ->
+        block = expand_fields(block, module, caller)
+
         quote generated: true, line: caller.line, file: caller.file do
           require unquote(module)
 
@@ -48,6 +52,54 @@ defmodule Jido.Flow.DSL.Authoring do
       {_block, _mixed_options} ->
         Config.compile_error!(caller, "do not mix keyword and block fields in #{mixed_label}")
     end
+  end
+
+  @doc false
+  @spec expand_fields(Macro.t(), module(), Macro.Env.t()) :: Macro.t()
+  def expand_fields(block, module, caller) do
+    options_module = Module.concat(module, Options)
+    fields = options_module.__info__(:macros)
+
+    case block do
+      {:__block__, metadata, declarations} ->
+        {:__block__, metadata, Enum.map(declarations, &expand_field(&1, options_module, fields, caller.line))}
+
+      declaration ->
+        expand_field(declaration, options_module, fields, caller.line)
+    end
+  end
+
+  defp expand_field({field, metadata, [value]} = declaration, module, fields, line) do
+    if {field, 1} in fields do
+      quote line: Keyword.get(metadata, :line, line) do
+        require unquote(__MODULE__)
+        unquote(__MODULE__).field(unquote(module), unquote(field), unquote(value))
+      end
+    else
+      declaration
+    end
+  end
+
+  defp expand_field(declaration, _module, _fields, _line), do: declaration
+
+  @doc false
+  defmacro field(module, field, value) do
+    # Use the field's environment after any aliases in the block take effect.
+    value = expand_aliases(value, __CALLER__)
+
+    quote do
+      require unquote(module)
+      unquote(module).unquote(field)(unquote(value))
+    end
+  end
+
+  @doc false
+  @spec expand_aliases(Macro.t(), Macro.Env.t()) :: Macro.t()
+  def expand_aliases(expression, caller) do
+    Macro.prewalk(expression, fn
+      {:__aliases__, _, _} = alias_ast -> Macro.expand(alias_ast, caller)
+      node -> node
+    end)
   end
 
   @doc false

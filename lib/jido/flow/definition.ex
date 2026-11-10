@@ -144,7 +144,7 @@ defmodule Jido.Flow.Definition do
 
   @doc false
   @spec to_map(components()) :: [map()]
-  def to_map(components), do: components |> to_definition() |> Enum.map(&Value.to_map/1)
+  def to_map(components), do: to_definition(components)
 
   defp components(%{} = values, :canonical) when not is_struct(values) do
     values

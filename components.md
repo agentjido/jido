@@ -32,9 +32,20 @@ review, or that the available evidence covers only part of the component.
 findings are closed or that the component is ready for release. A confirmed
 component boundary in the inventory below does not complete these checks.
 
-Current count: **16 reviewed** and **21 waiting for the full review**. This includes 21 top-level components and
-16 sub-components. Some waiting components have focused test evidence, as
-noted below.
+Current count: **18 reviewed** and **19 waiting for the full review**.
+
+- Top-level components: **15 reviewed**, **6 waiting**.
+- Sub-components: **3 reviewed**, **13 waiting**.
+- Before R7, the local checklist recorded **16 reviewed** and **21 waiting**.
+  That evidence and the checkpoint note below are retained.
+- The latest completed set is Action and Flow (R7).
+- The preceding set is Session, Thread, Instruction, Signal,
+  Persistence, and Telemetry, plus Signal Router, Bus, and Dispatch.
+- Four defect fixes from this set are included in checkpoint `8525ec43`.
+  Tests were not run after these fixes. Review completion does not establish
+  that all fixes have test evidence.
+
+Some waiting components have focused test evidence, as noted below.
 
 ### Top-level components
 
@@ -48,9 +59,9 @@ noted below.
 | [`Jido.Trace`](docs/components/trace.md) | [x] | [x] | [x] | [x] | Reviewed (R1, R4) |
 | [`Jido.Codec`](docs/components/codec.md) | [x] | [x] | [x] | [x] | Reviewed (R1, R4) |
 | [`Jido.Catalog`](docs/components/catalog.md) | [x] | [x] | [x] | [x] | Reviewed (R1, R4) |
-| `Jido.Action` | [ ] | [ ] | [ ] | [ ] | Waiting |
+| [`Jido.Action`](docs/components/action.md) | [x] | [x] | [x] | [x] | Reviewed (R7) |
 | [`Jido.Instruction`](docs/components/instruction.md) | [x] | [x] | [x] | [x] | Reviewed (R5) |
-| `Jido.Flow` | [ ] | [ ] | [ ] | [ ] | Waiting |
+| [`Jido.Flow`](docs/components/flow.md) | [x] | [x] | [x] | [x] | Reviewed (R7) |
 | `Jido.Exec` | [ ] | [ ] | [ ] | [ ] | Waiting |
 | [`Jido.Signal`](docs/components/signal.md) | [x] | [x] | [x] | [x] | Reviewed (R5) |
 | `Jido.Agent` | [ ] | [ ] | [ ] | [ ] | Waiting |
@@ -151,9 +162,86 @@ an additional public component in this checklist.
   - External store services, live model calls, and a real telemetry collector
     were not tested. Proof ownership and public API decisions remain open.
 
+- **R6 — Defect fixes included in the checkpoint.** In **Review thin Jido
+  components** (`01a1c5b7-fa3f-7952-aa6f-f8a52ff50325`), turn
+  `01a1c5d1-cd1b-7892-8fa2-43177cce00b6`, the user requested fixes without tests.
+  The Session timestamp fix (Session F3), Entry encode validation (Thread F3),
+  AI span context cleanup (Telemetry F4), and AI log value filtering
+  (Telemetry F5) are included in checkpoint `8525ec43`. That chat reported
+  passing compilation, formatting, and diff checks. No tests were added or
+  run for the fixes. The checkpoint was committed without completing the
+  additional test run, as requested. The earlier R5 tests apply to the review
+  state before the fixes. Other findings and design decisions remain open.
+
+- **R7 — Action and Flow reviews.** Applied the explicitly requested
+  `kata:jido` and `elixir-design-review` skills on 2026-11-10. Reviewed HEAD
+  `8525ec43f71656d8c9c9e5a428388aa87d159ac8` on
+  `migration/consolidated-v3`, with the existing local checklist update.
+  The Action and Flow records cover all four required checks. They retain
+  each namespace as one component, with no added sub-components.
+  - One read-only reviewer traced Action. A second traced Flow authoring.
+    The primary reviewer traced Flow values, graph rules, preparation,
+    defaults, identity, codecs, and cross-component consumers. It checked
+    the reduction claims and reproduced the defects.
+  - Action has no confirmed defect. One P3 refinement can remove duplicate
+    private reservation state. The `raw`/`opaque` overlap remains an API
+    decision; no public deletion was approved.
+  - Flow has four confirmed defects: module aliases in literals change
+    value, duplicate literal module keys can lose an entry, improper array
+    defaults can raise, and Selection child diagnostics lose their source
+    line. One P3 refinement can remove an identity traversal used by
+    inspection. These are open findings, not verified fixes.
+  - The focused command passed 587 tests, including Action, Flow, Flow codec,
+    Exec/Agent integration, and isolated consumer builds. The authoring
+    command passed 8 tests. These are separate command totals.
+  - Compilation with warnings as errors and format checks passed. The first
+    test attempt failed on Mix's local TCP lock (`:eperm`); the permitted
+    retry passed. Full CI, the quality gate, full Covenant checks, and live
+    calls were not run. Proof metadata and external compatibility limits
+    remain in the records.
+  - A separate read-only verifier checked both records against source and
+    contract evidence. It found no material record error. All 75 local links,
+    checklist counts, and patch checks passed.
+  - Only local documentation changed. No production fixes, commits, pushes,
+    or publications were made. Review completion does not adopt a finding.
+
+- **R8 — Flow repairs after the review.** The user requested fixes for the Flow
+  findings. F1 through F5 are applied locally: declaration-scope aliases,
+  canonical literal map-key checks, improper-default error handling, Selection
+  child locations, and removal of the internal inspection traversal. The
+  Action source is unchanged. Flow obligations I7/I8 were clarified and I12
+  now covers the partial-default boundary. The full offline test command
+  completed all stages before the final extension and nested-union guards.
+  The focused command passed 593 tests; public authoring passed 8 tests.
+  All 24 regression tests passed after the nested-union repair.
+  The static quality gate stopped at unused Action/Catalog Dialyzer filters.
+  ExDNA passed at 17 clones. Reach passed, with 281 advisory findings. A later
+  full Covenant run had one durable-turn recovery timeout; that test passed
+  alone, and the full retry passed 3,397 tests and 325 obligations. The final
+  Covenant check after the nested-union repair passed 3,397 tests and all 325
+  obligations. Final format, patch, and 77 local file/section links passed. The
+  [Flow record](docs/components/flow.md#r8--local-flow-repairs) holds the proof
+  and limits. Review counts stay at 18 reviewed and 19 waiting.
+
+### Remaining review list
+
+The following top-level components still need the full four-step review:
+
+- [ ] `Jido`, including internal Instance services and Application composition.
+- [ ] `Jido.Exec`
+- [ ] `Jido.Agent`
+- [ ] `Jido.Plugin`
+- [ ] `Jido.AgentServer`
+- [ ] `Jido.AI`
+
+The five bundled Plugin sub-components and eight AI reasoning sub-components
+also remain waiting, as listed in the sub-component table above. Do not mark
+these complete from a parent review alone.
+
 The seven foundational component reviews are complete. Catalog F1 is superseded by the confirmed scope in ADR 0004. Codec
 F2 remains an open recommendation. Their ownership and proof gaps remain visible
 in the linked records. The six R5 records and three Signal sub-component reviews are also complete.
+The Action and Flow records are complete under R7.
 Continue the component review with the waiting rows.
 Record later review findings and decisions in each owning component file,
 then update the matching checklist row with its evidence.

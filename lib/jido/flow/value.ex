@@ -109,24 +109,6 @@ defmodule Jido.Flow.Value do
        })}
 
   @doc false
-  @spec to_map(term()) :: term()
-  # Keep the struct tags distinct from literal maps with the same fields.
-  def to_map(%Ref{} = ref), do: ref
-
-  def to_map(%Jido.Expr.Operation{} = expr),
-    do: %{expr | operands: Enum.map(expr.operands, &to_map/1)}
-
-  # A Joi state schema stays a Joi value, like the Flow's own schemas.
-  def to_map(%_{} = struct), do: struct
-
-  def to_map(%{} = map) do
-    Map.new(map, fn {key, value} -> {key, to_map(value)} end)
-  end
-
-  def to_map(list) when is_list(list), do: Enum.map(list, &to_map/1)
-  def to_map(value), do: value
-
-  @doc false
   @spec result_refs(term()) :: [String.t()]
   def result_refs(value) do
     reducer = fn

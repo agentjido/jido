@@ -160,6 +160,19 @@ defmodule Jido.Flow.DSL.ExpressionTest do
     assert {:ok, %{status: :ready}} = ValueParser.parse(%{status: :ready})
   end
 
+  test "literal map duplicates are checked after keys become values" do
+    for expression <- [
+          "value(%{String => 1, Elixir.String => 2})",
+          "value(%{String => 1,\nString => 2})",
+          "value(%{nested: %{String => 1, Elixir.String => 2}})"
+        ] do
+      assert {:error, _error} = ValueParser.parse(Code.string_to_quoted!(expression))
+    end
+
+    assert {:ok, %{String => 1, URI => 2}} =
+             ValueParser.parse(quote(do: value(%{String => 1, URI => 2})))
+  end
+
   test "lowers every supported comparison" do
     for {expression, operator} <- [
           {quote(do: input(:left) == input(:right)), :==},

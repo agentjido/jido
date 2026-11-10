@@ -16,9 +16,9 @@
       "covered": 34
     },
     "jido_action": {
-      "active": 52,
+      "active": 53,
       "coverage": 1.0,
-      "covered": 52
+      "covered": 53
     },
     "jido_ai": {
       "active": 44,
@@ -4648,10 +4648,10 @@
       }
     },
     "jido_action.flow": {
-      "active": 5,
+      "active": 6,
       "app": "jido_action",
       "coverage": 1.0,
-      "covered": 5,
+      "covered": 6,
       "form": "light",
       "obligations": {
         "jido_action.flow.I10": {
@@ -4692,10 +4692,26 @@
             "test validation errors from extension declarations keep the call site"
           ]
         },
+        "jido_action.flow.I12": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test decoding improper arrays returns structured validation errors",
+            "test encodes and decodes defaults through the same Flow schema",
+            "test normalizes partial defaults with the selected Flow schema",
+            "test rejects invalid subjects and non-object schemas",
+            "test rejects non-portable defaults after schema validation",
+            "test rejects open defaults with duplicate JSON field names",
+            "test returns the exact invalid default path"
+          ]
+        },
         "jido_action.flow.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 29,
+          "passing": 31,
           "status": "active",
           "testable": true,
           "tests": [
@@ -4719,11 +4735,13 @@
             "test direct, Spark, and JSON authoring produce one mixed canonical Flow",
             "test direct, and Spark Step authoring produce the same canonical data",
             "test inline Action identity includes its parent Parallel name",
+            "test literal maps reject duplicate module keys after alias expansion",
             "test looked-up Actions use only the new map authoring refs, dependencies, and metadata",
             "test map authoring accepts needs for every component kind",
             "test map authoring rejects after for every component kind",
             "test map authoring rejects removed aliases",
             "test map authoring still requires an explicit output",
+            "test module aliases keep their literal meaning across declaration forms",
             "test public inspection exposes needs and sorted effective dependencies",
             "test runtime DSL lowering preserves Invoke and Handoff declarations",
             "test the Parallel DSL accepts only Action declarations",
@@ -4733,19 +4751,23 @@
         "jido_action.flow.I8": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 11,
+          "passing": 15,
           "status": "active",
           "testable": true,
           "tests": [
             "test Handoff checks use graph sinks and the complete result",
             "test Handoff parameter references precede terminal graph rules",
+            "test Selection child validation reports the child declaration",
+            "test Selection records Timer and Await source locations by index and name",
             "test a duplicate across component kinds points to the second occurrence",
             "test all component expression fields contribute static dependencies",
             "test cycle errors retain blocked nodes and point to the first authored blocked component",
             "test data and Codec diagnostics use the same dependency order",
             "test direct, map, DSL, and stored graphs agree on valid and invalid dependencies",
             "test duplicates and missing references aggregate without cycle or Handoff cascades",
+            "test error paths select the closest declaration before component or role hints",
             "test hydration rejects a registered module that is not available",
+            "test lowering records component and option indices with their names and nested sources",
             "test missing references and cycles identify their source declaration",
             "test nil output retains canonical and stored graph error precedence"
           ]
@@ -6368,8 +6390,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 324,
+    "active": 325,
     "coverage": 1.0,
-    "covered": 324
+    "covered": 325
   }
 }

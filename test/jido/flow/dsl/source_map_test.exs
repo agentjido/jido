@@ -1,5 +1,6 @@
 defmodule Jido.Flow.DSL.SourceMapTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido_action.flow", async: true
+  @moduletag obligation: "jido_action.flow.I8"
 
   alias Jido.Flow.DSL.SourceMap
 
@@ -72,5 +73,64 @@ defmodule Jido.Flow.DSL.SourceMapTest do
     assert SourceMap.lookup(sources, %{component: "route"}) == component
     assert SourceMap.lookup(sources, %{path: [:output]}) == nil
     assert SourceMap.lookup(sources, %{}) == nil
+  end
+
+  test "Selection records Timer and Await source locations by index and name" do
+    module = Module.concat(__MODULE__, "Selection#{System.unique_integer([:positive])}")
+
+    Code.compile_string(
+      """
+      defmodule #{inspect(module)} do
+        use Jido.Flow, name: "selection_sources"
+        flow do
+          selection "pick" do
+            await "event", event: "ready"
+            timer "clock", after_ms: 10
+          end
+          output result("pick")
+        end
+      end
+      """,
+      "selection_sources.ex"
+    )
+
+    sources = module.__jido_flow_source_map__()
+
+    for component <- [0, "pick"], {option, line} <- [{0, 5}, {"event", 5}, {1, 6}, {"clock", 6}] do
+      assert SourceMap.lookup(sources, %{path: [:components, component, :options, option, :name]}) ==
+               %{file: "selection_sources.ex", line: line}
+    end
+  end
+
+  test "Selection child validation reports the child declaration" do
+    for declaration <- [
+          ~s(await "", event: "ready"),
+          ~s(timer "", after_ms: 10),
+          ~s(await "event", event: ""),
+          ~s|await "event", event: "ready", match: %{token: item()}|
+        ] do
+      module = Module.concat(__MODULE__, "InvalidSelection#{System.unique_integer([:positive])}")
+
+      error =
+        assert_raise CompileError, fn ->
+          Code.compile_string(
+            """
+            defmodule #{inspect(module)} do
+              use Jido.Flow, name: "selection_error"
+              flow do
+                selection "pick" do
+                  #{declaration}
+                end
+                output result("pick")
+              end
+            end
+            """,
+            "selection_error.ex"
+          )
+        end
+
+      assert error.file == "selection_error.ex"
+      assert error.line == 5
+    end
   end
 end

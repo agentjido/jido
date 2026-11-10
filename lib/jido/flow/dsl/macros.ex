@@ -173,6 +173,7 @@ defmodule Jido.Flow.DSL.Macros do
     caller = __CALLER__
     module = extension_module(["Flow", "Output"])
     source = Authoring.source(caller)
+    value = Authoring.expand_aliases(value, caller)
 
     quote generated: true, line: caller.line, file: caller.file do
       require unquote(module)
@@ -203,6 +204,8 @@ defmodule Jido.Flow.DSL.Macros do
 
     case options do
       [do: block] ->
+        block = Authoring.expand_fields(block, module, caller)
+
         quote generated: true, line: caller.line, file: caller.file do
           require unquote(module)
 

@@ -1,5 +1,6 @@
 defmodule Jido.Flow.DefaultsTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido_action.flow", async: true
+  @moduletag obligation: "jido_action.flow.I12"
 
   defmodule ConfiguredFlow do
     use Jido.Flow,
@@ -10,12 +11,19 @@ defmodule Jido.Flow.DefaultsTest do
             input: Jido.Joi.string(),
             mode: Jido.Joi.enum([:fast, :safe]),
             modes: Jido.Joi.list(Jido.Joi.enum([:fast, :safe])),
+            mode_or_modes:
+              Jido.Joi.union([
+                Jido.Joi.enum([:fast, :safe]),
+                Jido.Joi.list(Jido.Joi.enum([:fast, :safe])),
+                Jido.Joi.list(Jido.Joi.list(Jido.Joi.enum([:fast, :safe])))
+              ]),
             retries: Jido.Joi.integer(gte: 0, lte: 3),
             nested:
               Jido.Joi.object(
                 %{
                   enabled: Jido.Joi.boolean(),
-                  mode: Jido.Joi.enum([:fast, :safe]) |> Jido.Joi.optional()
+                  mode: Jido.Joi.enum([:fast, :safe]) |> Jido.Joi.optional(),
+                  modes: Jido.Joi.list(Jido.Joi.enum([:fast, :safe])) |> Jido.Joi.optional()
                 },
                 unrecognized_keys: :error
               )
@@ -81,6 +89,24 @@ defmodule Jido.Flow.DefaultsTest do
 
     assert {:error, %Jido.Error.ValidationError{details: %{path: ["unknown"]}}} =
              Jido.Flow.normalize_defaults(%{"unknown" => true}, ConfiguredFlow)
+  end
+
+  test "decoding improper arrays returns structured validation errors" do
+    for {defaults, path} <- [
+          {%{modes: ["safe" | :tail]}, [:modes]},
+          {%{nested: %{enabled: true, modes: ["safe" | :tail]}}, [:nested]},
+          {%{mode_or_modes: ["safe" | :tail]}, [:mode_or_modes]},
+          {%{mode_or_modes: [["safe"], ["safe" | :tail]]}, [:mode_or_modes]}
+        ] do
+      assert {:error, %Jido.Error.ValidationError{details: %{path: ^path}}} =
+               Jido.Flow.decode_defaults(defaults, ConfiguredFlow)
+    end
+
+    assert {:ok, %{mode_or_modes: [:safe]}} =
+             Jido.Flow.decode_defaults(%{"mode_or_modes" => ["safe"]}, ConfiguredFlow)
+
+    assert {:ok, %{mode_or_modes: [[:safe]]}} =
+             Jido.Flow.decode_defaults(%{"mode_or_modes" => [["safe"]]}, ConfiguredFlow)
   end
 
   test "rejects non-portable defaults after schema validation" do

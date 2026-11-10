@@ -86,7 +86,7 @@ defmodule Jido.Flow.DSL.SourceMap do
   defp put_nested_sources(
          source_map,
          path,
-         %{options: options, fallback: fallback},
+         %{options: options} = entity,
          file
        )
        when is_list(options) do
@@ -99,7 +99,7 @@ defmodule Jido.Flow.DSL.SourceMap do
         end)
       end)
 
-    put_source(sources, path ++ [:fallback], fallback, file)
+    put_source(sources, path ++ [:fallback], Map.get(entity, :fallback), file)
   end
 
   defp put_nested_sources(source_map, path, %{state: state} = iterate, file) do

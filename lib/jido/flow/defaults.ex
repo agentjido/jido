@@ -163,8 +163,12 @@ defmodule Jido.Flow.Defaults do
   defp restore_map_atoms(_schema, value), do: value
 
   defp restore_array_atoms(schema, value) when is_list(value) do
-    {:ok, inner} = Joi.Schema.inner(schema)
-    Enum.map(value, &restore_schema_atoms(inner, &1))
+    if List.improper?(value) do
+      value
+    else
+      {:ok, inner} = Joi.Schema.inner(schema)
+      Enum.map(value, &restore_schema_atoms(inner, &1))
+    end
   end
 
   defp restore_array_atoms(_schema, value), do: value
@@ -175,7 +179,7 @@ defmodule Jido.Flow.Defaults do
     Enum.find_value(schemas, value, fn schema ->
       restored = restore_schema_atoms(schema, value)
 
-      if restored !== value and match?({:ok, _value}, Joi.parse(schema, restored, coerce: true)),
+      if restored !== value and match?({:ok, _value}, parse(schema, restored, [])),
         do: restored
     end)
   end

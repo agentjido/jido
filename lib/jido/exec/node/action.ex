@@ -360,6 +360,8 @@ defmodule Jido.Exec.Node.Action do
     with {:ok, frame} <- Frame.merge(input),
          {:ok, params} <-
            ValueResolver.resolve(params, Frame.resolver_state(frame, run_context)),
+         {:ok, params} <-
+           Validation.callback(instruction.target, :validate_params, params, :input),
          result <-
            call_action(
              instruction.target,

@@ -332,7 +332,7 @@ defmodule Jido.Flow do
       schema: flow.schema,
       output_schema: flow.output_schema,
       components: Definition.to_map(flow.components),
-      output: Jido.Flow.Value.to_map(flow.output)
+      output: flow.output
     }
   end
 
@@ -370,7 +370,7 @@ defmodule Jido.Flow do
          output_schema: flow.output_schema,
          components: Definition.to_map(flow.components),
          dependencies: dependency_map(flow),
-         output: Jido.Flow.Value.to_map(flow.output),
+         output: flow.output,
          identity: Identity.for_flow(flow)
        }}
     end

@@ -1,7 +1,7 @@
 ---
 title: Jido documentation
 status: current
-last-reviewed: 2026-11-04
+last-reviewed: 2026-11-10
 ---
 
 # Jido documentation
@@ -24,6 +24,8 @@ This page is the index for Jido project documentation.
 - [Trace component](components/trace.md)
 - [Codec component](components/codec.md)
 - [Catalog component](components/catalog.md)
+- [Action component](components/action.md)
+- [Flow component](components/flow.md)
 - [Session component](components/session.md)
 - [Thread component](components/thread.md)
 - [Instruction component](components/instruction.md)
