@@ -19,7 +19,7 @@ defmodule Jido.Exec.ActionEffectCountTest do
     use Jido.Action, name: "effect_count_nested", schema: Joi.map()
 
     def run(_params, _context) do
-      {:ok, _output, [_, _]} = Jido.Exec.call_action(Effects)
+      {:ok, _output, [_, _]} = Jido.Exec.run(Effects)
       {:ok, %{ok: true}}
     end
   end
@@ -83,9 +83,9 @@ defmodule Jido.Exec.ActionEffectCountTest do
     assert_received {:action_stop, NestedThenNoEffects, :ok, 0}
   end
 
-  test "call_action leaves no telemetry state in the caller" do
+  test "a nested Action run leaves no telemetry state in its caller" do
     before = Process.get_keys()
-    assert {:ok, _, _} = Jido.Exec.call_action(Effects)
+    assert {:ok, _, _} = Jido.Exec.run(Effects)
     assert Process.get_keys() -- before == []
   end
 end

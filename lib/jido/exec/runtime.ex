@@ -101,14 +101,18 @@ defmodule Jido.Exec.Runtime do
   @spec run(Jido.Exec.task_supervisor(), pid(), (-> term())) :: term()
   def run(task_supervisor, group_leader, work) do
     caller = self()
+    trace_context = Jido.Trace.Context.capture()
 
     task =
       Task.Supervisor.async_nolink(task_supervisor, fn ->
         Process.group_leader(self(), group_leader)
-        watcher = watch_caller(caller, self())
-        result = work.()
-        stop_watcher(watcher)
-        result
+
+        Jido.Trace.Context.with_context(trace_context, fn ->
+          watcher = watch_caller(caller, self())
+          result = work.()
+          stop_watcher(watcher)
+          result
+        end)
       end)
 
     case Task.yield(task, :infinity) do

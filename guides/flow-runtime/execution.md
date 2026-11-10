@@ -7,11 +7,10 @@ This guide explains how `Jido.Exec` runs an Action or Flow: which entry point to
 | Function | Use it when | Runs in | Survives its caller |
 | --- | --- | --- | --- |
 | `Jido.Exec.run/4` | You want the result now | A task under Jido's task supervisor | No |
-| `Jido.Exec.call_action/3` | You already own the process and policy for one Action | The calling process | No |
 | `Jido.Exec.start/6` | You want a supervised run you can step, inspect, stop, or resume | A Worker under a `Runic.Runner` | Yes |
 | An Agent route | The work belongs to an Agent Turn | The `Jido.AgentServer` Turn | Yes |
 
-A generated Flow module also has `run/2`. It calls `Jido.Exec.run/4` with default options. `Jido.Exec.call_action/3` accepts only an Action target, creates no task, and applies no retry or timeout policy.
+A generated Flow module also has `run/2`. It calls `Jido.Exec.run/4` with default options. One Action is compiled as a one-step Flow and uses the same execution path.
 
 This guide covers immediate execution. See [Managed Execution](managed-execution.md) for `Jido.Exec.start/6` and [Flow Waits](flow-waits.md) for work that suspends.
 

@@ -65,7 +65,7 @@ defmodule Jido.Trace.Context do
 
   @doc false
   @spec capture() :: Captured.t()
-  def capture, do: %Captured{trace: get(), otel_context: OpenTelemetry.current_context()}
+  def capture, do: %Captured{trace: get(), otel_context: OpenTelemetry.capture_context()}
 
   @doc false
   @spec with_context(Trace.t() | Captured.t() | nil, (-> result)) :: result when result: term()

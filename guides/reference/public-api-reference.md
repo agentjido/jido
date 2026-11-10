@@ -383,7 +383,6 @@ Compiles and runs Jido Actions and Flows with Runic.
 
 | Function | Summary |
 | --- | --- |
-| `Jido.Exec.call_action/3` | Calls one Action in the current process with input and output validation. |
 | `Jido.Exec.compile/2` | Compiles an Action, Instruction, Flow module, or Flow value to Runic. |
 | `Jido.Exec.compile!/2` | Compiles an executable target to Runic or raises its error. |
 | `Jido.Exec.effect_id/4` | Derives a stable identity for one deferred effect in a completed Runic output. |
@@ -406,15 +405,28 @@ Portable data for one suspended Flow wait.
 | `Jido.Exec.Wait.new/1` | Creates and validates one portable wait value. |
 | `Jido.Exec.Wait.next_deadline/1` | Returns the earliest timer deadline, or `nil`. |
 
-### `Jido.Exec.Continuation`
+### `Jido.Durable`
+
+Runs and resumes persisted Flows from Signals without an Agent.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Durable.ref/2` | Builds a portable durable execution reference. |
+| `Jido.Durable.start/4` | Starts or idempotently resumes one persisted Flow from a Signal. |
+| `Jido.Durable.resume/3` | Continues a stored execution to its next durable stop. |
+| `Jido.Durable.signal/5` | Saves one Signal as input to an addressed open wait. |
+| `Jido.Durable.status/3` | Reads the last committed state, waits, and next wake time. |
+| `Jido.Durable.result/3` | Reads the normal Exec result from the last committed state. |
+
+### `Jido.Durable.Continuation`
 
 Portable data for one suspended or terminal managed execution.
 
 | Function | Summary |
 | --- | --- |
-| `Jido.Exec.Continuation.fingerprint/1` | Returns a stable fingerprint for one Flow definition and its loaded code. |
-| `Jido.Exec.Continuation.portable/1` | Checks that a continuation contains only storage-safe terms. |
-| `Jido.Exec.Continuation.validate/1` | Checks the exact shape of one continuation. |
+| `Jido.Durable.Continuation.fingerprint/1` | Returns a stable fingerprint for one Flow definition and its loaded code. |
+| `Jido.Durable.Continuation.portable/1` | Checks that a continuation contains only storage-safe terms. |
+| `Jido.Durable.Continuation.validate/1` | Checks the exact shape of one continuation. |
 
 ## Flows and expressions
 

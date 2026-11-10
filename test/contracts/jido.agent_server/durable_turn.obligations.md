@@ -9,7 +9,7 @@ modules:
 
 Protect persistent Flow progress inside one AgentServer Turn. This component
 owns Runic workflow checkpoints, wait input receipts, and recovery of that
-execution. `Jido.Exec.Continuation` owns the portable saved Turn value. This
+execution. `Jido.Durable.Continuation` owns the portable saved Turn value. This
 component does not own Agent record formats, general Agent commits, transient
 Turn execution, or post-commit effects.
 

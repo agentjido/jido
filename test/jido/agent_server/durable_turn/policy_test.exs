@@ -3,7 +3,7 @@ defmodule Jido.AgentServer.DurableTurn.PolicyTest do
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: false
 
   alias Jido.AgentServer.Lifecycle
-  alias Jido.Exec.Continuation
+  alias Jido.Durable.Continuation
   alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   defp prepared(agent, type, data) do

@@ -103,7 +103,7 @@ end
 %{failures: 0, total: 3} = ExUnit.run()
 ```
 
-The Action body runs in a task, not in the test process, under `Jido.Exec.run/4`. The task carries the test process in `$callers`, which libraries such as Mox use to find ownership. Process dictionary values do not cross over. Use context for test doubles, or call `Jido.Exec.call_action/3` to stay in the test process.
+The Action body runs in a task, not in the test process, under `Jido.Exec.run/4`. The task carries the test process in `$callers`, which libraries such as Mox use to find ownership. Exec also carries the active Jido and OpenTelemetry trace context. Other process dictionary values do not cross over. Use the Action context for test doubles. Call the Action's `run/2` function only when you deliberately want to test the unvalidated callback body.
 
 ## Test the schemas
 

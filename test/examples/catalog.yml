@@ -344,6 +344,24 @@ examples:
   readme: examples/05_flow_durability/05_06_telemetry/README.md
   source: examples/05_flow_durability/05_06_telemetry/telemetry.ex
   test: test/examples/05_flow_durability/05_06_telemetry/telemetry_test.exs
+- id: 05_07_cron_signal
+  category: durable
+  component: jido.durable
+  readme: examples/05_flow_durability/05_07_cron_signal/README.md
+  source: examples/05_flow_durability/05_07_cron_signal/cron_signal.ex
+  test: test/examples/05_flow_durability/05_07_cron_signal/cron_signal_test.exs
+- id: 05_08_timed_wait
+  category: durable
+  component: jido.durable
+  readme: examples/05_flow_durability/05_08_timed_wait/README.md
+  source: examples/05_flow_durability/05_08_timed_wait/timed_wait.ex
+  test: test/examples/05_flow_durability/05_08_timed_wait/timed_wait_test.exs
+- id: 05_09_direct_flow
+  category: durable
+  component: jido.durable
+  readme: examples/05_flow_durability/05_09_direct_flow/README.md
+  source: examples/05_flow_durability/05_09_direct_flow/direct_flow.ex
+  test: test/examples/05_flow_durability/05_09_direct_flow/direct_flow_test.exs
 - id: 06_01_human_approval
   category: flow
   component: jido_action.flow

@@ -32,9 +32,9 @@ review, or that the available evidence covers only part of the component.
 findings are closed or that the component is ready for release. A confirmed
 component boundary in the inventory below does not complete these checks.
 
-Current count: **18 reviewed** and **19 waiting for the full review**.
+Current count: **18 reviewed** and **20 waiting for the full review**.
 
-- Top-level components: **15 reviewed**, **6 waiting**.
+- Top-level components: **15 reviewed**, **7 waiting**.
 - Sub-components: **3 reviewed**, **13 waiting**.
 - Before R7, the local checklist recorded **16 reviewed** and **21 waiting**.
   That evidence and the checkpoint note below are retained.
@@ -63,6 +63,7 @@ Some waiting components have focused test evidence, as noted below.
 | [`Jido.Instruction`](docs/components/instruction.md) | [x] | [x] | [x] | [x] | Reviewed (R5) |
 | [`Jido.Flow`](docs/components/flow.md) | [x] | [x] | [x] | [x] | Reviewed (R7) |
 | `Jido.Exec` | [ ] | [ ] | [ ] | [ ] | Waiting |
+| `Jido.Durable` | [ ] | [ ] | [ ] | [ ] | Waiting |
 | [`Jido.Signal`](docs/components/signal.md) | [x] | [x] | [x] | [x] | Reviewed (R5) |
 | `Jido.Agent` | [ ] | [ ] | [ ] | [ ] | Waiting |
 | `Jido.Plugin` | [ ] | [ ] | [ ] | [ ] | Waiting |
@@ -221,7 +222,8 @@ an additional public component in this checklist.
   Covenant check after the nested-union repair passed 3,397 tests and all 325
   obligations. Final format, patch, and 77 local file/section links passed. The
   [Flow record](docs/components/flow.md#r8--local-flow-repairs) holds the proof
-  and limits. Review counts stay at 18 reviewed and 19 waiting.
+  and limits. Review counts before `Jido.Durable` was added were 18 reviewed
+  and 19 waiting.
 
 ### Remaining review list
 
@@ -229,6 +231,7 @@ The following top-level components still need the full four-step review:
 
 - [ ] `Jido`, including internal Instance services and Application composition.
 - [ ] `Jido.Exec`
+- [ ] `Jido.Durable`
 - [ ] `Jido.Agent`
 - [ ] `Jido.Plugin`
 - [ ] `Jido.AgentServer`
@@ -294,7 +297,8 @@ still needs review.
 | `Jido.Action` | Component | None | Inline authoring, validation, output, effect requests | Confirmed |
 | `Jido.Instruction` | Component | None | Target values, compiler, configuration | Proposed |
 | `Jido.Flow` | Component | None | Graph, components, DSL, inline authoring, validation, values, preparation, codecs | Confirmed |
-| `Jido.Exec` | Component | None | Compiler, runtime, frames, nodes, waits, continuations, handoffs, Runic integration | Confirmed |
+| `Jido.Exec` | Component | None | Compiler, runtime, frames, nodes, waits, handoffs, Runic integration | Confirmed |
+| `Jido.Durable` | Component | None | Persisted Flow execution, portable references and status, Signal wait input, continuation recovery, host scheduling boundary | Proposed |
 | `Jido.Signal` | Parent component | `Jido.Signal.Router`, `Jido.Signal.Bus`, `Jido.Signal.Dispatch` | Envelope, context, boundary rules, codec, catalog | Confirmed |
 | `Jido.Agent` | Component | None | Route, Turn, Directive, mutation, topology, schema, codec, Plugin preparation, references, views | Confirmed |
 | `Jido.Plugin` | Parent component | `Jido.Plugin.Audit`, `Jido.Plugin.Bus`, `Jido.Plugin.Heartbeat`, `Jido.Plugin.Scheduler`, `Jido.Plugin.SensorManager` | Plugin behavior, config, specification, manifest, normalization, contexts, runtime callbacks | Proposed |
@@ -308,7 +312,7 @@ still needs review.
 
 ### Inventory totals
 
-- 21 proposed or confirmed top-level components. `Jido` replaces the former
+- 22 proposed or confirmed top-level components. `Jido` replaces the former
   `Jido.Instance` component candidate.
 - 16 proposed or confirmed sub-components.
 - `Jido.Application` is listed as application composition, not as a public
@@ -343,6 +347,7 @@ Jido package
 ├── Jido.Instruction                         component, candidate
 ├── Jido.Flow                                component, confirmed
 ├── Jido.Exec                                component, confirmed
+├── Jido.Durable                             component, candidate
 ├── Jido.Signal                              parent component, confirmed
 │   ├── Jido.Signal.Router                   sub-component, confirmed
 │   ├── Jido.Signal.Bus                      sub-component, confirmed
@@ -457,15 +462,27 @@ authoring, codec, and preparation paths are internal parts or proof surfaces.
 ## `Jido.Exec`
 
 Exec binds, compiles, and runs Actions and Flows. It owns typed waits,
-continuations, handoffs, execution facts, and task cleanup. It does not own
-Agent commit or Plugin lifecycle.
+handoffs, execution facts, and task cleanup. It does not own persistence,
+Agent commit, or Plugin lifecycle.
 
 | Component | Major function | Current Covenant surface | Migration note | Boundary status |
 | --- | --- | --- | --- | --- |
-| `Jido.Exec` | Compile and execute Actions and Flows, including waits, continuations, handoffs, nodes, frames, and runtime cleanup | `jido_action.execution` and `jido_action.boundary` | Current proof IDs retain the old package name | Component confirmed |
+| `Jido.Exec` | Compile and execute Actions and Flows, including waits, handoffs, nodes, frames, and runtime cleanup | `jido_action.execution` and `jido_action.boundary` | Current proof IDs retain the old package name | Component confirmed |
 
-Resolved boundary: Exec is one component. Action-boundary, continuation, wait,
-node, runner, and Runic behavior are internal parts or proof surfaces.
+Resolved boundary: Exec is one component. Action-boundary, wait, node, runner,
+and Runic behavior are internal parts or proof surfaces.
+
+## `Jido.Durable`
+
+Durable runs persisted Flows from Signals without an Agent. It owns portable
+execution references and status, saved continuation data, wait input receipts,
+and the host scheduling boundary. It reuses Exec, Runic history, and
+Persistence Store adapters. It does not own a scheduler, queue, public Journal,
+or Agent state commit.
+
+| Component | Major function | Current Covenant surface | Target Covenant surface | Boundary status |
+| --- | --- | --- | --- | --- |
+| `Jido.Durable` | Start, resume, inspect, and signal one persisted Flow | Covered by unit tests and durable AgentServer surfaces | Focused public durable execution surface | Proposed component; public-shape review open |
 
 ## `Jido.Signal`
 
@@ -540,7 +557,7 @@ work.
 | AgentServer lifecycle | Start, stop, admit, serialize, commit, and report status | `jido.agent_server` | `jido.agent_server` | Broad runtime owner |
 | Activation | Restore or create a durable Agent activation | `jido.agent_server.activation` | Focused AgentServer surface | Retain, exact ID open |
 | Composition | Reconcile live parent, child, and connection topology | `jido.agent_server.composition` | Focused AgentServer surface | Retain, exact ID open |
-| Durable execution | Host durable Flow execution and recovery | `jido.agent_server.durable` | Focused AgentServer surface | Overlaps lifecycle and persistence |
+| Durable execution | Host durable Flow execution and recovery through `Jido.Durable.Runtime` | `jido.agent_server.durable` | Focused AgentServer host surface | Generic execution belongs to Durable |
 | Durable Turn | Record and settle one durable Turn | `jido.agent_server.durable_turn` | Focused AgentServer surface | Overlaps lifecycle |
 | Effects | Run post-commit effects and replies | `jido.agent_server.effects` | Focused AgentServer surface | Agent Directive ownership must move out |
 | Handoff | Transfer execution or control to another target | `jido.agent_server.handoff` | Focused AgentServer surface | Relationship to Exec handoff is open |
@@ -739,12 +756,13 @@ implement one coherent Flow definition and composition contract.
 
 Status: Resolved by Mike.
 
-Current source puts compilation, runtime execution, continuations, waits,
-facts, frames, node execution, and Runic integration under `Jido.Exec`.
+Current source puts compilation, runtime execution, waits, facts, frames, node
+execution, and Runic integration under `Jido.Exec`. Portable durable
+continuations belong to `Jido.Durable`.
 
 Decision: Exec is one component. These areas implement one execution contract.
-Action-boundary, continuation, wait, node, runner, and Runic behavior are proof
-surfaces or internal parts.
+Action-boundary, wait, node, runner, and Runic behavior are proof surfaces or
+internal parts.
 
 ### D9. Agent sub-components
 

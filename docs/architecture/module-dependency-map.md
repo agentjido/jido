@@ -344,7 +344,7 @@ Jido is a configurable actor runtime on OTP:
 - `Jido.Action` is a validated leaf work unit inside a Flow.
 - `Jido.Plugin` adds owned capability facets without changing Agent or AgentServer core.
 - `Jido.AI` is a unique, top-level, first-party Plugin capability. Its reasoning unit is a Flow.
-- `Jido.Exec.Wait` and `Jido.Exec.Continuation` describe portable suspension and resume data.
+- `Jido.Exec.Wait` and `Jido.Durable.Continuation` describe portable suspension and resume data.
 - `Jido.AgentServer.Lifecycle` owns live Turn, wait, cancellation, commit, effect, and recovery transitions.
 - `Jido.AgentServer.Status` is the public, process-neutral runtime view used by inspection tools.
 
@@ -386,6 +386,7 @@ flowchart TD
   Instance --> Server["Jido.AgentServer"]
   Server --> Agent["Jido.Agent"]
   Server --> Exec["Jido.Exec"]
+  Server --> Durable["Jido.Durable"]
   Server --> Persistence["Jido.Persistence"]
   Server --> PluginRuntime["Plugin runtime facets"]
   Server --> CatalogView
@@ -410,7 +411,11 @@ flowchart TD
   Exec --> Flow
   Exec --> Action
   Exec --> Wait["Jido.Exec.Wait"]
-  Exec --> Continuation["Jido.Exec.Continuation"]
+
+  Durable --> Exec
+  Durable --> Wait
+  Durable --> Continuation["Jido.Durable.Continuation"]
+  Durable --> Persistence
 
   Persistence --> Codec["Jido.Codec"]
   Persistence --> Continuation
@@ -452,9 +457,9 @@ primitives
 | `primitives` | `Jido.Id`, `Jido.Joi`, `Jido.Expr`, `Jido.Error`, `Jido.Trace`, and standalone Codec mechanics | General policies and tools that do not know the Jido domain model |
 | `value_model` | `Jido.Signal`, `Jido.Session`, `Jido.Thread`, immutable Catalog values, and common Codec contracts and portable values | Process-free Jido values, inventories, references, and serialization contracts |
 | `definitions` | `Jido.Action`, `Jido.Flow`, `Jido.Instruction`, `Jido.Plugin.Spec`, `Jido.Plugin.Config`, Signal routing, and definition codecs | Declarative behavior and capability definitions that use only lower values and validation |
-| `execution` | `Jido.Exec`, Wait, Continuation, compiler and runtime policy | Executes definitions but does not commit Agent state |
+| `execution` | `Jido.Exec`, Wait, compiler, and runtime policy | Executes definitions but does not commit Agent state |
 | `agent_domain` | `Jido.Agent`, routes, Turns, Directives, validation, and pure Plugin reduction | Defines candidate transitions without process ownership |
-| `live_runtime` | `Jido.AgentServer`, `Jido.Instance`, Persistence stores and adapters, Signal delivery, and runtime context | Owns processes, commit, effects, continuation lifecycle, and recovery |
+| `live_runtime` | `Jido.Durable`, `Jido.AgentServer`, `Jido.Instance`, Persistence stores and adapters, Signal delivery, and runtime context | Owns processes, commit, effects, continuation lifecycle, and recovery |
 | `capabilities` | `Jido.AI` and bundled or external Plugin implementations | Uses the common lower contracts; core cannot depend on a capability |
 | `composition` | `Jido.Application`, `Jido.Catalog.Discovery` | Starts and publishes the complete application runtime |
 
@@ -649,7 +654,7 @@ Disposition terms:
 | `Jido.Exec.ValueResolver` | Keep | Runtime Flow value resolution |
 | `Jido.Exec.Waits` | Removed | Portable data moved to Wait and workflow host operations moved to Runtime |
 | `Jido.Exec.Wait` | Keep | Canonical portable wait, ID, match, deadline, and input-validation value |
-| `Jido.Exec.Continuation` | Keep | Canonical portable suspended Flow and Handoff state with stable identity and definition fingerprint |
+| `Jido.Durable.Continuation` | Keep | Canonical portable suspended Flow and Handoff state with stable identity and definition fingerprint |
 
 ### Agent domain
 
@@ -735,7 +740,7 @@ Disposition terms:
 | `Jido.AgentServer.Core` | Removed | Turn transition, admission, outcome, and commit policy now belong to AgentServer.Lifecycle |
 | `Jido.AgentServer.Directive` | Keep | AgentServer-specific runtime requests; shared AgentSend, ParentSend, and ServerStop values now belong to Agent.Directive |
 | `Jido.AgentServer.Durable` | Removed | Durable lifecycle policy now belongs to Lifecycle, durable conversion belongs to Persistence, and stable member identities belong to Agent.Topology |
-| `Jido.AgentServer.DurableTurn` | Removed | Portable suspension data belongs to Exec.Continuation, live continuation policy belongs to Lifecycle, and workflow bytes belong to Persistence.ContinuationStore |
+| `Jido.AgentServer.DurableTurn` | Removed | Portable suspension data and host-neutral execution belong to Jido.Durable, Agent commit policy belongs to Lifecycle, and workflow bytes belong to Persistence.ContinuationStore |
 | `Jido.AgentServer.Effects` | Keep | Post-commit effect execution boundary |
 | `Jido.AgentServer.Pending` | Keep internal | Private pending-turn record generated inside AgentServer |
 | `Jido.AgentServer.Plugin` | Keep | Canonical live Plugin lifecycle owner |
@@ -805,8 +810,9 @@ Jido
 │   ├── Signal
 │   └── Term
 ├── Error
+├── Durable
+│   └── Continuation
 ├── Exec
-│   ├── Continuation
 │   └── Wait
 ├── Expr
 ├── Flow
@@ -857,7 +863,7 @@ The target changes layer ownership in these ways:
 - Keep the global runtime Codec router, provider index, and current readers
   until each retained capability has a direct replacement and no library
   contract uses it.
-- Put `Jido.Exec.Wait` and `Jido.Exec.Continuation` in execution. They cannot depend on AgentServer or a Persistence adapter.
+- Put `Jido.Exec.Wait` in execution and `Jido.Durable.Continuation` in durability. They cannot depend on AgentServer or a Persistence adapter.
 - Put `Jido.AgentServer.Lifecycle` and `Jido.AgentServer.Status` in `live_runtime`.
 - Put `Jido.Telemetry.Signal`, `Jido.Telemetry.Exec`, `Jido.Telemetry.Persistence`, `Jido.Telemetry.AgentServer`, and `Jido.Telemetry.AI` in their owning feature layers.
 - Put `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry` in `value_model`.

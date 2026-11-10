@@ -19,7 +19,6 @@ defmodule Jido.Exec do
 
   alias Jido.Exec.{Compiler, Frame, Runtime}
   alias Jido.Telemetry.Exec, as: Telemetry
-  alias Jido.Exec.Node.Action, as: ActionNode
   alias Jido.Instruction
   alias Runic.Workflow
 
@@ -67,28 +66,6 @@ defmodule Jido.Exec do
   @doc "Compiles an executable target to Runic or raises its error."
   @spec compile!(term(), keyword()) :: Workflow.t() | no_return()
   def compile!(target, opts \\ []), do: Compiler.compile!(target, opts)
-
-  @doc """
-  Calls one Action in the current process with input and output validation.
-
-  Use this when the caller already owns the execution process and policy
-  boundary. This function does not accept a Flow, create a task, or apply
-  retry and timeout policy.
-  """
-  @spec call_action(term(), map() | keyword() | nil, map() | keyword() | nil) :: exec_result()
-  def call_action(target, params \\ %{}, context \\ %{}) do
-    with {:ok, %Instruction{kind: :action} = instruction} <- resolve(target, params, context),
-         node = ActionNode.new(instruction),
-         {:ok, value, effects} <- ActionNode.execute(node, %{}, %{}) do
-      if effects == [], do: {:ok, value}, else: {:ok, value, effects}
-    else
-      {:ok, %Instruction{kind: kind}} ->
-        {:error, Jido.Error.config_error("call_action requires an Action target", %{kind: kind})}
-
-      {:error, error} ->
-        {:error, normalize_runtime_error(error)}
-    end
-  end
 
   @doc "Derives a stable identity for one deferred effect in a completed Runic output."
   @spec effect_id(term(), Runic.Identity.t(), Runic.Identity.t(), non_neg_integer()) ::

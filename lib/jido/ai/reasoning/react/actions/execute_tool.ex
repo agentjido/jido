@@ -37,7 +37,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExecuteTool do
 
   defp execute(%{executor: %{kind: :action, target: action}, params: params}, context) do
     action
-    |> Jido.Exec.call_action(params, context)
+    |> Jido.Exec.run(params, context)
     |> normalize_result()
   end
 

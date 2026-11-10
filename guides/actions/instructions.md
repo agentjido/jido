@@ -161,7 +161,6 @@ template = Jido.Instruction.template(:action, Tickets.CloseTicket, %{source: "ro
 | Position | Accepts |
 |---|---|
 | `Jido.Exec.run/4`, `Jido.Exec.compile/2`, `Jido.Exec.start/6` | All four forms |
-| `Jido.Exec.call_action/3` | Action module, or an Instruction with an Action target |
 | Invoke expander, `{:continue, input, target}` | Action module, Flow module, `Jido.Flow` value, or Instruction |
 | Handoff selector, `{:handoff, input, target}` | Any target with no bound context or metadata |
 | Flow step `:action` | Action or Flow module. A bound Instruction is rejected. |

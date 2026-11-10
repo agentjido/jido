@@ -4,7 +4,7 @@ This guide shows how to declare the input and output of an Action, what each sch
 
 ## Validation order
 
-`Jido.Exec.run/4` and `Jido.Exec.call_action/3` check an Action in this order:
+`Jido.Exec.run/4` checks an Action in this order:
 
 1. `on_before_validate_params/1`, when the Action implements it.
 2. The `:schema` input schema.

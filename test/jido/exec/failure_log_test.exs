@@ -42,7 +42,7 @@ defmodule Jido.Exec.FailureLogTest do
 
     def run(_params, _context) do
       Logger.info("application info before failure")
-      {:ok, _nested} = Jido.Exec.call_action(Counter, %{n: 0, card: "x"})
+      {:ok, _nested} = Jido.Exec.run(Counter, %{n: 0, card: "x"})
       Logger.warning("application warning after nested call")
       {:error, "failed"}
     end
@@ -247,8 +247,8 @@ defmodule Jido.Exec.FailureLogTest do
     assert_no_sentinel(log)
   end
 
-  test "Exec.call_action logs nothing" do
-    log = logged(fn -> assert {:error, _} = Jido.Exec.call_action(Boom, input(), @context) end)
+  test "Exec.run logs no runtime failure details" do
+    log = logged(fn -> assert {:error, _} = Jido.Exec.run(Boom, input(), @context) end)
     assert log == ""
   end
 

@@ -3931,7 +3931,6 @@
             "test a Flow module input error reports Flow context",
             "test a validator map success keeps input structs separate from output envelope rules",
             "test absent validation targets preserve input and output values",
-            "test call_action/3 validates an Action in the calling process",
             "test custom validator success must contain a map or a valid output envelope",
             "test custom validators reject scalar success at root and nested boundaries",
             "test data Flow schemas run once at root and nested boundaries",
@@ -3942,6 +3941,7 @@
             "test preparation and Action schemas run once with explicit key preservation",
             "test root and nested data Flow input schemas reject scalar transformations",
             "test run/4 projects validation failures",
+            "test run/4 validates an Action outside the calling process",
             "test schema validation retains context when a transformation returns a scalar",
             "test selected Action validation failures keep their Flow location",
             "test validator exception errors retain the original exception",
@@ -3975,7 +3975,6 @@
             "test an Action exception fails the Runnable with a structured error",
             "test an Action failure stops dependent Flow work",
             "test an invalid Action return fails the Runnable",
-            "test call_action/3 validates an Action in the calling process",
             "test callback errors retain exact messages reasons and failure details",
             "test compiler catches a non-local Flow definition failure",
             "test control component failures in a nested Flow keep the parent path",
@@ -3983,6 +3982,7 @@
             "test original callback and validator stacktraces remain in both documented fields",
             "test run/4 projects Action exceptions",
             "test run/4 reports the same failure for serial and concurrent execution",
+            "test run/4 validates an Action outside the calling process",
             "test selected Action failures return no executable effects"
           ]
         },

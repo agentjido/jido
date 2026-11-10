@@ -2,7 +2,7 @@ defmodule Jido.AgentServer.DurableTurn.WaitHostTest do
   use ExUnit.Case, async: true
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: true
 
-  alias Jido.AgentServer.Lifecycle, as: WaitHost
+  alias Jido.Durable.Runtime, as: WaitHost
   alias Jido.Exec.{Frame, Runtime}
   alias Runic.Workflow
   alias Runic.Workflow.{CausalContext, Fact, Runnable}

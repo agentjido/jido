@@ -14,7 +14,7 @@ This guide lists the options that bound one Action run: timeouts, retries, backo
 | `:max_concurrency` | See [Concurrency](#concurrency) | Positive integer | Concurrent Flow work. No effect on one Action. |
 | `:task_supervisor` | The Jido application task supervisor | Local pid, registered name, or `{:via, module, name}` | Owner of the execution task. `Jido.Exec.run/4` only. |
 
-Options apply to `Jido.Exec.run/4`. `Jido.Exec.call_action/3` takes none and has no timeout or retry. An unknown or invalid option returns a configuration error, and no work runs.
+Options apply to `Jido.Exec.run/4`. An unknown or invalid option returns a configuration error, and no work runs.
 
 ```elixir
 defmodule Payments.Ping do

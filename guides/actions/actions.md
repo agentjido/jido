@@ -77,15 +77,10 @@ Invalid input stops before `run/2` is called:
 | Call | Process | Validates | Timeout and retry | Use it when |
 |---|---|---|---|---|
 | `Jido.Exec.run/4` | Supervised task | Yes | Yes | You want the public execution boundary. This is the default. |
-| `Jido.Exec.call_action/3` | Caller | Yes | No | The caller already owns the process and policy. |
 | `run/2` on the module | Caller | No | No | You test the function body or validate each boundary yourself. |
 
-`Jido.Exec.call_action/3` accepts only an Action target. A Flow target returns a `Jido.Error.ValidationError`.
-
-```elixir
-{:ok, %{total_cents: 110}} =
-  Jido.Exec.call_action(Billing.CalculateInvoiceTotal, %{subtotal_cents: 100})
-```
+Actions and Flows use the same `Jido.Exec.run/4` path. Exec compiles one
+Action as a one-step Flow and isolates it from the caller.
 
 A direct `run/2` call skips schema defaults, so validate first:
 

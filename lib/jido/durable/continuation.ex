@@ -1,4 +1,4 @@
-defmodule Jido.Exec.Continuation do
+defmodule Jido.Durable.Continuation do
   @moduledoc """
   Portable data for one suspended or terminal managed execution.
 

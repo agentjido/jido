@@ -140,6 +140,14 @@ defmodule Jido.Telemetry.OpenTelemetry do
   end
 
   @doc false
+  @spec capture_context() :: term() | nil
+  def capture_context do
+    if available?(), do: call(:otel_ctx, :get_current, [])
+  catch
+    _, _ -> nil
+  end
+
+  @doc false
   @spec context_from_trace(Trace.t() | nil) :: term() | nil
   def context_from_trace(trace) do
     if enabled?() do

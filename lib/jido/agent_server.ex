@@ -76,7 +76,7 @@ defmodule Jido.AgentServer do
   alias Jido.AgentServer.Plugin.Callbacks, as: PluginCallbacks
   alias Jido.Agent.Runner, as: AgentRunner
   alias Jido.Agent.Validation
-  alias Jido.Exec.Continuation
+  alias Jido.Durable.Continuation
   alias Jido.Persistence.ContinuationStore
   alias Jido.Signal
   alias Jido.Telemetry.AgentServer, as: AgentServerTelemetry

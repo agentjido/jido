@@ -102,14 +102,14 @@ true = is_binary(digest)
 
 ## Run one Action alone
 
-`Jido.Exec.call_action/3` runs one Action in the current process with validation and no policy. Use it to test the Action away from the Flow around it.
+`Jido.Exec.run/4` runs one Action through the same isolated path as a one-step Flow. Use it to test the Action away from the larger Flow.
 
 ```elixir
 {:ok, %{ticket_id: "t-9", owner: "ana"}} =
-  Jido.Exec.call_action(DebugFlowsGuide.AssignTicket, %{ticket_id: "t-9", owner: "ana"})
+  Jido.Exec.run(DebugFlowsGuide.AssignTicket, %{ticket_id: "t-9", owner: "ana"})
 
 {:error, %Jido.Error.ValidationError{details: %{errors: [%{path: [:owner]} | _]}}} =
-  Jido.Exec.call_action(DebugFlowsGuide.AssignTicket, %{ticket_id: "t-9"})
+  Jido.Exec.run(DebugFlowsGuide.AssignTicket, %{ticket_id: "t-9"})
 ```
 
 ## Watch a run with telemetry

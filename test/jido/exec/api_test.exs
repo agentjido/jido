@@ -40,17 +40,17 @@ defmodule Jido.Exec.ApiTest do
   end
 
   @tag obligation: ["jido_action.boundary.I1", "jido_action.boundary.I2"]
-  test "call_action/3 validates an Action in the calling process" do
+  test "run/4 validates an Action outside the calling process" do
     assert {:ok, %{pid: pid, value: 8}, [:effect]} =
-             Exec.call_action(CallerProcessAction, %{value: 8})
+             Exec.run(CallerProcessAction, %{value: 8})
 
-    assert pid == self()
+    refute pid == self()
 
     assert {:error, %Jido.Error.ValidationError{}} =
-             Exec.call_action(CallerProcessAction, %{value: "bad"})
+             Exec.run(CallerProcessAction, %{value: "bad"})
 
     assert {:error, %Jido.Error.ExecutionError{phase: :run}} =
-             Exec.call_action(ErrorAction, %{error_type: :runtime})
+             Exec.run(ErrorAction, %{error_type: :runtime})
   end
 
   @tag obligation: "jido_action.boundary.I5"

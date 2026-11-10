@@ -5,7 +5,8 @@ defmodule Jido.AgentServer.DurableTurn.ApiTest do
 
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Lifecycle
-  alias Jido.Exec.{Continuation, Wait}
+  alias Jido.Durable.Continuation
+  alias Jido.Exec.Wait
   alias Jido.Persistence.ContinuationStore
   alias Jido.Persistence.ContinuationStore.JoinCompletedRef
   alias Jido.Signal

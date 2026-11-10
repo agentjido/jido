@@ -2,7 +2,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: true
 
-  alias Jido.AgentServer.Lifecycle
+  alias Jido.Durable.Runtime
   alias Jido.Persistence.ContinuationStore, as: Store
   alias Jido.Persistence.ContinuationStore.JoinCompletedRef
   alias Jido.Test.AgentServer.DurableFixtures, as: F
@@ -485,10 +485,8 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
 
   @tag obligation: "jido.agent_server.durable_turn.I7"
   test "wait delivery rejects an execution with no saved graph", c do
-    data = %{jido: c.jido, active: %{worker_id: c.id}}
-
     assert {:error, :missing_wait_checkpoint} =
-             Lifecycle.deliver_wait_input(data, %{
+             Runtime.accept_input(c.jido, c.id, c.config, %{
                id: "input",
                event: "event",
                payload: %{},

@@ -77,7 +77,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Advance do
   end
 
   defp call(action, params, context) do
-    case Jido.Exec.call_action(action, params, context) do
+    case Jido.Exec.run(action, params, context) do
       {:ok, output} -> {:ok, output, []}
       {:ok, output, effects} -> {:ok, output, effects}
       {:error, _error} = error -> error
