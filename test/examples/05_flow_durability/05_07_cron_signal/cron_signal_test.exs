@@ -36,8 +36,9 @@ defmodule Jido.Examples.Durability.CronSignalTest do
     assert {:ok, %Occurrence{generation: 1, scheduled_at: "2026-11-10T12:00:00.000000Z"}} =
              Occurrence.from_signal(occurrence)
 
-    assert :ok = Durable.signal(jido, ref, wait_id, occurrence, now: 2_000)
-    assert {:ok, %Status{state: :completed}} = Durable.resume(jido, ref, now: 2_000)
+    assert {:ok, %Status{state: :completed}} =
+             Durable.signal(jido, ref, wait_id, occurrence, now: 2_000)
+
     assert {:ok, %{report: "daily"}} = Durable.result(jido, ref)
   end
 

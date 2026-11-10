@@ -85,7 +85,7 @@ defmodule Jido.Durable.ApiTest do
              Durable.result(c.jido, ref)
   end
 
-  test "saves a wait Signal before resume and makes equal retries inert", c do
+  test "a wait Signal resumes the Flow and equal retries are inert", c do
     input = signal("durable.request", %{request_id: "r1"})
 
     assert {:ok,
@@ -98,13 +98,14 @@ defmodule Jido.Durable.ApiTest do
              Durable.start(c.jido, WaitFlow, input, now: 100)
 
     approval = signal("durable.approved", %{request_id: "r1", actor: "operator"})
-    assert :ok = Durable.signal(c.jido, ref, wait_id, approval, now: 200)
-    assert :ok = Durable.signal(c.jido, ref, wait_id, approval, now: 200)
-
-    assert {:ok, %Status{state: :waiting}} = Durable.status(c.jido, ref)
 
     assert {:ok, %Status{state: :completed}} =
-             Durable.resume(c.jido, ref, now: 200)
+             Durable.signal(c.jido, ref, wait_id, approval, now: 200)
+
+    assert {:ok, %Status{state: :completed}} =
+             Durable.signal(c.jido, ref, wait_id, approval, now: 200)
+
+    assert {:ok, %Status{state: :completed}} = Durable.status(c.jido, ref)
 
     assert {:ok, %{selected: "approved", value: %{request_id: "r1", actor: "operator"}}} =
              Durable.result(c.jido, ref)
@@ -117,7 +118,9 @@ defmodule Jido.Durable.ApiTest do
              Durable.start(c.jido, WaitFlow, input, now: 100)
 
     approval = signal("durable.approved", %{request_id: "r1"})
-    assert :ok = Durable.signal(c.jido, ref, wait_id, approval, now: 200)
+
+    assert {:ok, %Status{state: :completed}} =
+             Durable.signal(c.jido, ref, wait_id, approval, now: 200)
 
     conflicting = %{approval | data: %{request_id: "r1", changed: true}}
 

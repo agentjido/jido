@@ -411,7 +411,7 @@ uses the persistence adapter of the named Jido instance.
 | `Jido.Durable.ref/2` | Builds a portable durable execution reference. |
 | `Jido.Durable.start/4` | Starts or idempotently resumes one persisted Flow from a Signal. |
 | `Jido.Durable.resume/3` | Continues a stored execution to its next durable stop. |
-| `Jido.Durable.signal/5` | Saves one Signal as input to an addressed open wait. |
+| `Jido.Durable.signal/5` | Saves one Signal for an addressed wait and continues the Flow. |
 | `Jido.Durable.status/2` | Reads the last committed state, waits, and next wake time. |
 | `Jido.Durable.result/2` | Reads the normal Exec result from the last committed state. |
 

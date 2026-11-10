@@ -11,9 +11,9 @@ defmodule Jido.Durable do
   uncertain, or opens a wait. Each execution unit is checkpointed before the
   next unit starts.
 
-  `signal/5` saves one Signal as input to an open wait. `:ok` confirms durable
-  acceptance only. Call `resume/3` to continue the Flow. Equal retries are
-  inert because the Signal ID identifies the input receipt.
+  `signal/5` saves one Signal as input to an open wait, then continues the Flow
+  until its next durable stop. Equal retries are inert because the Signal ID
+  identifies the input receipt.
 
   Timed waits expose `Jido.Durable.Status.next_wake_at`. A host can call
   `resume/3` at or after that UTC Unix time. A cron host calculates an
@@ -28,7 +28,7 @@ defmodule Jido.Durable do
   @metadata_fact {:jido_durable, 1, :execution}
   @start_option_keys [:id, :context, :exec_opts, :operation_timeout, :now]
   @resume_option_keys [:operation_timeout, :now]
-  @signal_option_keys [:now]
+  @signal_option_keys [:operation_timeout, :now]
 
   @typedoc "One durable operation result."
   @type operation_result :: {:ok, Status.t()} | {:error, term()}
@@ -72,16 +72,16 @@ defmodule Jido.Durable do
 
   def resume(_jido, _ref, _opts), do: invalid_ref()
 
-  @doc "Saves one Signal as input to an addressed durable wait."
+  @doc "Saves one Signal for an addressed wait and continues the durable Flow."
   @spec signal(atom(), Ref.t(), Jido.Exec.Wait.id(), Signal.t(), keyword()) ::
-          :ok | {:error, term()}
+          operation_result()
   def signal(jido, ref, wait_id, signal, opts \\ [])
 
   def signal(jido, %Ref{} = ref, wait_id, %Signal{} = signal, opts) do
     with :ok <- validate_options(opts, @signal_option_keys),
          :ok <- validate_ref_instance(jido, ref),
          {:ok, config} <- persistence(jido),
-         {:ok, _execution} <- load_execution(jido, ref, config),
+         {:ok, execution} <- load_execution(jido, ref, config),
          {:ok, input} <- Jido.Exec.Wait.input(wait_id, signal) do
       case Runtime.accept_input(
              jido,
@@ -90,6 +90,7 @@ defmodule Jido.Durable do
              input,
              now_option(opts)
            ) do
+        :ok -> run(jido, execution, config, opts)
         {:rejected, reason} -> {:error, reason}
         result -> result
       end
