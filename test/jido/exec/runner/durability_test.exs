@@ -2,7 +2,6 @@ defmodule Jido.Exec.Runner.DurabilityTest do
   use Covenant.Case, component: "jido_action.execution", async: false
   @moduletag obligation: "jido_action.execution.I22"
 
-  alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
 
@@ -242,7 +241,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
     end
 
     assert {:ok, _worker} =
-             Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                __MODULE__.Runner,
                execution_id,
                flow,
@@ -279,7 +278,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
              Runic.Runner.get_results(__MODULE__.Runner, execution_id, [])
 
     assert {:ok, workflow} = Runic.Runner.get_workflow(__MODULE__.Runner, execution_id)
-    assert Exec.result(workflow) == {:ok, %{value: 10}}
+    assert Jido.Test.Exec.RunnerHarness.result(workflow) == {:ok, %{value: 10}}
 
     {store, store_state} = Runic.Runner.get_store(__MODULE__.Runner)
     assert {:ok, events} = store.stream(execution_id, store_state)
@@ -436,17 +435,17 @@ defmodule Jido.Exec.Runner.DurabilityTest do
       })
 
     options = [on_complete: fn _, _ -> send(owner, {:handoff_done, id}) end]
-    assert {:ok, _worker} = Exec.start(runner, id, flow, %{}, %{}, options)
+    assert {:ok, _worker} = Jido.Test.Exec.RunnerHarness.start(runner, id, flow, %{}, %{}, options)
     assert_receive {:handoff_done, ^id}, 2_000
 
     expected =
       {:handoff, %Jido.Instruction{target: HandoffTarget, kind: :action, params: %{value: 8}}, [:handoff_effect]}
 
-    assert Exec.result(runner, id) == expected
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == expected
     assert :ok = Runic.Runner.checkpoint(runner, id)
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
-    assert {:ok, _worker} = Exec.resume(runner, id, %{}, options)
-    assert Exec.result(runner, id) == expected
+    assert {:ok, _worker} = Jido.Test.Exec.RunnerHarness.resume(runner, id, %{}, options)
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == expected
   end
 
   for {kind, target} <- [action: InvokeTargetStep, flow: InvokeTargetFlow] do
@@ -513,19 +512,19 @@ defmodule Jido.Exec.Runner.DurabilityTest do
     hooks = [on_complete: fn _runnable, _duration, _state -> send(owner, {tag, :accepted}) end]
 
     assert {:ok, _worker} =
-             Exec.start(runner, id, flow, %{value: 4}, %{},
+             Jido.Test.Exec.RunnerHarness.start(runner, id, flow, %{value: 4}, %{},
                dispatch_mode: :manual,
                hooks: hooks
              )
 
     Enum.reduce_while(1..10, nil, fn _, _ ->
-      assert {:ok, _workflow} = Exec.step(runner, id)
+      assert {:ok, _workflow} = Jido.Test.Exec.RunnerHarness.step(runner, id)
       assert_receive {^tag, :accepted}, 1_000
       if :invoke_target in Recorder.steps(), do: {:halt, nil}, else: {:cont, nil}
     end)
 
     assert Recorder.steps() == [:invoke_decision, :invoke_expander, :invoke_target]
-    assert {:error, _incomplete} = Exec.result(runner, id)
+    assert {:error, _incomplete} = Jido.Test.Exec.RunnerHarness.result(runner, id)
     assert :ok = Runic.Runner.checkpoint(runner, id)
 
     assert {:ok, %{status: :saved, pending_events: 0}} =
@@ -534,10 +533,10 @@ defmodule Jido.Exec.Runner.DurabilityTest do
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
 
     assert {:ok, _worker} =
-             Exec.resume(runner, id, %{}, dispatch_mode: :manual, hooks: hooks)
+             Jido.Test.Exec.RunnerHarness.resume(runner, id, %{}, dispatch_mode: :manual, hooks: hooks)
 
     Enum.reduce_while(1..10, nil, fn _, _ ->
-      case Exec.step(runner, id) do
+      case Jido.Test.Exec.RunnerHarness.step(runner, id) do
         {:ok, _workflow} ->
           assert_receive {^tag, :accepted}, 1_000
           {:cont, nil}
@@ -547,7 +546,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
       end
     end)
 
-    assert Exec.result(runner, id) == {:ok, %{value: 5}}
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == {:ok, %{value: 5}}
     assert Recorder.steps() == [:invoke_decision, :invoke_expander, :invoke_target]
   end
 
@@ -573,7 +572,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
     execution_id = {:changed_target, System.unique_integer([:positive])}
 
     assert {:ok, _worker} =
-             Exec.start(runner, execution_id, flow, %{}, %{},
+             Jido.Test.Exec.RunnerHarness.start(runner, execution_id, flow, %{}, %{},
                dispatch_mode: :manual,
                checkpoint_strategy: :every_cycle
              )
@@ -588,7 +587,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
     owner = self()
 
     assert {:ok, _worker} =
-             Exec.resume(runner, execution_id, %{},
+             Jido.Test.Exec.RunnerHarness.resume(runner, execution_id, %{},
                hooks: [
                  on_idle: fn _state -> send(owner, {:changed_target_idle, execution_id}) end
                ]
@@ -597,7 +596,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
     assert_receive {:changed_target_idle, ^execution_id}, 2_000
 
     assert {:error, %Jido.Error.ValidationError{details: details}} =
-             Exec.result(runner, execution_id)
+             Jido.Test.Exec.RunnerHarness.result(runner, execution_id)
 
     assert details.reason == :incompatible_target
     assert details.node == "work"
@@ -611,7 +610,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
     runner = __MODULE__.CancelledInvokeRunner
     start_supervised!({Runic.Runner, name: runner})
     id = {:cancelled_invoke, System.unique_integer([:positive])}
-    assert {:ok, worker} = Exec.start(runner, id, invoke_action_flow(), %{value: 4})
+    assert {:ok, worker} = Jido.Test.Exec.RunnerHarness.start(runner, id, invoke_action_flow(), %{value: 4})
     assert_receive {:checkpoint_waiting, :invoke_target}, 2_000
     [{task, _reply_tag}] = :sys.get_state(CheckpointGate).waiting
     task_monitor = Process.monitor(task)
@@ -620,7 +619,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
     assert_receive {:DOWN, ^task_monitor, :process, ^task, _reason}, 2_000
     assert_receive {:DOWN, ^worker_monitor, :process, ^worker, _reason}, 2_000
     assert Recorder.steps() == [:invoke_decision, :invoke_expander]
-    assert {:error, :not_found} = Exec.result(runner, id)
+    assert {:error, :not_found} = Jido.Test.Exec.RunnerHarness.result(runner, id)
   end
 
   defp invoke_action_flow do
@@ -661,7 +660,7 @@ defmodule Jido.Exec.Runner.DurabilityTest do
 
   defp start_execution(runner, execution_id, flow, input) do
     assert {:ok, _worker} =
-             Exec.start(runner, execution_id, flow, input, %{},
+             Jido.Test.Exec.RunnerHarness.start(runner, execution_id, flow, input, %{},
                max_concurrency: 1,
                checkpoint_strategy: :every_cycle
              )

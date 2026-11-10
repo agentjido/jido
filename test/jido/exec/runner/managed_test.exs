@@ -3,7 +3,6 @@ defmodule Jido.Exec.Runner.ManagedTest do
   @moduletag obligation: "jido_action.execution.I21"
 
   alias Jido.Error.{ExecutionError, TimeoutError}
-  alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
   alias Jido.Instruction
@@ -129,7 +128,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
     opts = [timeout: 60_000, max_attempts: 3, max_concurrency: 1]
 
     assert {:ok, _worker} =
-             Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                runner,
                id,
                two_step_flow(),
@@ -145,17 +144,17 @@ defmodule Jido.Exec.Runner.ManagedTest do
 
     test_pid = self()
     idle = [on_idle: fn _state -> send(test_pid, {:idle, id}) end]
-    assert {:ok, _worker} = Exec.resume(runner, id, context, opts ++ [hooks: idle])
+    assert {:ok, _worker} = Jido.Test.Exec.RunnerHarness.resume(runner, id, context, opts ++ [hooks: idle])
     assert_receive {:idle, ^id}, 2_000
 
     assert {:ok, workflow} = Runic.Runner.get_workflow(runner, id)
     assert [default: policy] = workflow.scheduler_policies
     assert %{timeout_ms: 60_000, max_retries: 2, execution_mode: :durable} = policy
 
-    assert Exec.result(workflow) ==
+    assert Jido.Test.Exec.RunnerHarness.result(workflow) ==
              {:ok, %{value: 2, request_id: "r-42"}, [:first, :second]}
 
-    assert Exec.result(runner, id) == Exec.result(workflow)
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == Jido.Test.Exec.RunnerHarness.result(workflow)
   end
 
   test "resume/4 keeps historical facts as references by default" do
@@ -163,20 +162,20 @@ defmodule Jido.Exec.Runner.ManagedTest do
     id = {:hybrid_resume, System.unique_integer([:positive])}
 
     assert {:ok, _worker} =
-             Exec.start(runner, id, Echo, %{value: 1}, %{}, hooks: idle_hook(id))
+             Jido.Test.Exec.RunnerHarness.start(runner, id, Echo, %{value: 1}, %{}, hooks: idle_hook(id))
 
     assert_receive {:idle, ^id}, 2_000
     assert :ok = Runic.Runner.checkpoint(runner, id)
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
 
-    assert {:ok, worker} = Exec.resume(runner, id)
+    assert {:ok, worker} = Jido.Test.Exec.RunnerHarness.resume(runner, id)
     _ = :sys.get_state(worker)
     assert {:ok, workflow} = Runic.Runner.get_workflow(runner, id)
 
     vertices = Map.values(workflow.graph.vertices)
     assert Enum.any?(vertices, &is_struct(&1, Runic.Workflow.FactRef))
     assert Enum.any?(vertices, &is_struct(&1, Runic.Workflow.Fact))
-    assert Exec.result(workflow) == {:ok, %{value: 1, seen: false}}
+    assert Jido.Test.Exec.RunnerHarness.result(workflow) == {:ok, %{value: 1, seen: false}}
   end
 
   test "resume/4 falls back to full recovery for a native Batch" do
@@ -199,20 +198,18 @@ defmodule Jido.Exec.Runner.ManagedTest do
       })
 
     assert {:ok, _worker} =
-             Exec.start(runner, id, flow, %{items: [1, 2]}, %{}, hooks: idle_hook(id))
+             Jido.Test.Exec.RunnerHarness.start(runner, id, flow, %{items: [1, 2]}, %{}, hooks: idle_hook(id))
 
     assert_receive {:idle, ^id}, 2_000
     assert :ok = Runic.Runner.checkpoint(runner, id)
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
 
     for mode <- [:hybrid, :lazy] do
-      assert {:error,
-              %ExecutionError{
-                details: %{reason: {:unsupported_batch_rehydration, ^mode}}
-              }} = Exec.resume(runner, id, %{}, rehydration: mode)
+      assert {:error, {:unsupported_batch_rehydration, ^mode}} =
+               Jido.Test.Exec.RunnerHarness.resume(runner, id, %{}, rehydration: mode)
     end
 
-    assert {:ok, worker} = Exec.resume(runner, id)
+    assert {:ok, worker} = Jido.Test.Exec.RunnerHarness.resume(runner, id)
     _ = :sys.get_state(worker)
     assert {:ok, workflow} = Runic.Runner.get_workflow(runner, id)
 
@@ -220,7 +217,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
              is_struct(vertex, Runic.Workflow.FactRef)
            end)
 
-    assert Exec.result(workflow) ==
+    assert Jido.Test.Exec.RunnerHarness.result(workflow) ==
              {:ok, %{items: [%{value: 1, seen: false}, %{value: 2, seen: false}]}}
   end
 
@@ -229,11 +226,13 @@ defmodule Jido.Exec.Runner.ManagedTest do
     id = {:secret, System.unique_integer([:positive])}
 
     assert {:ok, _worker} =
-             Exec.start(runner, id, Echo, %{value: 1}, %{api_key: "SECRET-KEY-123"}, hooks: idle_hook(id))
+             Jido.Test.Exec.RunnerHarness.start(runner, id, Echo, %{value: 1}, %{api_key: "SECRET-KEY-123"},
+               hooks: idle_hook(id)
+             )
 
     assert_receive {:idle, ^id}, 2_000
     assert {:ok, workflow} = Runic.Runner.get_workflow(runner, id)
-    assert Exec.result(workflow) == {:ok, %{value: 1, seen: true}}
+    assert Jido.Test.Exec.RunnerHarness.result(workflow) == {:ok, %{value: 1, seen: true}}
 
     {store, store_state} = Runic.Runner.get_store(runner)
     assert {:ok, events} = store.stream(id, store_state)
@@ -245,10 +244,10 @@ defmodule Jido.Exec.Runner.ManagedTest do
     id = {:datetime, System.unique_integer([:positive])}
 
     assert {:ok, _worker} =
-             Exec.start(runner, id, DateTimeValue, %{}, %{}, hooks: idle_hook(id))
+             Jido.Test.Exec.RunnerHarness.start(runner, id, DateTimeValue, %{}, %{}, hooks: idle_hook(id))
 
     assert_receive {:idle, ^id}, 2_000
-    assert Exec.result(runner, id) == {:ok, %{at: ~U[2026-11-03 12:00:00Z]}}
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == {:ok, %{at: ~U[2026-11-03 12:00:00Z]}}
   end
 
   test "managed execution rejects non-portable Instruction metadata" do
@@ -256,39 +255,9 @@ defmodule Jido.Exec.Runner.ManagedTest do
     instruction = Instruction.new!(target: Echo, metadata: %{owner: self()})
 
     assert {:error, %ExecutionError{details: details}} =
-             Exec.start(runner, {:metadata, 1}, instruction)
+             Jido.Test.Exec.RunnerHarness.start(runner, {:metadata, 1}, instruction)
 
     assert %{reason: :non_portable_durable_value, path: [:metadata, :owner]} = details
-  end
-
-  test "start/6 rejects invalid managed option values" do
-    runner = start_runner!(__MODULE__.OptionRunner)
-
-    for {key, value} <- [
-          max_concurrency: 0,
-          max_concurrency: :foo,
-          dispatch_mode: :bogus,
-          checkpoint_strategy: :bogus,
-          checkpoint_strategy: {:every_n, 0},
-          hooks: :bad,
-          executor: NoSuchExecutor
-        ] do
-      assert {:error, %Jido.Error.ValidationError{details: details}} =
-               Exec.start(runner, {:options, key}, Echo, %{}, %{}, [{key, value}])
-
-      assert details == %{option: key, value: value}
-    end
-
-    assert {:error, :not_found} = Runic.Runner.get_workflow(runner, {:options, :max_concurrency})
-  end
-
-  test "resume/4 rejects an invalid rehydration mode" do
-    runner = start_runner!(__MODULE__.InvalidRehydrationRunner)
-
-    assert {:error, %Jido.Error.ValidationError{details: details}} =
-             Exec.resume(runner, :missing, %{}, rehydration: :unknown)
-
-    assert details == %{option: :rehydration, value: :unknown}
   end
 
   test "resume/4 uses full recovery for a Store without fact storage" do
@@ -303,20 +272,13 @@ defmodule Jido.Exec.Runner.ManagedTest do
     id = {:legacy_streaming, System.unique_integer([:positive])}
 
     assert {:ok, _worker} =
-             Exec.start(runner, id, Echo, %{value: 1}, %{}, hooks: idle_hook(id))
+             Jido.Test.Exec.RunnerHarness.start(runner, id, Echo, %{value: 1}, %{}, hooks: idle_hook(id))
 
     assert_receive {:idle, ^id}, 2_000
     assert :ok = Runic.Runner.checkpoint(runner, id)
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
 
-    for mode <- [:hybrid, :lazy] do
-      assert {:error, %Jido.Error.ValidationError{details: details}} =
-               Exec.resume(runner, id, %{}, rehydration: mode)
-
-      assert details == %{option: :rehydration, value: mode}
-    end
-
-    assert {:ok, worker} = Exec.resume(runner, id)
+    assert {:ok, worker} = Jido.Test.Exec.RunnerHarness.resume(runner, id)
     _ = :sys.get_state(worker)
     assert {:ok, workflow} = Runic.Runner.get_workflow(runner, id)
 
@@ -324,7 +286,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
              is_struct(vertex, Runic.Workflow.FactRef)
            end)
 
-    assert Exec.result(workflow) == {:ok, %{value: 1, seen: false}}
+    assert Jido.Test.Exec.RunnerHarness.result(workflow) == {:ok, %{value: 1, seen: false}}
   end
 
   test "managed execution uses the package concurrency configuration" do
@@ -342,7 +304,7 @@ defmodule Jido.Exec.Runner.ManagedTest do
     id = {:default_concurrency, System.unique_integer([:positive])}
 
     assert {:ok, worker} =
-             Exec.start(runner, id, Echo, %{value: 1}, %{}, dispatch_mode: :manual)
+             Jido.Test.Exec.RunnerHarness.start(runner, id, Echo, %{value: 1}, %{}, dispatch_mode: :manual)
 
     assert %{max_concurrency: 2} = :sys.get_state(worker)
   end
@@ -351,10 +313,10 @@ defmodule Jido.Exec.Runner.ManagedTest do
     runner = start_runner!(__MODULE__.PartitionRunner, task_supervisor: {:partition, 2})
     id = {:partition, System.unique_integer([:positive])}
 
-    assert {:ok, _worker} = Exec.start(runner, id, Echo, %{value: 3}, %{}, hooks: idle_hook(id))
+    assert {:ok, _worker} = Jido.Test.Exec.RunnerHarness.start(runner, id, Echo, %{value: 3}, %{}, hooks: idle_hook(id))
     assert_receive {:idle, ^id}, 2_000
     assert {:ok, workflow} = Runic.Runner.get_workflow(runner, id)
-    assert Exec.result(workflow) == {:ok, %{value: 3, seen: false}}
+    assert Jido.Test.Exec.RunnerHarness.result(workflow) == {:ok, %{value: 3, seen: false}}
   end
 
   test "result/1 projects managed failures to public Jido errors" do
@@ -367,12 +329,12 @@ defmodule Jido.Exec.Runner.ManagedTest do
       id = {:failure, System.unique_integer([:positive])}
 
       assert {:ok, _worker} =
-               Exec.start(runner, id, target, %{}, %{}, opts ++ [hooks: idle_hook(id)])
+               Jido.Test.Exec.RunnerHarness.start(runner, id, target, %{}, %{}, opts ++ [hooks: idle_hook(id)])
 
       assert_receive {:idle, ^id}, 2_000
       assert {:ok, workflow} = Runic.Runner.get_workflow(runner, id)
-      assert {:error, %^error{message: message, details: details}} = Exec.result(workflow)
-      assert {:error, %^error{message: ^message, details: ^details}} = Exec.result(runner, id)
+      assert {:error, %^error{message: message, details: details}} = Jido.Test.Exec.RunnerHarness.result(workflow)
+      assert {:error, %^error{message: ^message, details: ^details}} = Jido.Test.Exec.RunnerHarness.result(runner, id)
     end
   end
 

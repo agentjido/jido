@@ -174,30 +174,9 @@ defmodule Jido.Exec.ErrorPathsTest do
     end
   end
 
-  describe "managed execution errors" do
+  describe "result projection errors" do
     @tag obligation: "jido_action.boundary.I6"
-    test "start, step, resume, and result report invalid requests" do
-      runner = :"error_paths_runner_#{System.unique_integer([:positive])}"
-      start_supervised!({Runic.Runner, name: runner})
-
-      assert {:error, %ValidationError{}} = Exec.start(runner, :id, Add, %{}, %{}, :bad)
-
-      assert {:error, %ValidationError{details: %{options: [:bogus]}}} =
-               Exec.start(runner, :id, Add, %{}, %{}, bogus: 1)
-
-      # A caller executor replaces the default, and other worker options pass through.
-      assert {:ok, _worker} =
-               Exec.start(runner, :custom_executor, Add, %{value: 1, amount: 1}, %{},
-                 executor: Runic.Runner.Executor.Task,
-                 executor_opts: [task_supervisor: Module.concat(runner, TaskSupervisor)],
-                 on_complete: nil
-               )
-
-      assert {:error, :not_found} = Exec.step(runner, :unknown)
-      assert {:error, %ValidationError{}} = Exec.resume(runner, :id, :bad_context)
-      assert {:error, %ExecutionError{}} = Exec.resume(runner, :unknown, nil)
-      assert {:error, %ExecutionError{}} = Exec.resume(runner, :unknown, value: 1)
-
+    test "result reports missing and failed output" do
       assert {:error, %ExecutionError{message: "Exec produced no result"}} =
                Exec.result(Runic.Workflow.new())
 

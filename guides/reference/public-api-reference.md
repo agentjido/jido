@@ -387,11 +387,8 @@ Compiles and runs Jido Actions and Flows with Runic.
 | `Jido.Exec.compile!/2` | Compiles an executable target to Runic or raises its error. |
 | `Jido.Exec.effect_id/4` | Derives a stable identity for one deferred effect in a completed Runic output. |
 | `Jido.Exec.result/1` | Projects a Runic workflow to the `run/4` result contract. |
-| `Jido.Exec.result/2` | Reads a managed result or projects a Runic execution observation. |
-| `Jido.Exec.resume/4` | Resumes a managed execution from the Runner's Runic Store. |
+| `Jido.Exec.result/2` | Projects one Runic execution observation to the `run/4` result contract. |
 | `Jido.Exec.run/4` | Runs an Action or Flow to completion with the in-memory Runic runtime. |
-| `Jido.Exec.start/6` | Starts one managed execution under an existing Runic Runner. |
-| `Jido.Exec.step/2` | Dispatches one Runic scheduler unit for a manually dispatched execution. |
 | `Jido.Exec.supports?/2` | Returns true when an Action context supports the specified host capability. |
 
 ### `Jido.Exec.Wait`
@@ -420,7 +417,7 @@ Runs and resumes persisted Flows from Signals without an Agent.
 
 ### `Jido.Durable.Continuation`
 
-Portable data for one suspended or terminal managed execution.
+Portable data for one suspended or terminal durable execution.
 
 | Function | Summary |
 | --- | --- |

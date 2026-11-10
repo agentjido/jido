@@ -94,6 +94,8 @@ defmodule Jido.MixProject do
   defp skip_internal_doc_link?(reference)
        when reference in [
               "Jido.Exec.Runtime",
+              "Jido.Exec.Fact",
+              "Jido.Exec.Frame",
               "Jido.Instruction.Compiler",
               "Jido.Instruction.Config",
               "Jido.Persistence.Record",

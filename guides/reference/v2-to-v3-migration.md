@@ -349,7 +349,7 @@ instruction =
 | `max_retries:` | `max_attempts:`, which includes the first attempt. The default is `1`. |
 | `backoff: ms` | `backoff: :none`, `:linear`, `:exponential`, or `:jitter`, with `base_delay_ms:` and `max_delay_ms:` |
 | `log_level:`, `telemetry:` options, `:jido_action` config defaults | Removed. Configure Logger and telemetry handlers, and pass options per call. |
-| `run_async/4`, `await/2`, `cancel/1` | `Jido.Exec.run/4` in your own supervised Task, or `Jido.Exec.start/6` with a Runner. See [Managed Execution](../flow-runtime/managed-execution.md). |
+| `run_async/4`, `await/2`, `cancel/1` | `Jido.Exec.run/4` in your own supervised Task, `Jido.Durable` for durable work, or `Jido.Exec.compile/2` with direct `Runic.Runner` calls for advanced control. See [Direct Runic Execution](../flow-runtime/managed-execution.md). |
 | Your `{Task.Supervisor, name: Jido.Action.TaskSupervisor}` child | Remove it. `:jido` starts its own, and `:task_supervisor` selects another. |
 | Jido.Plan, Jido.Exec.Chain, Jido.Tools.Workflow, Jido.Tools.ActionPlan | `Jido.Flow`. There is no automatic conversion. See [Flows](../flows/flows.md). |
 | Jido.Exec.Closure | A function of your own that calls `Jido.Exec.run/4` |

@@ -1,7 +1,6 @@
 defmodule Jido.Exec.Runner.RetryRecoveryTest do
   use ExUnit.Case, async: false
   @moduletag capture_log: true
-  alias Jido.Exec
 
   defmodule LostReplyStore do
     @behaviour Runic.Runner.Store
@@ -101,9 +100,9 @@ defmodule Jido.Exec.Runner.RetryRecoveryTest do
     owner = self()
     opts = [max_attempts: 3, on_complete: fn _, _ -> send(owner, :terminal_complete) end]
     context = %{counter: __MODULE__.Counter}
-    assert {:ok, worker} = Exec.start(runner, "lost-reply", flow, %{}, context, opts)
+    assert {:ok, worker} = Jido.Test.Exec.RunnerHarness.start(runner, "lost-reply", flow, %{}, context, opts)
     assert_receive :terminal_complete, 2_000
-    assert {:error, %{message: "terminal"}} = Exec.result(runner, "lost-reply")
+    assert {:error, %{message: "terminal"}} = Jido.Test.Exec.RunnerHarness.result(runner, "lost-reply")
     Agent.update(store, &%{&1 | lose?: true})
 
     assert {:error, {:persistence_failed, :lost_reply}} =
@@ -114,8 +113,8 @@ defmodule Jido.Exec.Runner.RetryRecoveryTest do
     assert {:ok, persistence} = Runic.Runner.persistence_status(runner, "lost-reply")
     assert persistence.status == {:error, {:persistence_failed, :lost_reply}}
     assert :ok = Runic.Runner.stop(runner, "lost-reply", persist: true)
-    assert {:ok, _} = Exec.resume(runner, "lost-reply", context, opts)
-    assert {:error, %{message: "terminal"}} = Exec.result(runner, "lost-reply")
+    assert {:ok, _} = Jido.Test.Exec.RunnerHarness.resume(runner, "lost-reply", context, opts)
+    assert {:error, %{message: "terminal"}} = Jido.Test.Exec.RunnerHarness.result(runner, "lost-reply")
     assert %{attempt: 1, completed: 1} = Agent.get(__MODULE__.Counter, & &1)
   end
 
@@ -124,7 +123,7 @@ defmodule Jido.Exec.Runner.RetryRecoveryTest do
     id = "retry-budget"
     opts = [max_attempts: 2]
     context = %{counter: __MODULE__.Counter}
-    assert {:ok, _worker} = Exec.start(runner, id, Probe, %{trace_delay: false}, context, opts)
+    assert {:ok, _worker} = Jido.Test.Exec.RunnerHarness.start(runner, id, Probe, %{trace_delay: false}, context, opts)
     assert_receive {:attempt, 1, task}, 2_000
     send(task, {:release, 1})
     assert_receive {:attempt, 2, ^task}, 2_000
@@ -132,18 +131,18 @@ defmodule Jido.Exec.Runner.RetryRecoveryTest do
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
     owner = self()
     opts = Keyword.put(opts, :on_complete, fn _, _ -> send(owner, :completed) end)
-    assert {:ok, _worker} = Exec.resume(runner, id, context, opts)
+    assert {:ok, _worker} = Jido.Test.Exec.RunnerHarness.resume(runner, id, context, opts)
     assert_receive {:attempt, 3, resumed}, 2_000
     refute resumed == task
     send(resumed, {:release, 3})
     assert_receive {:attempt, 4, ^resumed}, 2_000
     send(resumed, {:release, 4})
     assert_receive :completed, 2_000
-    assert {:error, %{message: "retry probe"}} = Exec.result(runner, id)
+    assert {:error, %{message: "retry probe"}} = Jido.Test.Exec.RunnerHarness.result(runner, id)
     assert {:ok, %{status: :stopped}} = Runic.Runner.admission_status(runner, id)
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
-    assert {:ok, _worker} = Exec.resume(runner, id, context, opts)
-    assert {:error, %{message: "retry probe"}} = Exec.result(runner, id)
+    assert {:ok, _worker} = Jido.Test.Exec.RunnerHarness.resume(runner, id, context, opts)
+    assert {:error, %{message: "retry probe"}} = Jido.Test.Exec.RunnerHarness.result(runner, id)
     assert Agent.get(__MODULE__.Counter, & &1.attempt) == 4
     refute_received {:attempt, _, _}
   end
@@ -163,7 +162,7 @@ defmodule Jido.Exec.Runner.RetryRecoveryTest do
       max_delay_ms: 86_400_000
     ]
 
-    assert {:ok, _worker} = Exec.start(runner, id, Probe, %{trace_delay: true}, context, opts)
+    assert {:ok, _worker} = Jido.Test.Exec.RunnerHarness.start(runner, id, Probe, %{trace_delay: true}, context, opts)
     assert_receive {:attempt, 1, task}, 2_000
     assert_receive {:trace, ^task, :call, {Process, :sleep, [86_400_000]}}, 2_000
     monitor = Process.monitor(task)
@@ -179,7 +178,7 @@ defmodule Jido.Exec.Runner.RetryRecoveryTest do
 
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
     assert_receive {:DOWN, ^monitor, :process, ^task, _}, 2_000
-    assert {:ok, _} = Exec.resume(runner, id, context, opts)
+    assert {:ok, _} = Jido.Test.Exec.RunnerHarness.resume(runner, id, context, opts)
     assert_receive {:attempt, 2, resumed}, 2_000
     assert_receive {:trace, ^resumed, :call, {Process, :sleep, [86_400_000]}}, 2_000
     monitor = Process.monitor(resumed)

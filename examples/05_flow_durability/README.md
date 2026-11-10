@@ -5,7 +5,7 @@ These supported offline lessons use the current `Jido.Exec`,
 
 | ID | Lesson |
 | --- | --- |
-| `05_01_run_identity` | Inspect one managed execution identity. |
+| `05_01_run_identity` | Inspect one direct Runic execution identity. |
 | `05_02_snapshot_and_resume` | Restore a completed checkpoint. |
 | `05_03_process_recovery` | Restore interrupted pending work. |
 | `05_04_run_inspection` | Inspect active and complete work. |

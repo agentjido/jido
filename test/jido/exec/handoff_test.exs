@@ -134,7 +134,9 @@ defmodule Jido.Exec.HandoffTest do
           {"action", ValidatorData, %{}}
         ] do
       assert {:ok, _} =
-               Exec.start(runner, id, target, params, %{}, on_complete: fn _, _ -> send(owner, {:data_done, id}) end)
+               Jido.Test.Exec.RunnerHarness.start(runner, id, target, params, %{},
+                 on_complete: fn _, _ -> send(owner, {:data_done, id}) end
+               )
 
       assert_receive {:data_done, ^id}, 2_000
       {:ok, workflow} = Runic.Runner.get_workflow(runner, id)
@@ -144,7 +146,11 @@ defmodule Jido.Exec.HandoffTest do
 
       replayed = workflow |> Runic.Workflow.event_log() |> Runic.Workflow.from_events()
 
-      for observed <- [Exec.result(runner, id), Exec.result(restored), Exec.result(replayed)] do
+      for observed <- [
+            Jido.Test.Exec.RunnerHarness.result(runner, id),
+            Jido.Test.Exec.RunnerHarness.result(restored),
+            Jido.Test.Exec.RunnerHarness.result(replayed)
+          ] do
         refute match?({:handoff, _, _}, observed)
       end
     end
@@ -169,17 +175,17 @@ defmodule Jido.Exec.HandoffTest do
     start_supervised!({Runic.Runner, name: runner})
     owner = self()
     opts = [on_complete: fn _, _ -> send(owner, :runtime_done) end]
-    assert {:ok, _} = Exec.start(runner, "runtime", flow, %{}, %{}, opts)
+    assert {:ok, _} = Jido.Test.Exec.RunnerHarness.start(runner, "runtime", flow, %{}, %{}, opts)
     assert_receive :runtime_done, 2_000
 
     assert {:handoff, %Instruction{target: ^successor, params: %{value: 7}}, []} =
-             Exec.result(runner, "runtime")
+             Jido.Test.Exec.RunnerHarness.result(runner, "runtime")
 
     {:ok, workflow} = Runic.Runner.get_workflow(runner, "runtime")
     {:ok, restored} = workflow |> Runic.Runner.encode_snapshot() |> Runic.Runner.decode_snapshot()
     replayed = workflow |> Runic.Workflow.event_log() |> Runic.Workflow.from_events()
-    assert Exec.result(restored) == Exec.result(runner, "runtime")
-    assert Exec.result(replayed) == Exec.result(runner, "runtime")
+    assert Jido.Test.Exec.RunnerHarness.result(restored) == Jido.Test.Exec.RunnerHarness.result(runner, "runtime")
+    assert Jido.Test.Exec.RunnerHarness.result(replayed) == Jido.Test.Exec.RunnerHarness.result(runner, "runtime")
   end
 
   test "handoff Flow telemetry reports its outcome and effects" do
@@ -312,7 +318,7 @@ defmodule Jido.Exec.HandoffTest do
     {completed, observation} =
       Runic.Workflow.execute(rebuilt, Jido.Exec.Fact.local_value(Jido.Exec.Frame.new(%{})))
 
-    assert Exec.result(completed, observation) ==
+    assert Jido.Test.Exec.RunnerHarness.result(completed, observation) ==
              {:handoff, %Instruction{target: Target, kind: :action, params: %{value: 5}}, []}
   end
 
@@ -393,17 +399,17 @@ defmodule Jido.Exec.HandoffTest do
     owner = self()
     id = "handoff-#{System.unique_integer([:positive])}"
     opts = [on_complete: fn _, _ -> send(owner, :done) end]
-    assert {:ok, _} = Exec.start(runner, id, Example, %{value: 3}, %{}, opts)
+    assert {:ok, _} = Jido.Test.Exec.RunnerHarness.start(runner, id, Example, %{value: 3}, %{}, opts)
     assert_receive :done, 2_000
 
     assert {:handoff, %Instruction{params: %{value: 3}}, [:predecessor_effect]} =
-             Exec.result(runner, id)
+             Jido.Test.Exec.RunnerHarness.result(runner, id)
 
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
-    assert {:ok, _} = Exec.resume(runner, id, %{}, opts)
+    assert {:ok, _} = Jido.Test.Exec.RunnerHarness.resume(runner, id, %{}, opts)
 
     assert {:handoff, %Instruction{params: %{value: 3}}, [:predecessor_effect]} =
-             Exec.result(runner, id)
+             Jido.Test.Exec.RunnerHarness.result(runner, id)
   end
 
   defp handoff_flow(selector) do

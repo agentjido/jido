@@ -157,12 +157,12 @@ defmodule Jido.Exec.FailureLogTest do
     runner = :"failure_log_runner_#{System.unique_integer([:positive])}"
     start_supervised!({Runic.Runner, name: runner})
 
-    assert {:ok, _pid} = Jido.Exec.start(runner, "run", target, params, @context)
+    assert {:ok, _pid} = Jido.Test.Exec.RunnerHarness.start(runner, "run", target, params, @context)
     assert {:error, _error} = await_result(runner, "run", 200)
   end
 
   defp await_result(runner, id, attempts) do
-    case Jido.Exec.result(runner, id) do
+    case Jido.Test.Exec.RunnerHarness.result(runner, id) do
       {:error, %{details: %{reason: :execution_active}}} when attempts > 0 ->
         Process.sleep(10)
         await_result(runner, id, attempts - 1)
@@ -186,7 +186,7 @@ defmodule Jido.Exec.FailureLogTest do
     assert_no_sentinel(log)
   end
 
-  test "Exec.start with an Action target logs no params" do
+  test "Jido.Test.Exec.RunnerHarness.start with an Action target logs no params" do
     assert_no_sentinel(logged(fn -> managed_failure(Boom, input()) end))
   end
 
@@ -195,7 +195,7 @@ defmodule Jido.Exec.FailureLogTest do
     assert_no_sentinel(log)
   end
 
-  test "Exec.start with a Flow target logs no step literals" do
+  test "Jido.Test.Exec.RunnerHarness.start with a Flow target logs no step literals" do
     assert_no_sentinel(logged(fn -> managed_failure(LiteralFlow, %{}) end))
   end
 
@@ -287,7 +287,7 @@ defmodule Jido.Exec.FailureLogTest do
     assert log =~ "observed action stop"
   end
 
-  test "Exec.start keeps a caller's on_failed hook" do
+  test "Jido.Test.Exec.RunnerHarness.start keeps a caller's on_failed hook" do
     runner = :"failure_log_runner_#{System.unique_integer([:positive])}"
     start_supervised!({Runic.Runner, name: runner})
     test_pid = self()
@@ -295,7 +295,7 @@ defmodule Jido.Exec.FailureLogTest do
     log =
       logged(fn ->
         assert {:ok, _pid} =
-                 Jido.Exec.start(runner, "run", Boom, input(), %{},
+                 Jido.Test.Exec.RunnerHarness.start(runner, "run", Boom, input(), %{},
                    hooks: [on_failed: fn _runnable, _error, _state -> send(test_pid, :on_failed) end]
                  )
 

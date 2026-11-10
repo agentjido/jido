@@ -2,7 +2,6 @@ defmodule Jido.Exec.Runner.ObservationTest do
   use Covenant.Case, component: "jido_action.execution", async: false
   @moduletag obligation: "jido_action.execution.I21"
 
-  alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
   alias Runic.Workflow.Execution
@@ -61,7 +60,10 @@ defmodule Jido.Exec.Runner.ObservationTest do
   test "managed results use a Runic input occurrence and reject active work", ctx do
     id = {:observed, System.unique_integer([:positive])}
     params = %{label: :one, fail: false}
-    assert {:ok, _worker} = Exec.start(ctx.runner, id, Controlled, params, ctx.context, ctx.opts)
+
+    assert {:ok, _worker} =
+             Jido.Test.Exec.RunnerHarness.start(ctx.runner, id, Controlled, params, ctx.context, ctx.opts)
+
     assert_receive {:scope, scope_id}
     assert_receive {:started, :one, task}
 
@@ -69,7 +71,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
              Runic.Runner.execution(ctx.runner, id, scope_id)
 
     assert {:error, %Jido.Error.ExecutionError{details: details}} =
-             Exec.result(ctx.runner, id)
+             Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
 
     assert details.reason == :execution_active
     send(task, :release)
@@ -82,13 +84,16 @@ defmodule Jido.Exec.Runner.ObservationTest do
     assert observation.input_fact_id.domain == :fact_occurrence
     assert observation.persistence.status == :saved
     assert observation.persistence.pending_events == 0
-    assert Exec.result(ctx.runner, id) == {:ok, params, [:saved]}
+    assert Jido.Test.Exec.RunnerHarness.result(ctx.runner, id) == {:ok, params, [:saved]}
   end
 
   test "later inputs keep distinct identities and do not replace the managed result", ctx do
     id = {:repeated, System.unique_integer([:positive])}
     params = %{label: :first, fail: false}
-    assert {:ok, _worker} = Exec.start(ctx.runner, id, Controlled, params, ctx.context, ctx.opts)
+
+    assert {:ok, _worker} =
+             Jido.Test.Exec.RunnerHarness.start(ctx.runner, id, Controlled, params, ctx.context, ctx.opts)
+
     assert_receive {:scope, first_id}
     assert_receive {:started, :first, task}
     send(task, :release)
@@ -100,15 +105,15 @@ defmodule Jido.Exec.Runner.ObservationTest do
         next = %{params | label: :second}
         assert {:ok, next_id} = Runic.Runner.start_execution(ctx.runner, id, next)
         assert_receive {:started, :second, task}
-        assert Exec.result(ctx.runner, id) == {:ok, params, [:saved]}
+        assert Jido.Test.Exec.RunnerHarness.result(ctx.runner, id) == {:ok, params, [:saved]}
         send(task, :release)
         assert_receive :idle
         assert {:ok, observation} = Runic.Runner.execution(ctx.runner, id, next_id)
         assert observation.id != first.id
         assert observation.input_fact_id != first.input_fact_id
         assert {:ok, workflow} = Runic.Runner.get_workflow(ctx.runner, id)
-        assert Exec.result(workflow, observation) == {:ok, next, [:saved]}
-        assert Exec.result(ctx.runner, id) == {:ok, params, [:saved]}
+        assert Jido.Test.Exec.RunnerHarness.result(workflow, observation) == {:ok, next, [:saved]}
+        assert Jido.Test.Exec.RunnerHarness.result(ctx.runner, id) == {:ok, params, [:saved]}
         observation
       end
 
@@ -121,7 +126,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
     id = {:failure, System.unique_integer([:positive])}
 
     assert {:ok, _worker} =
-             Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                ctx.runner,
                id,
                failure_flow(),
@@ -136,14 +141,14 @@ defmodule Jido.Exec.Runner.ObservationTest do
     assert_receive {:failed, "b"}
 
     assert {:error, %Jido.Error.ExecutionError{details: details}} =
-             Exec.result(ctx.runner, id)
+             Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
 
     assert details.reason == :execution_active
     send(a, :release)
     assert_receive :idle
 
     assert {:error, %Jido.Error.ExecutionError{message: "a"}} =
-             Exec.result(ctx.runner, id)
+             Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
   end
 
   @tag obligation: ["jido_action.execution.I18", "jido_action.execution.I21"]
@@ -151,7 +156,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
     id = {:serial_failure, System.unique_integer([:positive])}
 
     assert {:ok, _worker} =
-             Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                ctx.runner,
                id,
                failure_flow(),
@@ -166,7 +171,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
     refute_received {:started, :b, _task}
 
     assert {:error, %Jido.Error.ExecutionError{message: "a"}} =
-             Exec.result(ctx.runner, id)
+             Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
   end
 
   @tag obligation: ["jido_action.execution.I18", "jido_action.execution.I19"]
@@ -177,7 +182,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
       map_flow(%{label: Ref.item(), fail: false, effects: [Ref.item()]})
 
     assert {:ok, _worker} =
-             Exec.start(ctx.runner, id, flow, %{items: [:a, :b, :c]}, ctx.context,
+             Jido.Test.Exec.RunnerHarness.start(ctx.runner, id, flow, %{items: [:a, :b, :c]}, ctx.context,
                hooks: ctx.opts[:hooks],
                max_concurrency: 2
              )
@@ -191,7 +196,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
     send(a, :release)
     assert_receive :idle
 
-    assert Exec.result(ctx.runner, id) ==
+    assert Jido.Test.Exec.RunnerHarness.result(ctx.runner, id) ==
              {:ok,
               %{
                 items:
@@ -207,7 +212,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
     flow = map_flow(%{label: Ref.item(), fail: false})
 
     assert {:ok, worker} =
-             Exec.start(ctx.runner, id, flow, %{items: [:a, :b, :c]}, ctx.context,
+             Jido.Test.Exec.RunnerHarness.start(ctx.runner, id, flow, %{items: [:a, :b, :c]}, ctx.context,
                hooks: ctx.opts[:hooks],
                max_concurrency: 2
              )
@@ -234,7 +239,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
         id = {:batch_failure, concurrency, System.unique_integer([:positive])}
 
         assert {:ok, _worker} =
-                 Exec.start(ctx.runner, id, flow, %{items: [:a, :b, :c]}, ctx.context,
+                 Jido.Test.Exec.RunnerHarness.start(ctx.runner, id, flow, %{items: [:a, :b, :c]}, ctx.context,
                    hooks: ctx.opts[:hooks],
                    max_concurrency: concurrency
                  )
@@ -245,14 +250,16 @@ defmodule Jido.Exec.Runner.ObservationTest do
           assert_receive {:started, :b, b}
           send(b, :release)
           assert_receive {:failed, "__jido_map__/items/action"}
-          assert {:error, %{details: %{reason: :execution_active}}} = Exec.result(ctx.runner, id)
+
+          assert {:error, %{details: %{reason: :execution_active}}} =
+                   Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
         end
 
         send(a, :release)
         assert_receive :idle
         refute_received {:started, :c, _task}
         if concurrency == 1, do: refute_received({:started, :b, _task})
-        assert {:error, %{message: "a", details: details}} = Exec.result(ctx.runner, id)
+        assert {:error, %{message: "a", details: details}} = Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
         assert %{node: "items", item_index: 0, item_id: item_id} = details
         item_id
       end
@@ -278,7 +285,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
             ]
 
         assert {:ok, _worker} =
-                 Exec.start(ctx.runner, id, flow, %{items: items}, ctx.context, opts)
+                 Jido.Test.Exec.RunnerHarness.start(ctx.runner, id, flow, %{items: items}, ctx.context, opts)
 
         assert_receive {:started, :a, a}
 
@@ -292,16 +299,17 @@ defmodule Jido.Exec.Runner.ObservationTest do
           assert {:ok, %{status: :stopped, active_units: 1}} =
                    Runic.Runner.admission_status(ctx.runner, id)
 
-          assert {:error, %{details: %{reason: :execution_active}}} = Exec.result(ctx.runner, id)
+          assert {:error, %{details: %{reason: :execution_active}}} =
+                   Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
         end
 
         send(a, :release)
         assert_receive :idle
         refute_received {:started, :c, _task}
         if concurrency == 1, do: refute_received({:started, :b, _task})
-        live = Exec.result(ctx.runner, id)
+        live = Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
         assert {:ok, workflow} = Runic.Runner.get_workflow(ctx.runner, id)
-        snapshot = Exec.result(workflow)
+        snapshot = Jido.Test.Exec.RunnerHarness.result(workflow)
         assert :ok = Runic.Runner.checkpoint(ctx.runner, id)
 
         assert {:ok, %{status: :saved, pending_events: 0}} =
@@ -310,24 +318,24 @@ defmodule Jido.Exec.Runner.ObservationTest do
         assert :ok = Runic.Runner.stop(ctx.runner, id, persist: true)
 
         assert {:ok, _worker} =
-                 Exec.resume(ctx.runner, id, ctx.context, opts ++ [dispatch_mode: :manual])
+                 Jido.Test.Exec.RunnerHarness.resume(ctx.runner, id, ctx.context, opts ++ [dispatch_mode: :manual])
 
         assert {:ok, restored} = Runic.Runner.get_workflow(ctx.runner, id)
-        restored_snapshot = Exec.result(restored)
+        restored_snapshot = Jido.Test.Exec.RunnerHarness.result(restored)
 
         recovered =
           if concurrency == 2 do
             assert {:error, %{details: %{reason: :execution_active}}} =
-                     Exec.result(ctx.runner, id)
+                     Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
 
-            assert {:ok, _workflow} = Exec.step(ctx.runner, id)
+            assert {:ok, _workflow} = Jido.Test.Exec.RunnerHarness.step(ctx.runner, id)
             assert_receive {:started, :b, b}
             send(b, :release)
             assert_receive :executor_ended
             assert_receive :idle
             refute_received {:started, :a, _task}
             refute_received {:started, :c, _task}
-            [Exec.result(ctx.runner, id)]
+            [Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)]
           else
             []
           end
@@ -354,7 +362,7 @@ defmodule Jido.Exec.Runner.ObservationTest do
       opts = ctx.opts ++ [max_concurrency: 2]
 
       assert {:ok, _worker} =
-               Exec.start(ctx.runner, id, failure_flow(), %{}, ctx.context, opts)
+               Jido.Test.Exec.RunnerHarness.start(ctx.runner, id, failure_flow(), %{}, ctx.context, opts)
 
       assert_receive {:started, :a, a}
       assert_receive {:started, :b, b}
@@ -367,48 +375,51 @@ defmodule Jido.Exec.Runner.ObservationTest do
       end
 
       assert_receive :idle
-      assert {:error, %{message: "a", details: details}} = Exec.result(ctx.runner, id)
+      assert {:error, %{message: "a", details: details}} = Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
       assert :ok = Runic.Runner.checkpoint(ctx.runner, id)
       assert :ok = Runic.Runner.stop(ctx.runner, id, persist: true)
-      assert {:ok, _worker} = Exec.resume(ctx.runner, id, ctx.context, opts)
+      assert {:ok, _worker} = Jido.Test.Exec.RunnerHarness.resume(ctx.runner, id, ctx.context, opts)
 
-      assert {:error, %{message: "a", details: ^details}} = Exec.result(ctx.runner, id)
+      assert {:error, %{message: "a", details: ^details}} = Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
       assert {:ok, workflow} = Runic.Runner.get_workflow(ctx.runner, id)
-      assert {:error, %{message: "a", details: ^details}} = Exec.result(workflow)
+      assert {:error, %{message: "a", details: ^details}} = Jido.Test.Exec.RunnerHarness.result(workflow)
     end
   end
 
   test "resumed execution keeps snapshot results and rejects active recovery", ctx do
     id = {:resumed, System.unique_integer([:positive])}
     params = %{label: :restored, fail: false}
-    assert {:ok, _worker} = Exec.start(ctx.runner, id, Controlled, params, ctx.context, ctx.opts)
+
+    assert {:ok, _worker} =
+             Jido.Test.Exec.RunnerHarness.start(ctx.runner, id, Controlled, params, ctx.context, ctx.opts)
+
     assert_receive {:scope, scope_id}
     assert_receive {:started, :restored, _task}
     assert :ok = Runic.Runner.checkpoint(ctx.runner, id)
     assert :ok = Runic.Runner.stop(ctx.runner, id, persist: true)
 
     assert {:ok, _worker} =
-             Exec.resume(ctx.runner, id, ctx.context, ctx.opts ++ [dispatch_mode: :manual])
+             Jido.Test.Exec.RunnerHarness.resume(ctx.runner, id, ctx.context, ctx.opts ++ [dispatch_mode: :manual])
 
     assert Runic.Runner.execution(ctx.runner, id, scope_id) == {:error, :not_found}
 
     assert {:error, %Jido.Error.ExecutionError{details: details}} =
-             Exec.result(ctx.runner, id)
+             Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
 
     assert details.reason == :execution_active
-    assert {:ok, _workflow} = Exec.step(ctx.runner, id)
+    assert {:ok, _workflow} = Jido.Test.Exec.RunnerHarness.step(ctx.runner, id)
     assert_receive {:started, :restored, task}
 
     assert {:error, %Jido.Error.ExecutionError{details: %{reason: :execution_active}}} =
-             Exec.result(ctx.runner, id)
+             Jido.Test.Exec.RunnerHarness.result(ctx.runner, id)
 
     send(task, :release)
     assert_receive :idle
-    assert Exec.result(ctx.runner, id) == {:ok, params, [:saved]}
+    assert Jido.Test.Exec.RunnerHarness.result(ctx.runner, id) == {:ok, params, [:saved]}
   end
 
   test "missing managed executions keep the Runner lookup error", ctx do
-    assert Exec.result(ctx.runner, :missing) == {:error, :not_found}
+    assert Jido.Test.Exec.RunnerHarness.result(ctx.runner, :missing) == {:error, :not_found}
   end
 
   defp failure_flow do

@@ -42,8 +42,8 @@ callers. This does not establish complete Flow contract coverage.
 - **status:** active
 
 ### jido_action.boundary.I6 — Call options and targets reject malformed policy
-- **scope:** `Jido.Exec.compile/2`, `Jido.Exec.run/4`, `Jido.Exec.start/6`, `Jido.Exec.step/2`, `Jido.Exec.resume/4`, `Jido.Exec.result/1`
-- **must:** Return documented configuration errors for invalid executable targets and supported option containers, including root component options, concurrency, and Task Supervisor values. Retain useful option and value details. A missing Task Supervisor cannot start Action work. Native Runner lookup/control reasons can remain atoms, and arbitrary invalid process references are not universally contained.
+- **scope:** `Jido.Exec.compile/2`, `Jido.Exec.run/4`, `Jido.Exec.result/1`, `Jido.Exec.result/2`
+- **must:** Return documented configuration errors for invalid executable targets and supported option containers, including root component options, concurrency, and Task Supervisor values. Retain useful option and value details. A missing Task Supervisor cannot start Action work. Direct Runic lookup and control errors remain Runic values.
 - **kind:** functional
 - **status:** active
 
@@ -65,8 +65,8 @@ callers. This does not establish complete Flow contract coverage.
 - **kind:** functional
 - **status:** active
 
-### jido_action.boundary.I10 — Managed boundaries contain process-local values
-- **scope:** `Jido.Exec.Node.Action`, `Jido.Exec.start/6`
-- **must:** Reject process handles in input before managed work starts and in Action output or effects before persistence. Accept safe local structs through bounded local identity. A duplicate start must keep the existing worker intact.
+### jido_action.boundary.I10 — Durable boundaries contain process-local values
+- **scope:** `Jido.Durable`, `Jido.Exec.Node.Action`, `Runic.Runner`
+- **must:** Reject process handles at Jido durable boundaries and in Action output or effects before persistence. Accept safe local structs through bounded local identity. Direct Runic callers own input portability. A duplicate Runner start must keep the existing Worker intact.
 - **kind:** functional
 - **status:** active

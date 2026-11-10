@@ -22,7 +22,7 @@ defmodule Jido.Examples.Durability.ProcessRecoveryTest do
     hooks = [on_idle: fn _state -> send(owner, :idle) end]
 
     assert {:ok, worker} =
-             Jido.Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                runner,
                id,
                Jido.Examples.Durability.ProcessRecovery,
@@ -39,12 +39,12 @@ defmodule Jido.Examples.Durability.ProcessRecoveryTest do
     assert_receive {:DOWN, ^worker_monitor, :process, ^worker, _reason}, 1_000
     assert_receive {:DOWN, ^task_monitor, :process, ^task, _reason}, 1_000
 
-    assert {:ok, _worker} = Jido.Exec.resume(runner, id, context, hooks: hooks)
+    assert {:ok, _worker} = Jido.Test.Exec.RunnerHarness.resume(runner, id, context, hooks: hooks)
     assert_receive {:recovery_waiting, resumed_task}, 1_000
     refute resumed_task == task
     refute_received :recovery_recorded
     send(resumed_task, {:release_recovery, gate})
     assert_receive :idle, 1_000
-    assert Jido.Exec.result(runner, id) == {:ok, %{value: 6}}
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == {:ok, %{value: 6}}
   end
 end

@@ -52,7 +52,7 @@ Jido.Supervisor (one_for_one)
 ├── Jido.Telemetry.AI.CorrelationStore
 ├── Jido.Instance.NamespaceRegistry
 ├── Jido.Persistence.ETS.Owner
-└── Runic.Runner for direct managed execution
+└── Runic.Runner for direct and durable execution
 ```
 
 The application starts no Agents and no instance. Each instance that you start with `Jido.start_link/1` or `use Jido` is a separate supervisor.
@@ -258,7 +258,7 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | --- | --- |
 | `Jido.Exec` | Compiles and runs Jido Actions and Flows with Runic. |
 | `Jido.Durable` | Host-neutral persisted Flow execution from Signals. |
-| `Jido.Durable.Continuation` | Portable data for one suspended or terminal managed execution. |
+| `Jido.Durable.Continuation` | Portable data for one suspended or terminal durable execution. |
 | `Jido.Exec.Wait` | Portable data for one suspended Flow wait. |
 
 ### Jido.Expr

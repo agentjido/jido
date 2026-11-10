@@ -20,7 +20,7 @@ defmodule Jido.Examples.Durability.RunInspectionTest do
     owner = self()
 
     assert {:ok, _worker} =
-             Jido.Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                runner,
                id,
                Jido.Examples.Durability.RunInspection,
@@ -37,10 +37,10 @@ defmodule Jido.Examples.Durability.RunInspectionTest do
     assert {:ok, %Runic.Workflow{}} = Runic.Runner.get_workflow(runner, id)
 
     assert {:error, %Jido.Error.ExecutionError{details: %{reason: :execution_active}}} =
-             Jido.Exec.result(runner, id)
+             Jido.Test.Exec.RunnerHarness.result(runner, id)
 
     send(task, {:release_inspection, gate})
     assert_receive :idle, 1_000
-    assert Jido.Exec.result(runner, id) == {:ok, %{value: 9}}
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == {:ok, %{value: 9}}
   end
 end

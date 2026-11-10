@@ -20,7 +20,7 @@ defmodule Jido.Examples.Durability.SnapshotAndResumeTest do
     hooks = [on_idle: fn _state -> send(owner, :idle) end]
 
     assert {:ok, _worker} =
-             Jido.Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                runner,
                id,
                Jido.Examples.Durability.SnapshotAndResume,
@@ -32,14 +32,14 @@ defmodule Jido.Examples.Durability.SnapshotAndResumeTest do
     assert_receive {:snapshot_step, 1}, 1_000
     assert_receive {:snapshot_step, 2}, 1_000
     assert_receive :idle, 1_000
-    assert Jido.Exec.result(runner, id) == {:ok, %{value: 5}}
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == {:ok, %{value: 5}}
     assert :ok = Runic.Runner.checkpoint(runner, id)
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
 
     assert {:ok, _worker} =
-             Jido.Exec.resume(runner, id, %{observer: observer}, hooks: hooks)
+             Jido.Test.Exec.RunnerHarness.resume(runner, id, %{observer: observer}, hooks: hooks)
 
-    assert Jido.Exec.result(runner, id) == {:ok, %{value: 5}}
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == {:ok, %{value: 5}}
     refute_received {:snapshot_step, _step}
   end
 end

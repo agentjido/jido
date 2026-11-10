@@ -35,7 +35,7 @@ defmodule Jido.Examples.Patterns.CompensationTest do
     ]
 
     assert {:ok, _worker} =
-             Jido.Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                runner,
                id,
                Jido.Examples.Patterns.Compensation,
@@ -50,14 +50,14 @@ defmodule Jido.Examples.Patterns.CompensationTest do
     assert :ok = Runic.Runner.stop(runner, id, persist: true)
 
     assert {:ok, _worker} =
-             Jido.Exec.resume(runner, id, %{ledger: ledger},
+             Jido.Test.Exec.RunnerHarness.resume(runner, id, %{ledger: ledger},
                dispatch_mode: :manual,
                max_concurrency: 1,
                hooks: hooks
              )
 
     assert %Runic.Workflow{} = step_to_completion(runner, id, tag)
-    assert {:ok, output} = Jido.Exec.result(runner, id)
+    assert {:ok, output} = Jido.Test.Exec.RunnerHarness.result(runner, id)
     assert output.charge.status == :declined
     assert output.settlement.status == :compensated
 
@@ -91,14 +91,14 @@ defmodule Jido.Examples.Patterns.CompensationTest do
     if Agent.get(ledger, &(&1.operations != [])) do
       :ok
     else
-      assert {:ok, %Runic.Workflow{}} = Jido.Exec.step(runner, id)
+      assert {:ok, %Runic.Workflow{}} = Jido.Test.Exec.RunnerHarness.step(runner, id)
       assert_receive {^tag, :unit_done}, 1_000
       step_until_reserved(runner, id, tag, ledger)
     end
   end
 
   defp step_to_completion(runner, id, tag) do
-    case Jido.Exec.step(runner, id) do
+    case Jido.Test.Exec.RunnerHarness.step(runner, id) do
       {:ok, %Runic.Workflow{}} ->
         assert_receive {^tag, :unit_done}, 1_000
         step_to_completion(runner, id, tag)

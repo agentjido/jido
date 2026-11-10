@@ -75,7 +75,7 @@ end
   Jido.Exec.run(Support.NotifyCustomer, %{ticket_id: "t-1"}, %{mailer: Support.StubMailer})
 ```
 
-Immediate execution accepts any term in context, including a pid or a function. Managed execution does not. See [Keep context portable for managed execution](#keep-context-portable-for-managed-execution).
+Immediate execution accepts any term in context, including a pid or a function. Durable execution does not. See [Keep context portable for durable execution](#keep-context-portable-for-durable-execution).
 
 ## Bind context to an Instruction
 
@@ -198,11 +198,11 @@ end
 
 `:waits` is the only capability. Immediate `Jido.Exec.run/4` does not offer it. See [Flow Waits](../flow-runtime/flow-waits.md).
 
-## Keep context portable for managed execution
+## Keep context portable for durable execution
 
-`Jido.Exec.start/6` rejects params, metadata, or context that holds a pid, port, reference, or function, with `reason: :non_portable_durable_value`. Runic does not store runtime context, so `Jido.Exec.resume/4` needs the same context again. See [Managed Execution](../flow-runtime/managed-execution.md).
+`Jido.Durable` rejects params, metadata, or context that holds a pid, port, reference, or function, with `reason: :non_portable_durable_value`. Direct Runic execution does not store runtime context, so pass the same context again when you resume. See [Direct Runic Execution](../flow-runtime/managed-execution.md).
 
-Prefer a registered name or a module to a pid when an Action can move to managed execution.
+Prefer a registered name or a module to a pid when an Action can move to durable execution.
 
 ## Keep secrets out of context
 

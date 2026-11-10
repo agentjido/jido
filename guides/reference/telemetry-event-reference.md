@@ -83,7 +83,7 @@ An `:exception` event adds `kind`, and its `status` is `:error`. Only the `:oper
 | Event prefix | Metadata |
 | --- | --- |
 | `[:jido, :action]` | `action`, `action_name`, `node_name`, `runnable_id`, `activation_id`, `attempt_id`, `attempt`. In a Flow: `component`, `node_path`, `component_kind`, `invoke_phase`. In a Turn: `agent_id`, `agent_module`, `turn_id`, `trace_id`, `span_id`, `parent_span_id`. |
-| `[:jido, :flow]` | `kind` (always `:flow`), `flow`, and `target` when the target is a module. Emitted only by `Jido.Exec.run/4`, once per call. A Flow that runs in a Turn or under `Jido.Exec.start/6` emits Action events and Runic events, not these. |
+| `[:jido, :flow]` | `kind` (always `:flow`), `flow`, and `target` when the target is a module. Emitted only by `Jido.Exec.run/4`, once per call. A Flow that runs in a Turn, through `Jido.Durable`, or through `Runic.Runner` emits Action events and Runic events, not these. |
 
 Each `:stop` event adds:
 
@@ -159,7 +159,7 @@ Jido does not own model request events. `Jido.Telemetry.AI.events/0` includes th
 
 ## Runic events
 
-Runic owns managed execution events. `Jido.Telemetry.AI.events/0` includes them, and they are under `[:runic, :runner, ...]`: `:workflow`, `:runnable`, `:store`, `:promise`, and `:rehydration`. See the Runic documentation.
+Runic owns Runner execution events. `Jido.Telemetry.AI.events/0` includes them, and they are under `[:runic, :runner, ...]`: `:workflow`, `:runnable`, `:store`, `:promise`, and `:rehydration`. See the Runic documentation.
 
 ## Normalized fields
 

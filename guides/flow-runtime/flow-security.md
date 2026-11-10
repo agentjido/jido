@@ -86,7 +86,7 @@ The decoder also bounds what it reads. A document may be at most 8 MiB as JSON b
 
 ## Validate input at the boundary
 
-Give each Flow a `schema`. `Jido.Exec.run/4` and `Jido.Exec.start/6` validate input before any Action runs. Each Action validates its own params, and output schemas validate results. Schemas check shape, not permission. Check that the caller may act on `invoice_id` inside an Action or before the call.
+Give each Flow a `schema`. `Jido.Exec.run/4` and `Jido.Durable.start/4` validate input before any Action runs. Each Action validates its own params, and output schemas validate results. Schemas check shape, not permission. Check that the caller may act on `invoice_id` inside an Action or before the call.
 
 Flow input is data, so references resolve to values and are never evaluated. A `Jido.Expr` value inside input stays inert. Do not build a Flow definition by placing untrusted strings into `name`, `event`, or target fields.
 
@@ -180,9 +180,9 @@ A Handoff target cannot carry bound context or metadata. A context bound in an I
 
 Jido's telemetry start and stop metadata omits params, context, results, and full errors. Other outputs can include your values:
 
-- **Failure logs.** When a node fails, Runic logs a warning that prints the node and the error, and both can hold your values. `Jido.Exec.run/4`, `Jido.Exec.start/6`, `Jido.Exec.resume/4`, `cmd/3`, and a live AgentServer keep this line out of the logs. Code that calls `Runic.Workflow.execute/3` itself still gets it.
+- **Failure logs.** When a node fails, Runic can log a warning that prints the node and the error, and both can hold your values. `Jido.Exec.run/4`, `Jido.Durable`, `cmd/3`, and a live AgentServer keep this line out of the logs. Code that calls Runic directly owns its logging policy.
 - **Error details.** An exception message, `details.return` for an invalid return, and `details.reason` can hold values from your code. For a raised exception, `details.stacktrace` can hold call arguments, for example after a `FunctionClauseError`. `Jido.Error.to_map/1` omits the stacktrace and bounds the other details.
-- **Stored data.** A managed run or durable Turn stores Flow input and Action results. Runic does not persist runtime context. A durable Turn saves its caller context in its continuation record, and Instruction context on an Action target is cleared from a managed Workflow. A value copied from context into an Action's output is stored as a result. A live Workflow from `Runic.Runner.get_workflow/2` holds the run's context in memory, so do not log it.
+- **Stored data.** A Runic or durable run stores Flow input and Action results. Runic does not persist runtime context. Jido Durable saves its caller context in its continuation record. A value copied from context into an Action's output is stored as a result. A live Workflow from `Runic.Runner.get_workflow/2` holds the run's context in memory, so do not log it.
 
 Do these in production:
 
@@ -194,14 +194,14 @@ Do these in production:
 
 ## Protect stored runs
 
-A Store's contents decide what a resumed run does next. Limit who can write to it. `Jido.Exec.start/6` rejects PIDs, ports, references, and functions in params, context, and metadata. That check is for portability and it does not filter secrets or malicious data.
+A Store's contents decide what a resumed run does next. Limit who can write to it. `Jido.Durable.start/4` rejects PIDs, ports, references, and functions in params, context, and metadata. Direct Runic callers must enforce their own portability boundary. Portability checks do not filter secrets or malicious data.
 
 An Action module that changes after a graph is built fails with `details.reason: :incompatible_target` instead of running new code against the old graph. A durable Turn compares a fingerprint of its Flow and loaded code in the same way. See [Durable Turns and Flows](../durability/durable-turns-and-flows.livemd).
 
 ## Check your setup
 
 - Each Flow from outside your code decodes through a Catalog limited to what its author may call.
-- Your code authorizes the caller before `Jido.Exec.run/4`, `Jido.Exec.start/6`, and `Jido.AgentServer.deliver_wait/4`.
+- Your code authorizes the caller before `Jido.Exec.run/4`, `Jido.Durable.start/4`, and `Jido.AgentServer.deliver_wait/4`.
 - Each Flow has an input schema, and it bounds list lengths for untrusted collections.
 - Invoke and Handoff targets come from a fixed table.
 - Each external call has a `:timeout`, and non-idempotent Actions return `retry: false` or dedupe with `Jido.Exec.effect_id/4`.

@@ -45,7 +45,7 @@ Set these with `config :jido, ...`. Each key is read at runtime, each time it is
 | `Jido.Catalog.Discovery` | `:modules` | `[]` | `Jido.Catalog.Discovery` at each scan | Extra modules to include, each an atom or `{module, application}`. |
 | `Jido.Codec` | `:maximum_json_bytes` | `8_388_608` | `Jido.Codec` | The JSON size limit. A per-call `:maximum_json_bytes` option wins. |
 | `Jido.Signal.Bus` | `:call_timeout` | `30_000` | `Jido.Signal.Bus` | The client call timeout in milliseconds. An invalid value uses the default. |
-| `:max_concurrency` | None | The smaller of `System.schedulers_online/0` and `10` | `Jido.Exec` | The default concurrency for `Jido.Exec.run/4` and `Jido.Exec.start/6`. Turns do not use it. |
+| `:max_concurrency` | None | The smaller of `System.schedulers_online/0` and `10` | `Jido.Exec` | The default concurrency for `Jido.Exec.run/4`. Turns and direct Runic execution do not use it. |
 | `:max_payload_bytes` | None | `10_000_000` | `Jido.Signal.Codec` | The Signal payload limit. A per-call option wins. |
 | `:normalize_dispatch_errors` | None | `false` | `Jido.Signal.Dispatch` | Returns a `Jido.Error.RoutingError` for a delivery failure and a `Jido.Error.ValidationError` for an invalid target, in place of the raw reason. The compile-time value is the fallback. |
 | `:default_log_level` | None | `:info` | `Jido.Signal.Dispatch.LoggerAdapter` | The log level when the target sets none. |

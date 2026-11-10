@@ -182,7 +182,7 @@ defmodule Jido.Exec.CompilerTest do
 
     rebuilt = workflow |> Workflow.build_log() |> Workflow.from_log()
     {completed, observation} = Workflow.execute(rebuilt, Jido.Exec.Frame.new(%{}))
-    assert Exec.result(completed, observation) == expected
+    assert Jido.Test.Exec.RunnerHarness.result(completed, observation) == expected
   end
 
   test "public connections report missing source and target ports" do
@@ -218,7 +218,7 @@ defmodule Jido.Exec.CompilerTest do
 
     for workflow <- [definition, rebuilt] do
       {completed, observation} = Workflow.execute(workflow, %{value: 1})
-      assert Exec.result(completed, observation) == {:ok, %{input: [%{value: 5}, %{value: 3}]}}
+      assert Jido.Test.Exec.RunnerHarness.result(completed, observation) == {:ok, %{input: [%{value: 5}, %{value: 3}]}}
     end
   end
 
@@ -229,13 +229,13 @@ defmodule Jido.Exec.CompilerTest do
     id = {:ports, System.unique_integer([:positive])}
 
     assert {:ok, _worker} =
-             Exec.start(runner, id, port_flow(), %{}, %{},
+             Jido.Test.Exec.RunnerHarness.start(runner, id, port_flow(), %{}, %{},
                max_concurrency: 4,
                hooks: [on_idle: fn _state -> send(owner, {:idle, id}) end]
              )
 
     assert_receive {:idle, ^id}, 2_000
-    assert Exec.result(runner, id) == {:ok, %{value: 5}, [:left, :right, :child_tail, :after]}
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == {:ok, %{value: 5}, [:left, :right, :child_tail, :after]}
   end
 
   defp port_flow do

@@ -248,7 +248,7 @@ end
 %{total: 1, failures: 0} = run_tests.()
 ```
 
-## Test a managed run
+## Test direct Runic steps
 
 Start a Runner with `start_supervised!/1`, so it stops with the test. Use `dispatch_mode: :manual` to control each unit, and a hook to know when a unit has finished. Then assert that a stepped run and an immediate run agree.
 
@@ -270,28 +270,43 @@ defmodule TestFlowsTour.ManagedTest do
     hooks = [on_complete: fn _runnable, _duration, _state -> send(owner, :unit_done) end]
     id = "expense-#{System.unique_integer([:positive])}"
 
+    assert {:ok, instruction} = Jido.Instruction.resolve(TestFlowsTour.ApproveExpense, input)
+    assert {:ok, workflow} = Jido.Exec.compile(instruction)
+
     assert {:ok, _worker} =
-             Jido.Exec.start(runner, id, TestFlowsTour.ApproveExpense, input, %{},
+             Runic.Runner.start_workflow(runner, id, workflow,
                dispatch_mode: :manual,
                max_concurrency: 1,
                hooks: hooks
              )
 
-    assert {:error, %{details: %{reason: :execution_active}}} = Jido.Exec.result(runner, id)
+    execution_id = Runic.Identity.digest(:execution, id)
 
-    step_until_complete(runner, id)
+    assert {:ok, ^execution_id} =
+             Runic.Runner.start_execution(
+               runner,
+               id,
+               Jido.Exec.Fact.local_value(Jido.Exec.Frame.new(instruction.params)),
+               execution_id: execution_id,
+               run_context: %{_global: instruction.context}
+             )
 
-    assert Jido.Exec.result(runner, id) == Jido.Exec.run(TestFlowsTour.ApproveExpense, input)
+    workflow = step_until_complete(runner, id)
+    assert {:ok, observation} = Runic.Runner.execution(runner, id, execution_id)
+
+    assert Jido.Exec.result(workflow, observation) ==
+             Jido.Exec.run(TestFlowsTour.ApproveExpense, input)
   end
 
   defp step_until_complete(runner, id) do
-    case Jido.Exec.step(runner, id) do
-      {:ok, %Runic.Workflow{}} ->
+    case Runic.Runner.step(runner, id) do
+      :ok ->
         assert_receive :unit_done, 1_000
         step_until_complete(runner, id)
 
-      {:complete, %Runic.Workflow{}} ->
-        :ok
+      {:error, :not_runnable} ->
+        {:ok, workflow} = Runic.Runner.get_workflow(runner, id)
+        workflow
     end
   end
 end
@@ -303,7 +318,7 @@ end
 
 - Do not sleep and hope. Wait on a message from an Action or hook with `assert_receive`.
 - A blocking Action under `Jido.Exec.run/4` blocks your test, because the call has no caller-side timeout. Pass `:timeout`, or send the Action a release message.
-- Managed runs reject PIDs in context. Pass a registered name, then look it up in the Action with `Process.whereis/1`.
+- Durable runs reject PIDs in context. Pass a registered name, then look it up in the Action with `Process.whereis/1`.
 - To test waits, start a durable Agent as shown in [Flow Waits](flow-waits.md#host-the-flow-in-an-agent). Set `after_ms: 0` on a `timer` to test expiry without a delay.
 
 ## Next steps

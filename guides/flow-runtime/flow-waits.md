@@ -6,13 +6,14 @@ A wait holds no process. The Flow saves its position and releases its Worker, so
 
 ## Know where waits can run
 
-Only a durable Agent Turn can host a wait. It needs a Flow route and a persistence setting on the Agent or its Jido instance.
+A durable Agent Turn or `Jido.Durable` run can host a wait. Both need a persistence adapter.
 
 | Host | Result for a Flow with a wait |
 | --- | --- |
 | `Jido.AgentServer` with persistence | Runs and suspends |
+| `Jido.Durable` with persistence | Runs and suspends |
 | `Jido.AgentServer` without persistence | `{:error, error}` with `details.reason: :unsupported_host` |
-| `Jido.Exec.run/4`, `Jido.Exec.start/6` | `{:error, error}` with `details.reason: :unsupported_host` |
+| `Jido.Exec.run/4`, direct `Runic.Runner` | No wait host; execution returns an unsupported-host error |
 
 An Action can check for this support with `Jido.Exec.supports?/2`. Callers cannot claim it by passing it in context, because Jido drops the reserved keys.
 

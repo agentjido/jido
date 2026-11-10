@@ -199,7 +199,7 @@ At runtime:
 - The input must be portable data. A process-local value, such as a pid, fails with "durable execution data contains a process-local value".
 - The returned Instruction has fresh, empty context and metadata.
 
-Jido does not run the successor for you here. For hosts that manage the successor across Turns, see [Managed Execution](../flow-runtime/managed-execution.md).
+Jido does not run the successor for you here. A host can pass the returned Instruction to `Jido.Exec.run/4`, `Jido.Durable`, or an Agent Turn.
 
 ## Data form
 

@@ -242,7 +242,7 @@ attempts = :counters.new(2, [])
 
 An Agent passes options other than `:context` from `cmd/3` to `Jido.Exec.run/4`.
 
-Long-running work that must survive the caller belongs under `Jido.Exec.start/6`, which takes the same policy options and more worker options. See [Managed Execution](../flow-runtime/managed-execution.md).
+Long-running work that must survive the caller belongs under `Jido.Durable` or an AgentServer. Use direct `Runic.Runner` execution only when you need its advanced controls. See [Direct Runic Execution](../flow-runtime/managed-execution.md).
 
 ## Observe attempts
 

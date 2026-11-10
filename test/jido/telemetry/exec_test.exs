@@ -248,7 +248,7 @@ defmodule Jido.Telemetry.ExecTest do
     test_pid = self()
 
     assert {:ok, _worker} =
-             Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                runner,
                execution_id,
                one_step_flow("managed_telemetry", Add),

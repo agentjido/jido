@@ -1,7 +1,6 @@
 defmodule Jido.Exec.RuntimePortabilityTest do
   use Covenant.Case, component: "jido_action.boundary", async: false
 
-  alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
 
@@ -39,7 +38,9 @@ defmodule Jido.Exec.RuntimePortabilityTest do
     runner = start_runner!()
     execution_id = unique_id()
 
-    assert {:error, error} = Exec.start(runner, execution_id, BlockingAction, %{}, %{pid: self()})
+    assert {:error, error} =
+             Jido.Test.Exec.RunnerHarness.start(runner, execution_id, BlockingAction, %{}, %{pid: self()})
+
     assert error.details.reason == :non_portable_durable_value
     assert error.details.type == :pid
     assert Runic.Runner.lookup(runner, execution_id) == nil
@@ -52,7 +53,7 @@ defmodule Jido.Exec.RuntimePortabilityTest do
     test_pid = self()
 
     assert {:ok, _worker} =
-             Exec.start(runner, execution_id, LocalOutputAction, %{}, %{},
+             Jido.Test.Exec.RunnerHarness.start(runner, execution_id, LocalOutputAction, %{}, %{},
                hooks: [
                  on_failed: fn _runnable, error, _state ->
                    send(test_pid, {:local_output_failed, error})
@@ -73,12 +74,12 @@ defmodule Jido.Exec.RuntimePortabilityTest do
     owner = self()
 
     assert {:ok, _worker} =
-             Exec.start(runner, id, flow, %{value: %UnprojectedData{}}, %{},
+             Jido.Test.Exec.RunnerHarness.start(runner, id, flow, %{value: %UnprojectedData{}}, %{},
                hooks: [on_idle: fn _state -> send(owner, :local_input_idle) end]
              )
 
     assert_receive :local_input_idle
-    assert Exec.result(runner, id) == {:ok, %{value: %UnprojectedData{}}}
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == {:ok, %{value: %UnprojectedData{}}}
   end
 
   @tag obligation: "jido_action.boundary.I10"
@@ -86,10 +87,12 @@ defmodule Jido.Exec.RuntimePortabilityTest do
     runner = start_runner!()
     id = unique_id()
     flow = input_flow()
-    assert {:ok, worker} = Exec.start(runner, id, flow, %{value: 1}, %{}, dispatch_mode: :manual)
 
-    assert {:error, %{details: %{reason: {:already_started, ^worker}}}} =
-             Exec.start(runner, id, flow, %{value: %UnprojectedData{}})
+    assert {:ok, worker} =
+             Jido.Test.Exec.RunnerHarness.start(runner, id, flow, %{value: 1}, %{}, dispatch_mode: :manual)
+
+    assert {:error, {:already_started, ^worker}} =
+             Jido.Test.Exec.RunnerHarness.start(runner, id, flow, %{value: %UnprojectedData{}})
 
     assert Runic.Runner.lookup(runner, id) == worker
     assert Process.alive?(worker)

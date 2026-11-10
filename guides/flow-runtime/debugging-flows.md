@@ -155,20 +155,20 @@ A retried Action emits a start and stop for each attempt, with `attempt` startin
 
 Flow spans come from `Jido.Exec.run/4` only. Under a Runner, correlate `[:jido, :action, ...]` events with Runic's `[:runic, :runner, ...]` events through `runnable_id`. See [Telemetry Events](../reference/telemetry-event-reference.md).
 
-## Inspect a live managed run
+## Inspect a direct Runic run
 
 For a run under a `Runic.Runner`, ask the Runner what it is doing. Do not make these calls from inside a Worker hook.
 
 | Question | Call |
 | --- | --- |
-| Is it finished? | `Jido.Exec.result/2` |
+| Is one observed input finished? | `Runic.Runner.execution/3`, then `Jido.Exec.result/2` |
 | Is anything running or did admission stop? | `Runic.Runner.admission_status/2` |
 | Has its progress been saved? | `Runic.Runner.persistence_status/2` |
 | What does its graph look like? | `Runic.Runner.get_workflow/2` |
 | Is its Worker alive? | `Runic.Runner.lookup/2` |
 | What runs under this Runner? | `Runic.Runner.list_workflows/1` |
 
-To go through a run one unit at a time, start it with `dispatch_mode: :manual` and call `Jido.Exec.step/2`. See [Managed Execution](managed-execution.md#step-a-run-by-hand).
+To go through a run one unit at a time, start it with `dispatch_mode: :manual` and call `Runic.Runner.step/2`. See [Direct Runic Execution](managed-execution.md#step-through-a-run).
 
 ## Find common causes
 

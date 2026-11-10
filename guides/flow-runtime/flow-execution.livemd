@@ -249,5 +249,5 @@ end
 ## Next steps
 
 - [Execution](execution.md) lists every option and return shape.
-- [Managed Execution](managed-execution.md) runs the same Flows under a supervised Worker.
+- [Direct Runic Execution](managed-execution.md) runs the same Flows under a supervised Worker for advanced control.
 - [Test Flows](testing-flows.livemd) turns these checks into ExUnit tests.

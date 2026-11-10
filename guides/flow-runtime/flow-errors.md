@@ -199,7 +199,7 @@ true = Jido.Error.retryable?(transient)
 
 `Jido.Error.code/1` reads a stable program code. Codes cover Agent, Plugin, persistence, and configuration failures, and `Jido.Error.stable_codes/0` lists them. Flow failures such as those above have no code, so `code/1` returns `nil`. Use `details.reason` for those.
 
-## Managed execution errors
+## Runic observation errors
 
 `Jido.Exec.result/2` returns the same errors as `Jido.Exec.run/4`, plus these states for work that has not finished cleanly. All are `ExecutionError`.
 
@@ -210,7 +210,7 @@ true = Jido.Error.retryable?(transient)
 | `:foreign_execution` | The workflow has a result, but for another input |
 | `details.outcome: :uncertain` | The executor ended with no result. The Action may or may not have run |
 
-See [Managed Execution](managed-execution.md#handle-a-failed-run).
+See [Direct Runic Execution](managed-execution.md) and [Debug Flows](debugging-flows.md#inspect-a-direct-runic-run).
 
 ## Next steps
 

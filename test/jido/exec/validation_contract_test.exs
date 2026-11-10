@@ -257,7 +257,7 @@ defmodule Jido.Exec.ValidationContractTest do
 
     for failure <- [:raise, :throw, :exit, :invalid, :reason, :exception] do
       assert {:error, error} =
-               Exec.start(runner, make_ref(), FlowValidator, %{phase: :input, failure: failure})
+               Jido.Test.Exec.RunnerHarness.start(runner, make_ref(), FlowValidator, %{phase: :input, failure: failure})
 
       assert error.details.phase == :flow_input
       refute Map.has_key?(error.details, :non_portable_durable_value)

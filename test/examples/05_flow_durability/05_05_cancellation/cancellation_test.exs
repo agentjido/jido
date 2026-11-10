@@ -19,7 +19,7 @@ defmodule Jido.Examples.Durability.CancellationTest do
     gate = "cancel-#{System.unique_integer([:positive])}"
 
     assert {:ok, worker} =
-             Jido.Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                runner,
                id,
                Jido.Examples.Durability.Cancellation,

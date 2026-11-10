@@ -2,7 +2,6 @@ defmodule Jido.Exec.Runner.StepwiseTest do
   use Covenant.Case, component: "jido_action.execution", async: false
   @moduletag obligation: "jido_action.execution.I21"
 
-  alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
   alias Runic.Workflow
@@ -61,9 +60,9 @@ defmodule Jido.Exec.Runner.StepwiseTest do
     tag = make_ref()
 
     assert {:ok, _pid} =
-             Exec.start(runner, execution_id, flow, %{value: 0}, %{}, hooks: runner_hooks(tag))
+             Jido.Test.Exec.RunnerHarness.start(runner, execution_id, flow, %{value: 0}, %{}, hooks: runner_hooks(tag))
 
-    assert {:error, :automatic_dispatch} = Exec.step(runner, execution_id)
+    assert {:error, :automatic_dispatch} = Jido.Test.Exec.RunnerHarness.step(runner, execution_id)
     assert_receive {^tag, :idle}, 1_000
 
     assert {:ok, productions} = Runic.Runner.get_results(runner, execution_id)
@@ -79,7 +78,7 @@ defmodule Jido.Exec.Runner.StepwiseTest do
     tag = make_ref()
 
     assert {:ok, _pid} =
-             Exec.start(runner, execution_id, flow, %{value: 0}, %{},
+             Jido.Test.Exec.RunnerHarness.start(runner, execution_id, flow, %{value: 0}, %{},
                dispatch_mode: :manual,
                max_concurrency: 1,
                hooks: runner_hooks(tag)
@@ -87,7 +86,7 @@ defmodule Jido.Exec.Runner.StepwiseTest do
 
     assert {3, %Workflow{} = workflow} = step_to_completion(runner, execution_id, tag)
     refute Workflow.is_runnable?(workflow)
-    assert Exec.result(runner, execution_id) == {:ok, %{value: 2}}
+    assert Jido.Test.Exec.RunnerHarness.result(runner, execution_id) == {:ok, %{value: 2}}
     assert Recorder.entries() == [:first, :second]
 
     assert {:ok, productions} = Runic.Runner.get_results(runner, execution_id)
@@ -100,7 +99,7 @@ defmodule Jido.Exec.Runner.StepwiseTest do
     tag = make_ref()
 
     assert {:ok, _pid} =
-             Exec.start(runner, execution_id, flow, %{}, %{},
+             Jido.Test.Exec.RunnerHarness.start(runner, execution_id, flow, %{}, %{},
                dispatch_mode: :manual,
                hooks: runner_hooks(tag)
              )
@@ -108,7 +107,7 @@ defmodule Jido.Exec.Runner.StepwiseTest do
     assert {_steps, %Workflow{}} = step_to_completion(runner, execution_id, tag)
 
     assert {:error, %Jido.Error.ExecutionError{message: "step_failed"}} =
-             Exec.result(runner, execution_id)
+             Jido.Test.Exec.RunnerHarness.result(runner, execution_id)
 
     assert Recorder.entries() == [:failed]
   end
@@ -130,7 +129,7 @@ defmodule Jido.Exec.Runner.StepwiseTest do
       })
 
     assert {:ok, _worker} =
-             Exec.start(runner, id, flow, %{}, %{observer: observer},
+             Jido.Test.Exec.RunnerHarness.start(runner, id, flow, %{}, %{observer: observer},
                max_concurrency: 2,
                hooks: [
                  on_failed: fn _runnable, _reason, _state -> send(owner, :failed) end,
@@ -142,14 +141,14 @@ defmodule Jido.Exec.Runner.StepwiseTest do
     assert_receive {:started, :b, b}, 1_000
     send(a, :release)
     assert_receive :failed, 1_000
-    assert Exec.step(runner, id) == {:error, :busy}
+    assert Jido.Test.Exec.RunnerHarness.step(runner, id) == {:error, :busy}
 
     send(b, :release)
     assert_receive :idle, 1_000
-    assert {:complete, %Workflow{}} = Exec.step(runner, id)
+    assert {:complete, %Workflow{}} = Jido.Test.Exec.RunnerHarness.step(runner, id)
 
     assert {:error, %Jido.Error.ExecutionError{message: "controlled_failure"}} =
-             Exec.result(runner, id)
+             Jido.Test.Exec.RunnerHarness.result(runner, id)
   end
 
   test "manual execution resumes from durable Runic state", %{runner: runner} do
@@ -158,14 +157,14 @@ defmodule Jido.Exec.Runner.StepwiseTest do
     tag = make_ref()
 
     assert {:ok, _pid} =
-             Exec.start(runner, execution_id, flow, %{value: 0}, %{},
+             Jido.Test.Exec.RunnerHarness.start(runner, execution_id, flow, %{value: 0}, %{},
                dispatch_mode: :manual,
                max_concurrency: 1,
                checkpoint_strategy: :every_cycle,
                hooks: runner_hooks(tag)
              )
 
-    assert {:ok, %Workflow{} = workflow} = Exec.step(runner, execution_id)
+    assert {:ok, %Workflow{} = workflow} = Jido.Test.Exec.RunnerHarness.step(runner, execution_id)
     first_hash = Workflow.get_component(workflow, "first").hash
     assert_receive {^tag, :unit_done, ^first_hash}, 1_000
     assert Recorder.entries() == [:first]
@@ -241,7 +240,7 @@ defmodule Jido.Exec.Runner.StepwiseTest do
   end
 
   defp step_to_completion(runner, execution_id, tag, count \\ 0) do
-    case Exec.step(runner, execution_id) do
+    case Jido.Test.Exec.RunnerHarness.step(runner, execution_id) do
       {:ok, %Workflow{}} ->
         assert_receive {^tag, :unit_done, _node_hash}, 1_000
         step_to_completion(runner, execution_id, tag, count + 1)

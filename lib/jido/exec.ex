@@ -11,10 +11,10 @@ defmodule Jido.Exec do
   `{:handoff, successor_instruction, effects}`. Effects are returned to the
   caller without dispatch. See [Execution](execution.md).
 
-  Use `start/6` with a supervised `Runic.Runner` for managed execution,
-  `step/2` for manual dispatch, and `result/2` to read the Jido result.
-  Recovery after a Store or VM restart requires a persistent Runic Store.
-  See [Managed Execution](managed-execution.md).
+  Use `compile/2` when you need direct Runic execution. The compiled
+  `Runic.Workflow` can run through `Runic.Runner` for stepwise execution,
+  inspection, or custom recovery policy. Use `result/1,2` to project a
+  completed Runic workflow to the Jido result contract.
   """
 
   alias Jido.Exec.{Compiler, Frame, Runtime}
@@ -42,11 +42,6 @@ defmodule Jido.Exec do
           | {:ok, term(), [term()]}
           | {:handoff, Instruction.t(), [term()]}
           | {:error, Exception.t() | term()}
-
-  @type step_result ::
-          {:ok, Workflow.t()}
-          | {:complete, Workflow.t()}
-          | {:error, term()}
 
   @typedoc "A capability supplied by the current execution host."
   @type capability :: :waits
@@ -136,109 +131,18 @@ defmodule Jido.Exec do
     end
   end
 
-  @doc "Starts one managed execution under an existing Runic Runner."
-  @spec start(
-          module(),
-          term(),
-          term(),
-          map() | keyword() | nil,
-          map() | keyword() | nil,
-          keyword()
-        ) :: DynamicSupervisor.on_start_child()
-  def start(runner, execution_id, target, params \\ %{}, context \\ %{}, opts \\ []) do
-    with {:ok, instruction} <- Instruction.resolve(target, params, context),
-         {:ok, instruction} <- validate_flow_input(instruction),
-         :ok <- validate_durable_instruction(instruction),
-         {:ok, workflow} <- compile(%{instruction | context: %{}}),
-         :ok <- reject_waits(workflow),
-         {:ok, policy, worker_opts} <- managed_options(runner, execution_id, opts),
-         {:ok, pid} <-
-           Runic.Runner.start_workflow(runner, execution_id, workflow, worker_opts) do
-      case Runic.Runner.start_execution(
-             runner,
-             execution_id,
-             Jido.Exec.Fact.local_value(execution_input(instruction)),
-             execution_id: managed_identity(execution_id),
-             run_context: %{
-               _global:
-                 instruction.context
-                 |> durable_context()
-                 |> Map.put(:__jido_exec_max_concurrency__, worker_opts[:max_concurrency])
-             },
-             scheduler_policies: [{:default, Map.from_struct(policy)}]
-           ) do
-        {:ok, _scope_id} ->
-          {:ok, pid}
-
-        {:error, error} ->
-          case Runic.Runner.cancel(runner, execution_id) do
-            :ok -> {:error, error}
-            {:error, _reason} = cleanup_error -> cleanup_error
-          end
-      end
-      |> normalize_start()
-    else
-      {:error, error} -> {:error, normalize_runtime_error(error)}
-    end
-  end
-
-  @doc """
-  Resumes a managed execution from the Runner's Runic Store.
-
-  Runic does not persist runtime context or runtime policy. Pass the same
-  context and the same managed options that were given to `start/6`. Context
-  must contain portable values. Worker options such as `hooks` and
-  `dispatch_mode` apply to the resumed worker. Resume uses Runic hybrid fact
-  rehydration by default when the Store implements fact storage. Stores without
-  fact storage and native Batch workflows use full rehydration. Pass
-  `rehydration: :full`, `:hybrid`, or `:lazy` to select a specific Runic
-  recovery mode.
-  """
-  @spec resume(module(), term(), map() | keyword() | nil, keyword()) ::
-          DynamicSupervisor.on_start_child() | {:error, Exception.t()}
-  def resume(runner, execution_id, context \\ %{}, opts \\ []) do
-    with {:ok, rehydration, fallback?, opts} <- resume_options(runner, opts),
-         {:ok, context} <- runtime_context(context),
-         :ok <- Runtime.validate_local(context, :context),
-         {:ok, policy, worker_opts} <- managed_options(runner, execution_id, opts) do
-      resume_opts =
-        worker_opts ++
-          [
-            rehydration: rehydration,
-            run_context: %{
-              _global:
-                context
-                |> durable_context()
-                |> Map.put(:__jido_exec_max_concurrency__, worker_opts[:max_concurrency])
-            },
-            scheduler_policies: [{:default, Map.from_struct(policy)}]
-          ]
-
-      runner
-      |> resume_runner(execution_id, resume_opts, fallback?)
-      |> normalize_start()
-    else
-      {:error, error} -> {:error, normalize_runtime_error(error)}
-    end
-  end
-
   @doc """
   Projects a Runic workflow to the `run/4` result contract.
 
   This snapshot form includes historical failures and uncertain work. Use it
-  for a completed restored workflow. For a live managed execution, use
-  `result(runner, execution_id)` to check progress and select its input scope.
-  A missing Flow or Action result returns an error.
+  for a completed restored workflow. A missing Flow or Action result returns
+  an error.
   """
   @spec result(Workflow.t()) :: exec_result()
   def result(%Workflow{} = workflow), do: project_result(workflow, result_error(workflow), nil)
 
   @doc """
-  Reads a managed result or projects a Runic execution observation.
-
-  With a Runner and the ID passed to `start/6`, reads the live observation.
-  Runic observations are process-local. After resume, checks active and ready
-  work before projecting the restored workflow snapshot.
+  Projects a Runic execution observation.
 
   With a workflow and observation from `Runic.Workflow.execute/3` or
   `Runic.Runner.execution/3`, selects that input occurrence. Active work,
@@ -246,43 +150,8 @@ defmodule Jido.Exec do
   acknowledgement remains a separate Runic persistence status.
   """
   @spec result(Workflow.t(), Execution.t()) :: exec_result()
-  @spec result(module(), term()) :: exec_result()
   def result(%Workflow{} = workflow, %Execution{} = observation),
     do: project_result(workflow, result_error(observation, workflow), observation)
-
-  def result(runner, execution_id) when is_atom(runner) do
-    case Runic.Runner.execution(runner, execution_id, managed_identity(execution_id)) do
-      {:ok, observation} ->
-        with {:ok, workflow} <- Runic.Runner.get_workflow(runner, execution_id) do
-          project_managed_result(
-            runner,
-            execution_id,
-            workflow,
-            result_error(observation, workflow),
-            observation
-          )
-        end
-
-      {:error, :not_found} ->
-        with {:ok, workflow} <- Runic.Runner.get_workflow(runner, execution_id),
-             {:ok, status} <- Runic.Runner.admission_status(runner, execution_id) do
-          if status.active_units > 0 or
-               (status.status == :open and Workflow.is_runnable?(workflow)),
-             do: {:error, incomplete_error(execution_id, :execution_active)},
-             else:
-               project_managed_result(
-                 runner,
-                 execution_id,
-                 workflow,
-                 result_error(workflow),
-                 nil
-               )
-        end
-    end
-  end
-
-  defp managed_identity(execution_id),
-    do: Runic.Identity.digest(:execution, :erlang.term_to_binary(execution_id, [:deterministic]))
 
   defp incomplete_error(execution_id, reason),
     do:
@@ -291,32 +160,6 @@ defmodule Jido.Exec do
         reason: reason,
         retry: false
       })
-
-  @doc """
-  Dispatches one Runic scheduler unit for a manually dispatched execution.
-
-  Start the execution with `dispatch_mode: :manual`. The default scheduler
-  dispatches one Runnable per call. A custom batching scheduler can define a
-  larger unit.
-
-  `{:ok, workflow}` means that Runic dispatched one unit. The returned
-  workflow is the current Runic state and the unit can still be active. Retry
-  after `{:error, :busy}` when that unit completes.
-
-  `{:complete, workflow}` means that no work is ready or admission has stopped.
-  Read `result(runner, execution_id)` to distinguish success, failure, and
-  uncertain work. Retained ready work does not resume automatically after
-  stopped admission.
-  """
-  @spec step(module(), term()) :: step_result()
-  def step(runner, execution_id) do
-    case Runic.Runner.step(runner, execution_id) do
-      :ok -> current_workflow(runner, execution_id, :ok)
-      {:error, :not_runnable} -> current_workflow(runner, execution_id, :complete)
-      {:error, :admission_stopped} -> stopped_workflow(runner, execution_id)
-      {:error, _reason} = error -> error
-    end
-  end
 
   defp run_workflow(workflow, input, context, kind, opts) do
     with {:ok, policy, react_opts} <- execution_options(opts, kind) do
@@ -450,19 +293,6 @@ defmodule Jido.Exec do
 
   defp project_result(_workflow, error, _observation, _resolver),
     do: {:error, normalize_runtime_error(error)}
-
-  defp project_managed_result(runner, execution_id, workflow, error, observation) do
-    project_result(workflow, error, observation, result_resolver(runner, execution_id))
-  end
-
-  defp result_resolver(runner, execution_id) do
-    {store, state} = Runic.Runner.get_store(runner)
-
-    if function_exported?(store, :load_fact, 2) do
-      state = Runic.Runner.Store.for_workflow(store, execution_id, state)
-      Runic.Workflow.FactResolver.new({store, state})
-    end
-  end
 
   defp result_load_error(reason) do
     Jido.Error.execution_error("Exec result could not be loaded", %{
@@ -669,163 +499,6 @@ defmodule Jido.Exec do
      })}
   end
 
-  defp managed_options(_runner, _execution_id, opts) when is_list(opts) do
-    policy_keys = [:timeout, :max_attempts, :backoff, :base_delay_ms, :max_delay_ms]
-
-    worker_keys = [
-      :dispatch_mode,
-      :max_concurrency,
-      :on_complete,
-      :checkpoint_strategy,
-      :executor,
-      :executor_opts,
-      :scheduler,
-      :scheduler_opts,
-      :hooks,
-      :promise_opts
-    ]
-
-    if Keyword.keyword?(opts) do
-      case Keyword.keys(opts) -- (policy_keys ++ worker_keys) do
-        [] ->
-          with {:ok, policy} <- build_policy(Keyword.take(opts, policy_keys)),
-               worker_opts =
-                 opts
-                 |> Keyword.take(worker_keys)
-                 |> Keyword.put_new_lazy(:max_concurrency, &default_max_concurrency/0),
-               :ok <- validate_worker_options(worker_opts) do
-            policy = %{policy | execution_mode: :durable}
-
-            worker_opts =
-              worker_opts
-              |> quiet_failure_log()
-              |> Keyword.put(:runnable_order, &observation_order/1)
-
-            {:ok, policy, worker_opts}
-          end
-
-        unknown ->
-          {:error,
-           Jido.Error.config_error("unknown managed execution options", %{
-             options: unknown
-           })}
-      end
-    else
-      {:error, Jido.Error.config_error("execution options must be a keyword list")}
-    end
-  end
-
-  defp managed_options(_runner, _execution_id, _opts),
-    do: {:error, Jido.Error.config_error("execution options must be a keyword list")}
-
-  # The worker applies a failed runnable after this hook. See
-  # `Jido.Exec.Runtime.quiet_failure_log/0`.
-  defp quiet_failure_log(worker_opts) do
-    hooks = worker_opts |> Keyword.get(:hooks, []) |> wrap_worker_hooks()
-    failed = Keyword.get(hooks, :on_failed)
-
-    on_failed = fn runnable, error, state ->
-      try do
-        if failed, do: failed.(runnable, error, state)
-      after
-        Runtime.quiet_failure_log()
-      end
-    end
-
-    worker_opts
-    |> Keyword.put(:hooks, Keyword.put(hooks, :on_failed, on_failed))
-    |> wrap_worker_completion()
-  end
-
-  defp wrap_worker_hooks(hooks) do
-    Enum.map(hooks, fn {key, hook} -> {key, wrap_worker_hook(key, hook)} end)
-  end
-
-  defp wrap_worker_hook(:on_idle, hook) when is_function(hook, 1),
-    do: fn state -> application_callback(hook, [state]) end
-
-  defp wrap_worker_hook(key, hook)
-       when key in [:on_dispatch, :transform_runnables] and is_function(hook, 2),
-       do: fn first, second -> application_callback(hook, [first, second]) end
-
-  defp wrap_worker_hook(key, hook)
-       when key in [:on_complete, :on_failed, :on_persistence_error] and is_function(hook, 3),
-       do: fn first, second, third -> application_callback(hook, [first, second, third]) end
-
-  defp wrap_worker_hook(_key, hook), do: hook
-
-  defp wrap_worker_completion(worker_opts) do
-    case Keyword.fetch(worker_opts, :on_complete) do
-      {:ok, callback} -> Keyword.put(worker_opts, :on_complete, wrap_completion(callback))
-      :error -> worker_opts
-    end
-  end
-
-  defp wrap_completion(callback) when is_function(callback, 2),
-    do: fn id, workflow -> application_callback(callback, [id, workflow]) end
-
-  defp wrap_completion({module, function, args}) when is_atom(module) and is_atom(function) and is_list(args),
-    do: fn id, workflow -> application_callback({module, function, args}, [id, workflow]) end
-
-  defp wrap_completion(callback), do: callback
-
-  defp application_callback({module, function, extra}, args),
-    do: Runtime.with_application_logging(fn -> apply(module, function, args ++ extra) end)
-
-  defp application_callback(callback, args),
-    do: Runtime.with_application_logging(fn -> apply(callback, args) end)
-
-  defp resume_options(runner, opts) when is_list(opts) do
-    if Keyword.keyword?(opts) do
-      explicit? = Keyword.has_key?(opts, :rehydration)
-      fact_store? = fact_store?(runner)
-      default = if fact_store?, do: :hybrid, else: :full
-      {rehydration, opts} = Keyword.pop(opts, :rehydration, default)
-
-      cond do
-        rehydration not in [:full, :hybrid, :lazy] ->
-          {:error,
-           Jido.Error.config_error("invalid managed execution option", %{
-             option: :rehydration,
-             value: rehydration
-           })}
-
-        explicit? and rehydration in [:hybrid, :lazy] and not fact_store? ->
-          {:error,
-           Jido.Error.config_error("rehydration mode requires Runic fact storage", %{
-             option: :rehydration,
-             value: rehydration
-           })}
-
-        true ->
-          {:ok, rehydration, not explicit? and rehydration == :hybrid, opts}
-      end
-    else
-      {:error, Jido.Error.config_error("execution options must be a keyword list")}
-    end
-  end
-
-  defp resume_options(_runner, _opts),
-    do: {:error, Jido.Error.config_error("execution options must be a keyword list")}
-
-  defp fact_store?(runner) do
-    {store, _state} = Runic.Runner.get_store(runner)
-    function_exported?(store, :save_fact, 3) and function_exported?(store, :load_fact, 2)
-  end
-
-  defp resume_runner(runner, execution_id, opts, true) do
-    case Runic.Runner.resume(runner, execution_id, opts) do
-      {:error, {:unsupported_batch_rehydration, :hybrid}} ->
-        Runic.Runner.resume(runner, execution_id, Keyword.put(opts, :rehydration, :full))
-
-      result ->
-        result
-    end
-  end
-
-  defp resume_runner(runner, execution_id, opts, false),
-    do: Runic.Runner.resume(runner, execution_id, opts)
-
   defp max_concurrency(opts) do
     case Keyword.get_lazy(opts, :max_concurrency, &default_max_concurrency/0) do
       value when is_integer(value) and value > 0 ->
@@ -846,55 +519,6 @@ defmodule Jido.Exec do
       :max_concurrency,
       min(System.schedulers_online(), @default_max_concurrency_ceiling)
     )
-  end
-
-  # Runic accepts these values. Other worker options pass through to Runic.
-  defp validate_worker_options(opts) do
-    Enum.reduce_while(opts, :ok, fn {key, value}, :ok ->
-      if valid_worker_option?(key, value) do
-        {:cont, :ok}
-      else
-        {:halt,
-         {:error,
-          Jido.Error.config_error("invalid managed execution option", %{
-            option: key,
-            value: value
-          })}}
-      end
-    end)
-  end
-
-  defp valid_worker_option?(:max_concurrency, value), do: is_integer(value) and value > 0
-  defp valid_worker_option?(:dispatch_mode, value), do: value in [:automatic, :manual]
-
-  defp valid_worker_option?(:checkpoint_strategy, {:every_n, n}),
-    do: is_integer(n) and n > 0
-
-  defp valid_worker_option?(:checkpoint_strategy, value),
-    do: value in [:every_cycle, :on_complete, :manual]
-
-  defp valid_worker_option?(key, value) when key in [:executor, :scheduler],
-    do: is_atom(value) and match?({:module, _}, Code.ensure_loaded(value))
-
-  defp valid_worker_option?(key, value)
-       when key in [:hooks, :executor_opts, :scheduler_opts, :promise_opts],
-       do: is_list(value) and Keyword.keyword?(value)
-
-  defp valid_worker_option?(_key, _value), do: true
-
-  defp current_workflow(runner, execution_id, status) do
-    case Runic.Runner.get_workflow(runner, execution_id) do
-      {:ok, %Workflow{} = workflow} -> {status, workflow}
-      {:error, _reason} = error -> error
-    end
-  end
-
-  defp stopped_workflow(runner, execution_id) do
-    case Runic.Runner.admission_status(runner, execution_id) do
-      {:ok, %{active_units: 0}} -> current_workflow(runner, execution_id, :complete)
-      {:ok, _status} -> {:error, :busy}
-      {:error, _reason} = error -> error
-    end
   end
 
   defp build_policy(opts) do
@@ -953,34 +577,6 @@ defmodule Jido.Exec do
 
   defp execution_input(%Instruction{kind: :action}), do: %{}
   defp execution_input(%Instruction{kind: :flow, params: params}), do: Frame.new(params)
-
-  defp validate_durable_instruction(instruction), do: Jido.Exec.Runtime.portable(instruction)
-
-  defp durable_context(context) do
-    Jido.Exec.Runtime.context(context, true)
-  end
-
-  defp runtime_context(nil), do: {:ok, %{}}
-  defp runtime_context(context) when is_map(context), do: {:ok, context}
-
-  defp runtime_context(context) when is_list(context) do
-    if Keyword.keyword?(context), do: {:ok, Map.new(context)}, else: invalid_context(context)
-  end
-
-  defp runtime_context(context), do: invalid_context(context)
-
-  defp invalid_context(context) do
-    {:error,
-     Jido.Error.validation_error("context must be a map or keyword list", %{
-       kind: :input,
-       subject: :context,
-       field: :context,
-       value: context
-     })}
-  end
-
-  defp normalize_start({:ok, pid}), do: {:ok, pid}
-  defp normalize_start({:error, error}), do: {:error, normalize_runtime_error(error)}
 
   defp validate_flow_input(instruction), do: Jido.Exec.Runtime.flow_input(instruction)
 end

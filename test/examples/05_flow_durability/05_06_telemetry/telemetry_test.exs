@@ -31,7 +31,7 @@ defmodule Jido.Examples.Durability.TelemetryTest do
     owner = self()
 
     assert {:ok, _worker} =
-             Jido.Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                runner,
                id,
                Jido.Examples.Durability.Telemetry,
@@ -47,7 +47,7 @@ defmodule Jido.Examples.Durability.TelemetryTest do
     assert_receive {^token, [:runic, :runner, :workflow, :stop], _, %{id: ^id}}, 1_000
     assert_receive {^token, [:runic, :runner, :runnable, :start], _, %{runnable_id: ^runnable_id}}, 1_000
     assert_receive {^token, [:runic, :runner, :runnable, :stop], _, %{runnable_id: ^runnable_id}}, 1_000
-    assert Jido.Exec.result(runner, id) == {:ok, %{value: 5}}
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == {:ok, %{value: 5}}
   end
 
   def handle_event(event, measurements, metadata, {test_pid, token}) do

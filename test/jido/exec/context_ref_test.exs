@@ -63,14 +63,14 @@ defmodule Jido.Exec.ContextRefTest do
     runner = :"context_ref_runner_#{System.unique_integer([:positive])}"
     start_supervised!({Runic.Runner, name: runner})
 
-    assert {:ok, _pid} = Jido.Exec.start(runner, "run", ParamsAndOutputFlow, %{}, @context)
+    assert {:ok, _pid} = Jido.Test.Exec.RunnerHarness.start(runner, "run", ParamsAndOutputFlow, %{}, @context)
     assert {:ok, %{params: params, output: output}} = await_result(runner, "run", 200)
     assert params == @context
     assert output == @context
   end
 
   defp await_result(runner, id, attempts) do
-    case Jido.Exec.result(runner, id) do
+    case Jido.Test.Exec.RunnerHarness.result(runner, id) do
       {:error, %{details: %{reason: :execution_active}}} when attempts > 0 ->
         Process.sleep(10)
         await_result(runner, id, attempts - 1)

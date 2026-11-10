@@ -1,6 +1,6 @@
 defmodule Jido.Durable.Continuation do
   @moduledoc """
-  Portable data for one suspended or terminal managed execution.
+  Portable data for one suspended or terminal durable execution.
 
   A continuation keeps a stable Turn identity, accepted Signals, safe context,
   an executable fingerprint, an absolute expiry, and optional Handoff chain

@@ -22,7 +22,7 @@ defmodule Jido.Examples.Durability.RunIdentityTest do
     ]
 
     assert {:ok, _worker} =
-             Jido.Exec.start(
+             Jido.Test.Exec.RunnerHarness.start(
                runner,
                id,
                Jido.Examples.Durability.RunIdentity,
@@ -38,6 +38,6 @@ defmodule Jido.Examples.Durability.RunIdentityTest do
     assert observation.id.domain == :execution
     assert observation.input_id.domain == :input_command
     assert observation.input_fact_id.domain == :fact_occurrence
-    assert Jido.Exec.result(runner, id) == {:ok, %{value: 7}, [:identified]}
+    assert Jido.Test.Exec.RunnerHarness.result(runner, id) == {:ok, %{value: 7}, [:identified]}
   end
 end

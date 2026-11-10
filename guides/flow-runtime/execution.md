@@ -7,12 +7,13 @@ This guide explains how `Jido.Exec` runs an Action or Flow: which entry point to
 | Function | Use it when | Runs in | Survives its caller |
 | --- | --- | --- | --- |
 | `Jido.Exec.run/4` | You want the result now | A task under Jido's task supervisor | No |
-| `Jido.Exec.start/6` | You want a supervised run you can step, inspect, stop, or resume | A Worker under a `Runic.Runner` | Yes |
+| `Jido.Durable.start/4` | The run must save progress, accept Signals, or wait | A Worker hosted by the Jido instance | Yes |
+| `Jido.Exec.compile/2` plus `Runic.Runner` | You need advanced inspection or manual steps | A Worker under your Runner | Yes |
 | An Agent route | The work belongs to an Agent Turn | The `Jido.AgentServer` Turn | Yes |
 
 A generated Flow module also has `run/2`. It calls `Jido.Exec.run/4` with default options. One Action is compiled as a one-step Flow and uses the same execution path.
 
-This guide covers immediate execution. See [Managed Execution](managed-execution.md) for `Jido.Exec.start/6` and [Flow Waits](flow-waits.md) for work that suspends.
+This guide covers immediate execution. See [Direct Runic Execution](managed-execution.md) for the advanced Runner escape hatch and [Flow Waits](flow-waits.md) for work that suspends.
 
 ## Run a target
 
@@ -141,5 +142,5 @@ The run emits `[:jido, :flow, ...]` events once for a Flow and `[:jido, :action,
 ## Next steps
 
 - [Execute Flows](flow-execution.livemd) walks through running a Flow step by step.
-- [Managed Execution](managed-execution.md) covers supervised runs with Runic.
+- [Direct Runic Execution](managed-execution.md) covers advanced supervised runs with Runic.
 - [Flow Errors](flow-errors.md) lists the failures you can handle.
