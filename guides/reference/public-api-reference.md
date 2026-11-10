@@ -403,7 +403,8 @@ Portable data for one suspended Flow wait.
 
 ### `Jido.Durable`
 
-Runs and resumes persisted Flows from Signals without an Agent.
+Runs and resumes persisted Flows from Signals without an Agent. Every operation
+uses the persistence adapter of the named Jido instance.
 
 | Function | Summary |
 | --- | --- |
@@ -411,8 +412,8 @@ Runs and resumes persisted Flows from Signals without an Agent.
 | `Jido.Durable.start/4` | Starts or idempotently resumes one persisted Flow from a Signal. |
 | `Jido.Durable.resume/3` | Continues a stored execution to its next durable stop. |
 | `Jido.Durable.signal/5` | Saves one Signal as input to an addressed open wait. |
-| `Jido.Durable.status/3` | Reads the last committed state, waits, and next wake time. |
-| `Jido.Durable.result/3` | Reads the normal Exec result from the last committed state. |
+| `Jido.Durable.status/2` | Reads the last committed state, waits, and next wake time. |
+| `Jido.Durable.result/2` | Reads the normal Exec result from the last committed state. |
 
 ### `Jido.Durable.Continuation`
 

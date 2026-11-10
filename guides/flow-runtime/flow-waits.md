@@ -11,7 +11,7 @@ A durable Agent Turn or `Jido.Durable` run can host a wait. Both need a persiste
 | Host | Result for a Flow with a wait |
 | --- | --- |
 | `Jido.AgentServer` with persistence | Runs and suspends |
-| `Jido.Durable` with persistence | Runs and suspends |
+| `Jido.Durable` with persistence on its Jido instance | Runs and suspends |
 | `Jido.AgentServer` without persistence | `{:error, error}` with `details.reason: :unsupported_host` |
 | `Jido.Exec.run/4`, direct `Runic.Runner` | No wait host; execution returns an unsupported-host error |
 

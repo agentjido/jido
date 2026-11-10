@@ -3,8 +3,9 @@ defmodule Jido.Durable do
   Runs persisted Flows with `Jido.Signal` input.
 
   Durable execution is independent of Agents and AgentServer. It uses the
-  Runner and persistence adapter of a running named Jido instance. The
-  execution reference is portable and contains no process identity.
+  Runner and persistence adapter of a running named Jido instance. Durable
+  operations always use the persistence adapter configured on that instance.
+  The execution reference is portable and contains no process identity.
 
   `start/4` and `resume/3` run until the Flow completes, fails, becomes
   uncertain, or opens a wait. Each execution unit is checkpointed before the
@@ -25,10 +26,9 @@ defmodule Jido.Durable do
   alias Jido.Signal
 
   @metadata_fact {:jido_durable, 1, :execution}
-  @start_option_keys [:id, :persistence, :context, :exec_opts, :operation_timeout, :now]
-  @resume_option_keys [:persistence, :operation_timeout, :now]
-  @read_option_keys [:persistence]
-  @signal_option_keys [:persistence, :now]
+  @start_option_keys [:id, :context, :exec_opts, :operation_timeout, :now]
+  @resume_option_keys [:operation_timeout, :now]
+  @signal_option_keys [:now]
 
   @typedoc "One durable operation result."
   @type operation_result :: {:ok, Status.t()} | {:error, term()}
@@ -43,7 +43,7 @@ defmodule Jido.Durable do
 
   def start(jido, target, %Signal{} = signal, opts) do
     with :ok <- validate_options(opts, @start_option_keys),
-         {:ok, config} <- persistence(jido, opts),
+         {:ok, config} <- persistence(jido),
          {:ok, ref} <- Ref.new(jido, Keyword.get(opts, :id, signal.id)),
          {:ok, params} <- signal_params(signal),
          {:ok, context} <- durable_context(signal, Keyword.get(opts, :context, %{})),
@@ -65,7 +65,7 @@ defmodule Jido.Durable do
   def resume(jido, %Ref{} = ref, opts) do
     with :ok <- validate_options(opts, @resume_option_keys),
          :ok <- validate_ref_instance(jido, ref),
-         {:ok, config} <- persistence(jido, opts),
+         {:ok, config} <- persistence(jido),
          {:ok, execution} <- load_execution(jido, ref, config),
          do: run(jido, execution, config, opts)
   end
@@ -80,7 +80,7 @@ defmodule Jido.Durable do
   def signal(jido, %Ref{} = ref, wait_id, %Signal{} = signal, opts) do
     with :ok <- validate_options(opts, @signal_option_keys),
          :ok <- validate_ref_instance(jido, ref),
-         {:ok, config} <- persistence(jido, opts),
+         {:ok, config} <- persistence(jido),
          {:ok, _execution} <- load_execution(jido, ref, config),
          {:ok, input} <- Jido.Exec.Wait.input(wait_id, signal) do
       case Runtime.accept_input(
@@ -100,13 +100,10 @@ defmodule Jido.Durable do
     do: {:error, Jido.Error.validation_error("durable wait input must be a Jido.Signal")}
 
   @doc "Reads the last committed durable execution status."
-  @spec status(atom(), Ref.t(), keyword()) :: operation_result()
-  def status(jido, ref, opts \\ [])
-
-  def status(jido, %Ref{} = ref, opts) do
-    with :ok <- validate_options(opts, @read_option_keys),
-         :ok <- validate_ref_instance(jido, ref),
-         {:ok, config} <- persistence(jido, opts),
+  @spec status(atom(), Ref.t()) :: operation_result()
+  def status(jido, %Ref{} = ref) do
+    with :ok <- validate_ref_instance(jido, ref),
+         {:ok, config} <- persistence(jido),
          {:ok, _execution} <- load_execution(jido, ref, config),
          {:ok, workflow} <- Runtime.workflow(jido, Ref.execution_id(ref), config),
          true <- not is_nil(workflow) do
@@ -117,16 +114,13 @@ defmodule Jido.Durable do
     end
   end
 
-  def status(_jido, _ref, _opts), do: invalid_ref()
+  def status(_jido, _ref), do: invalid_ref()
 
   @doc "Reads the normal `Jido.Exec` result from the last committed state."
-  @spec result(atom(), Ref.t(), keyword()) :: Jido.Exec.exec_result()
-  def result(jido, ref, opts \\ [])
-
-  def result(jido, %Ref{} = ref, opts) do
-    with :ok <- validate_options(opts, @read_option_keys),
-         :ok <- validate_ref_instance(jido, ref),
-         {:ok, config} <- persistence(jido, opts),
+  @spec result(atom(), Ref.t()) :: Jido.Exec.exec_result()
+  def result(jido, %Ref{} = ref) do
+    with :ok <- validate_ref_instance(jido, ref),
+         {:ok, config} <- persistence(jido),
          {:ok, _execution} <- load_execution(jido, ref, config),
          {:ok, workflow} when not is_nil(workflow) <-
            Runtime.workflow(jido, Ref.execution_id(ref), config) do
@@ -137,7 +131,7 @@ defmodule Jido.Durable do
     end
   end
 
-  def result(_jido, _ref, _opts), do: invalid_ref()
+  def result(_jido, _ref), do: invalid_ref()
 
   defp run(jido, %Execution{} = execution, config, opts) do
     runner = Jido.Instance.Names.exec_runner(jido)
@@ -296,8 +290,8 @@ defmodule Jido.Durable do
     with :ok <- Runtime.validate_execution_options(opts), do: {:ok, opts}
   end
 
-  defp persistence(jido, opts) do
-    case Jido.Persistence.resolve_config(Keyword.get(opts, :persistence, :inherit), jido) do
+  defp persistence(jido) do
+    case Jido.Persistence.resolve_config(:inherit, jido) do
       {:ok, nil} ->
         invalid("durable execution requires a persistence adapter", %{instance: jido})
 

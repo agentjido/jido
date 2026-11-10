@@ -13,15 +13,28 @@ defmodule Jido.Examples.Durability.DirectFlowTest do
     :ok
   end
 
-  test "runs a durable Flow without an Agent", c do
+  test "runs a durable Flow without an Agent" do
     persistence = {Jido.Persistence.ETS, table: Module.concat(__MODULE__, Store)}
+    jido = start_durable_jido(persistence)
 
     {:ok, request} =
       Jido.Signal.new("examples.durable.order", %{subtotal: 10}, source: "/examples/durable")
 
     assert {:ok, %Status{state: :completed, ref: ref}} =
-             Durable.start(c.jido, DirectFlow, request, persistence: persistence)
+             Durable.start(jido, DirectFlow, request)
 
-    assert {:ok, %{total: 12}} = Durable.result(c.jido, ref, persistence: persistence)
+    assert {:ok, %{total: 12}} = Durable.result(jido, ref)
+  end
+
+  defp start_durable_jido(persistence) do
+    suffix = System.unique_integer([:positive])
+    jido = :"direct_flow_durable_#{suffix}"
+
+    start_supervised!(
+      {Jido, name: jido, namespace: "examples/direct-flow/#{suffix}", persistence: persistence},
+      id: jido
+    )
+
+    jido
   end
 end
