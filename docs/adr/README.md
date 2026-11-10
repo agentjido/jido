@@ -1,6 +1,6 @@
 # Architecture decision records
 
-This directory records decisions that constrain the Jido V3 architecture. The [aspirational module dependency map](../../../docs/aspirational-module-dependency-map.md) remains the living map of namespace ownership and dependency direction.
+This directory records decisions that constrain the Jido V3 architecture. The [module dependency map](../architecture/module-dependency-map.md) remains the living map of namespace ownership and dependency direction.
 
 ## Records
 

@@ -6,7 +6,7 @@ This tutorial cancels a running report Turn, confirms that its state did not cha
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

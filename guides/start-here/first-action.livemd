@@ -6,7 +6,7 @@ This tutorial builds an Action that totals an invoice, then adds a schema, an ou
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

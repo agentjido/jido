@@ -1,10 +1,19 @@
 defmodule Jido.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @description "A durable actor and agent framework for Elixir"
+  @source_url "https://github.com/agentjido/jido"
+  @source_ref "migration/consolidated-v3"
+
   def project do
     [
       app: :jido,
-      version: "0.1.0",
+      version: @version,
+      name: "Jido",
+      description: @description,
+      source_url: @source_url,
+      homepage_url: "https://jido.run",
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -71,6 +80,8 @@ defmodule Jido.MixProject do
     [
       main: "Jido",
       api_reference: true,
+      source_url: @source_url,
+      source_ref: @source_ref,
       extra_section: "Guides",
       skip_code_autolink_to: &skip_internal_doc_link?/1,
       extras: for({_section, guides} <- published_guides, {title, path} <- guides, do: {path, title: title}),
@@ -515,6 +526,25 @@ defmodule Jido.MixProject do
   end
 
   defp package do
-    [files: [".formatter.exs", "lib", "mix.exs"]]
+    [
+      files: [
+        ".formatter.exs",
+        "CHANGELOG.md",
+        "LICENSE",
+        "README.md",
+        "guides",
+        "lib",
+        "mix.exs",
+        "usage-rules.md"
+      ],
+      maintainers: ["Mike Hostetler"],
+      licenses: ["Apache-2.0"],
+      links: %{
+        "Changelog" => "#{@source_url}/blob/#{@source_ref}/CHANGELOG.md",
+        "Documentation" => "https://hexdocs.pm/jido",
+        "GitHub" => @source_url,
+        "Website" => "https://jido.run"
+      }
+    ]
   end
 end

@@ -6,7 +6,7 @@ In this tutorial you write ExUnit tests for a Flow: its output and effects, its 
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

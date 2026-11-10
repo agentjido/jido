@@ -15,7 +15,7 @@ execution: code
 - **Objective:** Maintainers can use the required authoring gate to detect regressions across both Agent and Flow authoring paths.
 - **Means:** Adapt the fixed `jido_action` Flow authoring corpus to the consolidated Catalog, Flow, Codec, and Exec contracts while preserving each supported scenario's intent (KTD1).
 - **Authority:** The fixed source commit and current public Jido contracts govern behavior. Current contracts replace removed source APIs.
-- **Execution profile:** Four dependency-ordered test slices, one Beadwork task and worktree per slice.
+- **Execution profile:** Four dependency-ordered test slices with one isolated worktree per slice.
 - **Stop conditions:** Stop a slice when a supported current contract fails and the correction would require `lib/**`, when a source scenario has no evidence-backed disposition, or when a reference repository would need a write.
 - **Tail ownership:** The final slice owns source reconciliation, the full authoring gate, and clean quality evidence.
 
@@ -296,14 +296,14 @@ test/authoring/
 | Coverage | `mix quality.coverage` | Package, component, and suite thresholds pass. |
 | Final report | `mix quality.report` | Clean-tree report passes with no new finding or waiver. |
 
-The implementation owner records exact counts, seeds, failures, and any superseded scenario in the Beadwork completion comments.
+The implementation owner records exact counts, seeds, failures, and any superseded scenario in the implementation record.
 
 ---
 
 ## Definition of Done
 
 - All four implementation units are complete on their required dependency bases.
-- The Beadwork graph has one task per U-ID and no hidden dependency between U2 and U3.
+- The work graph has one task per U-ID and no hidden dependency between U2 and U3.
 - The source ledger accounts for 12 test files, nine support assets, one README, and 60 declared tests or properties plus generated guide cases.
 - Eleven adapted Flow authoring test files and all required fixtures run through `mix test.authoring`.
 - `guides_test.exs` has named current evidence and an explicit superseded disposition.

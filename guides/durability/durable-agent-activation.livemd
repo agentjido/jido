@@ -6,7 +6,7 @@ This tutorial uses `Jido.activate_agent/4` to start a durable Agent the same way
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

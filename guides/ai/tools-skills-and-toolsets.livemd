@@ -6,7 +6,7 @@ This tutorial gives an AI Agent tools in the three ways Jido supports: Actions, 
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

@@ -18,7 +18,7 @@ product_contract_source: direct-request
 - **Means:** Reorganize the complete `test/` tree after `jido-nnq` closes. Consolidate shared support and reports. Assign one canonical owner to each proof claim. Remove only proven duplication. Update every active path consumer in the same change as each move. (KTD1-KTD9)
 - **Authority:** The confirmed scope in this plan controls organization. `AGENTS.md` controls repository boundaries. Existing Covenant records and quality contracts control proof meaning.
 - **Stop conditions:** Stop a unit if it needs a `lib/**` or `refs/**` change, a public behavior change, an active Covenant component-ID change, or a compatibility path. Record the need as follow-up work.
-- **Next executor:** A software implementation agent with local-write authority, one Beadwork task, and one worktree for the active unit.
+- **Next executor:** A software implementation agent with local-write authority and one worktree for the active unit.
 
 ---
 
@@ -68,7 +68,7 @@ Covenant records and property tests are not duplicate test systems. Covenant own
 - R14. Keep `test/contracts/coverage.json` as versioned Covenant evidence. Keep disposable reports and counterexamples under ignored `tmp/` or `_build/` paths, and remove unconsumed `coverage.static.json`.
 - R15. Finish with fewer test-tree clone groups than the post-`jido-nnq` baseline and no known clone group between former property harness or reporter copies. This is a completion measurement, not a new layout gate.
 - R16. Give each behavior claim one canonical executable owner and record every supplemental proof with its distinct claim in `test/quality/component_proof.yml`.
-- R17. Keep `quality` limited to proof registries and report infrastructure. Move useful deferred probes to their owning proof lane and keep non-executable gaps in Beadwork or the source manifest.
+- R17. Keep `quality` limited to proof registries and report infrastructure. Move useful deferred probes to their owning proof lane and keep non-executable gaps in the source manifest.
 
 ### Key Flows
 
@@ -139,7 +139,7 @@ None. The organization boundary, compatibility policy, proof methods, and start 
 
 - The direct user request and confirmed scope define the outcome and non-goals.
 - `docs/plans/2026-11-04-1255-test-flow-authoring-suite-plan.md` defines the upstream authoring baseline.
-- `AGENTS.md` defines repository, architecture, and Beadwork rules.
+- `AGENTS.md` defines repository and architecture rules.
 
 ---
 
@@ -422,7 +422,7 @@ flowchart TB
 1. Keep local OTP, lifecycle, and recovery proof under `system/jido_<namespace>`.
 2. Move load and benchmark assets into `perf/jido_<namespace>`. Keep load and benchmark as profiles or tags, not ownership trees.
 3. Move live AI and external service proof into `external/<owner>`. Keep live and service selection opt-in.
-4. Move each useful deferred probe to its owning proof lane with its existing exclusion and disposition. Remove non-useful executable probes after recording the gap in Beadwork or the source manifest.
+4. Move each useful deferred probe to its owning proof lane with its existing exclusion and disposition. Remove non-useful executable probes after recording the gap in the source manifest.
 5. Register system, external, and perf claims in the component proof registry. These lanes own lifecycle, boundary, and capacity claims that only they can prove. Repeated runtime claims stay supplemental.
 6. Update catalogs, scheduled burn-in commands, aliases, evidence paths, and current lane documentation in the same changes.
 
@@ -533,7 +533,7 @@ Run commands from the `jido/` repository. U1 records the post-`jido-nnq` baselin
 
 | Gate | Command | Expected result |
 |---|---|---|
-| Upstream blocker | `bw show jido-nnq` | The epic and all children are closed before U1 starts. |
+| Upstream blocker | Source manifest review | The prerequisite authoring work is complete before U1 starts. |
 | Compile and format | `mix compile --warnings-as-errors` and `mix format --check-formatted` | No warning and no format change. |
 | Default | `mix test --seed 0 --warnings-as-errors` | All default tests pass from final paths. |
 | Authoring | `mix test.authoring --warnings-as-errors` | Complete Agent and Flow authoring proof passes. |
@@ -624,4 +624,4 @@ None. Implementation-time file naming can vary when it preserves KTD1-KTD9 and t
 
 - Markdown: canonical at `docs/plans/2026-11-04-1314-refactor-jido-test-tree-plan.md`
 - HTML: not requested
-- Beadwork: epic `jido-fjs` ready after `jido-nnq` closed, 7 serial tasks; U1 `jido-fjs.1`, U2 `jido-fjs.2`, U3 `jido-fjs.3`, U4 `jido-fjs.4`, U5 `jido-fjs.5`, U6 `jido-fjs.6`, U7 `jido-fjs.7`
+- Work graph: seven serial implementation units, U1 through U7.

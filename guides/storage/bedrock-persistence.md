@@ -16,7 +16,7 @@ Bedrock is optional for Jido. The adapter supports Bedrock `0.7.2` and later `0.
 ```elixir
 defp deps do
   [
-    {:jido, github: "mikehostetler/new_jido", branch: "main"},
+    {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"},
     {:bedrock, "~> 0.7.2"},
     {:bedrock_raft, "~> 0.10.0"}
   ]

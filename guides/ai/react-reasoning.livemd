@@ -6,7 +6,7 @@ This tutorial runs `Jido.AI.Reasoning.ReAct` through each path it can take: tool
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

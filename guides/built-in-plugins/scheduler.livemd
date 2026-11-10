@@ -8,7 +8,7 @@ Use this Plugin when the Agent decides what to schedule, or when work must land 
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

@@ -6,7 +6,7 @@ This tutorial writes a reasoning Flow of your own. It classifies support tickets
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

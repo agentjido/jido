@@ -6,7 +6,7 @@ This tutorial sends Signals to a running order Agent in each request mode, then 
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

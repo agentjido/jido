@@ -6,7 +6,7 @@ This tutorial starts a Jido instance, runs a ticket Agent inside it, and reaches
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

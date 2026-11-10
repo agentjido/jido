@@ -1,12 +1,11 @@
-# NewJido
+# Jido V3 Consolidation
 
 > [!WARNING]
-> This repository is an experiment. It is not the current Jido release, a
-> supported package, or a complete source of Jido documentation. APIs, module
-> ownership, and project structure can change while the consolidation work is
-> in progress.
+> The `migration/consolidated-v3` branch is an integration candidate. It is
+> not the current Jido release. APIs, module ownership, and project structure
+> can change before the V3 release.
 
-This experiment consolidates the four core Jido repositories, `jido`,
+This branch consolidates the four core Jido repositories, `jido`,
 `jido_action`, `jido_signal`, and `jido_ai`, into one Mix project and one OTP
 application. The first source port is complete. The project is now testing and
 refining the module boundaries that became visible after the packages moved
@@ -22,9 +21,8 @@ include:
 - a complete public API and compatibility review; and
 - final performance baselines across the supported runtime matrix.
 
-Do not use this repository as the official guide for a released Jido version.
-The current focus is architecture and quality backpressure. Documentation and
-release preparation will follow after those boundaries are stable.
+Do not treat this branch as a released Hex package. The current focus is
+architecture, quality, and release preparation.
 
 The main work is:
 
@@ -34,11 +32,20 @@ The main work is:
 - compile Actions and Flows to Runic workflows; and
 - keep Joi schemas as the Jido data boundary.
 
-The surrounding NewJido workspace keeps the architecture and consolidation
-decisions in `docs/aspirational-module-dependency-map.md`.
+The repository keeps its architecture and consolidation decisions in
+[`docs/architecture/module-dependency-map.md`](docs/architecture/module-dependency-map.md).
 
 Use the [documentation index](docs/README.md) for project documents, required
 fixed paths, and material that still needs review.
+
+## Use the migration branch
+
+Until the consolidated package has a release, point Mix at the official
+migration branch:
+
+```elixir
+{:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+```
 
 ## Local checks
 

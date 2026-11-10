@@ -4,7 +4,7 @@ Run this Livebook to see how Jido derives execution order from your Flow, and ho
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

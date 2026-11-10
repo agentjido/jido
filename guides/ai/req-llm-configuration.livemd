@@ -6,7 +6,7 @@ This tutorial shows what Jido AI hands to ReqLLM: the model name, the provider k
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

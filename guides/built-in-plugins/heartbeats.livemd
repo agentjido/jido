@@ -8,7 +8,7 @@ The Plugin only produces Signals. It adds no Agent state and does not detect mis
 
 ```elixir
 Mix.install([
-  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
 ])
 ```
 

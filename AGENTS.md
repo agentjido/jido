@@ -35,19 +35,14 @@ The focused AI components are `jido.ai.agent_authoring`, `jido.ai.conversation`,
 
 `.reach.exs` is the source of truth for code dependency layers. Covenant is the source of truth for behavior ownership and proof. Each Covenant component owns modules from one Reach layer. Each module has no more than one primary Covenant owner. A component test can use a lower layer, but the component does not own that lower layer.
 
-Some active Covenant IDs still start with `jido_action.` or `jido_ai.`. These are legacy IDs. Use the target `jido.*` IDs from `../docs/covenant-component-refactor-plan.md` for new architecture work.
+Some active Covenant IDs still start with `jido_action.` or `jido_ai.`. These are legacy IDs. Use `jido.*` IDs for new architecture work and update the component proof in the same change.
 
 ## Work rules
 
 - Run Mix commands from this directory.
-- Always run `bw prime` before you start work. Beadwork stores plans, progress,
-  and decisions in Git so they remain available after context loss.
-- For multi-step work, create a Beadwork epic and child tasks before
-  implementation starts. Use one task and one worktree for each architecture
-  slice.
 - Keep one `:jido` OTP application. Keep `Jido.Application` as its only composition root.
 - Change one namespace or Covenant component at a time. Change its tests and contract records in the same work.
-- Update `../docs/aspirational-module-dependency-map.md` when ownership or dependency direction changes.
+- Update `docs/architecture/module-dependency-map.md` when ownership or dependency direction changes.
 - Record a lasting architecture decision in `docs/adr/` and update its index.
 - Run focused tests and `mix format --check-formatted` before handoff. For architecture changes, also run `mix reach.check --arch --smells` and the Covenant checks for the changed component.
 - Run `mix test.authoring` for public authoring compatibility and `mix test.contracts` for all Covenant contracts. Both commands run in `mix test.ci`.

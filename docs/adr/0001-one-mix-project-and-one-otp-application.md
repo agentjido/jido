@@ -24,5 +24,5 @@ Keep internal boundaries with `Jido.*` namespace ownership and enforced dependen
 
 ## References
 
-- [Jido package vision](../../../docs/package-vision.md)
-- [Aspirational module dependency map](../../../docs/aspirational-module-dependency-map.md)
+- [Jido package vision](../architecture/package-vision.md)
+- [Module dependency map](../architecture/module-dependency-map.md)

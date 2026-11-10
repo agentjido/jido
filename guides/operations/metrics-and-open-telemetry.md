@@ -107,7 +107,7 @@ Jido maps its Turn, effect, lifecycle, and persistence events to spans when two 
 ```elixir
 defp deps do
   [
-    {:jido, github: "mikehostetler/new_jido", branch: "main"},
+    {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"},
     {:opentelemetry_api, "~> 1.0"},
     {:opentelemetry, "~> 1.0"},
     {:opentelemetry_exporter, "~> 1.0"}
