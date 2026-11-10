@@ -354,7 +354,7 @@ defmodule Jido.MixProject do
     [
       # Runtime
       {:multigraph, "~> 0.16.1-mg.5"},
-      {:req_llm, "~> 1.29"},
+      {:req_llm, "~> 1.30"},
       {:runic, "~> 0.1.0-alpha.13"},
       {:sched_ex, "~> 1.2.1"},
       {:spark, "~> 2.7.3"},
@@ -362,7 +362,7 @@ defmodule Jido.MixProject do
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.2"},
       {:yaml_elixir, "~> 2.12"},
-      {:zoi, "~> 0.19.0", override: true},
+      {:zoi, "~> 0.19.0"},
 
       # Optional integrations
       {:bedrock, "~> 0.7.2", optional: true},
