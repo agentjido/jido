@@ -1,0 +1,123 @@
+# Nested Flows
+
+Run this Livebook to call one Flow from another, pass data across the boundary, and see how validation and errors behave at that boundary. Run the cells from top to bottom.
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Define a child Flow
+
+A child is an ordinary Flow module. You can run it alone. This one has its own input and output schemas.
+
+```elixir
+defmodule NestedFlows.Tax do
+  use Jido.Flow,
+    name: "nested_flows_tax",
+    schema: Jido.Joi.object(%{cents: Jido.Joi.integer()}),
+    output_schema: Jido.Joi.object(%{tax: Jido.Joi.integer()})
+
+  flow do
+    step "compute", cents <- input(:cents), inline: [context: ctx] do
+      {:ok, %{tax: div(cents * ctx.tax_percent, 100)}}
+    end
+
+    output result("compute")
+  end
+end
+
+{:ok, %{tax: 20}} = Jido.Exec.run(NestedFlows.Tax, %{cents: 100}, %{tax_percent: 20})
+```
+
+## Call it from a parent
+
+A Step whose `action` is a Flow module becomes a child Flow call. The child's output is the Step result. No separate syntax exists, and `params` builds the child's input as it does for an Action.
+
+```elixir
+defmodule NestedFlows.Invoice do
+  use Jido.Flow, name: "nested_flows_invoice"
+
+  flow do
+    step "tax", action: NestedFlows.Tax, params: %{cents: input(:cents)}
+
+    output %{
+      cents: input(:cents),
+      total: input(:cents) + result("tax", :tax)
+    }
+  end
+end
+
+{:ok, %{cents: 1000, total: 1200}} =
+  Jido.Exec.run(NestedFlows.Invoice, %{cents: 1000}, %{tax_percent: 20})
+```
+
+The example shows two boundary rules:
+
+- The parent's context reaches the child, so `ctx.tax_percent` works without any declaration.
+- The child sees only what `params` passes. It cannot read the parent's input or results, and a child `result` reference names a child component.
+
+## Boundary validation
+
+The child's `schema` validates what the parent passes, and its `output_schema` validates what it returns. A failure carries the path to the failed component.
+
+```elixir
+{:error, %Jido.Error.ValidationError{details: details}} =
+  Jido.Exec.run(NestedFlows.Invoice, %{cents: "ten"}, %{tax_percent: 20})
+
+%{phase: :subflow_input, node_path: ["tax"]} = details
+```
+
+An error inside the child extends that path with the child component name, such as `["tax", "compute"]`. See [Flow Errors](../flow-runtime/flow-errors.md).
+
+## Use one child more than once
+
+Each Step is a separate call with its own values and error path.
+
+```elixir
+defmodule NestedFlows.TwoInvoices do
+  use Jido.Flow, name: "nested_flows_two_invoices"
+
+  flow do
+    step "first", action: NestedFlows.Tax, params: %{cents: input(:first)}
+    step "second", action: NestedFlows.Tax, params: %{cents: input(:second)}
+
+    output %{first: result("first", :tax), second: result("second", :tax)}
+  end
+end
+
+{:ok, %{first: 10, second: 30}} =
+  Jido.Exec.run(NestedFlows.TwoInvoices, %{first: 100, second: 300}, %{tax_percent: 10})
+
+{:error, %Jido.Error.ValidationError{details: %{node_path: ["second"]}}} =
+  Jido.Exec.run(NestedFlows.TwoInvoices, %{first: 100, second: "bad"}, %{tax_percent: 10})
+```
+
+## Where child Flows are allowed
+
+A Flow module is a valid target for `step`, and for the target selected at runtime by `invoke`. The compiler rejects it in a Choice option, `map`, `reduce`, `parallel`, and `iterate` with "Flow component has the wrong target kind".
+
+To run a child Flow per item, keep the item logic in an Action, or run the child through `Jido.Exec` inside that Action. See [Dynamic Flows](dynamic-flows.md) for `invoke`.
+
+`step_action/1` works only for Action targets. It raises `ArgumentError` for a Step with a Flow target.
+
+```elixir
+{:error_raised, %ArgumentError{}} =
+  try do
+    NestedFlows.Invoice.step_action("tax")
+  rescue
+    error -> {:error_raised, error}
+  end
+```
+
+## Limits
+
+- A Flow cannot contain itself. A module cannot name itself as a Step target, because it has not finished compiling. Jido also rejects a recursive Flow cycle when it prepares a graph, with "recursive nested Flow cycle".
+- A child Flow cannot hand off for its parent. A `handoff` inside a child fails with "handoff must finish the root Flow". See [Dynamic Flows](dynamic-flows.md).
+- A child's effect requests occupy the parent Step's position in the Flow's effect order. See [Outputs and Effects](../actions/action-effects.livemd).
+
+## Next steps
+
+- [Dynamic Flows](dynamic-flows.md) selects a child at runtime.
+- [Inline Action DSLs](building-dsls-with-inline-actions.md) shows how to embed a Flow in another module's DSL with `Jido.Flow.Inline`.

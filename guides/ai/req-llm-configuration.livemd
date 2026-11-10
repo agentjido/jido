@@ -1,0 +1,220 @@
+# Configure ReqLLM
+
+This tutorial shows what Jido AI hands to ReqLLM: the model name, the provider key, and the options on each call. ReqLLM is the default model layer. Every cell runs against a local client that records its arguments, so you can read the exact call without a provider. The one provider fence is marked and is not for this notebook.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Provide a provider key
+
+`Jido.AI.InferenceClient.ReqLLM` is the default client. It passes each call to the matching `ReqLLM` function, and ReqLLM finds the provider key. Jido AI has no key setting of its own. In your application, set an environment variable such as `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, or use the ReqLLM config:
+
+<!-- partial -->
+```elixir
+# config/runtime.exs
+config :req_llm,
+  openai_api_key: System.fetch_env!("OPENAI_API_KEY"),
+  receive_timeout: 120_000
+```
+
+Under Mix, ReqLLM also loads a `.env` file from the current directory at startup. Set `config :req_llm, load_dotenv: false` to turn that off. Read the ReqLLM configuration guide for pools, timeouts, and provider base URLs.
+
+Keep keys out of Signal data and reasoning defaults. A request's `options` are ordinary Flow input.
+
+## Name a model
+
+A model name is a `provider:model` string. ReqLLM resolves it from its bundled catalog without a network call.
+
+```elixir
+model = ReqLLM.model!("anthropic:claude-haiku-4-5")
+
+{model.provider, String.starts_with?(model.id, "claude-haiku-4-5")}
+```
+
+The cell returns `{:anthropic, true}`. The catalog resolves this short name to a dated release, so `model.id` can be longer than the name you wrote. Use exact, versioned names when a provider publishes them, so that a model change is your choice. A reasoning Flow's `model` field accepts strings only.
+
+## Record what the client receives
+
+This client stores each call in an `Agent` and returns a fixed answer.
+
+```elixir
+defmodule ReqLLMGuide.Recorder do
+  @behaviour Jido.AI.InferenceClient
+
+  def start, do: Agent.start_link(fn -> nil end, name: __MODULE__)
+  def last_call, do: Agent.get(__MODULE__, & &1)
+
+  @impl true
+  def generate_text(model, context, options) do
+    Agent.update(__MODULE__, fn _previous -> %{model: model, options: options} end)
+
+    {:ok,
+     %ReqLLM.Response{
+       id: "local",
+       model: model,
+       context: context,
+       message: ReqLLM.Context.assistant(~s({"priority":"high"})),
+       object: if(options[:output], do: %{"priority" => "high"}),
+       finish_reason: :stop,
+       usage: %{input_tokens: 4, output_tokens: 3}
+     }}
+  end
+
+  @impl true
+  def evaluation_models, do: []
+
+  for {name, arity} <- Jido.AI.InferenceClient.behaviour_info(:callbacks),
+      {name, arity} not in [generate_text: 3, evaluation_models: 0] do
+    @impl true
+    def unquote(name)(unquote_splicing(Macro.generate_arguments(arity, __MODULE__))),
+      do: {:error, :not_supported}
+  end
+end
+
+defmodule ReqLLMGuide.TriageAgent do
+  use Jido.AI.Agent, name: "triage_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      model "anthropic:claude-haiku-4-5"
+      options %{temperature: 0.0, max_tokens: 200, receive_timeout: 20_000}
+
+      limits do
+        elapsed_ms 30_000
+      end
+    end
+  end
+end
+
+{:ok, _recorder} = ReqLLMGuide.Recorder.start()
+
+run_request = fn params ->
+  agent = ReqLLMGuide.TriageAgent.instantiate!(id: "triage-#{System.unique_integer([:positive])}")
+
+  {:ok, _agent, [%{signal: reply}]} =
+    ReqLLMGuide.TriageAgent.cmd(
+      agent,
+      ReqLLMGuide.TriageAgent.request_signal!(params),
+      context: %{jido_ai_inference_client: ReqLLMGuide.Recorder}
+    )
+
+  reply.data
+end
+
+%{status: :completed} = run_request.(%{input: "Triage ticket T-12."})
+
+ReqLLMGuide.Recorder.last_call().options |> Keyword.keys() |> Enum.sort()
+```
+
+The cell returns `[:max_tokens, :receive_timeout, :telemetry, :temperature, :total_timeout]`. The first, second, and fourth come from `options`. Jido adds the others, as the next section shows.
+
+## Know what Jido adds
+
+`Jido.AI.Reasoning.Actions.CallModel` builds the final option list from `options`:
+
+| Option | Source |
+| --- | --- |
+| Anything in `options` | Passed through as a keyword list. |
+| `:tool_choice` | The `tool_policy` requirement. A value set in `options` is removed. |
+| `:tools` | The selected tools, when there are any. |
+| `:total_timeout` | The smaller of any `total_timeout` in `options` and the time left in `limits.elapsed_ms`. |
+| `:telemetry` | Your map with `conversation_id` set to the Thread ID. |
+| `:output`, `:output_validation` | Set from `output_schema`, with `:strict` validation. |
+| `:provider_options` | Prompt cache settings, when enabled. |
+
+```elixir
+options = ReqLLMGuide.Recorder.last_call().options
+
+%{
+  timeout_within_budget: options[:total_timeout] <= 30_000,
+  telemetry_keys: Map.keys(options[:telemetry])
+}
+```
+
+The cell returns `%{timeout_within_budget: true, telemetry_keys: [:conversation_id]}`.
+
+## Request structured output
+
+Set `output_schema` to a JSON Schema map. ReqLLM receives it as an object output. The client must return the decoded object in the response's `:object` field, and it becomes the reply's `output`.
+
+```elixir
+schema = %{
+  "type" => "object",
+  "properties" => %{"priority" => %{"type" => "string"}},
+  "required" => ["priority"],
+  "additionalProperties" => false
+}
+
+structured = run_request.(%{input: "Triage ticket T-12.", output_schema: schema})
+options = ReqLLMGuide.Recorder.last_call().options
+
+{structured.output, options[:output_validation], options[:output].type}
+```
+
+The cell returns `{%{"priority" => "high"}, :strict, :object}`.
+
+## Turn on prompt caching
+
+`prompt_cache` lowers to provider options by the provider part of the model name. Jido sets options for `openai`, `anthropic`, `amazon_bedrock`, and `bedrock`. Other providers get no cache options, and the request still runs.
+
+| Provider | Options set |
+| --- | --- |
+| `openai` | `prompt_cache_key` set to the Session ID, and `prompt_cache_options` with `ttl` when set |
+| `anthropic` | `anthropic_prompt_cache: true`, and `anthropic_prompt_cache_ttl` when set |
+| `amazon_bedrock`, `bedrock` | `prompt_cache: true`, and `prompt_cache_ttl` when set |
+
+```elixir
+%{status: :completed} =
+  run_request.(%{input: "Triage ticket T-12.", prompt_cache: %{enabled: true, ttl: "1h"}})
+
+anthropic = ReqLLMGuide.Recorder.last_call().options[:provider_options]
+
+%{status: :completed} =
+  run_request.(%{
+    input: "Triage ticket T-12.",
+    model: "openai:gpt-4o-mini",
+    prompt_cache: %{enabled: true}
+  })
+
+openai = ReqLLMGuide.Recorder.last_call().options[:provider_options]
+
+{anthropic, Map.keys(openai)}
+```
+
+The cell returns `{%{anthropic_prompt_cache: true, anthropic_prompt_cache_ttl: "1h"}, [:prompt_cache_key]}`. Each attempt records what the provider reported in its `prompt_cache` field. See [Model Budgets and Usage](budgets-and-usage.md).
+
+## Run against a real provider
+
+Run this in your own application with a key set. It makes a paid call, so it is not part of this notebook's flow. `MyApp.SupportAgent` is your Agent.
+
+<!-- partial -->
+```elixir
+{:ok, _instance} = Jido.start(name: MyApp.Jido, namespace: "my-app")
+{:ok, server} = Jido.start_agent(MyApp.Jido, MyApp.SupportAgent, id: "support-1")
+:ok = Jido.AgentServer.await_ready(server)
+
+request =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Summarize the refund policy.",
+    model: "openai:gpt-4o-mini",
+    options: %{max_tokens: 256, receive_timeout: 60_000}
+  })
+
+{:ok, _agent, [%{signal: reply}]} =
+  Jido.AgentServer.call(server, request, timeout: :infinity, admission_timeout: :infinity)
+
+reply.data.output
+```
+
+`call/3` has a 5-second default timeout, which is too short for most model calls. The Agent's `limits.elapsed_ms` still bounds the model calls.
+
+## Next steps
+
+- [Inference Clients](inference-clients.md) replaces ReqLLM behind the same contract.
+- [Model Capabilities](model-capabilities.md) shows what a model supports.
+- [Reasoning Setup](reasoning-flows-models-and-limits.md) lists the request fields.

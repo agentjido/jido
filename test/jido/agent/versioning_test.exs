@@ -11,7 +11,7 @@ defmodule Jido.Agent.VersioningTest do
     use Jido.Agent, name: "versioned_agent", vsn: 3
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
   end
 
@@ -19,7 +19,7 @@ defmodule Jido.Agent.VersioningTest do
     use Jido.Agent, name: "custom_checkpoint_version_agent", vsn: 4
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     @impl Jido.Agent
@@ -33,7 +33,7 @@ defmodule Jido.Agent.VersioningTest do
     use Jido.Agent, name: "numeric_definition_agent", metadata: %{ratio: 1}
 
     state do
-      schema Zoi.object(%{count: Zoi.number() |> Zoi.default(1)})
+      schema Jido.Joi.object(%{count: Jido.Joi.number() |> Jido.Joi.default(1)})
     end
   end
 
@@ -70,13 +70,13 @@ defmodule Jido.Agent.VersioningTest do
           VersionedAgent.instantiate!(id: "json"),
           Agent.define!(%{name: "data", vsn: 8})
         ] do
-      registry = JidoTest.AgentRegistry.for(value)
-      assert {:ok, document} = JidoTest.AgentRegistry.encode(value, registry)
+      registry = Jido.Test.AgentServer.Registry.for(value)
+      assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(value, registry)
       assert document["vsn"] == 1
       assert document["definition"]["vsn"] == value.vsn
       expected = Agent.definition(value)
-      assert {:ok, ^expected} = JidoTest.AgentRegistry.decode(document, registry)
-      assert {:error, _} = JidoTest.AgentRegistry.decode(%{document | "vsn" => 99}, registry)
+      assert {:ok, ^expected} = Jido.Test.AgentServer.Registry.decode(document, registry)
+      assert {:error, _} = Jido.Test.AgentServer.Registry.decode(%{document | "vsn" => 99}, registry)
     end
   end
 
@@ -98,7 +98,7 @@ defmodule Jido.Agent.VersioningTest do
     for changed <- [
           agent,
           %{agent | metadata: %{ratio: 1.0}},
-          %{agent | schema: Zoi.object(%{count: Zoi.number() |> Zoi.default(1.0)})}
+          %{agent | schema: Jido.Joi.object(%{count: Jido.Joi.number() |> Jido.Joi.default(1.0)})}
         ] do
       assert {:ok, snapshot} = Jido.Persistence.snapshot(changed)
       assert snapshot.agent === changed

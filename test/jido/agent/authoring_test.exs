@@ -1,4 +1,4 @@
-defmodule JidoTest.Agent.AuthoringTest do
+defmodule Jido.Agent.AuthoringTest do
   use Covenant.Case, component: "jido.agent", async: false
 
   alias Jido.Agent
@@ -18,7 +18,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   defmodule Add do
     use Jido.Action,
       name: "authoring_add",
-      schema: Zoi.object(%{amount: Zoi.integer(), flag: Zoi.boolean() |> Zoi.default(false)})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer(), flag: Jido.Joi.boolean() |> Jido.Joi.default(false)})
 
     def run(%{amount: amount}, %{agent_state: state}),
       do: {:ok, %{state | count: state.count + amount}}
@@ -27,7 +27,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   defmodule ProjectedOutput do
     use Jido.Action,
       name: "authoring_projected_output",
-      output_schema: Zoi.object(%{state: Zoi.map(), reply: Zoi.string()})
+      output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), reply: Jido.Joi.string()})
 
     def run(_params, _context), do: {:ok, %{state: %{}, reply: "done"}}
   end
@@ -35,7 +35,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   defmodule Flow do
     use Jido.Flow,
       name: "authoring_flow",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     flow do
       step "add", action: Add, params: %{amount: input(:amount)}
@@ -47,17 +47,17 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Plugin
 
     @impl true
-    defdelegate state_spec(opts), to: JidoTest.Agent.AuthoringTest.CountTurns.Agent
+    defdelegate state_spec(opts), to: Jido.Agent.AuthoringTest.CountTurns.Agent
 
     @impl true
-    defdelegate reduce(reduction, opts), to: JidoTest.Agent.AuthoringTest.CountTurns.Agent
+    defdelegate reduce(reduction, opts), to: Jido.Agent.AuthoringTest.CountTurns.Agent
   end
 
   defmodule CountTurns.Agent do
     @behaviour Jido.Plugin
 
     def state_spec(opts),
-      do: {:turns, Zoi.integer() |> Zoi.default(Keyword.get(opts, :initial, 0))}
+      do: {:turns, Jido.Joi.integer() |> Jido.Joi.default(Keyword.get(opts, :initial, 0))}
 
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
   end
@@ -66,10 +66,10 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Plugin
 
     @impl true
-    defdelegate state_spec(opts), to: JidoTest.Agent.AuthoringTest.PassThrough.Agent
+    defdelegate state_spec(opts), to: Jido.Agent.AuthoringTest.PassThrough.Agent
 
     @impl true
-    defdelegate prepare(preparation, opts), to: JidoTest.Agent.AuthoringTest.PassThrough.Agent
+    defdelegate prepare(preparation, opts), to: Jido.Agent.AuthoringTest.PassThrough.Agent
   end
 
   defmodule PassThrough.Agent do
@@ -82,7 +82,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Agent, name: "prepared_counter"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -101,7 +101,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Agent, name: "raw_counter", metadata: %{day: ~D[2026-09-03]}
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -115,12 +115,12 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Action,
       name: "list_inputs",
       schema:
-        Zoi.object(%{
-          items: Zoi.array(Zoi.integer()) |> Zoi.optional(),
-          nullable_items: Zoi.array(Zoi.integer()) |> Zoi.nullable() |> Zoi.optional(),
-          options: Zoi.keyword(value: Zoi.integer()) |> Zoi.optional(),
-          empty: Zoi.literal([]) |> Zoi.optional(),
-          anything: Zoi.any() |> Zoi.optional()
+        Jido.Joi.object(%{
+          items: Jido.Joi.array(Jido.Joi.integer()) |> Jido.Joi.optional(),
+          nullable_items: Jido.Joi.array(Jido.Joi.integer()) |> Jido.Joi.nullable() |> Jido.Joi.optional(),
+          options: Jido.Joi.keyword(value: Jido.Joi.integer()) |> Jido.Joi.optional(),
+          empty: Jido.Joi.literal([]) |> Jido.Joi.optional(),
+          anything: Jido.Joi.any() |> Jido.Joi.optional()
         })
 
     def run(_params, %{agent_state: state}), do: {:ok, state}
@@ -130,14 +130,14 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Action,
       name: "named_inputs",
       schema:
-        Zoi.object(%{
-          server: Zoi.integer(),
-          opts: Zoi.integer(),
-          _: Zoi.integer(),
-          _private: Zoi.integer(),
-          "user-id": Zoi.integer(),
-          amount: Zoi.integer() |> Zoi.optional(),
-          amount_or_opts: Zoi.integer() |> Zoi.optional()
+        Jido.Joi.object(%{
+          server: Jido.Joi.integer(),
+          opts: Jido.Joi.integer(),
+          _: Jido.Joi.integer(),
+          _private: Jido.Joi.integer(),
+          "user-id": Jido.Joi.integer(),
+          amount: Jido.Joi.integer() |> Jido.Joi.optional(),
+          amount_or_opts: Jido.Joi.integer() |> Jido.Joi.optional()
         })
 
     def run(input, _context), do: {:ok, input}
@@ -162,7 +162,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       plugins: [{CountTurns, %{initial: 0}}, {PassThrough, %{label: :second}}]
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -183,7 +183,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       plugins: [{CountTurns, %{initial: 0}}, {PassThrough, %{label: :second}}]
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -197,7 +197,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     use Jido.Agent, name: "inline_authoring_counter"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -207,13 +207,12 @@ defmodule JidoTest.Agent.AuthoringTest do
         action %{amount: amount, multiplier: multiplier},
           name: "inline_authoring_add",
           schema:
-            Zoi.object(%{
-              amount: Zoi.integer(),
-              multiplier: Zoi.integer() |> Zoi.default(1)
+            Jido.Joi.object(%{
+              amount: Jido.Joi.integer(),
+              multiplier: Jido.Joi.integer() |> Jido.Joi.default(1)
             }),
           context: context do
-          {:ok,
-           %{context.agent_state | count: add(context.agent_state.count, amount, multiplier)}}
+          {:ok, %{context.agent_state | count: add(context.agent_state.count, amount, multiplier)}}
         end
       end
     end
@@ -228,7 +227,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert definition.vsn == 7
     assert Enum.map(definition.routes, & &1.path) == ["authoring.add", "authoring.flow"]
 
-    assert Agent.runtime_plugins(definition) == [
+    assert Agent.Plugin.declarations(definition) == [
              {CountTurns, [initial: 0]},
              {PassThrough, [label: :second]}
            ]
@@ -241,7 +240,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   @tag obligation: "jido.agent.I21"
   test "generated Signal helpers have tuple and raising forms" do
-    module = JidoTest.AuthoringDocsAgent
+    module = Jido.Test.Agent.AuthoringDocsAgent
     {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
 
     assert {{:function, :increment_signal, 2}, _, _, %{"en" => help}, _} =
@@ -262,7 +261,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert %{data: %{amount: "not validated during construction"}} =
              module.increment_signal!(%{amount: "not validated during construction"})
 
-    assert_raise Agent.Error, "Expected a plain Map", fn -> module.increment_signal!([]) end
+    assert_raise Jido.Error.ValidationError, "Expected a plain Map", fn -> module.increment_signal!([]) end
 
     assert_raise ArgumentError, ~r/invalid input Signal/, fn ->
       module.increment_signal!(%{}, source: "not a URI reference")
@@ -275,7 +274,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       compile_agent("", "", "state do\n schema nil\n end")
     end
 
-    for option <- ["schema: Zoi.object(%{})", "routes: []"] do
+    for option <- ["schema: Jido.Joi.object(%{})", "routes: []"] do
       assert_raise Spark.Options.ValidationError, ~r/unknown options/, fn ->
         compile_agent("", ", #{option}")
       end
@@ -311,7 +310,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     compiled =
       compile_isolated("""
-      defmodule JidoTest.BareAgent#{System.unique_integer([:positive])} do
+      defmodule Jido.Test.BareAgent#{System.unique_integer([:positive])} do
         use Jido.Agent, name: "bare"
         routes do
           route "test.pass" do
@@ -359,7 +358,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       InlineCounter.add_inline_signal(%{amount: 3, multiplier: 2})
 
     assert {:ok, candidate, []} =
-             InlineCounter.cmd(InlineCounter.instantiate!(id: Jido.Signal.ID.generate!()), signal)
+             InlineCounter.cmd(InlineCounter.instantiate!(id: Jido.Id.uuid7()), signal)
 
     assert candidate.state.count == 6
   end
@@ -370,7 +369,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       compile_agent(
         """
         route "test.classify" do
-          action schema: Zoi.object(%{amount: Zoi.integer()}), context: context do
+          action schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}), context: context do
             %{amount: amount} when amount > 0 ->
               {:ok, %{context.agent_state | result: :positive}}
 
@@ -383,7 +382,7 @@ defmodule JidoTest.Agent.AuthoringTest do
         "",
         """
         state do
-          schema Zoi.object(%{result: Zoi.atom() |> Zoi.default(:unset)})
+          schema Jido.Joi.object(%{result: Jido.Joi.atom() |> Jido.Joi.default(:unset)})
         end
         """
       )
@@ -397,17 +396,17 @@ defmodule JidoTest.Agent.AuthoringTest do
     other = Jido.Signal.new!("test.classify", %{amount: 0}, source: "/test")
 
     assert {:ok, %{state: %{result: :positive}}, []} =
-             module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), positive)
+             module.cmd(module.instantiate!(id: Jido.Id.uuid7()), positive)
 
     assert {:ok, %{state: %{result: :other}}, []} =
-             module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), other)
+             module.cmd(module.instantiate!(id: Jido.Id.uuid7()), other)
   end
 
   @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
   test "compiled Agents canonicalize string state selectors against atom output fields" do
     compiled =
       compile_agent("""
-      route "test.project", JidoTest.Agent.AuthoringTest.ProjectedOutput do
+      route "test.project", Jido.Agent.AuthoringTest.ProjectedOutput do
         state from: output("state")
       end
       """)
@@ -424,7 +423,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   test "compiled Agents canonicalize string reply selectors against atom output fields" do
     compiled =
       compile_agent("""
-      route "test.project", JidoTest.Agent.AuthoringTest.ProjectedOutput do
+      route "test.project", Jido.Agent.AuthoringTest.ProjectedOutput do
         state :unchanged
         reply "test.project.done", from: output("reply")
       end
@@ -449,15 +448,15 @@ defmodule JidoTest.Agent.AuthoringTest do
              Counter.add_signal(%{amount: 2}, source: "/custom", id: "stable")
 
     assert {:ok, next, []} =
-             Counter.cmd(Counter.instantiate!(id: Jido.Signal.ID.generate!()), first)
+             Counter.cmd(Counter.instantiate!(id: Jido.Id.uuid7()), first)
 
     assert next.state.count == 1
 
     assert {:ok, signal} = Counter.add_signal(%{amount: nil})
     assert signal.data == %{amount: nil}
 
-    assert {:error, %Jido.Action.Error.InvalidInputError{}} =
-             Counter.cmd(Counter.instantiate!(id: Jido.Signal.ID.generate!()), signal)
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Counter.cmd(Counter.instantiate!(id: Jido.Id.uuid7()), signal)
   end
 
   @tag obligation: "jido.agent.I21"
@@ -497,8 +496,8 @@ defmodule JidoTest.Agent.AuthoringTest do
   test "wildcard routes work and static structs are not portable authoring values" do
     definition = RawCounter.definition()
 
-    assert {:error, %Jido.Authoring.Error.InvalidError{code: :value}} =
-             JidoTest.AgentRegistry.encode(definition, JidoTest.AgentRegistry.for(definition))
+    assert {:error, %Jido.Codec.Error.InvalidError{code: :value}} =
+             Jido.Test.AgentServer.Registry.encode(definition, Jido.Test.AgentServer.Registry.for(definition))
 
     refute function_exported?(RawCounter, :raw_signal, 1)
 
@@ -514,12 +513,15 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:ok, %{state: %{count: -1}}, []} = Agent.cmd(agent, signal)
 
     assert {:error, _} =
-             Jido.Authoring.Registry.new(%{"runtime" => {:value, ~D[2026-09-03]}})
+             Jido.Catalog.from_targets(__MODULE__, :jido, %{
+               "runtime" => {:value, ~D[2026-09-03]}
+             })
   end
 
   @tag obligation: "jido.agent.I20"
   test "Codec rejects incomplete instance shapes before it derives a definition" do
     definition = Counter.definition()
+    catalog = Jido.Catalog.from_targets!(__MODULE__, :jido, %{})
 
     for malformed <- [
           %{definition | id: "", state: %{}},
@@ -529,7 +531,7 @@ defmodule JidoTest.Agent.AuthoringTest do
           %{definition | id: "instance", state: %URI{}},
           %{definition | id: "instance", state: []}
         ] do
-      assert {:error, _error} = JidoTest.AgentRegistry.encode(malformed, %{})
+      assert {:error, _error} = Jido.Test.AgentServer.Registry.encode(malformed, catalog)
     end
   end
 
@@ -597,12 +599,12 @@ defmodule JidoTest.Agent.AuthoringTest do
     signal = Jido.Signal.new!("test.add", %{}, source: "/caller")
 
     assert {:ok, %{state: %{}}, []} =
-             module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), signal)
+             module.cmd(module.instantiate!(id: Jido.Id.uuid7()), signal)
   end
 
   @tag obligation: ["jido.agent.I1", "jido.agent.I22"]
   test "recompilation verifies the new schema of an Action defined later in the same file" do
-    module = Module.concat(JidoTest, "ReloadedAgent#{System.unique_integer([:positive])}")
+    module = Module.concat(Jido.Test, "ReloadedAgent#{System.unique_integer([:positive])}")
 
     ExUnit.CaptureIO.capture_io(:stderr, fn ->
       for field <- [:amount, :value] do
@@ -611,7 +613,7 @@ defmodule JidoTest.Agent.AuthoringTest do
           use Jido.Agent, name: "reloaded"
 
           state do
-            schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+            schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
           end
 
           routes do
@@ -623,7 +625,7 @@ defmodule JidoTest.Agent.AuthoringTest do
         defmodule #{inspect(module)}.Add do
           use Jido.Action,
             name: "reloaded_add",
-            schema: Zoi.object(%{#{field}: Zoi.integer()})
+            schema: Jido.Joi.object(%{#{field}: Jido.Joi.integer()})
 
           def run(params, _context), do: {:ok, %{count: params.#{field}}}
         end
@@ -632,7 +634,7 @@ defmodule JidoTest.Agent.AuthoringTest do
         assert {:ok, signal} = module.add_signal(%{field => 3})
 
         assert {:ok, candidate, []} =
-                 module.cmd(module.instantiate!(id: Jido.Signal.ID.generate!()), signal)
+                 module.cmd(module.instantiate!(id: Jido.Id.uuid7()), signal)
 
         assert candidate.state.count == 3
       end
@@ -641,7 +643,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   @tag obligation: "jido.agent.I22"
   test "an unchanged Agent checks a reloaded Action contract" do
-    module = Module.concat(JidoTest, "ActionReload#{System.unique_integer([:positive])}")
+    module = Module.concat(Jido.Test, "ActionReload#{System.unique_integer([:positive])}")
     action = Module.concat(module, Action)
 
     compile_isolated("""
@@ -668,13 +670,13 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   defp compile_agent(routes, opts \\ "", extra \\ "", source? \\ true) do
-    name = "JidoTest.GeneratedAgent#{System.unique_integer([:positive])}"
+    name = "Jido.Test.GeneratedAgent#{System.unique_integer([:positive])}"
     source = if source?, do: "signal_source \"/test\"", else: ""
 
     compile_isolated("""
     defmodule #{name} do
-        alias JidoTest.Agent.AuthoringTest.Add, warn: false
-        alias JidoTest.Agent.AuthoringTest.ListInputs, warn: false
+        alias Jido.Agent.AuthoringTest.Add, warn: false
+        alias Jido.Agent.AuthoringTest.ListInputs, warn: false
       use Jido.Agent, name: "compiled"#{opts}
       #{extra}
       routes do
@@ -708,15 +710,15 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 end
 
-defmodule JidoTest.Agent.AuthoringRuntimeTest do
-  use JidoTest.Case, async: false
+defmodule Jido.Agent.AuthoringRuntimeTest do
+  use Jido.Test.Case, async: false
 
   alias Jido.AgentServer, as: Server
-  alias JidoTest.Agent.AuthoringTest.{Counter, InlineCounter, PreparedCounter}
+  alias Jido.Agent.AuthoringTest.{Counter, InlineCounter, PreparedCounter}
 
   test "generated Action and Flow helpers commit the direct candidate", %{jido: jido} do
-    agent = Counter.instantiate!(id: Jido.Signal.ID.generate!())
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    agent = Counter.instantiate!(id: Jido.Id.uuid7())
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
 
     {:ok, command_signal_1} = Counter.add_signal(%{amount: 3})
 
@@ -751,7 +753,7 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
   end
 
   test "generated inline helpers apply route defaults", %{jido: jido} do
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, InlineCounter)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, InlineCounter)
 
     {:ok, route_signal_3} = InlineCounter.add_inline_signal(%{amount: 4})
 
@@ -762,15 +764,15 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
   end
 
   test "a live helper forwards runtime validation without a commit", %{jido: jido} do
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, Counter)
-    before = JidoTest.AgentServerAssertions.committed(server)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, Counter)
+    before = Jido.Test.AgentServer.Assertions.committed(server)
 
     {:ok, route_signal_4} = Counter.add_signal(%{amount: 2})
 
     assert {:error, %{__exception__: true}} =
              Jido.AgentServer.call(server, route_signal_4, timeout: :invalid)
 
-    assert JidoTest.AgentServerAssertions.committed(server) == before
+    assert Jido.Test.AgentServer.Assertions.committed(server) == before
 
     {:ok, route_signal_5} = Counter.add_signal(%{amount: 0})
 
@@ -781,13 +783,13 @@ defmodule JidoTest.Agent.AuthoringRuntimeTest do
   end
 
   test "helpers leave executable validation to execution", %{jido: jido} do
-    agent = PreparedCounter.instantiate!(id: Jido.Signal.ID.generate!())
+    agent = PreparedCounter.instantiate!(id: Jido.Id.uuid7())
     assert {:ok, signal} = PreparedCounter.add_signal(%{amount: 2})
     assert signal.data == %{amount: 2}
     assert {:ok, candidate, []} = PreparedCounter.cmd(agent, signal)
     assert candidate.state.count == 2
 
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
 
     {:ok, route_signal_6} = PreparedCounter.add_signal(%{amount: 2})
 

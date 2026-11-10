@@ -1,0 +1,5 @@
+- id: react-component-boundary
+  date: "2026-10-27"
+  decision: Keep ReAct as an explicit graph that composes shared turn, model, conversation, and tool contracts.
+  driver: Approval, tool execution, cycle repair, and durable observations must remain visible Flow steps that users can replace.
+  approved_by: User-requested initial Covenant scaffold

@@ -42,6 +42,9 @@ defmodule Jido.Telemetry.Persistence do
   defp result_measurements({:ok, _agent, revision}, :load, _opts),
     do: %{revision_after: revision}
 
+  defp result_measurements({:ok, _agent, revision, _server_turn}, :load, _opts),
+    do: %{revision_after: revision}
+
   defp result_measurements(:ok, :compare_and_swap, opts) do
     opts = safe_options(opts)
     %{revision_after: Keyword.get(opts, :revision, 0)}
@@ -56,7 +59,7 @@ defmodule Jido.Telemetry.Persistence do
   defp instance(source) do
     if function_exported?(source, :__jido_persistence__, 0) or
          (is_pid(Process.whereis(source)) and
-            is_pid(Process.whereis(Jido.runtime_store_name(source)))) do
+            is_pid(Process.whereis(Jido.Instance.Names.runtime_store(source)))) do
       source
     end
   rescue
@@ -66,7 +69,7 @@ defmodule Jido.Telemetry.Persistence do
   defp namespace(nil), do: nil
 
   defp namespace(instance) do
-    Jido.namespace(instance)
+    Jido.Instance.NamespaceRegistry.namespace(instance)
   catch
     _, _ -> nil
   end

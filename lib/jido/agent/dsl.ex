@@ -1,6 +1,8 @@
 defmodule Jido.Agent.DSL do
+  alias Jido.Joi
   @moduledoc false
-  alias Jido.Agent.{Error, Extension, Validation}
+  alias Jido.Agent.{Extension, Validation}
+  alias Jido.Error
   alias Spark.Dsl.Extension, as: E
 
   use Spark.Dsl,
@@ -23,7 +25,7 @@ defmodule Jido.Agent.DSL do
     helpers =
       quote unquote: false do
         for route <- @agent_definition.routes,
-            route.as != nil and not Jido.Agent.Data.wildcard?(route.path) do
+            route.as != nil and not Jido.Agent.Schema.wildcard?(route.path) do
           helper = String.to_atom(Atom.to_string(route.as) <> "_signal")
           bang_helper = String.to_atom(Atom.to_string(route.as) <> "_signal!")
 
@@ -53,11 +55,11 @@ defmodule Jido.Agent.DSL do
       def vsn, do: @agent_definition.vsn
 
       @doc "Returns the complete state schema, including Plugin-owned fields."
-      @spec schema() :: Zoi.schema()
+      @spec schema() :: Joi.schema()
       def schema, do: Jido.Agent.schema(definition())
 
       @doc false
-      def __jido_authoring__ do
+      def __jido_catalog_manifest__ do
         %{
           id: unquote(opts[:id]),
           kind: :agent,
@@ -73,7 +75,7 @@ defmodule Jido.Agent.DSL do
       def route_executable!(path) do
         case Enum.find(@agent_definition.routes, &(&1.path == path)) do
           %{handler: %{kind: :executable, target: target}} ->
-            %{target: target} = Jido.Agent.Route.executable(target) |> Jido.Agent.Error.unwrap!()
+            %{target: target} = Jido.Agent.Route.executable(target) |> Jido.Error.unwrap!()
 
             target
 
@@ -95,6 +97,9 @@ defmodule Jido.Agent.DSL do
       @spec definition() :: Jido.Agent.definition()
       def definition, do: Jido.Agent.DSL.definition!(@agent_definition)
 
+      @doc false
+      def __jido_definition__(opts), do: Jido.Agent.DSL.definition(@agent_definition, opts)
+
       @doc "Builds and validates one instance of this Agent."
       @spec instantiate(keyword() | map()) ::
               {:ok, Jido.Agent.instance()} | {:error, term()}
@@ -104,6 +109,8 @@ defmodule Jido.Agent.DSL do
       @spec instantiate!(keyword() | map()) :: Jido.Agent.instance() | no_return()
       def instantiate!(opts \\ []), do: Jido.Agent.instantiate!(__MODULE__, opts)
       unquote(helpers)
+      @doc false
+      def __jido_location__, do: {__ENV__.file, __ENV__.line}
       @after_verify {Jido.Agent.DSL, :verify!}
     end
   end
@@ -114,11 +121,42 @@ defmodule Jido.Agent.DSL do
   def verify!(module) do
     case Jido.Agent.validate(module.definition()) do
       {:ok, _} -> :ok
-      {:error, error} -> raise error
+      {:error, error} -> compile_error!(module, error)
     end
+  rescue
+    error in Error.ValidationError -> compile_error!(module, error)
   end
 
-  def definition!(draft) do
+  # Elixir runs @after_verify after compilation, so report the source location here.
+  defp compile_error!(module, error) do
+    {file, line} = module.__jido_location__()
+
+    raise CompileError,
+      file: file,
+      line: line,
+      description:
+        "#{inspect(module)}: #{Exception.message(error)} " <>
+          "(code: #{inspect(Map.get(error, :code))}, path: #{inspect(Map.get(error, :path))}, " <>
+          "details: #{inspect(Map.get(error, :details))})"
+  end
+
+  @doc false
+  @spec prepend_plugin(keyword(), Jido.Plugin.declaration()) :: keyword()
+  def prepend_plugin(options, plugin) do
+    options = validate_keyword!(options)
+    plugins = Keyword.get(options, :plugins, [])
+
+    unless is_list(plugins), do: raise(ArgumentError, "Agent plugins must be a list")
+
+    plugins = if plugin in plugins, do: plugins, else: [plugin | plugins]
+
+    Keyword.delete(options, :plugins) ++ [plugins: plugins]
+  end
+
+  def definition!(draft), do: draft |> definition(related?: true) |> Error.unwrap!()
+
+  @doc false
+  def definition(draft, opts) do
     routes =
       Enum.map(draft.routes, fn
         %{handler: %{kind: :executable, target: target}} = route ->
@@ -128,7 +166,7 @@ defmodule Jido.Agent.DSL do
           route
       end)
 
-    draft |> Map.put(:routes, routes) |> Validation.define(related?: true) |> Error.unwrap!()
+    draft |> Map.put(:routes, routes) |> Validation.define(opts)
   end
 
   def build!(dsl, opts, module) do
@@ -140,7 +178,7 @@ defmodule Jido.Agent.DSL do
           |> Map.new()
           |> Map.merge(%{
             module: module,
-            schema: E.get_opt(dsl, [:__state__], :schema, Zoi.object(%{})),
+            schema: E.get_opt(dsl, [:__state__], :schema, Joi.object(%{})),
             initial_state: E.get_opt(dsl, [:__state__], :initial_state, %{}),
             signal_source: E.get_opt(dsl, [:__routes__], :signal_source),
             routes:
@@ -165,5 +203,12 @@ defmodule Jido.Agent.DSL do
           path: error.path,
           message: Exception.message(error)
     end
+  end
+
+  defp validate_keyword!(options) do
+    unless Keyword.keyword?(options) and Enum.uniq(Keyword.keys(options)) == Keyword.keys(options),
+      do: raise(ArgumentError, "Agent requires unique keyword options")
+
+    options
   end
 end

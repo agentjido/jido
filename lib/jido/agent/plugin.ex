@@ -1,4 +1,6 @@
 defmodule Jido.Agent.Plugin do
+  alias Jido.Joi
+
   @moduledoc """
   Executes the Agent callbacks of `Jido.Plugin`.
 
@@ -12,47 +14,65 @@ defmodule Jido.Agent.Plugin do
   owned field.
   """
 
-  alias Jido.Agent
-  alias Jido.Agent.{Data, Error, Route}
-  alias Jido.Agent.Plugin.{Preparation, RouteSelection, Spec}
-  alias Jido.Plugin.Error, as: PluginError
+  alias Jido.Agent.{Route, Schema}
+  alias Jido.Error
+  alias Jido.Agent.Plugin.{Preparation, RouteSelection}
+  alias Jido.Plugin, as: PluginBoundary
   alias Jido.Plugin.Input
   alias Jido.Plugin.Normalizer
+  alias Jido.Plugin.Spec.Agent, as: Spec
   alias Jido.Signal
 
-  @type state_spec :: :none | {atom(), Zoi.schema()}
-
   @doc false
-  @spec compose_schema(Zoi.schema(), [Jido.Plugin.declaration()] | [Jido.Plugin.Spec.t()]) ::
-          {:ok, Zoi.schema()} | {:error, term()}
-  def compose_schema(%Zoi.Types.Map{} = domain_schema, declarations) do
-    with {:ok, specs} <- Normalizer.normalize_all(declarations),
-         do: compose_schema_from_specs(domain_schema, specs)
+  def declarations(%{plugins: entries}) when is_list(entries) do
+    for %{provider: module, data: data} <- entries,
+        Code.ensure_loaded?(module) and function_exported?(module, :__jido_plugin__, 0),
+        do: {module, Enum.sort(data)}
   end
 
-  def compose_schema(schema, _declarations), do: compose_schema_from_specs(schema, [])
+  @type state_spec :: :none | {atom(), Joi.schema()}
 
-  # Callers pass the specifications from the current validation result.
   @doc false
-  def compose_schema_from_specs(%Zoi.Types.Map{fields: fields} = domain_schema, plugin_specs) do
-    agent_specs = specs(plugin_specs)
-
-    with :ok <- state_key_conflicts(fields, agent_specs) do
-      plugin_fields =
-        for %Spec{state_key: key, state_schema: schema} <- agent_specs,
-            not is_nil(key),
-            into: %{},
-            do: {key, schema}
-
-      extended = Zoi.extend(domain_schema, plugin_fields)
-      {:ok, %{domain_schema | fields: extended.fields}}
+  @spec compose_schema(Joi.schema(), [Jido.Plugin.declaration()] | [Jido.Plugin.Spec.t()]) ::
+          {:ok, Joi.schema()} | {:error, term()}
+  def compose_schema(domain_schema, declarations) do
+    if field_object?(domain_schema) do
+      with {:ok, specs} <- Normalizer.normalize_all(declarations),
+           do: compose_schema_from_specs(domain_schema, specs)
+    else
+      compose_schema_from_specs(domain_schema, [])
     end
   end
 
-  def compose_schema_from_specs(schema, _specs) do
-    PluginError.validation("Agent domain schema must be a field-based Zoi object", %{
-      schema: schema
-    })
+  # Callers pass the specifications from the current validation result.
+  @doc false
+  def compose_schema_from_specs(domain_schema, plugin_specs) do
+    with true <- field_object?(domain_schema),
+         {:ok, fields} <- Joi.Schema.fields(domain_schema) do
+      agent_specs = specs(plugin_specs)
+
+      with :ok <- state_key_conflicts(fields, agent_specs) do
+        plugin_fields =
+          for %Spec{state_key: key, state_schema: schema} <- agent_specs,
+              not is_nil(key),
+              into: %{},
+              do: {key, schema}
+
+        extended = Joi.extend(domain_schema, plugin_fields)
+        {:ok, extended_fields} = Joi.Schema.fields(extended)
+        {:ok, Joi.Schema.put_fields(domain_schema, extended_fields)}
+      end
+    else
+      _ ->
+        PluginBoundary.validation_error("Agent domain schema must be a field-based Joi object", %{
+          schema: domain_schema
+        })
+    end
+  end
+
+  defp field_object?(schema) do
+    Joi.Schema.kind(schema) == :map and
+      match?({:ok, fields} when is_list(fields), Joi.Schema.fields(schema))
   end
 
   @doc false
@@ -66,9 +86,9 @@ defmodule Jido.Agent.Plugin do
   end
 
   @doc false
-  @spec prepare(Agent.instance(), Signal.t(), [Jido.Plugin.Spec.t()] | [Spec.t()]) ::
+  @spec prepare(map(), Signal.t(), [Jido.Plugin.Spec.t()] | [Spec.t()]) ::
           {:ok, %{optional(module()) => Input.t()}} | {:error, term()}
-  def prepare(%Agent{} = agent, %Signal{} = signal, plugin_specs) do
+  def prepare(agent, %Signal{} = signal, plugin_specs) do
     with {:ok, candidates} <- Route.matching(agent, signal.type) do
       plugin_specs
       |> specs()
@@ -90,12 +110,12 @@ defmodule Jido.Agent.Plugin do
 
   @doc false
   @spec select_route(
-          Agent.instance(),
+          map(),
           Signal.t(),
           %{optional(module()) => Input.t()},
           [Jido.Plugin.Spec.t()] | [Spec.t()]
         ) :: {:ok, map()} | {:error, term()}
-  def select_route(%Agent{} = agent, %Signal{} = signal, inputs, plugin_specs) do
+  def select_route(agent, %Signal{} = signal, inputs, plugin_specs) do
     selectors = Enum.filter(specs(plugin_specs), & &1.route_selector?)
 
     case selectors do
@@ -106,7 +126,7 @@ defmodule Jido.Agent.Plugin do
         select_with_plugin(agent, signal, inputs, selector)
 
       selectors ->
-        PluginError.validation("Only one Agent Plugin can select routes", %{
+        PluginBoundary.validation_error("Only one Agent Plugin can select routes", %{
           plugins: Enum.map(selectors, & &1.package)
         })
     end
@@ -123,7 +143,7 @@ defmodule Jido.Agent.Plugin do
         validate_duplicate_route_aliases(routes)
 
       selectors ->
-        PluginError.validation("Only one Agent Plugin can select routes", %{
+        PluginBoundary.validation_error("Only one Agent Plugin can select routes", %{
           plugins: selectors
         })
     end
@@ -149,7 +169,7 @@ defmodule Jido.Agent.Plugin do
         route_candidates: candidates
       }
 
-      PluginError.safe_apply(
+      PluginBoundary.invoke(
         spec.package,
         spec.module,
         :prepare,
@@ -163,12 +183,12 @@ defmodule Jido.Agent.Plugin do
   end
 
   defp validate_preparation_result({:ok, input}, spec) do
-    case Jido.PortableTerm.validate(input, [:plugin_inputs, spec.package, :prepared]) do
+    case Jido.Codec.Term.validate(input, [:plugin_inputs, spec.package, :prepared]) do
       :ok ->
         {:ok, input}
 
       {:error, path} ->
-        PluginError.invalid_callback(
+        PluginBoundary.invalid_callback(
           "Agent Plugin prepare/2 returned a non-portable input",
           spec.package,
           spec.module,
@@ -180,7 +200,7 @@ defmodule Jido.Agent.Plugin do
   defp validate_preparation_result({:error, _reason} = error, _spec), do: error
 
   defp validate_preparation_result(result, spec) do
-    PluginError.invalid_callback(
+    PluginBoundary.invalid_callback(
       "Agent Plugin prepare/2 returned an invalid result",
       spec.package,
       spec.module,
@@ -209,7 +229,7 @@ defmodule Jido.Agent.Plugin do
       }
 
       spec.package
-      |> PluginError.safe_apply(
+      |> PluginBoundary.invoke(
         spec.module,
         :select_route,
         [selection, spec.options],
@@ -221,7 +241,7 @@ defmodule Jido.Agent.Plugin do
 
   defp require_candidates([], type),
     do:
-      Jido.Agent.Error.fail(
+      Jido.Error.validation_result(
         :unmatched_input,
         [:routes],
         "No route accepts this Signal type",
@@ -240,10 +260,9 @@ defmodule Jido.Agent.Plugin do
       :ok
     else
       {:error,
-       PluginError.execution(
+       PluginBoundary.execution_error(
          "Ambiguous matching routes require unique aliases",
          :core,
-         __MODULE__,
          %{code: :ambiguous_route_aliases, aliases: aliases}
        )}
     end
@@ -253,10 +272,9 @@ defmodule Jido.Agent.Plugin do
 
   defp validate_route_selection(:default, spec, candidates) do
     {:error,
-     PluginError.execution(
+     PluginBoundary.execution_error(
        "Agent Plugin left an ambiguous route selection unresolved",
        spec.package,
-       spec.module,
        %{
          code: :ambiguous_route_selection,
          aliases: Enum.map(candidates, & &1.as)
@@ -269,10 +287,9 @@ defmodule Jido.Agent.Plugin do
     case Enum.find(candidates, &(&1.as == route_as)) do
       nil ->
         {:error,
-         PluginError.execution(
+         PluginBoundary.execution_error(
            "Agent Plugin selected a route that does not match the Signal",
            spec.package,
-           spec.module,
            %{
              code: :invalid_route_selection,
              route: route_as,
@@ -288,7 +305,7 @@ defmodule Jido.Agent.Plugin do
   defp validate_route_selection({:error, _reason} = error, _spec, _candidates), do: error
 
   defp validate_route_selection(result, spec, _candidates) do
-    PluginError.invalid_callback(
+    PluginBoundary.invalid_callback(
       "Agent Plugin select_route/2 returned an invalid result",
       spec.package,
       spec.module,
@@ -316,7 +333,7 @@ defmodule Jido.Agent.Plugin do
           {:cont, :ok}
         else
           {:halt,
-           PluginError.validation("Duplicate routes require aliases for Plugin selection", %{
+           PluginBoundary.validation_error("Duplicate routes require aliases for Plugin selection", %{
              path: path,
              aliases: aliases
            })}
@@ -325,13 +342,13 @@ defmodule Jido.Agent.Plugin do
   end
 
   defp validate_routes_without_selector(routes) do
-    with :ok <- Data.unique(routes, & &1.path) do
-      case Enum.find(routes, &(not is_nil(&1.as) and Data.wildcard?(&1.path))) do
+    with :ok <- Schema.unique(routes, & &1.path) do
+      case Enum.find(routes, &(not is_nil(&1.as) and Schema.wildcard?(&1.path))) do
         nil ->
           :ok
 
         route ->
-          Error.fail(
+          Error.validation_result(
             :wildcard_helper,
             [:as],
             "A helper requires an exact input type",
@@ -349,7 +366,7 @@ defmodule Jido.Agent.Plugin do
         :ok
 
       spec ->
-        PluginError.validation("Plugin-owned Agent state key conflicts with the domain schema", %{
+        PluginBoundary.validation_error("Plugin-owned Agent state key conflicts with the domain schema", %{
           plugin: spec.package,
           state_key: spec.state_key
         })

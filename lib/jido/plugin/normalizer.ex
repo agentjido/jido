@@ -1,12 +1,13 @@
 defmodule Jido.Plugin.Normalizer do
   @moduledoc false
 
-  alias Jido.Agent.Directive
-  alias Jido.Agent.Plugin.Spec, as: AgentSpec
-  alias Jido.AgentServer.Plugin.Spec, as: ServerSpec
-  alias Jido.Persistence.Plugin.Spec, as: PersistenceSpec
+  alias Jido.Agent.Directive.Kind, as: DirectiveKind
+  alias Jido.Joi
   alias Jido.Plugin.{Manifest, Spec}
-  alias Jido.Plugin.Error, as: PluginError
+  alias Jido.Plugin, as: PluginBoundary
+  alias Jido.Plugin.Spec.Agent, as: AgentSpec
+  alias Jido.Plugin.Spec.Persistence, as: PersistenceSpec
+  alias Jido.Plugin.Spec.Runtime, as: ServerSpec
 
   @server_capabilities Jido.Plugin.owner_callbacks()[:agent_server]
                        |> Keyword.delete(:validate_options)
@@ -25,7 +26,7 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   def normalize_all(value),
-    do: PluginError.validation("Agent Plugins must be a list", %{plugins: value})
+    do: PluginBoundary.validation_error("Agent Plugins must be a list", %{plugins: value})
 
   @doc false
   @spec normalize_runtime([Jido.Plugin.declaration()] | [Spec.t()], keyword()) ::
@@ -51,7 +52,7 @@ defmodule Jido.Plugin.Normalizer do
     if valid?,
       do: :ok,
       else:
-        PluginError.validation("Plugin runtime options are invalid", %{
+        PluginBoundary.validation_error("Plugin runtime options are invalid", %{
           runtime_options: runtime_options
         })
   end
@@ -78,7 +79,7 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   def declarations(values),
-    do: PluginError.validation("Agent Plugins must be a list", %{plugins: values})
+    do: PluginBoundary.validation_error("Agent Plugins must be a list", %{plugins: values})
 
   defp bind_runtime_options(specs, runtime_options) do
     specs
@@ -135,7 +136,7 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   defp invalid_runtime_options(plugin, invalid_keys, allowed) do
-    PluginError.validation(
+    PluginBoundary.validation_error(
       "Plugin runtime options can contain only AgentServer-owned options",
       %{plugin: plugin, invalid_keys: invalid_keys, allowed: allowed}
     )
@@ -149,7 +150,7 @@ defmodule Jido.Plugin.Normalizer do
         validate_normalized_specs(values)
 
       specs != [] ->
-        PluginError.validation(
+        PluginBoundary.validation_error(
           "Agent Plugin declarations cannot mix normalized specs and declarations",
           %{normalized_specs: specs, declarations: declarations}
         )
@@ -173,13 +174,11 @@ defmodule Jido.Plugin.Normalizer do
         {:error, _reason} = error -> error
       end
     else
-      PluginError.validation("Plugin specs require a manifest", %{specs: specs})
+      PluginBoundary.validation_error("Plugin specs require a manifest", %{specs: specs})
     end
   end
 
-  defp validate_normalized_spec(
-         %Spec{module: module, options: options, manifest: %Manifest{} = manifest} = spec
-       ) do
+  defp validate_normalized_spec(%Spec{module: module, options: options, manifest: %Manifest{} = manifest} = spec) do
     with :ok <- ensure_loaded(module),
          true <- Keyword.keyword?(options),
          true <- manifest.module === module,
@@ -284,14 +283,14 @@ defmodule Jido.Plugin.Normalizer do
     do: invalid_normalized_owner(manifest.module, :persistence, persistence)
 
   defp invalid_normalized_spec(spec) do
-    PluginError.validation("Normalized Plugin spec is invalid", %{
+    PluginBoundary.validation_error("Normalized Plugin spec is invalid", %{
       plugin: spec.module,
       spec: spec
     })
   end
 
   defp invalid_normalized_owner(plugin, owner, value) do
-    PluginError.validation("Normalized Plugin owner spec is invalid", %{
+    PluginBoundary.validation_error("Normalized Plugin owner spec is invalid", %{
       plugin: plugin,
       owner: owner,
       spec: value
@@ -324,7 +323,7 @@ defmodule Jido.Plugin.Normalizer do
     if Keyword.keyword?(options) do
       {:ok, {module, options}}
     else
-      PluginError.validation("Agent Plugin options must be a keyword list", %{
+      PluginBoundary.validation_error("Agent Plugin options must be a keyword list", %{
         plugin: module,
         options: options
       })
@@ -332,7 +331,7 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   defp declaration(declaration),
-    do: PluginError.validation("Invalid Agent Plugin declaration", %{plugin: declaration})
+    do: PluginBoundary.validation_error("Invalid Agent Plugin declaration", %{plugin: declaration})
 
   defp build_spec(module, options) do
     with :ok <- ensure_loaded(module),
@@ -356,7 +355,7 @@ defmodule Jido.Plugin.Normalizer do
       {:ok, aggregate(module, options, manifest, agent, server, persistence)}
     else
       false ->
-        PluginError.validation("Plugin manifest package module does not match", %{
+        PluginBoundary.validation_error("Plugin manifest package module does not match", %{
           plugin: module,
           manifest: manifest.module
         })
@@ -427,7 +426,7 @@ defmodule Jido.Plugin.Normalizer do
        }}
     else
       false ->
-        PluginError.validation("Persistence Plugin facet must define dump/3 and load/3", %{
+        PluginBoundary.validation_error("Persistence Plugin facet must define dump/3 and load/3", %{
           plugin: manifest.module
         })
     end
@@ -436,25 +435,25 @@ defmodule Jido.Plugin.Normalizer do
   defp validate_pair(package, agent, server, persistence) do
     cond do
       function_exported?(package, :quiesce, 2) != function_exported?(package, :resume, 2) ->
-        PluginError.validation("Plugin must define both quiesce/2 and resume/2", %{
+        PluginBoundary.validation_error("Plugin must define both quiesce/2 and resume/2", %{
           plugin: package
         })
 
       not is_nil(persistence) and (is_nil(agent) or is_nil(agent.state_key)) ->
-        PluginError.validation("Persistence Plugin facet requires a stateful Agent facet", %{
+        PluginBoundary.validation_error("Persistence Plugin facet requires a stateful Agent facet", %{
           plugin: package
         })
 
       not is_nil(server) and server.dispatch? and
           (is_nil(agent) or agent.directive_modules == []) ->
-        PluginError.validation("Agent Server Plugin dispatch requires Agent-owned Directives", %{
+        PluginBoundary.validation_error("Agent Server Plugin dispatch requires Agent-owned Directives", %{
           plugin: package
         })
 
       not is_nil(agent) and agent.directive_modules != [] and
         not reducer?(agent) and
           (is_nil(server) or not server.dispatch?) ->
-        PluginError.validation(
+        PluginBoundary.validation_error(
           "Agent Plugin Directives must reduce state or dispatch runtime work",
           %{plugin: package}
         )
@@ -466,7 +465,7 @@ defmodule Jido.Plugin.Normalizer do
 
   defp read_package_marker(module) do
     if function_exported?(module, :__jido_plugin__, 0) do
-      case PluginError.safe_apply(
+      case PluginBoundary.invoke(
              module,
              module,
              :__jido_plugin__,
@@ -483,7 +482,7 @@ defmodule Jido.Plugin.Normalizer do
 
   defp invalid_package(module),
     do:
-      PluginError.validation("Plugin must use Jido.Plugin", %{
+      PluginBoundary.validation_error("Plugin must use Jido.Plugin", %{
         plugin: module
       })
 
@@ -499,7 +498,7 @@ defmodule Jido.Plugin.Normalizer do
         invalid_package(module)
 
       mismatch ->
-        PluginError.validation("Plugin manifest must match its documented callbacks", %{
+        PluginBoundary.validation_error("Plugin manifest must match its documented callbacks", %{
           plugin: module,
           owner: elem(mismatch, 0)
         })
@@ -513,14 +512,14 @@ defmodule Jido.Plugin.Normalizer do
     with true <- Jido.Agent.Extension in behaviours(module),
          {:ok, id} <- read_authoring_value(module, :id),
          {:ok, vsn} <- read_authoring_value(module, :vsn),
-         {:ok, authoring} <- read_authoring_value(module, :__jido_authoring__) do
+         {:ok, authoring} <- read_authoring_value(module, :__jido_catalog_manifest__) do
       expected = %{id: id, kind: :plugin, target: module, vsn: vsn}
 
       if is_binary(id) and byte_size(id) > 0 and vsn === manifest_vsn and
            authoring === expected do
         :ok
       else
-        PluginError.validation("Plugin authoring identity is invalid", %{
+        PluginBoundary.validation_error("Plugin authoring identity is invalid", %{
           plugin: module,
           id: id,
           vsn: vsn,
@@ -535,7 +534,7 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   defp read_authoring_value(module, function) do
-    case PluginError.safe_apply(
+    case PluginBoundary.invoke(
            module,
            module,
            function,
@@ -552,7 +551,7 @@ defmodule Jido.Plugin.Normalizer do
 
   defp validate_server_options(package, facet, options) do
     if function_exported?(facet, :validate_options, 1) do
-      case PluginError.safe_apply(
+      case PluginBoundary.invoke(
              package,
              facet,
              :validate_options,
@@ -566,7 +565,7 @@ defmodule Jido.Plugin.Normalizer do
           error
 
         result ->
-          PluginError.invalid_callback(
+          PluginBoundary.invalid_callback(
             "Agent Server Plugin validate_options/1 returned an invalid result",
             package,
             facet,
@@ -582,7 +581,7 @@ defmodule Jido.Plugin.Normalizer do
     if has_any?(module, callbacks) do
       :ok
     else
-      PluginError.validation("Plugin facet defines no capability", %{
+      PluginBoundary.validation_error("Plugin facet defines no capability", %{
         plugin: module,
         owner: owner
       })
@@ -591,7 +590,7 @@ defmodule Jido.Plugin.Normalizer do
 
   defp read_state_spec(package, facet, options) do
     if function_exported?(facet, :state_spec, 1) do
-      PluginError.safe_apply(
+      PluginBoundary.invoke(
         package,
         facet,
         :state_spec,
@@ -611,14 +610,14 @@ defmodule Jido.Plugin.Normalizer do
        do: error
 
   defp validate_state_spec({nil, _schema}, package, _facet) do
-    PluginError.validation("Plugin-owned Agent state key must not be nil", %{
+    PluginBoundary.validation_error("Plugin-owned Agent state key must not be nil", %{
       plugin: package,
       state_key: nil
     })
   end
 
   defp validate_state_spec({:__struct__, _schema}, package, _facet) do
-    PluginError.validation("Plugin-owned Agent state key is reserved", %{
+    PluginBoundary.validation_error("Plugin-owned Agent state key is reserved", %{
       plugin: package,
       state_key: :__struct__
     })
@@ -626,28 +625,28 @@ defmodule Jido.Plugin.Normalizer do
 
   defp validate_state_spec({key, schema}, package, _facet)
        when is_atom(key) and not is_nil(key) and key != :__struct__ and is_struct(schema) do
-    if is_nil(Zoi.Type.impl_for(schema)) do
-      PluginError.validation("Plugin-owned Agent state schema must be a Zoi schema", %{
+    if not Jido.Joi.Schema.schema?(schema) do
+      PluginBoundary.validation_error("Plugin-owned Agent state schema must be a Joi schema", %{
         plugin: package,
         schema: schema
       })
     else
-      case Jido.Authoring.validate_static(schema) do
+      case Joi.validate_static(schema) do
         :ok ->
           {:ok, {key, schema}}
 
         {:error, reason} ->
-          PluginError.validation("Plugin-owned Agent state schema must contain static data", %{
+          PluginBoundary.validation_error("Plugin-owned Agent state schema must contain static data", %{
             plugin: package,
             state_key: key,
-            reason: Exception.message(reason)
+            reason: reason
           })
       end
     end
   end
 
   defp validate_state_spec(value, package, _facet) do
-    PluginError.validation("Agent Plugin state_spec/1 returned an invalid value", %{
+    PluginBoundary.validation_error("Agent Plugin state_spec/1 returned an invalid value", %{
       plugin: package,
       value: value
     })
@@ -656,7 +655,7 @@ defmodule Jido.Plugin.Normalizer do
   defp read_directives(package, facet, options) do
     result =
       if function_exported?(facet, :directives, 1) do
-        PluginError.safe_apply(
+        PluginBoundary.invoke(
           package,
           facet,
           :directives,
@@ -682,31 +681,31 @@ defmodule Jido.Plugin.Normalizer do
 
     cond do
       not atom_modules? ->
-        PluginError.validation("Agent Plugin Directive modules must be atoms", %{
+        PluginBoundary.validation_error("Agent Plugin Directive modules must be atoms", %{
           plugin: package,
           directives: directives
         })
 
       Enum.uniq(directives) != directives ->
-        PluginError.validation("Agent Plugin Directive modules must be unique", %{
+        PluginBoundary.validation_error("Agent Plugin Directive modules must be unique", %{
           plugin: package,
           directives: directives
         })
 
       unloaded != nil ->
-        PluginError.validation("Agent Plugin Directive modules must be loaded", %{
+        PluginBoundary.validation_error("Agent Plugin Directive modules must be loaded", %{
           plugin: package,
           directive: unloaded
         })
 
       not_struct != nil ->
-        PluginError.validation("Agent Plugin Directive modules must define a struct", %{
+        PluginBoundary.validation_error("Agent Plugin Directive modules must define a struct", %{
           plugin: package,
           directive: not_struct
         })
 
-      Enum.any?(directives, &Directive.built_in_module?/1) ->
-        PluginError.validation("Agent Plugin cannot own a built-in Directive", %{
+      Enum.any?(directives, &DirectiveKind.built_in_module?/1) ->
+        PluginBoundary.validation_error("Agent Plugin cannot own a built-in Directive", %{
           plugin: package
         })
 
@@ -716,7 +715,7 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   defp validate_directive_modules(value, package, _facet) do
-    PluginError.validation("Agent Plugin directives/1 must return a list", %{
+    PluginBoundary.validation_error("Agent Plugin directives/1 must return a list", %{
       plugin: package,
       directives: value
     })
@@ -724,29 +723,29 @@ defmodule Jido.Plugin.Normalizer do
 
   defp validate_agent_contract(package, facet, state_key, directives) do
     reducer? = function_exported?(facet, :reduce, 2)
-    invalid_directive = Enum.find(directives, &(not Directive.validator?(&1)))
+    invalid_directive = Enum.find(directives, &(not DirectiveKind.validator?(&1)))
 
     cond do
       function_exported?(facet, :validate_directive, 2) ->
-        PluginError.validation(
+        PluginBoundary.validation_error(
           "Agent Plugin Directive validation belongs to the Directive module",
           %{plugin: package, callback: {:validate_directive, 2}}
         )
 
       function_exported?(facet, :update_state, 3) ->
-        PluginError.validation("Agent Plugin state middleware must define reduce/2", %{
+        PluginBoundary.validation_error("Agent Plugin state middleware must define reduce/2", %{
           plugin: package,
           callback: {:update_state, 3}
         })
 
       invalid_directive ->
-        PluginError.validation("Agent Plugin Directive must define validate/1", %{
+        PluginBoundary.validation_error("Agent Plugin Directive must define validate/1", %{
           plugin: package,
           directive: invalid_directive
         })
 
       reducer? and is_nil(state_key) ->
-        PluginError.validation("Agent Plugin reduce/2 requires state_spec/1", %{
+        PluginBoundary.validation_error("Agent Plugin reduce/2 requires state_spec/1", %{
           plugin: package
         })
 
@@ -793,7 +792,7 @@ defmodule Jido.Plugin.Normalizer do
         :ok
 
       _selectors ->
-        PluginError.validation("Only one Agent Plugin can select routes", %{
+        PluginBoundary.validation_error("Only one Agent Plugin can select routes", %{
           plugins: Enum.map(selectors, & &1.module)
         })
     end
@@ -804,7 +803,7 @@ defmodule Jido.Plugin.Normalizer do
          |> Enum.group_by(key_fun)
          |> Enum.find(fn {_key, group} -> match?([_first, _second | _rest], group) end) do
       nil -> :ok
-      {key, group} -> PluginError.validation(message, %{detail_key => key, declarations: group})
+      {key, group} -> PluginBoundary.validation_error(message, %{detail_key => key, declarations: group})
     end
   end
 
@@ -831,7 +830,7 @@ defmodule Jido.Plugin.Normalizer do
         :ok
 
       {:error, reason} ->
-        PluginError.validation("Agent Plugin could not be loaded", %{
+        PluginBoundary.validation_error("Agent Plugin could not be loaded", %{
           plugin: module,
           reason: reason
         })
@@ -839,7 +838,7 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   defp ensure_loaded(module) do
-    PluginError.validation("Agent Plugin could not be loaded", %{
+    PluginBoundary.validation_error("Agent Plugin could not be loaded", %{
       plugin: module,
       reason: :invalid_module
     })

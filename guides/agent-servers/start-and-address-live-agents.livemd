@@ -1,0 +1,214 @@
+# Start and Address Agents
+
+This tutorial starts a Jido instance, runs a ticket Agent inside it, and reaches that Agent by PID, ID, partition, stable Ref, and OTP name.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Define an Agent
+
+The Agent is a plain definition. It has no process until you start it.
+
+```elixir
+defmodule StartGuide.TicketDesk do
+  use Jido.Agent, name: "ticket_desk"
+
+  state do
+    schema Jido.Joi.object(%{
+             opened: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
+           })
+  end
+
+  routes do
+    signal_source "/support/desk"
+
+    route "ticket.open", as: :open do
+      action %{subject: subject},
+        schema: Jido.Joi.object(%{subject: Jido.Joi.string()}),
+        context: context do
+        {:ok, %{context.agent_state | opened: context.agent_state.opened ++ [subject]}}
+      end
+    end
+  end
+end
+
+StartGuide.TicketDesk.open_signal!(%{subject: "Login fails"}).type
+# The cell returns "ticket.open"
+```
+
+## Start an instance
+
+A Jido instance is a named supervisor. It owns the Agent registry, the Agent supervisor, and the Runner that executes Turns. Give it a `:namespace` when you want to use stable Refs later.
+
+```elixir
+{:ok, _instance} = Jido.start(name: StartGuide.Jido, namespace: "guides/support")
+```
+
+`Jido.start/1` suits scripts and Livebook. An application defines a module and adds it to its supervision tree:
+
+<!-- partial -->
+```elixir
+defmodule MyApp.Jido do
+  use Jido, otp_app: :my_app, namespace: "my-app/primary"
+end
+
+children = [MyApp.Jido]
+```
+
+See [Instances and Tenants](../operations/configuration-and-tenant-isolation.md) for instance options.
+
+## Start an Agent
+
+`Jido.start_agent/3` accepts an Agent module with `:id` and `:state`, or a complete Agent instance. It returns the PID of the AgentServer worker.
+
+```elixir
+{:ok, desk} =
+  Jido.start_agent(StartGuide.Jido, StartGuide.TicketDesk,
+    id: "desk-1",
+    state: %{opened: ["Welcome"]}
+  )
+
+:ok = Jido.AgentServer.await_ready(desk)
+
+instance = StartGuide.TicketDesk.instantiate!(id: "desk-2")
+{:ok, second_desk} = Jido.start_agent(StartGuide.Jido, instance)
+
+Jido.AgentServer.agent(desk).state
+# The cell returns %{opened: ["Welcome"]}
+```
+
+`Jido.AgentServer.await_ready/2` waits for Plugin startup and any persistence restore. Call it before you depend on the Agent. Without an `:id`, Jido generates one. A complete instance keeps its own ID and state, so it rejects a `:state` option or a different `:id`.
+
+A live ID is unique within its instance and partition. A duplicate start returns the running PID and leaves that Agent unchanged.
+
+```elixir
+{:error, {:already_started, ^desk}} =
+  Jido.start_agent(StartGuide.Jido, StartGuide.TicketDesk, id: "desk-1")
+```
+
+The worker links to its supervisor, so the Agent keeps running after the process that started it exits.
+
+## Find a live Agent
+
+Look up an Agent by ID when you do not hold its PID. These functions report only Agents that have finished startup.
+
+```elixir
+^desk = Jido.whereis_agent(StartGuide.Jido, "desk-1")
+nil = Jido.whereis_agent(StartGuide.Jido, "desk-404")
+
+ids = StartGuide.Jido |> Jido.list_agents() |> Enum.map(&elem(&1, 0)) |> Enum.sort()
+{ids, Jido.agent_count(StartGuide.Jido)}
+# The cell returns {["desk-1", "desk-2"], 2}
+```
+
+## Use a partition
+
+A partition is a nonempty string that gives one instance a separate ID space. The same ID in another partition is a different Agent. Lookups without `:partition` see only Agents with no partition.
+
+```elixir
+{:ok, acme_desk} =
+  Jido.start_agent(StartGuide.Jido, StartGuide.TicketDesk, id: "desk-1", partition: "acme")
+
+^acme_desk = Jido.whereis_agent(StartGuide.Jido, "desk-1", partition: "acme")
+true = acme_desk != desk
+
+{Jido.agent_count(StartGuide.Jido), Jido.agent_count(StartGuide.Jido, partition: "acme")}
+# The cell returns {2, 1}
+```
+
+## Address an Agent by stable Ref
+
+A PID changes when a process restarts. A `Jido.Agent.Ref` names the logical Agent with its namespace, partition, and ID. Store the Ref in your application and let each operation resolve the current process.
+
+```elixir
+{:ok, ref} = Jido.agent_ref(StartGuide.Jido, "desk-3", partition: "acme")
+{:ok, ref_desk} = Jido.start_agent_ref(StartGuide.Jido, ref, StartGuide.TicketDesk)
+:ok = Jido.await_ready(StartGuide.Jido, ref)
+
+{:ok, ^ref_desk} = Jido.resolve_agent(StartGuide.Jido, ref)
+
+{:ok, %{state: %{opened: ["Printer jam"]}}, []} =
+  Jido.call(StartGuide.Jido, ref, StartGuide.TicketDesk.open_signal!(%{subject: "Printer jam"}))
+
+Jido.Agent.Ref.to_map!(ref)
+# The cell returns %{"id" => "desk-3", "namespace" => "guides/support", "partition" => "acme", "version" => 1}
+```
+
+`Jido.Agent.Ref.to_map!/1` and `Jido.Agent.Ref.from_map/1` give you a form to save. A Ref is an identifier, not a credential.
+
+Kill the worker to see the Ref follow the replacement process. The activation restarts it with the last committed state.
+
+```elixir
+monitor = Process.monitor(ref_desk)
+Process.exit(ref_desk, :kill)
+
+receive do
+  {:DOWN, ^monitor, :process, ^ref_desk, :killed} -> :ok
+after
+  1_000 -> raise "the worker did not exit"
+end
+
+replacement =
+  Enum.find_value(1..100, fn _attempt ->
+    Process.sleep(10)
+
+    case Jido.resolve_agent(StartGuide.Jido, ref) do
+      {:ok, pid} when pid != ref_desk -> pid
+      _not_ready -> nil
+    end
+  end)
+
+{replacement != ref_desk, Jido.agent(StartGuide.Jido, ref).state}
+# The cell returns {true, %{opened: ["Printer jam"]}}
+```
+
+Each Ref call resolves once. It does not retry or replay a Turn. `Jido.resolve_agent/2` and the functions built on it return one of these errors when they cannot reach a worker:
+
+| Error | Meaning |
+| --- | --- |
+| `{:error, :not_found}` | No live registration exists. |
+| `{:error, :recovering}` | The worker is registered but not ready. |
+| `{:error, :unavailable}` | The registry could not be read, or the worker exited during the call. |
+
+Ref functions need an instance with a `:namespace`. Without one, they return a `Jido.Error.ValidationError` with the code `:jido_namespace_required`.
+
+## Give an Agent an OTP name
+
+The `:name` option registers the worker under an OTP name: an atom, `{:global, term}`, or `{:via, module, term}`. Every `Jido.AgentServer` function accepts that name in place of a PID.
+
+```elixir
+{:ok, front_desk} =
+  Jido.start_agent(StartGuide.Jido, StartGuide.TicketDesk, id: "front", name: StartGuide.FrontDesk)
+
+^front_desk = Process.whereis(StartGuide.FrontDesk)
+Jido.AgentServer.alive?(StartGuide.FrontDesk)
+# The cell returns true
+```
+
+Use a name only for a small, fixed set of Agents, because the runtime does not garbage collect atoms.
+
+## Stop an Agent
+
+`Jido.stop_agent/3` accepts a PID or an ID, and it confirms that the whole activation has exited. An ID in a partition needs the `:partition` option. `Jido.stop_agent_ref/4` does the same through a Ref.
+
+```elixir
+:ok = Jido.stop_agent(StartGuide.Jido, "desk-1")
+:ok = Jido.stop_agent(StartGuide.Jido, "desk-1", partition: "acme")
+:ok = Jido.stop_agent_ref(StartGuide.Jido, ref)
+
+{Jido.stop_agent(StartGuide.Jido, "desk-1"), Jido.resolve_agent(StartGuide.Jido, ref)}
+# The cell returns {{:error, :not_found}, {:error, :not_found}}
+```
+
+`Jido.stop/1` stops the instance and every Agent in it.
+
+## Next steps
+
+- [Call, Cast, and Await](send-signals-to-live-agents.livemd) sends Signals to a running Agent.
+- [Agent Lifecycle](agent-activation-control.md) explains activations, recovery, and startup options.
+- [Hibernate and Thaw](hibernate-thaw-and-activate.md) keeps an Agent's identity across process lifetimes.

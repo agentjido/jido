@@ -1,5 +1,5 @@
-defmodule JidoTest.Agent.CandidateCompletenessTest do
-  use JidoTest.Case, async: true
+defmodule Jido.Agent.CandidateCompletenessTest do
+  use Jido.Test.Case, async: true
 
   alias Jido.AgentServer, as: Server
   alias Jido.Signal
@@ -22,10 +22,10 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
     use Jido.Agent, name: "candidate_completeness_counter"
 
     state do
-      schema Zoi.object(%{
-               count: Zoi.integer() |> Zoi.default(0),
-               history: Zoi.list(Zoi.string()) |> Zoi.default([]),
-               note: Zoi.string() |> Zoi.optional()
+      schema Jido.Joi.object(%{
+               count: Jido.Joi.integer() |> Jido.Joi.default(0),
+               history: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
+               note: Jido.Joi.string() |> Jido.Joi.optional()
              })
     end
 
@@ -41,23 +41,23 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
     signal = Signal.new!("candidate.partial", %{}, source: "/test")
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :incomplete_state,
-              details: %{issues: [%Zoi.Error{path: [:history]}]}
+              details: %{issues: [%{path: [:history]}]}
             }} =
              Counter.cmd(initial, signal)
 
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, initial)
-    before = JidoTest.AgentServerAssertions.committed(server)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, initial)
+    before = Jido.Test.AgentServer.Assertions.committed(server)
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :incomplete_state,
-              details: %{issues: [%Zoi.Error{path: [:history]}]}
+              details: %{issues: [%{path: [:history]}]}
             }} =
              Server.call(server, signal)
 
-    assert JidoTest.AgentServerAssertions.committed(server) == before
+    assert Jido.Test.AgentServer.Assertions.committed(server) == before
   end
 
   test "a candidate can omit a field that has no default", %{jido: jido} do
@@ -67,7 +67,7 @@ defmodule JidoTest.Agent.CandidateCompletenessTest do
     assert {:ok, direct, []} = Counter.cmd(initial, signal)
     assert direct.state == %{count: 1, history: []}
 
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, initial)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, initial)
     assert {:ok, live, _} = Server.call(server, signal)
     assert live.state == direct.state
   end

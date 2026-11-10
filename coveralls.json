@@ -1,9 +1,5 @@
 {
-  "skip_files": [
-    "^examples/",
-    "^test/",
-    "^deps/"
-  ],
+  "skip_files": ["^examples/", "^test/", "^deps/"],
   "coverage_options": {
     "minimum_coverage": 90
   }

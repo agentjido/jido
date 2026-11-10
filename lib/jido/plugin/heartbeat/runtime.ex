@@ -4,19 +4,17 @@ defmodule Jido.Plugin.Heartbeat.Runtime do
   use GenServer
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Plugin.Heartbeat
   alias Jido.Plugin.Heartbeat.Signal.Tick
   alias Jido.Plugin.Init
   alias Jido.Signal
 
-  def start_link(%Init{} = init), do: GenServer.start_link(__MODULE__, init)
+  def start_link({%Init{} = init, config}) when is_map(config),
+    do: GenServer.start_link(__MODULE__, {init, config})
 
   @impl true
-  def init(%Init{} = init) do
-    with {:ok, config} <- Heartbeat.configuration(init.options) do
-      state = Map.put(config, :agent_server, init.agent_server)
-      {:ok, schedule(state)}
-    end
+  def init({%Init{} = init, config}) do
+    state = Map.put(config, :agent_server, init.agent_server)
+    {:ok, schedule(state)}
   end
 
   @impl true

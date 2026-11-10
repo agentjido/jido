@@ -1,34 +1,85 @@
-# Jido development instructions
+# Jido
 
-Use ASD-STE100 Simplified Technical English. Do not use skills unless requested.
+## Product
 
-## Contract
+Jido is an Elixir SDK for durable OTP actors and Agents. It gives developers one model for state, messages, behavior, effects, persistence, observation, and AI.
 
-- `Jido.Agent` holds complete domain state. A Signal selects one Action or Flow.
-- Composable Actions return `{:ok, state, directives}`.
-  Core validates the complete batch and state before commit. Flow rejects
-  a third success element that is not a proper list. No wrapper is required
-  for direct Actions or Flow composition.
-- Direct success is `{:ok, candidate, directives}`. Failure returns a structured error.
-- Actions and Flows can perform I/O. A failed Turn preserves committed state; it cannot undo completed external work.
-- `Jido.AgentServer` owns live state, serial Turns, admission, commit and effects.
-- Keep the implemented Plugin callback order and Plugin state ownership.
-- Use static Zoi schemas. Preserve structured errors at public boundaries.
+An Agent contains a portable definition and immutable state. A Signal starts a Turn. A Flow defines the Turn behavior, and Actions are its work units. The Flow returns candidate state and Directives. AgentServer serializes Turns, validates and commits state, and then runs effects. It also owns waits, recovery, timers, and process lifecycle.
 
-## Checks
+OTP owns process lifecycle and failure. Jido keeps domain decisions in explicit data. Plugins add complete capabilities. AI is a first-party Plugin capability, not a separate runtime.
 
-- Declared floor: Elixir 1.18 and OTP 27. Validate it during beta QA.
-- Default quality check: `mix quality`. It runs fast core tests, not peer, benchmark, example, authoring, system, or service tests.
-- Run filtered suites separately when needed: `mix test.peer`, `mix test.bench`, `mix test.examples`, `mix test.authoring`, and `mix test.system`.
-- Run `mix test.persistence` for the shared local persistence adapter contracts.
-- Run all six normal test categories with `mix test.all`. It includes local system tests, not external storage services.
-- Run opt-in Redis, PostgreSQL and real Bedrock tests with `mix test.services`. Run the separate MinIO profile with `mix test.services.minio`. See `test/system/README.md` for prerequisites and storage limits.
-- Compile with `mix compile --warnings-as-errors`.
-- Keep coverage at or above 90%. Aim above 93% to retain a maintenance buffer.
-- Run meaningful lint, Dialyzer, docs and package checks.
-- See `test/AGENTS.md` and `guides/testing.md`.
+## Architecture
 
-## History
+Dependencies point left through the Reach layers:
 
-Use Conventional Commits. Do not edit `CHANGELOG.md`; release notes are generated.
-Preserve donor history and published history.
+```text
+primitives <- value_model <- definitions <- execution <- agent_domain <- live_runtime <- capabilities <- composition
+```
+
+Use these major components and target Covenant IDs:
+
+| Reach layer | Major components |
+|---|---|
+| `primitives` | Identity (`jido.id`), validation (`jido.joi`), expressions (`jido.expr`), errors (`jido.error`), trace data (`jido.trace`), and base codecs (`jido.codec.compiler`, `jido.codec.term`) |
+| `value_model` | Signals (`jido.signal`), Catalog (`jido.catalog`), Session and Thread values (`jido.conversation`), and portable values and references (`jido.codec`) |
+| `definitions` | Actions (`jido.action`, `jido.action.inline`, `jido.action.output`, `jido.action.validation`), Flows (`jido.flow`, `jido.flow.inline`), Instructions (`jido.instruction`), Plugin definitions (`jido.plugin.definition`), and Signal routing (`jido.signal.routing`) |
+| `execution` | Flow execution (`jido.execution`) and the Action execution boundary (`jido.execution.action_boundary`) |
+| `agent_domain` | Agent data and authoring (`jido.agent`), pure evaluation (`jido.agent_evaluation`), references (`jido.agent_reference`), and the generic Plugin SDK (`jido.plugin`) |
+| `live_runtime` | AgentServer (`jido.agent_server.*`), Instance (`jido.instance`), Persistence (`jido.persistence`), Signal delivery (`jido.signal.delivery`), and Telemetry (`jido.telemetry`) |
+| `capabilities` | AI (`jido.ai.*`) and the bundled Audit, Bus, Heartbeat, Scheduler, and Sensor Manager components (`jido.plugin.*`) |
+| `composition` | The OTP application (`jido.application`) and Catalog discovery (`jido.catalog.discovery`) |
+
+The focused AgentServer components are `jido.agent_server`, `jido.agent_server.activation`, `jido.agent_server.effects`, `jido.agent_server.plugin_runtime`, `jido.agent_server.composition`, `jido.agent_server.durable`, `jido.agent_server.durable_turn`, and `jido.agent_server.handoff`.
+
+The focused AI components are `jido.ai.agent_authoring`, `jido.ai.conversation`, `jido.ai.model_execution`, `jido.ai.observability`, `jido.ai.react`, `jido.ai.strategies`, `jido.ai.tools`, and `jido.ai.turn`. The bundled Plugin components are `jido.plugin.audit`, `jido.plugin.bus`, `jido.plugin.heartbeat`, `jido.plugin.scheduler`, and `jido.plugin.sensor_manager`.
+
+`.reach.exs` is the source of truth for code dependency layers. Covenant is the source of truth for behavior ownership and proof. Each Covenant component owns modules from one Reach layer. Each module has no more than one primary Covenant owner. A component test can use a lower layer, but the component does not own that lower layer.
+
+Some active Covenant IDs still start with `jido_action.` or `jido_ai.`. These are legacy IDs. Use the target `jido.*` IDs from `../docs/covenant-component-refactor-plan.md` for new architecture work.
+
+## Work rules
+
+- Run Mix commands from this directory.
+- Always run `bw prime` before you start work. Beadwork stores plans, progress,
+  and decisions in Git so they remain available after context loss.
+- For multi-step work, create a Beadwork epic and child tasks before
+  implementation starts. Use one task and one worktree for each architecture
+  slice.
+- Keep one `:jido` OTP application. Keep `Jido.Application` as its only composition root.
+- Change one namespace or Covenant component at a time. Change its tests and contract records in the same work.
+- Update `../docs/aspirational-module-dependency-map.md` when ownership or dependency direction changes.
+- Record a lasting architecture decision in `docs/adr/` and update its index.
+- Run focused tests and `mix format --check-formatted` before handoff. For architecture changes, also run `mix reach.check --arch --smells` and the Covenant checks for the changed component.
+- Run `mix test.authoring` for public authoring compatibility and `mix test.contracts` for all Covenant contracts. Both commands run in `mix test.ci`.
+- Run `mix quality.coverage` before `mix quality.report`. The report runs all required offline suites and fails on missing, stale, unowned, or unresolved evidence. Provider and external-service suites stay opt-in.
+- Do not edit generated files in `_build/`, `cover/`, or `deps/`.
+
+## Change verification matrix
+
+Run the focused command for every changed surface. Run more than one command
+when a change crosses rows. `mix test.all` is the complete offline test alias.
+It does not select live provider or external-service tests.
+
+| Change type | Required focused command |
+|---|---|
+| Unit behavior | The narrow `mix test path/to/test.exs`, then `mix test` |
+| Public DSL, JSON, codec, or authoring | `mix test.authoring` |
+| Supported numbered example | `mix test.examples` |
+| Generated invariant or public API fuzz surface | `mix test.property` and `mix test.fuzz` |
+| Runtime, persistence, recovery, or process cleanup | `mix test.system` and, when applicable, `mix test.peer` |
+| Concurrency, ownership, or sustained execution | `mix test.load` |
+| Benchmark runner or metric | `mix test.bench`, then the changed documented `mix bench.*` command |
+| Covenant component behavior | `mix test.contracts` |
+| Namespace, dependency direction, or architecture | `mix reach.check --arch --smells` |
+| Quality contract, ownership, or coverage | `mix quality.contract`, `mix quality.coverage`, then `mix quality.report` |
+| External adapter | The documented `mix test.services` target with a dedicated test service |
+| Live AI provider | `mix test.live` with `JIDO_LIVE_OPENAI_API_KEY` set to an approved test key |
+
+Always finish with `mix format --check-formatted`. Use `mix test.ci` or
+`mix test.all` before a full handoff. Use `mix quality` for the static quality
+gate. The gate fails on highest-priority Credo findings. It also prints the
+full strict Credo backlog as advisory output. Compile warnings, Dialyzer,
+ExDNA, and Reach remain blocking. Dialyzer uses the line-specific checked-in
+baseline in `.dialyzer_ignore.exs` and fails when an entry becomes unused.
+ExDNA reports every clone and fails when the current 17-clone brownfield
+baseline increases.

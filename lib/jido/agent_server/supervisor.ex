@@ -123,7 +123,11 @@ defmodule Jido.AgentServer.Supervisor do
         {:ok, worker}
       else
         DynamicSupervisor.terminate_child(supervisor, root)
-        {:error, :worker_unavailable}
+
+        case Jido.AgentServer.Lifecycle.start_failure(root) do
+          {:ok, reason} -> {:error, reason}
+          :error -> {:error, :worker_unavailable}
+        end
       end
     end
   end

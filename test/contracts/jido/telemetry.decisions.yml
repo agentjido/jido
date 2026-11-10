@@ -1,0 +1,53 @@
+- id: telemetry-component-boundary
+  date: 2026-10-20
+  decision: Use jido.telemetry for metrics, semantic events, safe fields, bounded logs, Debug overrides, W3C trace context, and optional OpenTelemetry mapping.
+  driver: These values and adapters form one best-effort observation boundary, separate from the runtime and persistence operations that they observe.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: telemetry-test-ownership
+  date: 2026-10-20
+  decision: Move Telemetry, Debug, and tracing unit suites to test/contract/jido.telemetry while keeping the real SDK exporter suite under test/system.
+  driver: The focused contract proves component decisions. The system suite proves integration with a supervised SDK and AgentServer.
+  approved_by: Component hardening pass
+
+- id: telemetry-mutation-profile
+  date: 2026-10-20
+  decision: Mutate Jido.Debug, Jido.Telemetry, its three helper modules, Jido.Trace, and Jido.Trace.Context in one non-overlapping profile.
+  driver: These seven modules contain the component's behavior and are not targets of another active Covenant profile.
+  approved_by: Component hardening pass
+
+- id: activate-telemetry-component
+  date: 2026-10-20
+  decision: Activate jido.telemetry with 8 obligations, 86 focused tests, and one survivor ledger with no unclassified mutant.
+  driver: The contract tests now own the complete observation boundary, and the seven production modules are 44 lines smaller than the pre-component checkpoint.
+  approved_by: Component hardening pass
+
+- id: telemetry-full-mutation-check
+  date: 2026-10-20
+  decision: Accept the full 714-mutant profile with 657 killed, 16 classified equivalent survivors, 41 invalid mutations, no timeout, and a 97.6 percent score.
+  driver: Every valid behavior-changing mutant is killed, and every surviving mutant is classified at its current source location.
+  approved_by: Component hardening pass
+
+- id: telemetry-public-boundary-review
+  date: 2026-10-22
+  decision: Keep metrics/0 and open_telemetry?/0 as the public Jido.Telemetry API, expose debug control through Jido instance facades, and keep semantic emission, trace context, persistence observation, and the OpenTelemetry bridge internal. This component has no DSL.
+  driver: Applications consume metric definitions and status, while runtime-owned emitters need one private normalized observation path. Event production remains with the runtime and persistence components that own the observed work.
+  approved_by: Component review pass
+
+- id: telemetry-containment-review
+  date: 2026-10-22
+  decision: Treat malformed semantic metadata, options, and event prefixes as absent observation data; contain result-measurement callback faults; and escape line controls and byte-bound caller-controlled log strings.
+  driver: Best-effort observation must not prevent work, replace its result, or let an identifier create an unbounded or forged log line.
+  approved_by: Component review pass
+
+- id: telemetry-component-mutation-review
+  date: 2026-10-22
+  decision: Accept the current full profile with 779 mutants, 719 killed mutants, 16 reviewed equivalent survivors, 44 invalid mutations, no timeout, and no unclassified survivor.
+  driver: The component review needs current mutation evidence after the boundary, public API, Covenant, containment, and log-safety changes.
+  approved_by: Component review pass
+
+- id: telemetry-debug-ownership
+  date: 2026-10-22
+  decision: Fold per-instance semantic log control into Jido.Telemetry and remove the internal Jido.Debug module while retaining the Jido and generated instance debug facades.
+  driver: Debug now changes only semantic Telemetry log mode. A separate state module no longer owns an independent observation concern.
+  approved_by: Jido V3 API review

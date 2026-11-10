@@ -57,7 +57,7 @@ defmodule Jido.Agent.ValidationResolutionTest do
   test "resolution separates invalid values from unavailable modules" do
     for value <- [nil, true, false, "module"] do
       assert {:error,
-              %Jido.Agent.Error{
+              %Jido.Error.ValidationError{
                 code: :definition_required,
                 message: message,
                 details: %{}
@@ -69,7 +69,7 @@ defmodule Jido.Agent.ValidationResolutionTest do
     missing = Module.concat(__MODULE__, Missing)
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :unresolved_definition,
               message: message,
               details: %{module: ^missing}

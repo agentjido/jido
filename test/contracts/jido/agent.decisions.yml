@@ -1,0 +1,53 @@
+- id: agent-contract-hardening
+  date: 2026-10-19
+  decision: Keep the Covenant component on Agent-specific values, authoring, validation, definition mutation, logical topology, and composition data. Remove persistence, AgentServer, Scheduler provider, shared authoring, and shared Plugin ownership claims.
+  driver: The obligation set and mutation profile must follow current code ownership and current public APIs.
+  approved_by: User-requested hardening pass
+
+- id: reset-agent-mutation-evidence
+  date: 2026-10-19
+  decision: Remove the historical survivor ledger and do not claim a current full mutation result until the hardened profile completes.
+  driver: The historical full run used an older source shape, and many saved source locations no longer exist.
+  approved_by: User-requested hardening pass
+
+- id: transfer-pure-evaluation
+  date: 2026-10-19
+  decision: Transfer direct-command promises to jido.agent_evaluation. Keep the cmd entry point as an Agent facade and keep definition edit semantics with jido.agent.
+  driver: Pure candidate production must not share Covenant ownership with Agent authoring or live AgentServer execution.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: agent-boundary-review
+  date: 2026-10-22
+  decision: Remove transferred evaluation obligations from the Agent Covenant, keep stable obligation IDs, add Jido.Agent.View, describe Jido.Agent.Codec as the Agent adapter for Jido.Codec, and keep persistence evidence outside this component.
+  driver: The component must state current Agent-specific ownership without repeating transfer history or claiming shared jido_action and persistence behavior.
+  approved_by: User-approved component review
+
+- id: agent-public-api-review
+  date: 2026-10-22
+  decision: Define the documented Jido.Agent facade and generated Agent module facade explicitly. Keep runtime projection, direct Signal-helper support, compiler metadata, raw schema helpers, and transition functions exported only for internal package use. Use route_executable!/1 as the Action and Flow route lookup.
+  driver: Public functions must be documented and protected by Covenant without presenting internal coordination helpers as user APIs.
+  approved_by: User-approved component review
+
+- id: agent-dsl-review
+  date: 2026-10-23
+  decision: Replace the agent section with separate state and plugins sections. Keep routes and topology sections. Put static metadata in use Jido.Agent options. Use initial_state in every authoring form. Let initialize/2 transform the merged initial and explicit state. Require stable authoring IDs at Agent compilation, restrict generated Signal helper bases to safe lowercase names, document the complete core DSL on use Jido.Agent, and make DSL-to-Map parity explicit in the Covenant.
+  driver: The agent section mixed unrelated concerns. The refined DSL keeps state, Plugins, routes, and topology explicit. One state candidate avoids a separate initialization-input channel and unclear precedence.
+  approved_by: User-requested full component review
+
+- id: agent-full-mutation-review
+  date: 2026-10-22
+  decision: Accept the current full jido.agent mutation profile with 1,381 killed mutants, 154 reviewed survivors, 1 reviewed timeout, and 79 invalid mutants. Keep 155 survivor annotations for behavior that is equivalent, diagnostic-only, unreachable at the supported boundary, or not promised by this Covenant.
+  driver: The component review needs current mutation evidence after the boundary, public API, DSL, and Covenant changes.
+  approved_by: User-requested full component review
+
+- id: agent-mutation-runtime-profile
+  date: 2026-10-20
+  decision: Mutate Agent runtime and value modules without the Spark DSL declaration modules. Check generated DSL output through the Agent contract tests and the authoring suite.
+  driver: Invalid mutations inside Spark DSL declarations terminate Elixir's parallel verifier outside the test process, so Covenant cannot classify or restore those mutants. The stable runtime profile still checks the code that validates and lowers the generated values.
+  approved_by: Final hardening audit
+
+- id: transfer-route-and-checkpoint-callbacks
+  date: 2026-10-20
+  decision: Move Jido.Agent.Route mutation ownership to jido.agent_evaluation and Jido.Agent.Callback mutation ownership to jido.persistence.
+  driver: Route selection is pure evaluation behavior. Agent callback containment is used only by persistence checkpoint and restore callbacks. Their mutation profiles must follow those code paths.
+  approved_by: Final hardening audit

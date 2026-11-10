@@ -1,7 +1,9 @@
 defmodule Jido.Agent.Extension do
   @moduledoc false
-  alias Jido.Agent.{Data, Error, Route}
-  alias Jido.Authoring.{Registry, Value}
+  alias Jido.Agent.{Route, Schema}
+  alias Jido.Error
+  alias Jido.Catalog
+  alias Jido.Codec.Value
 
   @doc "Returns the stable authoring ID for this provider."
   @callback id() :: String.t()
@@ -31,11 +33,11 @@ defmodule Jido.Agent.Extension do
   @callback verify_connection(map(), map()) :: :ok | {:error, term()}
 
   @doc "Encodes normalized provider data for an Agent authoring document."
-  @callback encode_authoring_data(map(), Registry.t()) ::
+  @callback encode_authoring_data(map(), Catalog.t()) ::
               {:ok, term()} | {:error, term()}
 
   @doc "Decodes provider data from an Agent authoring document."
-  @callback decode_authoring_data(term(), Registry.t()) ::
+  @callback decode_authoring_data(term(), Catalog.t()) ::
               {:ok, term()} | {:error, term()}
 
   @optional_callbacks encode_authoring_data: 2, decode_authoring_data: 2, derive_routes: 1
@@ -52,15 +54,15 @@ defmodule Jido.Agent.Extension do
       def vsn, do: unquote(Keyword.get(opts, :vsn, 1))
 
       @doc false
-      def __jido_authoring__ do
+      def __jido_catalog_manifest__ do
         %{id: id(), kind: :plugin, vsn: vsn(), target: __MODULE__}
       end
 
       def lower(_dsl, config), do: {:ok, config}
 
       def normalize(data) do
-        with :ok <- Jido.Agent.Data.plain_map(data),
-             :ok <- Jido.Agent.Data.static(data),
+        with :ok <- Jido.Agent.Schema.plain_map(data),
+             :ok <- Jido.Agent.Schema.static(data),
              do: {:ok, data}
       end
 
@@ -71,10 +73,10 @@ defmodule Jido.Agent.Extension do
       def verify_connection(_data, _connection), do: :ok
 
       def encode_authoring_data(data, registry),
-        do: Jido.Authoring.Value.encode(data, registry)
+        do: Jido.Codec.Value.encode(data, registry)
 
       def decode_authoring_data(data, registry),
-        do: Jido.Authoring.Value.decode(data, registry)
+        do: Jido.Codec.Value.decode(data, registry)
 
       defoverridable lower: 2,
                      normalize: 1,
@@ -89,24 +91,24 @@ defmodule Jido.Agent.Extension do
   end
 
   @doc false
-  @spec encode_authoring_data(module(), map(), Registry.t()) ::
+  @spec encode_authoring_data(module(), map(), Catalog.t()) ::
           {:ok, term()} | {:error, term()}
-  def encode_authoring_data(provider, data, %Registry{} = registry) do
-    authoring_data(provider, :encode_authoring_data, data, registry, &Value.encode/2)
+  def encode_authoring_data(provider, data, %Catalog{} = catalog) do
+    authoring_data(provider, :encode_authoring_data, data, catalog, &Value.encode/2)
   end
 
   @doc false
-  @spec decode_authoring_data(module(), term(), Registry.t()) ::
+  @spec decode_authoring_data(module(), term(), Catalog.t()) ::
           {:ok, term()} | {:error, term()}
-  def decode_authoring_data(provider, data, %Registry{} = registry) do
-    authoring_data(provider, :decode_authoring_data, data, registry, &Value.decode/2)
+  def decode_authoring_data(provider, data, %Catalog{} = catalog) do
+    authoring_data(provider, :decode_authoring_data, data, catalog, &Value.decode/2)
   end
 
   @doc false
   def providers(providers) do
-    with {:ok, providers} <- Data.list(providers, &provider/1),
-         :ok <- Data.unique(providers, & &1),
-         :ok <- Data.unique(providers, & &1.id()),
+    with {:ok, providers} <- Schema.list(providers, &provider/1),
+         :ok <- Schema.unique(providers, & &1),
+         :ok <- Schema.unique(providers, & &1.id()),
          :ok <- namespaces(providers) do
       {:ok, providers}
     end
@@ -117,16 +119,16 @@ defmodule Jido.Agent.Extension do
     required_callbacks =
       __MODULE__.behaviour_info(:callbacks) -- __MODULE__.behaviour_info(:optional_callbacks)
 
-    callbacks = [{:sections, 0}, {:__jido_authoring__, 0} | required_callbacks]
+    callbacks = [{:sections, 0}, {:__jido_catalog_manifest__, 0} | required_callbacks]
 
     if match?({:module, _}, Code.ensure_compiled(module)) and
          Enum.all?(callbacks, fn {f, a} -> function_exported?(module, f, a) end) do
-      with :ok <- Data.nonempty(module.id()),
-           :ok <- Data.positive(module.vsn()),
+      with :ok <- Schema.nonempty(module.id()),
+           :ok <- Schema.positive(module.vsn()),
            :ok <- plugin(module),
            do: {:ok, module}
     else
-      Error.fail(
+      Error.validation_result(
         :invalid_provider,
         [],
         "Provider #{inspect(module)} does not implement the Agent contribution contract",
@@ -136,16 +138,16 @@ defmodule Jido.Agent.Extension do
   end
 
   def provider(value),
-    do: Error.fail(:invalid_provider, [], "Expected a provider module", %{provider: value})
+    do: Error.validation_result(:invalid_provider, [], "Expected a provider module", %{provider: value})
 
   defp plugin(module) do
-    authoring = module.__jido_authoring__()
+    authoring = module.__jido_catalog_manifest__()
     expected = %{id: module.id(), kind: :plugin, target: module, vsn: module.vsn()}
 
     if Jido.Plugin in behaviours(module) and authoring === expected do
       :ok
     else
-      Error.fail(
+      Error.validation_result(
         :invalid_plugin,
         [],
         "Agent plugins must use Jido.Plugin",
@@ -162,19 +164,19 @@ defmodule Jido.Agent.Extension do
 
   @doc false
   def normalize(entries) do
-    with {:ok, entries} <- Data.list(entries, &entry/1),
+    with {:ok, entries} <- Schema.list(entries, &entry/1),
          {:ok, _} <- providers(Enum.map(entries, & &1.provider)),
          do: {:ok, entries}
   end
 
   defp entry(value) do
-    with {:ok, value} <- Data.fields(value, [:id, :provider, :vsn, :data]),
+    with {:ok, value} <- Schema.fields(value, [:id, :provider, :vsn, :data]),
          {:ok, provider} <- provider(value[:provider]),
          :ok <- identity(value, provider),
-         :ok <- Data.plain_map(value[:data]),
+         :ok <- Schema.plain_map(value[:data]),
          {:ok, data} <- result(provider.normalize(value.data)),
-         :ok <- Data.plain_map(data),
-         :ok <- Data.static(data) do
+         :ok <- Schema.plain_map(data),
+         :ok <- Schema.static(data) do
       {:ok, %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}}
     end
   end
@@ -182,23 +184,22 @@ defmodule Jido.Agent.Extension do
   defp identity(value, provider) do
     if value[:id] === provider.id() and value[:vsn] === provider.vsn(),
       do: :ok,
-      else:
-        Error.fail(:provider_identity, [], "Provider ID or version does not match its contract")
+      else: Error.validation_result(:provider_identity, [], "Provider ID or version does not match its contract")
   end
 
   @doc false
   def lower(declarations, dsl) do
-    with :ok <- Data.plain_map(dsl),
+    with :ok <- Schema.plain_map(dsl),
          {:ok, declarations} <-
-           Data.list(declarations, fn declaration ->
-             with {:ok, declaration} <- Data.fields(declaration, [:provider, :config]),
+           Schema.list(declarations, fn declaration ->
+             with {:ok, declaration} <- Schema.fields(declaration, [:provider, :config]),
                   {:ok, provider} <- provider(declaration[:provider]),
-                  :ok <- Data.plain_map(declaration[:config]) do
+                  :ok <- Schema.plain_map(declaration[:config]) do
                {:ok, %{provider: provider, config: declaration.config}}
              end
            end) do
-      Data.list(declarations, fn %{provider: provider, config: config} ->
-        with :ok <- Data.plain_map(config),
+      Schema.list(declarations, fn %{provider: provider, config: config} ->
+        with :ok <- Schema.plain_map(config),
              {:ok, data} <- result(provider.lower(dsl, config)) do
           {:ok, %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}}
         end
@@ -209,7 +210,7 @@ defmodule Jido.Agent.Extension do
   @doc false
   def verify(entries, definition) do
     with {:ok, _} <-
-           Data.list(entries, fn entry ->
+           Schema.list(entries, fn entry ->
              with :ok <- result(entry.provider.verify(entry.data, definition)), do: {:ok, entry}
            end),
          do: :ok
@@ -218,17 +219,17 @@ defmodule Jido.Agent.Extension do
   @doc false
   def route_contributions(entries) do
     with {:ok, groups} <-
-           Data.list(entries, fn entry ->
+           Schema.list(entries, fn entry ->
              routes =
                if function_exported?(entry.provider, :derive_routes, 1),
                  do: entry.provider.derive_routes(entry.data),
                  else: []
 
              with {:ok, routes} <-
-                    Error.at(
-                      Data.list(routes, fn route ->
-                        with :ok <- Data.plain_map(route),
-                             :ok <- Error.at(Data.exact(Map.get(route, :path)), :path),
+                    Error.prefix_result_path(
+                      Schema.list(routes, fn route ->
+                        with :ok <- Schema.plain_map(route),
+                             :ok <- Error.prefix_result_path(Schema.exact(Map.get(route, :path)), :path),
                              do: {:ok, route}
                       end),
                       :routes
@@ -259,8 +260,8 @@ defmodule Jido.Agent.Extension do
   end
 
   defp normalize_derived_routes(contributions) do
-    Data.list(contributions, fn contribution ->
-      with {:ok, route} <- Error.at(Route.normalize(contribution.route), route_path(contribution)),
+    Schema.list(contributions, fn contribution ->
+      with {:ok, route} <- Error.prefix_result_path(Route.normalize(contribution.route), route_path(contribution)),
            do: {:ok, %{contribution | route: route}}
     end)
   end
@@ -270,7 +271,7 @@ defmodule Jido.Agent.Extension do
       case Enum.find_index(routes, &(&1 === contribution.route)) do
         nil ->
           {:halt,
-           Error.fail(
+           Error.validation_result(
              :missing_derived_route,
              route_path(contribution),
              "Agent definition is missing a route derived by a Plugin",
@@ -293,7 +294,7 @@ defmodule Jido.Agent.Extension do
   @doc false
   def verify_connection(entries, connection) do
     with {:ok, _} <-
-           Data.list(entries, fn entry ->
+           Schema.list(entries, fn entry ->
              with :ok <- result(entry.provider.verify_connection(entry.data, connection)),
                   do: {:ok, entry}
            end),
@@ -311,13 +312,13 @@ defmodule Jido.Agent.Extension do
         sections,
         &(&1 in ~w(agent state routes topology __state__ __routes__ __topology__)a)
       ) ->
-        Error.fail(:namespace_conflict, [], "Provider cannot replace a core section")
+        Error.validation_result(:namespace_conflict, [], "Provider cannot replace a core section")
 
       :agent in kinds ->
-        Error.fail(:namespace_conflict, [], "Provider cannot replace agent endpoints")
+        Error.validation_result(:namespace_conflict, [], "Provider cannot replace agent endpoints")
 
       true ->
-        with :ok <- Data.unique(sections, & &1), do: Data.unique(kinds, & &1)
+        with :ok <- Schema.unique(sections, & &1), do: Schema.unique(kinds, & &1)
     end
   end
 
@@ -335,7 +336,7 @@ defmodule Jido.Agent.Extension do
         error
 
       other ->
-        Error.fail(
+        Error.validation_result(
           :provider_authoring_data,
           [],
           "Provider authoring callback returned an invalid value",
@@ -344,7 +345,7 @@ defmodule Jido.Agent.Extension do
     end
   rescue
     exception ->
-      Error.fail(
+      Error.validation_result(
         :provider_authoring_data,
         [],
         "Provider authoring callback failed",
@@ -352,7 +353,7 @@ defmodule Jido.Agent.Extension do
       )
   catch
     kind, reason ->
-      Error.fail(
+      Error.validation_result(
         :provider_authoring_data,
         [],
         "Provider authoring callback failed",
@@ -360,11 +361,11 @@ defmodule Jido.Agent.Extension do
       )
   end
 
-  defp result({:error, %Error{}} = error), do: error
+  defp result({:error, %Error.ValidationError{}} = error), do: error
 
   defp result({:error, reason}),
     do:
-      Error.fail(:provider_error, [], "Provider rejected its data: #{inspect(reason)}", %{
+      Error.validation_result(:provider_error, [], "Provider rejected its data: #{inspect(reason)}", %{
         reason: reason
       })
 

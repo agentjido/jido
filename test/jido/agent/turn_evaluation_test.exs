@@ -1,12 +1,12 @@
 defmodule Jido.Agent.TurnEvaluationTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent.Runner
   alias Jido.Agent
-  alias Jido.Agent.Command
+  alias Jido.AgentServer.Command
   alias Jido.Agent.Turn
   alias Jido.Signal
-  alias JidoTest.AgentFixtures.Add
+  alias Jido.Test.AgentServer.Fixtures.Add
 
   defmodule CustomRouteAgent do
     @moduledoc false
@@ -14,9 +14,9 @@ defmodule Jido.Agent.TurnEvaluationTest do
     use Jido.Agent, name: "turn_evaluation_custom_route"
 
     state do
-      schema Zoi.object(%{
-               count: Zoi.integer() |> Zoi.default(0),
-               history: Zoi.list(Zoi.string()) |> Zoi.default([])
+      schema Jido.Joi.object(%{
+               count: Jido.Joi.integer() |> Jido.Joi.default(0),
+               history: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
              })
     end
 
@@ -26,9 +26,9 @@ defmodule Jido.Agent.TurnEvaluationTest do
   end
 
   test "route selection rejects malformed Signal types before callback", %{jido: jido} do
-    agent = CustomRouteAgent.instantiate!(id: Jido.Signal.ID.generate!())
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
-    before = JidoTest.AgentServerAssertions.committed(server)
+    agent = CustomRouteAgent.instantiate!(id: Jido.Id.uuid7())
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
+    before = Jido.Test.AgentServer.Assertions.committed(server)
     source = Signal.new!("source.custom", %{observer: self()}, source: "/test")
 
     for type <- [:invalid, nil, 42] do
@@ -37,13 +37,18 @@ defmodule Jido.Agent.TurnEvaluationTest do
       assert {:error, %Jido.Error.RoutingError{}} =
                Jido.AgentServer.call(server, %{source | type: type})
 
-      assert JidoTest.AgentServerAssertions.committed(server) == before
+      assert Jido.Test.AgentServer.Assertions.committed(server) == before
     end
   end
 
   test "source binding accepts nil and matching Signals and rejects malformed sources" do
     source = Signal.new!("source.route", %{}, source: "/test")
     unbound = Turn.new!(Add)
+
+    assert %Jido.Flow{
+             components: %{"action" => %{call: %{kind: :action, target: Add}}}
+           } = unbound.executable
+
     assert {:ok, bound} = Turn.bind_source(unbound, source)
     assert bound.source_signal == source
     assert {:ok, ^bound} = Turn.bind_source(bound, source)
@@ -63,7 +68,12 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
     assert {:ok, prepared} = Runner.prepare(agent, source, [])
     assert prepared.turn.source_signal == source
-    assert prepared.turn.executable == Add
+
+    assert %Jido.Flow{
+             components: %{"action" => %{call: %{kind: :action, target: Add}}}
+           } = prepared.turn.executable
+
+    assert prepared.turn.execution_mode == :managed
     assert prepared.turn.input == %{by: 1, label: "route", observer: self()}
     assert prepared.signal.type == "source.route"
     assert prepared.context.signal == prepared.signal
@@ -76,7 +86,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
     assert {:ok, direct, []} = Jido.Agent.cmd(agent, source)
     assert direct.state == %{count: 1, history: ["route"]}
 
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
     assert {:ok, live, _} = Jido.AgentServer.call(server, source)
     assert live.state == direct.state
   end
@@ -124,29 +134,29 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
     agent =
       Agent.define!(%{name: "missing_route"})
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Agent.instantiate!(id: Jido.Id.uuid7())
 
-    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.runtime_plugins(agent))
+    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.Plugin.declarations(agent))
     {:ok, command} = Command.new(agent, source)
 
-    assert {:error, :route, %Jido.Agent.Error{code: :unmatched_input}} =
-             Runner.prepare_for_server(command, source, [], specs)
+    assert {:error, :route, %Jido.Error.ValidationError{code: :unmatched_input}} =
+             Runner.prepare_admitted(command, source, [], specs)
 
     command = %{command | context: %{agent_id: "reserved"}}
 
     assert {:error, :input, %{__exception__: true}} =
-             Runner.prepare_for_server(command, source, [], specs)
+             Runner.prepare_admitted(command, source, [], specs)
 
     selected = Signal.new!("source.route", %{observer: self()}, source: "/test")
     selected_agent = CustomRouteAgent.instantiate!(id: "stages")
 
     {:ok, selected_specs} =
-      Jido.Plugin.Normalizer.normalize_all(Agent.runtime_plugins(selected_agent))
+      Jido.Plugin.Normalizer.normalize_all(Agent.Plugin.declarations(selected_agent))
 
     {:ok, selected_command} = Command.new(selected_agent, selected)
 
     assert {:ok, prepared} =
-             Runner.prepare_for_server(
+             Runner.prepare_admitted(
                selected_command,
                selected,
                [],

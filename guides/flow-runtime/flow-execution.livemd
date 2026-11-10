@@ -1,0 +1,253 @@
+# Execute Flows
+
+In this tutorial you run an order Flow with `Jido.Exec.run/4`, pass runtime context, collect effects, run work concurrently, retry a flaky step, and route a run to a successor.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Define the Actions
+
+Each Action does one job. `TotalOrder` needs a tax rate, which arrives through its params.
+
+```elixir
+defmodule FlowExecutionTour.PriceLine do
+  use Jido.Action,
+    name: "flow_execution_tour_price_line",
+    schema: Jido.Joi.object(%{sku: Jido.Joi.string(), cents: Jido.Joi.integer(), quantity: Jido.Joi.integer()})
+
+  @impl true
+  def run(%{sku: sku, cents: cents, quantity: quantity}, _context) do
+    {:ok, %{sku: sku, cents: cents * quantity}}
+  end
+end
+
+defmodule FlowExecutionTour.TotalOrder do
+  use Jido.Action, name: "flow_execution_tour_total_order"
+
+  @impl true
+  def run(%{lines: lines, tax_percent: tax_percent}, _context) do
+    subtotal = lines |> Enum.map(& &1.cents) |> Enum.sum()
+    {:ok, %{total_cents: subtotal + div(subtotal * tax_percent, 100)}}
+  end
+end
+
+defmodule FlowExecutionTour.ConfirmOrder do
+  use Jido.Action, name: "flow_execution_tour_confirm_order"
+
+  @impl true
+  def run(%{order_id: order_id, total_cents: total_cents}, _context) do
+    {:ok, %{order_id: order_id, status: "confirmed"}, [{:email_customer, order_id, total_cents}]}
+  end
+end
+
+[FlowExecutionTour.PriceLine, FlowExecutionTour.TotalOrder, FlowExecutionTour.ConfirmOrder]
+```
+
+## Define the Flow
+
+The Flow prices each line, totals the order, and confirms it. `result` references create the dependencies, so `total` waits for `lines`, and `confirm` waits for `total`.
+
+```elixir
+defmodule FlowExecutionTour.PlaceOrder do
+  use Jido.Flow,
+    name: "flow_execution_tour_place_order",
+    schema:
+      Jido.Joi.object(%{
+        order_id: Jido.Joi.string(),
+        lines: Jido.Joi.list(Jido.Joi.map())
+      })
+
+  flow do
+    map "lines",
+      collection: input(:lines),
+      action: FlowExecutionTour.PriceLine,
+      params: %{sku: item(:sku), cents: item(:cents), quantity: item(:quantity)}
+
+    step "total",
+      action: FlowExecutionTour.TotalOrder,
+      params: %{lines: result("lines"), tax_percent: context(:tax_percent)}
+
+    step "confirm",
+      action: FlowExecutionTour.ConfirmOrder,
+      params: %{order_id: input(:order_id), total_cents: result("total", :total_cents)}
+
+    output %{order: result("confirm"), total_cents: result("total", :total_cents)}
+  end
+end
+
+order = %{
+  order_id: "ord-1001",
+  lines: [%{sku: "desk", cents: 20_000, quantity: 1}, %{sku: "lamp", cents: 2_500, quantity: 2}]
+}
+```
+
+## Run it
+
+Pass input as the second argument and context as the third. `context(:tax_percent)` reads from the context, and the input schema never sees it.
+
+The Flow returns three elements because `ConfirmOrder` returned an effect. Nothing has sent an email yet. Your code owns that step.
+
+```elixir
+{:ok, output, effects} = Jido.Exec.run(FlowExecutionTour.PlaceOrder, order, %{tax_percent: 10})
+
+%{order: %{order_id: "ord-1001", status: "confirmed"}, total_cents: 27_500} = output
+[{:email_customer, "ord-1001", 27_500}] = effects
+
+{output, effects}
+```
+
+## Handle a failure
+
+Bad input stops the run before any Action starts. The error says which field failed and in which phase.
+
+```elixir
+{:error, %Jido.Error.ValidationError{details: invalid_input}} =
+  Jido.Exec.run(FlowExecutionTour.PlaceOrder, %{order_id: 1001, lines: []}, %{tax_percent: 10})
+
+%{phase: :flow_input, errors: [%{path: [:order_id]}]} = invalid_input
+invalid_input.errors
+```
+
+A missing context value fails when a component needs it. By then `lines` has run. The error names the component and the missing path.
+
+```elixir
+{:error, %Jido.Error.ExecutionError{details: missing_context}} =
+  Jido.Exec.run(FlowExecutionTour.PlaceOrder, order, %{})
+
+%{reason: :missing_key, ref_type: :context, path: [:tax_percent], node: "total"} = missing_context
+Map.take(missing_context, [:reason, :ref_type, :path, :node])
+```
+
+## Run work concurrently
+
+A Parallel component calls several Actions at once when `:max_concurrency` is above 1. Each result has the Action `name` and its `value`, in declaration order. This Flow checks stock and fraud, and each check takes about 100 ms.
+
+```elixir
+defmodule FlowExecutionTour.Check do
+  use Jido.Action, name: "flow_execution_tour_check"
+
+  @impl true
+  def run(%{check: check}, _context) do
+    Process.sleep(100)
+    {:ok, %{check: check, passed: true}}
+  end
+end
+
+defmodule FlowExecutionTour.Checks do
+  use Jido.Flow, name: "flow_execution_tour_checks"
+
+  flow do
+    parallel "checks" do
+      action "stock", FlowExecutionTour.Check, params: %{check: "stock"}
+      action "fraud", FlowExecutionTour.Check, params: %{check: "fraud"}
+    end
+
+    output %{checks: result("checks")}
+  end
+end
+
+{serial_us, {:ok, serial}} =
+  :timer.tc(fn -> Jido.Exec.run(FlowExecutionTour.Checks, %{}, %{}, max_concurrency: 1) end)
+
+{concurrent_us, {:ok, concurrent}} =
+  :timer.tc(fn -> Jido.Exec.run(FlowExecutionTour.Checks, %{}, %{}, max_concurrency: 2) end)
+
+true = serial == concurrent
+true = concurrent_us < serial_us
+["stock", "fraud"] = Enum.map(concurrent.checks, & &1.name)
+
+%{serial_ms: div(serial_us, 1000), concurrent_ms: div(concurrent_us, 1000)}
+```
+
+## Retry a flaky step
+
+`max_attempts` counts the first attempt. This Action fails twice, then succeeds. The Agent in context counts calls, which works here because immediate execution accepts process-local values in context.
+
+```elixir
+defmodule FlowExecutionTour.Reserve do
+  use Jido.Action, name: "flow_execution_tour_reserve"
+
+  @impl true
+  def run(_params, %{calls: calls}) do
+    case Agent.get_and_update(calls, &{&1 + 1, &1 + 1}) do
+      3 -> {:ok, %{reserved: true}}
+      _call -> {:error, Jido.Error.execution_error("warehouse busy", %{reason: :busy})}
+    end
+  end
+end
+
+{:ok, calls} = Agent.start_link(fn -> 0 end)
+
+{:ok, %{reserved: true}} =
+  Jido.Exec.run(FlowExecutionTour.Reserve, %{}, %{calls: calls}, max_attempts: 3, backoff: :linear, base_delay_ms: 10, max_delay_ms: 50)
+
+3 = Agent.get(calls, & &1)
+```
+
+## Bound a slow step
+
+`:timeout` limits each attempt. When it fires, the run returns a `Jido.Error.TimeoutError`, and the task for that attempt stops.
+
+```elixir
+defmodule FlowExecutionTour.SlowSupplier do
+  use Jido.Action, name: "flow_execution_tour_slow_supplier"
+
+  @impl true
+  def run(_params, _context) do
+    Process.sleep(1_000)
+    {:ok, %{quoted: true}}
+  end
+end
+
+{:error, %Jido.Error.TimeoutError{timeout: 20} = timed_out} =
+  Jido.Exec.run(FlowExecutionTour.SlowSupplier, %{}, %{}, timeout: 20)
+
+timed_out.message
+```
+
+## Route to a successor
+
+A `handoff` component ends the Flow and names the work to run next. `Jido.Exec.run/4` returns the successor as an Instruction and does not run it. Your code decides whether to call it. An Agent runs a Handoff as a new Turn. See [Dynamic Flows](../flows/dynamic-flows.md).
+
+```elixir
+defmodule FlowExecutionTour.SelectFulfilment do
+  use Jido.Action, name: "flow_execution_tour_select_fulfilment"
+
+  @impl true
+  def run(%{sku: sku}, _context) do
+    {:handoff, %{sku: sku, hours: 2}, FlowExecutionTour.Ship}
+  end
+end
+
+defmodule FlowExecutionTour.Ship do
+  use Jido.Action, name: "flow_execution_tour_ship"
+
+  @impl true
+  def run(%{sku: sku, hours: hours}, _context), do: {:ok, %{sku: sku, ships_in_hours: hours}}
+end
+
+defmodule FlowExecutionTour.Route do
+  use Jido.Flow, name: "flow_execution_tour_route"
+
+  flow do
+    handoff "fulfil", selector: FlowExecutionTour.SelectFulfilment, params: %{sku: input(:sku)}
+    output result("fulfil")
+  end
+end
+
+{:handoff, %Jido.Instruction{} = successor, []} =
+  Jido.Exec.run(FlowExecutionTour.Route, %{sku: "desk"})
+
+{:ok, %{sku: "desk", ships_in_hours: 2}} = Jido.Exec.run(successor)
+```
+
+## Next steps
+
+- [Execution](execution.md) lists every option and return shape.
+- [Managed Execution](managed-execution.md) runs the same Flows under a supervised Worker.
+- [Test Flows](testing-flows.livemd) turns these checks into ExUnit tests.

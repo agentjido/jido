@@ -1,8 +1,8 @@
 defmodule Jido.Plugin.OrderingTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
-  alias Jido.Agent.Command
-  alias Jido.Plugin.SignalContext
+  alias Jido.AgentServer.Command
+  alias Jido.Plugin.Context
 
   defmodule Agent do
     use Jido.Agent, name: "plugin_ordering_agent"
@@ -24,7 +24,7 @@ defmodule Jido.Plugin.OrderingTest do
     @impl true
     def state_spec(opts) do
       key = Keyword.get(opts, :key, :first)
-      {key, Zoi.integer() |> Zoi.default(0)}
+      {key, Jido.Joi.integer() |> Jido.Joi.default(0)}
     end
 
     @impl true
@@ -52,7 +52,7 @@ defmodule Jido.Plugin.OrderingTest do
     @impl true
     def state_spec(opts) do
       key = Keyword.get(opts, :key, :second)
-      {key, Zoi.integer() |> Zoi.default(0)}
+      {key, Jido.Joi.integer() |> Jido.Joi.default(0)}
     end
 
     @impl true
@@ -183,7 +183,7 @@ defmodule Jido.Plugin.OrderingTest do
   defmodule FirstReducerFacet do
     @behaviour Jido.Plugin
 
-    def state_spec(_opts), do: {:first_reduced, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:first_reduced, Jido.Joi.integer() |> Jido.Joi.default(0)}
 
     def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts),
       do: {:ok, reduction.plugin_state + 1}
@@ -202,7 +202,7 @@ defmodule Jido.Plugin.OrderingTest do
   defmodule SecondReducerFacet do
     @behaviour Jido.Plugin
 
-    def state_spec(_opts), do: {:second_observed, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:second_observed, Jido.Joi.integer() |> Jido.Joi.default(0)}
 
     def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts) do
       send(self(), {:reduction, reduction})
@@ -235,7 +235,7 @@ defmodule Jido.Plugin.OrderingTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:first, Zoi.atom() |> Zoi.default(:first_state)}
+    def state_spec(_opts), do: {:first, Jido.Joi.atom() |> Jido.Joi.default(:first_state)}
   end
 
   defmodule FirstOutboundPlugin.Server do
@@ -267,7 +267,7 @@ defmodule Jido.Plugin.OrderingTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:second, Zoi.atom() |> Zoi.default(:second_state)}
+    def state_spec(_opts), do: {:second, Jido.Joi.atom() |> Jido.Joi.default(:second_state)}
   end
 
   defmodule SecondOutboundPlugin.Server do
@@ -394,7 +394,8 @@ defmodule Jido.Plugin.OrderingTest do
     source = signal("plugin.order")
 
     context =
-      struct!(SignalContext,
+      struct!(Context,
+        phase: :signal,
         turn_id: "turn-1",
         agent_id: "agent-1",
         source_signal: source,
@@ -431,7 +432,8 @@ defmodule Jido.Plugin.OrderingTest do
     source = signal("plugin.order")
 
     context =
-      struct!(SignalContext,
+      struct!(Context,
+        phase: :signal,
         turn_id: "turn-1",
         agent_id: "agent-1",
         source_signal: source,
@@ -459,7 +461,7 @@ defmodule Jido.Plugin.OrderingTest do
                {SecondStatePlugin, result: :second_failed}
              ])
 
-    agent = %{Agent.instantiate!(id: Jido.Signal.ID.generate!()) | state: %{first: 0, second: 0}}
+    agent = %{Agent.instantiate!(id: Jido.Id.uuid7()) | state: %{first: 0, second: 0}}
 
     assert Jido.Agent.Plugin.Pipeline.run(
              {:ok, agent.state, []},
@@ -489,7 +491,7 @@ defmodule Jido.Plugin.OrderingTest do
             %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: Map.new(options)}
           end)
       })
-      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Jido.Agent.instantiate!(id: Jido.Id.uuid7())
 
     assert {:ok, state, []} =
              Jido.Agent.Plugin.Pipeline.run(
@@ -512,7 +514,7 @@ defmodule Jido.Plugin.OrderingTest do
 
   defp command do
     {:ok, command} =
-      Command.new(Agent.instantiate!(id: Jido.Signal.ID.generate!()), signal("plugin.command"))
+      Command.new(Agent.instantiate!(id: Jido.Id.uuid7()), signal("plugin.command"))
 
     command
   end

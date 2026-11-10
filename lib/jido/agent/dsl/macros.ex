@@ -44,7 +44,10 @@ defmodule Jido.Agent.DSL.RouteMacros do
   alias Jido.Flow.Inline, as: InlineFlow
 
   @entity Module.concat([
-            Jido.Agent.DSL.Extension,
+            "Jido",
+            "Agent",
+            "DSL",
+            "Extension",
             Macro.camelize("__routes__"),
             Macro.camelize("__route__")
           ])
@@ -287,7 +290,7 @@ defmodule Jido.Agent.DSL.RouteMacros do
           rescue
             error in FunctionClauseError ->
               if error.module == __MODULE__ and error.function == unquote(private) do
-                Jido.Agent.Error.fail(
+                Jido.Error.validation_result(
                   :transform_input,
                   [:routes, unquote(bound_path)],
                   "Signal does not match a transform clause"
@@ -304,15 +307,14 @@ defmodule Jido.Agent.DSL.RouteMacros do
 
   @doc false
   def transform_names!(path) do
-    case Jido.Agent.Data.path(path) do
+    case Jido.Agent.Schema.path(path) do
       :ok -> :ok
       {:error, error} -> raise error
     end
 
     suffix = :crypto.hash(:sha256, path) |> Base.encode16(case: :lower) |> binary_part(0, 16)
 
-    {String.to_atom("__agent_transform_" <> suffix),
-     String.to_atom("__agent_transform_clauses_" <> suffix)}
+    {String.to_atom("__agent_transform_" <> suffix), String.to_atom("__agent_transform_clauses_" <> suffix)}
   end
 
   defp transform_clause(fun, pattern, body, line) do

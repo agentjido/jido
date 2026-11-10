@@ -1,4 +1,4 @@
-defmodule JidoTest.Agent.AuthoringExtensionTest do
+defmodule Jido.Agent.AuthoringExtensionTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
   alias Jido.Agent.Extension
@@ -16,7 +16,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
       {:ok, Map.put(config, :label, SparkExtension.get_opt(dsl, [:labels], :value))}
     end
 
-    def normalize(data), do: Jido.Agent.Data.fields(data, [:label])
+    def normalize(data), do: Jido.Agent.Schema.fields(data, [:label])
     def verify(%{label: "blocked"}, _), do: {:error, :blocked_label}
     def verify(_, _), do: :ok
   end
@@ -126,14 +126,14 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
              Agent.define(%{name: "labels", module: Host, plugins: [entry]})
 
     assert definition === Host.definition()
-    assert Agent.runtime_plugins(definition) == []
+    assert Agent.Plugin.declarations(definition) == []
     refute function_exported?(Labels, :__jido_plugin__, 0)
   end
 
   @tag obligation: "jido.agent.I10"
   test "provider identity and core namespaces are unique" do
     for providers <- [[Labels, Labels], [Labels, DuplicateID], [CoreEndpoint]] do
-      assert {:error, %Agent.Error{}} = Extension.providers(providers)
+      assert {:error, %Jido.Error.ValidationError{}} = Extension.providers(providers)
     end
   end
 
@@ -151,7 +151,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     @tag obligation: "jido.agent.I10"
     test "#{section} is a reserved provider section" do
       assert {:error,
-              %Agent.Error{
+              %Jido.Error.ValidationError{
                 code: :namespace_conflict,
                 message: message
               }} = Extension.providers([unquote(provider)])
@@ -186,7 +186,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
 
     for value <- [NoSections, String, nil, true, false, 1, "module", %{}] do
       assert {:error,
-              %Agent.Error{
+              %Jido.Error.ValidationError{
                 code: :invalid_provider,
                 message: message,
                 details: %{provider: ^value}
@@ -234,7 +234,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     entry = contribution(Routed, %{target: RouteTarget})
 
     assert {:error,
-            %Agent.Error{
+            %Jido.Error.ValidationError{
               code: :missing_derived_route,
               path: [:plugins, 0, :routes, 0],
               details: %{path: "extension.request", provider: Routed}
@@ -252,7 +252,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     }
 
     assert {:error,
-            %Agent.Error{
+            %Jido.Error.ValidationError{
               code: :plugin_route_conflict,
               path: [:routes, 0],
               details: %{path: "extension.request", provider: Routed}
@@ -283,7 +283,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     entry = contribution(wildcard, %{})
 
     assert {:error,
-            %Agent.Error{
+            %Jido.Error.ValidationError{
               code: :wildcard_type,
               path: [:plugins, 0, :routes, 0, :path]
             }} = Agent.define(%{name: "wildcard", plugins: [entry]})
@@ -297,14 +297,14 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
           contribution(Labels, %{label: self()}),
           %{contribution(Labels, %{label: "valid"}) | vsn: 99}
         ] do
-      assert {:error, %Agent.Error{path: [:plugins | _]}} =
+      assert {:error, %Jido.Error.ValidationError{path: [:plugins | _]}} =
                Agent.define(%{name: "labels", plugins: [entry]})
     end
 
     rejected = contribution(Boundary, %{reject: :bad_data})
 
     assert {:error,
-            %Agent.Error{
+            %Jido.Error.ValidationError{
               code: :provider_error,
               message: message,
               details: %{reason: :bad_data}
@@ -316,7 +316,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   @tag obligation: "jido.agent.I22"
   test "a provider must implement the current contribution contract" do
     assert {:error,
-            %Agent.Error{
+            %Jido.Error.ValidationError{
               code: :invalid_provider,
               message: message,
               details: %{provider: String}

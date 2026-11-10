@@ -1,0 +1,289 @@
+# Connect Agent Outputs
+
+This tutorial routes Signals through a pipeline of members, then fans one output out through a local Bus. It also covers how Jido selects a destination and what happens when delivery fails.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Build a pipeline
+
+The order desk forwards each request to a packer. The packer commits its work and emits a completion Signal. A receipt member turns that into a receipt, and the desk commits the receipt.
+
+A connection is one line: the Signal type, its source, and its destination.
+
+```elixir
+defmodule ConnectGuide.Packer do
+  use Jido.Agent, name: "connect_packer"
+
+  state do
+    schema Jido.Joi.object(%{total: Jido.Joi.integer() |> Jido.Joi.default(0)})
+  end
+
+  routes do
+    route "order.requested" do
+      action %{amount: amount},
+        schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}),
+        context: context do
+        packed =
+          Jido.Signal.new!("order.packed", %{amount: amount}, source: "/orders/packer")
+
+        {:ok, %{context.agent_state | total: context.agent_state.total + amount},
+         [Jido.Agent.Directive.emit(packed)]}
+      end
+    end
+  end
+end
+
+defmodule ConnectGuide.Receipts do
+  use Jido.Agent, name: "connect_receipts"
+
+  routes do
+    route "order.packed" do
+      transform %Jido.Signal{data: %{amount: amount}} do
+        Jido.Signal.new("order.receipt", %{amount: amount}, source: "/orders/receipts")
+      end
+    end
+  end
+end
+
+defmodule ConnectGuide.Desk do
+  use Jido.Agent, name: "connect_desk"
+
+  state do
+    schema Jido.Joi.object(%{receipted: Jido.Joi.integer() |> Jido.Joi.default(0)})
+  end
+
+  routes do
+    signal_source "/orders/desk"
+
+    route "order.requested", as: :request do
+      forward(to: agent(:packer))
+    end
+
+    route "order.receipt" do
+      action %{amount: amount},
+        schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | receipted: context.agent_state.receipted + amount}}
+      end
+    end
+  end
+
+  topology do
+    agent :packer, ConnectGuide.Packer
+    agent :receipts, ConnectGuide.Receipts
+
+    connections do
+      connect "order.packed", from: :packer, to: :receipts
+      connect "order.receipt", from: :receipts, to: :root
+    end
+  end
+end
+```
+
+## Follow one Signal
+
+Each Agent commits its own Turn. The reply to `Jido.AgentServer.call/3` confirms only the desk's Turn, so the receipt has not arrived yet when the call returns. The `wait_until` helper polls until a check passes.
+
+```elixir
+wait_until = fn check ->
+  Enum.find(1..200, fn _attempt ->
+    check.() || (Process.sleep(10) && false)
+  end) != nil
+end
+
+{:ok, _instance} = Jido.start(name: ConnectGuide.Jido)
+{:ok, desk} = Jido.start_agent(ConnectGuide.Jido, ConnectGuide.Desk, id: "desk-1")
+:ok = Jido.AgentServer.await_ready(desk)
+
+{:ok, request} = ConnectGuide.Desk.request_signal(%{amount: 7})
+{:ok, at_reply, [_forward]} = Jido.AgentServer.call(desk, request)
+
+true = wait_until.(fn -> Jido.AgentServer.agent(desk).state.receipted == 7 end)
+
+[packer] = Jido.AgentServer.members(desk, :packer)
+{at_reply.state.receipted, Jido.AgentServer.agent(desk).state.receipted, Jido.AgentServer.agent(packer).state.total}
+```
+
+The cell returns `{0, 7, 7}`.
+
+## How Jido selects a destination
+
+Accepting a Signal does not produce one. An Action must return `Jido.Agent.Directive.emit/2`, or the route must be a transform. See [Transforms and Forwards](../agents/route-transforms-and-forwards.md).
+
+An `Emit` with no explicit dispatch goes to the first of these that applies:
+
+1. The Agent's own connections from `:root` that match the Signal type.
+2. The parent, when the Agent is a topology member. The parent uses its connections from that member's name. If none match, the Signal is dropped.
+3. The AgentServer's `:default_dispatch` option.
+4. The Agent's own AgentServer, as a new cast.
+
+A runtime child skips step 2. Use `Jido.Agent.Directive.parent_send/1` from a child, as [Parent and Child Agents](parent-and-child-agents.md) shows. That Directive and `forward to: parent()` also work from a member, and they send straight to the parent's routes without using connections.
+
+Connections differ from routes. A route is selected by first match. A Signal follows every connection that matches. `Jido.Agent.Topology.connections_for/3` returns the matches for one source and an exact type, and rejects a wildcard type.
+
+```elixir
+Jido.Agent.Topology.connections_for(
+  ConnectGuide.Desk.definition(),
+  %{kind: :agent, name: :packer},
+  "order.packed"
+)
+|> then(fn {:ok, edges} -> Enum.map(edges, & &1.to) end)
+```
+
+The cell returns `[%{name: :receipts, kind: :agent}]`.
+
+Use different types for requests and results. A connection from `:root` to a member and a member output of the same type back to `:root` form a loop that Jido does not detect.
+
+## Fan out through a local Bus
+
+Add `Jido.Plugin.Bus.DSL` to declare a Bus, and refer to it with `bus(:name)`. A counted destination needs `delivery: :broadcast`.
+
+```elixir
+defmodule ConnectGuide.Notifier do
+  use Jido.Agent, name: "connect_notifier"
+
+  state do
+    schema Jido.Joi.object(%{sent: Jido.Joi.integer() |> Jido.Joi.default(0)})
+  end
+
+  routes do
+    route "order.shipped" do
+      action _input, context: context do
+        {:ok, %{context.agent_state | sent: context.agent_state.sent + 1}}
+      end
+    end
+  end
+end
+
+defmodule ConnectGuide.Dispatch do
+  use Jido.Agent, name: "connect_dispatch", plugins: [Jido.Plugin.Bus.DSL]
+
+  state do
+    schema Jido.Joi.object(%{notifiers: Jido.Joi.integer() |> Jido.Joi.default(3)})
+  end
+
+  routes do
+    signal_source "/orders/dispatch"
+
+    route "order.ship", as: :ship do
+      action %{order_id: order_id},
+        schema: Jido.Joi.object(%{order_id: Jido.Joi.string()}),
+        context: context do
+        shipped =
+          Jido.Signal.new!("order.shipped", %{order_id: order_id}, source: "/orders/dispatch")
+
+        {:ok, context.agent_state, [Jido.Agent.Directive.emit(shipped)]}
+      end
+    end
+  end
+
+  signal_bus do
+    name :shipments
+  end
+
+  topology do
+    agent :notifiers, ConnectGuide.Notifier do
+      count state(:notifiers)
+    end
+
+    connections do
+      connect "order.shipped", from: :root, to: bus(:shipments)
+      connect "order.shipped", from: bus(:shipments), to: :notifiers, delivery: :broadcast
+    end
+  end
+end
+
+{:ok, dispatch} = Jido.start_agent(ConnectGuide.Jido, ConnectGuide.Dispatch, id: "dispatch-1")
+:ok = Jido.AgentServer.await_ready(dispatch)
+
+{:ok, ship} = ConnectGuide.Dispatch.ship_signal(%{order_id: "ord-1"})
+{:ok, _accepted, [_emit]} = Jido.AgentServer.call(dispatch, ship)
+
+notifiers = Jido.AgentServer.members(dispatch, :notifiers)
+true = wait_until.(fn -> Enum.all?(notifiers, &(Jido.AgentServer.agent(&1).state.sent == 1)) end)
+
+length(notifiers)
+```
+
+The cell returns `3`. Each notifier committed one Turn.
+
+The Bus is optional for fan-out. A direct connection to a counted member also reaches every live slot. A Bus adds a named publish point that several connections can read from. These rules apply:
+
+- The Plugin declares exactly one Bus.
+- Publishing to a Bus uses `:single` delivery.
+- A connection cannot go from one Bus to another.
+- A Bus can deliver to `:root` and to members.
+
+For the Bus API outside a topology, see [Signal Bus](../signals/signal-bus-and-subscriptions.md).
+
+## Read connection checks
+
+Jido validates each connection when it validates the definition. The destination must have a route for the path, unless the path contains a wildcard. This cell shows that rejection.
+
+```elixir
+broken =
+  Jido.Agent.mutate(ConnectGuide.Desk.definition(), [
+    Jido.Agent.Directive.connection_add("order.receipt", from: :receipts, to: :packer)
+  ])
+
+{:error, %Jido.Error.ValidationError{code: :unaccepted_type}} = broken
+:rejected
+```
+
+The cell returns `:rejected`.
+
+Jido cannot prove that a source produces a type. `Jido.Agent.Topology.checks/3` therefore reports `:unchecked` for every connection that passes, with a reason of `:unknown_outputs` or `:wildcard_coverage`.
+
+```elixir
+resolver = fn definition, _opts -> {:ok, definition} end
+{:ok, checks} = Jido.Agent.Topology.checks(ConnectGuide.Desk.definition(), [], resolver)
+
+Enum.map(checks, &{&1.connection.path, &1.status, &1.reason})
+```
+
+The cell returns:
+
+```text
+[
+  {"order.packed", :unchecked, :unknown_outputs},
+  {"order.receipt", :unchecked, :unknown_outputs}
+]
+```
+
+## Connection fields and errors
+
+| Field | Values | Rule |
+| --- | --- | --- |
+| `path` | Signal type, with `*` or `**` wildcards | Required. A source, destination, and path together identify the connection. |
+| `from`, `to` | Member name, `:root`, or `bus(:name)` | Must be declared. Otherwise the code is `:unknown_endpoint`. |
+| `delivery` | `:single` (default) or `:broadcast` | A member with a count other than 1, or a state-bound count, needs `:broadcast`. Otherwise the code is `:counted_delivery`. |
+
+The `delivery` value is checked when Jido validates the definition. At runtime both values send to every live slot of the destination.
+
+## When delivery fails
+
+Delivery uses best-effort casts, and each destination commits on its own. Nothing rolls back the sender.
+
+- A destination Turn that fails stays at the destination. The sender is not told.
+- A failed delivery of an output from `:root` marks that Turn's effects as failed. See `last_effect_outcome` in `Jido.AgentServer.status/1`. The Agent keeps running with its commit.
+- A member output or Bus delivery that finds no live destination is dropped. This can happen while the destination member restarts. The owner keeps running, logs a warning with the Signal type and reason, and sets `last_effect_outcome` to `status: :failed` with `turn_id: nil`, because no Turn of the owner sent it.
+
+## Clean up
+
+```elixir
+:ok = Jido.stop_agent(ConnectGuide.Jido, desk)
+:ok = Jido.stop_agent(ConnectGuide.Jido, dispatch)
+```
+
+Both calls return `:ok`.
+
+## Next steps
+
+- [Change Live Composition](change-live-composition.md) edits these connections from a Turn.
+- [Topology Reconciliation](topology-reconciliation.md) explains when members and Buses start and stop.

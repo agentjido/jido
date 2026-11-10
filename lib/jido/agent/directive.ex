@@ -1,4 +1,6 @@
 defmodule Jido.Agent.Directive do
+  alias Jido.Joi
+
   @moduledoc """
   Changes and runtime work returned by an Agent executable turn.
 
@@ -27,19 +29,11 @@ defmodule Jido.Agent.Directive do
   it needs another validation rule.
   """
 
-  alias __MODULE__.{Emit, Reply}
-  alias Jido.AgentServer.Directive, as: Runtime
+  alias __MODULE__.{AgentSend, Emit, ParentSend, Reply, ServerStop}
 
-  alias Jido.AgentServer.Directive.{
-    AgentSend,
-    AgentStart,
-    AgentStop,
-    ErrorReport,
-    ParentSend,
-    ProcessStart,
-    ServerStop
-  }
-
+  alias Jido.Agent.Schema
+  alias Jido.Agent.Directive.Kind
+  alias Jido.Error
   alias Jido.Signal
   alias __MODULE__.{PluginAdd, PluginConfigure, PluginRemove}
   alias Jido.Signal.Context, as: SignalContext
@@ -47,15 +41,22 @@ defmodule Jido.Agent.Directive do
   @callback validate(directive :: struct()) :: {:ok, struct()} | {:error, term()}
 
   @doc "Defines a self-validating custom Agent Directive."
-  defmacro __using__(_opts) do
-    quote location: :keep do
+  defmacro __using__(opts) do
+    built_in? = Keyword.get(opts, :built_in, false)
+
+    quote location: :keep, bind_quoted: [built_in?: built_in?] do
       @behaviour Jido.Agent.Directive
+
+      if built_in? do
+        @doc false
+        def __jido_builtin_directive__, do: true
+      end
 
       @impl Jido.Agent.Directive
       # `use` can precede `defstruct`; do not expand the struct here.
       def validate(%{__struct__: __MODULE__} = directive) do
         if function_exported?(__MODULE__, :schema, 0) do
-          Zoi.parse(apply(__MODULE__, :schema, []), Map.from_struct(directive))
+          Jido.Agent.Directive.parse(apply(__MODULE__, :schema, []), Map.from_struct(directive))
         else
           {:ok, directive}
         end
@@ -74,46 +75,19 @@ defmodule Jido.Agent.Directive do
 
   @type t :: struct()
 
-  @built_ins [
-    Emit,
-    Reply,
-    AgentSend,
-    AgentStart,
-    AgentStop,
-    ErrorReport,
-    ParentSend,
-    ProcessStart,
-    ServerStop
-  ]
-
-  @mutation_modules Jido.Agent.Mutation.modules()
-
-  @doc false
-  @spec built_in?(term()) :: boolean()
-  def built_in?(%{__struct__: module}), do: module in @built_ins or module in @mutation_modules
-  def built_in?(_value), do: false
-
-  @doc false
-  @spec built_in_module?(module()) :: boolean()
-  def built_in_module?(module) when is_atom(module),
-    do: module in @built_ins or module in @mutation_modules
-
-  @doc false
-  @spec validator?(module()) :: boolean()
-  def validator?(module) when is_atom(module),
-    do: built_in_module?(module) or function_exported?(module, :validate, 1)
+  @core_modules Kind.core_modules()
 
   @doc "Validates one built-in or custom Agent Directive."
   @spec validate(struct()) :: {:ok, struct()} | {:error, term()}
   def validate(%{__struct__: module, signal: %Signal{} = signal} = directive)
       when module in [Emit, Reply, ParentSend, AgentSend] do
-    with {:ok, signal} <- Zoi.parse(Signal.schema(), signal),
-         {:ok, extensions} <- SignalContext.normalize(signal.extensions),
+    with {:ok, signal} <- parse(Signal.schema(), signal),
+         {:ok, extensions} <- normalize_context(signal.extensions),
          {:ok, directive} <-
            directive
            |> Map.from_struct()
            |> Map.put(:signal, %{signal | extensions: extensions})
-           |> then(&Zoi.parse(module.schema(), &1)),
+           |> then(&parse(module.schema(), &1)),
          :ok <- validate_reply_causation(directive) do
       {:ok, directive}
     end
@@ -127,21 +101,49 @@ defmodule Jido.Agent.Directive do
      )}
   end
 
-  def validate(%AgentStart{} = directive) do
-    with {:ok, directive} <- Zoi.parse(AgentStart.schema(), Map.from_struct(directive)),
-         :ok <- Runtime.validate_agent_target(directive.agent) do
-      {:ok, directive}
-    end
-  end
-
-  def validate(%{__struct__: module} = directive) when module in @mutation_modules,
-    do: Jido.Agent.Mutation.validate(directive)
-
-  def validate(%{__struct__: module} = directive) when module in @built_ins do
-    Zoi.parse(module.schema(), Map.from_struct(directive))
+  def validate(%{__struct__: module} = directive) when module in @core_modules do
+    parse(module.schema(), Map.from_struct(directive))
   end
 
   def validate(%{__struct__: module} = directive) do
+    if Kind.mutation_module?(module),
+      do: Jido.Agent.Mutation.validate(directive),
+      else: validate_custom(module, directive)
+  end
+
+  def validate(value) do
+    {:error,
+     Jido.Error.validation_error("Unknown Agent Directive",
+       details: %{directive: value}
+     )}
+  end
+
+  @doc false
+  @spec parse(Joi.schema(), term()) :: {:ok, term()} | {:error, Exception.t()}
+  def parse(schema, value) do
+    with {:error, issues} <- Joi.parse(schema, value), do: invalid_schema(issues)
+  end
+
+  defp invalid_schema(issues) do
+    issues =
+      Enum.map(issues, fn issue ->
+        %{code: Joi.error_code(issue), path: Joi.error_path(issue), message: Joi.error_message(issue)}
+      end)
+
+    Error.validation_result(:invalid_directive, [], "Agent Directive does not match its schema", %{
+      issues: issues
+    })
+  end
+
+  defp normalize_context(extensions) do
+    with {:error, reason} <- SignalContext.normalize(extensions) do
+      Error.validation_result(:invalid_directive, [:signal, :extensions], "Signal context is invalid", %{
+        reason: reason
+      })
+    end
+  end
+
+  defp validate_custom(module, directive) do
     try do
       case module.validate(directive) do
         {:ok, %{__struct__: ^module} = validated} ->
@@ -152,6 +154,9 @@ defmodule Jido.Agent.Directive do
            Jido.Error.validation_error("Agent Directive validation changed its type",
              details: %{expected: module, actual: actual}
            )}
+
+        {:error, [%{code: _, path: _, message: _} | _] = issues} ->
+          invalid_schema(issues)
 
         {:error, _reason} = error ->
           error
@@ -177,13 +182,6 @@ defmodule Jido.Agent.Directive do
     end
   end
 
-  def validate(value) do
-    {:error,
-     Jido.Error.validation_error("Unknown Agent Directive",
-       details: %{directive: value}
-     )}
-  end
-
   @doc """
   Creates an emission request. It does not dispatch a Signal.
 
@@ -194,8 +192,8 @@ defmodule Jido.Agent.Directive do
   def emit(signal_or_type, dispatch_or_data \\ nil)
 
   def emit(type, data) when is_binary(type) do
-    with :ok <- Jido.Agent.Data.exact(type),
-         :ok <- Jido.Agent.Data.plain_map(data),
+    with :ok <- Jido.Agent.Schema.exact(type),
+         :ok <- Jido.Agent.Schema.plain_map(data),
          do: %{kind: :emit, type: type, data: data}
   end
 
@@ -204,6 +202,32 @@ defmodule Jido.Agent.Directive do
   @doc "Creates one correlated response request. It does not dispatch the Signal."
   @spec reply(Signal.t()) :: Reply.t()
   def reply(%Signal{} = signal), do: %Reply{signal: signal}
+
+  @doc "Creates a request to send one Signal to the parent Agent after commit."
+  @spec parent_send(Signal.t()) :: ParentSend.t()
+  def parent_send(%Signal{} = signal), do: %ParentSend{signal: signal}
+
+  @doc "Creates a request to send one Signal to a tracked child Agent after commit."
+  @spec agent_send(atom() | String.t(), Signal.t()) :: AgentSend.t()
+  def agent_send(name, %Signal{} = signal), do: %AgentSend{name: name, signal: signal}
+
+  @doc "Creates a terminal request to stop the AgentServer after commit."
+  @spec server_stop(term()) :: ServerStop.t()
+  def server_stop(reason \\ :normal), do: %ServerStop{reason: reason}
+
+  @doc false
+  def directives(definition, directives) do
+    Schema.list(directives, fn
+      %{kind: :emit} = request ->
+        with {:ok, request} <- emission(request, definition),
+             {:ok, signal} <- envelope(request, definition) do
+          {:ok, emit(signal)}
+        end
+
+      directive ->
+        {:ok, directive}
+    end)
+  end
 
   @doc "Replaces the complete topology data."
   @spec topology_set(map()) :: __MODULE__.TopologySet.t()
@@ -328,6 +352,39 @@ defmodule Jido.Agent.Directive do
   @spec plugin_remove(module(), keyword()) :: PluginRemove.t()
   def plugin_remove(module, opts \\ []),
     do: %PluginRemove{module: module, state: mutation_options(opts, [:state])[:state]}
+
+  defp envelope(%{signal: signal}, _definition), do: {:ok, signal}
+
+  defp envelope(%{type: type, data: data}, definition),
+    do: Signal.new(type, data, source: definition.signal_source)
+
+  defp emission(%{kind: :emit, signal: %Signal{} = signal} = request, _definition) do
+    with {:ok, _} <- Schema.fields(request, [:kind, :signal]),
+         :ok <- emission_signal(signal),
+         do: {:ok, request}
+  end
+
+  defp emission(%{kind: :emit, type: type, data: data} = request, definition) do
+    with {:ok, _} <- Schema.fields(request, [:kind, :type, :data]),
+         :ok <- Schema.exact(type),
+         :ok <- Schema.plain_map(data),
+         :ok <- Schema.static(data),
+         :ok <- Error.prefix_result_path(Schema.nonempty(definition.signal_source), :signal_source),
+         do: {:ok, request}
+  end
+
+  defp emission(_request, _definition),
+    do: Error.validation_result(:invalid_directive, [], "Expected a registered emission directive")
+
+  defp emission_signal(signal) do
+    case Jido.Joi.validate(Signal.schema(), signal) do
+      :ok ->
+        Schema.static(signal)
+
+      {:error, issues} ->
+        Error.validation_result(:invalid_signal, [], "Invalid Signal envelope", %{issues: issues})
+    end
+  end
 
   defp mutation_options(opts, allowed) do
     unless Keyword.keyword?(opts) and Enum.uniq(Keyword.keys(opts)) == Keyword.keys(opts),

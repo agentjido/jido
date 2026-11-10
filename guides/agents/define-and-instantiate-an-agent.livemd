@@ -1,0 +1,187 @@
+# Define an Agent
+
+This tutorial builds an invoice Agent with the DSL, creates an instance, runs one Turn on it, and then builds the same definition from a Map. No process starts at any point.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Write the Action
+
+A route needs something to run. This Action adds a payment to the current state. It reads that state from the `:agent_state` context key and returns the complete next state.
+
+```elixir
+defmodule DefineGuide.ApplyPayment do
+  use Jido.Action,
+    name: "define_guide_apply_payment",
+    schema: Jido.Joi.object(%{amount_cents: Jido.Joi.integer() |> Jido.Joi.min(1)})
+
+  @impl Jido.Action
+  def run(%{amount_cents: amount}, %{agent_state: state}) do
+    {:ok, %{state | paid_cents: state.paid_cents + amount}}
+  end
+end
+```
+
+## Define the Agent
+
+`use Jido.Agent` compiles the DSL into a validated definition. An invalid definition fails compilation.
+
+```elixir
+defmodule DefineGuide.InvoiceAgent do
+  use Jido.Agent,
+    name: "invoice",
+    description: "Tracks payments for one invoice"
+
+  state do
+    schema Jido.Joi.object(%{
+             total_cents: Jido.Joi.integer(),
+             paid_cents: Jido.Joi.integer() |> Jido.Joi.default(0)
+           })
+  end
+
+  routes do
+    signal_source "/billing/invoice"
+
+    route "invoice.payment.apply", DefineGuide.ApplyPayment, as: :apply_payment
+  end
+end
+```
+
+`use Jido.Agent` accepts these options:
+
+| Option | Meaning | Default |
+| --- | --- | --- |
+| `:name` | Agent name. Required. | none |
+| `:description` | Display text. | `nil` |
+| `:id` | Stable Catalog ID. This is separate from an instance ID. | The module name |
+| `:vsn` | Positive definition version. | `1` |
+| `:metadata` | Static definition data. | `%{}` |
+| `:plugins` | Ordered Plugin modules or `{Plugin, config}` tuples. | `[]` |
+
+The `state`, `routes`, and `topology` sections are optional. Each can occur once.
+
+## Read the definition
+
+A definition is a `Jido.Agent` struct with `nil` for both `id` and `state`. The same struct type holds an instance.
+
+```elixir
+definition = DefineGuide.InvoiceAgent.definition()
+
+true = Jido.Agent.definition?(definition)
+{definition.id, definition.state, definition.vsn}
+```
+
+The cell returns `{nil, nil, 1}`.
+
+## Create an instance
+
+An instance adds a nonempty string `id` and complete `state`. The schema fills in `paid_cents` from its default.
+
+```elixir
+invoice = DefineGuide.InvoiceAgent.instantiate!(id: "inv-1001", state: %{total_cents: 5_000})
+
+true = Jido.Agent.instance?(invoice)
+invoice.state
+```
+
+The cell returns `%{paid_cents: 0, total_cents: 5000}`.
+
+`instantiate/1` accepts only `:id` and `:state`. It returns an error when a value does not satisfy the schema, so a missing `total_cents` stops creation here:
+
+```elixir
+{:error, %Jido.Error.ValidationError{code: code, path: path}} =
+  DefineGuide.InvoiceAgent.instantiate(id: "inv-1002")
+
+{code, path}
+```
+
+The cell returns `{:invalid_state, [:state]}`.
+
+## Run one Turn
+
+The `as: :apply_payment` route option generated `apply_payment_signal/2` and `apply_payment_signal!/2`. They build an input Signal with the route's type and the Agent's `signal_source`. They do not validate or run the target.
+
+```elixir
+{:ok, signal} = DefineGuide.InvoiceAgent.apply_payment_signal(%{amount_cents: 1_500})
+{signal.type, signal.source}
+```
+
+The cell returns `{"invoice.payment.apply", "/billing/invoice"}`.
+
+`cmd/3` runs one Turn and returns the next Agent value with a list of Directives. The source value does not change, and nothing has been saved or dispatched.
+
+```elixir
+{:ok, paid, []} = DefineGuide.InvoiceAgent.cmd(invoice, signal)
+
+{invoice.state.paid_cents, paid.state.paid_cents}
+```
+
+The cell returns `{0, 1500}`.
+
+## Build the same definition from a Map
+
+`Jido.Agent.define!/1` validates a plain Map and returns the same value that the DSL lowers to. The `:module` field records the owning module, so it is set here to make the two values comparable.
+
+```elixir
+from_map =
+  Jido.Agent.define!(%{
+    module: DefineGuide.InvoiceAgent,
+    name: "invoice",
+    description: "Tracks payments for one invoice",
+    schema:
+      Jido.Joi.object(%{
+        total_cents: Jido.Joi.integer(),
+        paid_cents: Jido.Joi.integer() |> Jido.Joi.default(0)
+      }),
+    signal_source: "/billing/invoice",
+    routes: [
+      %{
+        path: "invoice.payment.apply",
+        handler: %{kind: :action, target: DefineGuide.ApplyPayment},
+        as: :apply_payment
+      }
+    ]
+  })
+
+from_map === definition
+```
+
+The cell returns `true`.
+
+A definition without a module has no generated functions. Use the `Jido.Agent` functions directly, and build the Signal with `Jido.Signal.new!/3`.
+
+```elixir
+standalone = %{from_map | module: nil} |> Map.from_struct() |> Jido.Agent.define!()
+
+instance = Jido.Agent.instantiate!(standalone, id: "inv-1003", state: %{total_cents: 900})
+
+payment = Jido.Signal.new!("invoice.payment.apply", %{amount_cents: 900}, source: "/billing/api")
+{:ok, settled, []} = Jido.Agent.cmd(instance, payment)
+
+settled.state.paid_cents
+```
+
+The cell returns `900`.
+
+## Functions the DSL generates
+
+| Function | Result |
+| --- | --- |
+| `definition/0` | The validated definition |
+| `instantiate/1`, `instantiate!/1` | One validated instance |
+| `cmd/3` | One Turn, through `Jido.Agent.cmd/3` |
+| `schema/0` | The complete state schema, including Plugin fields |
+| `vsn/0` | The definition version |
+| `route_executable!/1` | The Action or Flow target for one exact route path |
+| `<as>_signal/2`, `<as>_signal!/2` | An input Signal for a route with `:as` and an exact path |
+
+## Next steps
+
+- [Agent State and Schemas](agent-state-and-schemas.md) covers defaults, initial state, and validation.
+- [Routes and Handlers](build-agent-routes.livemd) covers every route form.
+- [Definitions and Runtime](../core-concepts/definitions-instances-activations.md) explains how a definition becomes a live process.

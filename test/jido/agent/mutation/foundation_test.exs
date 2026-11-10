@@ -1,9 +1,9 @@
 defmodule Jido.Agent.MutationFoundationTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias Jido.Agent.{Composition, Diff}
+  alias Jido.Agent.{Diff, Mutation}
   alias Jido.Agent.Directive, as: D
-  alias JidoTest.AgentEvolutionFixtures, as: F
+  alias Jido.Test.Agent.EvolutionFixtures, as: F
 
   @tag obligation: "jido.agent.I27"
   test "Diff reports exact final values and order for each collection and state" do
@@ -89,9 +89,9 @@ defmodule Jido.Agent.MutationFoundationTest do
     source = F.agent()
     state = %{source.state | count: source.state.count + 1}
 
-    assert {:ok, next} = Composition.apply(source, state, [])
+    assert {:ok, next} = Mutation.apply(source, state, [])
     assert next === %{source | state: state}
-    assert {:ok, ^next} = Composition.bind(next)
+    assert {:ok, ^next} = Mutation.bind(next)
   end
 
   @tag obligation: "jido.agent.I29"
@@ -127,8 +127,8 @@ defmodule Jido.Agent.MutationFoundationTest do
       Agent.define!(%{
         name: "nested",
         schema:
-          Zoi.object(%{
-            nested: Zoi.object(%{value: Zoi.integer() |> Zoi.default(1)}) |> Zoi.default(%{})
+          Jido.Joi.object(%{
+            nested: Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(1)}) |> Jido.Joi.default(%{})
           })
       })
 
@@ -138,19 +138,19 @@ defmodule Jido.Agent.MutationFoundationTest do
   end
 
   @tag obligation: "jido.agent.I27"
-  test "runtime constructors have a separate noun_verb API" do
+  test "domain and runtime constructors have separate noun_verb APIs" do
     alias Jido.AgentServer.Directive, as: R
     signal = Jido.Signal.new!("event", %{}, source: "/test")
 
     for directive <- [
           R.agent_start(F.Worker, :worker),
           R.agent_stop(:worker),
-          R.server_stop(),
+          D.server_stop(),
           R.process_start({Elixir.Agent, fn -> 0 end}),
           R.error_report(:failed),
           R.signal_send(signal, self(), timeout: 100),
-          R.parent_send(signal),
-          R.agent_send(:worker, signal)
+          D.parent_send(signal),
+          D.agent_send(:worker, signal)
         ] do
       assert {:ok, ^directive} = D.validate(directive)
       refute Agent.Mutation.mutation?(directive)
@@ -171,7 +171,7 @@ defmodule Jido.Agent.MutationFoundationTest do
 
     assert %R.AgentStart{name: :worker} = R.agent_start(F.Worker, :worker)
     assert %R.AgentStop{name: :worker} = R.agent_stop(:worker)
-    assert %R.AgentSend{name: :worker} = R.agent_send(:worker, signal)
+    assert %D.AgentSend{name: :worker} = D.agent_send(:worker, signal)
   end
 
   @tag obligation: "jido.agent.I28"
@@ -190,7 +190,7 @@ defmodule Jido.Agent.MutationFoundationTest do
   @tag obligation: "jido.agent.I27"
   test "Diff reports top-level definition changes made by a full upgrade" do
     before = F.agent()
-    schema = Zoi.object(%{count: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0)})
+    schema = Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(0)})
     upgraded = %{before | schema: schema, vsn: 2, metadata: %{source: "upgrade"}}
     assert {:ok, ^upgraded} = Agent.validate(upgraded)
     diff = Diff.between(before, upgraded)

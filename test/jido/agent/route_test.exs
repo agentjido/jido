@@ -1,4 +1,4 @@
-defmodule JidoTest.Agent.RouteTest do
+defmodule Jido.Agent.RouteTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
@@ -12,9 +12,9 @@ defmodule JidoTest.Agent.RouteTest do
     use Jido.Action,
       name: "route_nested_output",
       output_schema:
-        Zoi.object(%{
-          state: Zoi.object(%{count: Zoi.integer()}),
-          reply: Zoi.object(%{details: Zoi.object(%{id: Zoi.integer()})})
+        Jido.Joi.object(%{
+          state: Jido.Joi.object(%{count: Jido.Joi.integer()}),
+          reply: Jido.Joi.object(%{details: Jido.Joi.object(%{id: Jido.Joi.integer()})})
         })
 
     def run(_params, _context), do: {:ok, %{}}
@@ -24,9 +24,9 @@ defmodule JidoTest.Agent.RouteTest do
     use Jido.Action,
       name: "route_struct_output",
       output_schema:
-        Zoi.struct(OutputStruct, %{
-          id: Zoi.integer(),
-          details: Zoi.object(%{"label" => Zoi.string()})
+        Jido.Joi.struct(OutputStruct, %{
+          id: Jido.Joi.integer(),
+          details: Jido.Joi.object(%{"label" => Jido.Joi.string()})
         })
 
     def run(_params, _context), do: {:ok, %OutputStruct{}}
@@ -40,7 +40,7 @@ defmodule JidoTest.Agent.RouteTest do
   defmodule AmbiguousOutput do
     use Jido.Action,
       name: "route_ambiguous_output",
-      output_schema: Zoi.object([{:id, Zoi.integer()}, {"id", Zoi.string()}])
+      output_schema: Jido.Joi.object([{:id, Jido.Joi.integer()}, {"id", Jido.Joi.string()}])
 
     def run(_params, _context), do: {:ok, %{}}
   end
@@ -49,7 +49,7 @@ defmodule JidoTest.Agent.RouteTest do
     use Jido.Agent, name: "route_default_state"
 
     routes do
-      route "work.run", JidoTest.Agent.RouteTest.RootOutput
+      route "work.run", Jido.Agent.RouteTest.RootOutput
     end
   end
 
@@ -142,33 +142,33 @@ defmodule JidoTest.Agent.RouteTest do
           %{source: :output, path: [0]},
           %{source: :output, path: [:state], callback: &Function.identity/1}
         ] do
-      assert {:error, %Agent.Error{path: [:state | _]}} =
+      assert {:error, %Jido.Error.ValidationError{path: [:state | _]}} =
                Route.normalize(%{base | state: state}, false)
     end
 
-    assert {:error, %Agent.Error{code: :unknown_fields, path: [:reply]}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unknown_fields, path: [:reply]}} =
              Route.normalize(
                Map.put(base, :reply, %{
                  type: "work.done",
                  from: %{source: :output, path: []},
-                 schema: Zoi.any()
+                 schema: Jido.Joi.any()
                }),
                false
              )
 
-    assert {:error, %Agent.Error{code: :missing_fields, path: [:reply]}} =
+    assert {:error, %Jido.Error.ValidationError{code: :missing_fields, path: [:reply]}} =
              Route.normalize(Map.put(base, :reply, %{type: "work.done"}), false)
   end
 
   test "related normalization rejects unresolved and ambiguous schema paths" do
-    assert {:error, %Agent.Error{code: :unknown_output_field, path: [:state, :path, 1]}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unknown_output_field, path: [:state, :path, 1]}} =
              Route.normalize(%{
                path: "work.run",
                handler: %{kind: :action, target: NestedOutput},
                state: %{source: :output, path: ["state", "missing"]}
              })
 
-    assert {:error, %Agent.Error{code: :ambiguous_output_field, path: [:state, :path, 0]}} =
+    assert {:error, %Jido.Error.ValidationError{code: :ambiguous_output_field, path: [:state, :path, 0]}} =
              Route.normalize(%{
                path: "work.run",
                handler: %{kind: :action, target: AmbiguousOutput},
@@ -178,7 +178,7 @@ defmodule JidoTest.Agent.RouteTest do
     fresh_name = "route_missing_#{System.unique_integer([:positive])}"
     assert_raise ArgumentError, fn -> String.to_existing_atom(fresh_name) end
 
-    assert {:error, %Agent.Error{code: :unknown_output_field}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unknown_output_field}} =
              Route.normalize(%{
                path: "work.run",
                handler: %{kind: :action, target: NestedOutput},
@@ -203,12 +203,12 @@ defmodule JidoTest.Agent.RouteTest do
     assert {:ok, %{state: :unchanged, reply: nil}} = Route.normalize(transform)
 
     for route <- [forward, transform] do
-      assert {:error, %Agent.Error{code: :terminal_state, path: [:state]}} =
+      assert {:error, %Jido.Error.ValidationError{code: :terminal_state, path: [:state]}} =
                route
                |> Map.put(:state, %{source: :output, path: []})
                |> Route.normalize()
 
-      assert {:error, %Agent.Error{code: :terminal_reply, path: [:reply]}} =
+      assert {:error, %Jido.Error.ValidationError{code: :terminal_reply, path: [:reply]}} =
                route
                |> Map.put(:reply, %{type: "work.done", from: %{source: :output, path: []}})
                |> Route.normalize()
@@ -228,7 +228,7 @@ defmodule JidoTest.Agent.RouteTest do
       ]
     }
 
-    assert {:error, %Agent.Error{code: :reply_source_required, path: [:signal_source]}} =
+    assert {:error, %Jido.Error.ValidationError{code: :reply_source_required, path: [:signal_source]}} =
              Agent.define(definition)
 
     assert {:ok, %{routes: [%{reply: %{from: %{path: [:reply]}}}]}} =

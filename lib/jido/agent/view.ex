@@ -8,16 +8,18 @@ defmodule Jido.Agent.View do
   Agent state, metadata, schema values, Plugin options, route defaults, or
   route match functions.
 
-  The caller must supply a `Jido.Authoring.Registry`. The view uses stable
-  Registry identifiers for the Agent type and included route targets. It does
+  The caller must supply a `Jido.Catalog`. The view uses stable Catalog
+  identifiers for the Agent type and included route targets. It does
   not expose modules or create identifiers from module names.
 
   `project/3` does not start or contact an Agent process.
   """
 
   alias Jido.Agent
-  alias Jido.Agent.{Authoring, Codec}
-  alias Jido.Authoring.{Document, Registry}
+  alias Jido.Agent.Schema
+  alias Jido.Catalog
+  alias Jido.Agent.Codec, as: AgentCodec
+  alias Jido.Codec.{Document, Reference}
 
   @default_operation_limit 100
   @maximum_operation_limit 500
@@ -31,18 +33,17 @@ defmodule Jido.Agent.View do
   The `:operation_limit` option is between 0 and 500. Its default is 100.
   The result reports the total operation count when the list is truncated.
   """
-  @spec project(Agent.t() | module(), Registry.t() | map(), keyword()) ::
+  @spec project(Agent.t() | module(), Catalog.t(), keyword()) ::
           {:ok, projection()} | {:error, term()}
-  def project(source, registry, opts \\ []) do
-    with {:ok, opts} <- Authoring.attrs(opts),
-         :ok <- Authoring.keys(opts, [:operation_limit]),
+  def project(source, %Catalog{} = catalog, opts \\ []) do
+    with {:ok, opts} <- Schema.attrs(opts),
+         :ok <- Schema.keys(opts, [:operation_limit]),
          {:ok, limit} <-
            limit(Map.get(opts, :operation_limit, @default_operation_limit)),
-         {:ok, registry} <- Registry.new(registry),
          {:ok, agent} <- definition(source),
-         {:ok, agent_type} <- agent_type(agent.module, registry),
-         {:ok, schema} <- Registry.encode_reference(registry, :schema, agent.schema),
-         {:ok, operations} <- operations(agent.routes, registry, limit),
+         {:ok, agent_type} <- agent_type(agent.module, catalog),
+         {:ok, schema} <- Reference.encode(catalog, :schema, agent.schema),
+         {:ok, operations} <- operations(agent.routes, catalog, limit),
          view <- build(agent, agent_type, schema, operations),
          :ok <- Document.check(view) do
       {:ok, view}
@@ -50,7 +51,7 @@ defmodule Jido.Agent.View do
   end
 
   defp agent_type(nil, _registry), do: {:ok, nil}
-  defp agent_type(module, registry), do: Registry.encode_reference(registry, :agent, module)
+  defp agent_type(module, catalog), do: Reference.encode(catalog, :agent, module)
 
   defp definition(%Agent{} = agent) do
     Agent.validate(agent)
@@ -61,7 +62,7 @@ defmodule Jido.Agent.View do
   end
 
   defp definition(_source),
-    do: Authoring.error("Expected an Agent definition, instance, or module")
+    do: Schema.authoring_error("Expected an Agent definition, instance, or module")
 
   defp operations(routes, registry, limit) do
     total = length(routes)
@@ -69,7 +70,7 @@ defmodule Jido.Agent.View do
     with {:ok, items} <-
            routes
            |> Enum.take(limit)
-           |> Authoring.traverse(&encode_route(&1, registry)) do
+           |> Schema.traverse(&encode_route(&1, registry)) do
       {:ok, %{"items" => items, "total" => total, "truncated" => total > limit}}
     end
   end
@@ -79,12 +80,12 @@ defmodule Jido.Agent.View do
     with {:ok, operation} <-
            route
            |> Map.put(:defaults, %{})
-           |> Codec.encode_route(registry, &encode_reference/3),
+           |> AgentCodec.encode_route(registry, &encode_reference/3),
          do: {:ok, Map.delete(operation, "defaults")}
   end
 
   defp encode_reference(target, registry, kind),
-    do: Registry.encode_reference(registry, kind, target)
+    do: Reference.encode(registry, kind, target)
 
   defp build(agent, agent_type, schema, operations) do
     %{
@@ -106,7 +107,5 @@ defmodule Jido.Agent.View do
 
   defp limit(_value),
     do:
-      Authoring.error(
-        "Agent view operation_limit must be an integer from 0 through #{@maximum_operation_limit}"
-      )
+      Schema.authoring_error("Agent view operation_limit must be an integer from 0 through #{@maximum_operation_limit}")
 end

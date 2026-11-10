@@ -1,0 +1,220 @@
+# References and Data
+
+Run this Livebook to learn how a Flow reads its input, context, and earlier results, and where each reference is valid. Run the cells from top to bottom.
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## A small Action to read from
+
+Each example uses this Action, which returns its parameters unchanged.
+
+```elixir
+defmodule FlowRefs.Echo do
+  use Jido.Action, name: "flow_refs_echo"
+
+  @impl true
+  def run(params, _context), do: {:ok, params}
+end
+```
+
+## Read input, context, and results
+
+These three references work anywhere in a Flow. Each takes an optional path. With no path, `input()` and `context()` read the whole value, and `result("name")` reads the whole result.
+
+```elixir
+defmodule FlowRefs.Sources do
+  use Jido.Flow, name: "flow_refs_sources"
+
+  flow do
+    step "load",
+      action: FlowRefs.Echo,
+      params: %{order_id: input(:order_id), tenant: context(:tenant)}
+
+    output %{
+      whole_input: input(),
+      field: input(:order_id),
+      whole_result: result("load"),
+      tenant: result("load", :tenant)
+    }
+  end
+end
+
+{:ok, output} = Jido.Exec.run(FlowRefs.Sources, %{order_id: 42}, %{tenant: "acme"})
+
+%{
+  whole_input: %{order_id: 42},
+  field: 42,
+  whole_result: %{order_id: 42, tenant: "acme"},
+  tenant: "acme"
+} = output
+```
+
+A `result` reference also creates a dependency. See [Flow Dependencies](flow-dependencies.livemd).
+
+## Follow a path
+
+A path is one atom, string, or integer, or a list of them. Integers index lists from zero.
+
+```elixir
+defmodule FlowRefs.Paths do
+  use Jido.Flow, name: "flow_refs_paths"
+
+  flow do
+    step "load", action: FlowRefs.Echo, params: %{order: input(:order)}
+
+    output %{
+      first_sku: result("load", [:order, :lines, 0, :sku]),
+      city: input([:order, :address, "city"]),
+      selected: select(result("load"), [:order, :id])
+    }
+  end
+end
+
+order = %{id: 7, lines: [%{sku: "A-1"}], address: %{"city" => "Oslo"}}
+
+{:ok, %{first_sku: "A-1", city: "Oslo", selected: 7}} =
+  Jido.Exec.run(FlowRefs.Paths, %{order: order})
+```
+
+`select(source, path)` appends a path to a reference. It is equivalent to writing the full path. Its first argument must be a reference, so it cannot select from a calculation.
+
+An atom segment also finds a string key with the same name, which helps with decoded JSON. A string segment finds only a string key.
+
+```elixir
+defmodule FlowRefs.StringKeys do
+  use Jido.Flow, name: "flow_refs_string_keys"
+
+  flow do
+    step "load", action: FlowRefs.Echo, params: %{id: input(:id)}
+    output result("load")
+  end
+end
+
+{:ok, %{id: 3}} = Jido.Exec.run(FlowRefs.StringKeys, %{"id" => 3})
+```
+
+## Missing data is an error
+
+A reference never resolves to `nil` because a key is absent. A missing key fails the component with a structured error. A key whose value is `nil` resolves to `nil`.
+
+```elixir
+{:error, %Jido.Error.ExecutionError{message: message, details: details}} =
+  Jido.Exec.run(FlowRefs.StringKeys, %{other: 1})
+
+"flow reference path does not exist" = message
+%{reason: :missing_key, segment: :id, ref_type: :input} = details
+
+{:ok, %{id: nil}} = Jido.Exec.run(FlowRefs.StringKeys, %{id: nil})
+```
+
+The `reason` can also be `:missing_index` for a list index past the end, or `:not_traversable` for a path into a scalar. To handle absent data, give the field a default in the Flow's `schema`, which applies before any reference resolves. See [Schemas and Validation](../actions/schemas-validation.md).
+
+```elixir
+defmodule FlowRefs.Defaulted do
+  use Jido.Flow,
+    name: "flow_refs_defaulted",
+    schema: Jido.Joi.object(%{currency: Jido.Joi.string() |> Jido.Joi.default("EUR")})
+
+  flow do
+    step "load", action: FlowRefs.Echo, params: %{currency: input(:currency)}
+    output result("load")
+  end
+end
+
+{:ok, %{currency: "EUR"}} = Jido.Exec.run(FlowRefs.Defaulted, %{})
+```
+
+## Write literal data
+
+A Flow value can mix references with literal atoms, numbers, strings, lists, and maps. Maps and lists can nest references to any depth. Tuples and function calls are not Flow values.
+
+```elixir
+defmodule FlowRefs.Literals do
+  use Jido.Flow, name: "flow_refs_literals"
+
+  flow do
+    step "build",
+      action: FlowRefs.Echo,
+      params: %{
+        kind: :invoice,
+        tags: ["billing", input(:tag)],
+        customer: %{id: input(:customer_id), active: true},
+        adjustment: -5,
+        fixed: value(%{input: "stays literal"})
+      }
+
+    output result("build")
+  end
+end
+
+{:ok,
+ %{
+   kind: :invoice,
+   tags: ["billing", "urgent"],
+   customer: %{id: 9, active: true},
+   adjustment: -5,
+   fixed: %{input: "stays literal"}
+ }} = Jido.Exec.run(FlowRefs.Literals, %{tag: "urgent", customer_id: 9})
+```
+
+`value/1` marks its argument as literal data, with no references or expressions inside it.
+
+A complete Flow value can have up to 256 levels and 100,000 nodes. An expression inside it uses the smaller limits in [Expressions](flow-expressions.md#resource-limits).
+
+## References with local scope
+
+Some references exist only inside one field of one component. The compiler rejects them elsewhere with "flow expression contains a scoped ref outside its valid scope".
+
+| Reference | Valid in | Value |
+| --- | --- | --- |
+| `item(path)` | Map and Reduce `params` | The current item. |
+| `item_index()` | Map and Reduce `params` | The zero-based position of the item. |
+| `item_id()` | Map and Reduce `params` | A runtime identifier for this item. |
+| `accumulator(path)` | Reduce `params` | The current accumulator. |
+| `state(path)` | Iterate `params`, `update`, and `while` | The current State. |
+| `iteration_index()` | Iterate `params`, `update`, and `while` | The zero-based index of the current call. |
+| `body_result(path)` | Iterate `params`, `update`, and `while` | The latest body result, or `nil` before the first call. |
+
+These references are not valid in a Map or Reduce `collection`, a Reduce `initial`, or an Iterate `state` `initial`. Those fields can use `input`, `context`, and `result`.
+
+```elixir
+defmodule FlowRefs.Scoped do
+  use Jido.Flow, name: "flow_refs_scoped"
+
+  flow do
+    map "lines",
+      collection: input(:lines),
+      action: FlowRefs.Echo,
+      params: %{sku: item(:sku), position: item_index()}
+
+    output %{lines: result("lines")}
+  end
+end
+
+{:ok, %{lines: [%{sku: "A-1", position: 0}, %{sku: "B-2", position: 1}]}} =
+  Jido.Exec.run(FlowRefs.Scoped, %{lines: [%{sku: "A-1"}, %{sku: "B-2"}]})
+```
+
+[Map and Reduce](flow-collections.md) and [Iterate and State](flow-iterate-state.md) show these references in full.
+
+## Build references as data
+
+Inside `flow do`, the reference names are DSL forms. Outside the DSL, such as in a map definition, use the functions on `Jido.Flow.Ref`.
+
+```elixir
+ref = Jido.Flow.Ref.result("load", [:order, :id])
+
+%Jido.Flow.Ref{source: :result, component: "load", path: [:order, :id]} = ref
+%Jido.Flow.Ref{path: [:order, :id, :raw]} = Jido.Flow.Ref.select(ref, :raw)
+```
+
+See [Authoring Runtime Data](../flow-data/authoring-runtime-data.md) for complete data definitions.
+
+## Next steps
+
+- [Expressions](flow-expressions.md) covers calculations and conditions over references.
+- [Flow Dependencies](flow-dependencies.livemd) shows how `result` shapes execution order.

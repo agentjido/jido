@@ -1,56 +1,48 @@
-# Jido V3 examples
+# Jido example catalog
 
-The stable catalog has 75 executable examples in 10 groups. Original
-example numbers stay unchanged. Stable examples teach the current local runtime
-contract; research entries state unsupported behavior.
+All example chapters are direct children of this folder. A chapter contains
+its numbered lessons and local support files. There are no domain folders
+between `examples/` and a chapter.
 
-The [durable Flow proposals](11_durable/README.md#proposed-lessons) reserve
-11_08–11_19 as README-only spikes. They are not part of the executable count.
+| Chapter | Area | Lessons |
+| --- | --- | ---: |
+| [`00_quick_start`](00_quick_start/README.md) | Graph-first AI, including one opt-in live lesson | 3 |
+| [`01_agent_basics`](01_agent_basics/README.md) | Agent basics | 8 |
+| [`02_flow_authoring`](02_flow_authoring/README.md) | Flow definitions, DSL, and JSON | 8 |
+| [`03_flow_execution`](03_flow_execution/README.md) | Flow execution | 15 |
+| [`04_agent_workflows`](04_agent_workflows/README.md) | Agent workflows | 9 |
+| [`05_flow_durability`](05_flow_durability/README.md) | Durable Flow runs | 6 |
+| [`06_flow_patterns`](06_flow_patterns/README.md) | Flow patterns | 3 |
+| [`07_flow_distribution`](07_flow_distribution/README.md) | Distributed Flow work | 0 |
+| [`08_runtime`](08_runtime/README.md) | Agent runtime | 15 |
+| [`09_multi_agent`](09_multi_agent/README.md) | Multi-Agent runtime | 3 |
+| [`10_topologies`](10_topologies/README.md) | Agent topologies | 6 |
+| [`11_plugins`](11_plugins/README.md) | Plugin mechanics | 8 |
+| [`12_plugin_applications`](12_plugin_applications/README.md) | Plugin applications | 5 |
+| [`13_persistence`](13_persistence/README.md) | Persistence | 8 |
+| [`14_durable_agents`](14_durable_agents/README.md) | Durable Agents | 7 |
+| [`15_ai_basics`](15_ai_basics/README.md) | AI basics | 9 |
+| [`16_ai_conversations`](16_ai_conversations/README.md) | AI conversations and sessions | 5 |
 
-| Group | Examples | Source and tests |
-| --- | ---: | --- |
-| 01_basic | 8 | [Source](01_basic/README.md), [tests](../test/examples/01_basic/README.md) |
-| 02_workflow | 9 | [Source](02_workflow/README.md), [tests](../test/examples/02_workflow/README.md) |
-| 03_llm | 6 | [Source](03_llm/README.md), [tests](../test/examples/03_llm/README.md) |
-| 04_runtime | 15 | [Source](04_runtime/README.md), [tests](../test/examples/04_runtime/README.md) |
-| 05_multi_agent | 3 | [Source](05_multi_agent/README.md), [tests](../test/examples/05_multi_agent/README.md) |
-| 07_topology | 6 | [Source](07_topology/README.md), [tests](../test/examples/07_topology/README.md) |
-| 08_applications | 5 | [Source](08_applications/README.md), [tests](../test/examples/08_applications/README.md) |
-| 09_plugins | 8 | [Source](09_plugins/README.md), [tests](../test/examples/09_plugins/README.md) |
-| 10_persistence | 8 | [Source](10_persistence/README.md), [tests](../test/examples/10_persistence/README.md) |
-| 11_durable | 7 | [Source](11_durable/README.md), [tests](../test/examples/11_durable/README.md) |
+The offline catalog has 117 lessons. The graph-first chapter also has one
+opt-in live-provider lesson. Each chapter README lists its lessons in order.
 
-## Choose a path
+The machine-readable register is
+[`test/examples/catalog.yml`](../test/examples/catalog.yml). It is the source
+of truth for example IDs, categories, source files, README files, and paired
+tests.
 
-- **Start here:** [Minimal Agent](01_basic/01_01_minimal_agent/README.md), [typed input](01_basic/01_02_typed_command_agent/README.md), [route selection](01_basic/01_06_route_selection/README.md), [owned state](01_basic/01_03_plugin_state_agent/README.md), then [request modes](04_runtime/04_15_request_modes/README.md).
-- **Author from data:** [saved JSON and Scheduler](01_basic/01_07_data_defined_agent/README.md), [authoring Plugin](01_basic/01_09_authoring_plugin/README.md), [Plugin DSL structure](09_plugins/09_10_plugin_dsl/README.md), then [JSON topology](07_topology/07_01_independent/README.md).
-- **Recover work:** [persistent Agent](10_persistence/10_01_persistent_agent/README.md), [hibernate and thaw](10_persistence/10_02_hibernate_and_thaw/README.md), [saved Flow progress](11_durable/11_02_saved_progress/README.md), then [durable approval waits](11_durable/11_06_durable_wait/README.md).
+Each supported offline example has one catalog entry, one README, one primary
+source file, and one paired test. Auxiliary source files are in the same
+entry. The catalog rejects unregistered files, nested domain folders, invalid
+chapter or lesson numbers, and entries that are not sorted by ID. Each entry
+also names the component whose canonical behavior the lesson supplements.
 
-Use [dynamic child lifecycle](05_multi_agent/05_01_child_lifecycle/README.md)
-when a Turn decides to create a child. Use [declared topology](07_topology/README.md)
-when composition belongs to the Agent definition. The optional
-[LLM path](03_llm/README.md) uses example-owned model ports. It does not prove
-compatibility with the current `jido_ai` API.
-
-The [coverage register](COVERAGE.md) maps capabilities to evidence.
-The [research catalog](99_research/README.md) states unsupported contracts.
-
-Factory and Elastic Group moved to
-[application demonstrations](../../examples/jido_lab/experiments/jido_core/README.md).
-Those retained applications need separate API updates and are not loaded here.
-LLM examples use deterministic adapters and test Agent integration; model
-behavior belongs to `jido_ai`.
+Run all offline examples with:
 
 ```sh
-mix test
-mix test test/examples/01_basic/01_01_minimal_agent --include example --seed 0
 mix test.examples
 ```
 
-The example test loader compiles all `.ex` example sources before running a
-selected test. One source failure can therefore block another example.
-Use the tests as executable evidence; a passing suite does not replace the
-coverage register or each lesson’s stated limits.
-
-The Hex package excludes examples and tests. Production compiles `lib/` only.
-See [testing](../guides/test-jido-systems.livemd) for test categories and optional services.
+Provider and external-service examples are not part of the offline catalog.
+They must have an explicit exclusion or use the opt-in live or service suite.

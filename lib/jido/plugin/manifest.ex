@@ -2,6 +2,7 @@ defmodule Jido.Plugin.Manifest do
   @moduledoc false
 
   alias Jido.Error
+  alias Jido.Joi
 
   @owners [:agent, :agent_server, :persistence]
 
@@ -145,13 +146,13 @@ defmodule Jido.Plugin.Manifest do
     do: invalid("Plugin option mapping must be a map", %{option_keys: option_keys})
 
   defp validate_static_options(options) do
-    case Jido.Authoring.validate_static(options) do
+    case Joi.validate_static(options) do
       :ok ->
         :ok
 
       {:error, reason} ->
         invalid("Plugin declaration options must be static data", %{
-          reason: Exception.message(reason)
+          reason: reason
         })
     end
   end

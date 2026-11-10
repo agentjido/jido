@@ -28,8 +28,7 @@ defmodule Jido.Agent.DirectCommandTest do
           {:continue, %{amount: 4}, Jido.Agent.DirectCommandTest.Update}
 
         _ ->
-          {:ok,
-           %{context.agent_state | count: context.agent_state.count + Map.get(input, :amount, 1)},
+          {:ok, %{context.agent_state | count: context.agent_state.count + Map.get(input, :amount, 1)},
            Map.get(input, :directives, [])}
       end
     end
@@ -39,9 +38,9 @@ defmodule Jido.Agent.DirectCommandTest do
     use Jido.Agent, name: "direct"
 
     state do
-      schema Zoi.object(%{
-               count: Zoi.integer() |> Zoi.default(0),
-               label: Zoi.string() |> Zoi.default("same")
+      schema Jido.Joi.object(%{
+               count: Jido.Joi.integer() |> Jido.Joi.default(0),
+               label: Jido.Joi.string() |> Jido.Joi.default("same")
              })
     end
 
@@ -62,7 +61,7 @@ defmodule Jido.Agent.DirectCommandTest do
   defmodule Flow do
     use Jido.Flow,
       name: "direct_agent_flow",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     flow do
       step "update",
@@ -84,7 +83,7 @@ defmodule Jido.Agent.DirectCommandTest do
 
   defmodule Owned do
     use Jido.Plugin, id: "test.direct.owned"
-    def state_spec(_), do: {:owned, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
 
     def reduce(reduction, _opts) do
       send(self(), :reduced)
@@ -116,9 +115,9 @@ defmodule Jido.Agent.DirectCommandTest do
       name: "direct",
       signal_source: "/direct",
       schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0),
-          label: Zoi.string() |> Zoi.default("same")
+        Jido.Joi.object(%{
+          count: Jido.Joi.integer() |> Jido.Joi.default(0),
+          label: Jido.Joi.string() |> Jido.Joi.default("same")
         }),
       routes: routes,
       plugins: extensions
@@ -136,9 +135,9 @@ defmodule Jido.Agent.DirectCommandTest do
       module: Leaf,
       signal_source: "/direct",
       schema:
-        Zoi.object(%{
-          count: Zoi.integer() |> Zoi.default(0),
-          label: Zoi.string() |> Zoi.default("same")
+        Jido.Joi.object(%{
+          count: Jido.Joi.integer() |> Jido.Joi.default(0),
+          label: Jido.Joi.string() |> Jido.Joi.default("same")
         }),
       routes: [action("work")],
       topology: %{agents: [], connections: []}
@@ -209,7 +208,7 @@ defmodule Jido.Agent.DirectCommandTest do
           %{mode: :invalid},
           %{mode: :partial},
           %{directives: :bad},
-          %{directives: [Jido.AgentServer.Directive.server_stop() | :bad]},
+          %{directives: [Jido.Agent.Directive.server_stop() | :bad]},
           %{directives: [%UnknownDirective{}]},
           %{directives: [%{unknown: true}]},
           %{directives: [%Directive.Emit{signal: :bad}]},
@@ -363,7 +362,7 @@ defmodule Jido.Agent.DirectCommandTest do
 end
 
 defmodule Jido.Agent.ReplyDirectiveRuntimeTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent.DirectCommandTest.Leaf
   alias Jido.Agent.Directive
@@ -373,7 +372,7 @@ defmodule Jido.Agent.ReplyDirectiveRuntimeTest do
   test "live runtime delivers Reply to the current requester after commit", %{
     jido: jido
   } do
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, Leaf)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, Leaf)
     request = Signal.new!("work", %{}, source: "/test")
     output = Signal.new!("work.reply", %{}, source: "/direct")
     {:ok, output} = Signal.put_context(output, "jidocausationid", request.id)
@@ -384,7 +383,7 @@ defmodule Jido.Agent.ReplyDirectiveRuntimeTest do
     assert_receive %Signal{id: output_id, type: "work.reply", data: %{}} = delivered
     assert output_id == output.id
     assert Signal.get_context(delivered, "jidocausationid") == request.id
-    assert Signal.Trace.get(delivered) != nil
+    assert Signal.Context.get_trace(delivered) != nil
     assert AgentServer.status(server).state_version == 1
     assert AgentServer.agent(server) == committed
   end

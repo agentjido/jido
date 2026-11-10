@@ -7,7 +7,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
   defmodule Select do
     use Jido.Action,
       name: "plugin_route_selection_select",
-      schema: Zoi.object(%{selected: Zoi.atom()})
+      schema: Jido.Joi.object(%{selected: Jido.Joi.atom()})
 
     @impl true
     def run(%{selected: selected}, context) do
@@ -21,8 +21,8 @@ defmodule Jido.Plugin.RouteSelectionTest do
     @impl true
     def state_spec(_opts) do
       schema =
-        Zoi.object(%{route: Zoi.atom() |> Zoi.default(:left)})
-        |> Zoi.default(%{route: :left})
+        Jido.Joi.object(%{route: Jido.Joi.atom() |> Jido.Joi.default(:left)})
+        |> Jido.Joi.default(%{route: :left})
 
       {:selector, schema}
     end
@@ -75,7 +75,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
       plugins: [StatefulSelector]
 
     state do
-      schema Zoi.object(%{selected: Zoi.atom() |> Zoi.default(:none)})
+      schema Jido.Joi.object(%{selected: Jido.Joi.atom() |> Jido.Joi.default(:none)})
     end
 
     routes do
@@ -92,7 +92,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
       plugins: [DefaultSelector]
 
     state do
-      schema Zoi.object(%{selected: Zoi.atom() |> Zoi.default(:none)})
+      schema Jido.Joi.object(%{selected: Jido.Joi.atom() |> Jido.Joi.default(:none)})
     end
 
     routes do
@@ -109,7 +109,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
       plugins: [MissingSelector]
 
     state do
-      schema Zoi.object(%{selected: Zoi.atom() |> Zoi.default(:none)})
+      schema Jido.Joi.object(%{selected: Jido.Joi.atom() |> Jido.Joi.default(:none)})
     end
 
     routes do
@@ -124,7 +124,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
     use Jido.Agent, name: "plugin_ordered_route_selection"
 
     state do
-      schema Zoi.object(%{selected: Zoi.atom() |> Zoi.default(:none)})
+      schema Jido.Joi.object(%{selected: Jido.Joi.atom() |> Jido.Joi.default(:none)})
     end
 
     routes do
@@ -141,7 +141,7 @@ defmodule Jido.Plugin.RouteSelectionTest do
       plugins: [WildcardSelector]
 
     state do
-      schema Zoi.object(%{selected: Zoi.atom() |> Zoi.default(:none)})
+      schema Jido.Joi.object(%{selected: Jido.Joi.atom() |> Jido.Joi.default(:none)})
     end
 
     routes do

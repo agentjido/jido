@@ -1,5 +1,5 @@
 defmodule Jido.Agent.FlowExpressionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.Flow.Ref
@@ -7,7 +7,7 @@ defmodule Jido.Agent.FlowExpressionTest do
   defmodule Amount do
     use Jido.Action,
       name: "expression_amount",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     def run(input, _context), do: {:ok, input}
   end
@@ -15,7 +15,7 @@ defmodule Jido.Agent.FlowExpressionTest do
   defmodule Add do
     use Jido.Flow,
       name: "expression_add",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     flow do
       step "amount", action: Amount, params: %{amount: min(input(:amount), 5)}
@@ -27,7 +27,7 @@ defmodule Jido.Agent.FlowExpressionTest do
     use Jido.Agent, name: "expression_counter"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -61,11 +61,11 @@ defmodule Jido.Agent.FlowExpressionTest do
 
     assert {:ok, flow} = flow
     assert flow == Add.flow()
-    assert %Jido.Expr{} = flow.output.count
+    assert %Jido.Expr.Operation{} = flow.output.count
     assert {:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow)
 
     flow_registry =
-      Jido.Authoring.Registry.new!(%{
+      Jido.Catalog.from_targets!(__MODULE__, :jido, %{
         {"actions/amount", 1} => {:action, Amount},
         {"schemas/input", 1} => {:schema, flow.schema},
         {"schemas/output", 1} => {:schema, flow.output_schema},
@@ -74,11 +74,11 @@ defmodule Jido.Agent.FlowExpressionTest do
         {"atoms/count", 1} => {:atom, :count}
       })
 
-    flow_opts = [registry: flow_registry, codec: Jido.Flow.Codec]
-    assert {:ok, flow_document} = Jido.Authoring.encode(flow, flow_opts)
+    flow_opts = [catalog: flow_registry, codec: Jido.Flow.Codec]
+    assert {:ok, flow_document} = Jido.Codec.encode(flow, flow_opts)
 
     assert {:ok, ^flow} =
-             Jido.Authoring.decode(JSON.decode!(JSON.encode!(flow_document)), flow_opts)
+             Jido.Codec.decode(JSON.decode!(JSON.encode!(flow_document)), flow_opts)
 
     for target <- [Add] do
       definition =
@@ -95,14 +95,14 @@ defmodule Jido.Agent.FlowExpressionTest do
           ]
         })
 
-      registry = JidoTest.AgentRegistry.for(definition)
-      assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+      registry = Jido.Test.AgentServer.Registry.for(definition)
+      assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
 
       assert {:ok, decoded} =
-               JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
+               Jido.Test.AgentServer.Registry.decode(JSON.decode!(JSON.encode!(document)), registry)
 
       assert decoded == definition
-      instance = Agent.instantiate!(decoded, id: Jido.Signal.ID.generate!(), state: %{count: 10})
+      instance = Agent.instantiate!(decoded, id: Jido.Id.uuid7(), state: %{count: 10})
 
       {:ok, command_signal_1} = Counter.add_signal(%{})
 
@@ -139,9 +139,9 @@ defmodule Jido.Agent.FlowExpressionTest do
         })
 
       instance =
-        Agent.instantiate!(definition, id: Jido.Signal.ID.generate!(), state: %{count: 10})
+        Agent.instantiate!(definition, id: Jido.Id.uuid7(), state: %{count: 10})
 
-      {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, instance)
+      {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, instance)
 
       {:ok, route_signal_1} = Counter.add_signal(%{amount: 9})
 
@@ -177,13 +177,13 @@ defmodule Jido.Agent.FlowExpressionTest do
       })
 
     instance = Agent.instantiate!(definition, id: unique_id(), state: %{count: 10})
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, instance)
-    before = JidoTest.AgentServerAssertions.committed(server)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, instance)
+    before = Jido.Test.AgentServer.Assertions.committed(server)
     {:ok, input} = Counter.add_signal(%{})
     assert {:error, error} = Agent.cmd(instance, input)
     assert is_exception(error)
     assert {:error, _} = Jido.AgentServer.call(server, input)
-    assert JidoTest.AgentServerAssertions.committed(server) == before
+    assert Jido.Test.AgentServer.Assertions.committed(server) == before
     assert instance.state == %{count: 10}
 
     assert {:error, _} =

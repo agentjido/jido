@@ -13,7 +13,7 @@ defmodule Jido.Persistence.Mnesia do
   write error as indeterminate, so a record owner must reload before retrying.
   """
 
-  @behaviour Jido.Persistence.Adapter
+  @behaviour Jido.Persistence.Store
 
   @impl true
   @spec validate_options(keyword()) :: :ok | {:error, term()}

@@ -1,0 +1,221 @@
+# Flow Dependencies
+
+Run this Livebook to see how Jido derives execution order from your Flow, and how to add order where no data moves. Run the cells from top to bottom.
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Record what runs
+
+This Action sends a message when it starts and when it finishes, so the examples can observe order. The calling process passes itself through context.
+
+```elixir
+defmodule FlowDeps.Work do
+  use Jido.Action, name: "flow_deps_work"
+
+  @impl true
+  def run(%{name: name} = params, %{observer: observer}) do
+    send(observer, {:started, name})
+    send(observer, {:finished, name})
+    {:ok, Map.put(params, :done, true)}
+  end
+end
+
+defmodule FlowDeps.Events do
+  def drain(events \\ []) do
+    receive do
+      event -> drain([event | events])
+    after
+      0 -> Enum.reverse(events)
+    end
+  end
+end
+```
+
+## Data creates order
+
+A `result` reference makes one component depend on another. Source order does not matter. Here `"save"` appears first, but it reads from `"load"`, so `"load"` runs first.
+
+```elixir
+defmodule FlowDeps.ByData do
+  use Jido.Flow, name: "flow_deps_by_data"
+
+  flow do
+    step "save",
+      action: FlowDeps.Work,
+      params: %{name: "save", order: result("load", :name)}
+
+    step "load", action: FlowDeps.Work, params: %{name: "load"}
+
+    output result("save")
+  end
+end
+
+{:ok, %{name: "save", order: "load"}} =
+  Jido.Exec.run(FlowDeps.ByData, %{}, %{observer: self()})
+
+[
+  {:started, "load"},
+  {:finished, "load"},
+  {:started, "save"},
+  {:finished, "save"}
+] = FlowDeps.Events.drain()
+```
+
+## `needs` adds order without data
+
+Use `needs` when a component must run after another but does not read its result. It takes one name or a list of names, on any component kind.
+
+```elixir
+defmodule FlowDeps.ByNeeds do
+  use Jido.Flow, name: "flow_deps_by_needs"
+
+  flow do
+    step "reserve", action: FlowDeps.Work, params: %{name: "reserve"}
+    step "audit", action: FlowDeps.Work, params: %{name: "audit"}
+
+    step "charge",
+      action: FlowDeps.Work,
+      params: %{name: "charge"},
+      needs: ["reserve", "audit"]
+
+    output result("charge")
+  end
+end
+
+{:ok, %{name: "charge"}} = Jido.Exec.run(FlowDeps.ByNeeds, %{}, %{observer: self()})
+
+[{:started, "charge"}, {:finished, "charge"}] =
+  FlowDeps.Events.drain() |> Enum.take(-2)
+```
+
+`"charge"` starts only after both others finish. `"reserve"` and `"audit"` depend on nothing, so they have no order between them.
+
+Prefer a `result` reference when data moves. Use `needs` only for order that the data does not express, such as an external side effect.
+
+## Inspect the graph
+
+`Jido.Flow.dependencies/1` reports each component's explicit needs, reference dependencies, and the effective set that Jido uses.
+
+```elixir
+{:ok, dependencies} = Jido.Flow.dependencies(FlowDeps.ByNeeds.flow())
+
+%{needs: ["reserve", "audit"], references: [], effective: ["audit", "reserve"]} =
+  dependencies["charge"]
+
+{:ok, dependencies} = Jido.Flow.dependencies(FlowDeps.ByData.flow())
+
+%{needs: [], references: ["load"], effective: ["load"]} = dependencies["save"]
+```
+
+`Jido.Flow.explain/1` returns the same dependency map with the rest of the canonical Flow. See [Inspect Flows](../flow-data/flow-inspection.md).
+
+## Independent components can overlap
+
+Components with no path between them can run at the same time. `Jido.Exec.run/4` takes a `:max_concurrency` option. Its default comes from application configuration, or the lower of the scheduler count and 10. Set it to `1` to run one component at a time.
+
+```elixir
+{:ok, %{name: "charge"}} =
+  Jido.Exec.run(FlowDeps.ByNeeds, %{}, %{observer: self()}, max_concurrency: 1)
+
+6 = FlowDeps.Events.drain() |> length()
+```
+
+Dependencies hold at every setting. Do not rely on order between unrelated components. See [Execution](../flow-runtime/execution.md).
+
+## Every component runs
+
+The output does not choose what runs. A component whose result nothing reads still runs, and the Flow returns only after it finishes.
+
+```elixir
+defmodule FlowDeps.Unread do
+  use Jido.Flow, name: "flow_deps_unread"
+
+  flow do
+    step "audit", action: FlowDeps.Work, params: %{name: "audit"}
+    step "charge", action: FlowDeps.Work, params: %{name: "charge"}
+
+    output result("charge")
+  end
+end
+
+{:ok, %{name: "charge"}} = Jido.Exec.run(FlowDeps.Unread, %{}, %{observer: self()})
+
+true = {:finished, "audit"} in FlowDeps.Events.drain()
+```
+
+## Every reference counts
+
+Every `result` reference in a component's fields is a static dependency. This holds for fields that may not be used at runtime, such as a Choice option that is not selected or an operand that a short-circuit skips. Jido analyzes the graph before any data exists.
+
+```elixir
+defmodule FlowDeps.Route do
+  use Jido.Flow, name: "flow_deps_route"
+
+  flow do
+    step "expensive_lookup", action: FlowDeps.Work, params: %{name: "expensive_lookup"}
+
+    choice "route" do
+      option "use_lookup",
+        condition: input(:deep),
+        action: FlowDeps.Work,
+        params: %{name: "deep", found: result("expensive_lookup", :name)}
+
+      otherwise action: FlowDeps.Work, params: %{name: "shallow"}
+    end
+
+    output result("route")
+  end
+end
+
+{:ok, %{name: "shallow"}} = Jido.Exec.run(FlowDeps.Route, %{deep: false}, %{observer: self()})
+
+true = {:finished, "expensive_lookup"} in FlowDeps.Events.drain()
+```
+
+The lookup ran even though the selected fallback does not read it. To keep work lazy, put it inside the Action that needs it.
+
+## Graph errors
+
+The compiler checks the graph. These declarations raise `CompileError` at the declaration line:
+
+| Problem | Message |
+| --- | --- |
+| A `result` or `needs` entry names an unknown component | "Flow reference points to an unknown component" |
+| Two components depend on each other, or one reads its own result | "flow dependency graph contains a cycle" |
+| A `needs` list repeats a name | "component needs contains a duplicate" |
+
+```elixir
+source = """
+defmodule FlowDeps.Cycle do
+  use Jido.Flow, name: "flow_deps_cycle"
+
+  flow do
+    step "first", action: FlowDeps.Work, params: %{name: result("second", :name)}
+    step "second", action: FlowDeps.Work, params: %{name: result("first", :name)}
+    output result("second")
+  end
+end
+"""
+
+error =
+  try do
+    Code.compile_string(source)
+  rescue
+    error in CompileError -> error
+  end
+
+true = Exception.message(error) =~ "flow dependency graph contains a cycle"
+```
+
+## Effects follow dependency order
+
+When Actions return effect requests, the Flow returns them in canonical dependency order, then by component name. Nested Flows keep their parent's position, and collections use item order. See [Outputs and Effects](../actions/action-effects.livemd).
+
+## Next steps
+
+- [Choices and Conditions](flow-choices.md) applies these rules to routing.
+- [Inspect Flows](../flow-data/flow-inspection.md) reads the derived graph.

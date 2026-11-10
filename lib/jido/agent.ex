@@ -1,4 +1,6 @@
 defmodule Jido.Agent do
+  alias Jido.Joi
+
   @moduledoc """
   Author Agent definitions as Maps or with the Spark DSL.
 
@@ -6,15 +8,15 @@ defmodule Jido.Agent do
   `state`. A Map definition can contain a static `initial_state`. An instance
   has a nonempty `id` and complete `state`, including Plugin-owned fields.
   Authoring and instance construction do not start processes or execute
-  handlers. JSON uses trusted Registry references.
+  handlers. JSON uses trusted Catalog references.
 
   Routes select one handler in declaration order. Connections select recipients
   for outputs. Plugins add explicit, validated data to `plugins`.
   """
-  alias Jido.Agent.{Data, Options, Validation}
+  alias Jido.Agent.{Schema, Validation}
   alias Jido.Agent.Plugin.Declaration
   alias Jido.Agent.Runner
-  alias Jido.Dispatch.Preparation
+  alias Jido.Catalog
   alias Jido.Error
   alias Jido.Signal
 
@@ -32,36 +34,19 @@ defmodule Jido.Agent do
 
   @optional_callbacks checkpoint: 2, restore: 2, initialize: 2
 
-  @schema Zoi.struct(__MODULE__, %{
-            id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
-            state: Zoi.map() |> Zoi.nullable() |> Zoi.default(nil),
-            module: Zoi.atom() |> Zoi.nullable() |> Zoi.default(nil),
-            name: Zoi.string() |> Zoi.min(1),
-            description: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
-            vsn: Zoi.integer() |> Zoi.min(1) |> Zoi.default(1),
-            schema: Zoi.any() |> Zoi.default(Zoi.object(%{})),
-            initial_state: Zoi.map() |> Zoi.default(%{}),
-            metadata: Zoi.map() |> Zoi.default(%{}),
-            signal_source: Zoi.string() |> Zoi.min(1) |> Zoi.nullable() |> Zoi.default(nil),
-            routes: Zoi.list(Zoi.any()) |> Zoi.default([]),
-            topology: Zoi.map() |> Zoi.default(%{}),
-            plugins: Zoi.list(Zoi.any()) |> Zoi.default([])
-          })
-  @defaults Map.new(Zoi.Struct.struct_fields(@schema), fn
-              {key, value} -> {key, value}
-              key -> {key, nil}
-            end)
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @schema Schema.agent_schema()
+  @defaults Schema.defaults()
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
   @doc false
   def __schema__, do: @schema
   @doc false
   def __defaults__, do: @defaults
 
   @doc "Returns the state schema, including Plugin-owned fields."
-  @spec schema(t()) :: Zoi.schema()
+  @spec schema(t()) :: Joi.schema()
   def schema(%__MODULE__{} = agent),
-    do: Validation.state_schema(agent) |> Jido.Agent.Error.unwrap!()
+    do: Validation.state_schema(agent) |> Jido.Error.unwrap!()
 
   @type definition :: %__MODULE__{id: nil, state: nil, initial_state: map()}
   @type instance :: %__MODULE__{id: String.t(), state: map(), initial_state: map()}
@@ -73,7 +58,7 @@ defmodule Jido.Agent do
 
   - `:name` is the required Agent name.
   - `:description` is optional display text.
-  - `:id` is the stable authoring Registry ID. It defaults to the module name.
+  - `:id` is the stable Catalog ID. It defaults to the module name.
   - `:vsn` is the positive definition version. It defaults to `1`.
   - `:metadata` is optional static definition data. It defaults to an empty Map.
   - `:plugins` lists ordered Plugin modules or `{Plugin, config}` tuples. A
@@ -83,6 +68,8 @@ defmodule Jido.Agent do
 
   Each optional core section can occur once:
 
+      alias Jido.Joi
+
       use Jido.Agent,
         name: "counter",
         id: "my_app/counter",
@@ -91,7 +78,7 @@ defmodule Jido.Agent do
         plugins: [{MyApp.Plugin, %{mode: :strict}}]
 
       state do
-        schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+        schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
         initial_state %{count: 0}
       end
 
@@ -146,13 +133,13 @@ defmodule Jido.Agent do
       use Jido.Agent.DSL, unquote(Macro.escape(opts))
       import Jido.Agent.DSL.Macros
       import Jido.Agent.Directive, only: [emit: 1, emit: 2]
-      import Jido.Config, only: [env: 1]
+      import Jido.Plugin.Config, only: [env: 1]
     end
   end
 
   @doc false
   def options!(quoted_options, caller) do
-    options = Options.prepare!(quoted_options, caller)
+    options = prepare_options!(quoted_options, caller)
 
     case Declaration.normalize(Keyword.get(options, :plugins, [])) do
       {:ok, declarations} ->
@@ -166,6 +153,24 @@ defmodule Jido.Agent do
     end
   end
 
+  @doc false
+  @spec prepare_options!(Macro.t(), Macro.Env.t()) :: keyword()
+  def prepare_options!(quoted_options, %Macro.Env{} = caller) do
+    {options, _binding} = Code.eval_quoted(quoted_options, [], caller)
+
+    unless Keyword.keyword?(options) and
+             Enum.uniq(Keyword.keys(options)) == Keyword.keys(options) do
+      raise ArgumentError, "Agent requires unique keyword options"
+    end
+
+    options = Keyword.put_new(options, :id, Atom.to_string(caller.module))
+
+    case Catalog.validate_identifier(options[:id]) do
+      :ok -> options
+      {:error, error} -> raise error
+    end
+  end
+
   @doc """
   Builds and validates a neutral Agent definition from a plain Map.
 
@@ -176,7 +181,7 @@ defmodule Jido.Agent do
 
   @doc "Builds one neutral Agent definition or raises its validation error."
   @spec define!(map()) :: definition() | no_return()
-  def define!(map), do: map |> define() |> Jido.Agent.Error.unwrap!()
+  def define!(map), do: map |> define() |> Jido.Error.unwrap!()
 
   @doc "Validates a definition or instance, including schema, routes, and provider data."
   @spec validate(term()) :: {:ok, t()} | {:error, term()}
@@ -200,7 +205,7 @@ defmodule Jido.Agent do
   def definition(%__MODULE__{} = value), do: %{value | id: nil, state: nil}
 
   def definition(module) when is_atom(module),
-    do: module |> Validation.resolve() |> Jido.Agent.Error.unwrap!()
+    do: module |> Validation.resolve() |> Jido.Error.unwrap!()
 
   @doc """
   Builds and validates one Agent instance from a definition or compiled Agent module.
@@ -217,7 +222,7 @@ defmodule Jido.Agent do
   @doc "Builds one Agent instance or raises its validation error."
   @spec instantiate!(definition() | module(), keyword() | map()) :: instance() | no_return()
   def instantiate!(source, opts \\ []),
-    do: source |> instantiate(opts) |> Jido.Agent.Error.unwrap!()
+    do: source |> instantiate(opts) |> Jido.Error.unwrap!()
 
   @doc "Applies ordered data mutations and returns the candidate and its final Diff."
   @spec mutate(t(), [Jido.Agent.Directive.t()]) ::
@@ -225,21 +230,14 @@ defmodule Jido.Agent do
   def mutate(%__MODULE__{} = agent, directives), do: Jido.Agent.Mutation.apply(agent, directives)
 
   @doc false
-  def runtime_plugins(%__MODULE__{plugins: entries}) do
-    for %{provider: module, data: data} <- entries,
-        Code.ensure_loaded?(module) and function_exported?(module, :__jido_plugin__, 0),
-        do: {module, Enum.sort(data)}
-  end
-
-  @doc false
   @spec input_signal(definition(), String.t(), map(), keyword() | map()) ::
           {:ok, Signal.t()} | {:error, term()}
   def input_signal(definition, type, data, opts \\ []) do
     with {:ok, opts} <-
-           Validation.options(opts, [:source, :id, :time, :subject, :datacontenttype]),
+           Schema.options(opts, [:source, :id, :time, :subject, :datacontenttype]),
          source = Map.get(opts, :source, definition.signal_source),
-         :ok <- Jido.Agent.Error.at(Jido.Agent.Data.nonempty(source), :source),
-         :ok <- Jido.Agent.Data.plain_map(data) do
+         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Schema.nonempty(source), :source),
+         :ok <- Jido.Agent.Schema.plain_map(data) do
       Jido.Signal.new(type, data, Map.put(opts, :source, source))
     end
   end
@@ -263,11 +261,8 @@ defmodule Jido.Agent do
         data
       ) do
     with {:ok, signal} <- Signal.new(type, data, source: signal_source),
-         {:ok, _source_signal, trace} <- Signal.Trace.ensure(source_signal),
-         {:ok, signal} <- Signal.Trace.put(signal, trace),
-         {:ok, signal} <- Signal.put_context(signal, "jidocausationid", source_signal.id) do
-      {:ok, Preparation.propagate(signal, source_signal)}
-    end
+         {:ok, _source_signal, trace} <- Signal.Context.ensure_trace(source_signal),
+         do: Signal.Context.put_trace(signal, Jido.Trace.with_causation(trace, source_signal.id))
   end
 
   def build_signal(_context, _type, _data) do
@@ -281,16 +276,7 @@ defmodule Jido.Agent do
   @spec transition(instance(), term()) :: {:ok, instance()} | {:error, Exception.t()}
   def transition(%__MODULE__{} = agent, next_state) do
     with {:ok, agent, _specs, schema} <- Validation.validate_instance_with_plugins(agent) do
-      transition_validated(agent, next_state, schema)
-    end
-  end
-
-  @doc false
-  @spec transition_validated(instance(), term(), Zoi.schema()) ::
-          {:ok, instance()} | {:error, Exception.t()}
-  def transition_validated(%__MODULE__{} = agent, next_state, schema) do
-    with :ok <- Jido.Agent.Error.at(Data.complete(schema, next_state), :state) do
-      {:ok, %{agent | state: next_state}}
+      Runner.transition_validated(agent, next_state, schema)
     end
   end
 
@@ -356,15 +342,15 @@ defmodule Jido.Agent do
     do: invalid("Agent.cmd/3 options must be a keyword list", %{opts: opts})
 
   defp normalize_domain_attrs(attrs) do
-    case Jido.Agent.Authoring.to_attrs(attrs) do
+    case Jido.Agent.Schema.to_attrs(attrs) do
       {:ok, attrs} -> {:ok, attrs}
       :error -> invalid("Agent.set/2 attributes must be a map or keyword list", %{attrs: attrs})
     end
   end
 
   defp validate_domain_attrs(agent, attrs) do
-    case agent.schema do
-      %Zoi.Types.Map{fields: fields} ->
+    case {Joi.Schema.kind(agent.schema), Joi.Schema.fields(agent.schema)} do
+      {:map, {:ok, fields}} when is_list(fields) ->
         invalid_keys = Map.keys(attrs) -- Keyword.keys(fields)
 
         if invalid_keys == [] do
@@ -376,8 +362,8 @@ defmodule Jido.Agent do
            )}
         end
 
-      _schema ->
-        {:error, Error.validation_error("Agent domain schema must be a Zoi object")}
+      _ ->
+        {:error, Error.validation_error("Agent domain schema must be a Joi object")}
     end
   end
 

@@ -2,8 +2,8 @@ defmodule Jido.Telemetry.Semantic do
   @moduledoc false
 
   alias Jido.Error
-  alias Jido.Signal.Trace, as: SignalTrace
   alias Jido.Telemetry.OpenTelemetry
+  alias Jido.Trace
 
   @schema_version 1
 
@@ -15,12 +15,11 @@ defmodule Jido.Telemetry.Semantic do
   @kind_values ~w(error throw exit)a
   @operation_values ~w(activate stop hibernate thaw load compare_and_swap delete)a
   @admission_values ~w(deadline_expired overloaded)a
-  @persistence_values ~w(commit activate stop hibernate thaw manual topology)a
+  @persistence_values ~w(commit activate stop hibernate thaw manual topology stored_upgrade)a
   @topology_values ~w(activate repair update place cleanup)a
 
   @signed_measurements [:system_time, :monotonic_time]
   @count_measurements ~w(count duration state_version state_version_before state_version_after directive_count directive_index directive_completed directive_failed directive_skipped queue_depth queue_limit wait_duration expected_revision revision_before revision_after target_revision component_count ready_count failed_count epoch)a
-  @trace_metadata_keys [:trace_id, :span_id, :parent_span_id, :causation_id]
   @trace_carrier_keys [
     :trace_id,
     :span_id,
@@ -34,7 +33,7 @@ defmodule Jido.Telemetry.Semantic do
   @type span :: %{
           required(:prefix) => [atom()],
           required(:metadata) => map(),
-          required(:trace) => map() | nil,
+          required(:trace) => Trace.t() | nil,
           required(:at) => integer(),
           optional(:terminal_guard) => :atomics.atomics_ref(),
           optional(:log_scope) => atom() | nil,
@@ -54,11 +53,13 @@ defmodule Jido.Telemetry.Semantic do
     measurements = normalize_measurements(measurements)
 
     otel = OpenTelemetry.start(prefix, metadata, measurements, put_option(opts, :start_time, at))
-    trace = Map.merge(valid_trace(trace) || %{}, OpenTelemetry.trace_context(otel) || %{})
-    trace = if map_size(trace) == 0, do: nil, else: trace
+    trace = merge_traces(valid_trace(trace), OpenTelemetry.trace_context(otel))
 
     metadata =
-      Map.merge(metadata, normalize_metadata(Map.take(trace || %{}, @trace_metadata_keys)))
+      Map.merge(
+        metadata,
+        normalize_metadata(if trace, do: Trace.telemetry_context(trace), else: %{})
+      )
 
     span = %{
       prefix: prefix,
@@ -282,16 +283,15 @@ defmodule Jido.Telemetry.Semantic do
   defp log_scope(_metadata), do: nil
 
   defp valid_trace(%{traceparent: traceparent} = trace) do
-    case SignalTrace.from_traceparent(traceparent, Map.get(trace, :tracestate)) do
+    case Trace.from_traceparent(traceparent, Map.get(trace, :tracestate)) do
       {:ok, w3c} ->
-        %{
-          trace_id: w3c.trace_id,
-          span_id: w3c.span_id,
-          trace_flags: w3c.trace_flags,
-          traceparent: SignalTrace.to_traceparent(w3c)
+        candidate = %{
+          w3c
+          | parent_span_id: Map.get(trace, :parent_span_id),
+            causation_id: Map.get(trace, :causation_id)
         }
-        |> Map.merge(Map.take(trace, [:parent_span_id, :causation_id]))
-        |> maybe_put(:tracestate, w3c.tracestate)
+
+        if Trace.valid?(candidate), do: candidate
 
       {:error, :invalid_traceparent} ->
         nil
@@ -299,6 +299,18 @@ defmodule Jido.Telemetry.Semantic do
   end
 
   defp valid_trace(_trace), do: nil
+
+  defp merge_traces(nil, nil), do: nil
+  defp merge_traces(%Trace{} = trace, nil), do: trace
+  defp merge_traces(nil, %Trace{} = trace), do: trace
+
+  defp merge_traces(%Trace{} = source, %Trace{} = current) do
+    %{
+      current
+      | parent_span_id: source.parent_span_id,
+        causation_id: source.causation_id
+    }
+  end
 
   defp claim_terminal?(%{terminal_guard: guard}),
     do: :atomics.compare_exchange(guard, 1, 0, 1) == :ok

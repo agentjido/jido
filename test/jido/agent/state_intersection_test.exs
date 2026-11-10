@@ -1,5 +1,5 @@
 defmodule Jido.Agent.StateIntersectionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.AgentServer
@@ -11,16 +11,16 @@ defmodule Jido.Agent.StateIntersectionTest do
 
   def schema(reverse? \\ false) do
     branches = [
-      Zoi.object(%{
-        a: Zoi.integer() |> Zoi.refine({__MODULE__, :observe, [:a]}) |> Zoi.default(1)
+      Jido.Joi.object(%{
+        a: Jido.Joi.integer() |> Jido.Joi.refine({__MODULE__, :observe, [:a]}) |> Jido.Joi.default(1)
       }),
-      Zoi.object(%{
-        b: Zoi.integer() |> Zoi.refine({__MODULE__, :observe, [:b]}) |> Zoi.default(2)
+      Jido.Joi.object(%{
+        b: Jido.Joi.integer() |> Jido.Joi.refine({__MODULE__, :observe, [:b]}) |> Jido.Joi.default(2)
       })
     ]
 
     branches = if reverse?, do: Enum.reverse(branches), else: branches
-    Zoi.object(%{nested: Zoi.intersection(branches)})
+    Jido.Joi.object(%{nested: Jido.Joi.intersection(branches)})
   end
 
   test "creation retains both intersection fields and checks each branch once" do
@@ -29,7 +29,7 @@ defmodule Jido.Agent.StateIntersectionTest do
 
       assert {:ok, agent} =
                Agent.instantiate(definition,
-                 id: Jido.Signal.ID.generate!(),
+                 id: Jido.Id.uuid7(),
                  state: %{nested: nested}
                )
 
@@ -52,7 +52,7 @@ defmodule Jido.Agent.StateIntersectionTest do
 
     agent =
       Agent.instantiate!(definition,
-        id: Jido.Signal.ID.generate!(),
+        id: Jido.Id.uuid7(),
         state: %{nested: %{a: 3, b: 4}}
       )
 
@@ -88,14 +88,14 @@ defmodule Jido.Agent.StateIntersectionTest do
     @impl true
     def state_spec(_opts) do
       {:owned,
-       Zoi.object(%{
+       Jido.Joi.object(%{
          nested:
-           Zoi.intersection([
-             Zoi.object(%{a: Zoi.integer() |> Zoi.nullable() |> Zoi.default(1)}),
-             Zoi.object(%{b: Zoi.integer() |> Zoi.default(2)})
+           Jido.Joi.intersection([
+             Jido.Joi.object(%{a: Jido.Joi.integer() |> Jido.Joi.nullable() |> Jido.Joi.default(1)}),
+             Jido.Joi.object(%{b: Jido.Joi.integer() |> Jido.Joi.default(2)})
            ])
        })
-       |> Zoi.default(%{nested: %{a: 1, b: 2}})}
+       |> Jido.Joi.default(%{nested: %{a: 1, b: 2}})}
     end
 
     @impl true
@@ -117,14 +117,14 @@ defmodule Jido.Agent.StateIntersectionTest do
       })
 
     agent = Agent.instantiate!(definition, id: unique_id("intersection"))
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(c.jido, agent)
-    before = JidoTest.AgentServerAssertions.committed(server)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(c.jido, agent)
+    before = Jido.Test.AgentServer.Assertions.committed(server)
 
     for owned <- [%{}, %{nested: %{}}, %{nested: %{a: 3}}, %{nested: %{b: 4}}] do
       input = signal("intersection.reduce", %{owned: owned})
       assert {:error, _} = Agent.cmd(agent, input)
       assert {:error, _} = AgentServer.call(server, input)
-      assert JidoTest.AgentServerAssertions.committed(server) === before
+      assert Jido.Test.AgentServer.Assertions.committed(server) === before
     end
 
     owned = %{nested: %{a: nil, b: 7}}

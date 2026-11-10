@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "property": "routing_model",
+  "input": {
+    "type": "**.x.a",
+    "routes": [
+      {
+        "path": "**.a",
+        "priority": 0,
+        "mode": "scalar",
+        "predicate": "true"
+      }
+    ]
+  },
+  "description": "Fixed review regression. Construct process values at test time."
+}

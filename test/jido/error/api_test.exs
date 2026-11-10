@@ -1,0 +1,521 @@
+defmodule Jido.Error.ApiTest do
+  use Covenant.Case, component: "jido.error", async: true
+
+  alias Jido.Error
+
+  defmodule BadInspect do
+    defstruct [:token]
+  end
+
+  describe "validation_error/2" do
+    @describetag obligation: "jido.error.I1"
+    test "creates a validation error with message" do
+      error = Error.validation_error("Invalid input")
+
+      assert %Error.ValidationError{} = error
+      assert error.message == "Invalid input"
+    end
+
+    test "creates a validation error with field (infers kind: :input)" do
+      error = Error.validation_error("Invalid field", field: :email)
+
+      assert error.message == "Invalid field"
+      assert error.kind == :input
+      assert error.subject == :email
+    end
+
+    test "creates a validation error with explicit kind and subject" do
+      error = Error.validation_error("Invalid", kind: :config, subject: :timeout)
+
+      assert error.kind == :config
+      assert error.subject == :timeout
+    end
+
+    test "creates a validation error for action (convenience)" do
+      error = Error.validation_error("Action not found", action: SomeAction)
+
+      assert error.message == "Action not found"
+      assert error.kind == :action
+      assert error.subject == SomeAction
+    end
+
+    test "keeps domain kind values in details" do
+      error = Error.validation_error("Unknown catalog target", %{kind: :atom, path: [:target]})
+
+      assert error.kind == nil
+      assert error.subject == nil
+      assert error.details == %{kind: :atom, path: [:target]}
+    end
+  end
+
+  describe "execution_error/2" do
+    @describetag obligation: "jido.error.I1"
+    test "creates an execution error" do
+      error = Error.execution_error("Execution failed")
+
+      assert %Error.ExecutionError{} = error
+      assert error.message == "Execution failed"
+      assert error.phase == :execution
+    end
+
+    test "creates an execution error with planning phase" do
+      error = Error.execution_error("Planning failed", phase: :planning)
+
+      assert error.message == "Planning failed"
+      assert error.phase == :planning
+    end
+
+    test "creates an execution error with details" do
+      error = Error.execution_error("Failed", details: %{step: :process})
+
+      assert error.details[:step] == :process
+    end
+
+    test "stores unknown keyword opts in details" do
+      error =
+        Error.execution_error("Failed",
+          phase: :planning,
+          reason: :timeout,
+          details: %{step: :process}
+        )
+
+      assert error.phase == :planning
+      assert error.details == %{reason: :timeout, step: :process}
+    end
+  end
+
+  describe "routing_error/2" do
+    @describetag obligation: "jido.error.I1"
+    test "creates a routing error" do
+      error = Error.routing_error("Route not found", target: :agent_1)
+
+      assert %Error.RoutingError{} = error
+      assert error.message == "Route not found"
+      assert error.target == :agent_1
+    end
+  end
+
+  describe "timeout_error/2" do
+    @describetag obligation: "jido.error.I1"
+    test "creates a timeout error" do
+      error = Error.timeout_error("Operation timed out", timeout: 5000)
+
+      assert %Error.TimeoutError{} = error
+      assert error.message == "Operation timed out"
+      assert error.timeout == 5000
+    end
+  end
+
+  describe "compensation_error/2" do
+    @describetag obligation: "jido.error.I1"
+    test "creates a compensation error for successful compensation" do
+      original = Error.execution_error("Original failure")
+
+      error =
+        Error.compensation_error("Compensated",
+          original_error: original,
+          compensated: true,
+          result: %{refund: true}
+        )
+
+      assert %Error.CompensationError{} = error
+      assert error.compensated == true
+      assert error.original_error == original
+      assert error.result == %{refund: true}
+    end
+
+    test "creates a compensation error for failed compensation" do
+      original = Error.execution_error("Original failure")
+
+      error = Error.compensation_error("Compensation failed", original_error: original)
+
+      assert error.compensated == false
+      assert error.original_error == original
+    end
+  end
+
+  describe "internal_error/2" do
+    @describetag obligation: "jido.error.I1"
+    test "creates an internal error" do
+      error = Error.internal_error("Unexpected error")
+
+      assert %Error.InternalError{} = error
+      assert error.message == "Unexpected error"
+    end
+
+    test "creates an internal error with details" do
+      error = Error.internal_error("Failed", details: %{reason: :unknown})
+
+      assert error.details[:reason] == :unknown
+    end
+  end
+
+  describe "stable program codes" do
+    @describetag obligation: ["jido.error.I2", "jido.error.I3"]
+    test "publishes one closed Jido-owned code registry" do
+      expected = [
+        :non_portable_term,
+        :invalid_checkpoint,
+        :definition_mismatch,
+        :agent_invalid_callback_result,
+        :agent_callback_failed,
+        :plugin_state_owner_violation,
+        :plugin_invalid_callback_result,
+        :plugin_callback_failed,
+        :plugin_callback_timeout,
+        :plugin_callback_task_failed,
+        :persistence_invalid_callback_result,
+        :persistence_callback_failed,
+        :agent_exec_invalid_callback_result,
+        :agent_exec_callback_failed,
+        :agent_exec_callback_timeout,
+        :agent_exec_callback_task_failed,
+        :agent_turn_timeout,
+        :missing_env,
+        :invalid_env,
+        :invalid_config,
+        :jido_instance_invalid_config,
+        :jido_namespace_already_bound,
+        :jido_namespace_required,
+        :jido_namespace_mismatch
+      ]
+
+      assert Error.stable_codes() == expected
+      assert Enum.uniq(expected) == expected
+      assert Enum.all?(expected, &is_atom/1)
+    end
+
+    test "extracts registered codes without making messages part of the contract" do
+      error =
+        Error.execution_error("This text can change", details: %{code: :agent_callback_failed})
+
+      assert Error.code(error) == :agent_callback_failed
+      assert Error.code({:error, error}) == :agent_callback_failed
+      assert Error.code({:error, error, [:effect]}) == :agent_callback_failed
+      assert Error.code(%{code: :plugin_callback_failed}) == :plugin_callback_failed
+      assert Error.code(%{details: %{code: :unknown}}) == nil
+      assert Error.code(%{code: :unknown}) == nil
+      assert Error.code(:agent_callback_failed) == nil
+    end
+
+    test "keeps the exact version 1 projection shape and nests its program code" do
+      error =
+        Error.execution_error("Failed", details: %{code: :agent_callback_failed, callback: :run})
+
+      projection = Error.to_map(error)
+
+      assert Map.keys(projection) |> Enum.sort() == [:details, :message, :retryable?, :type]
+      assert projection.details.code == :agent_callback_failed
+      refute Map.has_key?(projection, :code)
+      refute Map.has_key?(projection, :class)
+    end
+  end
+
+  describe "to_map/1" do
+    @describetag obligation: ["jido.error.I3", "jido.error.I4", "jido.error.I5"]
+    @to_map_cases [
+      # {description, error_expr, expected_type}
+      {"validation error with field", Error.validation_error("Invalid", field: :email), :validation_error},
+      {"validation error with kind: :action", Error.validation_error("Bad action", action: SomeAction),
+       :invalid_action},
+      {"validation error with kind: :config", Error.validation_error("Bad config", kind: :config), :config_error},
+      {"execution error", Error.execution_error("Failed"), :execution_error},
+      {"execution error with phase: :planning", Error.execution_error("Planning failed", phase: :planning),
+       :planning_error},
+      {"routing error", Error.routing_error("Route not found", target: :agent), :routing_error},
+      {"timeout error", Error.timeout_error("Timed out", timeout: 5000), :timeout},
+      {"internal error", Error.internal_error("Internal"), :internal}
+    ]
+
+    for {desc, error, expected_type} <- @to_map_cases do
+      @desc desc
+      @error error
+      @expected_type expected_type
+
+      test "converts #{@desc} to map with type #{@expected_type}" do
+        result = Error.to_map(@error)
+        assert result.type == @expected_type
+      end
+    end
+
+    test "converts validation error to public map without stacktrace" do
+      error = Error.validation_error("Invalid", field: :email)
+      result = Error.to_map(error)
+
+      assert result.type == :validation_error
+      assert result.message == "Invalid"
+      assert result.details == %{field: :email, kind: :input, subject: :email}
+      assert result.retryable? == false
+      refute Map.has_key?(result, :stacktrace)
+    end
+
+    test "projects shared error groups with their ordered child errors" do
+      group =
+        Error.to_class([
+          Error.validation_error("First", details: %{path: [:first]}),
+          Error.validation_error("Second", details: %{path: [:second]})
+        ])
+
+      assert %{type: :validation_error, details: %{errors: errors}} = Error.to_map(group)
+      assert Enum.map(errors, & &1.message) == ["First", "Second"]
+      assert Enum.map(errors, & &1.details.path) == [[:first], [:second]]
+    end
+
+    test "converts compensation error to map" do
+      original = Error.execution_error("Original")
+
+      error =
+        Error.compensation_error("Compensated",
+          original_error: original,
+          compensated: true,
+          result: %{refund: true}
+        )
+
+      result = Error.to_map(error)
+
+      assert result.type == :compensation_error
+      assert result.details.compensated == true
+      assert result.details.result == %{refund: true}
+      assert result.details.original_error.type == :execution_error
+      assert result.details.original_error.message == "Original"
+    end
+
+    test "keeps each error module's public fields in details" do
+      assert Error.to_map(Error.execution_error("Failed", phase: :planning)).details == %{
+               phase: :planning
+             }
+
+      assert Error.to_map(Error.routing_error("No route", target: :worker)).details == %{
+               target: :worker
+             }
+
+      assert Error.to_map(Error.timeout_error("Late", timeout: 25)).details == %{timeout: 25}
+    end
+
+    test "sanitizes nested details for public transport payloads" do
+      long_value = String.duplicate("x", 700)
+
+      error =
+        Error.execution_error("Failed",
+          details: %{
+            token: "secret-token",
+            secretToken: "secret-token",
+            privateKey: "private-key",
+            accessToken: "access-token",
+            authorization: "Bearer secret-token",
+            stacktrace: [{__MODULE__, :test, 0, []}],
+            stackTrace: [{__MODULE__, :test, 0, []}],
+            message: long_value,
+            labels: Enum.map(1..30, &"label-#{&1}"),
+            nested: %{password: "secret-password", value: :ok},
+            headers: [{"authorization", "Bearer header-secret"}, {"x-request-id", "req-123"}],
+            opts: [password: "keyword-secret", timeout: 500],
+            bad: %BadInspect{token: "secret-token"}
+          }
+        )
+
+      result = Error.to_map(error)
+
+      assert result.details.token == "[REDACTED]"
+      assert result.details.secretToken == "[REDACTED]"
+      assert result.details.privateKey == "[REDACTED]"
+      assert result.details.accessToken == "[REDACTED]"
+      assert result.details.authorization == "[REDACTED]"
+      assert result.details.stacktrace == "[OMITTED]"
+      assert result.details.stackTrace == "[OMITTED]"
+      assert result.details.message =~ "(truncated)"
+      assert length(result.details.labels) == 20
+      refute "label-21" in result.details.labels
+      assert result.details.nested.password == "[REDACTED]"
+      assert result.details.headers["authorization"] == "[REDACTED]"
+      assert result.details.headers["x-request-id"] == "req-123"
+      assert result.details.opts.password == "[REDACTED]"
+      assert result.details.opts.timeout == 500
+      refute inspect(result.details) =~ "secret-password"
+      refute inspect(result.details) =~ "secret-token"
+      refute inspect(result.details) =~ "header-secret"
+      refute inspect(result.details) =~ "keyword-secret"
+      assert result.details.bad.token == "[REDACTED]"
+      assert Jason.encode!(result)
+    end
+
+    test "handles foreign exceptions without leaking stacktraces" do
+      result = Error.to_map(%RuntimeError{message: "foreign failure"})
+
+      assert result.type == :internal
+      assert result.message == "foreign failure"
+      assert result.details == %{}
+      assert result.retryable? == true
+      refute Map.has_key?(result, :stacktrace)
+    end
+
+    test "derives retryability from type and structured hints" do
+      assert Error.to_map(Error.timeout_error("Timed out")).retryable? == true
+      assert Error.to_map(Error.validation_error("Invalid")).retryable? == false
+
+      retryable_error = Error.validation_error("Retry anyway", details: %{retry: true})
+      non_retryable_error = Error.execution_error("Do not retry", details: %{retryable?: false})
+
+      assert Error.to_map(retryable_error).retryable? == true
+      assert Error.to_map(non_retryable_error).retryable? == false
+      assert Error.retryable?({:error, :timeout}) == true
+      assert Error.retryable?({:error, %{type: :validation_error}}) == false
+
+      for key <- [:retry, :retryable, :retryable?, "retry", "retryable", "retryable?"],
+          value <- [true, false] do
+        assert Error.retryable?(%{key => value}) == value
+        assert Error.retryable?(%{details: %{key => value}}) == value
+      end
+
+      assert Error.retryable?(%{reason: %{retry: false}}) == false
+      assert Error.retryable?(%{"reason" => %{"retry" => false}}) == false
+
+      for value <- [:yes, 1, nil] do
+        assert Error.retryable?(%{retryable?: value})
+      end
+    end
+
+    test "keeps retry defaults and detail hints for each Jido error struct" do
+      errors = [
+        {Error.validation_error("invalid"), false},
+        {Error.execution_error("failed"), true},
+        {Error.routing_error("missing"), true},
+        {Error.timeout_error("late"), true},
+        {Error.compensation_error("undo failed"), true},
+        {Error.internal_error("failed"), true}
+      ]
+
+      for {error, default} <- errors do
+        assert Error.retryable?(error) == default
+        assert Error.retryable?(%{error | details: %{retryable?: not default}}) == not default
+      end
+    end
+
+    test "recognizes the complete public type vocabulary" do
+      types = [
+        :validation_error,
+        :invalid_action,
+        :config_error,
+        :planning_error,
+        :execution_error,
+        :routing_error,
+        :timeout,
+        :compensation_error,
+        :internal
+      ]
+
+      for type <- types,
+          payload <- [
+            %{type: type, message: "failure"},
+            %{type: Atom.to_string(type), message: "failure"},
+            %{"type" => type, "message" => "failure"},
+            %{"type" => " :#{type} ", "message" => "failure"}
+          ] do
+        assert Error.to_map(payload).type == type
+      end
+
+      for type <- [:validation_error, :invalid_action, :config_error] do
+        refute Error.retryable?(%{type: type})
+      end
+
+      for type <- [:planning_error, :execution_error, :routing_error, :timeout, :internal] do
+        assert Error.retryable?(%{type: type})
+      end
+
+      payload = %{
+        "type" => "validation_error",
+        "message" => "Invalid",
+        "details" => %{"password" => "secret-password"}
+      }
+
+      result = Error.to_map(payload)
+
+      assert result.details["password"] == "[REDACTED]"
+      refute result.retryable?
+
+      assert Error.retryable?(%{
+               "type" => "execution_error",
+               "details" => %{"retryable" => false}
+             }) == false
+    end
+
+    test "invalid type values fail closed to internal" do
+      for payload <- [%{type: 1}, %{"type" => []}, %{type: nil}, %{"type" => %{}}] do
+        projection = Error.to_map(payload)
+        assert projection.type == :internal
+        assert projection.retryable?
+      end
+
+      assert Error.to_map(%{"message" => "visible"}).message == "visible"
+
+      for type <- ["validation_error", "invalid_action", "config_error"] do
+        assert Error.retryable?(%{type: type}) == false
+      end
+    end
+
+    test "handles unknown struct" do
+      result = Error.to_map(%{unknown: "struct"})
+
+      assert result.type == :internal
+      assert result.details == %{}
+    end
+  end
+
+  describe "Splode interop" do
+    @describetag obligation: ["jido.error.I1", "jido.error.I6"]
+    test "to_error/1 keeps Jido validation errors typed and classified" do
+      error = Error.validation_error("Invalid", field: :email)
+      converted = Error.to_error(error)
+
+      assert %Error.ValidationError{} = converted
+      assert converted.class == :invalid
+      assert converted.message == "Invalid"
+    end
+
+    test "to_class/1 wraps typed errors in the corresponding class" do
+      error = Error.validation_error("Invalid", field: :email)
+      class_error = Error.to_class(error)
+
+      assert %Error.Invalid{} = class_error
+      assert class_error.class == :invalid
+      assert [%Error.ValidationError{}] = class_error.errors
+    end
+
+    test "to_error/1 preserves unknown error message for plain values" do
+      unknown = Error.to_error("plain failure")
+
+      assert %Error.Internal.UnknownError{} = unknown
+      assert unknown.class == :internal
+      assert unknown.message == "plain failure"
+    end
+
+    test "Codec internal errors keep an internal type" do
+      error = Jido.Codec.Error.internal(:catalog_not_initialized, "Catalog is not initialized")
+
+      assert Error.type(error) == :internal
+      assert %{type: :internal, retryable?: true} = Error.to_map(error)
+      assert Error.retryable?(error)
+    end
+
+    test "to_map/1 keeps stack frames out of class error messages" do
+      class_error =
+        Error.to_class([Error.execution_error("First"), Error.execution_error("Second")])
+
+      assert Exception.message(class_error) =~ ".ex:"
+
+      assert %{message: "First; Second"} = Error.to_map(class_error)
+
+      assert %{details: %{cause: %{message: "First; Second"}}} =
+               Error.to_map(%{details: %{cause: class_error}})
+    end
+
+    test "to_class/1 handles unknown values without raising" do
+      class_error = Error.to_class("plain failure")
+
+      assert %Error.Internal{} = class_error
+      assert class_error.class == :internal
+      assert [%Error.Internal.UnknownError{} = wrapped] = class_error.errors
+      assert wrapped.message == "plain failure"
+    end
+  end
+end

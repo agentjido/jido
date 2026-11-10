@@ -1,63 +1,15 @@
 import Config
 
 if config_env() in [:dev, :test] do
-  # Resolve from each worker's private project copy, without a source-tree path.
   config :covenant,
     root: ".",
-    contracts_dir: "test/contract",
-    test_paths: ["test/contract", "test/jido/agent"],
-    sibling_dir: false
+    contracts_dir: "test/contracts",
+    test_paths: ["test"]
 end
 
-# Declare fallback log metadata for local tests and lint checks. This does not
-# set a formatter policy in applications that depend on Jido.
-if config_env() in [:dev, :test] do
-  config :logger, :default_formatter,
-    metadata: [:agent_id, :pool, :reason, :signal_id, :signal_type, :turn_id]
-end
-
-# Git hooks and git_ops configuration for conventional commits
-# Only enabled in dev environment (git_ops is a dev-only dependency)
-if config_env() == :dev do
-  # Worktrees use a `.git` file instead of a directory. We keep the explicit
-  # project path for git_hooks and only auto-install hooks from a normal checkout.
-  project_path = Path.expand("..", __DIR__)
-  auto_install_git_hooks? = File.dir?(Path.join(project_path, ".git"))
-
-  config :git_hooks,
-    auto_install: auto_install_git_hooks?,
-    project_path: project_path,
-    verbose: true,
-    hooks: [
-      commit_msg: [
-        tasks: [
-          {:cmd, "mix git_ops.check_message", include_hook_args: true}
-        ]
-      ]
-    ]
-
-  # Jido uses GitOps release tasks, not its optional Igniter installer.
-  config :git_ops,
-    no_igniter?: true,
-    mix_project: Jido.MixProject,
-    changelog_file: "CHANGELOG.md",
-    repository_url: "https://github.com/agentjido/jido",
-    manage_mix_version?: true,
-    manage_readme_version: "README.md",
-    version_tag_prefix: "v",
-    types: [
-      feat: [header: "Features"],
-      fix: [header: "Bug Fixes"],
-      perf: [header: "Performance"],
-      refactor: [header: "Refactoring"],
-      docs: [hidden?: true],
-      test: [hidden?: true],
-      chore: [hidden?: true],
-      ci: [hidden?: true]
-    ]
-end
-
-# Import environment specific config (test.exs only)
 if config_env() == :test do
-  import_config "test.exs"
+  config :jido, runtime_store_timeout: 100
+
+  # Keep normal test output quiet. CaptureLog installs its own handler when needed.
+  config :logger, :default_handler, false
 end

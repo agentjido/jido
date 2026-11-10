@@ -1,10 +1,10 @@
-defmodule JidoTest.Persistence.CrossBeamAtomTest do
-  use JidoTest.PeerCase, async: false
+defmodule Jido.Persistence.CrossBeamAtomTest do
+  use Jido.Test.AgentServer.PeerCase, async: false
 
   alias Jido.Persistence
   alias Jido.Persistence.ETS
-  alias JidoTest.Persistence.CheckpointPortabilityProbe, as: Probe
-  alias JidoTest.Persistence.StaticAtomAgent
+  alias Jido.Test.Persistence.CheckpointPortabilityProbe, as: Probe
+  alias Jido.Test.Persistence.StaticAtomAgent
 
   test "load brings in atoms defined by the trusted Agent module", c do
     source = {ETS, table: :cross_beam_static_atom_checkpoint}
@@ -77,9 +77,7 @@ defmodule JidoTest.Persistence.CrossBeamAtomTest do
              ])
 
     string_key =
-      Persistence.agent_key(
-        Jido.Agent.Ref.new!(namespace: "persistence-test", id: string_agent.id)
-      )
+      Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: string_agent.id))
 
     assert {:ok, string_bytes} = peer_call(c.peer_a, ETS, :get, [string_key, adapter_opts])
     assert :ok = peer_call(c.peer_b, ETS, :put, [string_key, string_bytes, adapter_opts])

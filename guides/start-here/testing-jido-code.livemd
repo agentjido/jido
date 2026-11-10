@@ -1,0 +1,256 @@
+# Test Jido Code
+
+This tutorial writes ExUnit tests for an invoice system at each level: an Action, a Flow, an Agent Turn, and a live Agent. Most tests need no process, so they stay fast and can run with `async: true`.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+Start ExUnit without its automatic run, so each cell can run its own tests. In a Mix project, put each test module in `test/` and run `mix test`. `test/test_helper.exs` and Mix then handle the start and the run.
+
+```elixir
+ExUnit.start(autorun: false)
+```
+
+## The code under test
+
+This is a smaller version of the Agent from [Build Your First Agent](first-agent.livemd). `ChargeCard` gets its gateway from context, so a test can replace it.
+
+```elixir
+defmodule TestingJido.Gateway do
+  def charge(_amount_cents), do: {:error, :not_configured}
+end
+
+defmodule TestingJido.ChargeCard do
+  use Jido.Action,
+    name: "testing_jido_charge_card",
+    schema: Jido.Joi.object(%{amount_cents: Jido.Joi.integer() |> Jido.Joi.min(1)})
+
+  @impl true
+  def run(%{amount_cents: amount}, context) do
+    gateway = Map.get(context, :gateway, TestingJido.Gateway)
+
+    case gateway.charge(amount) do
+      {:ok, receipt_id} -> {:ok, %{amount_cents: amount, receipt_id: receipt_id}}
+      {:error, reason} -> {:error, Jido.Error.execution_error("charge failed", %{reason: reason, retry: false})}
+    end
+  end
+end
+
+defmodule TestingJido.RecordPayment do
+  use Jido.Action, name: "testing_jido_record_payment"
+
+  @impl true
+  def run(%{amount_cents: amount}, %{agent_state: state}) do
+    {:ok, %{state | paid_cents: state.paid_cents + amount}}
+  end
+end
+
+defmodule TestingJido.PayInvoice do
+  use Jido.Flow,
+    name: "testing_jido_pay_invoice",
+    schema: Jido.Joi.object(%{amount_cents: Jido.Joi.integer()}),
+    output_schema: Jido.Joi.object(%{paid_cents: Jido.Joi.integer()})
+
+  flow do
+    step "charge", action: TestingJido.ChargeCard, params: %{amount_cents: input(:amount_cents)}
+
+    step "record",
+      action: TestingJido.RecordPayment,
+      params: %{amount_cents: result("charge", :amount_cents)}
+
+    output result("record")
+  end
+end
+
+defmodule TestingJido.InvoiceAgent do
+  use Jido.Agent, name: "testing_jido_invoice"
+
+  state do
+    schema Jido.Joi.object(%{paid_cents: Jido.Joi.integer() |> Jido.Joi.default(0)})
+  end
+
+  routes do
+    signal_source "/billing/invoice"
+
+    route "invoice.pay", TestingJido.PayInvoice, as: :pay do
+      reply "invoice.paid", from: output(:paid_cents)
+    end
+  end
+end
+
+defmodule TestingJido.ApprovingGateway do
+  def charge(amount_cents), do: {:ok, "receipt-#{amount_cents}"}
+end
+
+defmodule TestingJido.DecliningGateway do
+  def charge(_amount_cents), do: {:error, :card_declined}
+end
+```
+
+## Test an Action
+
+Run the Action through `Jido.Exec.run/4` to test what callers receive. Pass a stub through context. Match on the error struct and its `details`, not on the message.
+
+```elixir
+defmodule TestingJido.ChargeCardTest do
+  use ExUnit.Case, async: true
+
+  alias TestingJido.{ApprovingGateway, ChargeCard, DecliningGateway}
+
+  test "returns a receipt when the gateway approves" do
+    assert Jido.Exec.run(ChargeCard, %{amount_cents: 500}, %{gateway: ApprovingGateway}) ==
+             {:ok, %{amount_cents: 500, receipt_id: "receipt-500"}}
+  end
+
+  test "reports a declined card" do
+    assert {:error, %Jido.Error.ExecutionError{details: %{reason: :card_declined}}} =
+             Jido.Exec.run(ChargeCard, %{amount_cents: 500}, %{gateway: DecliningGateway})
+  end
+
+  test "rejects a zero amount by field" do
+    assert {:error, %Jido.Error.ValidationError{details: %{errors: [%{path: [:amount_cents]}]}}} =
+             Jido.Exec.run(ChargeCard, %{amount_cents: 0}, %{gateway: ApprovingGateway})
+  end
+end
+
+ExUnit.run() |> Map.take([:total, :failures])
+```
+
+The cell returns `%{total: 3, failures: 0}`. `ExUnit.run/0` runs the test modules defined since its last run.
+
+## Test a Flow
+
+A Flow test proves the components connect. It runs the real graph and checks which component failed. Context passes through to each Action, so the same stub works. `RecordPayment` needs `:agent_state`, which an Agent normally supplies, so the test passes it directly.
+
+```elixir
+defmodule TestingJido.PayInvoiceTest do
+  use ExUnit.Case, async: true
+
+  alias TestingJido.{ApprovingGateway, DecliningGateway, PayInvoice}
+
+  test "records the charged amount" do
+    context = %{gateway: ApprovingGateway, agent_state: %{paid_cents: 100}}
+
+    assert Jido.Exec.run(PayInvoice, %{amount_cents: 500}, context) == {:ok, %{paid_cents: 600}}
+  end
+
+  test "stops at the charge step when the card is declined" do
+    context = %{gateway: DecliningGateway, agent_state: %{paid_cents: 100}}
+
+    assert {:error, %Jido.Error.ExecutionError{details: details}} =
+             Jido.Exec.run(PayInvoice, %{amount_cents: 500}, context)
+
+    assert details.node == "charge"
+    assert details.reason == :card_declined
+  end
+end
+
+ExUnit.run() |> Map.take([:total, :failures])
+```
+
+The cell returns `%{total: 2, failures: 0}`.
+
+## Test an Agent Turn
+
+`cmd/3` needs no process and performs no Directives, so a test can assert on the state and on the Directives themselves. The `:context` option passes the stub to the handler. Compare with the source value to prove that a failed Turn changed nothing.
+
+```elixir
+defmodule TestingJido.InvoiceTurnTest do
+  use ExUnit.Case, async: true
+
+  alias TestingJido.{ApprovingGateway, DecliningGateway, InvoiceAgent}
+
+  setup do
+    %{invoice: InvoiceAgent.instantiate!(id: "inv-test")}
+  end
+
+  test "a payment updates state and requests a reply", %{invoice: invoice} do
+    signal = InvoiceAgent.pay_signal!(%{amount_cents: 500})
+
+    assert {:ok, paid, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+             InvoiceAgent.cmd(invoice, signal, context: %{gateway: ApprovingGateway})
+
+    assert paid.state.paid_cents == 500
+    assert reply.type == "invoice.paid"
+    assert reply.data == 500
+  end
+
+  test "a declined card fails the Turn", %{invoice: invoice} do
+    signal = InvoiceAgent.pay_signal!(%{amount_cents: 500})
+
+    assert {:error, %Jido.Error.ExecutionError{}} =
+             InvoiceAgent.cmd(invoice, signal, context: %{gateway: DecliningGateway})
+
+    assert invoice.state.paid_cents == 0
+  end
+end
+
+ExUnit.run() |> Map.take([:total, :failures])
+```
+
+The cell returns `%{total: 2, failures: 0}`.
+
+## Test a live Agent
+
+Add a small number of live tests for what only a server does: commit, state version, and delivery. Start the instance with `start_supervised!/1`, so it stops with the test. A unique name for each test keeps `async: true` safe. `Jido.AgentServer.call/3` returns at the commit and the server performs Directives afterward, so wait for the reply with `assert_receive`.
+
+```elixir
+defmodule TestingJido.InvoiceServerTest do
+  use ExUnit.Case, async: true
+
+  alias Jido.AgentServer
+  alias TestingJido.{ApprovingGateway, DecliningGateway, InvoiceAgent}
+
+  setup do
+    jido = :"testing_jido_#{System.unique_integer([:positive])}"
+    start_supervised!({Jido, name: jido})
+
+    {:ok, server} = Jido.start_agent(jido, InvoiceAgent, id: "inv-live")
+    :ok = AgentServer.await_ready(server)
+
+    %{server: server, signal: InvoiceAgent.pay_signal!(%{amount_cents: 500})}
+  end
+
+  test "commits the payment and delivers the reply", %{server: server, signal: signal} do
+    assert {:ok, committed, [_reply]} =
+             AgentServer.call(server, signal, context: %{gateway: ApprovingGateway})
+
+    assert committed.state.paid_cents == 500
+    assert AgentServer.status(server).state_version == 1
+    assert_receive %Jido.Signal{type: "invoice.paid", data: 500}
+  end
+
+  test "keeps the committed state after a failed Turn", %{server: server, signal: signal} do
+    assert {:error, _reason} = AgentServer.call(server, signal, context: %{gateway: DecliningGateway})
+
+    assert AgentServer.agent(server).state.paid_cents == 0
+    assert AgentServer.status(server).state_version == 0
+    assert Process.alive?(server)
+  end
+end
+
+ExUnit.run() |> Map.take([:total, :failures])
+```
+
+The cell returns `%{total: 2, failures: 0}`.
+
+## Choose the level
+
+| What you want to prove | Test with |
+| --- | --- |
+| A body, a schema, or a failure in one unit of work | `Jido.Exec.run/4` on the Action |
+| Components connect, and a failure stops in the right place | `Jido.Exec.run/4` on the Flow |
+| A route, a state change, or a Directive | `cmd/3` on an Agent instance |
+| Commit, state version, or delivery | `Jido.AgentServer.call/3` under a test instance |
+
+## Next steps
+
+- [Test Actions](../actions/testing-actions.livemd) adds retries, timeouts, and telemetry.
+- [Test Flows](../flow-runtime/testing-flows.livemd) adds stubbed Actions and managed runs.
+- [Test Agent Definitions](../agents/testing-agent-definitions.livemd) tests route selection and rejected definitions.
+- [Test Jido Systems](../operations/test-jido-systems.livemd) covers multi-Agent tests.

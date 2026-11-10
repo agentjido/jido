@@ -1,12 +1,13 @@
 defmodule Jido.AgentServer.Plugin do
-  @moduledoc false
+  @moduledoc "Live Plugin state access and lifecycle policy for one AgentServer."
 
-  alias Jido.Agent.Command
-  alias Jido.Agent.Error
-  alias Jido.AgentServer.Plugin.{Callbacks, Commit}
-  alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.Error
+  alias Jido.AgentServer.Command
+  alias Jido.AgentServer.Plugin.Callbacks
+  alias Jido.Plugin.Init
+  alias Jido.Plugin.Context.Commit
 
-  @doc false
+  @doc "Reads the current state owned by one live Plugin runtime."
   @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
   def state(%Init{agent_server: agent_server, module: package}, timeout \\ 5_000) do
     Jido.AgentServer.plugin_state(agent_server, package, timeout)
@@ -28,7 +29,7 @@ defmodule Jido.AgentServer.Plugin do
       if spec.module in changed and match?(%{runtime?: true}, spec.agent_server) and
            not function_exported?(spec.module, :quiesce, 2) do
         {:halt,
-         Error.fail(
+         Error.validation_result(
            :plugin_quiescence_required,
            [:plugins],
            "Plugin changes require quiesce and resume callbacks",
@@ -99,7 +100,7 @@ defmodule Jido.AgentServer.Plugin do
     Enum.reduce_while(specs, :ok, fn spec, :ok ->
       result =
         bounded(fn ->
-          Jido.Plugin.Error.safe_apply(
+          Jido.Plugin.invoke(
             spec.module,
             spec.module,
             callback,
@@ -119,9 +120,6 @@ defmodule Jido.AgentServer.Plugin do
     with :ok <- remove_roots(data.activation, changed),
          do: bootstrap(data, owner)
   end
-
-  @doc false
-  def commit_specs(specs), do: Callbacks.commit_specs(specs)
 
   @doc false
   def after_commit(data, active, plugin) do
@@ -146,7 +144,8 @@ defmodule Jido.AgentServer.Plugin do
         :unowned
 
       owner ->
-        context = %DirectiveContext{
+        context = %Jido.Plugin.Context{
+          phase: :directive,
           turn_id: active.turn_id,
           agent_id: data.agent.id,
           source_signal: active.source_signal,

@@ -7,8 +7,9 @@ defmodule Jido.Persistence.Plugin do
   result. `Jido.Persistence` owns when the conversion runs.
   """
 
-  alias Jido.Persistence.Plugin.{Context, Spec}
-  alias Jido.Plugin.Error, as: PluginError
+  alias Jido.Plugin, as: PluginBoundary
+  alias Jido.Plugin.Context.Persistence, as: Context
+  alias Jido.Plugin.Spec.Persistence, as: Spec
 
   @doc false
   @spec dump(Jido.Plugin.Spec.t(), term(), Context.t()) :: {:ok, term()} | {:error, term()}
@@ -16,7 +17,7 @@ defmodule Jido.Persistence.Plugin do
     with {:ok, context} <- Context.validate(context),
          :ok <- validate_context(context, spec, :dump),
          result <-
-           PluginError.safe_apply(
+           PluginBoundary.invoke(
              spec.package,
              spec.module,
              :dump,
@@ -40,7 +41,7 @@ defmodule Jido.Persistence.Plugin do
          :ok <- validate_context(context, spec, :load),
          :ok <- portable(value, spec, :load),
          result <-
-           PluginError.safe_apply(
+           PluginBoundary.invoke(
              spec.package,
              spec.module,
              :load,
@@ -70,7 +71,7 @@ defmodule Jido.Persistence.Plugin do
   defp callback_value({:error, _reason} = error, _spec, _callback), do: error
 
   defp callback_value(result, spec, callback) do
-    PluginError.invalid_callback(
+    PluginBoundary.invalid_callback(
       "Persistence Plugin callback returned an invalid result",
       spec.package,
       spec.module,
@@ -79,12 +80,12 @@ defmodule Jido.Persistence.Plugin do
   end
 
   defp portable(value, spec, callback) do
-    case Jido.PortableTerm.validate(value, [:plugin_state, spec.package]) do
+    case Jido.Codec.Term.validate(value, [:plugin_state, spec.package]) do
       :ok ->
         :ok
 
       {:error, path} ->
-        PluginError.invalid_callback(
+        PluginBoundary.invalid_callback(
           "Persistence Plugin storage value is not portable",
           spec.package,
           spec.module,
@@ -94,12 +95,12 @@ defmodule Jido.Persistence.Plugin do
   end
 
   defp validate_state(value, schema, spec) do
-    case Jido.Schema.validate(schema, value) do
+    case Jido.Joi.validate(schema, value) do
       :ok ->
         {:ok, value}
 
       {:error, errors} ->
-        PluginError.invalid_callback(
+        PluginBoundary.invalid_callback(
           "Persistence Plugin loaded invalid owned state",
           spec.package,
           spec.module,
@@ -116,7 +117,7 @@ defmodule Jido.Persistence.Plugin do
        do: :ok
 
   defp validate_context(context, spec, direction) do
-    PluginError.validation("Persistence Plugin context does not match its owner", %{
+    PluginBoundary.validation_error("Persistence Plugin context does not match its owner", %{
       plugin: spec.package,
       facet: spec.module,
       direction: direction,

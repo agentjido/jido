@@ -5,7 +5,7 @@ defmodule Jido.Agent.RefTest do
   alias Jido.Error.ValidationError
 
   test "schema and constructors return the same exact Ref" do
-    assert %Zoi.Types.Struct{module: Ref} = Ref.schema()
+    assert {:ok, Ref} = Jido.Joi.Schema.struct_module(Ref.schema())
 
     attrs = %{namespace: "shop/primary", partition: "west", id: "order-123"}
 

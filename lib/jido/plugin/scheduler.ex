@@ -13,14 +13,15 @@ defmodule Jido.Plugin.Scheduler do
 
   Pass `generation: integer` (0 through 2,147,483,647) to `cron/4` to add logical occurrence
   metadata. Use a new generation when replacing or recreating a schedule, and
-  retain it across restore. `occurrence/1` reads the metadata. Signal data stays
-  unchanged. Omit generation for the existing plain ticks.
+  retain it across restore. `Jido.Plugin.Scheduler.Occurrence.from_signal/1`
+  reads the metadata. Signal data stays unchanged. Omit generation for the
+  existing plain ticks.
 
       directive = Jido.Plugin.Scheduler.cron("report", "0 * * * *", tick, generation: 1)
 
   In the tick Action, read the metadata from `context.signal`:
 
-      {:ok, occurrence} = Jido.Plugin.Scheduler.occurrence(context.signal)
+      {:ok, occurrence} = Jido.Plugin.Scheduler.Occurrence.from_signal(context.signal)
       occurrence.id
 
   `:retry_delay_ms` sets the delay after a recurring job cannot start (default
@@ -66,43 +67,74 @@ defmodule Jido.Plugin.Scheduler do
   use Jido.Plugin,
     option_keys: [agent_server: [:delivery_adapter, :retry_delay_ms, :time_scale]]
 
-  @impl true
-  defdelegate state_spec(opts), to: Jido.Plugin.Scheduler.Agent
-
-  @impl true
-  defdelegate directives(opts), to: Jido.Plugin.Scheduler.Agent
-
-  @impl true
-  defdelegate reduce(reduction, opts), to: Jido.Plugin.Scheduler.Agent
-
-  @impl true
-  def validate_options(opts), do: validate_runtime_options(opts)
-
-  @impl true
-  defdelegate dispatch(runtime, directive, context, opts), to: Jido.Plugin.Scheduler.Server
-
-  @impl true
-  defdelegate await_ready(runtime, opts), to: Jido.Plugin.Scheduler.Server
-
-  @impl true
-  defdelegate child_spec(init), to: Jido.Plugin.Scheduler.Server
-
   alias Crontab.CronExpression.Parser
-  alias Jido.PortableTerm
+  alias Jido.Joi
+  alias Jido.Plugin.{Context, Init}
 
   alias Jido.Plugin.Scheduler.{
     Cancel,
     CronRules,
     Cron,
     Occurrence,
+    Runtime,
     Schedule
   }
 
   alias Jido.Signal
 
-  @default_timezone "Etc/UTC"
   @timer_max 4_294_967_295
   @cron_option_keys [:timezone, :generation]
+  @cron_spec_schema Joi.object(
+                      %{
+                        cron_expression: Joi.string(),
+                        message: Joi.struct(Signal),
+                        timezone: Joi.string(),
+                        generation:
+                          Joi.integer()
+                          |> Joi.min(0)
+                          |> Joi.max(2_147_483_647)
+                          |> Joi.optional()
+                      },
+                      unrecognized_keys: :error
+                    )
+  @state_schema Joi.object(%{
+                  cron:
+                    Joi.map(Joi.any(), @cron_spec_schema, description: "Recurring schedule definitions")
+                    |> Joi.refine({CronRules, :validate_state, []})
+                })
+                |> Joi.default(%{cron: %{}})
+
+  @impl true
+  def state_spec(_opts), do: {:scheduler, @state_schema}
+
+  @impl true
+  def directives(_opts), do: [Schedule, Cron, Cancel]
+
+  @impl true
+  def reduce(reduction, _opts),
+    do: apply_directives(reduction.plugin_state, reduction.directives)
+
+  @impl true
+  def validate_options(opts), do: validate_runtime_options(opts)
+
+  @impl true
+  def dispatch(runtime, directive, %Context{phase: :directive} = context, opts) do
+    GenServer.call(runtime, {:directive, directive, context}, Keyword.get(opts, :timeout, 5_000))
+  catch
+    :exit, reason -> {:error, {:scheduler_runtime_unavailable, reason}}
+  end
+
+  @impl true
+  def await_ready(runtime, opts) do
+    GenServer.call(runtime, :await_ready, Keyword.get(opts, :timeout, 5_000))
+  catch
+    :exit, reason -> {:error, {:scheduler_runtime_unavailable, reason}}
+  end
+
+  @impl true
+  def child_spec(%Init{} = init) do
+    Supervisor.child_spec({Runtime, init}, id: init.module)
+  end
 
   @typedoc "One Scheduler Plugin option."
   @type option ::
@@ -133,14 +165,25 @@ defmodule Jido.Plugin.Scheduler do
     }
   end
 
-  @doc "Reads logical occurrence metadata from a recurring tick."
-  @spec occurrence(Signal.t()) :: {:ok, Occurrence.t()} | {:error, term()}
-  defdelegate occurrence(signal), to: Occurrence, as: :from_signal
-
   @doc "Returns the next UTC occurrence after one UTC instant."
   @spec next_occurrence(String.t(), String.t(), DateTime.t()) ::
           {:ok, DateTime.t()} | {:error, term()}
-  defdelegate next_occurrence(expression, timezone, after_time), to: CronRules
+  def next_occurrence(expression, timezone, %DateTime{} = after_time)
+      when is_binary(expression) and is_binary(timezone) do
+    extended? = length(String.split(expression)) > 5
+
+    with {:ok, cron} <- Parser.parse(expression, extended?),
+         {:ok, local_after} <- DateTime.shift_zone(after_time, timezone) do
+      next_strict(cron, timezone, local_after, after_time)
+    end
+  rescue
+    _exception -> {:error, :invalid_cron_boundary}
+  catch
+    _kind, _reason -> {:error, :invalid_cron_boundary}
+  end
+
+  def next_occurrence(_expression, _timezone, _after_time),
+    do: {:error, :invalid_cron_boundary}
 
   @doc "Builds one fresh recurring occurrence Signal."
   @spec occurrence_signal(Signal.t(), term(), term(), non_neg_integer() | nil, DateTime.t()) ::
@@ -156,8 +199,8 @@ defmodule Jido.Plugin.Scheduler do
         %DateTime{} = scheduled_at
       )
       when is_integer(generation) and generation in 0..2_147_483_647 do
-    with :ok <- validate_occurrence_scope(scope),
-         :ok <- validate_job_id(job_id),
+    with :ok <- CronRules.validate_occurrence_scope(scope),
+         :ok <- CronRules.validate_job_id(job_id),
          :ok <- Occurrence.validate_template(signal) do
       Occurrence.attach(fresh_signal(signal), scope, job_id, generation, scheduled_at)
     end
@@ -178,107 +221,6 @@ defmodule Jido.Plugin.Scheduler do
          :ok <- validate_time_scale(Keyword.fetch(opts, :time_scale)),
          :ok <- validate_delivery_adapter(Keyword.fetch(opts, :delivery_adapter)),
          do: :ok
-  end
-
-  @doc false
-  def validate_cron_state(cron, _opts) do
-    Enum.reduce_while(cron, :ok, fn {job_id, spec}, :ok ->
-      with :ok <- validate_job_id(job_id),
-           {:ok, _timezone} <-
-             validate_cron_spec(spec.cron_expression, spec.message, spec.timezone),
-           :ok <- validate_occurrence(spec.message, Map.get(spec, :generation)) do
-        {:cont, :ok}
-      else
-        {:error, reason} ->
-          {:halt, {:error, "invalid cron state for #{inspect(job_id)}: #{inspect(reason)}"}}
-      end
-    end)
-  end
-
-  @doc false
-  @spec build_cron_spec(
-          String.t(),
-          term(),
-          String.t() | nil,
-          non_neg_integer() | nil
-        ) :: map()
-  def build_cron_spec(
-        cron_expression,
-        message,
-        timezone \\ nil,
-        generation \\ nil
-      )
-      when is_binary(cron_expression) and (is_nil(timezone) or is_binary(timezone)) do
-    spec = %{
-      cron_expression: cron_expression,
-      message: message,
-      timezone: normalize_timezone_value(timezone)
-    }
-
-    if is_nil(generation), do: spec, else: Map.put(spec, :generation, generation)
-  end
-
-  @doc false
-  def validate_occurrence_scope(scope) do
-    if PortableTerm.valid?(scope), do: :ok, else: {:error, :nonportable_occurrence_scope}
-  end
-
-  @doc false
-  def validate_occurrence(_signal, nil), do: :ok
-  def validate_occurrence(signal, _generation), do: Occurrence.validate_template(signal)
-
-  @doc false
-  def validate_cron_spec(cron_expression, message, timezone) do
-    with :ok <- validate_cron_expression_type(cron_expression),
-         {:ok, timezone} <- validate_timezone_option(timezone),
-         :ok <- validate_message(message),
-         :ok <- validate_cron_syntax(cron_expression),
-         :ok <- validate_timezone_support(timezone) do
-      {:ok, timezone}
-    end
-  end
-
-  defp validate_cron_syntax(cron_expression) do
-    extended? = length(String.split(cron_expression)) > 5
-
-    case Parser.parse(cron_expression, extended?) do
-      {:ok, _expression} -> :ok
-      {:error, reason} -> {:error, {:invalid_cron, reason}}
-    end
-  end
-
-  defp validate_timezone_support(timezone) do
-    case DateTime.now(timezone) do
-      {:ok, _now} -> :ok
-      {:error, reason} -> {:error, {:invalid_timezone, reason}}
-    end
-  end
-
-  defp validate_cron_expression_type(cron_expression) when is_binary(cron_expression), do: :ok
-
-  defp validate_cron_expression_type(_cron_expression),
-    do: {:error, {:invalid_cron, :invalid_type}}
-
-  defp validate_timezone_option(timezone) when is_nil(timezone) or is_binary(timezone),
-    do: {:ok, normalize_timezone_value(timezone)}
-
-  defp validate_timezone_option(_timezone), do: {:error, {:invalid_timezone, :invalid_type}}
-
-  defp normalize_timezone_value(nil), do: @default_timezone
-  defp normalize_timezone_value(""), do: @default_timezone
-  defp normalize_timezone_value(timezone) when is_binary(timezone), do: timezone
-
-  defp validate_message(message) do
-    if PortableTerm.valid?(message),
-      do: :ok,
-      else: {:error, {:invalid_message, :nonportable_term}}
-  end
-
-  @doc false
-  def validate_job_id(id) do
-    if PortableTerm.valid?(id),
-      do: :ok,
-      else: {:error, {:invalid_job_id, :nonportable_term}}
   end
 
   defp validate_cron_options!(opts) do
@@ -363,10 +305,57 @@ defmodule Jido.Plugin.Scheduler do
     {:error, Jido.Error.validation_error(message, kind: :config, details: details)}
   end
 
+  defp apply_directives(state, directives) do
+    Enum.reduce_while(directives, {:ok, state}, &apply_directive/2)
+  end
+
+  defp apply_directive(%Cron{} = directive, {:ok, state}) do
+    spec =
+      CronRules.build_spec(
+        directive.cron,
+        directive.signal,
+        directive.timezone,
+        directive.generation
+      )
+
+    {:cont, {:ok, put_in(state, [:cron, directive.job_id], spec)}}
+  end
+
+  defp apply_directive(%Cancel{job_id: job_id}, {:ok, state}),
+    do: {:cont, {:ok, update_in(state, [:cron], &Map.delete(&1, job_id))}}
+
+  defp apply_directive(_other, {:ok, state}), do: {:cont, {:ok, state}}
+
   defp fresh_signal(%Signal{} = signal) do
     signal
-    |> Signal.to_map()
+    |> Jido.Signal.Codec.to_map()
     |> Map.delete("id")
     |> Signal.new!()
+  end
+
+  defp next_local(cron, timezone, local_after) do
+    case Crontab.Scheduler.get_next_run_date(cron, DateTime.to_naive(local_after)) do
+      {:ok, naive_next} -> to_utc(cron, timezone, naive_next)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp next_strict(cron, timezone, local_after, after_time) do
+    with {:ok, next} <- next_local(cron, timezone, local_after) do
+      if DateTime.compare(next, after_time) == :gt do
+        {:ok, next}
+      else
+        next_local(cron, timezone, DateTime.add(local_after, 1, :microsecond))
+      end
+    end
+  end
+
+  defp to_utc(cron, timezone, naive_next) do
+    case DateTime.from_naive(naive_next, timezone) do
+      {:ok, next} -> DateTime.shift_zone(next, "Etc/UTC")
+      {:ambiguous, _first, second} -> DateTime.shift_zone(second, "Etc/UTC")
+      {:gap, _before, just_after} -> next_local(cron, timezone, just_after)
+      {:error, _reason} = error -> error
+    end
   end
 end

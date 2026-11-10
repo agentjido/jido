@@ -1,0 +1,174 @@
+# Cancel Turns
+
+This tutorial cancels a running report Turn, confirms that its state did not change, and shows the result you get at each point in a Turn's life.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Start a report Agent
+
+The Action tells this notebook its process, then waits. It never finishes on its own in this tutorial, so only cancellation can end it.
+
+```elixir
+defmodule CancelGuide.BuildReport do
+  use Jido.Action,
+    name: "cancel_guide_build_report",
+    schema: Jido.Joi.object(%{name: Jido.Joi.string()})
+
+  @impl Jido.Action
+  def run(%{name: name}, %{agent_state: state, notify: notify}) do
+    send(notify, {:building, self()})
+
+    receive do
+      :finish -> {:ok, %{state | reports: state.reports ++ [name]}}
+    end
+  end
+end
+
+defmodule CancelGuide.Reports do
+  use Jido.Agent, name: "reports"
+
+  state do
+    schema Jido.Joi.object(%{reports: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+  end
+
+  routes do
+    signal_source "/reports"
+    route "report.build", CancelGuide.BuildReport, as: :build
+  end
+end
+
+{:ok, _instance} = Jido.start(name: CancelGuide.Jido)
+{:ok, reports} = Jido.start_agent(CancelGuide.Jido, CancelGuide.Reports, id: "reports-1")
+:ok = Jido.AgentServer.await_ready(reports)
+
+start_report = fn name ->
+  signal = CancelGuide.Reports.build_signal!(%{name: name})
+  pending = Jido.AgentServer.submit(reports, signal, context: %{notify: self()})
+
+  receive do
+    {:building, action} -> {pending, action}
+  after
+    1_000 -> raise "the Turn did not start"
+  end
+end
+```
+
+## Cancel the active Turn
+
+`Jido.AgentServer.cancel/2` stops whichever Turn is active. It returns `:ok` after it confirms that the owned work has stopped. The Turn's caller receives `{:error, :cancelled}`.
+
+```elixir
+{pending, action} = start_report.("q1")
+monitor = Process.monitor(action)
+
+:ok = Jido.AgentServer.cancel(reports)
+{:error, :cancelled} = Jido.AgentServer.await(pending)
+
+action_stopped =
+  receive do
+    {:DOWN, ^monitor, :process, ^action, _reason} -> true
+  after
+    1_000 -> false
+  end
+
+action_stopped
+# The cell returns true
+```
+
+The Action did not need to cooperate. Jido stopped its process.
+
+Nothing committed, so the state and the revision are unchanged. The server is idle and ready for the next Turn. A cancelled Turn does not add to `error_count`, and the error policy does not run for it.
+
+```elixir
+%{agent: agent, state_version: version} = Jido.AgentServer.snapshot(reports)
+status = Jido.AgentServer.status(reports)
+
+{agent.state, version, status.phase, status.last_outcome.status, status.error_count}
+# The cell returns {%{reports: []}, 0, :idle, :cancelled, 0}
+```
+
+Cancellation undoes nothing outside the Agent. If an Action wrote to a file or called an API before it stopped, that work stays done.
+
+## Cancel one exact Turn
+
+`cancel/2` can hit a newer Turn than the one you meant, because the active Turn may have changed since you decided to cancel. To avoid that, read the Turn ID from status and pass it to `Jido.AgentServer.cancel_turn/3`.
+
+```elixir
+{pending, _action} = start_report.("q2")
+%{active: %{turn_id: turn_id}} = Jido.AgentServer.status(reports)
+
+stale = Jido.AgentServer.cancel_turn(reports, "01-an-old-turn-id")
+current = Jido.AgentServer.cancel_turn(reports, turn_id)
+{:error, :cancelled} = Jido.AgentServer.await(pending)
+
+{stale, current}
+# The cell returns {{:error, :stale_turn}, :ok}
+```
+
+## Know when you cannot cancel
+
+Cancellation covers work before commit. Once a Turn has committed, its state stands, and its effects run to their limit.
+
+```elixir
+Jido.AgentServer.cancel(reports)
+# The cell returns {:error, :not_running}
+```
+
+| Server is | `cancel/2` and `cancel_turn/3` return |
+| --- | --- |
+| Starting or restoring | `{:error, :not_running}` |
+| Idle | `{:error, :not_running}` |
+| Running pre-commit work | `:ok` after cleanup. A different Turn ID returns `{:error, :stale_turn}`. |
+| Saving the commit | `{:error, :commit_in_progress}` |
+| Running effects or the error policy | `{:error, :not_running}` |
+| Waiting on a durable Flow | `:ok` after a terminal save. `{:error, :unsafe_resume}` when admission is blocked. |
+| Between Turns of a Handoff chain, or in its predecessor's effects | `:ok`. The chain stops. See [Durable Turns and Flows](../durability/durable-turns-and-flows.livemd). |
+
+A call from the Turn's own work returns `{:error, :reentrant_turn}`.
+
+## Handle a slow cancel
+
+The second argument is how long the caller waits for confirmation, with a default of 5,000 ms. When it expires, the caller exits as with any OTP call. Cancellation continues, and you can call `cancel/2` again to wait on the same cleanup. If cleanup cannot be confirmed, the activation stops and its work stops with it.
+
+## Stop queued work
+
+`cancel/2` acts only on the active Turn. To clear the queue, call `Jido.AgentServer.quiesce/2`, which rejects queued Turns with `:quiesced`. Pass `active: :cancel` to cancel the active Turn as well, then reopen admission.
+
+```elixir
+{active, _action} = start_report.("q3")
+queued = Jido.AgentServer.submit(reports, CancelGuide.Reports.build_signal!(%{name: "q4"}))
+
+:ok = Jido.AgentServer.quiesce(reports, active: :cancel)
+results = {Jido.AgentServer.await(active), Jido.AgentServer.await(queued)}
+:ok = Jido.AgentServer.resume(reports)
+
+results
+# The cell returns {{:error, :cancelled}, {:error, :quiesced}}
+```
+
+See [Control Activations](inspect-and-control-activations.livemd).
+
+## Compare the ways to stop waiting
+
+| You call | The Turn | The caller |
+| --- | --- | --- |
+| `Jido.AgentServer.cancel/2` | Stops before commit. | Gets `{:error, :cancelled}`. |
+| `Jido.AgentServer.call/3` with a short timeout | Keeps running. | Exits on timeout. |
+| `Jido.AgentServer.await/2` with a short timeout | Keeps running. | Gets `{:error, :timeout}` and can wait again. |
+| `Jido.AgentServer.abandon/1` | Keeps running. | Gets no result. |
+| `Jido.AgentServer.stop/3` | Stops with the server. | Gets an exit or an error from `await/2`. |
+
+The `:turn_timeout` option cancels the same way on its own. Its caller gets `{:error, :turn_timeout}`, and its outcome has the status `:timed_out`.
+
+`Jido.cancel/3` and `Jido.cancel_turn/4` do the same through a `Jido.Agent.Ref`.
+
+## Next steps
+
+- [Status and Turn History](status-and-history.md) describes the outcome of a cancelled Turn.
+- [Admission and Deadlines](agent-server-admission.md) lists the other limits on a Turn.

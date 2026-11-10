@@ -12,7 +12,7 @@ defmodule Jido.Persistence.File do
   across BEAM instances.
   """
 
-  @behaviour Jido.Persistence.Adapter
+  @behaviour Jido.Persistence.Store
 
   @impl true
   def validate_options(opts) do

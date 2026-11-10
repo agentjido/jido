@@ -7,10 +7,10 @@ defmodule Jido.Agent.StateTest do
     use Jido.Agent, name: "initializing_agent"
 
     state do
-      schema Zoi.object(%{
-               value: Zoi.integer(),
-               initialized_for: Zoi.string(),
-               defaulted: Zoi.boolean() |> Zoi.default(false)
+      schema Jido.Joi.object(%{
+               value: Jido.Joi.integer(),
+               initialized_for: Jido.Joi.string(),
+               defaulted: Jido.Joi.boolean() |> Jido.Joi.default(false)
              })
 
       initial_state %{value: 1, transient: true}
@@ -43,15 +43,15 @@ defmodule Jido.Agent.StateTest do
     assert overridden.state == %{value: 4, initialized_for: "overridden", defaulted: false}
     assert {:ok, ^overridden} = Agent.validate(overridden)
 
-    assert {:error, %Agent.Error{code: :initialize_failed, details: %{reason: :rejected}}} =
+    assert {:error, %Jido.Error.ValidationError{code: :initialize_failed, details: %{reason: :rejected}}} =
              InitializingAgent.instantiate(id: "error", state: %{reject: true})
   end
 
   @tag obligation: "jido.agent.I8"
   test "initialization validates unchanged state once" do
     schema =
-      Zoi.object(%{
-        count: Zoi.integer() |> Zoi.refine({__MODULE__, :observe, []}) |> Zoi.default(0)
+      Jido.Joi.object(%{
+        count: Jido.Joi.integer() |> Jido.Joi.refine({__MODULE__, :observe, []}) |> Jido.Joi.default(0)
       })
 
     definition = Agent.define!(%{name: "single_validation", schema: schema})
@@ -67,9 +67,9 @@ defmodule Jido.Agent.StateTest do
   @tag obligation: ["jido.agent.I6", "jido.agent.I8"]
   test "initial state can be partial and the merged state uses one schema validation" do
     schema =
-      Zoi.object(%{
-        count: Zoi.integer() |> Zoi.refine({__MODULE__, :observe, []}),
-        enabled: Zoi.boolean() |> Zoi.default(true)
+      Jido.Joi.object(%{
+        count: Jido.Joi.integer() |> Jido.Joi.refine({__MODULE__, :observe, []}),
+        enabled: Jido.Joi.boolean() |> Jido.Joi.default(true)
       })
 
     definition =
@@ -81,7 +81,7 @@ defmodule Jido.Agent.StateTest do
 
     assert {:ok, agent} =
              Agent.instantiate(definition,
-               id: Jido.Signal.ID.generate!(),
+               id: Jido.Id.uuid7(),
                state: %{count: 3}
              )
 
@@ -90,43 +90,43 @@ defmodule Jido.Agent.StateTest do
     refute_received {:validated, _}
 
     invalid = %{definition | initial_state: %{enabled: "false"}}
-    assert {:error, %Jido.Agent.Error{path: [:state]}} = Agent.instantiate(invalid, id: "bad")
+    assert {:error, %Jido.Error.ValidationError{path: [:state]}} = Agent.instantiate(invalid, id: "bad")
   end
 
   @tag obligation: "jido.agent.I8"
   test "defaults and explicit nil cannot insert invalid values" do
     for schema <- [
-          Zoi.object(%{count: Zoi.integer() |> Zoi.default("invalid")}),
-          Zoi.object(%{nested: Zoi.object(%{count: Zoi.integer() |> Zoi.default("invalid")})})
+          Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default("invalid")}),
+          Jido.Joi.object(%{nested: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default("invalid")})})
         ],
         state <- [%{}, %{count: nil}, %{nested: %{}}] do
       definition = Agent.define!(%{name: "invalid_default", schema: schema})
 
       assert {:error, %{__exception__: true}} =
-               Agent.instantiate(definition, id: Jido.Signal.ID.generate!(), state: state)
+               Agent.instantiate(definition, id: Jido.Id.uuid7(), state: state)
     end
   end
 
   @tag obligation: ["jido.agent.I8", "jido.agent.I9"]
   test "initialization retains nested defaults, explicit nil, and supplied values" do
     schema =
-      Zoi.object(%{
-        config: Zoi.map() |> Zoi.default(%{first: 1, second: 2}),
-        count: Zoi.integer() |> Zoi.default(3),
-        optional: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)
+      Jido.Joi.object(%{
+        config: Jido.Joi.map() |> Jido.Joi.default(%{first: 1, second: 2}),
+        count: Jido.Joi.integer() |> Jido.Joi.default(3),
+        optional: Jido.Joi.string() |> Jido.Joi.nullable() |> Jido.Joi.default(nil)
       })
 
     definition = Agent.define!(%{name: "nested_defaults", schema: schema})
 
     assert {:ok, agent} =
              Agent.instantiate(definition,
-               id: Jido.Signal.ID.generate!(),
+               id: Jido.Id.uuid7(),
                state: %{config: %{second: 4}, count: nil}
              )
 
     assert agent.state == %{config: %{second: 4}, count: 3, optional: nil}
 
-    assert {:error, %Jido.Agent.Error{code: :incomplete_state}} =
+    assert {:error, %Jido.Error.ValidationError{code: :incomplete_state}} =
              Agent.transition(agent, %{optional: nil})
   end
 
@@ -143,16 +143,16 @@ defmodule Jido.Agent.StateTest do
   @tag obligation: "jido.agent.I8"
   test "nested defaults reach the leaf and validate it once" do
     for depth <- [0, 1, 2, 64, 70] do
-      leaf = Zoi.integer() |> Zoi.refine({__MODULE__, :observe, []}) |> Zoi.default(1)
+      leaf = Jido.Joi.integer() |> Jido.Joi.refine({__MODULE__, :observe, []}) |> Jido.Joi.default(1)
 
       nested =
         Enum.reduce(1..depth//1, leaf, fn _, child ->
-          Zoi.object(%{child: child}) |> Zoi.default(%{})
+          Jido.Joi.object(%{child: child}) |> Jido.Joi.default(%{})
         end)
 
       expected = Enum.reduce(1..depth//1, 1, fn _, child -> %{child: child} end)
-      definition = Agent.define!(%{name: "deep_defaults", schema: Zoi.object(%{root: nested})})
-      assert {:ok, agent} = Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+      definition = Agent.define!(%{name: "deep_defaults", schema: Jido.Joi.object(%{root: nested})})
+      assert {:ok, agent} = Agent.instantiate(definition, id: Jido.Id.uuid7())
       assert agent.state === %{root: expected}
       assert_received {:validated, 1}
       refute_received {:validated, _}
@@ -165,18 +165,18 @@ defmodule Jido.Agent.StateTest do
   @tag obligation: "jido.agent.I8"
   test "deep invalid defaults fail during initialization" do
     for depth <- [0, 1, 2, 64, 70] do
-      leaf = Zoi.integer() |> Zoi.default("bad")
+      leaf = Jido.Joi.integer() |> Jido.Joi.default("bad")
 
       nested =
         Enum.reduce(1..depth//1, leaf, fn _, child ->
-          Zoi.object(%{child: child}) |> Zoi.default(%{})
+          Jido.Joi.object(%{child: child}) |> Jido.Joi.default(%{})
         end)
 
       definition =
-        Agent.define!(%{name: "deep_invalid_defaults", schema: Zoi.object(%{root: nested})})
+        Agent.define!(%{name: "deep_invalid_defaults", schema: Jido.Joi.object(%{root: nested})})
 
-      assert {:error, %Jido.Agent.Error{details: %{issues: [%Zoi.Error{path: path}]}}} =
-               Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+      assert {:error, %Jido.Error.ValidationError{details: %{issues: [%{path: path}]}}} =
+               Agent.instantiate(definition, id: Jido.Id.uuid7())
 
       assert path == [:root | List.duplicate(:child, depth)]
     end
@@ -185,14 +185,14 @@ defmodule Jido.Agent.StateTest do
   @tag obligation: "jido.agent.I9"
   test "state schemas reject transforms and coercion before callbacks run" do
     for field <- [
-          Zoi.integer() |> Zoi.transform({__MODULE__, :increment, []}),
-          Zoi.integer(coerce: true),
-          Zoi.list(Zoi.integer() |> Zoi.transform({__MODULE__, :increment, []})),
-          Zoi.union([Zoi.integer(), Zoi.string(coerce: true)])
+          Jido.Joi.integer() |> Jido.Joi.transform({__MODULE__, :increment, []}),
+          Jido.Joi.integer(coerce: true),
+          Jido.Joi.list(Jido.Joi.integer() |> Jido.Joi.transform({__MODULE__, :increment, []})),
+          Jido.Joi.union([Jido.Joi.integer(), Jido.Joi.string(coerce: true)])
         ] do
-      schema = Zoi.object(%{nested: Zoi.object(%{value: field})})
+      schema = Jido.Joi.object(%{nested: Jido.Joi.object(%{value: field})})
 
-      assert {:error, %Jido.Agent.Error{path: [:schema | _]}} =
+      assert {:error, %Jido.Error.ValidationError{path: [:schema | _]}} =
                Agent.define(%{name: "invalid_schema", schema: schema})
 
       refute_received {:transformed, _}
@@ -201,9 +201,9 @@ defmodule Jido.Agent.StateTest do
 
   @tag obligation: "jido.agent.I9"
   test "input conversion types and dynamic schemas cannot bypass the state contract" do
-    for field <- [Zoi.string_boolean(), Zoi.lazy({__MODULE__, :lazy_transform, []})] do
-      assert {:error, %Jido.Agent.Error{path: [:schema | _]}} =
-               Agent.define(%{name: "conversion_schema", schema: Zoi.object(%{value: field})})
+    for field <- [Jido.Joi.string_boolean(), Jido.Joi.lazy({__MODULE__, :lazy_transform, []})] do
+      assert {:error, %Jido.Error.ValidationError{path: [:schema | _]}} =
+               Agent.define(%{name: "conversion_schema", schema: Jido.Joi.object(%{value: field})})
 
       refute_received :lazy_schema_called
     end
@@ -211,20 +211,20 @@ defmodule Jido.Agent.StateTest do
 
   def lazy_transform do
     send(self(), :lazy_schema_called)
-    Zoi.integer() |> Zoi.transform({__MODULE__, :increment, []})
+    Jido.Joi.integer() |> Jido.Joi.transform({__MODULE__, :increment, []})
   end
 
   @tag obligation: "jido.agent.I8"
   test "a successful refinement cannot change initialized state" do
     schema =
-      Zoi.object(%{
-        count: Zoi.integer() |> Zoi.refine({__MODULE__, :mutate, []}) |> Zoi.default(1)
+      Jido.Joi.object(%{
+        count: Jido.Joi.integer() |> Jido.Joi.refine({__MODULE__, :mutate, []}) |> Jido.Joi.default(1)
       })
 
     definition = Agent.define!(%{name: "mutating_refinement", schema: schema})
 
     assert {:error, %{__exception__: true}} =
-             Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+             Agent.instantiate(definition, id: Jido.Id.uuid7())
 
     assert_received {:mutated, 1}
     refute_received {:mutated, _}
@@ -233,12 +233,12 @@ defmodule Jido.Agent.StateTest do
   @tag obligation: "jido.agent.I9"
   test "stored state checks do not fill defaults or replace explicit nil" do
     schema =
-      Zoi.object(%{
-        nested: Zoi.object(%{count: Zoi.integer() |> Zoi.default(1)}) |> Zoi.default(%{})
+      Jido.Joi.object(%{
+        nested: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(1)}) |> Jido.Joi.default(%{})
       })
 
     definition = Agent.define!(%{name: "stored_defaults", schema: schema})
-    agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
+    agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
     assert agent.state === %{nested: %{count: 1}}
 
     for state <- [%{}, %{nested: %{}}, %{nested: nil}, %{nested: %{count: nil}}] do
@@ -252,15 +252,15 @@ defmodule Jido.Agent.StateTest do
 
   @tag obligation: ["jido.agent.I8", "jido.agent.I9"]
   test "optional defaulted fields stay absent in input and stored state" do
-    schema = Zoi.object(%{count: Zoi.integer() |> Zoi.default(1) |> Zoi.optional()})
+    schema = Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(1) |> Jido.Joi.optional()})
     definition = Agent.define!(%{name: "optional_default", schema: schema})
-    agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
+    agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
     assert agent.state === %{}
     assert {:ok, ^agent} = Agent.validate(agent)
     assert {:ok, ^agent} = Agent.transition(agent, %{})
 
     assert {:ok, %{state: %{count: 1}}} =
-             Agent.instantiate(definition, id: Jido.Signal.ID.generate!(), state: %{count: nil})
+             Agent.instantiate(definition, id: Jido.Id.uuid7(), state: %{count: nil})
 
     assert {:error, _} = Agent.transition(agent, %{count: nil})
   end
@@ -268,34 +268,34 @@ defmodule Jido.Agent.StateTest do
   @tag obligation: "jido.agent.I8"
   test "nil defaults need a nullable schema" do
     for nullable? <- [false, true] do
-      field = if nullable?, do: Zoi.integer() |> Zoi.nullable(), else: Zoi.integer()
+      field = if nullable?, do: Jido.Joi.integer() |> Jido.Joi.nullable(), else: Jido.Joi.integer()
 
       definition =
         Agent.define!(%{
           name: "nil_default",
-          schema: Zoi.object(%{count: Zoi.default(field, nil)})
+          schema: Jido.Joi.object(%{count: Jido.Joi.default(field, nil)})
         })
 
       if nullable? do
         assert {:ok, %{state: %{count: nil}} = agent} =
-                 Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+                 Agent.instantiate(definition, id: Jido.Id.uuid7())
 
         assert {:ok, ^agent} = Agent.validate(agent)
       else
         assert {:error, %{__exception__: true}} =
-                 Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+                 Agent.instantiate(definition, id: Jido.Id.uuid7())
       end
     end
   end
 
   @tag obligation: "jido.agent.I9"
   test "stored checks cannot silently strip nested keys" do
-    schema = Zoi.object(%{nested: Zoi.map(%{count: Zoi.integer()})})
+    schema = Jido.Joi.object(%{nested: Jido.Joi.map(%{count: Jido.Joi.integer()})})
     definition = Agent.define!(%{name: "stored_unknown", schema: schema})
 
     agent =
       Agent.instantiate!(definition,
-        id: Jido.Signal.ID.generate!(),
+        id: Jido.Id.uuid7(),
         state: %{nested: %{count: 1}}
       )
 
@@ -309,12 +309,12 @@ defmodule Jido.Agent.StateTest do
     def state_spec(_opts),
       do:
         {:plugin_count,
-         Zoi.integer() |> Zoi.transform({Jido.Agent.StateTest, :increment, []}) |> Zoi.default(1)}
+         Jido.Joi.integer() |> Jido.Joi.transform({Jido.Agent.StateTest, :increment, []}) |> Jido.Joi.default(1)}
   end
 
   @tag obligation: "jido.agent.I10"
   test "composed Plugin state follows the same schema policy" do
-    assert {:error, %Jido.Agent.Error{path: [:schema | _]}} =
+    assert {:error, %Jido.Error.ValidationError{path: [:schema | _]}} =
              Agent.define(%{
                name: "plugin_transform",
                plugins: [

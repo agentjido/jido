@@ -192,6 +192,8 @@ defmodule Jido.Error do
     :jido_namespace_mismatch
   ]
 
+  @validation_kinds [:input, :action, :config]
+
   # ============================================================================
   # Error Structs
   # ============================================================================
@@ -211,12 +213,14 @@ defmodule Jido.Error do
     """
     use Splode.Error,
       class: :invalid,
-      fields: [:message, :kind, :subject, :details]
+      fields: [:message, :kind, :subject, :code, :details]
 
     @type t :: %__MODULE__{
             message: String.t(),
             kind: :input | :action | :config | nil,
             subject: any(),
+            code: atom() | nil,
+            path: list() | nil,
             details: map()
           }
 
@@ -411,6 +415,34 @@ defmodule Jido.Error do
   def normalize_details(details) when is_map(details), do: details
   def normalize_details(_details), do: %{}
 
+  @doc "Prefixes a structured error path."
+  @spec prefix_path(term(), list()) :: term()
+  def prefix_path(%{details: details} = error, path) when is_map(details) and is_list(path) do
+    %{error | details: Map.put(details, :path, path ++ Map.get(details, :path, []))}
+  end
+
+  def prefix_path(error, _path), do: error
+
+  @doc "Creates a validation error result with a stable code and field path."
+  @spec validation_result(atom(), term(), String.t(), map()) :: {:error, ValidationError.t()}
+  def validation_result(code, path, message, details \\ %{}) when is_atom(code) do
+    {:error,
+     struct!(ValidationError,
+       message: message,
+       code: code,
+       path: List.wrap(path),
+       details: normalize_details(details)
+     )}
+  end
+
+  @doc "Prefixes the field path in a validation error result."
+  @spec prefix_result_path(term(), term()) :: term()
+  def prefix_result_path({:error, %ValidationError{} = error}, path) do
+    {:error, %{error | path: List.wrap(path) ++ List.wrap(error.path)}}
+  end
+
+  def prefix_result_path(result, _path), do: result
+
   @doc """
   Creates a validation error.
 
@@ -430,21 +462,34 @@ defmodule Jido.Error do
   @spec validation_error(String.t(), keyword() | map()) :: ValidationError.t()
   def validation_error(message, opts \\ []) do
     opts = if is_map(opts), do: Map.to_list(opts), else: opts
+    explicit_kind = opts[:kind]
 
     # Infer kind and subject from convenience keys
     {kind, subject} =
       cond do
         opts[:action] -> {:action, opts[:action]}
         opts[:field] -> {:input, opts[:field]}
-        true -> {opts[:kind], opts[:subject]}
+        explicit_kind in @validation_kinds -> {explicit_kind, opts[:subject]}
+        true -> {nil, opts[:subject]}
       end
+
+    reserved_keys =
+      if explicit_kind in @validation_kinds,
+        do: [:kind, :subject, :action],
+        else: [:subject, :action]
 
     ValidationError.exception(
       message: message,
       kind: kind,
       subject: subject,
-      details: Keyword.get(opts, :details, %{})
+      details: merge_extra_details(opts, reserved_keys)
     )
+  end
+
+  @doc "Creates a configuration validation error."
+  @spec config_error(String.t(), keyword() | map()) :: ValidationError.t()
+  def config_error(message, details \\ %{}) do
+    validation_error(message, kind: :config, details: normalize_constructor_details(details))
   end
 
   @doc """
@@ -483,7 +528,7 @@ defmodule Jido.Error do
     RoutingError.exception(
       message: message,
       target: Keyword.get(opts, :target),
-      details: Keyword.get(opts, :details, %{})
+      details: merge_extra_details(opts, [:target])
     )
   end
 
@@ -502,7 +547,7 @@ defmodule Jido.Error do
     TimeoutError.exception(
       message: message,
       timeout: Keyword.get(opts, :timeout),
-      details: Keyword.get(opts, :details, %{})
+      details: merge_extra_details(opts, [:timeout])
     )
   end
 
@@ -542,7 +587,7 @@ defmodule Jido.Error do
 
     InternalError.exception(
       message: message,
-      details: Keyword.get(opts, :details, %{})
+      details: merge_extra_details(opts, [])
     )
   end
 
@@ -557,9 +602,52 @@ defmodule Jido.Error do
     Map.merge(extra_details, explicit_details)
   end
 
+  defp normalize_constructor_details(details) when is_map(details), do: details
+
+  defp normalize_constructor_details(details) when is_list(details) do
+    if Keyword.keyword?(details), do: Map.new(details), else: %{}
+  end
+
+  defp normalize_constructor_details(_details), do: %{}
+
   # ============================================================================
   # Utilities
   # ============================================================================
+
+  @doc "Normalizes a foreign failure into the shared Jido taxonomy."
+  @spec normalize(term()) :: Exception.t()
+  def normalize({:error, reason}), do: normalize(reason)
+
+  def normalize(%struct{} = error)
+      when struct in [
+             ValidationError,
+             ExecutionError,
+             RoutingError,
+             TimeoutError,
+             CompensationError,
+             InternalError,
+             Internal.UnknownError
+           ],
+      do: error
+
+  def normalize(%ArgumentError{} = error) do
+    validation_error(Exception.message(error), reason: Exception.message(error))
+  end
+
+  def normalize(%RuntimeError{} = error) do
+    execution_error(Exception.message(error), reason: Exception.message(error))
+  end
+
+  def normalize(%_{} = error) when is_exception(error) do
+    internal_error(Exception.message(error), reason: error)
+  end
+
+  def normalize(error) when is_binary(error), do: internal_error(error, reason: error)
+  def normalize(error), do: internal_error("Jido operation failed", reason: error)
+
+  @doc "Returns the stable public type for an error."
+  @spec type(term()) :: public_type()
+  def type(error), do: unified_type(error)
 
   @doc "Returns the registered Jido program code carried by an error."
   @spec code(term()) :: code() | nil
@@ -597,6 +685,7 @@ defmodule Jido.Error do
     credentials
     password
     privatekey
+    query
     secret
     token
   ]
@@ -652,7 +741,9 @@ defmodule Jido.Error do
     |> sanitize_details()
     |> merge_public_fields(%{
       kind: error.kind,
-      subject: error.subject
+      subject: error.subject,
+      code: error.code,
+      path: if(error.path in [nil, []], do: nil, else: error.path)
     })
   end
 
@@ -682,6 +773,11 @@ defmodule Jido.Error do
       compensated: error.compensated,
       result: error.result
     })
+  end
+
+  defp public_details(%struct{errors: errors}, remaining_causes)
+       when struct in [Invalid, Execution, Routing, Timeout, Internal] and is_list(errors) do
+    %{errors: Enum.map(errors, &maybe_error_map(&1, remaining_causes))}
   end
 
   defp public_details(%{details: details}, _remaining_causes), do: sanitize_details(details)
@@ -768,7 +864,14 @@ defmodule Jido.Error do
 
   defp sanitize_key(key) when is_atom(key), do: key
   defp sanitize_key(key) when is_binary(key), do: sanitize_utf8(key)
-  defp sanitize_key(key), do: safe_inspect(key)
+  defp sanitize_key(key) when is_number(key), do: to_string(key)
+
+  defp sanitize_key(key) do
+    case safe_inspect(key) do
+      "#Inspect.Error" -> "#Inspect.Error"
+      _inspected -> "[COMPLEX_KEY]"
+    end
+  end
 
   defp sanitize_key_value_pairs(entries, depth) do
     entries
@@ -825,6 +928,13 @@ defmodule Jido.Error do
   defp transport_string(%{message: message}, depth), do: transport_string(message, depth - 1)
   defp transport_string(%{"message" => message}, depth), do: transport_string(message, depth - 1)
   defp transport_string(value, _depth), do: value |> sanitize_transport() |> safe_inspect()
+
+  defp safe_exception_message(%{class: _class, errors: errors} = error)
+       when is_exception(error) and is_list(errors) do
+    errors
+    |> Enum.map_join("; ", &safe_exception_message/1)
+    |> truncate_string()
+  end
 
   defp safe_exception_message(error) do
     error
@@ -905,6 +1015,7 @@ defmodule Jido.Error do
   defp default_retryable_for_type?(_type), do: true
 
   # Maps error structs to unified type atoms
+  defp unified_type(%ValidationError{code: :unmatched_input}), do: :routing_error
   defp unified_type(%ValidationError{kind: :action}), do: :invalid_action
   defp unified_type(%ValidationError{kind: :config}), do: :config_error
   defp unified_type(%ValidationError{}), do: :validation_error
@@ -915,22 +1026,21 @@ defmodule Jido.Error do
   defp unified_type(%CompensationError{}), do: :compensation_error
   defp unified_type(%InternalError{}), do: :internal
   defp unified_type(%Internal.UnknownError{}), do: :internal
-  defp unified_type(%Jido.Agent.Error{code: :unmatched_input}), do: :routing_error
-  defp unified_type(%Jido.Agent.Error{}), do: :validation_error
 
-  # Cross-package error mapping (jido_action, jido_signal)
-  defp unified_type(%Jido.Action.Error.InvalidInputError{}), do: :validation_error
-  defp unified_type(%Jido.Action.Error.ExecutionFailureError{}), do: :execution_error
-  defp unified_type(%Jido.Action.Error.TimeoutError{}), do: :timeout
-  defp unified_type(%Jido.Action.Error.ConfigurationError{}), do: :config_error
-  defp unified_type(%Jido.Action.Error.InternalError{}), do: :internal
+  defp unified_type(%{code: :unmatched_input, path: path}) when is_list(path),
+    do: :routing_error
 
-  defp unified_type(%Jido.Signal.Error.InvalidInputError{}), do: :validation_error
-  defp unified_type(%Jido.Signal.Error.ExecutionFailureError{}), do: :execution_error
-  defp unified_type(%Jido.Signal.Error.RoutingError{}), do: :routing_error
-  defp unified_type(%Jido.Signal.Error.TimeoutError{}), do: :timeout
-  defp unified_type(%Jido.Signal.Error.DispatchError{}), do: :routing_error
-  defp unified_type(%Jido.Signal.Error.InternalError{}), do: :internal
+  defp unified_type(%{class: :internal}), do: :internal
+
+  defp unified_type(%{code: code, path: path}) when is_atom(code) and is_list(path),
+    do: :validation_error
+
+  defp unified_type(%{class: :execution, timeout: _timeout}), do: :timeout
+  defp unified_type(%{class: :invalid}), do: :validation_error
+  defp unified_type(%{class: :config}), do: :config_error
+  defp unified_type(%{class: :execution}), do: :execution_error
+  defp unified_type(%{class: :routing}), do: :routing_error
+  defp unified_type(%{class: :timeout}), do: :timeout
 
   defp unified_type(%{type: type}) when is_atom(type), do: unified_type_from_atom(type)
   defp unified_type(%{type: type}) when is_binary(type), do: unified_type_from_string(type)

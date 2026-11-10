@@ -4,11 +4,12 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   use GenServer
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.Plugin.{Context, Init}
   alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.{Cancel, Cron, Schedule, WallClock}
+  alias Jido.Plugin.Scheduler.{Cancel, Cron, CronRules, Schedule, WallClock}
   alias Jido.Signal
-  alias Jido.Tracing.Trace
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
 
   def start_link(%Init{} = init), do: GenServer.start_link(__MODULE__, init)
 
@@ -22,6 +23,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
       partition: init.partition,
       jido: init.jido,
       options: init.options,
+      plugin: init.module,
       state_version: init.state_version,
       cron_jobs: %{},
       dormant_cron: %{},
@@ -54,7 +56,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   def handle_call(:await_ready, _from, runtime), do: {:reply, :ok, runtime}
 
   def handle_call(
-        {:directive, %Schedule{} = directive, %DirectiveContext{} = context},
+        {:directive, %Schedule{} = directive, %Context{phase: :directive} = context},
         _from,
         runtime
       ) do
@@ -74,7 +76,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     end
   end
 
-  def handle_call({:directive, directive, %DirectiveContext{} = context}, _from, runtime)
+  def handle_call({:directive, directive, %Context{phase: :directive} = context}, _from, runtime)
       when is_struct(directive, Cron) or is_struct(directive, Cancel) do
     if stale_state_version?(runtime.last_reconciled_version, context.state_version) do
       {:reply, :ok, runtime}
@@ -171,7 +173,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   end
 
   defp current_plugin_state(runtime) do
-    case Server.plugin_state(runtime.agent_server, Scheduler, 5_000) do
+    case Server.plugin_state(runtime.agent_server, runtime.plugin, 5_000) do
       {:ok, state} -> {:ok, state || %{cron: %{}}}
       {:error, reason} -> {:error, reason}
     end
@@ -378,7 +380,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   end
 
   defp validate_scope(nil, _scope), do: :ok
-  defp validate_scope(_generation, scope), do: Scheduler.validate_occurrence_scope(scope)
+  defp validate_scope(_generation, scope), do: CronRules.validate_occurrence_scope(scope)
 
   defp validate_time_scale_runtime(time_scale, timezone) do
     with {:ok, speedup} <- time_scale_call(:speedup, &time_scale.speedup/0),
@@ -402,13 +404,13 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     kind, reason -> {:error, {:time_scale_unavailable, callback, {kind, reason}}}
   end
 
-  defp scheduled_signal(%Signal{} = signal, %DirectiveContext{effective_signal: source}),
+  defp scheduled_signal(%Signal{} = signal, %Context{effective_signal: source}),
     do: propagate(signal, source)
 
   defp propagate(%Signal{} = signal, %Signal{} = source) do
-    case Trace.get(source) do
-      %{trace_id: _trace_id, span_id: _span_id} = trace ->
-        case Trace.put(signal, Trace.child_of(trace, source.id)) do
+    case SignalContext.get_trace(source) do
+      %Trace{} = trace ->
+        case SignalContext.put_trace(signal, Trace.child(trace, causation_id: source.id)) do
           {:ok, traced} -> traced
           {:error, _reason} -> signal
         end
@@ -420,7 +422,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
 
   defp fresh_signal(%Signal{} = signal) do
     signal
-    |> Signal.to_map()
+    |> Jido.Signal.Codec.to_map()
     |> Map.delete("id")
     |> Signal.new!()
   end
@@ -452,9 +454,9 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     }
   end
 
-  defp context_state_version(%DirectiveContext{state_version: version}, _default), do: version
+  defp context_state_version(%Context{state_version: version}, _default), do: version
   defp context_state_version(_context, default), do: default
-  defp context_turn_id(%DirectiveContext{turn_id: turn_id}), do: turn_id
+  defp context_turn_id(%Context{turn_id: turn_id}), do: turn_id
   defp context_turn_id(_context), do: nil
 
   defp adapter_call(adapter, function, arguments) do

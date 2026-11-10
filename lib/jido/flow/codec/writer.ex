@@ -1,0 +1,139 @@
+defmodule Jido.Flow.Codec.Writer do
+  @moduledoc false
+
+  alias Jido.Error
+  alias Jido.Flow.{Component, Graph}
+  alias Jido.Catalog
+  alias Jido.Catalog.Error, as: CatalogError
+  alias Jido.Codec.Reference
+  alias Jido.Flow.Codec.{Limits, Value}
+
+  @doc false
+  @spec encode(Jido.Flow.t(), Catalog.t()) ::
+          {:ok, map()} | {:error, Exception.t()}
+  def encode(flow, registry) do
+    case do_encode(flow, registry) do
+      {:error, %CatalogError{} = error} ->
+        {:error, Value.catalog_error(error)}
+
+      result ->
+        result
+    end
+  end
+
+  defp do_encode(flow, registry) do
+    with {:ok, schema} <- encode_schema(flow.schema, registry),
+         {:ok, output_schema} <- encode_schema(flow.output_schema, registry),
+         {:ok, components} <-
+           sequence(Graph.canonical_components(flow.components), fn {name, node} ->
+             record = Map.put(node, :name, name)
+
+             case record(
+                    record,
+                    Component.common_fields() ++ Component.fields(node.kind),
+                    registry
+                  ) do
+               {:ok, values} -> {:ok, Map.put(values, "kind", Atom.to_string(node.kind))}
+               {:error, error} -> {:error, Error.prefix_path(error, [:components, name])}
+             end
+           end),
+         {:ok, output} <- Value.encode_expression(flow.output, registry, 0) do
+      document = %{
+        "type" => "jido.flow",
+        "vsn" => 2,
+        "name" => flow.name,
+        "description" => flow.description,
+        "components" => components,
+        "output" => output
+      }
+
+      document =
+        document
+        |> put_schema("schema", schema)
+        |> put_schema("output_schema", output_schema)
+
+      with :ok <- Limits.check(document), do: {:ok, document}
+    end
+  end
+
+  defp encode_schema(schema, registry) do
+    if schema == Jido.Joi.map(),
+      do: {:ok, nil},
+      else: reference(registry, :schema, schema)
+  end
+
+  defp put_schema(document, _field, nil), do: document
+  defp put_schema(document, field, schema), do: Map.put(document, field, schema)
+
+  defp record(values, fields, registry) do
+    Enum.reduce_while(fields, {:ok, %{}}, fn {name, type}, {:ok, result} ->
+      case field(type, Map.fetch!(values, name), registry) do
+        {:ok, value} -> {:cont, {:ok, Map.put(result, Atom.to_string(name), value)}}
+        {:error, error} -> {:halt, {:error, Error.prefix_path(error, [name])}}
+      end
+    end)
+  end
+
+  defp field({type, _}, value, registry) when type in [:value, :condition],
+    do: Value.encode_expression(value, registry, 0)
+
+  defp field(:meta, value, registry), do: Value.encode_data(value, registry, 0)
+
+  defp field(:schema, value, registry) do
+    reference(registry, :schema, value)
+  end
+
+  defp field({:call, _, _}, call, registry) do
+    with {:ok, target} <- target(call, registry),
+         {:ok, params} <- encode_params(call.params, registry) do
+      {:ok, Map.put(target, "params", params)}
+    end
+  end
+
+  defp field({:target, _}, target, registry), do: target(target, registry)
+
+  defp field(:wait_options, options, registry),
+    do: sequence(options, &record(&1, Component.wait_option_fields(), registry))
+
+  defp field(:options, options, registry),
+    do: sequence(options, &record(&1, Component.option_fields(), registry))
+
+  defp field(:parallel_actions, actions, registry),
+    do: sequence(actions, &record(&1, Component.parallel_action_fields(), registry))
+
+  defp field(:state, state, registry), do: record(state, Component.state_fields(), registry)
+  defp field(:on_error, value, _registry), do: {:ok, Atom.to_string(value)}
+  defp field(_type, value, _registry), do: {:ok, value}
+
+  defp encode_params(params, registry) do
+    with {:error, error} <- Value.encode_expression(params, registry, 0) do
+      {:error, Error.prefix_path(error, [:params])}
+    end
+  end
+
+  defp target(target, registry) do
+    with {:ok, reference} <- reference(registry, target.kind, target.target) do
+      {:ok, %{"kind" => Atom.to_string(target.kind), "target" => reference}}
+    end
+  end
+
+  defp reference(registry, kind, target) do
+    with {:error, %CatalogError{} = error} <- Reference.encode(registry, kind, target) do
+      {:error, %{error | details: Map.put(error.details, :target, target)}}
+    end
+  end
+
+  defp sequence(values, encoder) do
+    values
+    |> Enum.reduce_while({:ok, []}, fn value, {:ok, result} ->
+      case encoder.(value) do
+        {:ok, value} -> {:cont, {:ok, [value | result]}}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
+    |> case do
+      {:ok, result} -> {:ok, Enum.reverse(result)}
+      error -> error
+    end
+  end
+end

@@ -1,0 +1,373 @@
+# Durable Turns and Flows
+
+This tutorial interrupts a four-step Flow, watches the AgentServer resume the same Turn at the interrupted step, and then keeps an approval Flow open across hibernation. You need to know how a route selects a Flow. [Flows](../flows/flows.md) and [Agent Turns and Replies](../agents/turns-state-and-replies.md) cover that.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Know what becomes durable
+
+A route to an authored Flow runs as a durable Turn when the AgentServer has persistence. A route to an Action stays an ordinary Turn with no recovery point, so move work to a Flow if it must survive a crash.
+
+The AgentServer follows one save order:
+
+1. Save acceptance with the unchanged Agent. This writes a Turn receipt with status `:running`.
+2. Run a step.
+3. Confirm the graph checkpoint. No later step starts before this save succeeds.
+4. Repeat steps 2 and 3 until the Flow ends.
+5. Save the candidate Agent and the `:completed` receipt in one write, then release the Turn.
+
+Recovery restarts the step that had no confirmed checkpoint. It cannot resume inside an Action.
+
+## Build a Flow with a test gate
+
+The `Gate` below is only for this guide. It records which steps start and holds one chosen step, so the crash happens at a known place. Production Actions need no such process.
+
+Each Action output and the final output must be portable data, because they are saved. The last step returns the complete candidate state.
+
+```elixir
+defmodule DurableTurnsGuide.Gate do
+  use GenServer
+
+  def start(hold_step), do: GenServer.start(__MODULE__, hold_step, name: __MODULE__)
+  def enter(step), do: GenServer.call(__MODULE__, {:enter, step}, :infinity)
+  def started, do: GenServer.call(__MODULE__, :started)
+  def hold(step), do: GenServer.call(__MODULE__, {:hold, step})
+
+  @impl true
+  def init(hold_step), do: {:ok, %{hold: hold_step, started: []}}
+
+  @impl true
+  def handle_call({:enter, step}, _from, %{hold: step} = state) do
+    {:noreply, %{state | hold: nil, started: [step | state.started]}}
+  end
+
+  def handle_call({:enter, step}, _from, state) do
+    {:reply, :ok, %{state | started: [step | state.started]}}
+  end
+
+  def handle_call(:started, _from, state), do: {:reply, Enum.reverse(state.started), state}
+  def handle_call({:hold, step}, _from, state), do: {:reply, :ok, %{state | hold: step, started: []}}
+end
+
+defmodule DurableTurnsGuide.Step do
+  use Jido.Action,
+    name: "durable_turns_step",
+    schema: Jido.Joi.object(%{step: Jido.Joi.integer(), lines: Jido.Joi.integer()}),
+    output_schema: Jido.Joi.object(%{lines: Jido.Joi.integer()})
+
+  @impl Jido.Action
+  def run(%{step: step, lines: lines}, _context) do
+    :ok = DurableTurnsGuide.Gate.enter(step)
+    {:ok, %{lines: lines + 1}}
+  end
+end
+
+defmodule DurableTurnsGuide.BuildReport do
+  use Jido.Flow,
+    name: "durable_turns_build_report",
+    schema: Jido.Joi.object(%{lines: Jido.Joi.integer()})
+
+  alias DurableTurnsGuide.Step
+
+  flow do
+    step "load", action: Step, params: %{step: 1, lines: input(:lines)}
+    step "summarize", action: Step, params: %{step: 2, lines: result("load", :lines)}
+    step "render", action: Step, params: %{step: 3, lines: result("summarize", :lines)}
+    step "sign", action: Step, params: %{step: 4, lines: result("render", :lines)}
+
+    step "finish", lines <- result("sign", :lines), inline: [context: context] do
+      {:ok, %{context.agent_state | lines: lines, status: "built"}}
+    end
+
+    output result("finish")
+  end
+end
+
+defmodule DurableTurnsGuide.ApproveReport do
+  use Jido.Flow,
+    name: "durable_turns_approve_report",
+    schema: Jido.Joi.object(%{report_id: Jido.Joi.string()})
+
+  flow do
+    step "request", request <- input() do
+      {:ok, request}
+    end
+
+    selection "decision" do
+      needs ["request"]
+      await("approved", event: "report.approve", match: %{report_id: result("request", :report_id)})
+      timer("expired", after_ms: 3_600_000)
+    end
+
+    step "finish", decision <- result("decision"), inline: [context: context] do
+      {:ok, %{context.agent_state | status: decision.selected}}
+    end
+
+    output result("finish")
+  end
+end
+
+defmodule DurableTurnsGuide.Report do
+  use Jido.Agent, name: "durable_turns_report"
+
+  state do
+    schema Jido.Joi.object(%{
+             lines: Jido.Joi.integer() |> Jido.Joi.default(0),
+             status: Jido.Joi.string() |> Jido.Joi.default("empty")
+           })
+  end
+
+  routes do
+    signal_source "/guides/durable_turns"
+    route "report.build", DurableTurnsGuide.BuildReport, as: :build
+    route "report.request_approval", DurableTurnsGuide.ApproveReport, as: :request_approval
+  end
+end
+
+defmodule DurableTurnsGuide.Poll do
+  def until(check) do
+    Enum.find_value(1..500, fn _attempt ->
+      with falsy when falsy in [nil, false] <- check.() do
+        Process.sleep(10)
+        nil
+      end
+    end) || raise "condition was not met"
+  end
+end
+```
+
+## Start the Agent and the Flow
+
+Hold step 3, so steps 1 and 2 finish and have confirmed saves. `Jido.AgentServer.submit/3` returns a handle while the caller keeps running.
+
+```elixir
+alias DurableTurnsGuide.{Gate, Poll, Report}
+alias Jido.AgentServer, as: Server
+
+{:ok, _gate} = Gate.start(3)
+
+{:ok, _} =
+  Jido.start_link(
+    name: DurableTurnsGuide.Jido,
+    namespace: "guides/durable-turns",
+    persistence: {Jido.Persistence.ETS, table: :durable_turns_guide}
+  )
+
+{:ok, server} =
+  Jido.start_agent(DurableTurnsGuide.Jido, Report, id: "report-7", persistence: :inherit)
+
+:ok = Server.await_ready(server)
+
+{:ok, build} = Report.build_signal(%{lines: 0})
+caller_handle = Server.submit(server, build)
+
+Poll.until(fn -> 3 in Gate.started() end)
+status = Server.status(server)
+
+{status.phase, status.state_version, status.durable_turn.status, Server.agent(server).state}
+```
+
+The cell returns `{:running, 1, :running, %{status: "empty", lines: 0}}`. The acceptance write produced revision 1. Agent state stays unchanged until the Turn commits, so a read never sees partial Flow output.
+
+## Queue another Signal
+
+One durable Flow is the current Turn. Other state-changing Turns wait, while reads such as the status call above stay available.
+
+```elixir
+alias DurableTurnsGuide.Report
+alias Jido.AgentServer, as: Server
+
+{:ok, second_build} = Report.build_signal(%{lines: 100})
+queued_handle = Server.submit(server, second_build)
+
+Server.status(server).admission.postponed
+```
+
+The cell returns `1`.
+
+## Kill the server during step 3
+
+The activation supervisor starts a replacement, which reads the receipt and resumes the same Turn. Step 3 runs again. Steps 1 and 2 do not.
+
+```elixir
+alias DurableTurnsGuide.{Gate, Poll}
+alias Jido.AgentServer, as: Server
+
+turn_id = Server.status(server).durable_turn.id
+Process.exit(server, :kill)
+
+restored =
+  Poll.until(fn ->
+    case Jido.whereis_agent(DurableTurnsGuide.Jido, "report-7") do
+      pid when is_pid(pid) and pid != server -> pid
+      _other -> nil
+    end
+  end)
+
+:ok = Server.await_ready(restored)
+
+Poll.until(fn -> Server.status(restored).durable_turn.status == :completed end)
+final = Server.status(restored)
+
+%{id: ^turn_id} = final.durable_turn
+
+{Gate.started(), Server.agent(restored).state, final.state_version}
+```
+
+The cell returns `{[1, 2, 3, 3, 4], %{status: "built", lines: 4}, 2}`. Step 3 started twice, the receipt kept the same Turn ID, and completion produced revision 2.
+
+## See what the crash lost
+
+The Turn survived, but both caller handles did not. A handle belongs to the process and the server that issued it, so each `Jido.AgentServer.await/2` returns an error. The queued Signal was only in the old server's memory, so its Flow never ran and `lines` is still 4, not 104.
+
+```elixir
+alias Jido.AgentServer, as: Server
+
+{:error, %Jido.Error.ExecutionError{}} = Server.await(caller_handle, 100)
+{:error, %Jido.Error.ExecutionError{}} = Server.await(queued_handle, 100)
+
+Server.agent(restored).state.lines
+```
+
+The cell returns `4`. After a crash, read status and Agent state to learn the result. Sending the same Signal again starts a new Turn, because Jido does not deduplicate requests. Put a domain guard in the Flow if a repeat must be refused.
+
+## Stop and resume
+
+A normal stop does not settle a durable Turn. The receipt stays `:running`, and the next activation resumes it.
+
+```elixir
+alias DurableTurnsGuide.{Gate, Poll, Report}
+alias Jido.AgentServer, as: Server
+
+:ok = Gate.hold(2)
+{:ok, build} = Report.build_signal(%{lines: 0})
+handle = Server.submit(restored, build)
+Poll.until(fn -> 2 in Gate.started() end)
+
+:ok = Server.stop(restored)
+{:error, _reason} = Server.await(handle, 100)
+
+{:ok, ref} = Jido.agent_ref(DurableTurnsGuide.Jido, "report-7")
+{:ok, resumed} = Jido.activate_agent(DurableTurnsGuide.Jido, ref, Report)
+:ok = Server.await_ready(resumed)
+
+Poll.until(fn -> Server.status(resumed).durable_turn.status == :completed end)
+
+{Gate.started(), Server.agent(resumed).state}
+```
+
+The cell returns `{[1, 2, 2, 3, 4], %{status: "built", lines: 4}}`.
+
+## Cancel a Turn
+
+`Jido.AgentServer.cancel/2` stops the work and saves a `:cancelled` receipt with the unchanged Agent. The cancelled Flow does not run again after a later restore.
+
+```elixir
+alias DurableTurnsGuide.{Gate, Poll, Report}
+alias Jido.AgentServer, as: Server
+
+before = Server.agent(resumed).state
+
+:ok = Gate.hold(2)
+{:ok, build} = Report.build_signal(%{lines: 500})
+handle = Server.submit(resumed, build)
+Poll.until(fn -> 2 in Gate.started() end)
+
+:ok = Server.cancel(resumed)
+{:error, :cancelled} = Server.await(handle, 1_000)
+
+{Server.status(resumed).durable_turn.status, Server.agent(resumed).state == before}
+```
+
+The cell returns `{:cancelled, true}`. Cancellation cannot undo external work that an Action already finished. See [Cancel Turns](../agent-servers/cancel-turns.livemd) for the options.
+
+## Hold a Turn open across hibernation
+
+A Flow wait releases its worker but keeps the Turn open. `Jido.AgentServer.status/2` reports the open waits, and the committed Agent does not change while the Turn waits.
+
+```elixir
+alias DurableTurnsGuide.{Poll, Report}
+alias Jido.AgentServer, as: Server
+
+{:ok, ask} = Report.request_approval_signal(%{report_id: "report-7"})
+approval_handle = Server.submit(resumed, ask)
+
+Poll.until(fn -> Server.status(resumed).phase == :waiting end)
+[wait] = Server.status(resumed).waits
+
+Enum.map(wait.options, & &1.name)
+```
+
+The cell returns `["approved", "expired"]`.
+
+`Jido.AgentServer.hibernate/2` saves the Agent and the open Turn, then stops the activation. Thawing restores the same wait with the same ID and the same absolute timer deadline. The original handle is gone, as before.
+
+```elixir
+alias DurableTurnsGuide.{Poll, Report}
+alias Jido.AgentServer, as: Server
+
+:ok = Server.hibernate(resumed)
+{:error, _reason} = Server.await(approval_handle, 100)
+
+{:ok, awake} = Jido.thaw(DurableTurnsGuide.Jido, Report, "report-7")
+:ok = Server.await_ready(awake)
+
+Poll.until(fn -> Server.status(awake).phase == :waiting end)
+[restored_wait] = Server.status(awake).waits
+
+restored_wait == wait
+```
+
+The cell returns `true`.
+
+## Deliver the decision
+
+`Jido.AgentServer.deliver_wait/4` saves a Signal as input to the open wait. It does not start a new Turn. `:ok` confirms saved acceptance, not Flow completion, so poll for the result. A later delivery to the same wait returns `{:error, :not_waiting}`.
+
+```elixir
+alias DurableTurnsGuide.Poll
+alias Jido.AgentServer, as: Server
+
+wrong =
+  Jido.Signal.new!("report.approve", %{report_id: "report-8"}, source: "/guides/durable_turns")
+
+{:error, %{details: %{reason: :unmatched_input}}} =
+  Server.deliver_wait(awake, restored_wait.id, wrong)
+
+approval =
+  Jido.Signal.new!("report.approve", %{report_id: "report-7"}, source: "/guides/durable_turns")
+
+:ok = Server.deliver_wait(awake, restored_wait.id, approval)
+
+Poll.until(fn -> Server.status(awake).durable_turn.status == :completed end)
+
+{Server.agent(awake).state.status, Server.deliver_wait(awake, restored_wait.id, approval)}
+```
+
+The cell returns `{"approved", {:error, :not_waiting}}`. [Flow Waits](../flow-runtime/flow-waits.md) covers selection rules, retries, and timer behavior.
+
+## Clean up
+
+```elixir
+:ok = Jido.stop(DurableTurnsGuide.Jido)
+GenServer.stop(DurableTurnsGuide.Gate)
+```
+
+## Know the rules for a durable Flow
+
+- Keep Flow and Action code unchanged while a Turn is pending. A code change stops the activation with `:changed_reference`.
+- Keep Signals and context portable. Non-portable context fails before execution, and non-portable step output fails the Turn.
+- Remember the Turn deadline. `turn_timeout:` becomes an absolute time in the receipt, and a restored Turn gets only the time that remains. A Turn past its deadline fails with a terminal receipt when it restores. Use `turn_timeout: :infinity` when only a Flow timer should decide expiry. The default is 60,000 ms.
+- Make external calls safe to repeat. An interrupted Action runs again.
+
+## Next steps
+
+- [Recovery Limits](recovery-and-effect-limits.md) covers repeated Actions and post-commit effects.
+- [Continuation Storage](../storage/flow-continuations.md) covers the saved graph.
+- [Revisions and Conflicts](durable-revisions-and-conflicts.md) explains failed writes.

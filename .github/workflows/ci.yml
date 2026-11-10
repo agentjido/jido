@@ -1,33 +1,201 @@
 name: CI
 
 on:
-  pull_request:
-  merge_group:
   push:
-    branches:
-      - main
-      - release/v3
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  pull_request:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      run_extended:
+        description: Run extended fuzz, burn-in, and benchmark checks
+        required: false
+        type: boolean
+        default: false
+      run_services:
+        description: Run opt-in Redis, PostgreSQL, and configured MinIO checks
+        required: false
+        type: boolean
+        default: false
+      run_live:
+        description: Run the paid AI provider check with the test secret
+        required: false
+        type: boolean
+        default: false
 
 permissions:
-  actions: read
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  MIX_ENV: test
+
 jobs:
-  ci:
-    name: CI
-    uses: agentjido/github-actions/.github/workflows/jido-ci.yml@v5
-    secrets: inherit
-    with:
-      runner: blacksmith-2vcpu-ubuntu-2404
-      credo_command: mix credo --strict --only warning
-      docs_command: mix docs --no-open -f html --warnings-as-errors
-      # Core contracts, then the executable learning and integration catalog.
-      test_command: |
-        mix test.ci
-        mix test.examples --warnings-as-errors --seed 0
-      # Check Hex publication when changes reach main, including its merge queue.
-      validate_hex_package: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event.merge_group.base_ref == 'refs/heads/main' }}
+  required:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Format
+            command: mix format --check-formatted
+          - name: Compile warnings
+            command: mix compile --warnings-as-errors
+          - name: Unit
+            command: mix test --seed 0 --warnings-as-errors
+          - name: Covenant
+            command: mix test.contracts
+          - name: Reach architecture
+            command: mix reach.check --arch --smells
+          - name: Static analysis
+            command: >-
+              mix credo --strict --min-priority higher &&
+              mix credo --strict --mute-exit-status &&
+              mix dialyzer --list-unused-filters &&
+              mix ex_dna --max-clones 17
+          - name: Authoring
+            command: mix test.authoring --warnings-as-errors
+          - name: Examples
+            command: mix test.examples --warnings-as-errors
+          - name: Bounded properties
+            command: mix test.property --warnings-as-errors
+          - name: Bounded fuzz
+            command: mix test.fuzz --warnings-as-errors
+          - name: Local system
+            command: mix test.system --warnings-as-errors
+          - name: Load
+            command: mix test.load --warnings-as-errors
+          - name: Peer
+            command: mix test.peer --warnings-as-errors
+          - name: Benchmark smoke
+            command: mix test.bench --warnings-as-errors
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27.3"
+          elixir-version: "1.18.4"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ runner.os }}-otp27-elixir1.18-${{ hashFiles('mix.lock') }}
+      - run: mix deps.get
+      - run: ${{ matrix.command }}
+
+  objective-quality:
+    name: Objective quality gate
+    needs: required
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27.3"
+          elixir-version: "1.18.4"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ runner.os }}-otp27-elixir1.18-${{ hashFiles('mix.lock') }}
+      - run: mix deps.get
+      - run: mix quality.coverage
+      - run: mix quality.report
+      - name: Upload objective quality evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: objective-quality-${{ github.sha }}
+          path: tmp/quality
+          if-no-files-found: warn
+
+  extended:
+    name: ${{ matrix.name }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_extended) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Extended fuzz
+            command: mix test.fuzz --warnings-as-errors
+          - name: Load burn-in
+            command: sh test/perf/jido_exec/burn_in.sh 10
+          - name: Extended benchmarks
+            command: >-
+              MIX_ENV=test mix run test/perf/jido_flow/flow_compile.exs --profile standard &&
+              MIX_ENV=test mix run test/perf/jido_exec/flow_run.exs --profile standard &&
+              MIX_ENV=test mix run test/perf/jido_flow/dsl_compile.exs --profile standard &&
+              MIX_ENV=test mix run test/perf/jido_ai/react_stress.exs --profile standard &&
+              mix bench.ai.state_growth --requests 20 &&
+              mix bench.ai.fresh_workflow --requests 20 &&
+              JIDO_MEMORY_BENCH_PROFILE=base mix bench
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27.3"
+          elixir-version: "1.18.4"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ runner.os }}-otp27-elixir1.18-${{ hashFiles('mix.lock') }}
+      - run: mix deps.get
+      - run: ${{ matrix.command }}
+      - name: Upload extended evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extended-${{ strategy.job-index }}-${{ github.sha }}
+          path: |
+            tmp/perf
+            tmp/quality
+          if-no-files-found: ignore
+
+  services:
+    name: External services
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_services }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27.3"
+          elixir-version: "1.18.4"
+      - run: mix deps.get
+      - run: mix test.services --warnings-as-errors
+
+  live:
+    name: Live AI provider
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_live }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      JIDO_LIVE_OPENAI_API_KEY: ${{ secrets.JIDO_LIVE_OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27.3"
+          elixir-version: "1.18.4"
+      - run: mix deps.get
+      - run: mix test.live --warnings-as-errors
+      - name: Upload redacted live trace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-trace-${{ github.sha }}
+          path: tmp/live
+          if-no-files-found: warn

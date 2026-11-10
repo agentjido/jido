@@ -1,0 +1,64 @@
+# 08_02 Turn Control
+
+Public status data identifies active work for precise precommit cancellation.
+
+## What you will learn
+
+- How `AgentServer.status/2` exposes a stable active Turn ID.
+- How `cancel_turn/3` cancels only the matching active Turn.
+- How a stale Turn ID fails without changing active work.
+- Why precommit cancellation keeps the last committed snapshot.
+
+## Read the code
+
+Read [the example Agent](turn_control.ex). Then read the behavior test. The test
+uses a fixed support barrier to hold the Action before commit. The barrier does
+not enter Signal data, Action input, or Turn context.
+
+## Run it
+
+```sh
+mix test test/examples/08_runtime/08_02_turn_control --include example --seed 0
+```
+
+Expected result: status reports the active Turn. A stale ID is rejected. The
+matching cancellation returns `:ok`, and the snapshot stays at revision zero.
+
+## Important behavior
+
+Use the Turn ID from the public `status/2` map when cancellation must not affect
+later work. The active summary is `nil` when no Turn is active.
+
+Cancellation can stop eligible admission or Action work before commit. It does
+not undo completed Action I/O, reverse a completed commit, or reverse an
+external Directive that already ran.
+
+## Limits
+
+Cancellation is not a transaction for external systems. An application must
+make external operations idempotent when a retry is possible.
+
+## Files
+
+- [Source](turn_control.ex)
+- [Tests](../../../test/examples/08_runtime/08_02_turn_control/turn_control_test.exs)
+
+`cancel/2` targets whichever eligible Turn is active when the Server handles
+the request. `cancel_turn/3` also checks the supplied ID, so a delayed request
+cannot cancel a later Turn. A different active ID returns `{:error, :stale_turn}`. An idle Server
+returns `{:error, :not_running}`. Commit in progress returns
+`{:error, :commit_in_progress}`. Neither API reverses committed effects.
+
+Previous: [Request Modes](../08_01_request_modes/README.md) | Next: [Failure Outcome](../08_03_failure_outcome/README.md)
+
+`quiesce/2` closes admission, rejects queued Turns with `:quiesced`, and waits
+for active work and effects. Reads remain available. With `active: :cancel`,
+eligible work stops before commit. `resume/2` opens admission after the Server
+settles. Rejected queued work does not run on resume. The tests prove both
+finish and cancel policies through public status and snapshots.
+
+```elixir
+:ok = Jido.AgentServer.quiesce(server)
+Jido.AgentServer.snapshot(server)
+:ok = Jido.AgentServer.resume(server)
+```

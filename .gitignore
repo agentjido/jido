@@ -10,8 +10,17 @@
 # Where third-party dependencies like ExDoc output generated docs.
 /doc/
 
-# Ignore .fetch files in case you like to edit your project deps locally.
-/.fetch
+# Generated Reach architecture reports.
+/reach_report/
+
+# Generated Covenant contract reports.
+/covenant/results/
+
+# Temporary files, for example, from tests.
+/tmp/
+
+# Local environment variables.
+.env
 
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
@@ -22,23 +31,3 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 jido-*.tar
 
-# Temporary files, for example, from tests.
-/tmp/
-
-# Elixir Language Server
-.elixir_ls/
-
-# expublish
-RELEASE.md
-
-# Local Notes
-NOTES.md
-PLAN.md
-plans/
-
-# Local migration and review records
-/docs/migration/
-/docs/reviews/
-
-# Local benchmark reports
-/test/bench/results/

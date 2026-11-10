@@ -1,10 +1,10 @@
-defmodule JidoTest.Persistence.BedrockTest do
+defmodule Jido.Persistence.BedrockTest do
   use ExUnit.Case, async: false
 
   alias Jido.Persistence
   alias Jido.Persistence.Bedrock
-  alias JidoTest.BedrockRepo
-  alias JidoTest.Persistence.AdapterConformance
+  alias Jido.Test.Persistence.BedrockRepo
+  alias Jido.Test.Persistence.AdapterConformance
 
   @prefix "jido-test/"
   @abort_message "Transaction retry limit exceeded after 0 attempts. Last error: :aborted"

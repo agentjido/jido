@@ -1,249 +1,269 @@
-# Jido
+# NewJido
 
-[![Hex.pm](https://img.shields.io/hexpm/v/jido.svg)](https://hex.pm/packages/jido)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/jido/)
-[![CI](https://github.com/agentjido/jido/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido/actions/workflows/ci.yml)
-[![License](https://img.shields.io/hexpm/l/jido.svg)](https://github.com/agentjido/jido/blob/main/LICENSE)
+> [!WARNING]
+> This repository is an experiment. It is not the current Jido release, a
+> supported package, or a complete source of Jido documentation. APIs, module
+> ownership, and project structure can change while the consolidation work is
+> in progress.
 
-Build validated, supervised agents for Elixir: declare an Agent's state and
-routes once, test it as plain data, and run it as an OTP process that commits
-state before it performs side effects.
+This experiment consolidates the four core Jido repositories, `jido`,
+`jido_action`, `jido_signal`, and `jido_ai`, into one Mix project and one OTP
+application. The first source port is complete. The project is now testing and
+refining the module boundaries that became visible after the packages moved
+together.
 
-```elixir
-signal = MyApp.Counter.increment_signal!(%{amount: 2})
+Many release-quality parts are missing, incomplete, or out of date. These
+include:
 
-# Plain data: no process, nothing saved, nothing sent
-{:ok, candidate, []} = MyApp.Counter.cmd(agent, signal)
+- complete user and module documentation;
+- tutorials and a reviewed example set;
+- migration guidance from the four separate packages;
+- final package, version, and release configuration;
+- a complete public API and compatibility review; and
+- final performance baselines across the supported runtime matrix.
 
-# Live process: one Turn at a time, committed before effects run
-{:ok, counter} = Jido.start_agent(agent)
-{:ok, committed, []} = Jido.AgentServer.call(counter, signal)
+Do not use this repository as the official guide for a released Jido version.
+The current focus is architecture and quality backpressure. Documentation and
+release preparation will follow after those boundaries are stable.
+
+The main work is:
+
+- organize code by `Jido.*` ownership instead of old package boundaries;
+- keep one `Jido.Application` composition root;
+- use `Jido.Flow` as the Agent behavior boundary;
+- compile Actions and Flows to Runic workflows; and
+- keep Joi schemas as the Jido data boundary.
+
+The surrounding NewJido workspace keeps the architecture and consolidation
+decisions in `docs/aspirational-module-dependency-map.md`.
+
+Use the [documentation index](docs/README.md) for project documents, required
+fixed paths, and material that still needs review.
+
+## Local checks
+
+```sh
+mix deps.get
+mix test
+mix test.ci
+mix test.all
+mix test.contracts
+mix test.authoring
+mix test.examples
+mix test.property
+mix test.fuzz
+mix test.system
+mix test.load
+mix test.peer
+mix test.bench
+mix quality
+mix quality.coverage
+mix quality.report
+mix reach.check --arch --smells
 ```
 
-Version `3.0.0-beta.2` is an evaluation candidate with breaking changes from
-V2 and beta.1. The
-[release record](https://github.com/agentjido/jido/blob/release/v3/docs/release-beta.2.md)
-lists its checks and known limits.
+`mix quality.coverage` measures the package, all active Covenant components, and each required offline suite. Run it
+before `mix quality.report`. The report writes JSON and text evidence under `tmp/quality/` and fails when a required
+suite, obligation, component proof, coverage rule, or stability record is not satisfied. Live provider and external
+service checks are separate opt-in commands.
 
-## Where This Package Fits
+`mix quality` blocks highest-priority Credo findings, compile warnings,
+Dialyzer errors, ExDNA errors, Reach architecture errors, and formatting
+errors. It also prints the full strict Credo backlog as advisory output.
+Dialyzer checks new warnings against the line-specific baseline in
+`.dialyzer_ignore.exs` and rejects unused baseline entries.
+ExDNA reports all clone groups and fails above the current 17-clone baseline.
 
-Jido is the core runtime of the Jido ecosystem. It owns Agents, the Agent
-Server, Plugins, state transitions, and Directives. Other packages build on
-it. See [jido.run](https://jido.run) for the ecosystem overview and
-cross-package tutorials.
+Run external services and the paid provider only when you explicitly select
+them:
 
-**Works best with:**
-
-- [jido_action](https://hex.pm/packages/jido_action) – the Actions and Flows
-  that Agent routes run. Installed with Jido.
-- [jido_signal](https://hex.pm/packages/jido_signal) – the Signal envelope,
-  routing, dispatch, and bus. Installed with Jido.
-- [jido_ai](https://hex.pm/packages/jido_ai) – model calls, tool use, and AI
-  agent behavior on top of Jido Agents.
-
-## Installation
-
-```elixir
-def deps do
-  [
-    {:jido, "~> 3.0.0-beta.2"}
-  ]
-end
+```sh
+mix test.services
+JIDO_LIVE_OPENAI_API_KEY=... mix test.live
 ```
 
-Jido requires Elixir 1.18 and OTP 27 or later.
+The live command requires a dedicated test key. See `test/external/README.md`
+and `test/external/jido_ai/README.md` for setup and cleanup rules. The CI
+workflow runs each required offline surface as a named job. Its
+scheduled or manual extended jobs run longer fuzz, load burn-in, and benchmark
+checks. Service and live jobs are manual only.
 
-## Quick Start
+The live graph-first example makes a paid model call. It starts a Jido instance,
+runs the canonical ReAct Flow in an AgentServer, calls two Actions in one tool
+round, and checks the committed Session.
 
-Declare an Agent with a state schema and one route:
-
-```elixir
-defmodule MyApp.Counter do
-  use Jido.Agent, name: "counter"
-
-  state do
-    schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
-  end
-
-  routes do
-    signal_source("/my_app")
-
-    route "counter.increment", as: :increment, defaults: %{amount: 1} do
-      action %{amount: amount},
-        name: "increment",
-        schema: Zoi.object(%{amount: Zoi.integer()}),
-        output_schema: Zoi.object(%{count: Zoi.integer()}),
-        context: context do
-        {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
-      end
-    end
-  end
-end
+```sh
+mix run examples/00_quick_start/00_03_live_react/live_react.exs
 ```
 
-Create an instance and apply a Signal to it as data:
+The default model is `openai:gpt-4o-mini`. Use `JIDO_LIVE_MODEL` and
+`JIDO_LIVE_PROMPT` to change the model and prompt.
 
-```elixir
-agent = MyApp.Counter.instantiate!(id: "counter-1")
-signal = MyApp.Counter.increment_signal!(%{amount: 2})
+## Runic ReAct memory benchmark
 
-{:ok, candidate, []} = MyApp.Counter.cmd(agent, signal)
-candidate.state.count
-# => 2
+[`test/perf/jido_ai/react_memory.exs`](test/perf/jido_ai/react_memory.exs) is one self-contained
+reproduction and benchmark for the canonical graph-first ReAct path. It does
+not call a model provider. A deterministic local inference client emits known
+tool calls. A local Action returns an empty payload.
+
+The default `quick` profile is one bounded iterative case for local checks. The
+`base` profile is the shared comparison case for Jido and Runic work. It removes
+model, network, payload, concurrency, and AgentServer effects. It compares two
+orchestration strategies.
+
+The benchmark-local `recursive` strategy preserves the former core path:
+
+```text
+Jido Agent.cmd/3
+  -> Jido.Exec
+  -> Runic.Workflow.execute/3
+  -> dynamic ReAct invoke graphs
 ```
 
-`cmd/2` returns a candidate Agent and a list of Directives. `agent` is
-unchanged. No process starts and nothing is saved.
+The production `iterative` strategy is now `Jido.AI.Reasoning.ReAct` and uses
+this path:
 
-A Flow can end with Handoff. In that case, `cmd/2` returns
-`{:handoff, candidate, instruction, directives}`. It validates the candidate,
-instruction, and Directive batch. It does not run the successor. A live
-AgentServer runs the successor as a new Turn.
-
-Run the same value as a live process:
-
-```elixir
-{:ok, _jido} = Jido.start()
-{:ok, counter} = Jido.start_agent(agent)
-
-{:ok, committed, []} = Jido.AgentServer.call(counter, signal)
-committed.state.count
-# => 2
+```text
+Jido Agent.cmd/3
+  -> one fixed Jido iterate graph
+  -> one ReAct transition Action per model round
+  -> the same loop nodes for the next round
 ```
 
-`call/3` returns `{:ok, committed_agent, directives}` after the Server commits
-the new state. The reply confirms the commit. Directives run after it.
+The base profile has these fixed defaults:
 
-`as: :increment` generated `increment_signal!/2`, which returns the Signal or
-raises when the data isn't a plain map or an option is invalid.
-`increment_signal/2` returns `{:ok, signal}` or `{:error, reason}` instead.
-Neither checks the data against the Action schema; the Turn does that. `defaults:` fills `amount` when the Signal data
-leaves it out.
+| Setting | Value |
+| --- | --- |
+| Strategies | `recursive` and `iterative` |
+| Execution | Direct, in-memory Runic workflow |
+| Tool calls | One serial call per ReAct round |
+| Tool result payload | 0 bytes |
+| Maximum concurrency | 1 |
+| Round counts | 1, 3, and 5 |
+| Isolation | One new BEAM VM for each round count |
 
-An Action or Flow route uses its complete output as the next Agent state by
-default. Use `state from: output(:field)` to select part of the output, or use
-`state :unchanged` to keep the current state.
+With Runic `0.1.0-alpha.13`, the recursive one-round and three-round cases
+finish. The recursive five-round case reaches the canonical identity item limit
+while it processes 137,659 items at path `[:value, 1]`. The iterative strategy
+finishes all three cases.
 
-## Why This Library?
+One local comparison produced these peak process-memory changes:
 
-- **State is validated on every change.** An Action returns the complete next
-  state. Jido checks it against the schema, including Plugin-owned fields,
-  before commit. A failed Turn leaves the committed state unchanged.
-- **Side effects wait for the commit.** Actions return Directives as data. The
-  Agent Server runs them only after the state is committed, so a failed Turn
-  sends no Signals and starts no processes.
-- **The same Agent runs with or without a process.** Unit-test routes with
-  `cmd/2` and no setup. Run the identical value in an Agent Server in
-  production.
-- **It is standard OTP.** Each live Agent is a `:gen_statem` under a
-  supervisor, addressed through a Registry. No custom scheduler.
+| Rounds | Recursive | Iterative | Iterative / recursive |
+| ---: | ---: | ---: | ---: |
+| 1 | 7.95 MiB | 3.26 MiB | 0.41x |
+| 3 | 36.29 MiB | 3.13 MiB | 0.09x |
+| 5 | 64.98 MiB, then error | 6.89 MiB | 0.11x |
 
-Jido doesn't undo external I/O. An Action that calls an HTTP API before a
-failed validation has still made that call. Make such calls idempotent, or
-return them as Directives.
+The production iterative strategy also completed eight tool rounds with 9.35
+MiB of peak process-memory growth.
 
-## Documentation
+These values vary by host. The growth shape and execution outcome are the
+important results.
 
-Full documentation is on [HexDocs](https://hexdocs.pm/jido). Start with:
+The script captures the recursive execution error as benchmark data and exits
+normally. The benchmark runner does not fail.
 
-- [Getting Started](guides/getting-started.livemd) – build and run a counter
-  Agent in Livebook.
-- [OTP Concepts](guides/otp-concepts-for-jido.md) – the processes,
-  supervisors, and timeouts behind a live Agent.
-- [Life of a Signal](guides/signal-to-effects.md) – each stage of a Turn,
-  from admission to effects.
-- [Pure or Live Execution](guides/pure-or-live-execution.md) – when to use
-  `cmd/2` and when to start an Agent Server.
+### What the experiment proves
 
-## Features
+The former ReAct design recursively added a new ModelRound and tool Flow to the
+active Runic workflow. Every round also carried the prior Jido Frame. Replacing
+that recursive expansion with a fixed loop removes the identity-limit failure
+and most of the memory growth.
 
-- Agent definitions from the `state`/`plugins`/`routes` DSL, plain maps with optional
-  static initial state through `Jido.Agent.define/1`, or portable definition
-  JSON through `Jido.Authoring`. All three run the same validation.
-- Routes to Actions, Flows, transforms, and explicit forward targets, matched
-  in declaration order with exact types or `*` wildcards.
-- Generated Signal constructors from exact routes that use `as:`.
-- Built-in Directives to reply, emit Signals, send to other Agents, start and
-  stop Agents and processes, and stop the Server.
-- Nested Agents with counts and state bindings, connected by declared
-  Signal routes.
-- Plugins that prepare input, own a state field, supervise runtime resources,
-  and handle their own Directives.
-- Built-in Plugins for Signal buses, audit records, heartbeats and schedules,
-  and managed sensors.
-- Optional persistence with ETS, File, Mnesia, Ecto, Redis, S3, and Bedrock
-  adapters, hibernate and thaw, and revision checks.
-- Telemetry under `[:jido, :agent_server]`, Turn status, and bounded Turn
-  history.
+The core implementation preserves the normal request and response contract,
+parallel tools, durable review waits, model and tool counts, Session entries,
+output guards, retry routing, and budget routing.
 
-## Examples
+One loop transition calls the existing ReAct Actions inside one outer Runic
+Action. Each tool batch runs as a short-lived Runic Flow with explicit parallel
+tool nodes. The inner Flow is discarded after the round, so it cannot expand
+the active outer graph. An approved review resumes through another fixed loop.
 
-### Test a route without a process
+The remaining boundary is checkpoint detail. Inner model work and a complete
+tool batch belong to the outer transition checkpoint. They do not have separate
+checkpoints in the active outer workflow.
 
-```elixir
-test "increment adds the amount" do
-  agent = MyApp.Counter.instantiate!(id: "test")
-  signal = MyApp.Counter.increment_signal!(%{amount: 3})
+The benchmark keeps the former recursive Flow in the benchmark file only. It is
+not a second library implementation.
 
-  assert {:ok, %{state: %{count: 3}}, []} = MyApp.Counter.cmd(agent, signal)
-end
+### Run and capture the base case
+
+Run the base profile in the production Mix environment:
+
+```sh
+JIDO_MEMORY_BENCH_PROFILE=base mix bench
 ```
 
-### Emit a Signal after commit
+Save one report that you can attach to an issue or send to another developer:
 
-An Action returns an `emit/2` Directive. The Server sends it after the commit,
-here to the calling process:
-
-```elixir
-defmodule MyApp.Reset do
-  use Jido.Action, name: "reset", schema: Zoi.object(%{})
-
-  @impl true
-  def run(_params, %{agent_state: state}) do
-    {:ok, %{state | count: 0},
-     [Jido.Agent.Directive.emit("counter.cleared", %{previous: state.count})]}
-  end
-end
-
-# In the Agent:
-#
-# route "counter.reset", MyApp.Reset, as: :reset
-
-{:ok, counter} =
-  Jido.start_agent(MyApp.Counter, id: "counter-2", default_dispatch: {:pid, target: self()})
-reset = MyApp.Counter.reset_signal!()
-{:ok, _committed, [_emit]} = Jido.AgentServer.call(counter, reset)
-
-receive do
-  {:signal, %Jido.Signal{type: "counter.cleared", data: data}} -> data
-end
-# => %{previous: 0}
+```sh
+JIDO_MEMORY_BENCH_PROFILE=base mix bench 2>&1 | tee runic-react-memory.txt
 ```
 
-### Persist every commit
+The report records the Jido Git revision, dirty-worktree state, Runic version,
+Elixir version, OTP version, system architecture, scheduler count, and memory
+sample interval. For each isolated case, it reports:
 
-Add an adapter and a stable namespace to your Jido instance:
+- elapsed time;
+- peak process, total, binary, and ETS memory above the forced-GC baseline;
+- final process-memory change;
+- retained Agent and Session term sizes;
+- committed Thread entry count;
+- model, tool-round, and tool-call count checks; and
+- the Runic error and stack trace when a case fails.
 
-```elixir
-defmodule MyApp.Jido do
-  use Jido,
-    otp_app: :my_app,
-    namespace: "my-app/agents",
-    persistence: {Jido.Persistence.Ecto, repo: MyApp.Repo}
-end
+The report also shows the compiled Runic graph component count, build-log entry
+count, shared size, and flat size. It compares the peak process memory of the
+three-round and five-round cases with the one-round case.
+
+The iterative base case has two success conditions:
+
+1. All three iterative round counts finish without a canonical identity limit.
+2. Peak memory grows in proportion to the added rounds. It must not make a
+   large jump between adjacent cases.
+
+### Run the expanded profile
+
+The expanded profile keeps the same deterministic model and tool. It adds the
+managed AgentServer path, four-call workloads, parallel execution, and a small
+tool payload:
+
+```sh
+JIDO_MEMORY_BENCH_PROFILE=expanded mix bench
 ```
 
-Persistence is off by default. Opt in when you start an Agent:
+This profile runs 18 recursive-strategy isolated cases:
 
-```elixir
-{:ok, pid} = MyApp.Jido.start_agent(MyApp.Counter, id: "counter-1", persistence: :inherit)
-```
+- direct and managed execution;
+- 1, 3, and 4 rounds; and
+- serial, constrained, and parallel workloads.
 
-That Agent saves each commit before the Server replies. `hibernate/2` saves and
-stops it, and `thaw/3` restores it. Jido doesn't start or supervise your Repo.
+The workloads are:
 
-## License
+| Workload | Tool calls per round | Maximum concurrency |
+| --- | ---: | ---: |
+| `serial` | 1 | 1 |
+| `constrained` | 4 | 1 |
+| `parallel` | 4 | 4 |
 
-Copyright 2024-2026 Jido contributors.
+### Configuration
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+| Environment variable | Meaning |
+| --- | --- |
+| `JIDO_MEMORY_BENCH_PROFILE` | `quick`, `base`, or `expanded` |
+| `JIDO_MEMORY_BENCH_STRATEGIES` | Comma-separated `recursive` or `iterative` strategies |
+| `JIDO_MEMORY_BENCH_MODES` | Comma-separated `direct` or `managed` modes |
+| `JIDO_MEMORY_BENCH_ROUNDS` | Comma-separated round counts from 1 through 8 |
+| `JIDO_MEMORY_BENCH_WORKLOADS` | Comma-separated workload names |
+| `JIDO_MEMORY_BENCH_PAYLOAD_BYTES` | Bytes returned by each tool call, from 0 through 1,000,000 |
+| `JIDO_MEMORY_BENCH_REPEATS` | Number of isolated runs for each case |
+| `JIDO_MEMORY_BENCH_SAMPLE_MS` | VM memory sampling interval |
+| `JIDO_MEMORY_BENCH_OUTPUT` | `markdown` or `json` |
+
+Peak values come from `:erlang.memory/0`. Retained values come from
+`:erts_debug.size/1` and `:erts_debug.flat_size/1`. These are VM-level
+diagnostics, not operating-system resident-set measurements. Use the same
+Elixir, OTP, Runic version, scheduler count, Mix environment, and host when you
+compare two commits.
+

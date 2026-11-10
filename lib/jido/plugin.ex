@@ -3,10 +3,12 @@ defmodule Jido.Plugin do
   Defines one reusable Plugin through optional callbacks.
 
       defmodule MyApp.Counter do
+        alias Jido.Joi
+
         use Jido.Plugin
 
         @impl true
-        def state_spec(_opts), do: {:turns, Zoi.integer() |> Zoi.default(0)}
+        def state_spec(_opts), do: {:turns, Joi.integer() |> Joi.default(0)}
 
         @impl true
         def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
@@ -50,10 +52,11 @@ defmodule Jido.Plugin do
   for the configuration commit; unchanged Plugins keep their normal hooks.
   """
 
+  alias Jido.{Error, Joi}
   alias Jido.Plugin.Init
 
   @type declaration :: module() | {module(), map()}
-  @type state_spec :: :none | {atom(), Zoi.schema()}
+  @type state_spec :: :none | {atom(), Joi.schema()}
 
   @callback prepare(Jido.Agent.Plugin.Preparation.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
@@ -63,16 +66,16 @@ defmodule Jido.Plugin do
   @callback directives(keyword()) :: [module()] | {:error, term()}
   @callback reduce(Jido.Agent.Plugin.Reduction.t(), keyword()) :: {:ok, term()} | {:error, term()}
   @callback validate_options(keyword()) :: :ok | {:error, term()}
-  @callback admit(term() | nil, Jido.AgentServer.Plugin.Admission.t(), keyword()) ::
+  @callback admit(term() | nil, Jido.Plugin.Context.Admission.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
   @callback prepare_outbound(
               term() | nil,
               Jido.Signal.t(),
-              Jido.Plugin.SignalContext.t(),
+              Jido.Plugin.Context.signal_t(),
               keyword()
             ) ::
               {:ok, Jido.Signal.t()} | {:error, term()}
-  @callback dispatch(term() | nil, struct(), Jido.Plugin.DirectiveContext.t(), keyword()) ::
+  @callback dispatch(term() | nil, struct(), Jido.Plugin.Context.directive_t(), keyword()) ::
               :ok | {:error, term()}
   @callback child_spec(Init.t()) :: Supervisor.child_spec()
   @callback await_ready(term(), keyword()) :: :ok | {:error, term()}
@@ -90,18 +93,21 @@ defmodule Jido.Plugin do
   replace state or return Directives. Startup, restore, and direct Agent
   commands do not invoke it.
 
-  Agent Server runs each hook in an owned task with the finite
-  `directive_timeout`, or 5,000 milliseconds when that option is `:infinity`.
-  Failure or timeout skips later hooks and Directives and uses the Server error
-  policy. The commit and the result already sent to the caller stay intact.
+  Agent Server runs each hook in an owned task. All hooks of one Turn share the
+  finite `commit_timeout`. Failure or timeout skips later hooks and Directives.
+  It does not use the Server error policy, and the Server stays ready for the
+  next Turn. Read the failure from `last_effect_outcome` in
+  `Jido.AgentServer.status/2`, with stage `:after_commit`, or from the
+  `[:jido, :agent_server, :effects, :stop]` Telemetry event. The commit and the
+  result already sent to the caller stay intact.
   Hooks are not replayed. Rebuild live state from `Jido.Plugin.Init` on startup
   and runtime replacement. Use Telemetry for optional observation.
   """
-  @callback after_commit(term() | nil, Jido.AgentServer.Plugin.Commit.t(), keyword()) ::
+  @callback after_commit(term() | nil, Jido.Plugin.Context.Commit.t(), keyword()) ::
               :ok | {:error, term()}
-  @callback dump(term(), Jido.Persistence.Plugin.Context.t(), keyword()) ::
+  @callback dump(term(), Jido.Plugin.Context.Persistence.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
-  @callback load(term(), Jido.Persistence.Plugin.Context.t(), keyword()) ::
+  @callback load(term(), Jido.Plugin.Context.Persistence.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
 
   @owner_callbacks [
@@ -138,8 +144,8 @@ defmodule Jido.Plugin do
         imports: unquote(Keyword.get(opts, :imports, []))
 
       def normalize(data) do
-        with :ok <- Jido.Agent.Data.plain_map(data),
-             :ok <- Jido.Agent.Data.static(data),
+        with :ok <- Jido.Agent.Schema.plain_map(data),
+             :ok <- Jido.Agent.Schema.static(data),
              do: {:ok, data}
       end
 
@@ -188,7 +194,7 @@ defmodule Jido.Plugin do
   @spec directive_owner([Jido.Plugin.Spec.t()], struct()) :: Jido.Plugin.Spec.t() | nil
   def directive_owner(specs, %{__struct__: directive_module}) when is_list(specs) do
     Enum.find(specs, fn
-      %{agent: %Jido.Agent.Plugin.Spec{directive_modules: modules}} ->
+      %{agent: %Jido.Plugin.Spec.Agent{directive_modules: modules}} ->
         directive_module in modules
 
       _spec ->
@@ -198,9 +204,58 @@ defmodule Jido.Plugin do
 
   def directive_owner(_specs, _directive), do: nil
 
-  @doc "Gets the current state owned by one Plugin runtime."
-  @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
-  def state(init, timeout \\ 5_000), do: Jido.AgentServer.Plugin.state(init, timeout)
+  @doc false
+  @spec invoke(module(), module(), atom(), [term()], String.t()) ::
+          term() | {:error, Exception.t()}
+  def invoke(package, facet, function, args, message) do
+    apply(facet, function, args)
+  rescue
+    error -> {:error, callback_error(message, package, function, :error, error)}
+  catch
+    kind, reason -> {:error, callback_error(message, package, function, kind, reason)}
+  end
+
+  @doc false
+  @spec invalid_callback(String.t(), module(), module(), map()) :: {:error, Exception.t()}
+  def invalid_callback(message, package, _facet, details \\ %{}) do
+    {:error,
+     execution_error(
+       message,
+       package,
+       Map.put_new(details, :code, :plugin_invalid_callback_result)
+     )}
+  end
+
+  @doc false
+  @spec validation_error(String.t(), map()) :: {:error, Exception.t()}
+  def validation_error(message, details) do
+    {:error, Error.validation_error(message, kind: :config, details: details)}
+  end
+
+  @doc false
+  @spec execution_error(String.t(), module(), map()) :: Exception.t()
+  def execution_error(message, package, details) do
+    Error.execution_error(message,
+      details: Map.put(details, :plugin, package)
+    )
+  end
+
+  defp callback_error(message, package, callback, :error, error) do
+    execution_error(message, package, %{
+      code: :plugin_callback_failed,
+      callback: callback,
+      error: error
+    })
+  end
+
+  defp callback_error(message, package, callback, kind, reason) do
+    execution_error(message, package, %{
+      code: :plugin_callback_failed,
+      callback: callback,
+      kind: kind,
+      reason: reason
+    })
+  end
 
   defp validate_use_options!(opts) do
     unless Keyword.keyword?(opts) do

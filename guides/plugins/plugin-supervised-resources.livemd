@@ -1,0 +1,274 @@
+# Supervised Resources
+
+A Plugin can run one supervised process for as long as its Agent runs. In this tutorial you build a ticket-number allocator, and then see how it starts, how handlers reach it, and how it recovers. Run the cells in order.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Write the runtime process
+
+The process starts from a `Jido.Plugin.Init`. This value carries the owning server, the Agent id, the Plugin's options, and the committed value of its field. It is everything a replacement process needs to rebuild itself.
+
+```elixir
+defmodule ResourceGuide.Allocator do
+  use GenServer
+
+  alias Jido.Plugin.Init
+
+  def start_link(%Init{} = init), do: GenServer.start_link(__MODULE__, init)
+  def next(runtime), do: GenServer.call(runtime, :next)
+  def committed(runtime), do: GenServer.call(runtime, :committed)
+
+  @impl true
+  def init(%Init{} = init) do
+    state = %{init: init, prefix: init.options[:prefix], last: init.plugin_state}
+    {:ok, state}
+  end
+
+  @impl true
+  def handle_call(:next, _from, state) do
+    number = state.last + 1
+    {:reply, {:ok, "#{state.prefix}-#{number}", number}, %{state | last: number}}
+  end
+
+  def handle_call(:committed, _from, state) do
+    {:reply, Jido.AgentServer.Plugin.state(state.init), state}
+  end
+end
+```
+
+`Jido.AgentServer.Plugin.state/2` reads the current committed value. `init.plugin_state` is only the value at startup.
+
+## Write the Plugin
+
+`child_spec/1` tells the Activation how to start the process. `await_ready/2` runs after every Plugin's process has started. `validate_options/1` rejects bad options before anything starts. `admit/3` receives the running process as its first argument.
+
+```elixir
+defmodule ResourceGuide.TicketNumbers do
+  use Jido.Plugin
+
+  alias ResourceGuide.Allocator
+  alias Jido.Agent.Plugin.Reduction
+  alias Jido.Plugin.Context.Admission
+  alias Jido.Plugin.Init
+
+  @impl true
+  def validate_options(opts) do
+    if is_binary(opts[:prefix]) and opts[:prefix] != "",
+      do: :ok,
+      else: {:error, Jido.Error.validation_error("Ticket prefix is required", kind: :config)}
+  end
+
+  @impl true
+  def child_spec(%Init{} = init) do
+    %{id: __MODULE__, start: {Allocator, :start_link, [init]}}
+  end
+
+  @impl true
+  def await_ready(runtime, _opts) do
+    case Allocator.committed(runtime) do
+      {:ok, _value} -> :ok
+      error -> error
+    end
+  end
+
+  @impl true
+  def state_spec(_opts), do: {:last_number, Jido.Joi.integer() |> Jido.Joi.default(0)}
+
+  @impl true
+  def admit(runtime, %Admission{signal: %{type: "ticket.open"}}, _opts) do
+    with {:ok, label, number} <- Allocator.next(runtime) do
+      {:ok, %{label: label, number: number}}
+    end
+  end
+
+  def admit(_runtime, %Admission{}, _opts), do: {:ok, nil}
+
+  @impl true
+  def reduce(%Reduction{} = reduction, _opts) do
+    {:ok, max(reduction.plugin_state, reduction.candidate_state.number)}
+  end
+end
+
+defmodule ResourceGuide.Ticket do
+  use Jido.Agent,
+    name: "ticket",
+    plugins: [{ResourceGuide.TicketNumbers, %{prefix: "TCK"}}]
+
+  state do
+    schema Jido.Joi.object(%{
+             label: Jido.Joi.string() |> Jido.Joi.default(""),
+             number: Jido.Joi.integer() |> Jido.Joi.default(0)
+           })
+  end
+
+  routes do
+    signal_source "/support/ticket"
+
+    route "ticket.open", as: :open do
+      action _input, schema: Jido.Joi.object(%{}), context: context do
+        %{label: label, number: number} = context.plugin_inputs[ResourceGuide.TicketNumbers].runtime
+        {:ok, %{context.agent_state | label: label, number: number}}
+      end
+    end
+  end
+end
+
+ticket_plugin = ResourceGuide.TicketNumbers
+
+Jido.Agent.define(%{
+  name: "no_prefix",
+  plugins: [%{id: ticket_plugin.id(), provider: ticket_plugin, vsn: ticket_plugin.vsn(), data: %{}}]
+})
+|> elem(1)
+|> Map.get(:message)
+```
+
+The cell returns `"Ticket prefix is required"`.
+
+## Start it
+
+An AgentServer starts the process under its Activation. `Jido.AgentServer.await_ready/2` returns after every Plugin process has started and every `await_ready/2` has returned `:ok`, which must happen within `readiness_timeout`, 5,000 milliseconds by default.
+
+```elixir
+{:ok, _instance} = Jido.start(name: ResourceGuide.Jido)
+{:ok, server} = Jido.start_agent(ResourceGuide.Jido, ResourceGuide.Ticket, id: "desk-1")
+:ok = Jido.AgentServer.await_ready(server)
+
+{:ok, %{state: first}, []} = Jido.AgentServer.call(server, ResourceGuide.Ticket.open_signal!(%{}))
+{:ok, %{state: second}, []} = Jido.AgentServer.call(server, ResourceGuide.Ticket.open_signal!(%{}))
+
+{first.label, second.label, second.last_number}
+```
+
+The cell returns `{"TCK-1", "TCK-2", 2}`.
+
+A Plugin with `child_spec/1` needs an Activation. `Jido.start_agent/3`, `Jido.AgentServer.start/1`, and `Jido.AgentServer.child_spec/1` provide one. `Jido.AgentServer.start_link/1` returns an error for such an Agent.
+
+A startup failure stops the Activation. That covers an invalid child specification, a failed start, an `await_ready/2` that returns anything other than `:ok`, and a readiness timeout. `Jido.start_agent/3` can return `{:ok, pid}` first, and `Jido.AgentServer.await_ready/2` then returns `{:error, reason}`, so always call it before relying on a new server. The runtime root must use the default `:permanent` restart. Any other value is an invalid specification.
+
+## See it recover
+
+The Plugin's process and the AgentServer belong to one Activation, and the Activation restarts them as a group. When the process dies, a new server starts from the last commit, and the Plugin starts from a new `Jido.Plugin.Init`.
+
+The child id `{:plugin, module}` identifies the Plugin's process under `Jido.AgentServer.activation/1`.
+
+```elixir
+activation = Jido.AgentServer.activation(server)
+
+{{:plugin, ResourceGuide.TicketNumbers}, allocator, _kind, _modules} =
+  activation
+  |> Supervisor.which_children()
+  |> List.keyfind({:plugin, ResourceGuide.TicketNumbers}, 0)
+
+Process.exit(allocator, :kill)
+
+replacement =
+  Enum.find_value(1..200, fn _attempt ->
+    Process.sleep(10)
+    pid = Jido.whereis_agent(ResourceGuide.Jido, "desk-1")
+    if pid not in [nil, server], do: pid
+  end)
+
+:ok = Jido.AgentServer.await_ready(replacement)
+
+{:ok, %{state: third}, []} = Jido.AgentServer.call(replacement, ResourceGuide.Ticket.open_signal!(%{}))
+:ok = Jido.stop_agent(ResourceGuide.Jido, replacement)
+
+{replacement != server, third.label}
+```
+
+The cell returns `{true, "TCK-3"}`. The number continued because the new process read `last_number` from its `Jido.Plugin.Init`. A number that the old process handed out without a commit would be issued again, so keep anything you cannot lose in the owned field.
+
+The Activation allows 3 restarts in 5 seconds, then stops. To keep a failing leaf from restarting the Agent, return a `Supervisor` as the root and supervise the leaf under it. The root stays up while the leaf restarts, and the Agent is not disturbed.
+
+## Keep secrets out of the definition
+
+Plugin options are static data stored in the Agent definition. Two features keep secrets and runtime terms out of it.
+
+A `Jido.Plugin.Config` reference stores the name of an environment variable. `Jido.Plugin.Config.env/1` creates one without reading the environment, and `use Jido.Agent` imports it as `env/1` for DSL sections in the module body. The runtime calls `Jido.Plugin.Config.resolve/1` when it starts and keeps the resolved value to itself. The definition and any snapshot keep only the reference.
+
+```elixir
+System.put_env("RESOURCE_GUIDE_API_KEY", "private-key")
+
+defmodule ResourceGuide.ConnectionRuntime do
+  use GenServer
+
+  def start_link(init), do: GenServer.start_link(__MODULE__, init)
+
+  @impl true
+  def init(init) do
+    case Jido.Plugin.Config.resolve(init.options) do
+      {:ok, options} -> {:ok, options}
+      {:error, error} -> {:stop, error}
+    end
+  end
+
+  @impl true
+  def handle_call(:key_length, _from, options), do: {:reply, {:ok, byte_size(options[:api_key])}, options}
+end
+
+defmodule ResourceGuide.Connection do
+  use Jido.Plugin, option_keys: [agent_server: [:api_key, :region]]
+
+  @impl true
+  def child_spec(init), do: %{id: __MODULE__, start: {ResourceGuide.ConnectionRuntime, :start_link, [init]}}
+
+  @impl true
+  def admit(runtime, _admission, opts) do
+    with {:ok, length} <- GenServer.call(runtime, :key_length), do: {:ok, %{length: length, region: opts[:region]}}
+  end
+end
+
+defmodule ResourceGuide.Gateway do
+  use Jido.Agent,
+    name: "gateway",
+    plugins: [{ResourceGuide.Connection, %{api_key: Jido.Plugin.Config.env("RESOURCE_GUIDE_API_KEY"), region: "us"}}]
+
+  state do
+    schema Jido.Joi.object(%{seen: Jido.Joi.any() |> Jido.Joi.default(nil)})
+  end
+
+  routes do
+    signal_source "/gateway"
+
+    route "gateway.ping", as: :ping do
+      action _input, schema: Jido.Joi.object(%{}), context: context do
+        {:ok, %{context.agent_state | seen: context.plugin_inputs[ResourceGuide.Connection].runtime}}
+      end
+    end
+  end
+end
+
+gateway_agent = ResourceGuide.Gateway.instantiate!(id: "gw-1")
+{:ok, snapshot} = Jido.Persistence.snapshot(gateway_agent)
+false = inspect(snapshot) =~ "private-key"
+
+{:ok, gateway} =
+  Jido.start_agent(ResourceGuide.Jido, ResourceGuide.Gateway,
+    id: "gw-2",
+    plugin_runtime_options: [{ResourceGuide.Connection, [region: "eu"]}]
+  )
+
+:ok = Jido.AgentServer.await_ready(gateway)
+{:ok, %{state: %{seen: seen}}, []} = Jido.AgentServer.call(gateway, ResourceGuide.Gateway.ping_signal!(%{}))
+:ok = Jido.stop_agent(ResourceGuide.Jido, gateway)
+seen
+```
+
+The cell returns `%{length: 11, region: "eu"}`.
+
+A missing variable makes `resolve/1` return a `Jido.Error.ValidationError` whose details have `code: :missing_env`. The runtime above then stops, and startup fails.
+
+`plugin_runtime_options` is the second feature. It supplies options for one server start and merges them over the declared options, and `validate_options/1` then checks the result. These values never enter the definition, so they can hold terms such as pids. Each key must appear in the Plugin's `option_keys` for `:agent_server` and for no other owner. Any other key is an error, so a Plugin without `option_keys` accepts none.
+
+## Next steps
+
+- [Post-Commit Work](plugin-post-commit-work.md) keeps a runtime in step with commits.
+- [Live Reconfiguration](plugin-live-reconfiguration.md) replaces a runtime while the Agent runs.
+- [Control Activations](../agent-servers/inspect-and-control-activations.livemd) covers the Activation's lifecycle.

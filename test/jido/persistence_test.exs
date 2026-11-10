@@ -1,13 +1,13 @@
-defmodule JidoTest.PersistenceTest do
-  use JidoTest.Case, async: false
+defmodule Jido.PersistenceTest do
+  use Jido.Test.Case, async: false
 
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
   alias Jido.Persistence
   alias Jido.Persistence.ETS
   alias Jido.Signal
-  alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
-  alias JidoTest.ScheduledOccurrenceFixtures.{Clock, FastRuntimeAgent}
+  alias Jido.Test.AgentServer.RuntimeFixtures.RuntimeAgent
+  alias Jido.Test.AgentServer.ScheduledOccurrenceFixtures.{Clock, FastRuntimeAgent}
 
   defmodule ConfiguredInstance do
     def __jido_persistence__, do: {ETS, table: __MODULE__}
@@ -29,7 +29,7 @@ defmodule JidoTest.PersistenceTest do
     use Jido.Agent, name: "checkpoint_contract"
 
     state do
-      schema Zoi.object(%{reply: Zoi.any()})
+      schema Jido.Joi.object(%{reply: Jido.Joi.any()})
     end
 
     @impl true
@@ -44,10 +44,7 @@ defmodule JidoTest.PersistenceTest do
 
   test "instance sources use their live namespace and honor explicit overrides" do
     start_supervised!(
-      {Jido,
-       name: ConfiguredInstance,
-       namespace: "configured",
-       persistence: ConfiguredInstance.__jido_persistence__()},
+      {Jido, name: ConfiguredInstance, namespace: "configured", persistence: ConfiguredInstance.__jido_persistence__()},
       id: ConfiguredInstance
     )
 
@@ -133,9 +130,7 @@ defmodule JidoTest.PersistenceTest do
       end
 
       assert {:error, :not_found} =
-               Persistence.load_agent(persistence, CheckpointAgent, agent.id,
-                 namespace: "persistence-test"
-               )
+               Persistence.load_agent(persistence, CheckpointAgent, agent.id, namespace: "persistence-test")
     end
 
     agent = RuntimeAgent.instantiate!(id: unique_id("revision"))
@@ -149,13 +144,11 @@ defmodule JidoTest.PersistenceTest do
     end
 
     assert {:error, :not_found} =
-             Persistence.load_agent(persistence, RuntimeAgent, agent.id,
-               namespace: "persistence-test"
-             )
+             Persistence.load_agent(persistence, RuntimeAgent, agent.id, namespace: "persistence-test")
   end
 
   defmodule RaisingAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(_key, opts) do
@@ -175,7 +168,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   defmodule ReplyAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(_key, opts), do: Keyword.get(opts, :get_reply, Keyword.fetch!(opts, :reply))
@@ -191,7 +184,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   defmodule CASFaultAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(_key, _opts), do: {:error, :not_found}
@@ -207,7 +200,7 @@ defmodule JidoTest.PersistenceTest do
   end
 
   defmodule BarrierAdapter do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
 
     @impl true
     def get(key, opts) do
@@ -333,7 +326,7 @@ defmodule JidoTest.PersistenceTest do
     start_supervised!(Clock)
     persistence = adapter(:plugin_state)
     tick = Signal.new!("cron.tick", %{}, source: "/test")
-    spec = Jido.Plugin.Scheduler.build_cron_spec("* * * * * * *", tick)
+    spec = Jido.Plugin.Scheduler.CronRules.build_spec("* * * * * * *", tick)
 
     agent =
       FastRuntimeAgent.instantiate!(
@@ -344,12 +337,10 @@ defmodule JidoTest.PersistenceTest do
     assert :ok = Persistence.save_agent(persistence, agent, namespace: "persistence-test")
 
     assert {:ok, restored} =
-             Persistence.load_agent(persistence, FastRuntimeAgent, agent.id,
-               namespace: "persistence-test"
-             )
+             Persistence.load_agent(persistence, FastRuntimeAgent, agent.id, namespace: "persistence-test")
 
     assert restored == agent
-    assert {:ok, pid} = JidoTest.AgentServerAssertions.start_agent(jido, restored)
+    assert {:ok, pid} = Jido.Test.AgentServer.Assertions.start_agent(jido, restored)
     assert Map.has_key?(Server.agent(pid).state.scheduler.cron, :heartbeat)
 
     eventually(fn -> Server.agent(pid).state.ticks > 4 end, timeout: 5_000)
@@ -363,35 +354,25 @@ defmodule JidoTest.PersistenceTest do
 
     assert Jido.Error.code(error) == :persistence_callback_failed
 
-    assert {:error,
-            {:indeterminate,
-             %Jido.Error.ExecutionError{details: %{operation: :compare_and_swap}} = error}} =
-             Persistence.save_agent({RaisingAdapter, allow_read: true}, agent,
-               namespace: "persistence-test"
-             )
+    assert {:error, {:indeterminate, %Jido.Error.ExecutionError{details: %{operation: :compare_and_swap}} = error}} =
+             Persistence.save_agent({RaisingAdapter, allow_read: true}, agent, namespace: "persistence-test")
 
     assert Jido.Error.code(error) == :persistence_callback_failed
 
     assert {:error, %Jido.Error.ExecutionError{details: %{operation: :get}} = error} =
-             Persistence.load_agent(RaisingAdapter, RuntimeAgent, agent.id,
-               namespace: "persistence-test"
-             )
+             Persistence.load_agent(RaisingAdapter, RuntimeAgent, agent.id, namespace: "persistence-test")
 
     assert Jido.Error.code(error) == :persistence_callback_failed
 
     assert {:error, %Jido.Error.ExecutionError{details: %{operation: :delete}} = error} =
-             Persistence.delete_agent(RaisingAdapter, RuntimeAgent, agent.id,
-               namespace: "persistence-test"
-             )
+             Persistence.delete_agent(RaisingAdapter, RuntimeAgent, agent.id, namespace: "persistence-test")
 
     assert Jido.Error.code(error) == :persistence_callback_failed
 
-    assert {{:shutdown, {:indeterminate, %Jido.Error.ExecutionError{}}}, _} =
-             catch_exit(
-               JidoTest.AgentServerAssertions.start_agent(jido, agent,
-                 persistence: {RaisingAdapter, allow_read: true},
-                 persistence_mode: :create
-               )
+    assert {:error, {:indeterminate, %Jido.Error.ExecutionError{}}} =
+             Jido.Test.AgentServer.Assertions.start_result(jido, agent,
+               persistence: {RaisingAdapter, allow_read: true},
+               persistence_mode: :create
              )
 
     eventually(fn -> Jido.whereis_agent(jido, agent.id) == nil end)
@@ -468,9 +449,7 @@ defmodule JidoTest.PersistenceTest do
                %Jido.Error.ExecutionError{
                  details: %{code: :persistence_callback_failed, kind: ^kind}
                }}} =
-               Persistence.save_agent({CASFaultAdapter, mode: mode}, agent,
-                 namespace: "persistence-test"
-               )
+               Persistence.save_agent({CASFaultAdapter, mode: mode}, agent, namespace: "persistence-test")
     end
   end
 
@@ -479,7 +458,7 @@ defmodule JidoTest.PersistenceTest do
     id = unique_id("commit")
 
     {:ok, pid} =
-      JidoTest.AgentServerAssertions.start_agent(jido, RuntimeAgent,
+      Jido.Test.AgentServer.Assertions.start_agent(jido, RuntimeAgent,
         id: id,
         persistence: persistence,
         persistence_mode: :create
@@ -501,7 +480,7 @@ defmodule JidoTest.PersistenceTest do
     id = unique_id("hibernate")
 
     {:ok, pid} =
-      JidoTest.AgentServerAssertions.start_agent(jido, RuntimeAgent,
+      Jido.Test.AgentServer.Assertions.start_agent(jido, RuntimeAgent,
         id: id,
         persistence: persistence,
         persistence_mode: :create
@@ -524,7 +503,7 @@ defmodule JidoTest.PersistenceTest do
     persistence = adapter(:stale_server)
     agent = RuntimeAgent.instantiate!(id: unique_id("stale-server"))
     opts = [persistence: persistence, persistence_mode: :create, error_policy: :log_only]
-    assert {:ok, stale} = JidoTest.AgentServerAssertions.start_agent(jido, agent, opts)
+    assert {:ok, stale} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent, opts)
     monitor = Process.monitor(stale)
     committed = %{agent | state: %{agent.state | events: [:winner]}}
 
@@ -555,9 +534,7 @@ defmodule JidoTest.PersistenceTest do
     eventually(fn -> Jido.whereis_agent(jido, agent.id) == nil end)
 
     assert {:ok, ^committed, 1} =
-             Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id,
-               instance: jido
-             )
+             Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id, instance: jido)
   end
 
   test "thaw restores, starts, and rebuilds Plugin runtimes", %{jido: jido} do
@@ -577,7 +554,7 @@ defmodule JidoTest.PersistenceTest do
 
     assert :ok = Server.await_ready(pid)
     assert Server.agent(pid).state.events == [:saved]
-    assert %{state_version: 7} = JidoTest.AgentServerAssertions.committed(pid)
+    assert %{state_version: 7} = Jido.Test.AgentServer.Assertions.committed(pid)
 
     assert {:ok, _agent, _} =
              Server.call(pid, Signal.new!("runtime.record", %{event: :next}, source: "/test"))
@@ -594,14 +571,14 @@ defmodule JidoTest.PersistenceTest do
     assert :ok = Persistence.save_agent(persistence, agent, instance: jido, revision: 3)
 
     assert {:ok, pid} =
-             JidoTest.AgentServerAssertions.start_agent(jido, RestoreAgent,
+             Jido.Test.AgentServer.Assertions.start_agent(jido, RestoreAgent,
                id: id,
                persistence: persistence,
                persistence_mode: :restore
              )
 
     assert Server.agent(pid) == agent
-    assert %{state_version: 3} = JidoTest.AgentServerAssertions.committed(pid)
+    assert %{state_version: 3} = Jido.Test.AgentServer.Assertions.committed(pid)
   end
 
   test "deletes one persisted Agent", %{jido: jido} do
@@ -623,9 +600,7 @@ defmodule JidoTest.PersistenceTest do
     assert :ok = ETS.put(key, <<0, 1, 2>>, opts)
 
     assert {:error, :invalid_persistence_record} =
-             Persistence.load_agent(persistence, RuntimeAgent, agent.id,
-               namespace: "persistence-test"
-             )
+             Persistence.load_agent(persistence, RuntimeAgent, agent.id, namespace: "persistence-test")
 
     assert {:error, :invalid_persistence_record} =
              Persistence.save_agent(persistence, agent,
@@ -677,9 +652,7 @@ defmodule JidoTest.PersistenceTest do
              )
 
     assert {:ok, ^agent, 2} =
-             Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id,
-               namespace: "persistence-test"
-             )
+             Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id, namespace: "persistence-test")
 
     assert :ok =
              Persistence.save_agent(persistence, changed,
@@ -716,9 +689,7 @@ defmodule JidoTest.PersistenceTest do
              )
 
     assert :ok =
-             Persistence.delete_agent(persistence, RuntimeAgent, agent.id,
-               namespace: "persistence-test"
-             )
+             Persistence.delete_agent(persistence, RuntimeAgent, agent.id, namespace: "persistence-test")
 
     assert {:error, :conflict} =
              Persistence.save_agent(persistence, agent,
@@ -771,19 +742,17 @@ defmodule JidoTest.PersistenceTest do
       revision = initial_revision + 1
 
       assert {:ok, ^winner, ^revision} =
-               Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id,
-                 namespace: "persistence-test"
-               )
+               Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id, namespace: "persistence-test")
     end
   end
 
   test "a live Server snapshot exposes no private process references", %{jido: jido} do
     {:ok, pid} =
-      JidoTest.AgentServerAssertions.start_agent(jido, RuntimeAgent, id: unique_id("snapshot"))
+      Jido.Test.AgentServer.Assertions.start_agent(jido, RuntimeAgent, id: unique_id("snapshot"))
 
-    assert %{agent: %Agent{}, state_version: 0} = JidoTest.AgentServerAssertions.committed(pid)
+    assert %{agent: %Agent{}, state_version: 0} = Jido.Test.AgentServer.Assertions.committed(pid)
 
-    snapshot = JidoTest.AgentServerAssertions.committed(pid)
+    snapshot = Jido.Test.AgentServer.Assertions.committed(pid)
     refute Map.has_key?(snapshot, :children)
     refute Map.has_key?(snapshot, :active)
     refute Map.has_key?(snapshot, :runtime)

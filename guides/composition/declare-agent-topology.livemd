@@ -1,0 +1,250 @@
+# Declare Agent Topology
+
+This tutorial declares an order desk with named members, a group sized from Agent state, and a nested team, and then starts it under one owner. Run the cells in order.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Declare members
+
+A `topology` section lists members with `agent`. The second argument is an Agent module or a definition. `count` defaults to 1 and `initial_state` defaults to `%{}`.
+
+`state(:key)` refers to a field in the enclosing Agent's state. It works for `count` and anywhere inside `initial_state`.
+
+```elixir
+defmodule TopologyGuide.Packer do
+  use Jido.Agent, name: "order_packer"
+
+  state do
+    schema Jido.Joi.object(%{
+             station: Jido.Joi.string() |> Jido.Joi.default("unassigned"),
+             packed: Jido.Joi.integer() |> Jido.Joi.default(0)
+           })
+  end
+
+  routes do
+    signal_source "/orders/packer"
+
+    route "order.pack", as: :pack do
+      action %{items: items},
+        schema: Jido.Joi.object(%{items: Jido.Joi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | packed: context.agent_state.packed + items}}
+      end
+    end
+  end
+end
+
+defmodule TopologyGuide.Desk do
+  use Jido.Agent, name: "order_desk"
+
+  state do
+    schema Jido.Joi.object(%{
+             packer_count: Jido.Joi.integer() |> Jido.Joi.default(2),
+             site: Jido.Joi.string() |> Jido.Joi.default("north")
+           })
+  end
+
+  topology do
+    agent :auditor, TopologyGuide.Packer do
+      initial_state %{station: "audit"}
+    end
+
+    agent :packers, TopologyGuide.Packer do
+      count state(:packer_count)
+      initial_state %{station: state(:site)}
+    end
+  end
+end
+
+TopologyGuide.Desk.definition().topology.agents
+|> Enum.map(&{&1.name, &1.count, &1.initial_state})
+```
+
+The cell returns plain data. References stay symbolic because a definition has no state yet:
+
+```text
+[
+  {:auditor, 1, %{station: "audit"}},
+  {:packers, %{key: :packer_count, kind: :state}, %{station: %{key: :site, kind: :state}}}
+]
+```
+
+## Bind members without starting them
+
+An instance has state, so Jido can resolve its references. `Jido.Agent.instantiate/2` checks that the bound values are valid, and starts nothing.
+
+```elixir
+{:error, %Jido.Error.ValidationError{code: :invalid_positive, path: path}} =
+  Jido.Agent.instantiate(TopologyGuide.Desk, id: "desk-empty", state: %{packer_count: 0})
+
+path
+```
+
+The cell returns `[:topology, :agents, 1, :count]`.
+
+`Jido.Agent.Topology.bind/3` shows the resolved values. Its third argument resolves each member definition.
+
+```elixir
+desk = TopologyGuide.Desk.instantiate!(id: "desk-preview", state: %{packer_count: 3})
+resolver = fn definition, _opts -> {:ok, definition} end
+
+{:ok, bound} = Jido.Agent.Topology.bind(desk, desk.state, resolver)
+Enum.map(bound, &{&1.name, &1.count, &1.state})
+```
+
+The cell returns `[{:auditor, 1, %{station: "audit"}}, {:packers, 3, %{station: "north"}}]`.
+
+## Start the owner
+
+`Jido.start_agent/3` starts the owner. Members start under the owner's activation, so wait for `Jido.AgentServer.await_ready/2` before you use them.
+
+```elixir
+{:ok, _instance} = Jido.start(name: TopologyGuide.Jido)
+{:ok, owner} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Desk, id: "desk-1")
+:ok = Jido.AgentServer.await_ready(owner)
+
+Jido.agent_count(TopologyGuide.Jido)
+```
+
+The cell returns `4`: the owner, the auditor, and two packers. An Agent with members needs a supervised activation, so `Jido.AgentServer.start_link/1` rejects it.
+
+## Read and address members
+
+`Jido.AgentServer.members/3` returns live PIDs in slot order. Each member is an ordinary AgentServer with its own state.
+
+```elixir
+[auditor] = Jido.AgentServer.members(owner, :auditor)
+[first_packer, second_packer] = packers = Jido.AgentServer.members(owner, :packers)
+
+{:ok, pack} = TopologyGuide.Packer.pack_signal(%{items: 4})
+{:ok, _committed, []} = Jido.AgentServer.call(first_packer, pack)
+
+Enum.map([auditor | packers], &Jido.AgentServer.agent(&1).state)
+```
+
+Only the first packer changed:
+
+```text
+[
+  %{station: "audit", packed: 0},
+  %{station: "north", packed: 4},
+  %{station: "north", packed: 0}
+]
+```
+
+`Jido.AgentServer.children/2` returns all children, with each worker and activation PID. Its keys for members are generated, so do not match on them. Use `members/3` instead.
+
+## Tell slots apart
+
+Slots of one member start with the same `initial_state`. An `initialize/2` function on the member module receives the member name and slot, and can make each copy different. Outside a topology these context values are `nil`.
+
+```elixir
+defmodule TopologyGuide.Lane do
+  use Jido.Agent, name: "order_lane"
+
+  state do
+    schema Jido.Joi.object(%{lane: Jido.Joi.integer() |> Jido.Joi.default(0)})
+  end
+
+  def initialize(state, %{slot: nil}), do: {:ok, state}
+  def initialize(state, %{slot: slot}), do: {:ok, Map.put(state, :lane, slot)}
+end
+
+defmodule TopologyGuide.Conveyor do
+  use Jido.Agent, name: "order_conveyor"
+
+  topology do
+    agent :lanes, TopologyGuide.Lane, count: 2
+  end
+end
+
+{:ok, conveyor} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Conveyor, id: "conveyor-1")
+:ok = Jido.AgentServer.await_ready(conveyor)
+
+Jido.AgentServer.members(conveyor, :lanes) |> Enum.map(&Jido.AgentServer.agent(&1).state.lane)
+```
+
+The cell returns `[1, 2]`.
+
+## Nest a team
+
+A member can declare its own topology. Each level owns the level below it, so `members/3` reads one level at a time.
+
+```elixir
+defmodule TopologyGuide.Team do
+  use Jido.Agent, name: "order_team"
+
+  topology do
+    agent :packers, TopologyGuide.Packer, count: 2
+  end
+end
+
+defmodule TopologyGuide.Warehouse do
+  use Jido.Agent, name: "order_warehouse"
+
+  topology do
+    agent :team, TopologyGuide.Team
+  end
+end
+
+{:ok, warehouse} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Warehouse, id: "warehouse-1")
+:ok = Jido.AgentServer.await_ready(warehouse)
+
+[team] = Jido.AgentServer.members(warehouse, :team)
+length(Jido.AgentServer.members(team, :packers))
+```
+
+The cell returns `2`.
+
+Do not declare a cycle. A module that lists itself as a member, or two modules that list each other, fail to compile. The `CompileError` names the file, the line, and `:recursive_membership`.
+
+## Stop the owner
+
+Stopping an owner stops its whole subtree. Stop each owner from this tutorial and count what remains.
+
+```elixir
+:ok = Jido.stop_agent(TopologyGuide.Jido, owner)
+:ok = Jido.stop_agent(TopologyGuide.Jido, conveyor)
+:ok = Jido.stop_agent(TopologyGuide.Jido, warehouse)
+
+Enum.find(1..100, fn _attempt ->
+  Process.sleep(10)
+  Jido.agent_count(TopologyGuide.Jido) == 0
+end) != nil
+```
+
+The cell returns `true`.
+
+## See validation errors
+
+A module compiles without checking its members, because they may not be compiled yet. Full checks run on the first call to `definition/0` or when you start the Agent. `Jido.Agent.define/1` runs them at once on Map input and returns the error.
+
+```elixir
+member = fn fields ->
+  Jido.Agent.define(%{
+    name: "invalid_desk",
+    topology: %{agents: [Map.merge(%{name: :packer, definition: TopologyGuide.Packer}, fields)]}
+  })
+end
+
+{:error, %{code: :reserved_name}} = member.(%{name: :root})
+{:error, %{code: :invalid_positive}} = member.(%{count: 0})
+{:error, %{code: :unknown_state_field}} = member.(%{count: Jido.Agent.Topology.state(:missing)})
+{:error, %{code: :invalid_state}} = member.(%{initial_state: %{packed: "many"}})
+{:error, %{code: :unresolved_definition}} = member.(%{definition: TopologyGuide.Missing})
+:rejected
+```
+
+The cell returns `:rejected` after every case fails with its expected code. A member's `initial_state` may hold only fields from that member's schema.
+
+## Next steps
+
+- [Connect Agent Outputs](connect-agent-outputs.livemd) sends Signals between these members.
+- [Change Live Composition](change-live-composition.md) edits members from a Turn.
+- [Agent Callbacks](../agents/agent-callbacks.md) covers `initialize/2`.

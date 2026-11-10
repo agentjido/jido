@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.RedisTest do
+defmodule Jido.Persistence.RedisTest do
   use ExUnit.Case, async: true
 
   alias Jido.Persistence.Redis
@@ -71,8 +71,7 @@ defmodule JidoTest.Persistence.RedisTest do
     opts = [command_fn: command_fn, prefix: "custom", ttl: 60_000]
     assert :ok = Redis.compare_and_swap("key", <<0, 255>>, <<1, 0>>, opts)
 
-    assert_receive {:command,
-                    ["EVAL", script, "1", "custom:key", "value", <<0, 255>>, <<1, 0>>, "60000"]}
+    assert_receive {:command, ["EVAL", script, "1", "custom:key", "value", <<0, 255>>, <<1, 0>>, "60000"]}
 
     assert :ok = Redis.compare_and_swap("key", :not_found, <<1>>, command_fn: command_fn)
     assert_receive {:command, ["EVAL", ^script, "1", "jido:key", "missing", "", <<1>>, ""]}

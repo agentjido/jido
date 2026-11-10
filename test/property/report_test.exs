@@ -1,21 +1,35 @@
 Code.require_file("support/report.exs", __DIR__)
 
-defmodule JidoTest.Property.ReportTest do
+defmodule Jido.Property.ReportTest do
   use ExUnit.Case, async: true
+
   @moduletag :property
-  alias JidoTest.Property.Report
+
+  alias Jido.Test.Property.Report
+
+  defmodule FamilyTest do
+  end
+
+  defmodule OtherFamilyTest do
+  end
+
+  @configs %{
+    "family" => %{
+      module_prefixes: ["Jido.Property.ReportTest.FamilyTest"],
+      fuzz_ids: ["family_case"],
+      required_observations: %{"family_case" => ["complete"]}
+    },
+    "other" => %{
+      module_prefixes: ["Jido.Property.ReportTest.OtherFamilyTest"],
+      fuzz_ids: ["other_case"],
+      required_observations: %{}
+    }
+  }
 
   setup do
-    # ExUnit's default tmp_dir paths are shared by runtime jobs in one checkout.
     suffix = "#{System.pid()}-#{System.unique_integer([:positive])}"
     dir = Path.join([Mix.Project.build_path(), "property-report-tests", suffix])
     File.mkdir_p!(dir)
-
-    File.write!(
-      Path.join(dir, "contracts.md"),
-      "| SIG-001 | Probe | Cases |\n| WIRE-001 | Wire | Cases |\n| WIRE-002 | Wire 2 | Cases |\n"
-    )
-
     on_exit(fn -> File.rm_rf!(dir) end)
     {:ok, tmp_dir: dir}
   end
@@ -28,249 +42,160 @@ defmodule JidoTest.Property.ReportTest do
     refute Map.has_key?(report, "outcome")
   end
 
-  test "incomplete disk report has the source metadata before the first test", %{tmp_dir: dir} do
+  test "an incomplete report contains source metadata", %{tmp_dir: dir} do
     path = Path.join(dir, "report.json")
-    {:ok, state} = Report.init(path: path, register: Path.join(dir, "contracts.md"))
+    {:ok, state} = Report.init(path: path, configs: @configs)
     report = read(path)
     assert report == JSON.decode!(JSON.encode!(state.metadata))
-    assert report["status"] == "incomplete"
     assert is_binary(report["revision"])
     assert is_boolean(report["working_tree_dirty"])
     assert Regex.match?(~r/\A[0-9a-f]{64}\z/, report["source_digest"])
-    assert is_binary(report["runtime"])
-    assert Map.has_key?(report["dependencies"], "jido_action")
   end
 
-  test "register load failure leaves full incomplete metadata on disk", %{tmp_dir: dir} do
-    path = Path.join(dir, "report.json")
-
-    assert_raise File.Error, fn ->
-      Report.init(path: path, register: Path.join(dir, "missing.md"))
-    end
-
-    report = read(path)
-    assert report["status"] == "incomplete"
-    assert is_binary(report["revision"])
-    assert is_binary(report["source_digest"])
-    assert is_binary(report["runtime"])
-    assert is_map(report["dependencies"])
+  test "a focused run records only its selected family", %{tmp_dir: dir} do
+    report = finish(dir, [test_record(FamilyTest, "property", nil)], configs: @configs)
+    assert report["outcome"] == "passed"
+    assert Map.keys(report["families"]) == ["family"]
+    assert report["families"]["family"]["outcome"] == "passed"
   end
 
-  test "missing measurements cannot produce passed contract evidence", %{tmp_dir: dir} do
-    record = test_record("missing artifact", nil, ["SIG-001"], ["SIG-001/boundary"])
-    record = %{record | tags: Map.put(record.tags, :fuzz_id, "missing_group")}
-    report = finish(dir, [record])
-    assert report["outcome"] == "failed"
-    assert report["contracts_with_passed_evidence"] == []
-    assert [%{"id" => "missing_group", "suite" => "property"}] = report["artifact_errors"]
+  test "property tests do not require fuzz measurements", %{tmp_dir: dir} do
+    report = finish(dir, [test_record(FamilyTest, "property", nil)], configs: @configs)
+    assert report["families"]["family"]["validation_errors"] == []
   end
 
-  test "overlapping suite tags fail report validation", %{tmp_dir: dir} do
-    record = test_record("overlap", nil, ["SIG-001"], [])
-    record = %{record | tags: Map.put(record.tags, :fuzz, true)}
-    report = finish(dir, [record])
-    assert report["outcome"] == "failed"
-    assert report["contracts_with_passed_evidence"] == []
-  end
+  test "missing failed orphaned and duplicate measurements fail", %{tmp_dir: dir} do
+    for fault <- [:missing, :failed, :orphaned, :duplicate] do
+      path = Path.join(dir, "#{fault}.json")
+      {:ok, state} = Report.init(path: path, configs: @configs)
+      owner = test_record(FamilyTest, "fuzz", "family_case")
 
-  test "a measurement must match its suite and contract declarations", %{tmp_dir: dir} do
-    for wrong <- [%{variant: "fuzz"}, %{contracts: ["WIRE-001"]}, %{generated: 0}] do
-      path = Path.join(dir, "report.json")
-      {:ok, state} = Report.init(path: path, register: Path.join(dir, "contracts.md"))
+      state =
+        if fault == :orphaned do
+          state
+        else
+          {:noreply, state} = Report.handle_cast({:test_finished, owner}, state)
+          state
+        end
 
-      measurement =
-        Map.merge(
-          %{
-            id: "matched_group",
-            run_id: state.metadata.run_id,
-            variant: "property",
-            outcome: "passed",
-            generated: 1,
-            contracts: ["SIG-001"],
-            declared_forced_cases: []
-          },
-          wrong
-        )
+      if fault != :missing do
+        record = measurement(state.metadata.run_id, outcome: if(fault == :failed, do: "failed", else: "passed"))
+        write_measurement(dir, record)
+        if fault == :duplicate, do: write_measurement(dir, record, "duplicate.json")
+      end
 
-      artifact =
-        Path.join([dir, "property-fuzz", state.metadata.run_id, "matched_group-property.json"])
-
-      Report.write!(artifact, measurement)
-      test = test_record("mutated metadata", nil, ["SIG-001"], [])
-      test = %{test | tags: Map.put(test.tags, :fuzz_id, "matched_group")}
-      {:noreply, state} = Report.handle_cast({:test_finished, test}, state)
-      {:noreply, _} = Report.handle_cast({:suite_finished, %{}}, state)
+      {:noreply, _state} = Report.handle_cast({:suite_finished, %{}}, state)
       assert read(path)["outcome"] == "failed"
-      assert read(path)["contracts_with_passed_evidence"] == []
     end
   end
 
-  test "source digest changes when an exported source file changes", %{tmp_dir: dir} do
-    File.mkdir_p!(Path.join(dir, "guides"))
+  test "invalid and malformed measurements fail", %{tmp_dir: dir} do
+    for {name, artifact} <- [
+          {:invalid, measurement("run", generated: -1)},
+          {:malformed, "not json"}
+        ] do
+      path = Path.join(dir, "#{name}.json")
+      {:ok, state} = Report.init(path: path, configs: @configs)
+      artifact = if is_map(artifact), do: %{artifact | run_id: state.metadata.run_id}, else: artifact
+      write_measurement(dir, artifact, nil, state.metadata.run_id)
+      {:noreply, _state} = Report.handle_cast({:suite_finished, %{}}, state)
+      assert read(path)["outcome"] == "failed"
+    end
+  end
+
+  test "only current-run measurements are used", %{tmp_dir: dir} do
+    path = Path.join(dir, "report.json")
+    {:ok, state} = Report.init(path: path, configs: @configs)
+    owner = test_record(FamilyTest, "fuzz", "family_case")
+    {:noreply, state} = Report.handle_cast({:test_finished, owner}, state)
+    write_measurement(dir, measurement(state.metadata.run_id))
+    write_measurement(dir, measurement("old-run"), "stale.json", state.metadata.run_id)
+    {:noreply, _state} = Report.handle_cast({:suite_finished, %{}}, state)
+    assert length(read(path)["families"]["family"]["measurements"]) == 1
+  end
+
+  test "required lifecycle observations must be present", %{tmp_dir: dir} do
+    path = Path.join(dir, "report.json")
+    {:ok, state} = Report.init(path: path, configs: @configs)
+    owner = test_record(FamilyTest, "fuzz", "family_case")
+    {:noreply, state} = Report.handle_cast({:test_finished, owner}, state)
+    write_measurement(dir, measurement(state.metadata.run_id, observations: %{"partial" => 1}))
+    {:noreply, _state} = Report.handle_cast({:suite_finished, %{}}, state)
+    assert [error] = read(path)["families"]["family"]["validation_errors"]
+    assert error =~ "missed observation complete"
+  end
+
+  test "a full run requires every family and every fuzz ID", %{tmp_dir: dir} do
+    path = Path.join(dir, "report.json")
+    report = finish(dir, [test_record(FamilyTest, "property", nil)], path: path, configs: @configs)
+    assert report["outcome"] == "passed"
+
+    assert_raise RuntimeError, ~r/missing property families/, fn ->
+      Report.check!(path: path, full: true, suite: :property, configs: @configs)
+    end
+  end
+
+  test "a focused infrastructure run may have no family evidence", %{tmp_dir: dir} do
+    path = Path.join(dir, "report.json")
+    report = finish(dir, [], path: path, configs: @configs)
+    assert report["outcome"] == "no_evidence"
+    assert :ok = Report.check!(path: path, full: false, suite: :property, configs: @configs)
+  end
+
+  test "the source digest changes with exported source", %{tmp_dir: dir} do
     File.mkdir_p!(Path.join(dir, "lib"))
-    File.write!(Path.join(dir, "guides/public-contracts.md"), "| SIG-001 | Promise | Cases |\n")
     source = Path.join(dir, "lib/example.ex")
     File.write!(source, "first source")
-    first = finish(dir, [], root: dir)
+    first = finish(dir, [], root: dir, configs: @configs)
     File.write!(source, "second source")
-    second = finish(dir, [], root: dir)
+    second = finish(dir, [], root: dir, configs: @configs)
     refute first["source_digest"] == second["source_digest"]
   end
 
-  test "failed and excluded declarations remain visible without passed case evidence", %{
-    tmp_dir: dir
-  } do
-    report =
-      finish(dir, [
-        test_record("pass", nil, ["SIG-001"], ["SIG-001/missing"]),
-        test_record("fail", {:failed, []}, ["SIG-001", "UNKNOWN-001"], ["UNKNOWN-001/case"]),
-        test_record("exclude", {:excluded, []}, ["WIRE-001"], ["WIRE-001/raise"]),
-        test_record("skip", {:skipped, []}, ["WIRE-002"], ["WIRE-002/after-callback"])
-      ])
+  defp test_record(module, suite, measurement_id) do
+    tag = String.to_existing_atom(suite)
 
-    assert report["outcome"] == "failed"
-    assert report["contracts_with_passed_evidence"] == ["SIG-001"]
-    assert report["declared_forced_cases_in_passed_tests"] == ["SIG-001/missing"]
-    assert report["unknown_contract_ids"] == ["UNKNOWN-001"]
-    assert report["invalid_case_ids"] == ["UNKNOWN-001/case"]
-    assert "WIRE-001" in report["contracts_without_passed_evidence"]
-
-    assert Enum.map(report["tests"], & &1["result"]) == [
-             "excluded",
-             "failed",
-             "passed",
-             "skipped"
-           ]
-  end
-
-  test "a case must belong to a known contract declared by its test", %{tmp_dir: dir} do
-    report =
-      finish(dir, [test_record("invalid tags", nil, ["SIG-001"], ["WIRE-001/raise", "SIG-001/"])])
-
-    assert Enum.sort(report["invalid_case_ids"]) == ["SIG-001/", "WIRE-001/raise"]
-  end
-
-  test "invalid passed declarations cannot supply global or suite evidence", %{tmp_dir: dir} do
-    property = test_record("invalid property case", nil, ["SIG-001"], ["SIG-001:boundary"])
-    fuzz = test_record("unknown fuzz contract", nil, ["WIRE-001", "UNKNOWN-001"], [])
-    fuzz = %{fuzz | tags: fuzz.tags |> Map.delete(:property) |> Map.put(:fuzz, true)}
-    valid = test_record("valid independent evidence", nil, ["WIRE-002"], ["WIRE-002/boundary"])
-    report = finish(dir, [property, fuzz, valid])
-
-    assert report["outcome"] == "failed"
-    assert report["unknown_contract_ids"] == ["UNKNOWN-001"]
-    assert report["invalid_case_ids"] == ["SIG-001:boundary"]
-    assert report["contracts_with_passed_evidence"] == ["WIRE-002"]
-    assert report["declared_forced_cases_in_passed_tests"] == ["WIRE-002/boundary"]
-    evidence = report["contract_evidence_by_suite"]
-    assert evidence["property"]["contracts_with_passed_evidence"] == ["WIRE-002"]
-    assert evidence["fuzz"]["contracts_with_passed_evidence"] == []
-    assert evidence["fuzz"]["declared_forced_cases_in_passed_tests"] == []
-    assert Enum.all?(report["tests"], &(&1["result"] == "passed"))
-  end
-
-  test "an empty selection has no evidence and an invalid test fails the run", %{tmp_dir: dir} do
-    assert finish(dir, [test_record("excluded", {:excluded, []}, ["SIG-001"], [])])["outcome"] ==
-             "no_evidence"
-
-    assert finish(dir, [test_record("invalid", {:invalid, nil}, ["SIG-001"], [])])["outcome"] ==
-             "failed"
-
-    # --include property can also run default tests. Their failures affect this outcome.
-    normal = %{test_record("normal", {:failed, []}, [], []) | tags: %{}}
-    assert finish(dir, [normal])["outcome"] == "failed"
-  end
-
-  test "an exported source tree has unknown Git metadata", %{tmp_dir: dir} do
-    File.mkdir_p!(Path.join(dir, "guides"))
-    File.write!(Path.join(dir, "guides/public-contracts.md"), "| SIG-001 | A promise | Cases |\n")
-
-    report =
-      finish(dir, [test_record("pass", nil, ["SIG-001"], [])],
-        root: dir,
-        register: Path.join(dir, "guides/public-contracts.md")
-      )
-
-    assert report["status"] == "finished"
-    assert report["outcome"] == "passed"
-    assert report["revision"] == nil
-    assert report["working_tree_dirty"] == nil
-    assert report["contracts_without_passed_evidence"] == []
-  end
-
-  test "fuzz evidence belongs only to the current run", %{tmp_dir: dir} do
-    path = Path.join(dir, "report.json")
-    {:ok, state} = Report.init(path: path, register: Path.join(dir, "contracts.md"))
-    fuzz_dir = Path.join([dir, "property-fuzz", state.metadata.run_id])
-    File.mkdir_p!(fuzz_dir)
-    current = %{id: "current", run_id: state.metadata.run_id, generated: 7}
-    stale = %{id: "stale", run_id: "previous-run", generated: 900}
-    File.write!(Path.join(fuzz_dir, "current.json"), JSON.encode!(current))
-    File.write!(Path.join(fuzz_dir, "stale.json"), JSON.encode!(stale))
-    {:noreply, _} = Report.handle_cast({:suite_finished, %{}}, state)
-    assert read(path)["fuzz"] == [JSON.decode!(JSON.encode!(current))]
-  end
-
-  test "old malformed files cannot break a new report", %{tmp_dir: dir} do
-    fuzz_dir = Path.join([dir, "property-fuzz", "old-run"])
-    File.mkdir_p!(fuzz_dir)
-    File.write!(Path.join(fuzz_dir, "broken.json"), "not json")
-    assert finish(dir, [test_record("pass", nil, ["SIG-001"], [])])["outcome"] == "passed"
-  end
-
-  test "a malformed current artifact produces a finished failed report", %{tmp_dir: dir} do
-    path = Path.join(dir, "report.json")
-    {:ok, state} = Report.init(path: path, register: Path.join(dir, "contracts.md"))
-    fuzz_dir = Path.join([dir, "property-fuzz", state.metadata.run_id])
-    File.mkdir_p!(fuzz_dir)
-    File.write!(Path.join(fuzz_dir, "broken.json"), "not json")
-    {:noreply, _} = Report.handle_cast({:suite_finished, %{}}, state)
-    assert read(path)["status"] == "finished"
-    assert read(path)["outcome"] == "failed"
-    assert [%{"path" => _, "error" => _}] = read(path)["artifact_errors"]
-  end
-
-  test "fuzz-only tests contribute evidence", %{tmp_dir: dir} do
-    record = test_record("fuzz pass", nil, ["SIG-001"], [])
-    record = %{record | tags: record.tags |> Map.delete(:property) |> Map.put(:fuzz, true)}
-    report = finish(dir, [record])
-    assert report["outcome"] == "passed"
-    assert report["contracts_with_passed_evidence"] == ["SIG-001"]
-  end
-
-  test "short properties cannot fill gaps in fuzz contract evidence", %{tmp_dir: dir} do
-    property = test_record("short", nil, ["SIG-001"], ["SIG-001/short"])
-    fuzz = test_record("long", nil, ["WIRE-001"], ["WIRE-001/long"])
-    fuzz = %{fuzz | tags: fuzz.tags |> Map.delete(:property) |> Map.put(:fuzz, true)}
-    failed = test_record("failed long", {:failed, []}, ["WIRE-002"], ["WIRE-002/long"])
-    failed = %{failed | tags: failed.tags |> Map.delete(:property) |> Map.put(:fuzz, true)}
-    report = finish(dir, [property, fuzz, failed])
-    assert report["contracts_with_passed_evidence"] == ["SIG-001", "WIRE-001"]
-    evidence = report["contract_evidence_by_suite"]
-    assert evidence["property"]["contracts_with_passed_evidence"] == ["SIG-001"]
-    assert evidence["fuzz"]["contracts_with_passed_evidence"] == ["WIRE-001"]
-    assert evidence["fuzz"]["declared_forced_cases_in_passed_tests"] == ["WIRE-001/long"]
-    assert "SIG-001" in evidence["fuzz"]["contracts_without_passed_evidence"]
-    assert "WIRE-002" in evidence["fuzz"]["contracts_without_passed_evidence"]
-  end
-
-  defp test_record(name, state, contracts, cases) do
     %ExUnit.Test{
-      module: __MODULE__,
-      name: name,
-      state: state,
-      tags: %{property: true, contracts: contracts, contract_cases: cases}
+      module: module,
+      name: "#{suite} proof",
+      state: nil,
+      tags: %{tag => true, fuzz_id: measurement_id}
     }
   end
 
-  defp finish(dir, tests, options \\ []) do
-    path = Path.join(dir, "report.json")
+  defp measurement(run_id, overrides \\ []) do
+    Map.merge(
+      %{
+        id: "family_case",
+        family: "family",
+        run_id: run_id,
+        variant: "fuzz",
+        seed: 0,
+        generated: 1,
+        examples: 0,
+        replayed: 0,
+        shrink_attempts: 0,
+        confirmations: 0,
+        elapsed_ms: 1,
+        outcome: "passed",
+        observations: %{"complete" => 1},
+        test_timeout: 90_000,
+        limits: %{max_runs: 1, max_run_time: 10_000, max_shrinking_steps: 200}
+      },
+      Map.new(overrides)
+    )
+  end
 
-    {:ok, state} =
-      Report.init(
-        [path: path, register: Keyword.get(options, :register, Path.join(dir, "contracts.md"))] ++
-          options
-      )
+  defp write_measurement(dir, record, name \\ nil, directory_run_id \\ nil) do
+    run_id = directory_run_id || if(is_map(record), do: record.run_id, else: "unknown")
+    path = Path.join([dir, "property-fuzz", run_id, "family", name || "family_case-fuzz.json"])
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, if(is_map(record), do: JSON.encode!(record), else: record))
+  end
+
+  defp finish(dir, tests, options) do
+    path = Keyword.get(options, :path, Path.join(dir, "report.json"))
+    {:ok, state} = Report.init(Keyword.put(options, :path, path))
 
     state =
       Enum.reduce(tests, state, fn test, state ->
@@ -278,7 +203,7 @@ defmodule JidoTest.Property.ReportTest do
         state
       end)
 
-    {:noreply, _} = Report.handle_cast({:suite_finished, %{}}, state)
+    {:noreply, _state} = Report.handle_cast({:suite_finished, %{}}, state)
     read(path)
   end
 

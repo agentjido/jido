@@ -1,5 +1,5 @@
 defmodule Jido.Agent.FlowEffectsTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.AgentServer, as: Server
   alias Jido.Signal
@@ -25,7 +25,7 @@ defmodule Jido.Agent.FlowEffectsTest do
     def dispatch(_, request, context, _) do
       server = Jido.whereis_agent(context.jido, context.agent_id, partition: context.partition)
       # Read the public snapshot inside dispatch. The commit must already exist.
-      snapshot = JidoTest.AgentServerAssertions.committed(server)
+      snapshot = Jido.Test.AgentServer.Assertions.committed(server)
       send(context.turn_context.observer, {:submitted, request.key, snapshot})
       :ok
     end
@@ -108,9 +108,8 @@ defmodule Jido.Agent.FlowEffectsTest do
     use Jido.Agent, name: "flow_effect_booking_agent", plugins: [Plugin]
 
     state do
-      schema Zoi.object(%{
-               status:
-                 Zoi.enum([:awaiting_approval, :submitting]) |> Zoi.default(:awaiting_approval)
+      schema Jido.Joi.object(%{
+               status: Jido.Joi.enum([:awaiting_approval, :submitting]) |> Jido.Joi.default(:awaiting_approval)
              })
     end
 
@@ -130,7 +129,7 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   test "direct and Flow commands return the same candidate and directives without dispatch" do
-    agent = BookingAgent.instantiate!(id: Jido.Signal.ID.generate!())
+    agent = BookingAgent.instantiate!(id: Jido.Id.uuid7())
     context = %{observer: self()}
 
     assert {:ok, candidate, [%Submit{key: "booking-1"}]} =
@@ -142,7 +141,7 @@ defmodule Jido.Agent.FlowEffectsTest do
   end
 
   test "a Flow booking request runs only after the live state commit", %{jido: jido} do
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, BookingAgent)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, BookingAgent)
 
     assert {:ok, candidate, _} =
              Server.call(server, command_signal("flow"), context: %{observer: self()})
@@ -155,8 +154,8 @@ defmodule Jido.Agent.FlowEffectsTest do
   test "state validation, directive validation, and Flow failure prevent commit and dispatch", %{
     jido: jido
   } do
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, BookingAgent)
-    initial = JidoTest.AgentServerAssertions.committed(server)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, BookingAgent)
+    initial = Jido.Test.AgentServer.Assertions.committed(server)
 
     for command <- [
           command_signal("flow", %{status: :invalid}),
@@ -169,7 +168,7 @@ defmodule Jido.Agent.FlowEffectsTest do
         ] do
       assert {:error, _} = Jido.Agent.cmd(initial.agent, command, context: %{observer: self()})
       assert {:error, _} = Server.call(server, command, context: %{observer: self()})
-      assert JidoTest.AgentServerAssertions.committed(server) == initial
+      assert Jido.Test.AgentServer.Assertions.committed(server) == initial
       # The call reply and snapshot are barriers after the failed Turn.
       refute_received {:submitted, _, _}
     end
@@ -178,13 +177,13 @@ defmodule Jido.Agent.FlowEffectsTest do
   test "all Flow requests reach the caller in order and dispatch once after one commit", %{
     jido: jido
   } do
-    agent = BookingAgent.instantiate!(id: Jido.Signal.ID.generate!())
+    agent = BookingAgent.instantiate!(id: Jido.Id.uuid7())
 
     assert {:ok, candidate, [%Submit{key: "first"}, %Submit{key: "second"}]} =
              Jido.Agent.cmd(agent, command_signal("multiple"), context: %{observer: self()})
 
     refute_received {:submitted, _, _}
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
 
     assert {:ok, ^candidate, _} =
              Server.call(server, command_signal("multiple"), context: %{observer: self()})
@@ -193,7 +192,7 @@ defmodule Jido.Agent.FlowEffectsTest do
     assert_receive {:submitted, "second", second_snapshot}
     assert first_snapshot == %{agent: candidate, state_version: 1}
     assert second_snapshot == first_snapshot
-    assert JidoTest.AgentServerAssertions.committed(server) == first_snapshot
+    assert Jido.Test.AgentServer.Assertions.committed(server) == first_snapshot
     refute_received {:submitted, _, _}
   end
 

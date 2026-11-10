@@ -1,0 +1,284 @@
+# Custom Directives
+
+A Plugin can own Directive types. A handler returns one as data, and the Plugin reduces it into its state, dispatches it after commit, or does both. In this tutorial you build one Directive of each kind. Run the cells in order.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Define a Directive
+
+A custom Directive is a struct whose module uses `Jido.Agent.Directive`. That macro adds a default `validate/1`, which applies `schema/0` when the module defines one.
+
+```elixir
+defmodule PluginDirectiveGuide.AddLabel do
+  use Jido.Agent.Directive
+
+  @schema Jido.Joi.struct(__MODULE__, %{name: Jido.Joi.string() |> Jido.Joi.min(1)}, coerce: true)
+  @enforce_keys Jido.Joi.enforce_keys(@schema)
+  defstruct Jido.Joi.struct_fields(@schema)
+
+  def schema, do: @schema
+end
+
+{:ok, validated} = PluginDirectiveGuide.AddLabel.validate(struct!(PluginDirectiveGuide.AddLabel, name: "billing"))
+validated.name
+```
+
+The cell returns `"billing"`.
+
+## Reduce a Directive into state
+
+The handler requests the change, and the Plugin applies it. `directives/1` claims the type. `reduce/2` finds its Directives in `reduction.directives`, which holds the whole batch, so filter by struct.
+
+```elixir
+defmodule PluginDirectiveGuide.Labels do
+  use Jido.Plugin
+
+  alias PluginDirectiveGuide.AddLabel
+
+  @impl true
+  def state_spec(_opts), do: {:labels, Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])}
+
+  @impl true
+  def directives(_opts), do: [AddLabel]
+
+  @impl true
+  def reduce(reduction, _opts) do
+    added = for %AddLabel{name: name} <- reduction.directives, do: name
+    {:ok, Enum.uniq(reduction.plugin_state ++ added)}
+  end
+end
+
+defmodule PluginDirectiveGuide.Ticket do
+  use Jido.Agent, name: "ticket", plugins: [PluginDirectiveGuide.Labels]
+
+  state do
+    schema Jido.Joi.object(%{open: Jido.Joi.boolean() |> Jido.Joi.default(true)})
+  end
+
+  routes do
+    signal_source "/support/ticket"
+
+    route "ticket.label", as: :label do
+      action %{name: name},
+        schema: Jido.Joi.object(%{name: Jido.Joi.string()}),
+        context: context do
+        {:ok, context.agent_state, [%PluginDirectiveGuide.AddLabel{name: name}]}
+      end
+    end
+  end
+end
+
+ticket = PluginDirectiveGuide.Ticket.instantiate!(id: "t-1")
+
+{:ok, labeled, [%PluginDirectiveGuide.AddLabel{name: "billing"}]} =
+  PluginDirectiveGuide.Ticket.cmd(ticket, PluginDirectiveGuide.Ticket.label_signal!(%{name: "billing"}))
+
+labeled.state
+```
+
+The cell returns `%{open: true, labels: ["billing"]}`. The pure path still returns the batch, so a caller or a test can inspect it.
+
+## See validation fail
+
+Jido validates every Directive before commit. One invalid Directive fails the whole Turn with no state change. Here an empty name breaks the schema's `min(1)` rule.
+
+```elixir
+{:error, %Jido.Error.ValidationError{code: :invalid_directive, details: %{issues: [issue]}}} =
+  PluginDirectiveGuide.Ticket.cmd(ticket, PluginDirectiveGuide.Ticket.label_signal!(%{name: ""}))
+
+issue.code
+```
+
+The cell returns `:greater_than_or_equal_to`. A schema failure returns a `Jido.Error.ValidationError`, and `details.issues` lists each failed rule with its `code`, `path`, and `message`. A custom `validate/1` returns its own `{:error, reason}`, and the Turn fails with that reason.
+
+A Directive with no owner on this Agent fails the same way. This Agent returns `AddLabel` but does not declare the `Labels` Plugin.
+
+```elixir
+defmodule PluginDirectiveGuide.NoOwner do
+  use Jido.Agent, name: "no_owner"
+
+  routes do
+    signal_source "/support/no_owner"
+
+    route "ticket.label", as: :label do
+      action _input, schema: Jido.Joi.object(%{}), context: context do
+        {:ok, context.agent_state, [%PluginDirectiveGuide.AddLabel{name: "billing"}]}
+      end
+    end
+  end
+end
+
+{:error, unowned} =
+  PluginDirectiveGuide.NoOwner.cmd(
+    PluginDirectiveGuide.NoOwner.instantiate!(id: "t-2"),
+    PluginDirectiveGuide.NoOwner.label_signal!(%{})
+  )
+
+unowned.message
+```
+
+The cell returns `"Agent Directive has no owner"`.
+
+## Dispatch a Directive after commit
+
+A Directive that requests work outside the Agent uses `dispatch/4`. It runs only in `Jido.AgentServer`, after the commit, in its own task. The arguments are the Plugin's runtime process or `nil`, the Directive, a `Jido.Plugin.Context` with `phase: :directive`, and the Plugin's options.
+
+The next cell starts a small mailbox process that stands in for an email service. The `:mailbox` option names it.
+
+```elixir
+{:ok, _mailbox} = Agent.start(fn -> [] end, name: PluginDirectiveGuide.Mailbox)
+
+defmodule PluginDirectiveGuide.SendEmail do
+  use Jido.Agent.Directive
+
+  @schema Jido.Joi.struct(
+            __MODULE__,
+            %{
+              to: Jido.Joi.string() |> Jido.Joi.min(1),
+              subject: Jido.Joi.string(),
+              fail: Jido.Joi.boolean() |> Jido.Joi.default(false)
+            },
+            coerce: true
+          )
+  @enforce_keys Jido.Joi.enforce_keys(@schema)
+  defstruct Jido.Joi.struct_fields(@schema)
+
+  def schema, do: @schema
+end
+
+defmodule PluginDirectiveGuide.Email do
+  use Jido.Plugin, option_keys: [agent_server: [:mailbox]]
+
+  alias PluginDirectiveGuide.SendEmail
+  alias Jido.Plugin.Context
+
+  @impl true
+  def directives(_opts), do: [SendEmail]
+
+  @impl true
+  def dispatch(_runtime, %SendEmail{fail: true}, %Context{}, _opts), do: {:error, :mail_service_down}
+
+  def dispatch(_runtime, %SendEmail{} = email, %Context{phase: :directive} = context, opts) do
+    message = %{to: email.to, subject: email.subject, state_version: context.state_version}
+    Agent.update(opts[:mailbox], &[message | &1])
+  end
+end
+
+defmodule PluginDirectiveGuide.Notifier do
+  use Jido.Agent,
+    name: "notifier",
+    plugins: [{PluginDirectiveGuide.Email, %{mailbox: PluginDirectiveGuide.Mailbox}}]
+
+  state do
+    schema Jido.Joi.object(%{closed: Jido.Joi.integer() |> Jido.Joi.default(0)})
+  end
+
+  routes do
+    signal_source "/support/notifier"
+
+    route "ticket.close", as: :close do
+      action %{to: to, fail: fail},
+        schema: Jido.Joi.object(%{to: Jido.Joi.string(), fail: Jido.Joi.boolean() |> Jido.Joi.default(false)}),
+        context: context do
+        emails = [
+          %PluginDirectiveGuide.SendEmail{to: to, subject: "Your ticket closed", fail: fail},
+          %PluginDirectiveGuide.SendEmail{to: "audit@example.com", subject: "Ticket closed"}
+        ]
+
+        {:ok, %{context.agent_state | closed: context.agent_state.closed + 1}, emails}
+      end
+    end
+  end
+end
+
+pure = PluginDirectiveGuide.Notifier.instantiate!(id: "n-pure")
+
+{:ok, %{state: %{closed: 1}}, [_customer, _audit]} =
+  PluginDirectiveGuide.Notifier.cmd(pure, PluginDirectiveGuide.Notifier.close_signal!(%{to: "ada@example.com"}))
+
+Agent.get(PluginDirectiveGuide.Mailbox, & &1)
+```
+
+The cell returns `[]`. The pure path returned the Directives but ran nothing.
+
+Now run the same Turn live. `Jido.AgentServer.call/3` replies at commit, before post-commit work finishes, so this cell waits for the server to return to `:idle`.
+
+```elixir
+{:ok, _instance} = Jido.start(name: PluginDirectiveGuide.Jido)
+{:ok, server} = Jido.start_agent(PluginDirectiveGuide.Jido, PluginDirectiveGuide.Notifier, id: "n-live")
+:ok = Jido.AgentServer.await_ready(server)
+
+wait_for_idle = fn ->
+  Enum.find(1..200, fn _attempt ->
+    Process.sleep(10)
+    Jido.AgentServer.status(server).phase == :idle
+  end)
+end
+
+{:ok, %{state: %{closed: 1}}, [_, _]} =
+  Jido.AgentServer.call(server, PluginDirectiveGuide.Notifier.close_signal!(%{to: "ada@example.com"}))
+
+wait_for_idle.()
+
+PluginDirectiveGuide.Mailbox |> Agent.get(& &1) |> Enum.reverse() |> Enum.map(&{&1.to, &1.state_version})
+```
+
+The cell returns `[{"ada@example.com", 1}, {"audit@example.com", 1}]`. The two emails went out in batch order, and both saw the committed revision.
+
+## Handle a dispatch failure
+
+A failed dispatch stops the rest of the batch and does not undo the commit. The caller has already received its result. Look at `last_effect_outcome` in `Jido.AgentServer.status/1` to see what happened.
+
+```elixir
+Agent.update(PluginDirectiveGuide.Mailbox, fn _ -> [] end)
+
+{:ok, %{state: %{closed: 2}}, [_, _]} =
+  Jido.AgentServer.call(server, PluginDirectiveGuide.Notifier.close_signal!(%{to: "ada@example.com", fail: true}))
+
+wait_for_idle.()
+
+status = Jido.AgentServer.status(server)
+outcome = status.last_effect_outcome
+sent = Agent.get(PluginDirectiveGuide.Mailbox, & &1)
+:ok = Jido.stop_agent(PluginDirectiveGuide.Jido, server)
+
+{status.last_outcome.status, outcome.status, outcome.completed, outcome.total, sent}
+```
+
+The cell returns `{:succeeded, :failed, 0, 2, []}`. The Turn succeeded. Its effects failed on the first Directive, and the audit email never ran. Jido does not retry a dispatch, so make it safe to skip, or have a later Turn repair the result.
+
+## Dispatch context
+
+`dispatch/4` receives a `Jido.Plugin.Context` with these fields:
+
+| Field | Value |
+|---|---|
+| `:phase` | `:directive` |
+| `:turn_id`, `:agent_id` | Identity of this Turn and Agent. |
+| `:source_signal` | The Signal that the server received. |
+| `:effective_signal` | The Signal that the Turn used. |
+| `:state_version` | The committed revision. |
+| `:plugin_state` | The committed value of this Plugin's field, or `nil`. |
+| `:turn_context` | The transient context the caller passed. |
+| `:jido`, `:partition` | The instance and partition, or `nil`. |
+
+The batch shares the `directive_timeout` budget, 5,000 milliseconds by default. Running past it stops the batch with status `:timed_out`. A dispatch cannot make a synchronous request to its own AgentServer. That request returns `{:error, :reentrant_turn}`. Use `Jido.AgentServer.cast/2` to send a follow-up Signal.
+
+## Rules
+
+- A Directive module must define a struct and `validate/1`. A custom `validate/1` returns `{:ok, directive}` of the same type or `{:error, reason}`.
+- A Directive type has one owner, and a Plugin cannot own a built-in Directive.
+- An owned Directive needs `reduce/2` or `dispatch/4` on its Plugin. `dispatch/4` requires `directives/1`.
+- A Turn cannot add, configure, or remove a Plugin and also return that Plugin's Directives.
+
+## Next steps
+
+- [Post-Commit Work](plugin-post-commit-work.md) covers `after_commit/3` and outbound Signals.
+- [State and Directives](../agents/agent-results-and-directives.md) lists the built-in Directives.
+- [Runtime Effects](../agent-servers/runtime-directives-and-effects.md) explains how the server runs the batch.

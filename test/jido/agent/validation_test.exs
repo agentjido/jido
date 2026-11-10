@@ -41,14 +41,14 @@ defmodule Jido.Agent.ValidationTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:owned, Zoi.integer()}
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer()}
   end
 
   defmodule InvalidSchemaPlugin do
     use Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:owned, Zoi.integer(coerce: true)}
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer(coerce: true)}
   end
 
   @tag obligation: "jido.agent.I10"
@@ -56,7 +56,7 @@ defmodule Jido.Agent.ValidationTest do
     assert {:error, %Jido.Error.ValidationError{} = reason} =
              Agent.define(%{
                name: "conflict",
-               schema: Zoi.object(%{owned: Zoi.integer()}),
+               schema: Jido.Joi.object(%{owned: Jido.Joi.integer()}),
                plugins: [entry(StatePlugin)]
              })
 
@@ -74,7 +74,7 @@ defmodule Jido.Agent.ValidationTest do
              module: nil,
              description: nil,
              vsn: 1,
-             schema: Zoi.object(%{}),
+             schema: Jido.Joi.object(%{}),
              initial_state: %{},
              plugins: [],
              routes: [],
@@ -94,7 +94,7 @@ defmodule Jido.Agent.ValidationTest do
   @tag obligation: ["jido.agent.I3", "jido.agent.I6"]
   test "initial state must be a plain static Map" do
     for initial_state <- [nil, [], %URI{}, %{process: self()}] do
-      assert {:error, %Agent.Error{path: [:initial_state]}} =
+      assert {:error, %Jido.Error.ValidationError{path: [:initial_state]}} =
                Agent.define(%{name: "invalid_initial_state", initial_state: initial_state})
     end
   end
@@ -155,7 +155,7 @@ defmodule Jido.Agent.ValidationTest do
                plugins: [entry(CallbackPlugin, %{label: :first})]
              })
 
-    assert Agent.runtime_plugins(definition) == [{CallbackPlugin, [label: :first]}]
+    assert Agent.Plugin.declarations(definition) == [{CallbackPlugin, [label: :first]}]
     assert_received {:callback, :state_spec, [label: :first]}
     assert_received {:callback, :directives, [label: :first]}
 
@@ -182,27 +182,27 @@ defmodule Jido.Agent.ValidationTest do
   test "validation distinguishes definitions, instances, and unsupported values" do
     definition = Agent.define!(%{name: "validation_shapes"})
 
-    assert {:error, %Agent.Error{code: :invalid_map, path: [:state], message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_map, path: [:state], message: message}} =
              Agent.validate(%{definition | id: "instance"})
 
     assert message != ""
 
-    assert {:error, %Agent.Error{code: :invalid_string, path: [:id], message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_string, path: [:id], message: message}} =
              Agent.validate(%{definition | state: %{}})
 
     assert message != ""
 
-    assert {:error, %Agent.Error{code: :invalid_agent, message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_agent, message: message}} =
              Agent.validate(:invalid)
 
     assert message != ""
 
-    assert {:error, %Agent.Error{code: :definition_required, message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :definition_required, message: message}} =
              Validation.validate_definition(%{definition | id: "instance"})
 
     assert message != ""
 
-    assert {:error, %Agent.Error{code: :instance_required, message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :instance_required, message: message}} =
              Validation.validate_instance_with_plugins(:invalid)
 
     assert message != ""
@@ -212,7 +212,7 @@ defmodule Jido.Agent.ValidationTest do
   test "noncanonical definitions return one nonempty normalization error" do
     definition = Agent.define!(%{name: "noncanonical"})
 
-    assert {:error, %Agent.Error{code: :not_canonical, message: message}} =
+    assert {:error, %Jido.Error.ValidationError{code: :not_canonical, message: message}} =
              Validation.validate_definition(%{definition | topology: %{}})
 
     assert message != ""

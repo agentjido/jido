@@ -1,5 +1,5 @@
 defmodule Jido.Plugin.AuditIntegrationTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.AgentServer
   alias Jido.Plugin.Audit
@@ -19,7 +19,7 @@ defmodule Jido.Plugin.AuditIntegrationTest do
     use Jido.Agent, name: "audit_integration_agent", plugins: [{Audit, %{max_entries: 2}}]
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -31,14 +31,14 @@ defmodule Jido.Plugin.AuditIntegrationTest do
     jido: jido
   } do
     {:ok, server} =
-      JidoTest.AgentServerAssertions.start_agent(jido, Agent, id: unique_id("audit"))
+      Jido.Test.AgentServer.Assertions.start_agent(jido, Agent, id: unique_id("audit"))
 
     for event <- [:one, :two, :three] do
       assert {:ok, _agent, _directives} =
                AgentServer.call(server, signal("audit.record", %{event: event}))
     end
 
-    committed = JidoTest.AgentServerAssertions.committed(server)
+    committed = Jido.Test.AgentServer.Assertions.committed(server)
     assert committed.agent.state.count == 3
     assert Enum.map(committed.agent.state.audit.records, & &1.event) == [:two, :three]
     assert {:ok, committed.agent.state.audit} == AgentServer.plugin_state(server, Audit)
@@ -46,6 +46,6 @@ defmodule Jido.Plugin.AuditIntegrationTest do
     assert {:error, %Jido.Error.ValidationError{details: %{path: [:record, :event]}}} =
              AgentServer.call(server, signal("audit.record", %{event: <<5::3>>}))
 
-    assert JidoTest.AgentServerAssertions.committed(server) == committed
+    assert Jido.Test.AgentServer.Assertions.committed(server) == committed
   end
 end

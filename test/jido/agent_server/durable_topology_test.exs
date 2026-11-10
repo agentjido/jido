@@ -1,11 +1,11 @@
-defmodule JidoTest.AgentServer.DurableTopologyTest do
-  use JidoTest.Case, async: false
+defmodule Jido.AgentServer.DurableTopologyTest do
+  use Jido.Test.Case, async: false
   @moduletag :tmp_dir
   @moduletag capture_log: true
 
   alias Jido.Agent.Directive, as: D
   alias Jido.AgentServer, as: Server
-  alias JidoTest.DurableFixtures, as: F
+  alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   setup do
     start_supervised!({F.Probe, self()})
@@ -149,9 +149,7 @@ defmodule JidoTest.AgentServer.DurableTopologyTest do
     assert :ok = Server.hibernate(root)
 
     assert {:ok, awake} =
-             Jido.thaw(c.jido, F.Team, root_id,
-               persistence: {Jido.Persistence.File, path: c.tmp_dir}
-             )
+             Jido.thaw(c.jido, F.Team, root_id, persistence: {Jido.Persistence.File, path: c.tmp_dir})
 
     assert :ok = Server.await_ready(awake)
     restored = member(awake, :worker)

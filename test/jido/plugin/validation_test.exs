@@ -1,8 +1,8 @@
 defmodule Jido.Plugin.ValidationTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Plugin
-  alias Jido.Plugin.{Init, SignalContext}
+  alias Jido.Plugin.{Context, Init}
 
   defmodule Effect do
     defstruct [:value]
@@ -40,7 +40,7 @@ defmodule Jido.Plugin.ValidationTest do
 
   defmodule Configurable.Agent do
     @behaviour Jido.Plugin
-    def state_spec(opts), do: Keyword.get(opts, :state, {:owned, Zoi.integer()})
+    def state_spec(opts), do: Keyword.get(opts, :state, {:owned, Jido.Joi.integer()})
     def directives(opts), do: Keyword.get(opts, :directives, [Effect])
     def reduce(_reduction, opts), do: Keyword.fetch!(opts, :result)
   end
@@ -180,7 +180,7 @@ defmodule Jido.Plugin.ValidationTest do
       assert {:error, error} =
                Jido.Agent.define(%{
                  name: "bad_plugin_state_schema",
-                 schema: Zoi.object(%{}),
+                 schema: Jido.Joi.object(%{}),
                  plugins: [
                    %{
                      id: FailingStateSpec.id(),
@@ -200,7 +200,7 @@ defmodule Jido.Plugin.ValidationTest do
     assert {:error, error} =
              Jido.Agent.define(%{
                name: "returned_plugin_state_error",
-               schema: Zoi.object(%{}),
+               schema: Jido.Joi.object(%{}),
                plugins: [
                  %{
                    id: FailingStateSpec.id(),
@@ -218,18 +218,18 @@ defmodule Jido.Plugin.ValidationTest do
     assert {:ok, definition} =
              Jido.Agent.define(%{
                name: "error_field_plugin",
-               schema: Zoi.object(%{}),
+               schema: Jido.Joi.object(%{}),
                plugins: [
                  %{
                    id: Configurable.id(),
                    provider: Configurable,
                    vsn: Configurable.vsn(),
-                   data: %{state: {:error, Zoi.integer() |> Zoi.default(7)}}
+                   data: %{state: {:error, Jido.Joi.integer() |> Jido.Joi.default(7)}}
                  }
                ]
              })
 
-    assert {:ok, agent} = Jido.Agent.instantiate(definition, id: Jido.Signal.ID.generate!())
+    assert {:ok, agent} = Jido.Agent.instantiate(definition, id: Jido.Id.uuid7())
     assert agent.state.error == 7
   end
 
@@ -238,9 +238,9 @@ defmodule Jido.Plugin.ValidationTest do
           {Empty, "must use Jido.Plugin"},
           {{Configurable, [:invalid]}, "options must be a keyword list"},
           {42, "Invalid Agent Plugin declaration"},
-          {JidoTest.MissingPlugin, "could not be loaded"},
+          {Jido.Test.MissingPlugin, "could not be loaded"},
           {{Configurable, state: :invalid}, "state_spec/1 returned an invalid value"},
-          {{Configurable, state: {:owned, Zoi.any() |> Zoi.refine(fn _ -> :ok end)}},
+          {{Configurable, state: {:owned, Jido.Joi.any() |> Jido.Joi.refine(fn _ -> :ok end)}},
            "options must be static data"},
           {{Configurable, directives: :invalid}, "directives/1 must return a list"},
           {{Configurable, directives: [42]}, "Directive modules must be atoms"},
@@ -252,16 +252,15 @@ defmodule Jido.Plugin.ValidationTest do
       assert error.message =~ fragment
     end
 
-    assert {:error, error} = Jido.Agent.Plugin.compose_schema(Zoi.integer(), [])
-    assert error.message =~ "domain schema must be a field-based Zoi object"
+    assert {:error, error} = Jido.Agent.Plugin.compose_schema(Jido.Joi.integer(), [])
+    assert error.message =~ "domain schema must be a field-based Joi object"
   end
 
-  test "state_spec requires a usable Zoi schema and a safe state key" do
+  test "state_spec requires a usable Joi schema and a safe state key" do
     for {state_spec, message} <- [
-          {{nil, Zoi.integer()}, "Plugin-owned Agent state key must not be nil"},
-          {{:__struct__, Zoi.integer()}, "Plugin-owned Agent state key is reserved"},
-          {{:owned, %URI{scheme: "https"}},
-           "Plugin-owned Agent state schema must be a Zoi schema"}
+          {{nil, Jido.Joi.integer()}, "Plugin-owned Agent state key must not be nil"},
+          {{:__struct__, Jido.Joi.integer()}, "Plugin-owned Agent state key is reserved"},
+          {{:owned, %URI{scheme: "https"}}, "Plugin-owned Agent state schema must be a Joi schema"}
         ] do
       assert {:error, %{__exception__: true} = error} =
                Jido.Plugin.Normalizer.normalize_all([{Configurable, state: state_spec}])
@@ -273,7 +272,7 @@ defmodule Jido.Plugin.ValidationTest do
     assert {:error, %{__exception__: true} = error} =
              Jido.Agent.define(%{
                name: "invalid_plugin_schema",
-               schema: Zoi.object(%{}),
+               schema: Jido.Joi.object(%{}),
                plugins: [
                  %{
                    id: Configurable.id(),
@@ -284,7 +283,7 @@ defmodule Jido.Plugin.ValidationTest do
                ]
              })
 
-    assert error.message == "Plugin-owned Agent state schema must be a Zoi schema"
+    assert error.message == "Plugin-owned Agent state schema must be a Joi schema"
   end
 
   test "normalizes options and declaration callbacks once for reusable specs" do
@@ -304,7 +303,7 @@ defmodule Jido.Plugin.ValidationTest do
 
     init = %Init{agent_server: self(), agent_id: "agent", module: OptionValidator}
 
-    assert {:ok, _schema} = Jido.Agent.Plugin.compose_schema(Zoi.object(%{}), [spec])
+    assert {:ok, _schema} = Jido.Agent.Plugin.compose_schema(Jido.Joi.object(%{}), [spec])
 
     assert {:ok, [{OptionValidator, ^original_opts}]} =
              Jido.Plugin.Normalizer.canonical_declarations([spec])
@@ -358,7 +357,7 @@ defmodule Jido.Plugin.ValidationTest do
   test "direct preparation validates Plugin declarations once" do
     agent =
       Jido.Agent.define!(%{name: "prepared"})
-      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Jido.Agent.instantiate!(id: Jido.Id.uuid7())
 
     opts = [validation_result: :ok]
 
@@ -376,7 +375,7 @@ defmodule Jido.Plugin.ValidationTest do
 
     signal = Jido.Signal.new!("unrouted", %{}, source: "/test")
 
-    assert {:error, %Jido.Agent.Error{code: :unmatched_input}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unmatched_input}} =
              Jido.Agent.Runner.prepare(agent, signal, [])
 
     assert_received {:callback, :validate_options, ^opts}
@@ -392,12 +391,12 @@ defmodule Jido.Plugin.ValidationTest do
         routes: [
           %{
             path: "observe",
-            handler: %{kind: :action, target: JidoTest.AgentFixtures.ObserveExecutionBoundary},
+            handler: %{kind: :action, target: Jido.Test.AgentServer.Fixtures.ObserveExecutionBoundary},
             state: %{source: :output, path: []}
           }
         ]
       })
-      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Jido.Agent.instantiate!(id: Jido.Id.uuid7())
 
     opts = [validation_result: :ok]
 
@@ -421,13 +420,13 @@ defmodule Jido.Plugin.ValidationTest do
     assert_received {:callback, :directives, ^opts}
     refute_received {:callback, _, _}
 
-    assert {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.runtime_plugins(agent))
+    assert {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Jido.Agent.Plugin.declarations(agent))
     assert_received {:callback, :validate_options, ^opts}
     assert_received {:callback, :state_spec, ^opts}
     assert_received {:callback, :directives, ^opts}
-    command = %Jido.Agent.Command{agent: agent, signal: signal}
+    command = %Jido.AgentServer.Command{agent: agent, signal: signal}
 
-    assert {:ok, prepared} = Jido.Agent.Runner.prepare_for_server(command, signal, [], specs)
+    assert {:ok, prepared} = Jido.Agent.Runner.prepare_admitted(command, signal, [], specs)
     assert {:ok, ^agent, []} = Jido.Agent.Runner.finish_for_server(prepared, {:ok, agent.state})
     refute_received {:callback, _, _}
   end
@@ -557,7 +556,7 @@ defmodule Jido.Plugin.ValidationTest do
 
   test "Directive owners must be loaded struct modules" do
     for {directive, message} <- [
-          {JidoTest.MissingDirective, "must be loaded"},
+          {Jido.Test.MissingDirective, "must be loaded"},
           {String, "must define a struct"}
         ] do
       assert {:error, error} =
@@ -573,9 +572,9 @@ defmodule Jido.Plugin.ValidationTest do
     agent =
       Jido.Agent.define!(%{
         name: "plugin_pipeline_validation",
-        schema: Zoi.object(%{owned: Zoi.integer()})
+        schema: Jido.Joi.object(%{owned: Jido.Joi.integer()})
       })
-      |> Jido.Agent.instantiate!(id: Jido.Signal.ID.generate!(), state: %{owned: 1})
+      |> Jido.Agent.instantiate!(id: Jido.Id.uuid7(), state: %{owned: 1})
 
     source = signal("plugin.pipeline")
 
@@ -616,7 +615,8 @@ defmodule Jido.Plugin.ValidationTest do
   test "outbound preparation rejects invalid results and preserves explicit errors" do
     outbound = signal("plugin.output")
 
-    context = %SignalContext{
+    context = %Context{
+      phase: :signal,
       turn_id: "turn",
       agent_id: "agent",
       source_signal: outbound,
@@ -640,10 +640,7 @@ defmodule Jido.Plugin.ValidationTest do
                )
 
       if result == :invalid,
-        do:
-          assert(
-            error.message == "Agent Server Plugin prepare_outbound/4 returned an invalid result"
-          ),
+        do: assert(error.message == "Agent Server Plugin prepare_outbound/4 returned an invalid result"),
         else: assert(error == :blocked)
     end
   end
@@ -652,7 +649,8 @@ defmodule Jido.Plugin.ValidationTest do
     outbound = signal("plugin.output")
     invalid = %{outbound | source: "not a URI reference"}
 
-    context = %SignalContext{
+    context = %Context{
+      phase: :signal,
       turn_id: "turn",
       agent_id: "agent",
       source_signal: outbound,
@@ -680,7 +678,7 @@ defmodule Jido.Plugin.ValidationTest do
     ref = Process.monitor(pid)
     assert_receive {:DOWN, ^ref, :process, ^pid, _}
     init = %Init{agent_server: pid, agent_id: "agent", module: ThrowingChild}
-    assert {:error, {:agent_server_unavailable, _}} = Plugin.state(init)
+    assert {:error, {:agent_server_unavailable, _}} = Jido.AgentServer.Plugin.state(init)
     assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([ThrowingChild])
     assert {:error, error} = Jido.AgentServer.Plugin.Callbacks.child_spec(init, spec)
     assert error.message == "Agent Server Plugin child_spec/1 failed"

@@ -1,9 +1,9 @@
-defmodule JidoTest.Persistence.Conformance.RegistryTest do
+defmodule Jido.Persistence.Conformance.RegistryTest do
   use ExUnit.Case, async: true
 
   @moduletag :persistence
 
-  alias JidoTest.Persistence.Profiles
+  alias Jido.Test.Persistence.Profiles
 
   test "every built-in persistence adapter has an active or explained profile" do
     assert Profiles.discovered_adapter_modules() == Profiles.adapter_modules()
@@ -14,12 +14,12 @@ defmodule JidoTest.Persistence.Conformance.RegistryTest do
   end
 end
 
-for profile <- JidoTest.Persistence.Profiles.active(:local) do
+for profile <- Jido.Test.Persistence.Profiles.active(:local) do
   defmodule Module.concat(
-              JidoTest.Persistence.Conformance.Local,
+              Jido.Persistence.Conformance.Local,
               Macro.camelize(to_string(profile))
             ) do
-    use JidoTest.Persistence.Case, profile: profile
-    use JidoTest.Persistence.Contracts.Store
+    use Jido.Test.Persistence.Case, profile: profile
+    use Jido.Test.Persistence.Contracts.Store
   end
 end

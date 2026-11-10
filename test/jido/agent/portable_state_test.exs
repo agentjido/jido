@@ -36,19 +36,19 @@ defmodule Jido.Agent.PortableStateTest do
     ]
 
     definition =
-      Agent.define!(%{name: "portable_state", schema: Zoi.object(%{payload: Zoi.any()})})
+      Agent.define!(%{name: "portable_state", schema: Jido.Joi.object(%{payload: Jido.Joi.any()})})
 
     for value <- values do
       assert {:ok, agent} =
                Agent.instantiate(definition,
-                 id: Jido.Signal.ID.generate!(),
+                 id: Jido.Id.uuid7(),
                  state: %{payload: value}
                )
 
       assert agent.state.payload === value
       assert {:ok, ^agent} = Agent.validate(agent)
 
-      assert {:error, %Jido.Agent.Error{code: :non_portable_term, path: path}} =
+      assert {:error, %Jido.Error.ValidationError{code: :non_portable_term, path: path}} =
                Jido.Persistence.snapshot(agent)
 
       assert Enum.take(path, 4) == [:snapshot, :agent, :state, :payload]
@@ -64,7 +64,7 @@ defmodule Jido.Agent.PortableStateTest do
 
     deep_value = Enum.reduce(1..30, self(), fn index, value -> %{index => value} end)
 
-    assert {:error, %Jido.Agent.Error{code: :non_portable_term, path: deep_path}} =
+    assert {:error, %Jido.Error.ValidationError{code: :non_portable_term, path: deep_path}} =
              checkpoint_value(definition, deep_value)
 
     assert length(deep_path) == 20
@@ -72,7 +72,7 @@ defmodule Jido.Agent.PortableStateTest do
 
   test "bounds every diagnostic path segment" do
     definition =
-      Agent.define!(%{name: "portable_path", schema: Zoi.object(%{payload: Zoi.any()})})
+      Agent.define!(%{name: "portable_path", schema: Jido.Joi.object(%{payload: Jido.Joi.any()})})
 
     long_binary = String.duplicate("b", 100)
     long_integer = String.to_integer(String.duplicate("9", 100))
@@ -80,7 +80,7 @@ defmodule Jido.Agent.PortableStateTest do
 
     for key <- [long_binary, long_atom] do
       assert {:error,
-              %Jido.Agent.Error{
+              %Jido.Error.ValidationError{
                 code: :non_portable_term,
                 path: [:snapshot, :agent, :state, :payload, segment]
               }} = checkpoint_value(definition, %{key => self()})
@@ -90,13 +90,13 @@ defmodule Jido.Agent.PortableStateTest do
     end
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :non_portable_term,
               path: [:snapshot, :agent, :state, :payload, {:map_value, 0}]
             }} = checkpoint_value(definition, %{long_integer => self()})
 
     assert {:error, [root_segment]} =
-             Jido.PortableTerm.validate(self(), [String.duplicate("r", 100)])
+             Jido.Codec.Term.validate(self(), [String.duplicate("r", 100)])
 
     assert root_segment == String.duplicate("r", 64)
   end
@@ -105,7 +105,7 @@ defmodule Jido.Agent.PortableStateTest do
     definition =
       Agent.define!(%{
         name: "local_transition",
-        schema: Zoi.object(%{payload: Zoi.any()}),
+        schema: Jido.Joi.object(%{payload: Jido.Joi.any()}),
         routes: [
           %{
             path: "local.run",
@@ -116,7 +116,7 @@ defmodule Jido.Agent.PortableStateTest do
       })
 
     agent =
-      Agent.instantiate!(definition, id: Jido.Signal.ID.generate!(), state: %{payload: :initial})
+      Agent.instantiate!(definition, id: Jido.Id.uuid7(), state: %{payload: :initial})
 
     port = Port.open({:spawn_executable, System.find_executable("true")}, [])
     on_exit(fn -> if Port.info(port), do: Port.close(port) end)
@@ -133,14 +133,14 @@ defmodule Jido.Agent.PortableStateTest do
   end
 
   test "live local values must still match the declared schema and identity" do
-    definition = Agent.define!(%{name: "typed_local", schema: Zoi.object(%{payload: Zoi.pid()})})
+    definition = Agent.define!(%{name: "typed_local", schema: Jido.Joi.object(%{payload: Jido.Joi.pid()})})
 
     agent =
-      Agent.instantiate!(definition, id: Jido.Signal.ID.generate!(), state: %{payload: self()})
+      Agent.instantiate!(definition, id: Jido.Id.uuid7(), state: %{payload: self()})
 
     assert {:error, %{__exception__: true}} =
              Agent.instantiate(definition,
-               id: Jido.Signal.ID.generate!(),
+               id: Jido.Id.uuid7(),
                state: %{payload: <<5::size(3)>>}
              )
 
@@ -152,7 +152,7 @@ defmodule Jido.Agent.PortableStateTest do
     agent = NonportableCheckpointAgent.instantiate!(id: "checkpoint")
 
     assert {:error,
-            %Jido.Agent.Error{
+            %Jido.Error.ValidationError{
               code: :non_portable_term,
               path: [:snapshot, :agent, :state, :runtime]
             }} = Jido.Persistence.snapshot(agent)
@@ -165,7 +165,7 @@ defmodule Jido.Agent.PortableStateTest do
 
   defp checkpoint_value(definition, value) do
     definition
-    |> Agent.instantiate!(id: Jido.Signal.ID.generate!(), state: %{payload: value})
+    |> Agent.instantiate!(id: Jido.Id.uuid7(), state: %{payload: value})
     |> Jido.Persistence.snapshot()
   end
 end

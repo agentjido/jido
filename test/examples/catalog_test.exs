@@ -1,95 +1,181 @@
-defmodule JidoTest.Examples.CatalogTest do
+Code.require_file("support/catalog.exs", __DIR__)
+
+defmodule Jido.Examples.CatalogTest do
   use ExUnit.Case, async: true
+
   @moduletag :example
+  @root Path.expand("../..", __DIR__)
+  @catalog Path.join(__DIR__, "catalog.yml")
 
-  @package Path.expand("../..", __DIR__)
-  @source Path.join(@package, "examples")
+  alias Jido.Test.Examples.Catalog
 
-  defp groups do
-    @source
-    |> Path.join("[0-9][0-9]_*")
-    |> Path.wildcard()
-    |> Enum.filter(&(File.dir?(&1) and not String.starts_with?(Path.basename(&1), "99_")))
+  test "the checked-in example register is complete" do
+    assert Catalog.validate(Catalog.load!(@catalog), @root) == []
   end
 
-  defp lessons(group) do
-    group
-    |> Path.join("[0-9][0-9]_[0-9][0-9]_*")
-    |> Path.wildcard()
-    |> Enum.filter(&File.dir?/1)
+  test "the package compiler does not include the example source tree" do
+    paths = Mix.Project.config() |> Keyword.fetch!(:elixirc_paths) |> Enum.map(&Path.expand/1)
+    refute Path.expand("examples") in paths
+    refute Enum.any?(paths, &String.starts_with?(&1, Path.expand("examples") <> "/"))
+    refute Code.ensure_loaded?(Jido.Examples.GraphFirst.Agent)
   end
 
-  test "the catalog counts and section indexes match executable lesson folders" do
-    catalog = File.read!(Path.join(@source, "README.md"))
-    groups = groups()
-    all = Enum.flat_map(groups, &lessons/1)
+  test "a complete registered example is accepted" do
+    with_fixture(fn root, catalog ->
+      assert Catalog.validate(catalog, root) == []
+    end)
+  end
 
-    [_, total, group_count] =
-      Regex.run(~r/catalog has (\d+) executable examples in (\d+) groups/, catalog)
+  test "every example names its proof component" do
+    catalog = Catalog.load!(@catalog)
 
-    assert String.to_integer(total) == length(all)
-    assert String.to_integer(group_count) == length(groups)
-    ids = Enum.map(all, &String.slice(Path.basename(&1), 0, 5))
-    assert ids == Enum.uniq(ids)
+    assert Enum.all?(catalog["examples"], &is_binary(&1["component"]))
+  end
 
-    for group <- groups do
-      name = Path.basename(group)
-      assert [_, count] = Regex.run(~r/\| #{name} \| (\d+) \|/, catalog)
-      assert String.to_integer(count) == length(lessons(group)), name
-      index = File.read!(Path.join(group, "README.md"))
+  test "a missing README, source, or paired test is rejected" do
+    for {field, message} <- [
+          {"readme", "missing readme"},
+          {"source", "missing source"},
+          {"test", "missing test"}
+        ] do
+      with_fixture(fn root, catalog ->
+        path = catalog["examples"] |> hd() |> Map.fetch!(field)
+        File.rm!(Path.join(root, path))
+        assert Enum.any?(Catalog.validate(catalog, root), &String.starts_with?(&1, message))
+      end)
+    end
+  end
 
-      for lesson <- lessons(group) do
-        assert String.starts_with?(Path.basename(lesson), String.slice(name, 0, 2))
-        assert index =~ "#{Path.basename(lesson)}/README.md", lesson
-        assert File.regular?(Path.join(lesson, "README.md")), lesson
-        assert Path.wildcard(Path.join(lesson, "**/*.ex")) != [], lesson
-        tests = Path.join(__DIR__, Path.relative_to(lesson, @source))
-        assert Path.wildcard(Path.join(tests, "**/*_test.exs")) != [], tests
+  test "duplicate IDs and duplicate paired assets are rejected" do
+    with_fixture(fn root, catalog ->
+      [entry] = catalog["examples"]
+      duplicate = %{entry | "source" => "examples/01_flow_basics/01_01_echo/second.ex"}
+      File.write!(Path.join(root, duplicate["source"]), "defmodule Fixture.Second, do: nil\n")
+      invalid = %{catalog | "examples" => [entry, duplicate]}
+      errors = Catalog.validate(invalid, root)
+      assert "duplicate example id: 01_01_echo" in errors
+      assert "duplicate example readme: examples/01_flow_basics/01_01_echo/README.md" in errors
+      assert "duplicate example test: test/examples/01_flow_basics/01_01_echo/echo_test.exs" in errors
+    end)
+  end
+
+  test "unlisted source, README, test, and top-level paths are rejected" do
+    with_fixture(fn root, catalog ->
+      write!(root, "examples/01_flow_basics/01_02_orphan/orphan.ex", "defmodule Fixture.Orphan, do: nil\n")
+      write!(root, "examples/01_flow_basics/01_02_orphan/README.md", "# Orphan\n")
+      write!(root, "test/examples/01_flow_basics/01_02_orphan/orphan_test.exs", tagged_test())
+      write!(root, "examples/unknown/example.ex", "defmodule Fixture.Unknown, do: nil\n")
+
+      errors = Catalog.validate(catalog, root)
+      assert "unlisted example source: examples/01_flow_basics/01_02_orphan/orphan.ex" in errors
+      assert "unlisted example README: examples/01_flow_basics/01_02_orphan/README.md" in errors
+      assert "unlisted example test: test/examples/01_flow_basics/01_02_orphan/orphan_test.exs" in errors
+      assert "unlisted top-level example path: examples/unknown" in errors
+    end)
+  end
+
+  test "chapter, lesson, mirror, and catalog order are enforced" do
+    with_fixture(fn root, catalog ->
+      [entry] = catalog["examples"]
+
+      invalid_chapter = %{entry | "source" => "examples/flow_basics/01_01_echo/echo.ex"}
+      errors = Catalog.validate(%{catalog | "examples" => [invalid_chapter]}, root)
+      assert "source chapter must use NN_chapter: examples/flow_basics/01_01_echo/echo.ex" in errors
+
+      wrong_prefix = %{entry | "source" => "examples/01_flow_basics/02_01_echo/echo.ex"}
+      errors = Catalog.validate(%{catalog | "examples" => [wrong_prefix]}, root)
+
+      assert "source lesson chapter prefix does not match its parent: examples/01_flow_basics/02_01_echo/echo.ex" in errors
+
+      nested = %{entry | "source" => "examples/flow/01_flow_basics/01_01_echo/echo.ex"}
+      errors = Catalog.validate(%{catalog | "examples" => [nested]}, root)
+      assert "source path must use NN_chapter/NN_NN_lesson: examples/flow/01_flow_basics/01_01_echo/echo.ex" in errors
+
+      second = %{
+        "id" => "02_01_second",
+        "category" => "flow",
+        "component" => "jido_action.flow",
+        "readme" => "examples/02_flow_more/02_01_second/README.md",
+        "source" => "examples/02_flow_more/02_01_second/second.ex",
+        "test" => "test/examples/02_flow_more/02_01_second/second_test.exs"
+      }
+
+      write!(root, second["readme"], "# Second\n")
+      write!(root, second["source"], "defmodule Fixture.Second, do: nil\n")
+      write!(root, second["test"], tagged_test("02_flow_more/02_01_second/second.ex"))
+
+      errors = Catalog.validate(%{catalog | "examples" => [second, entry]}, root)
+      assert "example entries must be sorted by id" in errors
+    end)
+  end
+
+  test "paired tests must use the example tag and deferred setup loader" do
+    with_fixture(fn root, catalog ->
+      path = catalog["examples"] |> hd() |> Map.fetch!("test")
+      File.write!(Path.join(root, path), "defmodule Fixture.BadTest, do: nil\n")
+      errors = Catalog.validate(catalog, root)
+      assert "paired test has no :example tag: #{path}" in errors
+      assert "paired test does not use the example loader: #{path}" in errors
+      assert "paired test does not load its source in setup_all: #{path}" in errors
+    end)
+  end
+
+  defp with_fixture(test) do
+    root = Path.join(System.tmp_dir!(), "jido-example-catalog-#{System.unique_integer([:positive])}")
+
+    try do
+      entry = %{
+        "id" => "01_01_echo",
+        "category" => "flow",
+        "component" => "jido_action.flow",
+        "readme" => "examples/01_flow_basics/01_01_echo/README.md",
+        "source" => "examples/01_flow_basics/01_01_echo/echo.ex",
+        "test" => "test/examples/01_flow_basics/01_01_echo/echo_test.exs"
+      }
+
+      write!(root, entry["readme"], "# Echo\n")
+      write!(root, entry["source"], "defmodule Fixture.Echo, do: nil\n")
+      write!(root, entry["test"], tagged_test())
+      write!(root, "examples/README.md", "# Catalog\n")
+
+      catalog = %{
+        "version" => 1,
+        "id_pattern" => "^[0-9]{2}_[0-9]{2}_[a-z][a-z0-9_]*$",
+        "categories" => [
+          %{
+            "id" => "flow",
+            "source_root" => "examples",
+            "test_root" => "test/examples"
+          }
+        ],
+        "index_readmes" => [],
+        "examples" => [entry],
+        "exclusions" => []
+      }
+
+      test.(root, catalog)
+    after
+      File.rm_rf!(root)
+    end
+  end
+
+  defp tagged_test(source \\ "01_flow_basics/01_01_echo/echo.ex") do
+    """
+    defmodule Fixture.EchoTest do
+      use ExUnit.Case
+      @moduletag :example
+      setup_all do
+        Jido.Test.Examples.Loader.require_source!("#{source}")
+        :ok
       end
+      test "echo", do: assert(true)
     end
+    """
   end
 
-  test "stable test folders have a lesson and contain no skipped tests" do
-    for group <- groups(), tests <- lessons(Path.join(__DIR__, Path.basename(group))) do
-      source = Path.join(group, Path.basename(tests))
-      assert File.dir?(source), tests
-
-      for file <- Path.wildcard(Path.join(tests, "**/*_test.exs")) do
-        refute File.read!(file) =~ ~r/@(?:module)?tag\s+(?::skip\b|skip:\s*true)/, file
-      end
-    end
-  end
-
-  test "repository documentation links resolve to files or folders" do
-    documents =
-      Path.wildcard(Path.join(@source, "**/*.md")) ++
-        Path.wildcard(Path.join(__DIR__, "**/*.md"))
-
-    broken =
-      for file <- documents,
-          Path.basename(file) != "AGENTS.md",
-          [_, href] <- Regex.scan(~r/\]\(([^)\s]+)\)/, File.read!(file)),
-          not String.starts_with?(href, "#"),
-          not Regex.match?(~r/^[a-zA-Z][a-zA-Z0-9+.-]*:/, href),
-          target = href |> String.split("#", parts: 2) |> hd() |> URI.decode(),
-          expanded = Path.expand(target, Path.dirname(file)),
-          # Sibling repositories and private demos are optional workspace content.
-          String.starts_with?(expanded, @package <> "/"),
-          not File.exists?(expanded),
-          do: "#{Path.relative_to(file, @source)}: #{href}"
-
-    assert broken == [], Enum.join(broken, "\n")
-  end
-
-  test "durable proposals stay outside the executable test tree" do
-    proposals = Path.wildcard(Path.join(@source, "11_durable/proposals/11_*"))
-    assert proposals != []
-
-    for proposal <- proposals do
-      assert File.regular?(Path.join(proposal, "README.md"))
-      assert File.regular?(Path.join(proposal, "test-plan.md"))
-      assert Path.wildcard(Path.join(proposal, "**/*.ex")) == []
-      refute File.exists?(Path.join(__DIR__, "11_durable/#{Path.basename(proposal)}"))
-    end
+  defp write!(root, relative, content) do
+    path = Path.join(root, relative)
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, content)
   end
 end

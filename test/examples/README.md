@@ -1,24 +1,43 @@
 # Example tests
 
-Runnable source lives in the root [example catalog](../../examples/README.md).
-Test folders follow that catalog, including [application examples](08_applications)
-and [Plugin examples](09_plugins), plus the [persistence examples](10_persistence).
-Every test uses `:example`, directly or through a shared case template. Do not
-add a separate integration tag or a second copy of an existing assertion.
+The public [example tree](../../examples/README.md) and this test tree use the
+same flat chapter and lesson names. The catalog in
+[`catalog.yml`](catalog.yml) pairs each source lesson with its test.
 
-```sh
-mix test                               # Excludes examples
-mix test.examples                      # Runs all example tests
-mix test test/examples/08_applications --include example --seed 0
-mix test test/examples/10_persistence --include example --seed 0
+Every paired test must:
+
+- use the `:example` tag;
+- load its primary source in `setup_all` with
+  `Jido.Test.Examples.Loader.require_source!/1`;
+- make exact assertions about the documented result;
+- run without provider keys or external services.
+
+Executable test modules use the production `Jido.Examples.*` namespace.
+Shared loaders and fixtures use `Jido.Test.Examples.*`. Each catalog entry
+names its component, and each paired test owns one executable documentation
+claim in `test/quality/component_proof.yml`.
+
+This pattern prevents default `mix test` from loading example source:
+
+```elixir
+Code.require_file("../../support/loader.exs", __DIR__)
+
+defmodule Jido.Examples.SampleTest do
+  use ExUnit.Case, async: false
+  @moduletag :example
+
+  setup_all do
+    Jido.Test.Examples.Loader.require_source!(
+      "02_flow_authoring/02_01_sample/sample.ex"
+    )
+    :ok
+  end
+end
 ```
 
-The research suite contains the peer-based external fencing evidence for the
-missing cluster-exclusive ownership contract.
-Use the [testing guide](../../guides/test-jido-systems.livemd) for full acceptance and coverage
-commands. Detailed stable contracts stay in focused core tests.
+Run the catalog or the full offline suite with a fixed seed:
 
-The [catalog checks](catalog_test.exs) verify counts, section indexes, matching
-source and test folders, repository documentation links, and the absence of skipped
-stable tests. Design plans stay under `examples/11_durable/proposals/`. CI runs
-the example suite after the core contract and property suite.
+```sh
+mix test test/examples/catalog_test.exs --include example --seed 0
+mix test.examples
+```

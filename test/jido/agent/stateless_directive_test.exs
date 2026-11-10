@@ -1,15 +1,15 @@
 defmodule Jido.Agent.StatelessDirectiveTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.AgentServer, as: Server
   alias Jido.Signal
 
   defmodule Effect do
-    @schema Zoi.struct(__MODULE__, %{kind: Zoi.enum([:reply, :block, :last])}, coerce: true)
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
+    @schema Jido.Joi.struct(__MODULE__, %{kind: Jido.Joi.enum([:reply, :block, :last])}, coerce: true)
+    @enforce_keys Jido.Joi.enforce_keys(@schema)
+    defstruct Jido.Joi.struct_fields(@schema)
     def schema, do: @schema
-    def validate(%__MODULE__{} = effect), do: Zoi.parse(@schema, Map.from_struct(effect))
+    def validate(%__MODULE__{} = effect), do: Jido.Joi.parse(@schema, Map.from_struct(effect))
   end
 
   defmodule Effects do
@@ -59,7 +59,7 @@ defmodule Jido.Agent.StatelessDirectiveTest do
   defmodule Submit do
     use Jido.Action,
       name: "stateless_directive_submit",
-      schema: Zoi.object(%{kind: Zoi.enum([:reply, :block])})
+      schema: Jido.Joi.object(%{kind: Jido.Joi.enum([:reply, :block])})
 
     @impl true
     def run(%{kind: kind}, %{agent_state: state}),
@@ -69,7 +69,7 @@ defmodule Jido.Agent.StatelessDirectiveTest do
   defmodule Result do
     use Jido.Action,
       name: "stateless_directive_result",
-      schema: Zoi.object(%{value: Zoi.integer()})
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     @impl true
     def run(%{value: value}, %{agent_state: state}), do: {:ok, %{state | value: value}}
@@ -79,7 +79,7 @@ defmodule Jido.Agent.StatelessDirectiveTest do
     use Jido.Agent, name: "stateless_directive_agent", plugins: [Effects]
 
     state do
-      schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -89,13 +89,11 @@ defmodule Jido.Agent.StatelessDirectiveTest do
   end
 
   test "a handler without a Plugin process sends its result through another Turn", %{jido: jido} do
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, Agent)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, Agent)
     refute Map.has_key?(Server.children(server), {:plugin, Effects})
 
     assert {:ok, committed, _} =
-             Server.call(server, signal("effect.submit", %{kind: :reply}),
-               context: %{observer: self()}
-             )
+             Server.call(server, signal("effect.submit", %{kind: :reply}), context: %{observer: self()})
 
     assert committed.state == %{value: 7}
     assert_receive {:effect_started, :reply, worker}

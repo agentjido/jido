@@ -9,7 +9,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
   defmodule Mark do
     use Jido.Action,
       name: "fsm_mark",
-      schema: Zoi.object(%{label: Zoi.atom()})
+      schema: Jido.Joi.object(%{label: Jido.Joi.atom()})
 
     @impl true
     def run(%{label: label}, context) do
@@ -46,7 +46,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
       plugins: [{FSM, %{definition_vsn: 1}}]
 
     state do
-      schema Zoi.object(%{log: Zoi.list(Zoi.atom()) |> Zoi.default([])})
+      schema Jido.Joi.object(%{log: Jido.Joi.list(Jido.Joi.atom()) |> Jido.Joi.default([])})
     end
 
     state_machine do
@@ -81,7 +81,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
       plugins: [{FSM, %{definition_vsn: 1}}]
 
     state do
-      schema Zoi.object(%{log: Zoi.list(Zoi.atom()) |> Zoi.default([])})
+      schema Jido.Joi.object(%{log: Jido.Joi.list(Jido.Joi.atom()) |> Jido.Joi.default([])})
     end
 
     state_machine do
@@ -102,7 +102,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
       plugins: [{FSM, %{definition_vsn: 1}}]
 
     state do
-      schema Zoi.object(%{log: Zoi.list(Zoi.atom()) |> Zoi.default([])})
+      schema Jido.Joi.object(%{log: Jido.Joi.list(Jido.Joi.atom()) |> Jido.Joi.default([])})
     end
 
     state_machine do
@@ -126,7 +126,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
     map_definition =
       Agent.define!(%{
         name: "map_fsm_guide",
-        schema: Zoi.object(%{log: Zoi.list(Zoi.atom()) |> Zoi.default([])}),
+        schema: Jido.Joi.object(%{log: Jido.Joi.list(Jido.Joi.atom()) |> Jido.Joi.default([])}),
         signal_source: "/plugin/fsm/map",
         routes: Guide.definition().routes,
         plugins: [fsm_extension(Map.delete(machine_data(), :definition_vsn))]
@@ -206,12 +206,12 @@ defmodule Jido.Agent.Plugin.FSMTest do
 
   test "Agent codec preserves the canonical FSM definition" do
     definition = Guide.definition()
-    registry = JidoTest.AgentRegistry.for(definition)
+    registry = Jido.Test.AgentServer.Registry.for(definition)
 
-    assert {:ok, document} = JidoTest.AgentRegistry.encode(definition, registry)
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
 
     assert {:ok, ^definition} =
-             JidoTest.AgentRegistry.decode(JSON.decode!(JSON.encode!(document)), registry)
+             Jido.Test.AgentServer.Registry.decode(JSON.decode!(JSON.encode!(document)), registry)
   end
 
   test "Agent mutation keeps selector and route invariants" do

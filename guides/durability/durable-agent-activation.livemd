@@ -1,0 +1,252 @@
+# Durable Agent Activation
+
+This tutorial uses `Jido.activate_agent/4` to start a durable Agent the same way on first use and on every later start. It also shows how the strict start functions differ, and which records `Jido.activate_agent/4` refuses to replace.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Why one operation
+
+A caller with a stable ID often does not know whether the Agent has a record yet. Checking storage and then choosing a start function has a race, because another caller can create the record between the two steps. `Jido.activate_agent/4` closes that race with these steps:
+
+1. If this instance already has a live activation for the Ref, it returns that process.
+2. Otherwise the new server reads the record.
+3. An active record is restored.
+4. A `:not_found` read creates revision zero with compare-and-swap.
+5. If that create conflicts, the server reads and restores the record that won.
+
+Only `:not_found` leads to a create. A tombstone, an invalid record, and a storage error stop the activation instead.
+
+## Set up an order Agent
+
+An activation uses a `Jido.Agent.Ref`, so the instance needs a namespace. Build the Ref with `Jido.agent_ref/3`, which fills in that namespace.
+
+```elixir
+defmodule ActivationGuide.AddItem do
+  use Jido.Action,
+    name: "activation_add_item",
+    schema: Jido.Joi.object(%{sku: Jido.Joi.string()})
+
+  @impl Jido.Action
+  def run(%{sku: sku}, %{agent_state: state}) do
+    {:ok, %{state | items: [sku | state.items]}}
+  end
+end
+
+defmodule ActivationGuide.Order do
+  use Jido.Agent, name: "activation_order"
+
+  state do
+    schema Jido.Joi.object(%{
+             items: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
+           })
+  end
+
+  routes do
+    signal_source "/guides/activation"
+    route "order.add_item", ActivationGuide.AddItem, as: :add_item
+  end
+end
+
+{:ok, _} =
+  Jido.start_link(
+    name: ActivationGuide.Jido,
+    namespace: "guides/activation",
+    persistence: {Jido.Persistence.ETS, table: :activation_guide}
+  )
+
+{:ok, order_ref} = Jido.agent_ref(ActivationGuide.Jido, "order-1001")
+order_ref
+```
+
+The cell returns `%Jido.Agent.Ref{id: "order-1001", namespace: "guides/activation", partition: nil}`. A Ref is an identifier. It holds no process and no credential.
+
+## Activate for the first time
+
+No record exists, so the server creates revision zero. `Jido.activate_agent/4` defaults to `persistence: :inherit`. The function can return before recovery finishes, so wait for readiness first.
+
+```elixir
+alias ActivationGuide.Order
+alias Jido.AgentServer, as: Server
+
+{:ok, server} = Jido.activate_agent(ActivationGuide.Jido, order_ref, Order)
+:ok = Server.await_ready(server)
+
+{Server.agent(server).state, Server.snapshot(server).state_version}
+```
+
+The cell returns `{%{items: []}, 0}`.
+
+## Send work through the Ref
+
+The Ref functions on `Jido` resolve the process again for each call. Use them when you do not want to hold a PID. `Jido.resolve_agent/2` shows the current answer, which is `{:ok, pid}`, `{:error, :recovering}` while the server is not ready, or `{:error, :not_found}`.
+
+```elixir
+alias ActivationGuide.Order
+
+{:ok, signal} = Order.add_item_signal(%{sku: "sku-red-mug"})
+{:ok, agent, []} = Jido.call(ActivationGuide.Jido, order_ref, signal)
+
+{agent.state, Jido.resolve_agent(ActivationGuide.Jido, order_ref) == {:ok, server}}
+```
+
+The cell returns `{%{items: ["sku-red-mug"]}, true}`.
+
+## Activate again
+
+A second call finds the live activation and returns the same process. Many concurrent callers also get one activation, because the instance Registry allows one server for each Ref.
+
+```elixir
+alias ActivationGuide.Order
+
+{:ok, ^server} = Jido.activate_agent(ActivationGuide.Jido, order_ref, Order)
+
+results =
+  1..20
+  |> Enum.map(fn _caller ->
+    Task.async(fn -> Jido.activate_agent(ActivationGuide.Jido, order_ref, Order) end)
+  end)
+  |> Task.await_many()
+
+Enum.uniq(results) == [{:ok, server}]
+```
+
+The cell returns `true`.
+
+Concurrent activation of a Ref that has no record, for example on different nodes that share a store, uses compare-and-swap on the create. One create wins and the other server restores the winning record.
+
+## Restore after a stop
+
+Stopping the server leaves the record in place. Calling `Jido.activate_agent/4` again restores it with the same state and revision.
+
+```elixir
+alias ActivationGuide.Order
+alias Jido.AgentServer, as: Server
+
+:ok = Jido.stop_agent_ref(ActivationGuide.Jido, order_ref)
+{:error, :not_found} = Jido.resolve_agent(ActivationGuide.Jido, order_ref)
+
+{:ok, server} = Jido.activate_agent(ActivationGuide.Jido, order_ref, Order)
+:ok = Server.await_ready(server)
+
+{Server.agent(server).state, Server.snapshot(server).state_version}
+```
+
+The cell returns `{%{items: ["sku-red-mug"]}, 1}`.
+
+## Compare the strict functions
+
+Two other functions keep narrower meanings. Use them when a wrong answer should fail instead of being corrected.
+
+| Function | Mode | No record | Active record | Tombstone |
+| --- | --- | --- | --- | --- |
+| `Jido.activate_agent/4` | `:restore_or_create` | Creates revision 0 | Restores | Stops with `:deleted` |
+| `Jido.start_agent_ref/4` with `persistence: :inherit` | `:create` | Creates revision 0 | Stops with `:conflict` | Stops with `:conflict` |
+| `Jido.thaw/4` | `:restore` | Stops with `:not_found` | Restores | Stops with `:deleted` |
+
+These reasons arrive after the start call, because the read happens in the new server. The helper below turns each outcome into a value. A fast failure can make the start itself return `{:error, reason}`. Otherwise `Jido.AgentServer.await_ready/2` returns `{:error, reason}`. Handle both forms. `{:error, :worker_unavailable}` and `{:error, :noproc}` mean that no reason was recorded, so read the record to learn why.
+
+```elixir
+defmodule ActivationGuide.Outcome do
+  alias Jido.AgentServer, as: Server
+
+  def of({:ok, pid}), do: Server.await_ready(pid)
+  def of({:error, reason}), do: {:error, reason}
+end
+```
+
+A running Agent rejects both strict functions with `{:error, {:already_started, pid}}`. Stop it first to see the storage rules.
+
+```elixir
+alias ActivationGuide.{Order, Outcome}
+
+{:error, {:already_started, ^server}} =
+  Jido.thaw(ActivationGuide.Jido, Order, "order-1001")
+
+:ok = Jido.stop_agent_ref(ActivationGuide.Jido, order_ref)
+
+create = Jido.start_agent_ref(ActivationGuide.Jido, order_ref, Order, persistence: :inherit)
+create_outcome = Outcome.of(create)
+
+missing = Outcome.of(Jido.thaw(ActivationGuide.Jido, Order, "order-unknown"))
+
+true = create_outcome != :ok
+true = missing != :ok
+
+{create_outcome, missing}
+```
+
+The strict create refused the existing record, and the strict restore refused to invent one. Neither changed storage, so the order still loads at revision 1.
+
+```elixir
+alias ActivationGuide.Order
+
+{:ok, saved, 1} =
+  Jido.Persistence.load_agent_with_revision(ActivationGuide.Jido, Order, "order-1001")
+
+{:error, :not_found} =
+  Jido.Persistence.load_agent(ActivationGuide.Jido, Order, "order-unknown")
+
+saved.state
+```
+
+## Refuse a deleted order
+
+A tombstone is a saved decision, so activation does not reverse it. `Jido.delete_agent/4` writes the tombstone and requires a stopped Agent. Activation then stops and the same Ref stays deleted.
+
+```elixir
+alias ActivationGuide.{Order, Outcome}
+
+:ok = Jido.delete_agent(ActivationGuide.Jido, order_ref, Order)
+
+outcome = Outcome.of(Jido.activate_agent(ActivationGuide.Jido, order_ref, Order))
+true = outcome != :ok
+
+{:error, :deleted} = Jido.Persistence.load_agent(ActivationGuide.Jido, Order, "order-1001")
+outcome
+```
+
+An invalid record, changed code, and a storage read error follow the same rule. The activation stops with its reason and creates nothing. Repair the data or the code, then activate again. [Deletion and Tombstones](deletion-and-tombstones.md) covers reuse of a deleted ID.
+
+## Use a partition
+
+A partition is part of the Ref, so the same ID in another partition is a separate record and a separate process.
+
+```elixir
+alias ActivationGuide.Order
+alias Jido.AgentServer, as: Server
+
+{:ok, eu_ref} = Jido.agent_ref(ActivationGuide.Jido, "order-1001", partition: "eu")
+{:ok, eu_server} = Jido.activate_agent(ActivationGuide.Jido, eu_ref, Order)
+:ok = Server.await_ready(eu_server)
+
+{:ok, _saved} =
+  Jido.Persistence.load_agent(ActivationGuide.Jido, Order, "order-1001", partition: "eu")
+
+{:error, :deleted} = Jido.Persistence.load_agent(ActivationGuide.Jido, Order, "order-1001")
+
+Server.agent(eu_server).state
+```
+
+The cell returns `%{items: []}`. The tombstone in the default partition did not affect this record.
+
+## Clean up
+
+```elixir
+:ok = Jido.stop(ActivationGuide.Jido)
+```
+
+## After BEAM loss
+
+Activation is a call your application makes. Jido does not scan storage or find Agents to restart. Keep the IDs of durable Agents somewhere your application can read at boot, such as a table of open orders, and activate each one with the same namespace, store, and compatible code.
+
+## Next steps
+
+- [Durable Turns and Flows](durable-turns-and-flows.livemd) shows what an activation resumes.
+- [Hibernate and Thaw](../agent-servers/hibernate-thaw-and-activate.md) saves and stops an idle Agent.
+- [Durability Model](durability-model.md) explains the record.

@@ -3,7 +3,7 @@ defmodule Jido.Plugin.FacetsTest do
 
   alias Jido.Agent
   alias Jido.Persistence.Plugin, as: PersistencePlugin
-  alias Jido.Plugin.DirectiveContext
+  alias Jido.Plugin.Context
   alias Jido.Signal
 
   defmodule Effect do
@@ -27,9 +27,9 @@ defmodule Jido.Plugin.FacetsTest do
     @moduledoc false
     use Jido.Agent.Directive
 
-    @schema Zoi.struct(__MODULE__, %{count: Zoi.integer()}, coerce: true)
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
+    @schema Jido.Joi.struct(__MODULE__, %{count: Jido.Joi.integer()}, coerce: true)
+    @enforce_keys Jido.Joi.enforce_keys(@schema)
+    defstruct Jido.Joi.struct_fields(@schema)
 
     def schema, do: @schema
   end
@@ -49,7 +49,7 @@ defmodule Jido.Plugin.FacetsTest do
            label: opts[:agent_label]
          }}
 
-    def state_spec(_opts), do: {:facet_count, Zoi.integer() |> Zoi.default(7)}
+    def state_spec(_opts), do: {:facet_count, Jido.Joi.integer() |> Jido.Joi.default(7)}
     def directives(_opts), do: [Effect, SchemaEffect]
     def reduce(%Reduction{plugin_state: state}, _opts), do: {:ok, state + 1}
   end
@@ -58,7 +58,7 @@ defmodule Jido.Plugin.FacetsTest do
     @moduledoc false
     @behaviour Jido.Plugin
 
-    alias Jido.AgentServer.Plugin.Admission
+    alias Jido.Plugin.Context.Admission
 
     def admit(_runtime, %Admission{} = admission, _opts) do
       {:ok,
@@ -323,7 +323,7 @@ defmodule Jido.Plugin.FacetsTest do
     @moduledoc false
     @behaviour Jido.Plugin
 
-    def state_spec(_opts), do: {:legacy_state, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:legacy_state, Jido.Joi.integer() |> Jido.Joi.default(0)}
     def update_state(state, _directives, _opts), do: {:ok, state}
   end
 
@@ -406,7 +406,7 @@ defmodule Jido.Plugin.FacetsTest do
       assert {:error, %{message: "Plugin-owned Agent state key conflicts with the domain schema"}} =
                Jido.Agent.define(%{
                  name: "conflict",
-                 schema: Zoi.object(%{facet_count: Zoi.integer()}),
+                 schema: Jido.Joi.object(%{facet_count: Jido.Joi.integer()}),
                  plugins: [
                    %{
                      id: package.id(),
@@ -436,9 +436,7 @@ defmodule Jido.Plugin.FacetsTest do
     refute Map.has_key?(Map.from_struct(spec.agent_server), :state_schema)
     refute Map.has_key?(Map.from_struct(spec.persistence), :agent_server)
 
-    assert Jido.Plugin in List.flatten(
-             Keyword.get_values(Package.module_info(:attributes), :behaviour)
-           )
+    assert Jido.Plugin in List.flatten(Keyword.get_values(Package.module_info(:attributes), :behaviour))
 
     assert function_exported?(Package, :prepare, 2)
     refute function_exported?(AgentFacet, :validate_directive, 2)
@@ -497,7 +495,7 @@ defmodule Jido.Plugin.FacetsTest do
       agent = agent(@package)
       signal = Signal.new!("facet.run", %{}, source: "/test")
       assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([{@package, options()}])
-      assert {:ok, command} = Jido.Agent.Command.new(agent, signal, %{request: "one"})
+      assert {:ok, command} = Jido.AgentServer.Command.new(agent, signal, %{request: "one"})
 
       prepared = %Jido.Plugin.Input{prepared: %{tenant: "alpha"}}
       command = %{command | plugin_inputs: %{@package => prepared}}
@@ -536,7 +534,7 @@ defmodule Jido.Plugin.FacetsTest do
                  spec,
                  nil,
                  %Effect{label: "validated:facet"},
-                 struct(DirectiveContext)
+                 struct(Context, phase: :directive)
                )
 
       dump_context = PersistencePlugin.context(spec, :dump, 1, :test)
@@ -602,7 +600,7 @@ defmodule Jido.Plugin.FacetsTest do
     agent =
       Agent.define!(%{
         name: "foreign_plugin_directive",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         routes: [
           %{
             path: "facet.foreign",
@@ -611,7 +609,7 @@ defmodule Jido.Plugin.FacetsTest do
           }
         ]
       })
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Agent.instantiate!(id: Jido.Id.uuid7())
 
     signal = Signal.new!("facet.foreign", %{}, source: "/test")
 
@@ -623,9 +621,9 @@ defmodule Jido.Plugin.FacetsTest do
     Agent.define!(%{
       name: "plugin_facets",
       schema:
-        Zoi.object(%{
-          visible: Zoi.integer() |> Zoi.default(2),
-          seen: Zoi.string() |> Zoi.default("")
+        Jido.Joi.object(%{
+          visible: Jido.Joi.integer() |> Jido.Joi.default(2),
+          seen: Jido.Joi.string() |> Jido.Joi.default("")
         }),
       plugins: [
         %{id: package.id(), provider: package, vsn: package.vsn(), data: Map.new(options())}
@@ -638,7 +636,7 @@ defmodule Jido.Plugin.FacetsTest do
         }
       ]
     })
-    |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+    |> Agent.instantiate!(id: Jido.Id.uuid7())
   end
 
   defp options do

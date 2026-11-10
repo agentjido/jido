@@ -1,0 +1,296 @@
+# Observe Agent Turns
+
+In this tutorial you attach a telemetry handler to a live Agent and follow one Turn from its start to its effects. You then compare a failed Turn and a failed effect, connect events to a caller's trace, and check the events against `Jido.AgentServer.status/2`.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Start an invoice Agent
+
+The `:pay` route commits a new balance and returns one `Jido.Agent.Directive.Emit`. A payment of zero or less returns an error, so the tutorial can show both results.
+
+```elixir
+defmodule ObserveTurns.Pay do
+  use Jido.Action,
+    name: "observe_turns_pay",
+    schema: Jido.Joi.object(%{cents: Jido.Joi.integer()})
+
+  @impl Jido.Action
+  def run(%{cents: cents}, _context) when cents <= 0 do
+    {:error, Jido.Error.validation_error("payment must be positive")}
+  end
+
+  def run(%{cents: cents}, %{agent_state: state}) do
+    {:ok, %{state | paid_cents: state.paid_cents + cents},
+     [Jido.Agent.Directive.emit("invoice.paid", %{cents: cents})]}
+  end
+end
+
+defmodule ObserveTurns.Invoice do
+  use Jido.Agent, name: "observe_turns_invoice"
+
+  state do
+    schema Jido.Joi.object(%{paid_cents: Jido.Joi.integer() |> Jido.Joi.default(0)})
+  end
+
+  routes do
+    signal_source "/billing"
+    route "invoice.pay", ObserveTurns.Pay, as: :pay
+  end
+end
+
+{:ok, _instance} = Jido.start(name: ObserveTurns.Jido)
+
+{:ok, invoice} =
+  Jido.start_agent(ObserveTurns.Jido, ObserveTurns.Invoice,
+    id: "invoice-1",
+    default_dispatch: {:pid, target: self()}
+  )
+
+:ok = Jido.AgentServer.await_ready(invoice)
+Jido.AgentServer.status(invoice).phase
+```
+
+The cell returns `:idle`. The Agent sends its `invoice.paid` Signal to this notebook through `:default_dispatch`.
+
+## Attach a handler
+
+A telemetry handler runs in the process that emits the event. This one only forwards each event to the notebook. It uses a module function, because `:telemetry` logs a notice about anonymous handlers.
+
+`Jido.Telemetry.AgentServer.event_names/0` returns every AgentServer event. `Jido.Telemetry.Exec.event_names/0` returns the Action and Flow events.
+
+```elixir
+defmodule ObserveTurns.Forwarder do
+  def handle(event, measurements, metadata, target) do
+    send(target, {:jido_event, event, measurements, metadata})
+  end
+end
+
+:ok =
+  :telemetry.attach_many(
+    "observe-turns",
+    Jido.Telemetry.AgentServer.event_names() ++ Jido.Telemetry.Exec.event_names(),
+    &ObserveTurns.Forwarder.handle/4,
+    self()
+  )
+
+collect = fn collect, events ->
+  receive do
+    {:jido_event, event, measurements, metadata} ->
+      collect.(collect, [{event, measurements, metadata} | events])
+  after
+    200 -> Enum.reverse(events)
+  end
+end
+
+names = fn events -> Enum.map(events, fn {event, _, _} -> Enum.drop(event, 1) end) end
+```
+
+## Follow a committed Turn
+
+Send one payment and list the events in order.
+
+```elixir
+{:ok, _agent, [_emit]} =
+  Jido.AgentServer.call(invoice, ObserveTurns.Invoice.pay_signal!(%{cents: 500}))
+
+paid_events = collect.(collect, [])
+names.(paid_events)
+```
+
+The cell returns these events:
+
+```text
+[:agent_server, :turn, :start]
+[:action, :start]
+[:action, :stop]
+[:agent_server, :commit]
+[:agent_server, :directives, :returned]
+[:agent_server, :turn, :stop]
+[:agent_server, :turn, :settled]
+[:agent_server, :effects, :start]
+[:agent_server, :effects, :stop]
+```
+
+The effect events come last. `Jido.AgentServer.call/3` returns at commit, so a successful call says nothing about delivery.
+
+Measurements hold numbers, and metadata holds bounded labels and IDs. Read both from the Turn stop event.
+
+```elixir
+{_event, turn_measurements, turn_metadata} =
+  Enum.find(paid_events, fn {event, _, _} -> event == [:jido, :agent_server, :turn, :stop] end)
+
+%{status: :ok, stage: :commit, committed?: true, agent_id: "invoice-1", signal_type: "invoice.pay"} =
+  turn_metadata
+
+%{state_version_before: 0, state_version_after: 1, directive_count: 1, duration: duration} =
+  turn_measurements
+
+milliseconds = System.convert_time_unit(duration, :native, :millisecond)
+is_integer(milliseconds)
+```
+
+The cell returns `true`. `duration` uses native time units, so convert it before you display it.
+
+The Action events carry the same `turn_id`, which links work to its Turn.
+
+```elixir
+paid_events
+|> Enum.map(fn {_event, _measurements, metadata} -> metadata.turn_id end)
+|> Enum.uniq()
+|> length()
+```
+
+The cell returns `1`.
+
+The Signal itself arrived here too.
+
+```elixir
+receive do
+  {:signal, %Jido.Signal{type: type, data: data}} -> {type, data}
+after
+  1_000 -> :no_signal
+end
+```
+
+The cell returns `{"invoice.paid", %{cents: 500}}`.
+
+## Follow a failed Turn
+
+Now send a payment that the Action rejects.
+
+```elixir
+{:error, %Jido.Error.ValidationError{}} =
+  Jido.AgentServer.call(invoice, ObserveTurns.Invoice.pay_signal!(%{cents: 0}))
+
+failed_events = collect.(collect, [])
+names.(failed_events)
+```
+
+The cell returns five events. There is no commit and no effect:
+
+```text
+[:agent_server, :turn, :start]
+[:action, :start]
+[:action, :stop]
+[:agent_server, :turn, :stop]
+[:agent_server, :turn, :settled]
+```
+
+The stop event reports the status and the stage where the Turn ended. The revision does not change. The Action stop event uses its own field, `outcome`.
+
+```elixir
+{_event, failed_measurements, failed_metadata} =
+  Enum.find(failed_events, fn {event, _, _} -> event == [:jido, :agent_server, :turn, :stop] end)
+
+{_event, _measurements, action_metadata} =
+  Enum.find(failed_events, fn {event, _, _} -> event == [:jido, :action, :stop] end)
+
+{failed_metadata.status, failed_metadata.stage, failed_metadata.committed?,
+ failed_measurements.state_version_after, action_metadata.outcome, action_metadata.error_type}
+```
+
+The cell returns `{:error, :evaluate, false, 1, :error, :validation_error}`. The event has the error type and no error text. To read the message, use the value that the caller received.
+
+## Separate a commit from its effects
+
+A failed effect does not undo a commit, so watch both results. This second Agent dispatches to a process that has already exited.
+
+```elixir
+gone = spawn(fn -> :ok end)
+monitor = Process.monitor(gone)
+
+receive do
+  {:DOWN, ^monitor, :process, ^gone, _reason} -> :ok
+end
+
+{:ok, lost} =
+  Jido.start_agent(ObserveTurns.Jido, ObserveTurns.Invoice,
+    id: "invoice-2",
+    default_dispatch: {:pid, target: gone}
+  )
+
+:ok = Jido.AgentServer.await_ready(lost)
+_ = collect.(collect, [])
+
+{:ok, %{state: %{paid_cents: 700}}, [_emit]} =
+  Jido.AgentServer.call(lost, ObserveTurns.Invoice.pay_signal!(%{cents: 700}))
+
+lost_events = collect.(collect, [])
+
+[turn_stop_status] =
+  for {[:jido, :agent_server, :turn, :stop], _, metadata} <- lost_events, do: metadata.status
+
+[{effects_status, effects_stage, effects_measurements}] =
+  for {[:jido, :agent_server, :effects, :stop], measurements, metadata} <- lost_events,
+      do: {metadata.status, metadata.stage, Map.take(measurements, [:directive_completed, :directive_count])}
+
+{turn_stop_status, effects_status, effects_stage, effects_measurements}
+```
+
+The cell returns `{:ok, :error, :directive, %{directive_completed: 0, directive_count: 1}}`. Alert on `[:jido, :agent_server, :effects, :stop]` as well as on the Turn stop event. A dashboard that reads only Turn results reports this payment as a full success.
+
+## Connect a caller's trace
+
+A Signal can carry a W3C trace. Parse the `traceparent` from an inbound request and attach it to the Signal with `Jido.Signal.Context.put_trace/2`.
+
+```elixir
+{:ok, inbound} =
+  Jido.Trace.from_traceparent("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
+
+{:ok, traced} =
+  Jido.Signal.Context.put_trace(ObserveTurns.Invoice.pay_signal!(%{cents: 100}), inbound)
+
+{:ok, _agent, [_emit]} = Jido.AgentServer.call(invoice, traced)
+
+[traced_metadata] =
+  for {[:jido, :agent_server, :turn, :stop], _, metadata} <- collect.(collect, []), do: metadata
+
+{traced_metadata.trace_id == inbound.trace_id, traced_metadata.span_id != inbound.span_id,
+ traced_metadata.parent_span_id == inbound.span_id}
+```
+
+The cell returns `{true, true, true}`. The Turn joins the caller's trace with a new span of its own. A Signal with no trace starts a new root trace.
+
+The Signal that the Turn emitted carries the same trace ID.
+
+```elixir
+receive do
+  {:signal, %Jido.Signal{} = emitted} ->
+    Jido.Signal.Context.get_trace(emitted).trace_id == inbound.trace_id
+after
+  1_000 -> :no_signal
+end
+```
+
+The cell returns `true`.
+
+## Compare with status
+
+Telemetry reports each change as it happens, and `Jido.AgentServer.status/2` reports where the Agent is now. `last_outcome` uses Server words such as `:succeeded`. Events use `:ok`.
+
+```elixir
+%{status: last_status, state_version_after: revision} =
+  Jido.AgentServer.status(invoice).last_outcome
+
+{last_status, revision}
+```
+
+The cell returns `{:succeeded, 2}`.
+
+Handlers stay attached until you remove them. Handlers are global to the node, so a shared system needs a filter on a field such as `agent_id`.
+
+```elixir
+:telemetry.detach("observe-turns")
+```
+
+## Next steps
+
+- [Telemetry and Tracing](telemetry-tracing-and-logs.md) lists the event families and log modes.
+- [Metrics and OTel](metrics-and-open-telemetry.md) sends these events to a reporter or to spans.
+- [Runtime Debugging](runtime-state-and-debugging.md) uses status to diagnose a live Agent.

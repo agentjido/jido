@@ -1,13 +1,14 @@
 defmodule Jido.Agent.Plugin.Pipeline do
   @moduledoc false
 
-  alias Jido.Agent
   alias Jido.Agent.Directive.Reply
+  alias Jido.Agent.Directive.Kind, as: DirectiveKind
   alias Jido.Agent.Plugin
-  alias Jido.Agent.Plugin.{Reduction, Spec}
+  alias Jido.Agent.Plugin.Reduction
   alias Jido.Error
-  alias Jido.Plugin.Error, as: PluginError
+  alias Jido.Plugin, as: PluginBoundary
   alias Jido.Plugin.Input
+  alias Jido.Plugin.Spec.Agent, as: Spec
   alias Jido.Signal
 
   @type result :: {:ok, map(), [struct()]} | {:error, term()}
@@ -15,7 +16,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
   @doc false
   @spec run(
           {:ok, map(), [struct()]},
-          Agent.instance(),
+          map(),
           Signal.t(),
           %{optional(module()) => Input.t()},
           [Spec.t()]
@@ -23,7 +24,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
           result()
   def run(
         {:ok, state, directives},
-        %Agent{} = agent,
+        agent,
         %Signal{} = signal,
         plugin_inputs,
         specs
@@ -45,21 +46,22 @@ defmodule Jido.Agent.Plugin.Pipeline do
 
   defp protect_owned_state(state, original_state, specs) do
     changed =
-      for %{state_key: key} <- specs,
+      for %{state_key: key} = spec <- specs,
           not is_nil(key),
           Map.fetch(state, key) !== Map.fetch(original_state, key),
-          do: key
+          do: spec
 
-    if changed == [] do
-      :ok
-    else
-      {:error,
-       PluginError.execution(
-         "Agent executable changed Plugin-owned state",
-         :core,
-         __MODULE__,
-         %{keys: changed, code: :plugin_state_owner_violation}
-       )}
+    case changed do
+      [] ->
+        :ok
+
+      [%{package: plugin} | _other] ->
+        {:error,
+         PluginBoundary.execution_error(
+           "Agent executable changed Plugin-owned state",
+           plugin,
+           %{keys: Enum.map(changed, & &1.state_key), code: :plugin_state_owner_violation}
+         )}
     end
   end
 
@@ -126,7 +128,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
   end
 
   defp validate_directive(directive, specs) do
-    if Jido.Agent.Directive.built_in?(directive) do
+    if DirectiveKind.built_in?(directive) do
       Jido.Agent.Directive.validate(directive)
     else
       case Plugin.directive_owner(specs, directive) do
@@ -199,7 +201,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
         directives: directives
       }
 
-      PluginError.safe_apply(
+      PluginBoundary.invoke(
         spec.package,
         spec.module,
         :reduce,
@@ -213,12 +215,12 @@ defmodule Jido.Agent.Plugin.Pipeline do
   end
 
   defp validate_reduction({:ok, value}, spec, state) do
-    case Jido.Schema.validate(spec.state_schema, value) do
+    case Jido.Joi.validate(spec.state_schema, value) do
       :ok ->
         {:ok, Map.put(state, spec.state_key, value)}
 
       {:error, issues} ->
-        PluginError.invalid_callback(
+        PluginBoundary.invalid_callback(
           "Plugin-owned Agent state field is invalid",
           spec.package,
           spec.module,
@@ -230,7 +232,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
   defp validate_reduction({:error, _reason} = error, _spec, _state), do: error
 
   defp validate_reduction(result, spec, _state) do
-    PluginError.invalid_callback(
+    PluginBoundary.invalid_callback(
       "Agent Plugin reduce/2 returned an invalid result",
       spec.package,
       spec.module,

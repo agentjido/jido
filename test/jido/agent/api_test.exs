@@ -7,7 +7,7 @@ defmodule Jido.Agent.APITest do
 
   defmodule Audit do
     use Jido.Plugin, id: "test.api.audit"
-    def state_spec(_), do: {:turns, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_), do: {:turns, Jido.Joi.integer() |> Jido.Joi.default(0)}
     def reduce(reduction, _), do: {:ok, reduction.plugin_state + 1}
   end
 
@@ -15,7 +15,7 @@ defmodule Jido.Agent.APITest do
     use Jido.Agent, name: "api_counter", plugins: [Jido.Agent.APITest.Audit]
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -40,7 +40,7 @@ defmodule Jido.Agent.APITest do
     assert Counter.schema() === Agent.schema(definition)
 
     assert {:ok, %{count: 2, turns: 3}} =
-             Zoi.parse(Agent.schema(instance), %{count: 2, turns: 3})
+             Jido.Joi.parse(Agent.schema(instance), %{count: 2, turns: 3})
 
     refute function_exported?(Agent, :validate_definition, 1)
     refute function_exported?(Agent, :validate_instance, 1)
@@ -71,7 +71,7 @@ defmodule Jido.Agent.APITest do
 
   test "build_signal uses the Agent source and correlates the source Signal" do
     source = Signal.new!("request", %{}, source: "/caller")
-    {:ok, source, trace} = Signal.Trace.ensure(source)
+    {:ok, source, trace} = Signal.Context.ensure_trace(source)
 
     assert {:ok, output} =
              Agent.build_signal(
@@ -84,7 +84,8 @@ defmodule Jido.Agent.APITest do
     assert output.data == %{step: 1}
     assert output.source == "/counter"
     assert Signal.get_context(output, "jidocausationid") == source.id
-    assert Signal.Trace.get(output) == trace
+    output_trace = Signal.Context.get_trace(output)
+    assert %{output_trace | causation_id: nil} == trace
 
     assert {:error, %Jido.Error.ValidationError{}} =
              Agent.build_signal(%{}, "progress", %{step: 1})
@@ -112,9 +113,7 @@ defmodule Jido.Agent.APITest do
              )
 
     assert {:ok, ^candidate, 1} =
-             Persistence.load_agent_with_revision(source, Counter, instance.id,
-               namespace: "api-test"
-             )
+             Persistence.load_agent_with_revision(source, Counter, instance.id, namespace: "api-test")
 
     assert :ok = Persistence.delete_agent(source, Counter, instance.id, namespace: "api-test")
 

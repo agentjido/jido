@@ -1,5 +1,5 @@
 defmodule Jido.Agent.RouteProjectionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.Agent.Directive
@@ -15,9 +15,9 @@ defmodule Jido.Agent.RouteProjectionTest do
     use Jido.Action,
       name: "route_projection_project",
       output_schema:
-        Zoi.object(%{
-          state: Zoi.any() |> Zoi.optional(),
-          reply: Zoi.any() |> Zoi.optional()
+        Jido.Joi.object(%{
+          state: Jido.Joi.any() |> Jido.Joi.optional(),
+          reply: Jido.Joi.any() |> Jido.Joi.optional()
         })
 
     @impl Jido.Action
@@ -57,7 +57,7 @@ defmodule Jido.Agent.RouteProjectionTest do
   defmodule RootReply do
     use Jido.Action,
       name: "route_projection_root_reply",
-      output_schema: Zoi.object(%{value: Zoi.integer()})
+      output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     @impl Jido.Action
     def run(_params, _context), do: {:ok, %{value: 1}}
@@ -75,9 +75,9 @@ defmodule Jido.Agent.RouteProjectionTest do
     use Jido.Action,
       name: "route_projection_blocking_project",
       output_schema:
-        Zoi.object(%{
-          state: Zoi.map(),
-          reply: Zoi.any()
+        Jido.Joi.object(%{
+          state: Jido.Joi.map(),
+          reply: Jido.Joi.any()
         })
 
     @impl Jido.Action
@@ -95,7 +95,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     use Jido.Plugin, id: "test.route_projection.reply_reducer"
 
     @impl Jido.Plugin
-    def state_spec(_opts), do: {:reply_reductions, Zoi.integer() |> Zoi.default(0)}
+    def state_spec(_opts), do: {:reply_reductions, Jido.Joi.integer() |> Jido.Joi.default(0)}
 
     @impl Jido.Plugin
     def reduce(reduction, _opts) do
@@ -128,16 +128,16 @@ defmodule Jido.Agent.RouteProjectionTest do
     Agent.define!(%{
       name: "route_projection",
       signal_source: "/agent/route-projection",
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
       routes: routes,
       plugins: extensions
     })
-    |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+    |> Agent.instantiate!(id: Jido.Id.uuid7())
   end
 
   defp request(data \\ %{}) do
     signal = Signal.new!("project", data, source: "/test")
-    {:ok, signal, trace} = Signal.Trace.ensure(signal)
+    {:ok, signal, trace} = Signal.Context.ensure_trace(signal)
     {signal, trace}
   end
 
@@ -163,7 +163,8 @@ defmodule Jido.Agent.RouteProjectionTest do
     assert reply.source == "/agent/route-projection"
     assert reply.data === reply_data
     assert reply.id != source.id
-    assert Signal.Trace.get(reply) == trace
+    reply_trace = Signal.Context.get_trace(reply)
+    assert %{reply_trace | causation_id: nil} == trace
     assert Signal.get_context(reply, "jidocausationid") == source.id
   end
 
@@ -181,7 +182,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     {missing, _trace} = request(%{mode: :missing})
 
     assert {:error,
-            %Agent.Error{
+            %Jido.Error.ValidationError{
               code: :missing_output_field,
               path: [:reply, :from, :path, 0]
             }} = Agent.cmd(before, missing)
@@ -198,7 +199,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     before = agent([project_route()])
     {source, _trace} = request(%{mode: :missing_state, reply: %{value: 1}})
 
-    expected_error = %Agent.Error{
+    expected_error = %Jido.Error.ValidationError{
       code: :missing_output_field,
       path: [:state, :path, 0],
       message: "Selected output field is missing",
@@ -208,7 +209,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     assert {:error, ^expected_error} = Agent.cmd(before, source)
     assert before.state == %{count: 0}
 
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
     assert {:error, ^expected_error} = AgentServer.call(server, source)
     assert AgentServer.agent(server) === before
     assert AgentServer.status(server).state_version == 0
@@ -251,7 +252,7 @@ defmodule Jido.Agent.RouteProjectionTest do
 
     for mode <- [:partial, :struct] do
       {source, _trace} = request(%{mode: mode, reply: %{value: 1}})
-      assert {:error, %Agent.Error{}} = Agent.cmd(before, source)
+      assert {:error, %Jido.Error.ValidationError{}} = Agent.cmd(before, source)
     end
 
     assert before.state == %{count: 0}
@@ -262,8 +263,10 @@ defmodule Jido.Agent.RouteProjectionTest do
     {source, trace} = request(%{reply: %{value: 1}})
 
     manual_signal = Signal.new!("manual.done", %{}, source: "/manual")
-    {:ok, manual_signal} = Signal.Trace.put(manual_signal, trace)
-    {:ok, manual_signal} = Signal.put_context(manual_signal, "jidocausationid", source.id)
+
+    {:ok, manual_signal} =
+      Signal.Context.put_trace(manual_signal, Jido.Trace.with_causation(trace, source.id))
+
     manual = Directive.reply(manual_signal)
     source = %{source | data: Map.put(source.data, :directives, [manual])}
 
@@ -283,7 +286,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     assert {:ok, after_agent, [^remove, %Reply{}]} = Agent.cmd(before, source)
     assert after_agent.state == %{count: 1}
     assert after_agent.routes == []
-    assert {:error, %Agent.Error{code: :unmatched_input}} = Agent.cmd(after_agent, source)
+    assert {:error, %Jido.Error.ValidationError{code: :unmatched_input}} = Agent.cmd(after_agent, source)
   end
 
   test "direct and live execution use the same projection path", %{jido: jido} do
@@ -291,7 +294,7 @@ defmodule Jido.Agent.RouteProjectionTest do
     {source, _trace} = request(%{reply: %{value: 1}})
 
     assert {:ok, direct, [%Reply{signal: direct_reply}]} = Agent.cmd(before, source)
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
     assert {:ok, live, [%Reply{signal: live_reply}]} = AgentServer.call(server, source)
     assert_receive %Signal{} = delivered_reply
 
@@ -308,9 +311,9 @@ defmodule Jido.Agent.RouteProjectionTest do
 
   test "a generated Reply runs before a terminal ServerStop", %{jido: jido} do
     before = agent([project_route()])
-    stop = Jido.AgentServer.Directive.server_stop()
+    stop = Jido.Agent.Directive.server_stop()
     {source, _trace} = request(%{reply: %{value: 1}, directives: [stop]})
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
     monitor = Process.monitor(server)
 
     assert {:ok, committed, [%Reply{signal: reply}, ^stop]} = AgentServer.call(server, source)
@@ -324,7 +327,7 @@ defmodule Jido.Agent.RouteProjectionTest do
   test "a cast with a generated reply fails before commit", %{jido: jido} do
     before = agent([project_route(), barrier_route()])
     {source, _trace} = request(%{reply: %{value: 1}})
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
 
     assert :ok = AgentServer.cast(server, source)
     barrier = Signal.new!("barrier", %{}, source: "/test")
@@ -342,10 +345,10 @@ defmodule Jido.Agent.RouteProjectionTest do
 
     before = agent([route])
     {source, _trace} = request(%{test_pid: self()})
-    {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, before)
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
     caller = Task.async(fn -> AgentServer.call(server, source) end)
 
-    assert_receive {:route_projection_started, worker}
+    assert_receive {:route_projection_started, worker}, 1_000
     assert :ok = AgentServer.cancel(server)
     assert {:error, :cancelled} = Task.await(caller)
     refute Process.alive?(worker)

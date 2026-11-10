@@ -1,0 +1,234 @@
+# Test Agent Definitions
+
+This tutorial writes ExUnit tests for an Agent without starting a process, and then adds one test that proves a live AgentServer matches. Run the cells in order.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+Start ExUnit in its own cell, and turn off the automatic run so the last cell can run the tests.
+
+```elixir
+ExUnit.start(autorun: false)
+```
+
+## The Agent under test
+
+This ticket Agent has a schema rule, a default, a fallback, and a reply. Each behavior gets a test.
+
+```elixir
+defmodule TestingGuide.Priority do
+  def in_range(%{priority: priority}, _opts) do
+    if priority in 1..5, do: :ok, else: {:error, "priority must be from 1 to 5"}
+  end
+end
+
+defmodule TestingGuide.TicketAgent do
+  use Jido.Agent, name: "ticket"
+
+  state do
+    schema Jido.Joi.object(%{
+             priority: Jido.Joi.integer() |> Jido.Joi.default(3),
+             handled: Jido.Joi.string() |> Jido.Joi.default("none")
+           })
+           |> Jido.Joi.refine({TestingGuide.Priority, :in_range, []})
+  end
+
+  routes do
+    signal_source "/support/ticket"
+
+    route "ticket.prioritize", as: :prioritize, defaults: %{priority: 1} do
+      action %{priority: priority},
+        schema: Jido.Joi.object(%{priority: Jido.Joi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | priority: priority}}
+      end
+    end
+
+    route "ticket.close", as: :close do
+      action _input, schema: Jido.Joi.object(%{}), context: context do
+        {:ok, %{context.agent_state | handled: "closed"},
+         [emit("ticket.closed", %{id: context.agent_id})]}
+      end
+    end
+
+    route "ticket.*" do
+      action _input, schema: Jido.Joi.object(%{}), context: context do
+        {:ok, %{context.agent_state | handled: "fallback"}}
+      end
+    end
+  end
+end
+```
+
+## Test the definition
+
+A compiled module is already valid, because an invalid definition fails compilation. Test the choices you care about: the route order, the helper names, and the state contract. These tests are pure, so they can use `async: true`.
+
+```elixir
+defmodule TestingGuide.DefinitionTest do
+  use ExUnit.Case, async: true
+
+  alias Jido.Agent
+  alias TestingGuide.TicketAgent
+
+  test "the definition is neutral and validates" do
+    definition = TicketAgent.definition()
+
+    assert Agent.definition?(definition)
+    assert {:ok, ^definition} = Agent.validate(definition)
+  end
+
+  test "the fallback does not shadow an exact route" do
+    definition = TicketAgent.definition()
+
+    assert {:ok, %{path: "ticket.close"}} = Agent.Route.select(definition, "ticket.close")
+    assert {:ok, %{path: "ticket.*"}} = Agent.Route.select(definition, "ticket.reopen")
+
+    assert {:error, %Jido.Error.ValidationError{code: :unmatched_input}} =
+             Agent.Route.select(definition, "invoice.created")
+  end
+
+  test "a new instance gets schema defaults" do
+    assert %{priority: 3, handled: "none"} = TicketAgent.instantiate!(id: "t-1").state
+  end
+
+  test "the schema rejects an invalid starting value" do
+    assert {:error, %Jido.Error.ValidationError{path: [:state]}} =
+             TicketAgent.instantiate(id: "t-1", state: %{priority: 9})
+  end
+end
+```
+
+## Test one Turn
+
+`cmd/3` returns the candidate and the Directives without dispatching them, so a test can assert on both. Compare the source with the candidate to prove that a failed Turn left no trace. A failed Turn logs a warning. Add `@moduletag :capture_log` to keep that out of the test output.
+
+```elixir
+defmodule TestingGuide.TurnTest do
+  use ExUnit.Case, async: true
+
+  alias TestingGuide.TicketAgent
+
+  @moduletag :capture_log
+
+  setup do
+    %{ticket: TicketAgent.instantiate!(id: "t-1")}
+  end
+
+  test "route defaults apply and Signal data wins", %{ticket: ticket} do
+    assert {:ok, %{state: %{priority: 1}}, []} =
+             TicketAgent.cmd(ticket, TicketAgent.prioritize_signal!())
+
+    assert {:ok, %{state: %{priority: 5}}, []} =
+             TicketAgent.cmd(ticket, TicketAgent.prioritize_signal!(%{priority: 5}))
+  end
+
+  test "closing returns the state and the output Signal", %{ticket: ticket} do
+    assert {:ok, closed, [%Jido.Agent.Directive.Emit{signal: signal}]} =
+             TicketAgent.cmd(ticket, TicketAgent.close_signal!())
+
+    assert closed.state.handled == "closed"
+    assert signal.type == "ticket.closed"
+    assert signal.data == %{id: "t-1"}
+    assert signal.source == "/support/ticket"
+  end
+
+  test "an invalid candidate fails and the source stays the same", %{ticket: ticket} do
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_state}} =
+             TicketAgent.cmd(ticket, TicketAgent.prioritize_signal!(%{priority: 9}))
+
+    assert ticket.state.priority == 3
+  end
+
+  test "an invalid input fails before the handler runs", %{ticket: ticket} do
+    assert {:error, %Jido.Error.ValidationError{}} =
+             TicketAgent.cmd(ticket, TicketAgent.prioritize_signal!(%{priority: "high"}))
+  end
+end
+```
+
+## Test a rejected definition
+
+Use `Jido.Agent.define/1` to test what a generated or stored definition must not do. Each error has a `code` and a `path`, so assert on those and not on the message. A compile failure in the DSL raises when the module compiles, so assert with `Code.compile_string/2`.
+
+```elixir
+defmodule TestingGuide.RejectionTest do
+  use ExUnit.Case, async: true
+
+  test "a Map definition rejects a duplicate route" do
+    route = %{path: "ticket.close", handler: %{kind: :forward, target: %{kind: :parent}}}
+
+    assert {:error, %Jido.Error.ValidationError{code: :duplicate, path: [:routes]}} =
+             Jido.Agent.define(%{name: "bad_ticket", routes: [route, route]})
+  end
+
+  test "the DSL rejects a second handler in a route" do
+    source = """
+    defmodule TestingGuide.BadRoute do
+      use Jido.Agent, name: "bad_route"
+
+      routes do
+        route "ticket.close" do
+          forward to: parent()
+          forward to: parent()
+        end
+      end
+    end
+    """
+
+    assert_raise CompileError, ~r/exactly one handler/, fn -> Code.compile_string(source) end
+  end
+end
+```
+
+## Test the live path
+
+Pure tests cover most behavior. Add a small number of live tests for what only a server does: commit, revision, and delivery. Start a named Jido instance under the test supervisor with `start_supervised!/1`, and give each test its own Agent ID.
+
+```elixir
+defmodule TestingGuide.LiveTest do
+  use ExUnit.Case, async: true
+
+  alias Jido.AgentServer
+  alias TestingGuide.TicketAgent
+
+  setup do
+    start_supervised!({Jido, name: TestingGuide.Instance})
+    :ok
+  end
+
+  test "a live Turn commits the same state as a pure Turn" do
+    ticket = TicketAgent.instantiate!(id: "t-live")
+    signal = TicketAgent.prioritize_signal!(%{priority: 2})
+
+    {:ok, pure, []} = TicketAgent.cmd(ticket, signal)
+
+    {:ok, server} = Jido.start_agent(TestingGuide.Instance, TicketAgent, id: "t-live")
+    :ok = AgentServer.await_ready(server)
+
+    assert {:ok, committed, []} = AgentServer.call(server, signal)
+    assert committed.state == pure.state
+    assert %{state_version: 1} = AgentServer.snapshot(server)
+  end
+end
+```
+
+## Run the tests
+
+```elixir
+result = ExUnit.run()
+Map.take(result, [:failures, :total])
+```
+
+The cell returns `%{total: 11, failures: 0}`. In a Mix project, put these modules in `test/` and run `mix test`. Skip `ExUnit.start/1` and `ExUnit.run/0`, which `test/test_helper.exs` and Mix handle there.
+
+## Next steps
+
+- [Test Actions](../actions/testing-actions.livemd) covers a handler alone.
+- [Test Plugins](../plugins/testing-plugins.livemd) covers Plugin state and Directives.
+- [Test Jido Systems](../operations/test-jido-systems.livemd) covers multi-Agent and runtime tests.

@@ -1,0 +1,304 @@
+# Tools and Toolsets
+
+This tutorial gives an AI Agent tools in the three ways Jido supports: Actions, Flows, and trusted runtime sources. It then narrows them for one request and loads a `SKILL.md` file as a tool. A local client shows which tools the model receives.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Declare Action and Flow tools
+
+An Action or Flow becomes a tool when the Agent's `tools` block names it. The tool name is its `name`, its description goes to the model, and its input schema becomes the tool's parameters. Give every tool a clear description.
+
+```elixir
+defmodule ToolsGuide.LookupOrder do
+  use Jido.Action,
+    name: "lookup_order",
+    description: "Look up one order by ID",
+    schema: Jido.Joi.object(%{order_id: Jido.Joi.string()})
+
+  @impl true
+  def run(%{order_id: order_id}, _context), do: {:ok, %{order_id: order_id, total_cents: 4_200}}
+end
+
+defmodule ToolsGuide.ApplyDiscount do
+  use Jido.Action,
+    name: "apply_discount",
+    description: "Compute a discounted total",
+    schema: Jido.Joi.object(%{total_cents: Jido.Joi.integer(), percent: Jido.Joi.integer()})
+
+  @impl true
+  def run(%{total_cents: total, percent: percent}, _context) do
+    {:ok, %{total_cents: div(total * (100 - percent), 100)}}
+  end
+end
+
+defmodule ToolsGuide.DiscountFlow do
+  use Jido.Flow,
+    name: "discount_order",
+    description: "Look up an order and compute its 10 percent discount",
+    schema: Jido.Joi.object(%{order_id: Jido.Joi.string()})
+
+  flow do
+    step "order", action: ToolsGuide.LookupOrder, params: %{order_id: input(:order_id)}
+
+    step "discount",
+      action: ToolsGuide.ApplyDiscount,
+      params: %{total_cents: result("order", :total_cents), percent: value(10)}
+
+    output result("discount")
+  end
+end
+
+defmodule ToolsGuide.OrdersAgent do
+  use Jido.AI.Agent, name: "orders_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct
+
+    tools do
+      action ToolsGuide.LookupOrder
+      flow ToolsGuide.DiscountFlow
+    end
+  end
+end
+
+ToolsGuide.OrdersAgent.explain().tools
+```
+
+The cell returns the two modules in declaration order. A tools list must not repeat a module or a name. Compilation fails if it does. Use `action` for an Action and `flow` for a Flow. Jido finds the real kind from the module.
+
+## Inspect the Toolset
+
+`Jido.AI.Toolset` works on the list directly. `Jido.AI.Toolset.definitions/1` builds what the model receives.
+
+```elixir
+tools = ToolsGuide.OrdersAgent.explain().tools
+
+:ok = Jido.AI.Toolset.validate(tools)
+{:error, :duplicate_tools} = Jido.AI.Toolset.validate(tools ++ tools)
+{:ok, definitions} = Jido.AI.Toolset.definitions(tools)
+
+Enum.map(definitions, &{&1.name, &1.description})
+```
+
+The cell returns `[{"lookup_order", "Look up one order by ID"}, {"discount_order", "Look up an order and compute its 10 percent discount"}]`.
+
+The definitions have no working callback. Tools run as graph nodes in the Flow, never from inside ReqLLM. Definitions are strict. Their JSON Schema does not list a field with a default as required. ReqLLM's OpenAI strict mode still makes every field required, so the model must send it there.
+
+## Record the tools each request sends
+
+This client calls the first tool it is offered, once, and stores the tool names and tool choice.
+
+```elixir
+defmodule ToolsGuide.LocalModel do
+  @behaviour Jido.AI.InferenceClient
+
+  def start, do: Agent.start_link(fn -> [] end, name: __MODULE__)
+  def offered, do: Agent.get(__MODULE__, &List.first/1)
+
+  @impl true
+  def generate_text(model, context, options) do
+    tools = options[:tools] || []
+    offer = %{tools: Enum.map(tools, & &1.name), tool_choice: options[:tool_choice]}
+    Agent.update(__MODULE__, &[offer | &1])
+
+    message =
+      case {context |> ReqLLM.Context.to_list() |> List.last(), tools} do
+        {%{role: :user}, [tool | _others]} ->
+          call = ReqLLM.ToolCall.new("call-1", tool.name, arguments_for(tool.name))
+          ReqLLM.Context.assistant("", tool_calls: [call])
+
+        {%{role: :tool, metadata: %{tool_output: output}}, _tools} ->
+          ReqLLM.Context.assistant("Tool result: #{JSON.encode!(output)}")
+
+        _other ->
+          ReqLLM.Context.assistant("No tool was needed.")
+      end
+
+    {:ok,
+     %ReqLLM.Response{
+       id: "local",
+       model: model,
+       context: context,
+       message: message,
+       finish_reason: if(message.tool_calls in [nil, []], do: :stop, else: :tool_calls),
+       usage: %{input_tokens: 4, output_tokens: 3}
+     }}
+  end
+
+  defp arguments_for("load_skill"), do: ~s({"name":"refund-policy"})
+  defp arguments_for("exchange_rate"), do: ~s({"currency":"EUR"})
+  defp arguments_for(_order_tool), do: ~s({"order_id":"ORD-5"})
+
+  @impl true
+  def evaluation_models, do: []
+
+  for {name, arity} <- Jido.AI.InferenceClient.behaviour_info(:callbacks),
+      {name, arity} not in [generate_text: 3, evaluation_models: 0] do
+    @impl true
+    def unquote(name)(unquote_splicing(Macro.generate_arguments(arity, __MODULE__))),
+      do: {:error, :not_supported}
+  end
+end
+
+{:ok, _local_model} = ToolsGuide.LocalModel.start()
+
+run_orders = fn params, extra_context ->
+  agent = ToolsGuide.OrdersAgent.instantiate!(id: "orders-#{System.unique_integer([:positive])}")
+
+  result =
+    ToolsGuide.OrdersAgent.cmd(
+      agent,
+      ToolsGuide.OrdersAgent.request_signal!(params),
+      context: Map.merge(%{jido_ai_inference_client: ToolsGuide.LocalModel}, extra_context)
+    )
+
+  case result do
+    {:ok, _agent, [%{signal: reply}]} -> reply.data
+    {:error, error} -> {:error, error}
+  end
+end
+
+reply = run_orders.(%{input: "Show order ORD-5."}, %{})
+
+{reply.output, hd(reply.tool_attempts).tool.kind}
+```
+
+The model called `lookup_order`, the first tool. The cell returns `{~s(Tool result: {"order_id":"ORD-5","total_cents":4200}), :action}`.
+
+## Narrow tools for one request
+
+`tool_policy` can only remove tools from the Agent's list. It never adds one. `visible` selects tools, and `hidden` removes them.
+
+```elixir
+visible = run_orders.(%{input: "Discount it.", tool_policy: %{visible: ["discount_order"]}}, %{})
+flow_attempt = hd(visible.tool_attempts)
+
+disabled = run_orders.(%{input: "Answer directly.", tool_policy: %{requirement: :disabled}}, %{})
+disabled_offer = ToolsGuide.LocalModel.offered()
+
+unknown = run_orders.(%{input: "Delete it.", tool_policy: %{visible: ["delete_order"]}}, %{})
+
+{
+  visible.output,
+  flow_attempt.tool.kind,
+  disabled.output,
+  disabled_offer,
+  elem(unknown, 0)
+}
+```
+
+| Result | Value |
+| --- | --- |
+| Flow tool output | `~s(Tool result: {"total_cents":3780})` |
+| Tool kind | `:flow` |
+| Disabled output | `"No tool was needed."` |
+| Disabled offer | `%{tools: [], tool_choice: :none}` |
+| Unknown name | `:error`, before any model call |
+
+## Require tool use
+
+`tool_policy.requirement` lowers to a provider tool choice and an output check.
+
+| Requirement | Tool choice sent | Final answer accepted |
+| --- | --- | --- |
+| `:optional` | not set | Always |
+| `:required` | `:required` before the first tool round, then `:auto` | After at least one tool round |
+| `:disabled` | `:none` | Always, and no tools are offered |
+
+A `:required` requirement with no selected tool returns an error before any model call.
+
+```elixir
+required = run_orders.(%{input: "Show order ORD-5.", tool_policy: %{requirement: :required}}, %{})
+
+{required.status, required.tool_rounds, ToolsGuide.LocalModel.offered().tool_choice}
+```
+
+The cell returns `{:completed, 1, :auto}`. The last value is the tool choice on the second call.
+
+## Add tools at run time
+
+Implement `Jido.AI.ToolSource` to load tools from something the Agent definition cannot name, such as a tenant's connector. A trusted host adds the source to the Action context under `:jido_ai_tool_sources`. Request data cannot add a source. Source tools come after the Agent's own tools, and `tool_policy` can narrow them.
+
+```elixir
+defmodule ToolsGuide.RatesSource do
+  @behaviour Jido.AI.ToolSource
+
+  @impl true
+  def list_tools(_config, _context) do
+    {:ok,
+     [
+       %{
+         name: "exchange_rate",
+         description: "Return one exchange rate",
+         parameter_schema: %{
+           "type" => "object",
+           "properties" => %{"currency" => %{"type" => "string"}},
+           "required" => ["currency"],
+           "additionalProperties" => false
+         }
+       }
+     ]}
+  end
+
+  @impl true
+  def run_tool(%{name: "exchange_rate", arguments: arguments}, %{base: base}, _context) do
+    {:ok, %{base: base, currency: arguments["currency"], rate: 0.92}}
+  end
+end
+
+source_reply =
+  run_orders.(
+    %{input: "What is the rate?", tool_policy: %{visible: ["exchange_rate"]}},
+    %{jido_ai_tool_sources: [{ToolsGuide.RatesSource, %{base: "USD"}}]}
+  )
+
+{source_reply.output, hd(source_reply.tool_attempts).tool}
+```
+
+The output holds the rate, and the attempt records `%{kind: :source, name: "exchange_rate", source: "Elixir.ToolsGuide.RatesSource"}`.
+
+The source specification and each definition must be portable data, because a durable Turn can store them. A source with a PID or function in its config fails to load, and the request returns an error.
+
+## Load skills
+
+`Jido.AI.Skill` is a tool source that serves `SKILL.md` files. A root holds one directory per skill, and each file needs `name` and `description` frontmatter. The name must match its directory, use lowercase words joined by hyphens, and be at most 64 bytes. The description has a 1,024-byte limit.
+
+```elixir
+root = Path.join(System.tmp_dir!(), "tools-guide-#{System.unique_integer([:positive])}")
+File.mkdir_p!(Path.join(root, "refund-policy"))
+
+File.write!(Path.join([root, "refund-policy", "SKILL.md"]), """
+---
+name: refund-policy
+description: Apply the refund policy to an order.
+---
+Refund within 30 days of delivery.
+""")
+
+{:ok, [%{name: "refund-policy", description: "Apply the refund policy to an order."}]} =
+  Jido.AI.Skill.discover([root])
+
+skill_reply =
+  run_orders.(
+    %{input: "Can I refund it?", tool_policy: %{visible: ["load_skill"]}},
+    %{jido_ai_tool_sources: [Jido.AI.Skill.source([root])]}
+  )
+
+File.rm_rf!(root)
+
+hd(skill_reply.tool_attempts).output["instructions"]
+```
+
+The cell returns `"Refund within 30 days of delivery.\n"`. The source adds one `load_skill` tool. Its description lists the available skills. A call returns the Markdown body as a tool result, and the model reads it in the next round. Jido does not run scripts or read other files in a skill directory.
+
+## Next steps
+
+- [Tool Calls and Results](tool-calls-and-results.md) covers validation, errors, and truncation.
+- [Tool Review](tool-review.md) adds human approval.
+- [Actions](../actions/actions.md) covers writing the Actions themselves.

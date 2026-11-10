@@ -1,8 +1,9 @@
 defmodule Jido.Agent.MutationTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent
-  alias Jido.Agent.{Diff, Directive, Error, Mutation, Route}
-  alias JidoTest.AgentEvolutionFixtures, as: F
+  alias Jido.Agent.{Diff, Directive, Mutation, Route}
+  alias Jido.Error.ValidationError, as: Error
+  alias Jido.Test.Agent.EvolutionFixtures, as: F
 
   defmodule InvalidMigrations do
     def invalid(_value), do: :invalid
@@ -15,7 +16,7 @@ defmodule Jido.Agent.MutationTest do
   defmodule MappedOutput do
     use Jido.Action,
       name: "mutation_mapped_output",
-      output_schema: Zoi.object(%{state: Zoi.map(), reply: Zoi.map()})
+      output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), reply: Jido.Joi.map()})
 
     def run(_, context), do: {:ok, %{state: context.agent_state, reply: %{ok: true}}}
   end
@@ -23,7 +24,7 @@ defmodule Jido.Agent.MutationTest do
   defmodule StateOnlyOutput do
     use Jido.Action,
       name: "mutation_state_only_output",
-      output_schema: Zoi.object(%{state: Zoi.map()})
+      output_schema: Jido.Joi.object(%{state: Jido.Joi.map()})
 
     def run(_, context), do: {:ok, %{state: context.agent_state}}
   end
@@ -51,7 +52,7 @@ defmodule Jido.Agent.MutationTest do
       Directive.PluginRemove
     ]
 
-    assert Mutation.modules() === modules
+    assert Jido.Agent.Directive.Kind.mutation_modules() === modules
 
     for module <- modules do
       assert Mutation.mutation?(struct(module)) === true
@@ -267,7 +268,7 @@ defmodule Jido.Agent.MutationTest do
       Agent.define!(%{
         name: "mapped_mutations",
         signal_source: "/mutations",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
         routes: [
           %{
             path: "run",
@@ -429,9 +430,7 @@ defmodule Jido.Agent.MutationTest do
 
     assert {:ok, migrated, _} =
              Agent.mutate(added, [
-               Directive.plugin_configure(F.Counter, [key: :other],
-                 migrate: {F.Migrations, :add, [2]}
-               )
+               Directive.plugin_configure(F.Counter, [key: :other], migrate: {F.Migrations, :add, [2]})
              ])
 
     assert migrated.state == %{count: 0, other: 5}
@@ -448,7 +447,7 @@ defmodule Jido.Agent.MutationTest do
     assert explicit.state.counter == 9
 
     assert {:ok, stateless, _} =
-             Agent.mutate(F.agent(), [Directive.plugin_add(JidoTest.AgentContract.Stateless)])
+             Agent.mutate(F.agent(), [Directive.plugin_add(Jido.Test.Agent.Contract.Stateless)])
 
     assert stateless.state === F.agent().state
 
@@ -463,9 +462,7 @@ defmodule Jido.Agent.MutationTest do
 
     assert {:error, %Error{code: :invalid_plugin_migration}} =
              Agent.mutate(added, [
-               Directive.plugin_configure(F.Counter, [],
-                 migrate: {InvalidMigrations, :invalid, []}
-               )
+               Directive.plugin_configure(F.Counter, [], migrate: {InvalidMigrations, :invalid, []})
              ])
   end
 
@@ -482,7 +479,7 @@ defmodule Jido.Agent.MutationTest do
     conflict =
       Agent.define!(%{
         name: "plugin_conflict",
-        schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(1)})
+        schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(1)})
       })
       |> Agent.instantiate!(id: "plugin-conflict")
 
@@ -528,7 +525,7 @@ defmodule Jido.Agent.MutationTest do
           nil,
           :bad,
           [Directive.agent_remove(:a) | :bad],
-          [Jido.AgentServer.Directive.server_stop()],
+          [Jido.Agent.Directive.server_stop()],
           [42]
         ] do
       assert {:error, _} = Agent.mutate(F.agent(), changes)

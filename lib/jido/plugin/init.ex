@@ -1,4 +1,6 @@
 defmodule Jido.Plugin.Init do
+  alias Jido.Joi
+
   @moduledoc """
   Input for one supervised Agent Plugin runtime generation.
 
@@ -9,41 +11,41 @@ defmodule Jido.Plugin.Init do
   complete commit. Runtime handles and the complete Agent are not part of this
   value.
 
-  Use `Jido.Plugin.state/2` when a running resource must read state after a
-  later commit.
+  Use `Jido.AgentServer.Plugin.state/2` when a running resource must read state
+  after a later commit.
   """
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              agent_server: Zoi.pid(description: "Owning Agent Server process"),
-              agent_id: Zoi.string(description: "Owning Agent identifier"),
-              module: Zoi.module(description: "Plugin module"),
+              agent_server: Joi.pid(description: "Owning Agent Server process"),
+              agent_id: Joi.string(description: "Owning Agent identifier"),
+              module: Joi.module(description: "Plugin module"),
               plugin_state:
-                Zoi.any(description: "Immutable value of the Plugin-owned Agent field")
-                |> Zoi.optional(),
+                Joi.any(description: "Immutable value of the Plugin-owned Agent field")
+                |> Joi.optional(),
               state_version:
-                Zoi.integer(description: "Agent state version paired with the owned value")
-                |> Zoi.min(0)
-                |> Zoi.default(0),
-              jido: Zoi.atom(description: "Optional Jido instance") |> Zoi.optional(),
-              partition: Zoi.any(description: "Optional Agent partition") |> Zoi.optional(),
+                Joi.integer(description: "Agent state version paired with the owned value")
+                |> Joi.min(0)
+                |> Joi.default(0),
+              jido: Joi.atom(description: "Optional Jido instance") |> Joi.optional(),
+              partition: Joi.any(description: "Optional Agent partition") |> Joi.optional(),
               options:
-                Zoi.list(
-                  Zoi.tuple({Zoi.atom(), Zoi.any()}),
+                Joi.list(
+                  Joi.tuple({Joi.atom(), Joi.any()}),
                   description: "Plugin options"
                 )
-                |> Zoi.default([])
+                |> Joi.default([])
             },
             coerce: true,
             unrecognized_keys: :error
           )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc "Returns the data schema for Plugin runtime initialization."
-  @spec schema() :: Zoi.schema()
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 end

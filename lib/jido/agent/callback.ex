@@ -1,6 +1,8 @@
 defmodule Jido.Agent.Callback do
   @moduledoc false
 
+  alias Jido.Error
+
   @doc false
   def invoke(module, callback, args) do
     apply(module, callback, args)
@@ -12,7 +14,7 @@ defmodule Jido.Agent.Callback do
 
   defp failed(module, callback, kind, reason) do
     {:error,
-     Jido.Error.execution_error("Agent callback failed",
+     Error.execution_error("Agent callback failed",
        details: %{
          code: :agent_callback_failed,
          module: module,

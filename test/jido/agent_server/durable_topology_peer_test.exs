@@ -1,13 +1,13 @@
-defmodule JidoTest.AgentServer.DurableTopologyPeerTest do
-  use JidoTest.PeerCase
+defmodule Jido.AgentServer.DurableTopologyPeerTest do
+  use Jido.Test.AgentServer.PeerCase
   @moduletag :tmp_dir
 
   alias Jido.AgentServer, as: Server
-  alias JidoTest.DurableFixtures, as: F
+  alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   test "SIGKILL recovery restores member commits, connections, and step 6 in a fresh BEAM", c do
     persistence = {Jido.Persistence.File, path: c.tmp_dir}
-    id = JidoTest.Case.unique_id("durable-team")
+    id = Jido.Test.Case.unique_id("durable-team")
 
     assert {:ok, _} =
              peer_call(c.peer_a, Supervisor, :start_child, [Jido.Supervisor, {F.Probe, nil}])
@@ -24,12 +24,12 @@ defmodule JidoTest.AgentServer.DurableTopologyPeerTest do
     sibling = peer_call(c.peer_a, F, :member, [root, :sibling])
 
     assert {:ok, _, []} =
-             peer_call(c.peer_a, Server, :call, [sibling, JidoTest.Case.signal("increment")])
+             peer_call(c.peer_a, Server, :call, [sibling, Jido.Test.Case.signal("increment")])
 
     assert :ok =
              peer_call(c.peer_a, Server, :cast, [
                worker,
-               JidoTest.Case.signal("request", %{id: "job", value: 0})
+               Jido.Test.Case.signal("request", %{id: "job", value: 0})
              ])
 
     peer_eventually(fn -> peer_call(c.peer_a, F.Probe, :records, []) == Enum.to_list(1..6) end,

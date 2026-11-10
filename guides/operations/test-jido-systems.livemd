@@ -1,0 +1,337 @@
+# Test Jido Systems
+
+In this tutorial you write ExUnit tests for what a whole system does at runtime: isolation between tests, a Turn's effects, process crashes, a full restart, overload, and shutdown. Every test runs offline against an in-memory store.
+
+Jido has no public test helper module. These tests use the same functions as production code. For tests of a single Action, Agent, Plugin, or Flow, see [Test Jido Code](../start-here/testing-jido-code.livemd).
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+Start ExUnit without its automatic run, so each section can run its own tests.
+
+```elixir
+ExUnit.start(autorun: false)
+```
+
+## The system under test
+
+An order Agent counts its items and emits one Signal for each. A second route holds its Turn open until the test releases it, so a test can control timing without a sleep.
+
+```elixir
+defmodule SystemTests.AddItem do
+  use Jido.Action,
+    name: "system_tests_add_item",
+    schema: Jido.Joi.object(%{sku: Jido.Joi.string()})
+
+  @impl Jido.Action
+  def run(%{sku: sku}, %{agent_state: state}) do
+    {:ok, %{state | items: state.items ++ [sku]},
+     [Jido.Agent.Directive.emit("order.item_added", %{sku: sku})]}
+  end
+end
+
+defmodule SystemTests.Hold do
+  use Jido.Action, name: "system_tests_hold", schema: Jido.Joi.object(%{})
+
+  @impl Jido.Action
+  def run(_input, %{agent_state: state, test_pid: test_pid}) do
+    send(test_pid, {:holding, self()})
+
+    receive do
+      :release -> {:ok, state}
+    end
+  end
+end
+
+defmodule SystemTests.Order do
+  use Jido.Agent, name: "system_tests_order"
+
+  state do
+    schema Jido.Joi.object(%{
+             items: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
+           })
+  end
+
+  routes do
+    signal_source "/orders"
+    route "order.add_item", SystemTests.AddItem, as: :add_item
+    route "order.hold", SystemTests.Hold, as: :hold
+  end
+end
+```
+
+## Give each test its own instance
+
+Start a unique instance with `start_supervised/1`. ExUnit stops it after the test, so tests can run with `async: true`. This `CaseTemplate` also gives each test its own namespace and ETS table.
+
+The `eventually` helper polls a condition with a deadline. Use it only for a change that has no event to wait on, such as an OTP restart.
+
+```elixir
+defmodule SystemTests.Case do
+  use ExUnit.CaseTemplate
+
+  using do
+    quote do
+      import SystemTests.Case
+      alias SystemTests.Order
+      alias Jido.AgentServer, as: Server
+    end
+  end
+
+  setup do
+    unique = System.unique_integer([:positive])
+    jido = :"system_tests_jido_#{unique}"
+    namespace = "system-tests/#{unique}"
+    store = {Jido.Persistence.ETS, table: :"system_tests_store_#{unique}"}
+
+    start_supervised!({Jido, name: jido, namespace: namespace, persistence: store})
+    %{jido: jido, namespace: namespace, store: store}
+  end
+
+  def eventually(check, attempts \\ 200) do
+    case check.() do
+      falsy when falsy in [nil, false] and attempts > 0 ->
+        Process.sleep(5)
+        eventually(check, attempts - 1)
+
+      value ->
+        value
+    end
+  end
+
+  def hold_signal, do: SystemTests.Order.hold_signal!(%{})
+  def add_signal(sku), do: SystemTests.Order.add_item_signal!(%{sku: sku})
+
+  def open_turn(server) do
+    pending = Jido.AgentServer.submit(server, hold_signal(), context: %{test_pid: self()})
+
+    receive do
+      {:holding, action} -> {pending, action}
+    after
+      1_000 -> raise "the Turn did not start"
+    end
+  end
+end
+```
+
+The first test proves that two instances can use one Agent ID.
+
+```elixir
+defmodule SystemTests.IsolationTest do
+  use SystemTests.Case, async: true
+
+  test "equal Agent IDs stay separate across instances", %{jido: jido} do
+    other = :"#{jido}_other"
+    start_supervised!({Jido, name: other})
+
+    {:ok, first} = Jido.start_agent(jido, Order, id: "order-1")
+    {:ok, second} = Jido.start_agent(other, Order, id: "order-1")
+
+    {:ok, _agent, _directives} = Server.call(first, add_signal("sku-1"))
+
+    assert first != second
+    assert Server.agent(first).state.items == ["sku-1"]
+    assert Server.agent(second).state.items == []
+    assert Jido.list_agents(other) == [{"order-1", second}]
+  end
+end
+
+%{failures: 0, total: 1} = ExUnit.run()
+```
+
+## Wait for effects with messages
+
+`Jido.AgentServer.call/3` returns at commit, before effects run. Do not sleep and then look for the effect. Set `:default_dispatch` to the test process and use `assert_receive`, which fails with a clear message when the Signal never arrives.
+
+To assert on telemetry, attach a handler and filter by Agent ID, because handlers are global to the node. This filter keeps the test safe with `async: true`.
+
+```elixir
+defmodule SystemTests.TelemetryForwarder do
+  def handle(event, measurements, %{agent_id: agent_id} = metadata, {agent_id, target}) do
+    send(target, {:telemetry, event, measurements, metadata})
+  end
+
+  def handle(_event, _measurements, _metadata, _config), do: :ok
+end
+
+defmodule SystemTests.EffectsTest do
+  use SystemTests.Case, async: true
+
+  setup %{test: test} do
+    %{agent_id: "order-#{System.unique_integer([:positive])}", handler: {__MODULE__, test}}
+  end
+
+  test "an added item commits and then emits", %{jido: jido, agent_id: id} = context do
+    :ok =
+      :telemetry.attach(
+        context.handler,
+        [:jido, :agent_server, :effects, :stop],
+        &SystemTests.TelemetryForwarder.handle/4,
+        {id, self()}
+      )
+
+    on_exit(fn -> :telemetry.detach(context.handler) end)
+
+    {:ok, server} =
+      Jido.start_agent(jido, Order, id: id, default_dispatch: {:pid, target: self()})
+
+    {:ok, %{state: %{items: ["sku-1"]}}, [_emit]} = Server.call(server, add_signal("sku-1"))
+
+    assert_receive {:signal, %Jido.Signal{type: "order.item_added", data: %{sku: "sku-1"}}}
+    assert_receive {:telemetry, _event, %{directive_completed: 1}, %{status: :ok}}
+  end
+end
+
+%{failures: 0, total: 1} = ExUnit.run()
+```
+
+## Test a crash
+
+Kill the worker to prove what your system does after a crash. A monitor tells the test when the old process is gone. The new process has no event to wait on, so the test polls `Jido.whereis_agent/3`.
+
+`Jido.AgentServer` restarts with the last committed Agent. The activation stops after three restarts in five seconds, so the second test checks that limit.
+
+```elixir
+defmodule SystemTests.CrashTest do
+  use SystemTests.Case, async: true
+
+  defp kill_worker(jido, id) do
+    worker = Jido.whereis_agent(jido, id)
+    monitor = Process.monitor(worker)
+    Process.exit(worker, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}
+    worker
+  end
+
+  test "a killed worker restarts with committed state", %{jido: jido} do
+    {:ok, server} = Jido.start_agent(jido, Order, id: "order-1", default_dispatch: {:noop, []})
+    {:ok, _agent, _directives} = Server.call(server, add_signal("sku-1"))
+
+    old = kill_worker(jido, "order-1")
+
+    restarted =
+      eventually(fn ->
+        case Jido.whereis_agent(jido, "order-1") do
+          pid when is_pid(pid) and pid != old -> pid
+          _other -> nil
+        end
+      end)
+
+    assert Server.agent(restarted).state.items == ["sku-1"]
+    assert Server.status(restarted).state_version == 1
+  end
+
+  test "repeated crashes stop the activation", %{jido: jido} do
+    {:ok, server} = Jido.start_agent(jido, Order, id: "order-1")
+    activation = Server.activation(server)
+    monitor = Process.monitor(activation)
+
+    crash_until_down = fn crash_until_down ->
+      receive do
+        {:DOWN, ^monitor, :process, ^activation, reason} ->
+          reason
+      after
+        0 ->
+          worker = eventually(fn -> Server.worker(activation) || not Process.alive?(activation) end)
+          if is_pid(worker), do: Process.exit(worker, :kill)
+          Process.sleep(10)
+          crash_until_down.(crash_until_down)
+      end
+    end
+
+    assert crash_until_down.(crash_until_down) == :shutdown
+    assert eventually(fn -> Jido.agent_count(jido) == 0 end)
+  end
+end
+
+%{failures: 0, total: 2} = ExUnit.run()
+```
+
+## Test a full restart
+
+A durable Agent must come back after its instance stops. Use `stop_supervised!/1` to stop the instance, start it again with the same namespace and store, and activate the Agent.
+
+`Jido.Persistence.ETS` keeps its table across instance restarts inside one BEAM, which suits this test. It loses all data when the BEAM stops, so use a real adapter for a test of node loss.
+
+```elixir
+defmodule SystemTests.RestartTest do
+  use SystemTests.Case, async: true
+
+  test "a durable Agent survives an instance restart", context do
+    %{jido: jido, namespace: namespace, store: store} = context
+    {:ok, ref} = Jido.agent_ref(jido, "order-1")
+
+    {:ok, server} = Jido.activate_agent(jido, ref, Order, default_dispatch: {:noop, []})
+    :ok = Server.await_ready(server)
+    {:ok, _agent, _directives} = Server.call(server, add_signal("sku-1"))
+
+    stop_supervised!(jido)
+    assert {:error, _reason} = Jido.agent_ref(jido, "order-1")
+
+    start_supervised!({Jido, name: jido, namespace: namespace, persistence: store})
+
+    {:ok, server} = Jido.activate_agent(jido, ref, Order, default_dispatch: {:noop, []})
+    :ok = Server.await_ready(server)
+
+    assert Server.agent(server).state.items == ["sku-1"]
+  end
+end
+
+%{failures: 0, total: 1} = ExUnit.run()
+```
+
+## Test overload and shutdown
+
+A held Turn gives exact control over the queue. These tests prove how your callers see a full queue and a drain. Neither depends on timing.
+
+```elixir
+defmodule SystemTests.PressureTest do
+  use SystemTests.Case, async: true
+
+  test "a full queue rejects new work", %{jido: jido} do
+    {:ok, server} = Jido.start_agent(jido, Order, id: "order-1", max_postponed_signals: 0)
+    {pending, action} = open_turn(server)
+
+    assert {:error, {:overloaded, %{limit: 0}}} = Server.call(server, add_signal("sku-1"))
+
+    send(action, :release)
+    assert {:ok, _agent, []} = Server.await(pending)
+  end
+
+  test "a drain rejects new work and lets the open Turn finish", %{jido: jido} do
+    {:ok, server} = Jido.start_agent(jido, Order, id: "order-1")
+    {pending, action} = open_turn(server)
+
+    assert {:error, :quiesce_timeout} = Server.quiesce(server, timeout: 10)
+    assert {:error, :quiesced} = Server.call(server, add_signal("sku-1"))
+    assert %{admission: %{mode: :quiescing}} = Server.status(server)
+
+    send(action, :release)
+    assert {:ok, _agent, []} = Server.await(pending)
+
+    assert :ok = Server.quiesce(server, timeout: 1_000)
+    assert :ok = Server.resume(server)
+    assert %{admission: %{mode: :open}} = Server.status(server)
+  end
+end
+
+%{failures: 0, total: 2} = ExUnit.run()
+```
+
+## What to run elsewhere
+
+These tests use one BEAM and an in-memory store. Add separate tests for what they cannot prove:
+
+- **Your storage adapter.** Run the restart test against the adapter you deploy, and stop the BEAM between its two halves.
+- **Effects outside Jido.** Replace an external service with a local stub in your Action. See [Recovery Limits](../durability/recovery-and-effect-limits.md) for work that can run twice.
+- **Behavior under load.** See [Load Testing](load-and-performance-testing.md).
+
+## Next steps
+
+- [Shutdown and Recovery](shutdown-and-recovery.md) describes the behavior these tests prove.
+- [Observe Agent Turns](observe-agent-turns.livemd) lists the events you can assert on.

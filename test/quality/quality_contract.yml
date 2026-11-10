@@ -1,0 +1,184 @@
+version: 1
+schema:
+  required_top_level_fields:
+    - version
+    - schema
+    - suites
+    - thresholds
+    - fuzz
+    - reports
+    - registries
+    - waivers
+    - stability_findings
+  suite_required_fields:
+    - id
+    - state
+    - alias
+    - owner
+    - seed
+    - coverage
+    - evidence_artifacts
+  suite_states:
+    - required
+    - opt_in
+  coverage_states:
+    - included
+    - excluded
+  required_suite_ids:
+    - unit
+    - authoring
+    - covenant
+    - examples
+    - property
+    - fuzz
+    - system
+    - load
+    - peer
+    - benchmark_smoke
+  waiver_required_fields:
+    - id
+    - finding_id
+    - owner
+    - reason
+    - expires_on
+    - resolution_condition
+  stability_required_fields:
+    - id
+    - suite_id
+    - component
+    - owner
+    - status
+    - observed_on
+    - reason
+    - resolution_condition
+  stability_statuses:
+    - unresolved
+    - resolved
+    - waived
+suites:
+  - id: unit
+    state: required
+    alias: test
+    owner: jido.package
+    seed: 0
+    coverage: included
+    evidence_artifacts:
+      - tmp/quality/suites/unit.json
+  - id: authoring
+    state: required
+    alias: test.authoring
+    owner: jido.authoring
+    seed: 0
+    coverage: included
+    evidence_artifacts:
+      - tmp/quality/suites/authoring.json
+  - id: covenant
+    state: required
+    alias: test.contracts
+    owner: jido.contracts
+    seed: 0
+    coverage: included
+    evidence_artifacts:
+      - test/contracts/coverage.json
+  - id: examples
+    state: required
+    alias: test.examples
+    owner: jido.examples
+    seed: 0
+    coverage: included
+    evidence_artifacts:
+      - tmp/quality/suites/examples.json
+  - id: property
+    state: required
+    alias: test.property
+    owner: jido.property
+    seed: 0
+    coverage: included
+    evidence_artifacts:
+      - _build/test/property-report.json
+  - id: fuzz
+    state: required
+    alias: test.fuzz
+    owner: jido.fuzz
+    seed: 0
+    coverage: included
+    evidence_artifacts:
+      - _build/test/property-report.json
+  - id: system
+    state: required
+    alias: test.system
+    owner: jido.system
+    seed: 0
+    coverage: included
+    evidence_artifacts:
+      - tmp/quality/suites/system.json
+  - id: load
+    state: required
+    alias: test.load
+    owner: jido.load
+    seed: 0
+    coverage: included
+    evidence_artifacts:
+      - tmp/quality/suites/load.json
+  - id: peer
+    state: required
+    alias: test.peer
+    owner: jido.peer
+    seed: 0
+    coverage: included
+    evidence_artifacts:
+      - tmp/quality/suites/peer.json
+  - id: benchmark_smoke
+    state: required
+    alias: test.bench
+    owner: jido.benchmark
+    seed: 0
+    coverage: included
+    evidence_artifacts:
+      - tmp/quality/suites/benchmark-smoke.json
+  - id: live
+    state: opt_in
+    alias: test.live
+    owner: jido.ai.live
+    seed: 0
+    coverage: excluded
+    evidence_artifacts:
+      - tmp/quality/suites/live.json
+  - id: services
+    state: opt_in
+    alias: test.services
+    owner: jido.services
+    seed: 0
+    coverage: excluded
+    evidence_artifacts:
+      - tmp/quality/suites/services.json
+thresholds:
+  line_coverage:
+    package_minimum_percent: 90
+    component_minimum_percent: 80
+    maximum_component_regression_points: 0.5
+  covenant:
+    obligation_coverage_percent: 100
+fuzz:
+  required_seed: 0
+  bounded_generators: true
+  replayable_reduced_inputs: true
+  complete_reports: true
+reports:
+  root: tmp/quality
+  json: tmp/quality/quality.json
+  text: tmp/quality/quality.txt
+registries:
+  component_proof: test/quality/component_proof.yml
+  coverage_baseline: test/quality/coverage_baseline.json
+  test_tree_refactor: test/quality/test_tree_refactor.yml
+waivers: []
+stability_findings:
+  - id: covenant-persistence-token-cleanup-race
+    suite_id: covenant
+    component: jido.persistence
+    owner: jido.persistence
+    status: resolved
+    observed_on: 2026-11-04
+    reason: The token tests used a linked Agent with a check-then-stop cleanup callback. ExUnit now owns that Agent under its per-test supervisor, which removes the cleanup ordering race.
+    resolution_condition: Keep supervised test-process ownership and retain passing repeated token tests plus a complete Covenant run.

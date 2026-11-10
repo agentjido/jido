@@ -1,5 +1,5 @@
 defmodule Jido.Agent.AuthoringPortTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
   alias Jido.Agent
   alias Jido.AgentServer
 
@@ -7,7 +7,7 @@ defmodule Jido.Agent.AuthoringPortTest do
     use Jido.Agent, name: "authoring_port_leaf"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do

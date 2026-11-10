@@ -1,0 +1,177 @@
+# Start a Jido Instance
+
+This tutorial starts a Jido instance from a script, moves it into a supervision tree, and runs an Agent inside it. A Jido instance is the named supervisor that owns your running Agents.
+
+Actions and Flows run through `Jido.Exec.run/4` without an instance. You need one when an Agent runs as a process.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Define an Agent to run
+
+This is the invoice Agent from [Getting Started](getting-started.livemd), with an inline Action to keep the tutorial short.
+
+```elixir
+defmodule StartInstance.InvoiceAgent do
+  use Jido.Agent, name: "start_instance_invoice"
+
+  state do
+    schema Jido.Joi.object(%{paid_cents: Jido.Joi.integer() |> Jido.Joi.default(0)})
+  end
+
+  routes do
+    signal_source "/billing/invoice"
+
+    route "invoice.payment.apply", as: :apply_payment do
+      action %{amount_cents: amount},
+        schema: Jido.Joi.object(%{amount_cents: Jido.Joi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | paid_cents: context.agent_state.paid_cents + amount}}
+      end
+    end
+  end
+end
+```
+
+## Start the default instance
+
+`Jido.start/1` suits scripts and Livebook. With no `:name`, it starts the default instance, whose name is the module-style atom Jido.Default. Calling it again returns the running instance's PID and ignores any new options.
+
+```elixir
+{:ok, default_pid} = Jido.start()
+{:ok, ^default_pid} = Jido.start(max_tasks: 2_000)
+
+Process.whereis(Jido.Default) == default_pid
+```
+
+The cell returns `true`.
+
+Pass the instance name to every instance function.
+
+```elixir
+{:ok, server} = Jido.start_agent(Jido.Default, StartInstance.InvoiceAgent, id: "inv-1001")
+:ok = Jido.AgentServer.await_ready(server)
+
+{Jido.agent_count(Jido.Default), Jido.whereis_agent(Jido.Default, "inv-1001") == server}
+```
+
+The cell returns `{1, true}`.
+
+The Agent links to the instance's supervisor, not to the process that started it. Stopping the instance stops its Agents.
+
+```elixir
+:ok = Jido.stop()
+
+{Process.whereis(Jido.Default), Process.alive?(server)}
+```
+
+The cell returns `{nil, false}`.
+
+## Define an instance module
+
+An application defines a module with `use Jido`. `:otp_app` is required, and it names the application whose config the module reads.
+
+```elixir
+defmodule StartInstance.Jido do
+  use Jido,
+    otp_app: :start_instance,
+    namespace: "start-instance/primary"
+end
+```
+
+The `:namespace` option is a nonempty string that gives this instance a stable identity. You need it for stable Agent Refs and for persistent Agents. One namespace can bind to one live instance per node.
+
+## Add the instance to a supervision tree
+
+In an application, put the module in the children list in `lib/my_app/application.ex`. This cell starts the same tree directly so that you can see it run.
+
+```elixir
+children = [StartInstance.Jido]
+
+{:ok, tree} = Supervisor.start_link(children, strategy: :one_for_one)
+
+Supervisor.which_children(tree) |> Enum.map(&elem(&1, 0))
+```
+
+The cell returns `[StartInstance.Jido]`. The instance module's name is the instance's name.
+
+```elixir
+{:ok, server} = Jido.start_agent(StartInstance.Jido, StartInstance.InvoiceAgent, id: "inv-2001")
+:ok = Jido.AgentServer.await_ready(server)
+
+signal = StartInstance.InvoiceAgent.apply_payment_signal!(%{amount_cents: 700})
+{:ok, agent, []} = Jido.AgentServer.call(server, signal)
+
+agent.state
+```
+
+The cell returns `%{paid_cents: 700}`.
+
+## Configure the instance
+
+The module reads `config :my_app, MyApp.Jido` and merges it with any options in the child spec. `config/0` shows the result. This cell uses `Application.put_env/3` in place of a config file.
+
+```elixir
+Application.put_env(:start_instance, StartInstance.Jido, max_tasks: 2_000)
+
+StartInstance.Jido.config()
+```
+
+The cell returns `[max_tasks: 2000]`. Jido reads this config when the instance starts, so it applies to the next start.
+
+| Option | Meaning | Default |
+| --- | --- | --- |
+| `:name` | The instance name, a non-nil atom. Required by `Jido.start_link/1`. A `use Jido` module uses its own name. | The default instance under `Jido.start/1` |
+| `:namespace` | Stable identity for Refs and persistent Agents. | `nil` |
+| `:max_tasks` | Child limit for the instance's Task supervisor, a nonnegative integer or `:infinity`. | `1_000` |
+| `:persistence` | Adapter, as a module or `{module, options}`, for `Jido.thaw/4`, `Jido.activate_agent/4`, and `persistence: :inherit`. `Jido.start_agent/3` ignores it unless you pass `persistence: :inherit`. | `nil` |
+| `:agent_server` | Default AgentServer runtime options for this instance. | `[]` |
+| `:debug` | Log detail for this instance: `false`, `true`, or `:verbose`. | `nil` |
+
+An unknown option returns an error.
+
+```elixir
+{:error, %Jido.Error.ValidationError{details: %{keys: keys}}} =
+  Jido.start_link(name: StartInstance.Other, max_agents: 10)
+
+keys
+```
+
+The cell returns `[:max_agents]`.
+
+## Run two instances
+
+Two instances have separate registries, so the same Agent ID can run in each. Use this to keep tenants or test runs apart.
+
+```elixir
+{:ok, _second} = Jido.start(name: StartInstance.Second)
+{:ok, other_server} = Jido.start_agent(StartInstance.Second, StartInstance.InvoiceAgent, id: "inv-2001")
+
+{
+  other_server != server,
+  Jido.whereis_agent(StartInstance.Jido, "inv-2001") == server,
+  Jido.whereis_agent(StartInstance.Second, "inv-2001") == other_server
+}
+```
+
+The cell returns `{true, true, true}`.
+
+```elixir
+:ok = Jido.stop(StartInstance.Second)
+:ok = Supervisor.stop(tree)
+
+Process.whereis(StartInstance.Jido)
+```
+
+The cell returns `nil`.
+
+## Next steps
+
+- [Build Your First Action](first-action.livemd) writes the work that an Agent runs.
+- [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd) covers partitions, Refs, and OTP names.
+- [Instances and Tenants](../operations/configuration-and-tenant-isolation.md) covers tenant isolation.

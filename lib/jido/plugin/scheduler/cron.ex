@@ -1,32 +1,33 @@
 defmodule Jido.Plugin.Scheduler.Cron do
+  alias Jido.Joi
   @moduledoc "Creates or replaces one recurring Signal schedule."
 
-  alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Scheduler.CronRules
 
-  @schema Zoi.struct(
+  @schema Joi.struct(
             __MODULE__,
             %{
-              job_id: Zoi.any(description: "Agent-local job id"),
-              cron: Zoi.string(description: "Cron expression"),
-              signal: Zoi.struct(Jido.Signal, description: "Signal to send"),
+              job_id: Joi.any(description: "Agent-local job id"),
+              cron: Joi.string(description: "Cron expression"),
+              signal: Joi.struct(Jido.Signal, description: "Signal to send"),
               generation:
-                Zoi.integer(description: "Optional explicit generation for occurrence metadata")
-                |> Zoi.min(0)
-                |> Zoi.max(2_147_483_647)
-                |> Zoi.nullable()
-                |> Zoi.optional(),
+                Joi.integer(description: "Optional explicit generation for occurrence metadata")
+                |> Joi.min(0)
+                |> Joi.max(2_147_483_647)
+                |> Joi.nullable()
+                |> Joi.optional(),
               timezone:
-                Zoi.string(description: "Optional timezone")
-                |> Zoi.nullable()
-                |> Zoi.optional()
+                Joi.string(description: "Optional timezone")
+                |> Joi.nullable()
+                |> Joi.optional()
             },
             coerce: true
           )
 
   @typedoc "A recurring Signal Directive."
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc false
   def schema, do: @schema
@@ -34,15 +35,13 @@ defmodule Jido.Plugin.Scheduler.Cron do
   @doc "Validates one recurring schedule request."
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
   def validate(%__MODULE__{} = directive) do
-    with {:ok, directive} <- Zoi.parse(@schema, Map.from_struct(directive)),
-         :ok <- Scheduler.validate_job_id(directive.job_id),
+    with {:ok, directive} <- Jido.Agent.Directive.parse(@schema, Map.from_struct(directive)),
+         :ok <- CronRules.to_error(CronRules.validate_job_id(directive.job_id)),
          {:ok, timezone} <-
-           Scheduler.validate_cron_spec(
-             directive.cron,
-             directive.signal,
-             directive.timezone
-           ),
-         :ok <- Scheduler.validate_occurrence(directive.signal, directive.generation) do
+           directive.cron
+           |> CronRules.validate_spec(directive.signal, directive.timezone)
+           |> CronRules.to_error(),
+         :ok <- CronRules.to_error(CronRules.validate_occurrence(directive.signal, directive.generation)) do
       {:ok, %{directive | timezone: timezone}}
     end
   end

@@ -1,17 +1,19 @@
 defmodule Jido.Agent.Route do
+  alias Jido.Joi
   @moduledoc "Pure route normalization and selection. Selection does not run a handler."
-  alias Jido.Agent.{Data, Error}
+  alias Jido.Agent.Schema
+  alias Jido.Error
 
   @helper_name ~r/\A[a-z][a-z0-9_]*\z/
   @route_fields [:path, :as, :defaults, :handler, :state, :reply]
 
   def normalize(value, related? \\ true) do
-    with {:ok, route} <- Data.fields(value, @route_fields, %{as: nil, defaults: %{}, reply: nil}),
-         :ok <- Error.at(Data.path(route[:path]), :path),
+    with {:ok, route} <- Schema.fields(value, @route_fields, %{as: nil, defaults: %{}, reply: nil}),
+         :ok <- Error.prefix_result_path(Schema.path(route[:path]), :path),
          :ok <- helper(route),
-         :ok <- Error.at(Data.plain_map(route.defaults), :defaults),
-         :ok <- Error.at(Data.static(route.defaults), :defaults),
-         {:ok, handler} <- Error.at(handler(route[:handler], related?), :handler),
+         :ok <- Error.prefix_result_path(Schema.plain_map(route.defaults), :defaults),
+         :ok <- Error.prefix_result_path(Schema.static(route.defaults), :defaults),
+         {:ok, handler} <- Error.prefix_result_path(handler(route[:handler], related?), :handler),
          :ok <- defaults(handler, route.defaults) do
       route
       |> Map.put(:handler, handler)
@@ -26,7 +28,7 @@ defmodule Jido.Agent.Route do
       {:ok, %{kind: executable.kind, target: target}}
     else
       {:error, reason} ->
-        Error.fail(:invalid_executable, [], "Expected an Action or Flow module", %{
+        Error.validation_result(:invalid_executable, [], "Expected an Action or Flow module", %{
           target: target,
           reason: reason
         })
@@ -34,32 +36,30 @@ defmodule Jido.Agent.Route do
   end
 
   def executable(value),
-    do: Error.fail(:invalid_executable, [], "Expected an executable module", %{target: value})
+    do: Error.validation_result(:invalid_executable, [], "Expected an executable module", %{target: value})
 
   # :executable is an internal Spark draft. Public Map authoring rejects it.
   defp handler(%{kind: kind} = value, related?)
        when kind in [:action, :flow, :forward, :transform] or
               (kind == :executable and related? == false) do
-    with {:ok, value} <- Data.fields(value, [:kind, :target]),
+    with {:ok, value} <- Schema.fields(value, [:kind, :target]),
          {:ok, target} <- handler_target(kind, value[:target], related?) do
       {:ok, %{kind: kind, target: target}}
     end
   end
 
   defp handler(_, _),
-    do:
-      Error.fail(:invalid_handler, [], "Expected one Action, Flow, transform, or forward handler")
+    do: Error.validation_result(:invalid_handler, [], "Expected one Action, Flow, transform, or forward handler")
 
   defp handler_target(:forward, target, _related?), do: forward_target(target)
 
   defp handler_target(kind, target, related?) when kind in [:action, :flow, :executable] do
-    with :ok <- Data.name(target) do
+    with :ok <- Schema.name(target) do
       if related? do
         with {:ok, actual} <- executable(target) do
           if actual.kind == kind,
             do: {:ok, target},
-            else:
-              Error.fail(:executable_kind, [], "Executable kind does not match the declared kind")
+            else: Error.validation_result(:executable_kind, [], "Executable kind does not match the declared kind")
         end
       else
         {:ok, target}
@@ -72,7 +72,7 @@ defmodule Jido.Agent.Route do
     if not related? or (Code.ensure_loaded?(module) and function_exported?(module, fun, 1)),
       do: {:ok, target},
       else:
-        Error.fail(
+        Error.validation_result(
           :unresolved_transform,
           [],
           "Transform must reference a public function of arity one",
@@ -83,20 +83,20 @@ defmodule Jido.Agent.Route do
   end
 
   defp handler_target(:transform, _target, _related?),
-    do: Error.fail(:invalid_transform, [], "Transform requires {module, function, 1}")
+    do: Error.validation_result(:invalid_transform, [], "Transform requires {module, function, 1}")
 
   defp helper(%{as: nil}), do: :ok
 
   defp helper(route) do
-    with :ok <- Error.at(Data.name(route.as), :as),
-         do: Error.at(helper_name(route.as), :as)
+    with :ok <- Error.prefix_result_path(Schema.name(route.as), :as),
+         do: Error.prefix_result_path(helper_name(route.as), :as)
   end
 
   defp helper_name(value) do
     if Regex.match?(@helper_name, Atom.to_string(value)),
       do: :ok,
       else:
-        Error.fail(
+        Error.validation_result(
           :invalid_helper_name,
           [],
           "A helper name must start with a lowercase letter and contain only lowercase letters, digits, and underscores"
@@ -105,25 +105,25 @@ defmodule Jido.Agent.Route do
 
   defp defaults(%{kind: kind}, defaults)
        when kind in [:transform, :forward] and map_size(defaults) > 0,
-       do: Error.fail(:invalid_defaults, :defaults, "Only Action and Flow routes accept defaults")
+       do: Error.validation_result(:invalid_defaults, :defaults, "Only Action and Flow routes accept defaults")
 
   defp defaults(_, _), do: :ok
 
   defp mappings(%{handler: %{kind: kind}} = route, related?)
        when kind in [:action, :flow, :executable] do
-    with {:ok, state} <- Error.at(state(route.state), :state),
-         {:ok, reply} <- Error.at(reply(route.reply), :reply) do
+    with {:ok, state} <- Error.prefix_result_path(state(route.state), :state),
+         {:ok, reply} <- Error.prefix_result_path(reply(route.reply), :reply) do
       resolve_mappings(%{route | state: state, reply: reply}, related?)
     end
   end
 
   defp mappings(%{handler: %{kind: kind}, state: state}, _related?)
        when kind in [:forward, :transform] and state != :unchanged,
-       do: Error.fail(:terminal_state, [:state], "A terminal route cannot select output state")
+       do: Error.validation_result(:terminal_state, [:state], "A terminal route cannot select output state")
 
   defp mappings(%{handler: %{kind: kind}, reply: reply}, _related?)
        when kind in [:forward, :transform] and not is_nil(reply),
-       do: Error.fail(:terminal_reply, [:reply], "A terminal route cannot declare a reply")
+       do: Error.validation_result(:terminal_reply, [:reply], "A terminal route cannot declare a reply")
 
   defp mappings(%{handler: %{kind: kind}} = route, _related?)
        when kind in [:forward, :transform],
@@ -141,8 +141,8 @@ defmodule Jido.Agent.Route do
 
   defp reply(value) do
     with {:ok, reply} <- required_fields(value, [:type, :from], "Reply requires type and from"),
-         :ok <- Error.at(Data.exact(reply.type), :type),
-         {:ok, from} <- Error.at(selector(reply.from), :from) do
+         :ok <- Error.prefix_result_path(Schema.exact(reply.type), :type),
+         {:ok, from} <- Error.prefix_result_path(selector(reply.from), :from) do
       {:ok, %{reply | from: from}}
     end
   end
@@ -151,7 +151,7 @@ defmodule Jido.Agent.Route do
     with {:ok, selector} <-
            required_fields(value, [:source, :path], "Output selector requires source and path"),
          :ok <- output_source(selector.source),
-         {:ok, path} <- Error.at(selector_path(selector.path), :path) do
+         {:ok, path} <- Error.prefix_result_path(selector_path(selector.path), :path) do
       {:ok, %{source: :output, path: path}}
     end
   end
@@ -159,22 +159,22 @@ defmodule Jido.Agent.Route do
   defp output_source(:output), do: :ok
 
   defp output_source(_value),
-    do: Error.fail(:invalid_selector_source, [:source], "Selector source must be output")
+    do: Error.validation_result(:invalid_selector_source, [:source], "Selector source must be output")
 
   defp selector_path(path) do
-    Data.list(path, fn
+    Schema.list(path, fn
       key when is_atom(key) or is_binary(key) -> {:ok, key}
-      _key -> Error.fail(:invalid_selector_key, [], "Output path keys must be atoms or strings")
+      _key -> Error.validation_result(:invalid_selector_key, [], "Output path keys must be atoms or strings")
     end)
   end
 
   defp required_fields(value, fields, message) do
-    with :ok <- Data.plain_map(value) do
+    with :ok <- Schema.plain_map(value) do
       missing = Enum.reject(fields, &Map.has_key?(value, &1))
 
       if missing == [],
-        do: Data.fields(value, fields),
-        else: Error.fail(:missing_fields, [], message, %{keys: missing})
+        do: Schema.fields(value, fields),
+        else: Error.validation_result(:missing_fields, [], message, %{keys: missing})
     end
   end
 
@@ -185,9 +185,9 @@ defmodule Jido.Agent.Route do
   defp resolve_mappings(route, true) do
     first_path = if route.state == :unchanged, do: [:reply, :from], else: [:state]
 
-    with {:ok, schema} <- Error.at(output_schema(route.handler), first_path),
-         {:ok, state} <- Error.at(resolve_selector(route.state, schema), :state),
-         {:ok, reply} <- Error.at(resolve_selector(route.reply, schema), :reply) do
+    with {:ok, schema} <- Error.prefix_result_path(output_schema(route.handler), first_path),
+         {:ok, state} <- Error.prefix_result_path(resolve_selector(route.state, schema), :state),
+         {:ok, reply} <- Error.prefix_result_path(resolve_selector(route.reply, schema), :reply) do
       {:ok, %{route | state: state, reply: reply}}
     end
   end
@@ -195,22 +195,22 @@ defmodule Jido.Agent.Route do
   defp output_schema(%{target: target}) do
     if function_exported?(target, :output_schema, 0),
       do: output_schema_value(target.output_schema()),
-      else: Error.fail(:missing_output_schema, [], "Executable has no output schema")
+      else: Error.validation_result(:missing_output_schema, [], "Executable has no output schema")
   rescue
     reason ->
-      Error.fail(:invalid_output_schema, [], "Executable output schema failed", %{reason: reason})
+      Error.validation_result(:invalid_output_schema, [], "Executable output schema failed", %{reason: reason})
   end
 
   defp output_schema_value(schema) do
-    if is_struct(schema) and Zoi.Type.impl_for(schema) != nil,
+    if Joi.Schema.schema?(schema),
       do: {:ok, schema},
-      else: Error.fail(:invalid_output_schema, [], "Executable output schema is invalid")
+      else: Error.validation_result(:invalid_output_schema, [], "Executable output schema is invalid")
   end
 
   defp resolve_selector(value, _schema) when value in [:unchanged, nil], do: {:ok, value}
 
   defp resolve_selector(%{from: from} = reply, schema) do
-    with {:ok, from} <- Error.at(resolve_selector(from, schema), :from),
+    with {:ok, from} <- Error.prefix_result_path(resolve_selector(from, schema), :from),
          do: {:ok, %{reply | from: from}}
   end
 
@@ -228,55 +228,61 @@ defmodule Jido.Agent.Route do
     end
   end
 
-  defp output_field(%{__struct__: type, fields: fields}, key, index)
-       when type in [Zoi.Types.Map, Zoi.Types.Struct] and is_list(fields) do
-    matches =
-      for {declared_key, schema} <- fields,
-          is_atom(declared_key) or is_binary(declared_key),
-          to_string(declared_key) == to_string(key),
-          do: {declared_key, schema}
+  defp output_field(schema, key, index) do
+    with kind when kind in [:map, :struct] <- Joi.Schema.kind(schema),
+         {:ok, fields} when is_list(fields) <- Joi.Schema.fields(schema) do
+      matches =
+        for {declared_key, child_schema} <- fields,
+            is_atom(declared_key) or is_binary(declared_key),
+            to_string(declared_key) == to_string(key),
+            do: {declared_key, child_schema}
 
-    case matches do
-      [{declared_key, schema}] ->
-        {:ok, declared_key, schema}
+      case matches do
+        [{declared_key, child_schema}] ->
+          {:ok, declared_key, child_schema}
 
-      [] ->
-        Error.fail(:unknown_output_field, [:path, index], "Output path field is not declared", %{
-          key: key
-        })
+        [] ->
+          Error.validation_result(
+            :unknown_output_field,
+            [:path, index],
+            "Output path field is not declared in the target output_schema",
+            %{
+              key: key
+            }
+          )
 
-      _many ->
-        Error.fail(
-          :ambiguous_output_field,
+        _many ->
+          Error.validation_result(
+            :ambiguous_output_field,
+            [:path, index],
+            "Output path field name is ambiguous",
+            %{key: key}
+          )
+      end
+    else
+      _ ->
+        Error.validation_result(
+          :unsupported_output_path,
           [:path, index],
-          "Output path field name is ambiguous",
+          "Output paths can traverse only object or struct fields. Declare the field in the target output_schema",
           %{key: key}
         )
     end
   end
 
-  defp output_field(_schema, key, index),
-    do:
-      Error.fail(
-        :unsupported_output_path,
-        [:path, index],
-        "Output paths can traverse only object or struct fields",
-        %{key: key}
-      )
-
   defp forward_target(%{kind: :agent} = target) do
-    with {:ok, target} <- Data.fields(target, [:kind, :name]),
-         :ok <- Data.name(target[:name]) do
+    with {:ok, target} <- Schema.fields(target, [:kind, :name]),
+         :ok <- Schema.name(target[:name]) do
       if target.name == :root,
-        do: Error.fail(:self_forward, [], "Forward cannot target the current Agent"),
+        do: Error.validation_result(:self_forward, [], "Forward cannot target the current Agent"),
         else: {:ok, target}
     end
   end
 
-  defp forward_target(%{kind: :parent} = target), do: Data.fields(target, [:kind])
+  defp forward_target(%{kind: :parent} = target), do: Schema.fields(target, [:kind])
 
   defp forward_target(_target),
-    do: Error.fail(:invalid_forward_target, [], "Forward requires agent(name) or parent()")
+    do: Error.validation_result(:invalid_forward_target, [], "Forward requires agent(name) or parent()")
 
   def select(%{routes: routes}, type), do: select(routes, type)
 
@@ -284,7 +290,7 @@ defmodule Jido.Agent.Route do
     with {:ok, candidates} <- matching(routes, type) do
       case candidates do
         [] ->
-          Error.fail(:unmatched_input, [:routes], "No route accepts this Signal type", %{
+          Error.validation_result(:unmatched_input, [:routes], "No route accepts this Signal type", %{
             type: type
           })
 
@@ -298,15 +304,15 @@ defmodule Jido.Agent.Route do
   def matching(%{routes: routes}, type), do: matching(routes, type)
 
   def matching(routes, type) when is_list(routes) do
-    with :ok <- Data.exact(type) do
-      {:ok, Enum.filter(routes, &Data.matches?(type, &1.path))}
+    with :ok <- Schema.exact(type) do
+      {:ok, Enum.filter(routes, &Schema.matches?(type, &1.path))}
     end
   end
 
   def params(%{handler: %{kind: kind}, defaults: defaults}, data) when kind in [:action, :flow] do
-    with :ok <- Data.plain_map(data), do: {:ok, Map.merge(defaults, data)}
+    with :ok <- Schema.plain_map(data), do: {:ok, Map.merge(defaults, data)}
   end
 
   def params(_, _),
-    do: Error.fail(:invalid_handler, [:handler], "Only Action and Flow routes have parameters")
+    do: Error.validation_result(:invalid_handler, [:handler], "Only Action and Flow routes have parameters")
 end

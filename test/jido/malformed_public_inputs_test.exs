@@ -1,12 +1,12 @@
-defmodule JidoTest.MalformedPublicInputsTest do
-  use JidoTest.Case, async: true
+defmodule Jido.MalformedPublicInputsTest do
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.Agent.{Extension, Turn}
   alias Jido.Error.ValidationError
   alias Jido.Persistence
   alias Jido.Signal
-  alias JidoTest.AgentFixtures.Add
+  alias Jido.Test.AgentServer.Fixtures.Add
 
   test "Plugin lowering rejects improper declarations and invalid DSL data" do
     for {declarations, dsl} <- [

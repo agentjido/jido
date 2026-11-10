@@ -1,113 +1,175 @@
-defmodule JidoTest.Property.Report do
+Code.require_file("config.exs", __DIR__)
+
+defmodule Jido.Test.Property.Report do
   @moduledoc false
   use GenServer
 
+  alias Jido.Test.Property.Config
+
   @root Path.expand("../../..", __DIR__)
 
-  # Write full incomplete evidence before register reads or test compilation.
-  def prepare!(path \\ report_path(), options \\ []) do
-    root = Keyword.get(options, :root, @root)
+  def check!(options \\ []) do
+    path = Keyword.get(options, :path, Config.report_path())
+    full? = Keyword.get(options, :full, false)
+    suite = Keyword.get(options, :suite)
+    configs = Keyword.get(options, :configs, Config.families())
+    report = path |> File.read!() |> JSON.decode!()
 
-    metadata =
-      %{
-        status: "incomplete",
-        started_at: DateTime.to_iso8601(DateTime.utc_now()),
-        run_id: Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false),
-        package_version: Mix.Project.config()[:version],
-        elixir: System.version(),
-        otp: System.otp_release(),
-        otp_version: otp_version(),
-        runtime: :erlang.system_info(:system_version) |> to_string(),
-        stream_data: application_version(:stream_data),
-        zoi: application_version(:zoi),
-        exunit_seed: ExUnit.configuration()[:seed],
-        selection: %{
-          include: inspect(ExUnit.configuration()[:include]),
-          exclude: inspect(ExUnit.configuration()[:exclude])
-        },
-        source_digest: source_digest(root),
-        dependencies: dependency_metadata(root)
-      }
-      |> Map.merge(git_metadata(root))
+    if report["status"] != "finished" or report["outcome"] == "failed" do
+      raise "property report did not pass: #{inspect(report["outcome"])}"
+    end
 
-    write!(path, metadata)
-    metadata
+    if full? do
+      missing_families = Map.keys(configs) -- Map.keys(report["families"] || %{})
+
+      if missing_families != [] do
+        raise "missing property families: #{Enum.join(missing_families, ", ")}"
+      end
+
+      if suite == :fuzz do
+        completed =
+          for {_family, result} <- report["families"],
+              measurement <- result["measurements"],
+              measurement["variant"] == "fuzz" and measurement["outcome"] == "passed",
+              do: {measurement["family"], measurement["id"]}
+
+        required =
+          for {family, config} <- configs, id <- config.fuzz_ids, do: {family, id}
+
+        missing = required -- completed
+        if missing != [], do: raise("missing fuzz measurements: #{inspect(missing)}")
+      end
+    end
+
+    :ok
+  end
+
+  def fuzz_ids do
+    Map.new(Config.families(), fn {family, config} -> {family, Enum.sort(config.fuzz_ids)} end)
+  end
+
+  # Invalidate old evidence before test files compile.
+  def prepare!(path \\ Config.report_path()) do
+    report = %{
+      status: "incomplete",
+      started_at: DateTime.to_iso8601(DateTime.utc_now()),
+      run_id: Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)
+    }
+
+    write!(path, report)
+    report
   end
 
   @impl true
   def init(options) do
-    path = Keyword.get(options, :path, report_path())
+    path = Keyword.get(options, :path, Config.report_path())
     root = Keyword.get(options, :root, @root)
-    metadata = prepare!(path, root: root)
-    register = Keyword.get(options, :register, Path.join(root, "guides/public-contracts.md"))
+    configs = Keyword.get(options, :configs, Config.families())
 
-    # A bad register leaves the complete incomplete record already on disk.
-    text = File.read!(register)
-    ids = Regex.scan(~r/^\| ([A-Z][A-Z0-9_-]*-\d+) \|/m, text) |> Enum.map(&List.last/1)
-    if ids == [] or ids != Enum.uniq(ids), do: raise(ArgumentError, "invalid contract register")
-    {:ok, %{path: path, metadata: metadata, ids: ids, records: [], failed?: false}}
+    metadata =
+      prepare!(path)
+      |> Map.merge(git_metadata(root))
+      |> Map.merge(%{
+        package_version: Mix.Project.config()[:version],
+        elixir: System.version(),
+        otp: System.otp_release(),
+        stream_data: to_string(Application.spec(:stream_data, :vsn)),
+        source_digest: source_digest(root),
+        exunit_seed: ExUnit.configuration()[:seed],
+        selection: %{
+          include: inspect(ExUnit.configuration()[:include]),
+          exclude: inspect(ExUnit.configuration()[:exclude])
+        }
+      })
+
+    write!(path, metadata)
+
+    {:ok,
+     %{
+       path: path,
+       metadata: metadata,
+       configs: configs,
+       records: [],
+       failed?: false
+     }}
   end
 
   @impl true
   def handle_cast({:test_finished, test}, state) do
-    result = if test.tags[:property] && test.tags[:fuzz], do: "invalid", else: result(test.state)
+    result = result(test.state)
     state = %{state | failed?: state.failed? or result in ["failed", "invalid"]}
 
     if test.tags[:property] || test.tags[:fuzz] do
-      record = %{
-        test: "#{inspect(test.module)}: #{test.name}",
-        suite: if(test.tags[:fuzz], do: "fuzz", else: "property"),
-        contracts: Map.get(test.tags, :contracts, []),
-        declared_forced_cases: Map.get(test.tags, :contract_cases, []),
-        fuzz_id: Map.get(test.tags, :fuzz_id),
-        result: result
-      }
+      case family_for_module(test.module, state.configs) do
+        nil ->
+          {:noreply, state}
 
-      {:noreply, %{state | records: [record | state.records]}}
+        family ->
+          record = %{
+            family: family,
+            test: "#{inspect(test.module)}: #{test.name}",
+            suite: if(test.tags[:fuzz], do: "fuzz", else: "property"),
+            measurement_id: test.tags[:fuzz_id],
+            result: result
+          }
+
+          {:noreply, %{state | records: [record | state.records]}}
+      end
     else
       {:noreply, state}
     end
   end
 
   def handle_cast({:suite_finished, _times}, state) do
-    {fuzz, artifact_errors} = fuzz_records(state)
-    artifact_errors = artifact_errors ++ missing_artifacts(state.records, fuzz)
-    unknown = Enum.sort(Enum.uniq(Enum.flat_map(state.records, & &1.contracts)) -- state.ids)
-    invalid_cases = invalid_case_ids(state.records, state.ids)
-    passed = Enum.filter(state.records, &passed_evidence?(&1, fuzz, state.ids))
-    evidenced = passed |> Enum.flat_map(& &1.contracts) |> Enum.uniq() |> Enum.sort()
-    cases = passed |> Enum.flat_map(& &1.declared_forced_cases) |> Enum.uniq() |> Enum.sort()
+    {measurements, artifact_errors} = measurement_records(state)
+
+    family_ids =
+      (Enum.map(state.records, & &1.family) ++ Enum.map(measurements, & &1["family"]))
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    families =
+      Map.new(family_ids, fn family ->
+        records = Enum.filter(state.records, &(&1.family == family))
+        family_measurements = Enum.filter(measurements, &(&1["family"] == family))
+        family_artifacts = Enum.filter(artifact_errors, &(&1[:family] == family))
+        errors = measurement_errors(family, records, family_measurements, state.configs)
+
+        outcome =
+          if Enum.any?(records, &(&1.result in ["failed", "invalid"])) or errors != [] or
+               family_artifacts != [],
+             do: "failed",
+             else: "passed"
+
+        {family,
+         %{
+           outcome: outcome,
+           tests: Enum.sort_by(records, & &1.test),
+           measurements: family_measurements,
+           validation_errors: errors,
+           artifact_errors: family_artifacts
+         }}
+      end)
+
+    outcome =
+      cond do
+        state.failed? or artifact_errors != [] or
+            Enum.any?(families, fn {_id, result} -> result.outcome == "failed" end) ->
+          "failed"
+
+        map_size(families) == 0 ->
+          "no_evidence"
+
+        true ->
+          "passed"
+      end
 
     report =
       Map.merge(state.metadata, %{
         status: "finished",
         finished_at: DateTime.to_iso8601(DateTime.utc_now()),
-        outcome:
-          cond do
-            state.failed? or artifact_errors != [] or unknown != [] or invalid_cases != [] ->
-              "failed"
-
-            evidenced == [] ->
-              "no_evidence"
-
-            true ->
-              "passed"
-          end,
-        contracts_with_passed_evidence: evidenced,
-        declared_forced_cases_in_passed_tests: cases,
-        contracts_without_passed_evidence: Enum.sort(state.ids -- evidenced),
-        contract_evidence_by_suite:
-          Map.new(["property", "fuzz"], fn suite ->
-            {suite, evidence(Enum.filter(state.records, &(&1.suite == suite)), state.ids, fuzz)}
-          end),
-        unknown_contract_ids: unknown,
-        invalid_case_ids: invalid_cases,
-        tests: Enum.sort_by(state.records, & &1.test),
-        fuzz: fuzz,
-        measurements_by_suite:
-          Map.new(["property", "fuzz"], fn suite ->
-            {suite, Enum.filter(fuzz, &(&1["variant"] == suite))}
-          end),
+        outcome: outcome,
+        families: families,
         artifact_errors: artifact_errors
       })
 
@@ -115,167 +177,135 @@ defmodule JidoTest.Property.Report do
     {:noreply, state}
   end
 
-  def handle_cast(_event, records), do: {:noreply, records}
+  def handle_cast(_event, state), do: {:noreply, state}
 
-  defp evidence(records, ids, artifacts) do
-    passed = Enum.filter(records, &passed_evidence?(&1, artifacts, ids))
-    contracts = passed |> Enum.flat_map(& &1.contracts) |> Enum.uniq() |> Enum.sort()
-
-    %{
-      contracts_with_passed_evidence: contracts,
-      contracts_without_passed_evidence: Enum.sort(ids -- contracts),
-      declared_forced_cases_in_passed_tests:
-        passed |> Enum.flat_map(& &1.declared_forced_cases) |> Enum.uniq() |> Enum.sort()
-    }
-  end
-
-  defp fuzz_records(state) do
-    Path.join([Path.dirname(state.path), "property-fuzz", state.metadata.run_id, "*.json"])
+  defp measurement_records(state) do
+    Path.join([Path.dirname(state.path), "property-fuzz", state.metadata.run_id, "*", "*.json"])
     |> Path.wildcard()
     |> Enum.reduce({[], []}, fn path, {records, errors} ->
       with {:ok, data} <- File.read(path),
            {:ok, record} when is_map(record) <- JSON.decode(data) do
-        if record["run_id"] == state.metadata.run_id,
-          do: {[record | records], errors},
-          else: {records, errors}
+        family = record["family"]
+
+        cond do
+          record["run_id"] != state.metadata.run_id ->
+            {records, errors}
+
+          valid_measurement?(record, state.configs) ->
+            {[record | records], errors}
+
+          true ->
+            {records, [%{path: path, family: family, error: "invalid fuzz measurement"} | errors]}
+        end
       else
-        error -> {records, [%{path: path, error: inspect(error)} | errors]}
+        error -> {records, [%{path: path, family: nil, error: inspect(error)} | errors]}
       end
     end)
     |> then(fn {records, errors} ->
-      {Enum.sort_by(records, &{&1["id"], &1["variant"]}), Enum.sort_by(errors, & &1.path)}
+      {
+        Enum.sort_by(records, &{&1["family"], &1["id"], &1["variant"]}),
+        Enum.sort_by(errors, & &1.path)
+      }
     end)
   end
 
-  defp passed_evidence?(record, artifacts, ids) do
-    record.result == "passed" and
-      Enum.all?(record.contracts, &(&1 in ids)) and
-      Enum.all?(record.declared_forced_cases, &valid_case?(&1, record.contracts, ids)) and
-      (is_nil(record.fuzz_id) or Enum.any?(artifacts, &artifact_matches?(record, &1)))
+  defp valid_measurement?(record, configs) do
+    limits = record["limits"]
+    counts = ~w(generated examples replayed shrink_attempts confirmations elapsed_ms)
+    family = configs[record["family"]]
+
+    is_map(family) and record["id"] in family.fuzz_ids and
+      record["variant"] in ["fuzz", "property"] and
+      record["outcome"] in ["passed", "failed", "incomplete"] and
+      is_integer(record["seed"]) and is_integer(record["test_timeout"]) and
+      record["test_timeout"] > 0 and
+      Enum.all?(counts, &(is_integer(record[&1]) and record[&1] >= 0)) and
+      is_map(limits) and is_integer(limits["max_runs"]) and limits["max_runs"] > 0 and
+      is_integer(limits["max_run_time"]) and limits["max_run_time"] > 0 and
+      is_integer(limits["max_shrinking_steps"]) and limits["max_shrinking_steps"] >= 0 and
+      record["generated"] <= limits["max_runs"] and
+      record["shrink_attempts"] <= limits["max_shrinking_steps"] and
+      is_map(record["observations"]) and
+      Enum.all?(record["observations"], fn {name, count} ->
+        is_binary(name) and is_integer(count) and count > 0 and
+          count <= record["generated"] + record["examples"] + record["replayed"]
+      end) and
+      (record["outcome"] != "passed" or
+         (record["generated"] > 0 and map_size(record["observations"]) > 0))
   end
 
-  defp artifact_matches?(record, artifact) do
-    artifact["id"] == record.fuzz_id and artifact["variant"] == record.suite and
-      artifact["outcome"] == "passed" and
-      artifact["contracts"] == record.contracts and
-      artifact["declared_forced_cases"] == record.declared_forced_cases and
-      is_integer(artifact["generated"]) and artifact["generated"] > 0
+  defp measurement_errors(family, tests, measurements, configs) do
+    owners = Enum.filter(tests, &(&1.result == "passed" and not is_nil(&1.measurement_id)))
+
+    missing_ids =
+      for test <- tests,
+          test.suite == "fuzz" and is_nil(test.measurement_id),
+          do: "fuzz test has no measurement ID: #{test.test}"
+
+    missing =
+      for test <- owners,
+          not Enum.any?(measurements, fn record ->
+            record["id"] == test.measurement_id and record["variant"] == test.suite and
+              record["outcome"] == "passed"
+          end),
+          do: "missing or failed measurement: #{test.test}"
+
+    failed =
+      for record <- measurements,
+          record["outcome"] != "passed",
+          do: "measurement did not pass: #{record["id"]}"
+
+    orphaned =
+      for record <- measurements,
+          not Enum.any?(owners, &(&1.measurement_id == record["id"] and &1.suite == record["variant"])),
+          do: "measurement has no passed owner: #{record["id"]}"
+
+    duplicates =
+      measurements
+      |> Enum.frequencies_by(&{&1["id"], &1["variant"]})
+      |> Enum.filter(fn {_key, count} -> count > 1 end)
+      |> Enum.map(fn {key, _count} -> "duplicate measurements: #{inspect(key)}" end)
+
+    missing_observations =
+      for record <- measurements,
+          observation <- get_in(configs, [family, :required_observations, record["id"]]) || [],
+          not Map.has_key?(record["observations"], observation),
+          do: "measurement #{record["id"]} missed observation #{observation}"
+
+    missing_ids ++ missing ++ failed ++ orphaned ++ duplicates ++ missing_observations
   end
 
-  defp missing_artifacts(records, artifacts) do
-    for record <- records,
-        record.result == "passed" and not is_nil(record.fuzz_id),
-        not Enum.any?(artifacts, &artifact_matches?(record, &1)),
-        do: %{
-          id: record.fuzz_id,
-          suite: record.suite,
-          error: "missing passed current-run measurement"
-        }
-  end
+  defp family_for_module(module, configs) do
+    name = inspect(module)
 
-  defp invalid_case_ids(records, ids) do
-    for record <- records,
-        id <- record.declared_forced_cases,
-        not valid_case?(id, record.contracts, ids),
-        uniq: true,
-        do: id
-  end
-
-  defp valid_case?(id, contracts, ids) do
-    case String.split(id, "/", parts: 2) do
-      [contract, name] -> name != "" and contract in contracts and contract in ids
-      _ -> false
-    end
+    Enum.find_value(configs, fn {family, config} ->
+      if Enum.any?(config.module_prefixes, &String.starts_with?(name, &1)), do: family
+    end)
   end
 
   defp git_metadata(root) do
-    with true <- File.dir?(root),
-         git when is_binary(git) <- System.find_executable("git"),
-         {top, 0} <-
-           System.cmd(git, ["rev-parse", "--show-toplevel"], cd: root, stderr_to_stdout: true),
+    with git when is_binary(git) <- System.find_executable("git"),
+         {top, 0} <- System.cmd(git, ["rev-parse", "--show-toplevel"], cd: root, stderr_to_stdout: true),
          true <- Path.expand(String.trim(top)) == Path.expand(root),
-         {revision, 0} <-
-           System.cmd(git, ["rev-parse", "HEAD"], cd: root, stderr_to_stdout: true),
-         {status, 0} <-
-           System.cmd(git, ["status", "--porcelain"], cd: root, stderr_to_stdout: true) do
+         {revision, 0} <- System.cmd(git, ["rev-parse", "HEAD"], cd: root, stderr_to_stdout: true),
+         {status, 0} <- System.cmd(git, ["status", "--porcelain"], cd: root, stderr_to_stdout: true) do
       %{revision: String.trim(revision), working_tree_dirty: status != ""}
     else
       _ -> %{revision: nil, working_tree_dirty: nil}
     end
   end
 
-  defp otp_version do
-    path =
-      Path.join([to_string(:code.root_dir()), "releases", System.otp_release(), "OTP_VERSION"])
-
-    case File.read(path) do
-      {:ok, version} -> String.trim(version)
-      _ -> nil
-    end
-  end
-
-  defp application_version(application) do
-    case Application.spec(application, :vsn) do
-      nil -> nil
-      version -> to_string(version)
-    end
-  end
-
-  defp dependency_metadata(root) do
-    Map.new([:jido_action, :jido_signal, :zoi, :stream_data], fn application ->
-      declared = Enum.find(Mix.Project.config()[:deps] || [], &(elem(&1, 0) == application))
-
-      opts =
-        if is_tuple(declared) and is_list(elem(declared, tuple_size(declared) - 1)),
-          do: elem(declared, tuple_size(declared) - 1),
-          else: []
-
-      declared_source = Path.expand(Keyword.get(opts, :path, "deps/#{application}"), root)
-      source = loaded_source(application) || declared_source
-      metadata = git_metadata(source)
-
-      {application,
-       Map.merge(metadata, %{
-         version: application_version(application),
-         declaration: inspect(declared),
-         source_root: source,
-         source_origin:
-           if(loaded_source(application), do: "loaded module", else: "declared dependency"),
-         source_present: File.dir?(source),
-         source_digest: if(File.dir?(source), do: source_digest(source), else: nil)
-       })}
-    end)
-  end
-
-  defp loaded_source(application) when application in [:jido_action, :jido_signal] do
-    module = if application == :jido_action, do: Jido.Action, else: Jido.Signal
-
-    if :code.is_loaded(module) != false do
-      case module.module_info(:compile)[:source] do
-        nil -> nil
-        source -> source |> to_string() |> Path.dirname() |> Path.dirname()
-      end
-    end
-  end
-
-  defp loaded_source(_application), do: nil
-
-  # Include local edits and new test files. HEAD alone does not identify a dirty tree.
   defp source_digest(root) do
     paths = [
       "mix.exs",
       "mix.lock",
       "lib/**/*.{ex,exs}",
       "test/**/*.{ex,exs,json}",
-      "examples/**/*.{ex,exs,json}",
       "config/**/*.{ex,exs}",
-      "guides/**/*.{md,livemd}",
-      "README.md",
-      "AGENTS.md"
+      "guides/*.md"
     ]
 
-    files =
-      paths |> Enum.flat_map(&Path.wildcard(Path.join(root, &1))) |> Enum.uniq() |> Enum.sort()
+    files = paths |> Enum.flat_map(&Path.wildcard(Path.join(root, &1))) |> Enum.uniq() |> Enum.sort()
 
     digest =
       Enum.reduce(files, :crypto.hash_init(:sha256), fn path, hash ->
@@ -285,19 +315,10 @@ defmodule JidoTest.Property.Report do
     digest |> :crypto.hash_final() |> Base.encode16(case: :lower)
   end
 
-  defp report_path, do: Path.join(Mix.Project.build_path(), "property-report.json")
-
-  @doc false
-  def write!(path, report) do
+  defp write!(path, report) do
     File.mkdir_p!(Path.dirname(path))
-    temporary = path <> ".#{System.pid()}-#{System.unique_integer([:positive])}.tmp"
-
-    try do
-      File.write!(temporary, JSON.encode!(report))
-      File.rename!(temporary, path)
-    after
-      File.rm(temporary)
-    end
+    File.write!(path <> ".tmp", JSON.encode!(report))
+    File.rename!(path <> ".tmp", path)
   end
 
   defp result(nil), do: "passed"

@@ -1,4 +1,6 @@
 defmodule Jido.Agent.Ref do
+  alias Jido.Joi
+
   @moduledoc """
   Stable identity for one logical Agent.
 
@@ -13,38 +15,38 @@ defmodule Jido.Agent.Ref do
 
   @version 1
 
-  @nonempty_binary_schema Zoi.string(description: "Nonempty Agent identity value")
-                          |> Zoi.refine({__MODULE__, :validate_nonempty_binary, []})
+  @nonempty_binary_schema Joi.string(description: "Nonempty Agent identity value")
+                          |> Joi.refine({__MODULE__, :validate_nonempty_binary, []})
 
   @fields %{
     namespace: @nonempty_binary_schema,
     partition:
       @nonempty_binary_schema
-      |> Zoi.nullable()
-      |> Zoi.default(nil),
+      |> Joi.nullable()
+      |> Joi.default(nil),
     id: @nonempty_binary_schema
   }
 
-  @schema Zoi.struct(__MODULE__, @fields, unrecognized_keys: :error)
-  @attrs_schema Zoi.map(@fields, unrecognized_keys: :error)
+  @schema Joi.struct(__MODULE__, @fields, unrecognized_keys: :error)
+  @attrs_schema Joi.map(@fields, unrecognized_keys: :error)
 
-  @map_schema Zoi.map(
+  @map_schema Joi.map(
                 %{
-                  "version" => Zoi.literal(@version),
+                  "version" => Joi.literal(@version),
                   "namespace" => @nonempty_binary_schema,
-                  "partition" => @nonempty_binary_schema |> Zoi.nullable(),
+                  "partition" => @nonempty_binary_schema |> Joi.nullable(),
                   "id" => @nonempty_binary_schema
                 },
                 unrecognized_keys: :error
               )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
+  @type t :: unquote(Joi.type_spec(@schema))
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc "Returns the static schema for an Agent Ref."
-  @spec schema() :: Zoi.schema()
+  @spec schema() :: Joi.schema()
   def schema, do: @schema
 
   @doc "Creates and validates one Agent Ref."
@@ -62,7 +64,7 @@ defmodule Jido.Agent.Ref do
   end
 
   def new(attrs) when is_map(attrs) and not is_struct(attrs) do
-    case Zoi.parse(@attrs_schema, attrs) do
+    case Joi.parse(@attrs_schema, attrs) do
       {:ok, parsed} -> {:ok, struct!(__MODULE__, parsed)}
       {:error, issues} -> invalid("Agent Ref attributes are invalid", %{issues: issues})
     end
@@ -70,6 +72,19 @@ defmodule Jido.Agent.Ref do
 
   def new(value),
     do: invalid("Agent Ref attributes must be a map or keyword list", %{value: value})
+
+  @doc false
+  @spec new_scoped(String.t(), term(), term()) ::
+          {:ok, t()} | {:error, Error.ValidationError.t()}
+  def new_scoped(namespace, id, opts) when is_binary(id) do
+    with :ok <- validate_option_list(opts, "Agent Ref options"),
+         :ok <- validate_ref_option_keys(opts) do
+      new(namespace: namespace, partition: Keyword.get(opts, :partition), id: id)
+    end
+  end
+
+  def new_scoped(_namespace, id, _opts),
+    do: invalid_config("Agent Ref ID must be a binary", %{id: id})
 
   @doc "Creates one Agent Ref or raises its validation error."
   @spec new!(map() | keyword() | t()) :: t() | no_return()
@@ -83,13 +98,44 @@ defmodule Jido.Agent.Ref do
   @doc "Validates one Agent Ref without changing its identity fields."
   @spec validate(term()) :: {:ok, t()} | {:error, Error.ValidationError.t()}
   def validate(%__MODULE__{} = ref) do
-    case Zoi.parse(@schema, ref) do
+    case Joi.parse(@schema, ref) do
       {:ok, validated} -> {:ok, validated}
       {:error, issues} -> invalid("Agent Ref is invalid", %{issues: issues})
     end
   end
 
   def validate(value), do: invalid("Expected a Jido.Agent.Ref value", %{value: value})
+
+  @doc false
+  @spec validate_namespace(term(), String.t()) ::
+          {:ok, t()} | {:error, Error.ValidationError.t()}
+  def validate_namespace(value, namespace) do
+    with {:ok, ref} <- validate(value) do
+      if ref.namespace == namespace do
+        {:ok, ref}
+      else
+        invalid_config("Agent Ref namespace does not match the Jido instance", %{
+          code: :jido_namespace_mismatch,
+          expected: namespace,
+          actual: ref.namespace
+        })
+      end
+    end
+  end
+
+  @doc false
+  @spec startup_options(t(), term()) ::
+          {:ok, keyword()} | {:error, Error.ValidationError.t()}
+  def startup_options(%__MODULE__{} = ref, opts) do
+    with :ok <- validate_option_list(opts, "Agent Ref startup options"),
+         :ok <- matching_option(opts, :id, ref.id),
+         :ok <- matching_option(opts, :partition, ref.partition) do
+      {:ok,
+       opts
+       |> Keyword.put(:id, ref.id)
+       |> Keyword.put(:partition, ref.partition)}
+    end
+  end
 
   @doc "Returns the exact version-1 public map for one Agent Ref."
   @spec to_map(term()) :: {:ok, map()} | {:error, Error.ValidationError.t()}
@@ -123,7 +169,7 @@ defmodule Jido.Agent.Ref do
   @doc "Decodes and validates one exact version-1 Agent Ref map."
   @spec from_map(term()) :: {:ok, t()} | {:error, Error.ValidationError.t()}
   def from_map(value) do
-    case Zoi.parse(@map_schema, value) do
+    case Joi.parse(@map_schema, value) do
       {:ok, decoded} ->
         {:ok,
          %__MODULE__{
@@ -153,6 +199,53 @@ defmodule Jido.Agent.Ref do
       do: :ok
 
   def validate_nonempty_binary(_value, _context), do: {:error, "must be a nonempty binary"}
+
+  defp validate_option_list(opts, label) do
+    if Keyword.keyword?(opts) do
+      keys = Keyword.keys(opts)
+
+      case keys -- Enum.uniq(keys) do
+        [] ->
+          :ok
+
+        duplicates ->
+          invalid_config("#{label} must contain unique keys", %{
+            keys: Enum.uniq(duplicates)
+          })
+      end
+    else
+      invalid_config("#{label} must be a keyword list", %{value: opts})
+    end
+  end
+
+  defp validate_ref_option_keys(opts) do
+    case Enum.reject(Keyword.keys(opts), &(&1 == :partition)) do
+      [] -> :ok
+      keys -> invalid_config("Agent Ref options have unknown keys", %{keys: keys})
+    end
+  end
+
+  defp matching_option(opts, key, expected) do
+    case Keyword.fetch(opts, key) do
+      :error ->
+        :ok
+
+      {:ok, ^expected} ->
+        :ok
+
+      {:ok, value} ->
+        invalid_config("Agent Ref conflicts with startup options", %{key: key, value: value})
+    end
+  end
+
+  defp invalid_config(message, details) do
+    {:error,
+     Error.validation_error(message,
+       kind: :input,
+       subject: __MODULE__,
+       details: Map.put_new(details, :code, :jido_instance_invalid_config)
+     )}
+  end
 
   defp invalid(message, details) do
     {:error,

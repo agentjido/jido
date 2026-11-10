@@ -1,5 +1,5 @@
-defmodule JidoTest.Persistence.LiveStateTest do
-  use JidoTest.Case, async: true
+defmodule Jido.Persistence.LiveStateTest do
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
@@ -31,9 +31,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
     use Jido.Agent, name: "local_state_agent"
 
     state do
-      schema Zoi.object(%{
-               payload: Zoi.any() |> Zoi.default(<<>>),
-               count: Zoi.integer() |> Zoi.default(0)
+      schema Jido.Joi.object(%{
+               payload: Jido.Joi.any() |> Jido.Joi.default(<<>>),
+               count: Jido.Joi.integer() |> Jido.Joi.default(0)
              })
     end
 
@@ -46,9 +46,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
     use Jido.Agent, name: "local_custom_checkpoint"
 
     state do
-      schema Zoi.object(%{
-               payload: Zoi.any() |> Zoi.default(<<>>),
-               count: Zoi.integer() |> Zoi.default(0)
+      schema Jido.Joi.object(%{
+               payload: Jido.Joi.any() |> Jido.Joi.default(<<>>),
+               count: Jido.Joi.integer() |> Jido.Joi.default(0)
              })
     end
 
@@ -80,7 +80,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
     use Jido.Plugin
 
     def state_spec(_opts),
-      do: {:owned, Zoi.object(%{bits: Zoi.any()}) |> Zoi.default(%{bits: <<>>})}
+      do: {:owned, Jido.Joi.object(%{bits: Jido.Joi.any()}) |> Jido.Joi.default(%{bits: <<>>})}
 
     def reduce(reduction, _opts),
       do: {:ok, Map.get(reduction.signal.data, :owned, reduction.plugin_state)}
@@ -99,9 +99,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
     use Jido.Agent, name: "local_plugin_checkpoint", plugins: [Package]
 
     state do
-      schema Zoi.object(%{
-               payload: Zoi.any() |> Zoi.default(<<>>),
-               count: Zoi.integer() |> Zoi.default(0)
+      schema Jido.Joi.object(%{
+               payload: Jido.Joi.any() |> Jido.Joi.default(<<>>),
+               count: Jido.Joi.integer() |> Jido.Joi.default(0)
              })
     end
 
@@ -111,7 +111,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
   end
 
   defmodule RejectedStorage do
-    @behaviour Jido.Persistence.Adapter
+    @behaviour Jido.Persistence.Store
     defdelegate validate_options(opts), to: ETS
     defdelegate get(key, opts), to: ETS
     defdelegate put(key, value, opts), to: ETS
@@ -225,11 +225,11 @@ defmodule JidoTest.Persistence.LiveStateTest do
   test "live execution commits local domain and Plugin values without persistence", c do
     initial =
       PluginAgent.instantiate!(
-        id: Jido.Signal.ID.generate!(),
+        id: Jido.Id.uuid7(),
         state: %{payload: self(), owned: %{bits: <<5::3>>}}
       )
 
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(c.jido, initial)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(c.jido, initial)
     port = Port.open({:spawn_executable, System.find_executable("true")}, [])
     on_exit(fn -> if Port.info(port), do: Port.close(port) end)
 
@@ -259,9 +259,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
           {PluginAgent, %{payload: :portable, owned: %{bits: <<5::3>>}}}
         ] do
       assert {:ok, server} =
-               JidoTest.AgentServerAssertions.start_agent(c.jido, module,
-                 persistence: c.persistence
-               )
+               Jido.Test.AgentServer.Assertions.start_agent(c.jido, module, persistence: c.persistence)
 
       assert {:ok, committed, _} =
                Server.call(server, signal("local.update", Map.put(input, :observer, self())))
@@ -269,9 +267,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
       assert_receive {:signal, %{type: "local.updated"}}, 1_000
 
       assert {:ok, ^committed, 1} =
-               Persistence.load_agent_with_revision(c.persistence, module, committed.id,
-                 instance: c.jido
-               )
+               Persistence.load_agent_with_revision(c.persistence, module, committed.id, instance: c.jido)
     end
   end
 
@@ -291,11 +287,9 @@ defmodule JidoTest.Persistence.LiveStateTest do
       persistence = {adapter, elem(c.persistence, 1)}
 
       assert {:ok, server} =
-               JidoTest.AgentServerAssertions.start_agent(c.jido, module,
-                 persistence: persistence
-               )
+               Jido.Test.AgentServer.Assertions.start_agent(c.jido, module, persistence: persistence)
 
-      before = JidoTest.AgentServerAssertions.committed(server)
+      before = Jido.Test.AgentServer.Assertions.committed(server)
       monitor = Process.monitor(server)
 
       assert {:error, %Jido.Error.ExecutionError{message: "Required durable commit failed"}} =
@@ -304,9 +298,7 @@ defmodule JidoTest.Persistence.LiveStateTest do
       assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000
 
       assert {:ok, saved, 0} =
-               Persistence.load_agent_with_revision(persistence, module, before.agent.id,
-                 instance: c.jido
-               )
+               Persistence.load_agent_with_revision(persistence, module, before.agent.id, instance: c.jido)
 
       assert saved == before.agent
       refute_received {:signal, %{type: "local.updated"}}
@@ -325,5 +317,5 @@ defmodule JidoTest.Persistence.LiveStateTest do
   end
 
   defp key(c, id),
-    do: Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.namespace(c.jido), id: id))
+    do: Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(c.jido), id: id))
 end

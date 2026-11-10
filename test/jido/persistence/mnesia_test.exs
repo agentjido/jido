@@ -1,10 +1,10 @@
-defmodule JidoTest.Persistence.MnesiaTest do
+defmodule Jido.Persistence.MnesiaTest do
   use ExUnit.Case, async: false
 
   alias Jido.Persistence
   alias Jido.Persistence.{Mnesia, Store}
-  alias JidoTest.Persistence.AdapterConformance
-  alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
+  alias Jido.Test.Persistence.AdapterConformance
+  alias Jido.Test.AgentServer.RuntimeFixtures.RuntimeAgent
 
   setup do
     {:ok, _started} = Application.ensure_all_started(:mnesia)
@@ -43,9 +43,7 @@ defmodule JidoTest.Persistence.MnesiaTest do
              Persistence.load_agent(source, RuntimeAgent, agent.id, namespace: "persistence-test")
 
     assert :ok =
-             Persistence.delete_agent(source, RuntimeAgent, agent.id,
-               namespace: "persistence-test"
-             )
+             Persistence.delete_agent(source, RuntimeAgent, agent.id, namespace: "persistence-test")
 
     assert {:error, :deleted} =
              Persistence.load_agent(source, RuntimeAgent, agent.id, namespace: "persistence-test")

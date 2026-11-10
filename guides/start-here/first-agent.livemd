@@ -1,0 +1,242 @@
+# Build Your First Agent
+
+This tutorial builds an invoice Agent with a Flow route and an Action route, runs Turns on it as plain values, and then runs it live. An Agent holds state that changes across Signals.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Write the behavior
+
+An Agent's behavior lives in Actions and Flows. Each one reads the current state from the `:agent_state` context key.
+
+`ApplyPayment` is an Action that returns the complete next state. `PriceInvoice` is a Flow that returns the next state and the invoice total as two fields, and its `output_schema` declares both. An Action inside a Flow sees the same context.
+
+```elixir
+defmodule FirstAgent.ApplyPayment do
+  use Jido.Action,
+    name: "first_agent_apply_payment",
+    schema: Jido.Joi.object(%{amount_cents: Jido.Joi.integer() |> Jido.Joi.min(1)})
+
+  @impl true
+  def run(%{amount_cents: amount}, %{agent_state: state}) do
+    paid = state.paid_cents + amount
+    status = if paid >= state.total_cents, do: "paid", else: "open"
+    {:ok, %{state | paid_cents: paid, status: status}}
+  end
+end
+
+defmodule FirstAgent.SumLines do
+  use Jido.Action,
+    name: "first_agent_sum_lines",
+    schema: Jido.Joi.object(%{lines: Jido.Joi.list(Jido.Joi.integer())})
+
+  @impl true
+  def run(%{lines: lines}, _context), do: {:ok, %{subtotal_cents: Enum.sum(lines)}}
+end
+
+defmodule FirstAgent.RecordTotal do
+  use Jido.Action,
+    name: "first_agent_record_total",
+    schema: Jido.Joi.object(%{subtotal_cents: Jido.Joi.integer()})
+
+  @impl true
+  def run(%{subtotal_cents: subtotal}, %{agent_state: state}) do
+    total = subtotal + div(subtotal * state.tax_percent, 100)
+    {:ok, %{next_state: %{state | total_cents: total, status: "open"}, total_cents: total}}
+  end
+end
+
+defmodule FirstAgent.PriceInvoice do
+  use Jido.Flow,
+    name: "first_agent_price_invoice",
+    schema: Jido.Joi.object(%{lines: Jido.Joi.list(Jido.Joi.integer())}),
+    output_schema:
+      Jido.Joi.object(%{
+        next_state: Jido.Joi.map(),
+        total_cents: Jido.Joi.integer()
+      })
+
+  flow do
+    step "sum", action: FirstAgent.SumLines, params: %{lines: input(:lines)}
+
+    step "record",
+      action: FirstAgent.RecordTotal,
+      params: %{subtotal_cents: result("sum", :subtotal_cents)}
+
+    output result("record")
+  end
+end
+```
+
+## Define the Agent
+
+The `state` section declares the state contract. The `routes` section maps Signal types to behavior.
+
+`as:` generates a Signal builder for a route. By default, a handler's complete output becomes the next state, as on the payment route. On the pricing route, `state from: output(:next_state)` selects one output field for the next state, and `reply` answers the caller with the total. These selectors read the declared `output_schema`, so a route that selects a field the schema does not declare fails at compile time.
+
+```elixir
+defmodule FirstAgent.InvoiceAgent do
+  use Jido.Agent,
+    name: "first_agent_invoice",
+    description: "Prices one invoice and tracks its payments"
+
+  state do
+    schema Jido.Joi.object(%{
+             tax_percent: Jido.Joi.integer() |> Jido.Joi.default(10),
+             total_cents: Jido.Joi.integer() |> Jido.Joi.default(0),
+             paid_cents: Jido.Joi.integer() |> Jido.Joi.default(0),
+             status: Jido.Joi.string() |> Jido.Joi.default("draft")
+           })
+  end
+
+  routes do
+    signal_source "/billing/invoice"
+
+    route "invoice.price", FirstAgent.PriceInvoice, as: :price do
+      state from: output(:next_state)
+      reply "invoice.priced", from: output(:total_cents)
+    end
+
+    route "invoice.payment.apply", FirstAgent.ApplyPayment, as: :apply_payment
+  end
+end
+
+FirstAgent.InvoiceAgent.definition().name
+```
+
+The cell returns `"first_agent_invoice"`.
+
+## Create an instance
+
+An instance adds an ID and complete state. The schema fills in the defaults, and no process starts.
+
+```elixir
+invoice = FirstAgent.InvoiceAgent.instantiate!(id: "inv-1001")
+
+invoice.state
+```
+
+The cell returns `%{status: "draft", paid_cents: 0, total_cents: 0, tax_percent: 10}`.
+
+## Run Turns as values
+
+`cmd/3` runs one Turn. It returns the next Agent value and a list of Directives, and it performs none of them. Pass each result into the next Turn.
+
+```elixir
+price = FirstAgent.InvoiceAgent.price_signal!(%{lines: [1_200, 300]})
+payment = FirstAgent.InvoiceAgent.apply_payment_signal!(%{amount_cents: 1_650})
+
+{:ok, priced, [%Jido.Agent.Directive.Reply{}]} = FirstAgent.InvoiceAgent.cmd(invoice, price)
+{:ok, settled, []} = FirstAgent.InvoiceAgent.cmd(priced, payment)
+
+{priced.state.total_cents, settled.state.status}
+```
+
+The cell returns `{1650, "paid"}`.
+
+An invalid Signal returns an error, and the Agent value you passed in still holds the same state.
+
+```elixir
+bad_payment = FirstAgent.InvoiceAgent.apply_payment_signal!(%{amount_cents: 0})
+
+{:error, %Jido.Error.ValidationError{}} = FirstAgent.InvoiceAgent.cmd(priced, bad_payment)
+
+priced.state.paid_cents
+```
+
+The cell returns `0`.
+
+A Signal type with no route also returns an error.
+
+```elixir
+unknown = Jido.Signal.new!("invoice.refund", %{}, source: "/billing/api")
+
+{:error, %Jido.Error.ValidationError{code: code}} = FirstAgent.InvoiceAgent.cmd(invoice, unknown)
+
+code
+```
+
+The cell returns `:unmatched_input`.
+
+## Run the Agent live
+
+Start a Jido instance, then start the Agent inside it. The AgentServer holds the committed Agent and runs one Turn at a time.
+
+```elixir
+{:ok, _instance} = Jido.start(name: FirstAgent.Jido)
+{:ok, server} = Jido.start_agent(FirstAgent.Jido, FirstAgent.InvoiceAgent, id: "inv-2001")
+:ok = Jido.AgentServer.await_ready(server)
+
+{:ok, committed, [%Jido.Agent.Directive.Reply{}]} = Jido.AgentServer.call(server, price)
+
+committed.state.total_cents
+```
+
+The cell returns `1650`, the same total as the pure Turn.
+
+The server performs Directives after the commit. The Reply Directive sends the reply to the caller as a message.
+
+```elixir
+receive do
+  %Jido.Signal{type: "invoice.priced", data: total} -> total
+after
+  1_000 -> :no_reply
+end
+```
+
+The cell returns `1650`.
+
+The state stays in the server, so each call builds on the last one.
+
+```elixir
+deposit = FirstAgent.InvoiceAgent.apply_payment_signal!(%{amount_cents: 650})
+balance = FirstAgent.InvoiceAgent.apply_payment_signal!(%{amount_cents: 1_000})
+
+{:ok, _agent, []} = Jido.AgentServer.call(server, deposit)
+{:ok, _agent, []} = Jido.AgentServer.call(server, balance)
+
+Map.take(Jido.AgentServer.agent(server).state, [:paid_cents, :status])
+```
+
+The cell returns `%{status: "paid", paid_cents: 1650}`.
+
+`Jido.AgentServer.status/2` reports the Agent's identity and its `state_version`. Each committed Turn moved that version forward by one.
+
+```elixir
+status = Jido.AgentServer.status(server)
+
+{status.agent_id, status.state_version}
+```
+
+The cell returns `{"inv-2001", 3}`.
+
+A failed live Turn leaves the committed state and the server in place.
+
+```elixir
+{:error, %Jido.Error.ValidationError{}} = Jido.AgentServer.call(server, bad_payment)
+
+{Jido.AgentServer.agent(server).state.paid_cents, Jido.AgentServer.status(server).state_version}
+```
+
+The cell returns `{1650, 3}`.
+
+`Jido.stop_agent/3` stops one Agent. Its committed state goes with it, because this Agent has no persistence.
+
+```elixir
+:ok = Jido.stop_agent(FirstAgent.Jido, "inv-2001")
+
+Jido.whereis_agent(FirstAgent.Jido, "inv-2001")
+```
+
+The cell returns `nil`.
+
+## Next steps
+
+- [Test Jido Code](testing-jido-code.livemd) tests this Agent at each level.
+- [Define an Agent](../agents/define-and-instantiate-an-agent.livemd) lists the definition options and generated functions.
+- [Call, Cast, and Await](../agent-servers/send-signals-to-live-agents.livemd) covers each way to send a Signal, including `Jido.AgentServer.cast/3`.

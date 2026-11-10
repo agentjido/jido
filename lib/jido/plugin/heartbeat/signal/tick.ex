@@ -4,5 +4,5 @@ defmodule Jido.Plugin.Heartbeat.Signal.Tick do
   use Jido.Signal,
     type: "jido.agent.heartbeat",
     default_source: "/plugin/heartbeat",
-    schema: Zoi.map()
+    schema: Jido.Joi.map()
 end

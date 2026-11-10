@@ -1,0 +1,301 @@
+# Managed Sensors
+
+This tutorial uses `Jido.Plugin.SensorManager` to run input processes that an Agent starts and stops from its own Actions. A sensor turns outside events into Signals. The Plugin keeps the set of running sensors equal to the set in Agent state.
+
+Jido has no sensor behaviour to implement. A sensor is any OTP child that accepts a `Jido.Plugin.SensorManager.Init` value and casts Signals to its Agent. For a fixed set of input processes that the Agent never changes, see [Supervised Resources](../plugins/plugin-supervised-resources.livemd).
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Start a Jido instance
+
+```elixir
+{:ok, _instance} = Jido.start_link(name: SensorGuide.Jido)
+
+defmodule SensorGuide.Wait do
+  def until(check, attempts \\ 200) do
+    cond do
+      value = check.() ->
+        value
+
+      attempts == 0 ->
+        raise "condition was not met in time"
+
+      true ->
+        Process.sleep(10)
+        until(check, attempts - 1)
+    end
+  end
+end
+```
+
+## Write a sensor
+
+This sensor receives pushed mailbox events and casts each one to the Agent as a Signal. It stands in for a process that would read from a webhook, a queue, or a socket. `start_link/1` receives the `Init` value. The global name lets this tutorial find the current process after a restart.
+
+The stub fails to start while the `:mailbox_online` setting is `false`, which a later step uses.
+
+```elixir
+defmodule SensorGuide.MailboxSensor do
+  use GenServer
+
+  alias Jido.Plugin.SensorManager.Init
+
+  def start_link(%Init{} = init) do
+    if Application.get_env(:sensor_guide, :mailbox_online, true) do
+      GenServer.start_link(__MODULE__, init, name: {:global, name(init.agent_id, init.tag)})
+    else
+      {:error, :mailbox_offline}
+    end
+  end
+
+  def whereis(agent_id, tag) do
+    case :global.whereis_name(name(agent_id, tag)) do
+      :undefined -> nil
+      pid -> pid
+    end
+  end
+
+  def push(sensor, event), do: GenServer.cast(sensor, {:push, event})
+
+  @impl true
+  def init(%Init{} = init), do: {:ok, init}
+
+  @impl true
+  def handle_cast({:push, event}, %Init{} = init) do
+    signal = Jido.Signal.new!("mail.received", event, source: init.config.source)
+    Jido.AgentServer.cast(init.agent_server, signal)
+    {:noreply, init}
+  end
+
+  defp name(agent_id, tag), do: {__MODULE__, agent_id, tag}
+end
+```
+
+`GenServer` already provides the `child_spec/1` that the Plugin requires. The Plugin overrides the child ID and sets `restart: :temporary`, because it does the restarting itself.
+
+The `Init` value has these fields:
+
+| Field | Meaning |
+|---|---|
+| `agent_server` | PID of the owning AgentServer. Cast Signals here. |
+| `agent_id` | ID of the owning Agent. |
+| `tag` | The tag from the Directive. |
+| `module` | The sensor module. |
+| `config` | The config map from the Directive. |
+| `jido` | The Jido instance, when there is one. |
+| `partition` | The Agent's partition, when there is one. |
+
+## Add the Plugin and manage sensors from an Action
+
+`Jido.Plugin.SensorManager.start/3` and `Jido.Plugin.SensorManager.stop/1` build Directives. Return them from an Action like any other Directive. `:retry_delay_ms` is the wait before retrying a failed start or restarting a crashed sensor. It defaults to `1_000`, and it must be an integer from 1 through 4,294,967,295.
+
+```elixir
+defmodule SensorGuide.ManageMailbox do
+  use Jido.Action,
+    name: "sensor_guide_manage_mailbox",
+    schema:
+      Jido.Joi.object(%{
+        operation: Jido.Joi.enum([:start, :stop]),
+        mailbox: Jido.Joi.string()
+      })
+
+  alias Jido.Plugin.SensorManager
+
+  @impl Jido.Action
+  def run(%{operation: :start, mailbox: mailbox}, context) do
+    directive =
+      SensorManager.start(mailbox, SensorGuide.MailboxSensor, %{source: "/mail/#{mailbox}"})
+
+    {:ok, context.agent_state, [directive]}
+  end
+
+  def run(%{operation: :stop, mailbox: mailbox}, context) do
+    {:ok, context.agent_state, [SensorManager.stop(mailbox)]}
+  end
+end
+
+defmodule SensorGuide.Inbox do
+  use Jido.Agent,
+    name: "sensor_guide_inbox",
+    plugins: [{Jido.Plugin.SensorManager, %{retry_delay_ms: 20}}]
+
+  state do
+    schema Jido.Joi.object(%{message_ids: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+  end
+
+  routes do
+    route "mailbox.manage", SensorGuide.ManageMailbox
+
+    route "mail.received" do
+      action %{message_id: message_id},
+        schema: Jido.Joi.object(%{message_id: Jido.Joi.string()}),
+        context: context do
+        state = context.agent_state
+
+        if message_id in state.message_ids do
+          {:ok, state}
+        else
+          {:ok, %{state | message_ids: state.message_ids ++ [message_id]}}
+        end
+      end
+    end
+  end
+end
+
+{:ok, inbox} = Jido.start_agent(SensorGuide.Jido, SensorGuide.Inbox, id: "inbox-1")
+:ok = Jido.AgentServer.await_ready(inbox)
+
+manage = fn operation, mailbox ->
+  Jido.Signal.new!("mailbox.manage", %{operation: operation, mailbox: mailbox}, source: "/mail/admin")
+end
+```
+
+## Start a sensor
+
+The Turn commits the desired sensor to the `:sensors` key of Agent state. After the commit, the Plugin starts the process.
+
+```elixir
+{:ok, committed, _directives} = Jido.AgentServer.call(inbox, manage.(:start, "support"))
+
+committed.state.sensors.desired
+# => %{"support" => %{config: %{source: "/mail/support"}, module: SensorGuide.MailboxSensor}}
+```
+
+Push events into the sensor. They arrive through the normal Signal path, so each one is a Turn. A repeated event ID changes nothing, because the handler checks it.
+
+```elixir
+sensor = SensorGuide.Wait.until(fn -> SensorGuide.MailboxSensor.whereis("inbox-1", "support") end)
+
+for message_id <- ["msg-1", "msg-2", "msg-2"] do
+  SensorGuide.MailboxSensor.push(sensor, %{message_id: message_id})
+end
+
+SensorGuide.Wait.until(fn -> length(Jido.AgentServer.agent(inbox).state.message_ids) == 2 end)
+Jido.AgentServer.agent(inbox).state.message_ids
+# => ["msg-1", "msg-2"]
+```
+
+## Recover from a crash
+
+The Plugin monitors each sensor and restarts it while its tag stays desired. Kill the sensor and wait for a replacement:
+
+```elixir
+Process.exit(sensor, :kill)
+
+replacement =
+  SensorGuide.Wait.until(fn ->
+    case SensorGuide.MailboxSensor.whereis("inbox-1", "support") do
+      pid when is_pid(pid) and pid != sensor -> pid
+      _other -> nil
+    end
+  end)
+
+SensorGuide.MailboxSensor.push(replacement, %{message_id: "msg-3"})
+
+SensorGuide.Wait.until(fn -> "msg-3" in Jido.AgentServer.agent(inbox).state.message_ids end)
+Jido.AgentServer.agent(inbox).state.message_ids
+# => ["msg-1", "msg-2", "msg-3"]
+```
+
+A sensor that crashes restarts after `:retry_delay_ms`, the same wait as a failed start. A sensor that keeps crashing therefore starts at most once per delay, and it keeps restarting while its tag stays desired. The delay is fixed. For a longer backoff, handle the fault inside the sensor.
+
+## Change a sensor
+
+Sending `start` again with the same tag and the same module and config keeps the running process. A different module or config replaces it.
+
+```elixir
+{:ok, _agent, _directives} = Jido.AgentServer.call(inbox, manage.(:start, "support"))
+SensorGuide.MailboxSensor.whereis("inbox-1", "support") == replacement
+# => true
+```
+
+## Handle a failed start
+
+The Turn commits before the sensor starts, so a start failure does not fail the Turn. The call returns `{:ok, ...}`, the tag stays desired, and the Plugin retries after `:retry_delay_ms`. Read the failure from `last_effect_outcome` in `Jido.AgentServer.status/2`. The call can return before that field updates, so poll it.
+
+```elixir
+Application.put_env(:sensor_guide, :mailbox_online, false)
+
+{:ok, _agent, _directives} = Jido.AgentServer.call(inbox, manage.(:start, "billing"))
+
+outcome =
+  SensorGuide.Wait.until(fn ->
+    case Jido.AgentServer.status(inbox).last_effect_outcome do
+      %{status: :failed} = outcome -> outcome
+      _other -> nil
+    end
+  end)
+
+%{status: :failed, stage: :directive} = outcome
+Map.keys(Jido.AgentServer.agent(inbox).state.sensors.desired)
+# => ["billing", "support"]
+```
+
+Bring the dependency back. The retry starts the sensor with no new Directive.
+
+```elixir
+Application.put_env(:sensor_guide, :mailbox_online, true)
+
+billing = SensorGuide.Wait.until(fn -> SensorGuide.MailboxSensor.whereis("inbox-1", "billing") end)
+is_pid(billing)
+# => true
+```
+
+## Reject invalid Directives
+
+The tag must be a portable term and not `nil`. The sensor must be a loaded module with `child_spec/1`, and the config must be a portable map. An invalid Directive fails its Turn before commit, so neither state nor sensors change.
+
+```elixir
+Jido.Plugin.SensorManager.Start.validate(Jido.Plugin.SensorManager.start(nil, SensorGuide.MailboxSensor))
+|> elem(1)
+|> Exception.message()
+# => "Sensor tag must not be nil"
+```
+
+```elixir
+Jido.Plugin.SensorManager.Start.validate(
+  Jido.Plugin.SensorManager.start("support", SensorGuide.MailboxSensor, %{owner: self()})
+)
+|> elem(1)
+|> Exception.message()
+# => "Sensor config must contain portable data"
+```
+
+Keep live values out of config. Pass names or identifiers that the sensor can resolve when it starts.
+
+## Stop sensors
+
+`stop/1` removes the tag from desired state, and the Plugin terminates the process. All remaining sensors stop with the Agent.
+
+```elixir
+{:ok, stopped, _directives} = Jido.AgentServer.call(inbox, manage.(:stop, "support"))
+Map.keys(stopped.state.sensors.desired)
+# => ["billing"]
+```
+
+```elixir
+SensorGuide.Wait.until(fn -> SensorGuide.MailboxSensor.whereis("inbox-1", "support") == nil end)
+
+monitor = Process.monitor(billing)
+:ok = Jido.stop_agent(SensorGuide.Jido, inbox)
+
+receive do
+  {:DOWN, ^monitor, :process, ^billing, reason} -> reason
+after
+  1_000 -> raise "the sensor did not stop"
+end
+# => :shutdown
+```
+
+Desired sensors live in Agent state. When a durable Agent restores, the Plugin starts them again from that state. In-memory work inside a sensor does not survive, so a sensor must read its position from its source or from `config`.
+
+## Next steps
+
+- [Make an Agent Durable](../durability/make-an-agent-durable.livemd)
+- [Status and Turn History](../agent-servers/status-and-history.md)

@@ -1,0 +1,5 @@
+- id: agent-authoring-component-boundary
+  date: "2026-10-27"
+  decision: Keep AI Agent DSL normalization, route creation, and read-only graph inspection in jido_ai.agent_authoring.
+  driver: Authoring selects the graph and static capabilities, but it must not own model or tool execution.
+  approved_by: User-requested initial Covenant scaffold

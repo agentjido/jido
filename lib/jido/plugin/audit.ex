@@ -1,4 +1,6 @@
 defmodule Jido.Plugin.Audit do
+  alias Jido.Joi
+
   @moduledoc """
   Stores bounded domain audit records in portable Agent state.
 
@@ -15,7 +17,7 @@ defmodule Jido.Plugin.Audit do
   use Jido.Plugin, option_keys: [agent: [:max_entries]]
 
   alias Jido.Plugin.Audit.Record
-  alias Jido.Signal.ID
+  alias Jido.Id
 
   @typedoc "One Audit Plugin option."
   @type plugin_option :: {:max_entries, pos_integer()}
@@ -34,7 +36,7 @@ defmodule Jido.Plugin.Audit do
     opts = record_options!(opts)
 
     %Record{
-      id: Keyword.get_lazy(opts, :id, &ID.generate!/0),
+      id: Keyword.get_lazy(opts, :id, &Id.uuid7/0),
       at: Keyword.get_lazy(opts, :at, fn -> System.system_time(:millisecond) end),
       event: event,
       outcome: outcome,
@@ -43,8 +45,8 @@ defmodule Jido.Plugin.Audit do
   end
 
   @default_max_entries 1_000
-  @state_schema Zoi.object(%{records: Zoi.list(Zoi.struct(Record)) |> Zoi.default([])})
-                |> Zoi.default(%{records: []})
+  @state_schema Joi.object(%{records: Joi.list(Joi.struct(Record)) |> Joi.default([])})
+                |> Joi.default(%{records: []})
 
   @impl true
   def state_spec(opts) do

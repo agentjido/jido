@@ -1,0 +1,105 @@
+---
+modules:
+  - Jido.Plugin
+  - Jido.Plugin.Config
+  - Jido.Plugin.Context
+  - Jido.Plugin.Context.Admission
+  - Jido.Plugin.Context.Commit
+  - Jido.Plugin.Context.Persistence
+  - Jido.Plugin.Init
+  - Jido.Plugin.Input
+  - Jido.Plugin.Manifest
+  - Jido.Plugin.Normalizer
+  - Jido.Plugin.Spec
+  - Jido.Plugin.Spec.Agent
+  - Jido.Plugin.Spec.Persistence
+  - Jido.Plugin.Spec.Runtime
+---
+
+## Purpose
+
+Protect the generic Plugin declaration and callback contract. This component
+defines valid Plugin metadata, callback shapes, and narrow handoff values. Its
+public modules are `Jido.Plugin`, `Jido.Plugin.Input`, `Jido.Plugin.Init`,
+`Jido.Plugin.Context` and its Admission, Commit, and Persistence records. Config
+owns deferred environment references. Manifest, normalization, the aggregate
+Spec and its consumer facet values, and callback error policy are internal.
+
+`Jido.AgentServer.Plugin.state/2` is the public live Plugin state API. The
+`jido.agent_server.plugin_runtime` component owns it. This component does not
+provide a runtime facade. It does not define when a consumer runs a callback
+or what a bundled Plugin does.
+
+## Obligations
+
+### jido.plugin.I1 — Plugin declaration and identity
+
+- **scope:** `use Jido.Plugin`, `Jido.Plugin.Normalizer.normalize_all/1`
+- **must:** Define one Plugin module with a nonempty stable ID, positive version, static authoring and Plugin markers, and optional Agent, AgentServer, and persistence callback groups. Reject duplicate or unknown use options and malformed callback-option mappings. Reject removed role and facet selectors. Require both the Plugin and Agent Extension behaviors.
+- **why:** A Plugin declaration must have one current source of identity and capability metadata.
+- **kind:** functional
+- **status:** active
+
+### jido.plugin.I2 — Callback ownership discovery
+
+- **scope:** `Jido.Plugin.owner_callbacks/0`, `Jido.Plugin.Manifest`
+- **must:** Select an owner only from documented callback names and arities. Keep owner order fixed as Agent, AgentServer, and persistence. Do not select an owner from arbitrary helper functions. Require selected callbacks to belong to the Plugin module.
+- **why:** Capability discovery must not depend on naming accidents or hidden facet modules.
+- **kind:** functional
+- **status:** active
+
+### jido.plugin.I3 — Manifest and option validation
+
+- **scope:** `Jido.Plugin.Manifest.validate/2`, `Jido.Plugin.Manifest.options_for/3`
+- **must:** Require a valid module, positive version, at least one selected owner, and a valid owner-to-option-key map. Keep declaration option keys and each owner's mapped keys unique. Assign every declared option when a map is present, reject mappings to unselected or unknown owners, and require static option data. Give each owner only its assigned options.
+- **why:** Each consumer must receive a stable and isolated configuration view.
+- **kind:** functional
+- **status:** active
+
+### jido.plugin.I4 — Declaration normalization
+
+- **scope:** `Jido.Plugin.Normalizer.normalize_all/1`, `normalize_runtime/2`, `canonical_declarations/1`, `declarations/1`
+- **must:** Accept Plugin modules, module-and-keyword declarations, or a complete list of normalized Specs. Preserve declaration order and exact common options. Reject malformed declarations, unloaded modules, incomplete or inconsistent Specs, mixed Specs and declarations, repeated Plugin modules, and mismatched marker metadata. Reusing a normalized Spec must recheck its static structure without running declaration callbacks again. Runtime options must be unique Plugin-to-keyword entries. They can merge only into exclusive AgentServer facet options of a matching declared Plugin. They must pass normal AgentServer Plugin option validation. They must not change the common Plugin declaration, the Agent facet, or the persistence facet.
+- **why:** Authoring and runtime consumers need one canonical Plugin declaration without repeated callback work.
+- **kind:** functional
+- **status:** active
+
+### jido.plugin.I5 — Agent callback declaration shapes
+
+- **scope:** Agent callbacks declared by `Jido.Plugin`, `Jido.Plugin.Normalizer`
+- **must:** Accept no owned state or one safe atom key with a static Joi schema. Accept a unique list of loaded Directive struct modules with Directive-owned validation. Require `reduce/2` to have owned state. Require every declared Directive type to have either reduction or runtime dispatch. Reject built-in Directive ownership and duplicate state keys or Directive owners across Plugins.
+- **why:** The generic interface must define valid ownership before Agent evaluation starts.
+- **kind:** functional
+- **status:** active
+
+### jido.plugin.I6 — Server and persistence callback declaration shapes
+
+- **scope:** AgentServer and persistence callbacks declared by `Jido.Plugin`, `Jido.Plugin.Normalizer`
+- **must:** Require one documented AgentServer capability in addition to option validation. Preserve explicit option-validation errors and reject other results. Pair quiesce with resume. Require runtime dispatch to own Directive types. Require persistence dump and load together and require one Agent-owned state field.
+- **why:** A valid declaration must not advertise a callback group that its consumer cannot use.
+- **kind:** functional
+- **status:** active
+
+### jido.plugin.I7 — Callback fault containment
+
+- **scope:** Plugin marker, state, Directive, and option callbacks used during normalization
+- **must:** Convert callback raises, throws, and exits to Plugin-scoped execution errors with the package, callback, and original failure data. Preserve an explicit callback error when the callback result shape is unambiguous. Treat `{:error, schema}` from `state_spec/1` as state owned under the valid `:error` key. Reject an invalid callback result with a structured Plugin error.
+- **why:** A declaration fault must not escape as an unrelated process failure.
+- **kind:** functional
+- **status:** active
+
+### jido.plugin.I8 — Public API boundary
+
+- **scope:** documented modules and functions in the generic Plugin contract
+- **must:** Keep `use Jido.Plugin`, the Input and Init structs, the phase-tagged Context, and the exact Admission, Commit, and Persistence callback records public. Keep Manifest, Normalizer, aggregate Spec, and error helpers internal. Keep the callback list closed and optional. Do not add a facade for live AgentServer Plugin behavior.
+- **why:** Users need one small stable authoring surface while consumers keep ownership of execution.
+- **kind:** functional
+- **status:** active
+
+### jido.plugin.I9 — Generic Plugin context values
+
+- **scope:** `Jido.Plugin.Input`, `Jido.Plugin.Init`, `Jido.Plugin.Context`, `Jido.Plugin.Context.Admission`, `Jido.Plugin.Context.Commit`, `Jido.Plugin.Context.Persistence`
+- **must:** Keep prepared and runtime input separate. Validate exact runtime initialization and narrow Signal, Directive, admission, commit, and persistence contexts with their required identity, Signal, version, owned-state, option, instance, partition, and format fields. Supply only documented empty defaults. Permit the owning AgentServer PID only in Init and transient handles only in runtime input and Turn context. Do not place complete Agent values in these generic structs.
+- **why:** Consumers need narrow handoff values that do not create a second Agent state or leak full runtime ownership.
+- **kind:** functional
+- **status:** active

@@ -1,4 +1,42 @@
-# Agent DSL calls are kept without parentheses in authored modules.
+# Used by "mix format".
+# DSL declarations omit parentheses across the consolidated packages.
+action_locals = [
+  flow: 1,
+  step: 2,
+  step: 3,
+  step: 4,
+  choice: 2,
+  timer: 2,
+  await: 2,
+  selection: 2,
+  option: 2,
+  otherwise: 1,
+  map: 2,
+  reduce: 2,
+  iterate: 2,
+  state: 2,
+  invoke: 2,
+  handoff: 2,
+  output: 1,
+  action: 1,
+  action: 3,
+  action: 4,
+  params: 1,
+  needs: 1,
+  meta: 1,
+  condition: 1,
+  collection: 1,
+  on_error: 1,
+  initial: 1,
+  update: 1,
+  while: 1,
+  repeat: 1,
+  max_iterations: 1,
+  decision: 1,
+  expander: 1,
+  selector: 1
+]
+
 agent_locals = [
   agent: 1,
   agent: 2,
@@ -33,19 +71,93 @@ agent_locals = [
   on: 1
 ]
 
-# Keep the public Flow control declarations stable even when the dependency
-# formatter is not available to a downstream consumer.
-flow_locals = [
-  invoke: 2,
-  handoff: 2
+ai_locals = [
+  ai: 1,
+  ai: 2,
+  instructions: 1,
+  instructions: 2,
+  instructions: 3,
+  model: 1,
+  model: 2,
+  model: 3,
+  models: 1,
+  fallback_models: 1,
+  limits: 1,
+  model_calls: 1,
+  tool_rounds: 1,
+  tool_calls: 1,
+  retries: 1,
+  context: 1,
+  max_messages: 1,
+  max_bytes: 1,
+  prompt_cache: 1,
+  enabled: 1,
+  ttl: 1,
+  greeting: 1,
+  punctuation: 1,
+  router: 1,
+  router: 2,
+  reasoning: 1,
+  reasoning: 2,
+  tools: 1,
+  action: 1,
+  action: 2,
+  action: 3,
+  action: 4,
+  flow: 1,
+  flow: 2,
+  ash_resource: 1,
+  ash_resource: 2,
+  mcp_tools: 1,
+  browser: 1,
+  browser: 2,
+  catalog: 1,
+  catalog: 2,
+  skill: 1,
+  load_path: 1,
+  subagent: 1,
+  subagent: 2,
+  handoff: 1,
+  handoff: 2,
+  controls: 1,
+  input_action: 2,
+  input_action: 3,
+  output_action: 2,
+  output_action: 3,
+  max_iterations: 1,
+  max_model_calls: 1,
+  max_tool_calls: 1,
+  timeout: 1,
+  input: 1,
+  input: 2,
+  operation: 1,
+  operation: 2,
+  output: 1,
+  output: 2,
+  result: 1,
+  result: 2,
+  steering: 1,
+  idle_timeout: 1,
+  tool_heartbeat: 1,
+  memory: 1,
+  observability: 1,
+  emit_telemetry: 1,
+  emit_signals: 1,
+  emit_llm_deltas: 1,
+  redact_tool_args: 1,
+  stream_content: 1,
+  store_content: 1,
+  stream_reasoning: 1,
+  store_reasoning: 1,
+  diagnostics_content: 1,
+  metadata: 1
 ]
 
-jido_locals = agent_locals ++ flow_locals
+locals_without_parens = Enum.uniq(action_locals ++ agent_locals ++ ai_locals)
 
-# Used by "mix format"
 [
-  import_deps: [:jido_action],
-  locals_without_parens: jido_locals,
-  export: [locals_without_parens: jido_locals],
-  inputs: ["{mix,.formatter,.credo}.exs", "{config,lib,examples,test}/**/*.{ex,exs}"]
+  line_length: 120,
+  inputs: ["{mix,.formatter}.exs", "{config,lib,test,examples}/**/*.{ex,exs}"],
+  locals_without_parens: locals_without_parens,
+  export: [locals_without_parens: locals_without_parens]
 ]

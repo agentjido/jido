@@ -5,15 +5,15 @@ defmodule Jido.Persistence.AgentStateTest do
 
   test "checkpoint restore rejects missing defaults and preserves nullable nil" do
     schema =
-      Zoi.object(%{
+      Jido.Joi.object(%{
         nested:
-          Zoi.object(%{count: Zoi.integer() |> Zoi.nullable() |> Zoi.default(3)})
-          |> Zoi.default(%{})
+          Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.nullable() |> Jido.Joi.default(3)})
+          |> Jido.Joi.default(%{})
       })
 
     agent =
       Agent.define!(%{name: "restore_defaults", schema: schema})
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Agent.instantiate!(id: Jido.Id.uuid7())
 
     assert {:ok, stored_nil} = Agent.transition(agent, %{nested: %{count: nil}})
     assert {:ok, checkpoint} = Jido.Persistence.snapshot(stored_nil)
@@ -27,13 +27,13 @@ defmodule Jido.Persistence.AgentStateTest do
 
   test "input empty values do not remove stored nullable nil" do
     schema =
-      Zoi.object(%{count: Zoi.integer() |> Zoi.nullable() |> Zoi.default(nil)},
+      Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.nullable() |> Jido.Joi.default(nil)},
         empty_values: [nil]
       )
 
     agent =
       Agent.define!(%{name: "empty_nil", schema: schema})
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Agent.instantiate!(id: Jido.Id.uuid7())
 
     assert agent.state === %{count: nil}
     assert Agent.validate(agent) === {:ok, agent}

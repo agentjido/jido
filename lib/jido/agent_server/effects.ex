@@ -2,15 +2,13 @@ defmodule Jido.AgentServer.Effects do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.Directive.{Emit, Reply}
+  alias Jido.Agent.Directive.{AgentSend, Emit, ParentSend, Reply, ServerStop}
   alias Jido.Agent.Mutation
   alias Jido.AgentServer, as: Server
-  alias Jido.AgentServer.Directive.{AgentSend, AgentStart, AgentStop, ParentSend}
-  alias Jido.AgentServer.Directive.{ErrorReport, ProcessStart, ServerStop}
-  alias Jido.AgentServer.TopologyRuntime
-  alias Jido.Dispatch.Preparation, as: DispatchPreparation
+  alias Jido.AgentServer.Directive.{AgentStart, AgentStop, ErrorReport, ProcessStart}
+  alias Jido.AgentServer.Topology
   alias Jido.Signal
-  alias Jido.Tracing.Context, as: TraceContext
+  alias Jido.Trace.Context, as: TraceContext
 
   def validate_batch(directives, config) do
     limit = config.max_directives_per_turn
@@ -77,7 +75,7 @@ defmodule Jido.AgentServer.Effects do
 
   defp do_run(%AgentSend{name: name, signal: signal}, _handler, context) do
     with {:ok, signal} <- prepare_outbound(signal, {:agent, name}, context),
-         do: TopologyRuntime.send_agent(context.activation_state, name, signal)
+         do: Topology.send_agent(context.activation_state, name, signal)
   end
 
   defp do_run(%Reply{signal: signal}, _handler, context) do
@@ -87,7 +85,7 @@ defmodule Jido.AgentServer.Effects do
 
   defp do_run(%ParentSend{signal: signal}, _handler, context) do
     with {:ok, signal} <- prepare_outbound(signal, :parent, context),
-         do: TopologyRuntime.parent_send(context.parent, signal)
+         do: Topology.parent_send(context.parent, signal)
   end
 
   defp do_run(%ServerStop{reason: reason}, _handler, _context), do: {:stop, reason}
@@ -96,7 +94,7 @@ defmodule Jido.AgentServer.Effects do
     do: {:reported_error, {:reported_error, context, error}}
 
   defp do_run(%ProcessStart{child_spec: spec}, _handler, context) do
-    case DynamicSupervisor.start_child(Jido.agent_supervisor_name(context.jido), spec) do
+    case DynamicSupervisor.start_child(Jido.Instance.Names.agent_supervisor(context.jido), spec) do
       {:ok, _} -> :ok
       {:ok, _, _} -> :ok
       :ignore -> :ok
@@ -130,7 +128,7 @@ defmodule Jido.AgentServer.Effects do
         _ -> signal
       end
 
-    case Signal.Dispatch.dispatch(signal, DispatchPreparation.inherit_bus_scope(target, jido)) do
+    case Signal.Dispatch.dispatch(signal, Signal.Dispatch.inherit_bus_scope(target, jido)) do
       :ok -> :continue
       _ -> {:stop, :error_signal_failed}
     end
@@ -215,7 +213,7 @@ defmodule Jido.AgentServer.Effects do
          :ok <- validate_start_source(directive.agent, opts),
          :ok <-
            opts
-           |> Keyword.drop([:id, :state, :name])
+           |> Keyword.drop([:id, :state])
            |> Keyword.put_new(:persistence, false)
            |> Server.validate_defaults() do
       :ok
@@ -266,7 +264,8 @@ defmodule Jido.AgentServer.Effects do
   end
 
   defp prepare_outbound(signal, target, context) do
-    signal_context = %Jido.Plugin.SignalContext{
+    signal_context = %Jido.Plugin.Context{
+      phase: :signal,
       turn_id: context.turn_id,
       agent_id: context.agent.id,
       source_signal: context.source_signal,
@@ -297,13 +296,13 @@ defmodule Jido.AgentServer.Effects do
     before = {
       correlated.id,
       Signal.get_context(correlated, "jidocausationid"),
-      Signal.Trace.get(correlated)
+      Signal.Context.get_trace(correlated)
     }
 
     after_preparation = {
       prepared.id,
       Signal.get_context(prepared, "jidocausationid"),
-      Signal.Trace.get(prepared)
+      Signal.Context.get_trace(prepared)
     }
 
     if before == after_preparation,
@@ -313,9 +312,9 @@ defmodule Jido.AgentServer.Effects do
 
   defp validate_outbound_correlation(_target, _correlated, _prepared), do: :ok
 
-  defp dispatch_outbound(signal, nil, context), do: TopologyRuntime.emit(context, signal)
+  defp dispatch_outbound(signal, nil, context), do: Topology.emit(context, signal)
 
   defp dispatch_outbound(signal, target, context) do
-    Signal.Dispatch.dispatch(signal, DispatchPreparation.inherit_bus_scope(target, context.jido))
+    Signal.Dispatch.dispatch(signal, Signal.Dispatch.inherit_bus_scope(target, context.jido))
   end
 end

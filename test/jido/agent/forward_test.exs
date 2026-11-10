@@ -1,5 +1,5 @@
 defmodule Jido.Agent.ForwardTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.AgentServer
@@ -18,7 +18,7 @@ defmodule Jido.Agent.ForwardTest do
     use Jido.Agent, name: "forward_worker"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -34,7 +34,7 @@ defmodule Jido.Agent.ForwardTest do
     use Jido.Agent, name: "forward_parent"
 
     state do
-      schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
     routes do
@@ -66,14 +66,12 @@ defmodule Jido.Agent.ForwardTest do
 
   test "forward sends to one declared Agent without default dispatch fallback", %{jido: jido} do
     {:ok, parent} =
-      JidoTest.AgentServerAssertions.start_agent(jido, Parent,
-        default_dispatch: {:pid, target: self()}
-      )
+      Jido.Test.AgentServer.Assertions.start_agent(jido, Parent, default_dispatch: {:pid, target: self()})
 
     [worker] = AgentServer.members(parent, :worker)
     signal = Signal.new!("work.request", %{}, source: "/test")
 
-    assert {:ok, _, [%Jido.AgentServer.Directive.AgentSend{name: :worker}]} =
+    assert {:ok, _, [%Jido.Agent.Directive.AgentSend{name: :worker}]} =
              AgentServer.call(parent, signal)
 
     eventually(fn -> AgentServer.agent(worker).state.count == 1 end)
@@ -81,18 +79,18 @@ defmodule Jido.Agent.ForwardTest do
   end
 
   test "forward sends to the current parent Agent", %{jido: jido} do
-    {:ok, parent} = JidoTest.AgentServerAssertions.start_agent(jido, Parent)
+    {:ok, parent} = Jido.Test.AgentServer.Assertions.start_agent(jido, Parent)
     [worker] = AgentServer.members(parent, :worker)
     signal = Signal.new!("work.completed", %{}, source: "/test")
 
-    assert {:ok, _, [%Jido.AgentServer.Directive.ParentSend{}]} =
+    assert {:ok, _, [%Jido.Agent.Directive.ParentSend{}]} =
              AgentServer.call(worker, signal)
 
     eventually(fn -> AgentServer.agent(parent).state.count == 1 end)
   end
 
   test "forward rejects missing definition and runtime targets", %{jido: jido} do
-    assert {:error, %Agent.Error{code: :unknown_forward_target}} =
+    assert {:error, %Jido.Error.ValidationError{code: :unknown_forward_target}} =
              Agent.define(%{
                name: "missing_forward_target",
                routes: [
@@ -103,7 +101,7 @@ defmodule Jido.Agent.ForwardTest do
                ]
              })
 
-    {:ok, worker} = JidoTest.AgentServerAssertions.start_agent(jido, Worker)
+    {:ok, worker} = Jido.Test.AgentServer.Assertions.start_agent(jido, Worker)
     signal = Signal.new!("work.completed", %{}, source: "/test")
 
     assert {:error, :parent_not_found} = AgentServer.call(worker, signal)

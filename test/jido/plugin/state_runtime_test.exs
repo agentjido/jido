@@ -1,16 +1,16 @@
 defmodule Jido.Plugin.StateRuntimeTest do
-  use JidoTest.Case, async: false
+  use Jido.Test.Case, async: false
 
   alias Jido.AgentServer, as: Server
   alias Jido.Signal
 
   defmodule Spend do
-    @schema Zoi.struct(__MODULE__, %{amount: Zoi.integer() |> Zoi.min(1)})
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
+    @schema Jido.Joi.struct(__MODULE__, %{amount: Jido.Joi.integer() |> Jido.Joi.min(1)})
+    @enforce_keys Jido.Joi.enforce_keys(@schema)
+    defstruct Jido.Joi.struct_fields(@schema)
 
     def schema, do: @schema
-    def validate(%__MODULE__{} = directive), do: Zoi.parse(@schema, directive)
+    def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, directive)
   end
 
   defmodule Credits do
@@ -30,7 +30,7 @@ defmodule Jido.Plugin.StateRuntimeTest do
     @behaviour Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:credits, Zoi.integer() |> Zoi.min(0) |> Zoi.default(3)}
+    def state_spec(_opts), do: {:credits, Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(3)}
 
     @impl true
     def directives(_opts), do: [Spend]
@@ -64,7 +64,7 @@ defmodule Jido.Plugin.StateRuntimeTest do
   end
 
   test "state-only Plugins compose optional state into the Agent" do
-    agent = DataAgent.instantiate!(id: Jido.Signal.ID.generate!())
+    agent = DataAgent.instantiate!(id: Jido.Id.uuid7())
 
     assert agent.state == %{credits: 3}
     assert agent.schema.fields == []
@@ -73,7 +73,7 @@ defmodule Jido.Plugin.StateRuntimeTest do
 
   test "state-only Plugin Directives update state without a Plugin runtime", %{jido: jido} do
     {:ok, pid} =
-      JidoTest.AgentServerAssertions.start_agent(jido, DataAgent, id: unique_id("plugin-data"))
+      Jido.Test.AgentServer.Assertions.start_agent(jido, DataAgent, id: unique_id("plugin-data"))
 
     signal = Signal.new!("plugin.credits.spend", %{amount: 1}, source: "/test")
 

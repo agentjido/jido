@@ -1,16 +1,17 @@
 defmodule Jido.Agent.Plugin.Declaration do
   @moduledoc false
 
-  alias Jido.Agent.{Data, Error, Extension}
+  alias Jido.Agent.{Extension, Schema}
+  alias Jido.Error
 
   @type t :: %{provider: module(), config: map()}
 
   @doc false
   @spec normalize(term()) :: {:ok, [t()]} | {:error, Error.t()}
   def normalize(value) do
-    with {:ok, declarations} <- Data.list(value, &declaration/1),
-         :ok <- Data.unique(declarations, & &1.provider),
-         :ok <- Data.unique(declarations, & &1.provider.id()) do
+    with {:ok, declarations} <- Schema.list(value, &declaration/1),
+         :ok <- Schema.unique(declarations, & &1.provider),
+         :ok <- Schema.unique(declarations, & &1.provider.id()) do
       {:ok, declarations}
     end
   end
@@ -19,15 +20,15 @@ defmodule Jido.Agent.Plugin.Declaration do
 
   defp declaration({provider, config}) do
     with {:ok, provider} <- Extension.provider(provider),
-         :ok <- Data.plain_map(config),
+         :ok <- Schema.plain_map(config),
          :ok <- atom_keys(config),
-         :ok <- Data.static(config) do
+         :ok <- Schema.static(config) do
       {:ok, %{provider: provider, config: config}}
     end
   end
 
   defp declaration(value) do
-    Error.fail(
+    Error.validation_result(
       :invalid_plugin_declaration,
       [],
       "Expected a Plugin module or {Plugin module, config Map}",
@@ -41,7 +42,7 @@ defmodule Jido.Agent.Plugin.Declaration do
         :ok
 
       key ->
-        Error.fail(
+        Error.validation_result(
           :invalid_plugin_config,
           [],
           "Plugin configuration requires atom keys",

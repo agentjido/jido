@@ -1,10 +1,12 @@
 defmodule Jido.Agent.SelectionTest do
-  use JidoTest.Case, async: true
+  use Jido.Test.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.{Command, Runner}
+  alias Jido.Agent.Runner
+  alias Jido.AgentServer.Command
   alias Jido.AgentServer, as: Server
-  alias Jido.Tracing.Trace
+  alias Jido.Signal.Context, as: SignalContext
+  alias Jido.Trace
 
   defmodule Record do
     use Jido.Action,
@@ -33,7 +35,7 @@ defmodule Jido.Agent.SelectionTest do
   defmodule ValidatedRecord do
     use Jido.Action,
       name: "selection_validated_record",
-      schema: Zoi.object(%{value: Zoi.integer()})
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
 
     @impl true
     def run(input, context), do: Record.run(input, context)
@@ -43,17 +45,16 @@ defmodule Jido.Agent.SelectionTest do
     use Jido.Agent, name: "selection_routed"
 
     state do
-      schema Zoi.object(%{
-               input: Zoi.map() |> Zoi.default(%{}),
-               calls: Zoi.integer() |> Zoi.default(0)
+      schema Jido.Joi.object(%{
+               input: Jido.Joi.map() |> Jido.Joi.default(%{}),
+               calls: Jido.Joi.integer() |> Jido.Joi.default(0)
              })
     end
 
     routes do
       route "selection.action", Record, defaults: %{value: 7, settings: %{first: 1, second: 2}}
 
-      route "selection.flow", RecordFlow,
-        defaults: %{value: 7, settings: %{first: 1, second: 2}} do
+      route "selection.flow", RecordFlow, defaults: %{value: 7, settings: %{first: 1, second: 2}} do
       end
     end
   end
@@ -79,12 +80,25 @@ defmodule Jido.Agent.SelectionTest do
     for definition <- definitions(),
         {type, target} <- [{"selection.action", Record}, {"selection.flow", RecordFlow}],
         {data, input} <- cases do
-      agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
+      agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
       source = signal(type, data)
 
       assert {:ok, prepared} = Runner.prepare(agent, source, [])
       turn = prepared.turn
-      assert turn.executable == target
+
+      if type == "selection.action" do
+        assert %Jido.Flow{
+                 components: %{
+                   "action" => %{call: %{kind: :action, target: ^target}}
+                 }
+               } = turn.executable
+
+        assert turn.execution_mode == :managed
+      else
+        assert turn.executable == target
+        assert turn.execution_mode == :durable
+      end
+
       assert turn.input == input
       assert turn.source_signal == source
 
@@ -92,7 +106,7 @@ defmodule Jido.Agent.SelectionTest do
       assert_receive {:executed, ^input, ^source}
       assert direct.state == %{input: input, calls: 1}
 
-      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+      assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
       assert {:ok, live, _} = Server.call(server, source, context: %{observer: self()})
       assert_receive {:executed, ^input, execution_signal}
       assert execution_signal.data == source.data
@@ -119,9 +133,9 @@ defmodule Jido.Agent.SelectionTest do
           ]
         })
 
-      agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
+      agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
       source = signal("selection.empty", data)
-      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+      assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
       assert {:ok, direct, []} = Agent.cmd(agent, source)
       assert {:ok, live, _} = Server.call(server, source)
       assert direct.state == %{input: %{}, calls: 1}
@@ -131,8 +145,8 @@ defmodule Jido.Agent.SelectionTest do
 
   test "invalid route data returns its Signal context before executable work", %{jido: jido} do
     for definition <- definitions() do
-      agent = Agent.instantiate!(definition, id: Jido.Signal.ID.generate!())
-      assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+      agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
+      assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
 
       for data <- ["hello", 3, [1, 2], [{"value", 3}], [{:value, 3} | :invalid]] do
         source = signal("selection.action", data)
@@ -173,10 +187,10 @@ defmodule Jido.Agent.SelectionTest do
           }
         ]
       })
-      |> Agent.instantiate!(id: Jido.Signal.ID.generate!())
+      |> Agent.instantiate!(id: Jido.Id.uuid7())
 
     source = signal("selection.validated", value: "invalid")
-    assert {:ok, server} = JidoTest.AgentServerAssertions.start_agent(jido, agent)
+    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
     assert {:error, _error} = Agent.cmd(agent, source, context: %{observer: self()})
     assert {:error, _error} = Server.call(server, source, context: %{observer: self()})
     assert Server.agent(server).state == agent.state
@@ -187,11 +201,11 @@ defmodule Jido.Agent.SelectionTest do
     for module <- [RoutedAgent] do
       source = signal("selection.action", %{})
       assert {:ok, command} = Command.new(module.instantiate!(id: "source"), source)
-      assert {:ok, execution_signal} = Trace.put(source, Trace.new_root())
+      assert {:ok, execution_signal} = SignalContext.put_trace(source, Trace.new())
       refute execution_signal.extensions == source.extensions
       command = %{command | signal: execution_signal}
 
-      assert {:ok, prepared} = Runner.prepare_for_server(command, source, [], [])
+      assert {:ok, prepared} = Runner.prepare_admitted(command, source, [], [])
       assert prepared.turn.source_signal == source
       assert prepared.signal == execution_signal
       assert prepared.context.signal == execution_signal

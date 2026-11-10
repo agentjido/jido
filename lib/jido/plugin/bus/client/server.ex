@@ -2,7 +2,6 @@ defmodule Jido.Plugin.Bus.Client.Server do
   @moduledoc false
   @behaviour Jido.Plugin
 
-  alias Jido.Plugin.Bus.Client
   alias Jido.Plugin.Bus.Client.Runtime
   alias Jido.Plugin.Init
 
@@ -15,6 +14,6 @@ defmodule Jido.Plugin.Bus.Client.Server do
 
   @impl true
   def child_spec(%Init{} = init) do
-    Supervisor.child_spec({Runtime, init}, id: Client)
+    Supervisor.child_spec({Runtime, init}, id: init.module)
   end
 end

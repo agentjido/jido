@@ -1,0 +1,320 @@
+# Outputs and Effects
+
+In this tutorial you build Actions that return plain outputs, deferred effect requests, and output envelopes. You then see how a Flow and an Agent receive those effects.
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Return a map
+
+A normal Action output is a map. `Jido.Exec.run/4` validates it against `:output_schema` and returns it.
+
+```elixir
+defmodule ActionEffects.ApproveRefund do
+  alias Jido.Joi
+
+  use Jido.Action,
+    name: "approve_refund",
+    schema: Joi.object(%{order_id: Joi.string(), amount_cents: Joi.integer()}),
+    output_schema: Joi.object(%{refund_id: Joi.string(), amount_cents: Joi.integer()})
+
+  @impl true
+  def run(params, _context) do
+    {:ok, %{refund_id: "refund-" <> params.order_id, amount_cents: params.amount_cents}}
+  end
+end
+
+{:ok, %{refund_id: "refund-o1", amount_cents: 500}} =
+  Jido.Exec.run(ActionEffects.ApproveRefund, %{order_id: "o1", amount_cents: 500})
+```
+
+Any other bare value fails output validation, even when the Action succeeded. This protects callers that expect a map.
+
+```elixir
+defmodule ActionEffects.RefundLabel do
+  use Jido.Action, name: "refund_label"
+
+  @impl true
+  def run(_params, _context), do: {:ok, "refund approved"}
+end
+
+{:error, %Jido.Error.ValidationError{message: "Action output validation must return a map"}} =
+  Jido.Exec.run(ActionEffects.RefundLabel)
+```
+
+## Request effects
+
+An effect is a request for work that the caller performs later. Return it in a list as the third element. Exec does not read or dispatch the list. The elements can be any term, so the caller and the Action agree on their meaning.
+
+```elixir
+defmodule ActionEffects.IssueRefund do
+  use Jido.Action, name: "issue_refund"
+
+  @impl true
+  def run(%{order_id: order_id}, _context) do
+    {:ok, %{order_id: order_id, status: :issued},
+     [{:send_email, order_id}, {:notify_ledger, order_id}]}
+  end
+end
+
+{:ok, %{order_id: "o1", status: :issued}, effects} =
+  Jido.Exec.run(ActionEffects.IssueRefund, %{order_id: "o1"})
+
+[{:send_email, "o1"}, {:notify_ledger, "o1"}] = effects
+```
+
+Handle both result shapes in the caller. An empty list returns the two-element form.
+
+```elixir
+defmodule ActionEffects.MaybeNotify do
+  use Jido.Action, name: "maybe_notify"
+
+  @impl true
+  def run(_params, _context), do: {:ok, %{checked: true}, []}
+end
+
+{:ok, %{checked: true}} = Jido.Exec.run(ActionEffects.MaybeNotify)
+```
+
+The third element is only for effects. A value that is not a proper list is an error.
+
+```elixir
+defmodule ActionEffects.BadEffects do
+  use Jido.Action, name: "bad_effects"
+
+  @impl true
+  def run(_params, _context), do: {:ok, %{}, %{trace: "abc"}}
+end
+
+{:error, %Jido.Error.ExecutionError{details: %{reason: :invalid_effects}}} =
+  Jido.Exec.run(ActionEffects.BadEffects)
+```
+
+## Discard effects on failure
+
+A failed Action exposes no effects. Exec accepts `{:error, reason, effects}` and drops the list. Output validation failure also drops the list.
+
+```elixir
+defmodule ActionEffects.RejectRefund do
+  use Jido.Action, name: "reject_refund"
+
+  @impl true
+  def run(_params, _context), do: {:error, :over_limit, [{:send_email, "never"}]}
+end
+
+{:error, %Jido.Error.ExecutionError{details: %{reason: :over_limit}}} =
+  Jido.Exec.run(ActionEffects.RejectRefund)
+
+defmodule ActionEffects.BadOutputWithEffects do
+  use Jido.Action,
+    name: "bad_output_with_effects",
+    output_schema: Jido.Joi.object(%{refund_id: Jido.Joi.string()})
+
+  @impl true
+  def run(_params, _context), do: {:ok, %{refund_id: 42}, [{:send_email, "never"}]}
+end
+
+{:error, %Jido.Error.ValidationError{}} = Jido.Exec.run(ActionEffects.BadOutputWithEffects)
+```
+
+## Return a value that is not a map
+
+Use `Jido.Action.Output` when a successful result must not be a map. The envelope states the intent, so a stray bare value still fails.
+
+| Constructor | Kind | Value rule | Output schema |
+|---|---|---|---|
+| `Jido.Action.Output.raw/2` | `:raw` | Any term | Not applied |
+| `Jido.Action.Output.stream/2` | `:stream` | Enumerable, not consumed | Not applied |
+| `Jido.Action.Output.batch/2` | `:batch` | Proper list | Not applied |
+| `Jido.Action.Output.opaque/2` | `:opaque` | Any term | Not applied |
+| `Jido.Action.Output.preserve/2` | `:preserve` | Must parse to a map or struct | Applied, root shape kept |
+
+Each constructor takes an optional `meta:` map. Constructors raise `ArgumentError` on a value or option they do not accept.
+
+```elixir
+defmodule ActionEffects.ExportRefunds do
+  alias Jido.Action.Output
+
+  use Jido.Action,
+    name: "export_refunds",
+    output_schema: Jido.Joi.object(%{never: Jido.Joi.string()})
+
+  @impl true
+  def run(%{format: :csv}, _context), do: {:ok, Output.raw("id,amount\no1,500\n")}
+
+  def run(%{format: :batch}, _context) do
+    {:ok, Output.batch([%{id: "o1"}, %{id: "o2"}], meta: %{count: 2}), [{:audit, :export}]}
+  end
+
+  def run(%{format: :stream}, %{test_pid: test_pid}) do
+    stream =
+      Stream.map(1..3, fn index ->
+        send(test_pid, :consumed)
+        %{index: index}
+      end)
+
+    {:ok, Output.stream(stream)}
+  end
+end
+
+{:ok, %Jido.Action.Output{kind: :raw, value: "id,amount\no1,500\n"}} =
+  Jido.Exec.run(ActionEffects.ExportRefunds, %{format: :csv})
+
+{:ok, %Jido.Action.Output{kind: :batch, meta: %{count: 2}}, [{:audit, :export}]} =
+  Jido.Exec.run(ActionEffects.ExportRefunds, %{format: :batch})
+
+{:ok, %Jido.Action.Output{kind: :stream, value: stream}} =
+  Jido.Exec.run(ActionEffects.ExportRefunds, %{format: :stream}, %{test_pid: self()})
+
+:not_consumed =
+  receive do
+    :consumed -> :consumed_by_exec
+  after
+    0 -> :not_consumed
+  end
+
+[%{index: 1}, %{index: 2}, %{index: 3}] = Enum.to_list(stream)
+```
+
+Exec returned the stream without running it, because no `:consumed` message arrived before the `Enum.to_list/1` call. The required `:never` field shows that these kinds skip `:output_schema`.
+
+A stream runs in the process that consumes it, after the Action task has exited. Do not build one that depends on the Action process.
+
+`preserve/2` is the exception. It applies the output schema and keeps the parsed root value. A normal output with a struct schema becomes a plain map at the Action boundary, so use this kind when the caller needs the struct.
+
+```elixir
+defmodule ActionEffects.RefundSummary do
+  alias Jido.Action.Output
+  alias Jido.Joi
+
+  defstruct [:total_cents]
+
+  use Jido.Action,
+    name: "refund_summary",
+    output_schema: Joi.struct(__MODULE__, %{total_cents: Joi.integer()}, coerce: true)
+
+  @impl true
+  def run(%{total_cents: total, keep_struct: true}, _context) do
+    {:ok, Output.preserve(%{total_cents: total}, meta: %{source: "ledger"})}
+  end
+
+  def run(%{total_cents: total}, _context), do: {:ok, %{total_cents: total}}
+end
+```
+
+```elixir
+{:ok, %{total_cents: 900} = plain} =
+  Jido.Exec.run(ActionEffects.RefundSummary, %{total_cents: 900})
+
+false = is_struct(plain)
+
+{:ok,
+ %Jido.Action.Output{
+   kind: :preserve,
+   value: %ActionEffects.RefundSummary{total_cents: 900},
+   meta: %{source: "ledger"}
+ }} = Jido.Exec.run(ActionEffects.RefundSummary, %{total_cents: 900, keep_struct: true})
+
+{:error, %Jido.Error.ValidationError{}} =
+  Jido.Exec.run(ActionEffects.RefundSummary, %{total_cents: "nine", keep_struct: true})
+```
+
+## Collect effects from a Flow
+
+A Flow returns the effects of every successful component it ran, in dependency order. It returns no effects if it fails.
+
+```elixir
+defmodule ActionEffects.Reserve do
+  use Jido.Action, name: "reserve_funds"
+
+  @impl true
+  def run(%{order_id: order_id}, _context) do
+    {:ok, %{order_id: order_id}, [{:reserved, order_id}]}
+  end
+end
+
+defmodule ActionEffects.Capture do
+  use Jido.Action, name: "capture_funds"
+
+  @impl true
+  def run(%{order_id: "declined"}, _context), do: {:error, :declined}
+  def run(%{order_id: order_id}, _context), do: {:ok, %{captured: order_id}, [{:captured, order_id}]}
+end
+
+defmodule ActionEffects.RefundFlow do
+  use Jido.Flow,
+    name: "refund_flow",
+    schema: Jido.Joi.object(%{order_id: Jido.Joi.string()})
+
+  flow do
+    step "reserve", action: ActionEffects.Reserve, params: %{order_id: input(:order_id)}
+    step "capture", action: ActionEffects.Capture, params: %{order_id: result("reserve", :order_id)}
+    output result("capture")
+  end
+end
+
+{:ok, %{captured: "o1"}, [{:reserved, "o1"}, {:captured, "o1"}]} =
+  Jido.Exec.run(ActionEffects.RefundFlow, %{order_id: "o1"})
+
+{:error, %Jido.Error.ExecutionError{details: %{reason: :declined}}} =
+  Jido.Exec.run(ActionEffects.RefundFlow, %{order_id: "declined"})
+```
+
+The first step succeeded in the failed run, but its `{:reserved, ...}` request does not escape. The Action still ran, so a side effect that it performed directly is not undone. That is the reason to return a request and let the caller act after success.
+
+## Return Directives from an Agent route
+
+An Agent is one caller that gives effects a defined meaning. When a route runs an Action, the Action output is the complete next Agent state, and the third element is a list of Directives. `Jido.Agent.build_signal/3` builds a Signal from the Action context.
+
+```elixir
+defmodule ActionEffects.RecordRefund do
+  use Jido.Action,
+    name: "record_refund",
+    schema: Jido.Joi.object(%{amount_cents: Jido.Joi.integer()})
+
+  @impl true
+  def run(%{amount_cents: amount}, context) do
+    state = %{context.agent_state | refunded_cents: context.agent_state.refunded_cents + amount}
+
+    with {:ok, signal} <-
+           Jido.Agent.build_signal(context, "refund.recorded", %{
+             refunded_cents: state.refunded_cents
+           }) do
+      {:ok, state, [Jido.Agent.Directive.emit(signal)]}
+    end
+  end
+end
+
+defmodule ActionEffects.RefundAgent do
+  use Jido.Agent, name: "refund_agent"
+
+  state do
+    schema Jido.Joi.object(%{refunded_cents: Jido.Joi.integer() |> Jido.Joi.default(0)})
+  end
+
+  routes do
+    signal_source "/refunds"
+    route "refund.record", ActionEffects.RecordRefund
+  end
+end
+
+agent = ActionEffects.RefundAgent.instantiate!(id: "refunds-1", state: %{refunded_cents: 100})
+signal = Jido.Signal.new!("refund.record", %{amount_cents: 50}, source: "/billing")
+
+{:ok, next_agent, [%Jido.Agent.Directive.Emit{signal: emitted}]} =
+  ActionEffects.RefundAgent.cmd(agent, signal)
+
+%{refunded_cents: 150} = next_agent.state
+"refund.recorded" = emitted.type
+```
+
+`cmd/2` validates and returns the Directive. It does not dispatch it. `Jido.AgentServer` commits the state and then does the runtime work.
+
+## Next steps
+
+- [State and Directives](../agents/agent-results-and-directives.md)
+- [Runtime Effects](../agent-servers/runtime-directives-and-effects.md)
+- [Recovery Limits](../durability/recovery-and-effect-limits.md)

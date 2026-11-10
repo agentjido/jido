@@ -1,0 +1,271 @@
+# Write a Stateful Plugin
+
+In this tutorial you build a Plugin that keeps a bounded history of an Agent's priority changes. You start with an owned field, add Turn input, and then run the same Plugin in a live AgentServer. Run the cells in order.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "mikehostetler/new_jido", branch: "main"}
+])
+```
+
+## Start with an Agent
+
+This ticket Agent has one domain field and one route. It knows nothing about history.
+
+```elixir
+defmodule StatefulGuide.Ticket do
+  use Jido.Agent, name: "ticket"
+
+  state do
+    schema Jido.Joi.object(%{priority: Jido.Joi.integer() |> Jido.Joi.default(3)})
+  end
+
+  routes do
+    signal_source "/support/ticket"
+
+    route "ticket.prioritize", as: :prioritize do
+      action %{priority: priority},
+        schema: Jido.Joi.object(%{priority: Jido.Joi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | priority: priority}}
+      end
+    end
+  end
+end
+
+ticket = StatefulGuide.Ticket.instantiate!(id: "t-1")
+{:ok, changed, []} = StatefulGuide.Ticket.cmd(ticket, StatefulGuide.Ticket.prioritize_signal!(%{priority: 1}))
+changed.state
+```
+
+The cell returns `%{priority: 1}`.
+
+## Own one state field
+
+A Plugin owns one field by returning its name and schema from `state_spec/1`. `reduce/2` computes the field's next value from the Turn's result. `reduction.state_before` holds the state when the Turn started, and `reduction.candidate_state` holds the handler's result.
+
+```elixir
+defmodule StatefulGuide.History do
+  use Jido.Plugin
+
+  alias Jido.Agent.Plugin.Reduction
+
+  @impl true
+  def state_spec(_opts) do
+    {:history, Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])}
+  end
+
+  @impl true
+  def reduce(%Reduction{} = reduction, _opts) do
+    from = reduction.state_before.priority
+    to = reduction.candidate_state.priority
+
+    if from == to do
+      {:ok, reduction.plugin_state}
+    else
+      {:ok, [%{from: from, to: to} | reduction.plugin_state]}
+    end
+  end
+end
+
+defmodule StatefulGuide.TrackedTicket do
+  use Jido.Agent, name: "tracked_ticket", plugins: [StatefulGuide.History]
+
+  state do
+    schema Jido.Joi.object(%{priority: Jido.Joi.integer() |> Jido.Joi.default(3)})
+  end
+
+  routes do
+    signal_source "/support/ticket"
+
+    route "ticket.prioritize", as: :prioritize do
+      action %{priority: priority},
+        schema: Jido.Joi.object(%{priority: Jido.Joi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | priority: priority}}
+      end
+    end
+  end
+end
+
+tracked = StatefulGuide.TrackedTicket.instantiate!(id: "t-2")
+{:ok, once, []} = StatefulGuide.TrackedTicket.cmd(tracked, StatefulGuide.TrackedTicket.prioritize_signal!(%{priority: 1}))
+{:ok, twice, []} = StatefulGuide.TrackedTicket.cmd(once, StatefulGuide.TrackedTicket.prioritize_signal!(%{priority: 2}))
+twice.state
+```
+
+The cell returns `%{priority: 2, history: [%{from: 1, to: 2}, %{from: 3, to: 1}]}`. The Plugin's schema became part of the Agent schema, and the default gave the new field its starting value. The handler did not change.
+
+## Make it configurable
+
+Declaration options reach callbacks as a keyword list. Add a `:limit` option with a matching guard in `state_spec/1`, so a bad value fails when the Agent loads the Plugin.
+
+```elixir
+defmodule StatefulGuide.BoundedHistory do
+  use Jido.Plugin
+
+  alias Jido.Agent.Plugin.Reduction
+
+  @impl true
+  def state_spec(opts) do
+    case Keyword.get(opts, :limit, 10) do
+      limit when is_integer(limit) and limit > 0 ->
+        {:history, Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])}
+
+      limit ->
+        {:error, Jido.Error.validation_error("History limit must be positive", kind: :config, details: %{limit: limit})}
+    end
+  end
+
+  @impl true
+  def reduce(%Reduction{} = reduction, opts) do
+    from = reduction.state_before.priority
+    to = reduction.candidate_state.priority
+    limit = Keyword.get(opts, :limit, 10)
+
+    if from == to do
+      {:ok, reduction.plugin_state}
+    else
+      {:ok, Enum.take([%{from: from, to: to} | reduction.plugin_state], limit)}
+    end
+  end
+end
+
+plugin = StatefulGuide.BoundedHistory
+
+{:error, error} =
+  Jido.Agent.define(%{
+    name: "bad_limit",
+    plugins: [%{id: plugin.id(), provider: plugin, vsn: plugin.vsn(), data: %{limit: 0}}]
+  })
+
+error.message
+```
+
+The cell returns `"History limit must be positive"`. `Jido.Agent.define/1` takes a Plugin in this map form, and `use Jido.Agent` takes `{plugin, %{limit: 0}}` and raises the same error at compile time.
+
+## Pass input to the handler
+
+A handler cannot change a Plugin-owned field, but it can read it. To give the handler a derived value, define `prepare/2`. Its result reaches the handler at `context.plugin_inputs[plugin].prepared` and reaches `reduce/2` as `reduction.prepared_input`. Here the handler rejects a Turn after too many changes, and the reducer records the Signal that caused each change.
+
+```elixir
+defmodule StatefulGuide.AuditedHistory do
+  use Jido.Plugin
+
+  alias Jido.Agent.Plugin.{Preparation, Reduction}
+
+  @impl true
+  def state_spec(_opts), do: {:history, Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])}
+
+  @impl true
+  def prepare(%Preparation{} = preparation, _opts) do
+    {:ok, %{changes: length(preparation.plugin_state), signal_id: preparation.signal.id}}
+  end
+
+  @impl true
+  def reduce(%Reduction{} = reduction, _opts) do
+    from = reduction.state_before.priority
+    to = reduction.candidate_state.priority
+
+    if from == to do
+      {:ok, reduction.plugin_state}
+    else
+      {:ok, [%{from: from, to: to, signal_id: reduction.prepared_input.signal_id} | reduction.plugin_state]}
+    end
+  end
+end
+
+defmodule StatefulGuide.LimitedTicket do
+  use Jido.Agent, name: "limited_ticket", plugins: [StatefulGuide.AuditedHistory]
+
+  state do
+    schema Jido.Joi.object(%{priority: Jido.Joi.integer() |> Jido.Joi.default(3)})
+  end
+
+  routes do
+    signal_source "/support/ticket"
+
+    route "ticket.prioritize", as: :prioritize do
+      action %{priority: priority},
+        schema: Jido.Joi.object(%{priority: Jido.Joi.integer()}),
+        context: context do
+        if context.plugin_inputs[StatefulGuide.AuditedHistory].prepared.changes >= 1 do
+          {:error, :too_many_priority_changes}
+        else
+          {:ok, %{context.agent_state | priority: priority}}
+        end
+      end
+    end
+  end
+end
+
+limited = StatefulGuide.LimitedTicket.instantiate!(id: "t-3")
+signal = StatefulGuide.LimitedTicket.prioritize_signal!(%{priority: 1})
+{:ok, first, []} = StatefulGuide.LimitedTicket.cmd(limited, signal)
+[%{from: 3, to: 1, signal_id: recorded}] = first.state.history
+true = recorded == signal.id
+
+{:error, rejected} = StatefulGuide.LimitedTicket.cmd(first, StatefulGuide.LimitedTicket.prioritize_signal!(%{priority: 2}))
+rejected.__struct__
+```
+
+The cell returns `Jido.Error.ExecutionError`. The second Turn failed, so the reducer did not run for it and no state changed.
+
+## Protect the field
+
+Jido rejects a Turn whose handler changed a Plugin-owned field. This route tries to clear the history.
+
+```elixir
+defmodule StatefulGuide.TamperingTicket do
+  use Jido.Agent, name: "tampering_ticket", plugins: [StatefulGuide.History]
+
+  state do
+    schema Jido.Joi.object(%{priority: Jido.Joi.integer() |> Jido.Joi.default(3)})
+  end
+
+  routes do
+    signal_source "/support/ticket"
+
+    route "ticket.reset", as: :reset do
+      action _input, schema: Jido.Joi.object(%{}), context: context do
+        {:ok, %{context.agent_state | history: []}}
+      end
+    end
+  end
+end
+
+tampering = StatefulGuide.TamperingTicket.instantiate!(id: "t-4", state: %{history: [%{from: 3, to: 1}]})
+{:error, error} = StatefulGuide.TamperingTicket.cmd(tampering, StatefulGuide.TamperingTicket.reset_signal!(%{}))
+error.details.code
+```
+
+The cell returns `:plugin_state_owner_violation`.
+
+## Run it live
+
+The same Plugin runs unchanged in an AgentServer. `Jido.AgentServer.plugin_state/3` reads the committed value of the owned field.
+
+```elixir
+{:ok, _instance} = Jido.start(name: StatefulGuide.Jido)
+
+{:ok, server} = Jido.start_agent(StatefulGuide.Jido, StatefulGuide.TrackedTicket, id: "t-live")
+:ok = Jido.AgentServer.await_ready(server)
+
+{:ok, committed, []} =
+  Jido.AgentServer.call(server, StatefulGuide.TrackedTicket.prioritize_signal!(%{priority: 1}))
+
+{:ok, history} = Jido.AgentServer.plugin_state(server, StatefulGuide.History)
+:ok = Jido.stop_agent(StatefulGuide.Jido, server)
+
+{committed.state.priority, history}
+```
+
+The cell returns `{1, [%{from: 3, to: 1}]}`.
+
+## Next steps
+
+- [Plugin State](plugin-state-and-directives.md) gives the full rules for owned fields.
+- [Custom Directives](plugin-custom-directives.livemd) lets a handler request a state change or a side effect.
+- [Test Plugins](testing-plugins.livemd) turns these checks into ExUnit tests.
