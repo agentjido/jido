@@ -17,7 +17,6 @@
   {"lib/jido/telemetry/open_telemetry.ex", :pattern_match_cov, 356},
   {"test/support/jido_action/fixtures/definitions.ex", :invalid_contract, 127},
   {"test/support/jido_action/fixtures/failures.ex", :invalid_contract, 97},
-  {"test/support/jido_action/fixtures/failures.ex", :invalid_contract, 106},
   {"test/support/jido_action/fixtures/failures.ex", :invalid_contract, 145},
   {"test/support/jido_action/fixtures/failures.ex", :invalid_contract, 176},
   {"test/support/jido_action/fixtures/failures.ex", :callback_type_mismatch, 12},
@@ -25,4 +24,9 @@
   {"test/support/jido_action/fixtures/failures.ex", :callback_type_mismatch, 29},
   {"test/support/jido_action/fixtures/failures.ex", :no_return, 120},
   {"test/support/jido_flow/component.ex", :call, 173}
-]
+] ++
+  if Version.match?(System.version(), ">= 1.20.0") do
+    [{"test/support/jido_action/fixtures/failures.ex", :invalid_contract, 106}]
+  else
+    []
+  end
