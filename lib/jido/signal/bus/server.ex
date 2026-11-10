@@ -124,6 +124,8 @@ defmodule Jido.Signal.Bus.Server do
       {:error, {:invalid_signal, index, reason}} ->
         {:error,
          Error.validation_error("Signals must be valid Signal structs", %{
+           kind: :input,
+           subject: :signals,
            field: :signals,
            index: index,
            reason: reason

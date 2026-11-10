@@ -22,18 +22,29 @@ defmodule Jido.Test.Perf.Flow.DSLCompile do
         {row, compiled ++ modules}
       end)
 
-    Enum.each(compiled_modules, &:code.purge/1)
-    Enum.each(compiled_modules, &:code.delete/1)
-
     Runner.report!("jido.flow.dsl_compile", options, settings, cases, %{
-      cleanup: %{purged_modules: length(compiled_modules)}
+      cleanup: purge_modules!(compiled_modules)
     })
   end
 
   defp preflight! do
     {_row, modules} = compile_case!(0)
-    Enum.each(modules, &:code.purge/1)
-    Enum.each(modules, &:code.delete/1)
+    purge_modules!(modules)
+  end
+
+  defp purge_modules!(modules) do
+    for module <- modules do
+      :code.delete(module)
+      :code.purge(module)
+    end
+
+    remaining =
+      Enum.count(modules, fn module ->
+        :code.is_loaded(module) != false or :erlang.check_old_code(module)
+      end)
+
+    if remaining != 0, do: raise("generated DSL modules remain loaded after cleanup")
+    %{purged_modules: length(modules), remaining_modules: remaining}
   end
 
   defp compile_case!(index) do

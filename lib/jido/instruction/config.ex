@@ -282,7 +282,12 @@ defmodule Jido.Instruction.Config do
     do: Error.validation_error(reason)
 
   defp flow_error({field, reason}),
-    do: Error.validation_error("#{field} #{reason}", %{field: to_string(field)})
+    do:
+      Error.validation_error("#{field} #{reason}", %{
+        kind: :input,
+        subject: to_string(field),
+        field: to_string(field)
+      })
 
   defp normalize_options(raw_opts) when is_list(raw_opts) do
     if Keyword.keyword?(raw_opts), do: Map.new(raw_opts), else: raw_opts

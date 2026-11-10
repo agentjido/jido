@@ -82,16 +82,13 @@ defmodule Jido.Instruction.Compiler do
       def __jido_codec_kind__, do: unquote(kind)
 
       @doc false
-      @spec __jido_catalog_manifest__() :: map()
+      @spec __jido_catalog_manifest__() :: [map()]
       def __jido_catalog_manifest__ do
-        %{
-          id: @__jido_codec_config__[:id],
-          kind: __jido_codec_kind__(),
-          vsn: @__jido_codec_config__[:vsn],
-          target: __MODULE__,
-          name: name(),
-          description: description()
-        }
+        [
+          %{id: @__jido_codec_config__[:id], vsn: @__jido_codec_config__[:vsn], target: __MODULE__},
+          %{name: :schema, target: schema()},
+          %{name: :output_schema, target: output_schema()}
+        ]
       end
     end
   end

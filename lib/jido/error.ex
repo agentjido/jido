@@ -4,7 +4,7 @@ defmodule Jido.Error do
 
   ## Error Types
 
-  Six consolidated error types cover all failure scenarios:
+  Five error types cover all failure scenarios:
 
   | Error | Use Case |
   |-------|----------|
@@ -12,14 +12,13 @@ defmodule Jido.Error do
   | `ExecutionError` | Runtime failures during execution or planning |
   | `RoutingError` | Signal routing and dispatch failures |
   | `TimeoutError` | Operation timeouts |
-  | `CompensationError` | Saga compensation failures |
   | `InternalError` | Unexpected system failures |
 
   ## Usage
 
       # Validation failures (with optional kind)
-      Jido.Error.validation_error("Invalid email", kind: :input, field: :email)
-      Jido.Error.validation_error("Unknown action", kind: :action, action: MyAction)
+      Jido.Error.validation_error("Invalid email", kind: :input, subject: :email)
+      Jido.Error.validation_error("Unknown action", kind: :action, subject: MyAction)
 
       # Execution failures (with optional phase)
       Jido.Error.execution_error("Action failed", phase: :run)
@@ -154,7 +153,6 @@ defmodule Jido.Error do
           | :execution_error
           | :routing_error
           | :timeout
-          | :compensation_error
           | :internal
 
   @typedoc "The exact version-1 public error projection."
@@ -341,43 +339,6 @@ defmodule Jido.Error do
     end
   end
 
-  defmodule CompensationError do
-    @moduledoc """
-    Error for saga compensation failures.
-
-    ## Fields
-
-    - `message` - Human-readable error message
-    - `original_error` - The error that triggered compensation
-    - `compensated` - Whether compensation succeeded
-    - `result` - Result from successful compensation
-    - `details` - Additional context
-    """
-    use Splode.Error,
-      class: :execution,
-      fields: [:message, :original_error, :compensated, :result, :details]
-
-    @type t :: %__MODULE__{
-            message: String.t(),
-            original_error: any(),
-            compensated: boolean(),
-            result: any(),
-            details: map()
-          }
-
-    @impl true
-    def exception(opts) do
-      opts = if is_map(opts), do: Map.to_list(opts), else: opts
-
-      opts
-      |> Keyword.put_new(:message, "Compensation error")
-      |> Keyword.put_new(:compensated, false)
-      |> Keyword.put_new(:details, %{})
-      |> Keyword.update!(:details, &Jido.Error.normalize_details/1)
-      |> super()
-    end
-  end
-
   defmodule InternalError do
     @moduledoc """
     Error for unexpected internal failures.
@@ -450,13 +411,11 @@ defmodule Jido.Error do
 
   - `:kind` - Category: `:input`, `:action`, `:config`
   - `:subject` - The invalid value
-  - `:field` - Alias for `:subject` (for input validation)
-  - `:action` - Alias for `:subject` with `kind: :action`
   - `:details` - Additional context map
 
   ## Examples
 
-      validation_error("Invalid email", field: :email)
+      validation_error("Invalid email", kind: :input, subject: :email)
       validation_error("Unknown action", kind: :action, subject: MyAction)
   """
   @spec validation_error(String.t(), keyword() | map()) :: ValidationError.t()
@@ -464,19 +423,9 @@ defmodule Jido.Error do
     opts = if is_map(opts), do: Map.to_list(opts), else: opts
     explicit_kind = opts[:kind]
 
-    # Infer kind and subject from convenience keys
-    {kind, subject} =
-      cond do
-        opts[:action] -> {:action, opts[:action]}
-        opts[:field] -> {:input, opts[:field]}
-        explicit_kind in @validation_kinds -> {explicit_kind, opts[:subject]}
-        true -> {nil, opts[:subject]}
-      end
-
-    reserved_keys =
-      if explicit_kind in @validation_kinds,
-        do: [:kind, :subject, :action],
-        else: [:subject, :action]
+    kind = if explicit_kind in @validation_kinds, do: explicit_kind
+    subject = opts[:subject]
+    reserved_keys = if kind, do: [:kind, :subject], else: [:subject]
 
     ValidationError.exception(
       message: message,
@@ -552,29 +501,6 @@ defmodule Jido.Error do
   end
 
   @doc """
-  Creates a compensation error.
-
-  ## Options
-
-  - `:original_error` - The error that triggered compensation
-  - `:compensated` - Whether compensation succeeded (default: false)
-  - `:result` - Result from successful compensation
-  - `:details` - Additional context map
-  """
-  @spec compensation_error(String.t(), keyword() | map()) :: CompensationError.t()
-  def compensation_error(message, opts \\ []) do
-    opts = if is_map(opts), do: Map.to_list(opts), else: opts
-
-    CompensationError.exception(
-      message: message,
-      original_error: Keyword.get(opts, :original_error),
-      compensated: Keyword.get(opts, :compensated, false),
-      result: Keyword.get(opts, :result),
-      details: Keyword.get(opts, :details, %{})
-    )
-  end
-
-  @doc """
   Creates an internal error.
 
   ## Options
@@ -614,37 +540,6 @@ defmodule Jido.Error do
   # Utilities
   # ============================================================================
 
-  @doc "Normalizes a foreign failure into the shared Jido taxonomy."
-  @spec normalize(term()) :: Exception.t()
-  def normalize({:error, reason}), do: normalize(reason)
-
-  def normalize(%struct{} = error)
-      when struct in [
-             ValidationError,
-             ExecutionError,
-             RoutingError,
-             TimeoutError,
-             CompensationError,
-             InternalError,
-             Internal.UnknownError
-           ],
-      do: error
-
-  def normalize(%ArgumentError{} = error) do
-    validation_error(Exception.message(error), reason: Exception.message(error))
-  end
-
-  def normalize(%RuntimeError{} = error) do
-    execution_error(Exception.message(error), reason: Exception.message(error))
-  end
-
-  def normalize(%_{} = error) when is_exception(error) do
-    internal_error(Exception.message(error), reason: error)
-  end
-
-  def normalize(error) when is_binary(error), do: internal_error(error, reason: error)
-  def normalize(error), do: internal_error("Jido operation failed", reason: error)
-
   @doc "Returns the stable public type for an error."
   @spec type(term()) :: public_type()
   def type(error), do: unified_type(error)
@@ -672,8 +567,7 @@ defmodule Jido.Error do
     "planning_error" => :planning_error,
     "execution_error" => :execution_error,
     "routing_error" => :routing_error,
-    "timeout" => :timeout,
-    "compensation_error" => :compensation_error
+    "timeout" => :timeout
   }
   @redacted "[REDACTED]"
   @omitted "[OMITTED]"
@@ -700,7 +594,7 @@ defmodule Jido.Error do
   #{@transport_max_items} entries per map or list. Scalar leaves are kept at the
   depth limit, so validation paths retain field names and list indexes. Strings
   are limited to #{@transport_max_string} characters plus a truncation suffix.
-  Nested compensation errors include at most #{@transport_max_causes} causes.
+  Nested error groups include at most #{@transport_max_causes} causes.
   Invalid UTF-8 binaries use bounded inspection.
   Improper lists use `[IMPROPER LIST]` without inspecting their sensitive data.
   Deeper containers and opaque terms are replaced with `#{@depth_limit}`.
@@ -763,16 +657,6 @@ defmodule Jido.Error do
     error.details
     |> sanitize_details()
     |> merge_public_fields(%{timeout: error.timeout})
-  end
-
-  defp public_details(%CompensationError{} = error, remaining_causes) do
-    error.details
-    |> sanitize_details()
-    |> merge_public_fields(%{
-      original_error: maybe_error_map(error.original_error, remaining_causes),
-      compensated: error.compensated,
-      result: error.result
-    })
   end
 
   defp public_details(%struct{errors: errors}, remaining_causes)
@@ -1023,7 +907,6 @@ defmodule Jido.Error do
   defp unified_type(%ExecutionError{}), do: :execution_error
   defp unified_type(%RoutingError{}), do: :routing_error
   defp unified_type(%TimeoutError{}), do: :timeout
-  defp unified_type(%CompensationError{}), do: :compensation_error
   defp unified_type(%InternalError{}), do: :internal
   defp unified_type(%Internal.UnknownError{}), do: :internal
 

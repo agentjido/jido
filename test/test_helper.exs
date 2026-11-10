@@ -8,9 +8,8 @@ ExUnit.start(capture_log: true)
     Code.require_file("support/jido_action/fixtures/missing_callbacks.exs", __DIR__)
   end)
 
-special_quality_tags = [
+special_suite_tags = [
   :authoring,
-  :system,
   :load,
   :throughput,
   :property,
@@ -22,11 +21,11 @@ special_quality_tags = [
   :service
 ]
 
-ExUnit.configure(seed: 0, exclude: [:integration, :skip, :flaky] ++ special_quality_tags)
+ExUnit.configure(seed: 0, exclude: [:integration, :skip, :flaky] ++ special_suite_tags)
 
-quality_selection = ExUnit.configuration()[:include]
+suite_selection = ExUnit.configuration()[:include]
 
-if Enum.any?(quality_selection, fn
+if Enum.any?(suite_selection, fn
      tag when tag in [:property, :fuzz] -> true
      {tag, value} when tag in [:property, :fuzz] -> value != false
      _other -> false

@@ -45,8 +45,8 @@ defmodule Jido.Agent.SerializationContractTest do
 
     registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"agents/probe", 1} => {:agent, Probe},
-        {"schemas/probe", 1} => {:schema, definition.schema}
+        {"agents/probe", 1} => Probe,
+        {"schemas/probe", 1} => definition.schema
       })
 
     assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)

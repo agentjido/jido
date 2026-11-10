@@ -60,14 +60,10 @@ defmodule Jido.Agent.DSL do
 
       @doc false
       def __jido_catalog_manifest__ do
-        %{
-          id: unquote(opts[:id]),
-          kind: :agent,
-          vsn: vsn(),
-          target: __MODULE__,
-          name: @agent_definition.name,
-          description: @agent_definition.description
-        }
+        [
+          %{id: unquote(opts[:id]), vsn: vsn(), target: __MODULE__},
+          %{name: :schema, target: schema()}
+        ]
       end
 
       @doc "Returns the Action or Flow target for one exact executable route."

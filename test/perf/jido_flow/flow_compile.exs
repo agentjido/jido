@@ -34,7 +34,7 @@ defmodule Jido.Test.Perf.Flow.Compile do
           Runner.measure!(
             "compile/#{width}",
             fn -> Jido.Exec.compile!(flow) end,
-            &check_program!/1,
+            &check_program!(&1, width),
             settings
           )
 
@@ -52,8 +52,20 @@ defmodule Jido.Test.Perf.Flow.Compile do
     :ok
   end
 
-  defp check_program!(program) do
-    if map_size(program.components) == 0, do: raise("compiled Flow has no components")
+  defp check_program!(program, width) do
+    expected = Enum.map(1..width, &"branch_#{&1}") |> Enum.sort()
+
+    branches =
+      program.components
+      |> Map.keys()
+      |> Enum.filter(&String.starts_with?(&1, "branch_"))
+      |> Enum.sort()
+
+    unless branches == expected and
+             Enum.all?(expected, &(not is_nil(Runic.Workflow.get_component(program, &1)))) do
+      raise "compiled Flow has missing or incorrect branches"
+    end
+
     :ok
   end
 end

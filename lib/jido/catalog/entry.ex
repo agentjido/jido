@@ -1,62 +1,30 @@
 defmodule Jido.Catalog.Entry do
-  @moduledoc """
-  One stable definition in a Jido Catalog.
-
-  An Entry identifies a trusted target by stable ID, version, and kind. The
-  provider and OTP application make package contributions inspectable.
-  """
-
+  @moduledoc "One explicitly registered value and its source."
   @identifier_pattern ~r/\A[A-Za-z0-9][A-Za-z0-9._\/:@-]{0,254}\z/
-  @fields [:id, :vsn, :kind, :target, :provider, :application, :name, :description]
-  @required_fields [:id, :vsn, :kind, :target, :provider, :application]
+  @fields [:id, :vsn, :target, :provider, :application]
+  @enforce_keys @fields
+  defstruct @fields
+  @type ref :: {String.t(), pos_integer()}
+  @type t :: %__MODULE__{id: String.t(), vsn: pos_integer(), target: term(), provider: module(), application: atom()}
 
-  alias Jido.Joi
-
-  @enforce_keys @required_fields
-  defstruct @required_fields ++ [name: nil, description: nil]
-
-  @type stable_id :: String.t()
-  @type version :: pos_integer()
-  @type kind :: atom()
-  @type ref :: {stable_id(), version()}
-
-  @type t :: %__MODULE__{
-          id: stable_id(),
-          vsn: version(),
-          kind: kind(),
-          target: term(),
-          provider: module(),
-          application: atom(),
-          name: String.t() | nil,
-          description: String.t() | nil
-        }
-
-  @doc "Builds one validated Catalog Entry."
-  @spec new(map() | t()) :: {:ok, t()} | {:error, term()}
+  @doc "Builds a registration. Named values default to Provider/name; modules use their full name."
   def new(%__MODULE__{} = entry), do: validate(entry)
 
-  def new(%{} = attrs) when not is_struct(attrs) do
+  def new(attrs) when is_map(attrs) and not is_struct(attrs) do
+    attrs = attrs |> Map.put_new(:vsn, 1) |> default_id()
     unknown = Map.keys(attrs) -- @fields
-    missing = @required_fields -- Map.keys(attrs)
+    missing = @fields -- Map.keys(attrs)
 
     cond do
-      unknown != [] ->
-        {:error, {:invalid_catalog_entry, :unknown_fields, Enum.sort(unknown)}}
-
-      missing != [] ->
-        {:error, {:invalid_catalog_entry, :missing_fields, missing}}
-
-      true ->
-        attrs
-        |> then(&struct(__MODULE__, &1))
-        |> validate()
+      unknown != [] -> {:error, {:invalid_catalog_entry, :unknown_fields, Enum.sort(unknown)}}
+      missing != [] -> {:error, {:invalid_catalog_entry, :missing_fields, missing}}
+      true -> validate(struct!(__MODULE__, attrs))
     end
   end
 
-  def new(_attrs), do: {:error, {:invalid_catalog_entry, :entry, :map}}
+  def new(_), do: {:error, {:invalid_catalog_entry, :entry, :map}}
 
-  @doc "Builds one validated Catalog Entry or raises `ArgumentError`."
-  @spec new!(map() | t()) :: t()
+  @doc "Builds a registration or raises."
   def new!(attrs) do
     case new(attrs) do
       {:ok, entry} -> entry
@@ -64,91 +32,45 @@ defmodule Jido.Catalog.Entry do
     end
   end
 
-  @doc "Returns the stable ID and version reference."
-  @spec reference(t()) :: ref()
   def reference(%__MODULE__{id: id, vsn: vsn}), do: {id, vsn}
-
   @doc false
-  @spec sort_key(t()) :: tuple()
-  def sort_key(%__MODULE__{} = entry) do
-    {
-      entry.id,
-      entry.vsn,
-      Atom.to_string(entry.kind),
-      Atom.to_string(entry.application),
-      Atom.to_string(entry.provider)
-    }
+  def sort_key(entry), do: {entry.id, entry.vsn, entry.application, entry.provider}
+  @doc false
+  def valid_identifier?(id), do: is_binary(id) and byte_size(id) in 1..255 and Regex.match?(@identifier_pattern, id)
+
+  defp default_id(attrs) do
+    {name, attrs} = Map.pop(attrs, :name)
+
+    Map.put_new_lazy(attrs, :id, fn ->
+      target = Map.get(attrs, :target)
+      provider = Map.get(attrs, :provider)
+
+      cond do
+        not valid_atom?(provider) ->
+          nil
+
+        is_binary(name) or (is_atom(name) and not is_nil(name)) ->
+          "#{provider}/#{name}"
+
+        is_atom(target) and not is_nil(target) ->
+          value = Atom.to_string(target)
+          if String.starts_with?(value, "Elixir."), do: value, else: "#{provider}/#{value}"
+
+        true ->
+          nil
+      end
+    end)
   end
 
-  @doc false
-  @spec valid_identifier?(term()) :: boolean()
-  def valid_identifier?(id),
-    do: is_binary(id) and byte_size(id) in 1..255 and Regex.match?(@identifier_pattern, id)
-
-  defp validate(%__MODULE__{} = entry) do
+  defp validate(entry) do
     cond do
-      not valid_identifier?(entry.id) ->
-        {:error, {:invalid_catalog_entry, :id, entry.id}}
-
-      not (is_integer(entry.vsn) and entry.vsn > 0) ->
-        {:error, {:invalid_catalog_entry, :vsn, entry.vsn}}
-
-      not valid_kind?(entry.kind) ->
-        {:error, {:invalid_catalog_entry, :kind, entry.kind}}
-
-      is_nil(entry.target) ->
-        {:error, {:invalid_catalog_entry, :target, nil}}
-
-      not valid_atom?(entry.provider) ->
-        {:error, {:invalid_catalog_entry, :provider, entry.provider}}
-
-      not valid_atom?(entry.application) ->
-        {:error, {:invalid_catalog_entry, :application, entry.application}}
-
-      not valid_text?(entry.name) ->
-        {:error, {:invalid_catalog_entry, :name, :utf8_string}}
-
-      not valid_text?(entry.description) ->
-        {:error, {:invalid_catalog_entry, :description, :utf8_string}}
-
-      true ->
-        validate_target(entry)
-    end
-  end
-
-  defp validate_target(%__MODULE__{kind: kind, target: target} = entry)
-       when kind in [:action, :flow] do
-    if valid_atom?(target),
-      do: {:ok, entry},
-      else: {:error, {:invalid_catalog_entry, :target, "Action and Flow targets must be modules"}}
-  end
-
-  defp validate_target(%__MODULE__{kind: :atom, target: target} = entry) do
-    if valid_atom?(target),
-      do: {:ok, entry},
-      else: {:error, {:invalid_catalog_entry, :target, "atom targets must be non-Boolean atoms"}}
-  end
-
-  defp validate_target(%__MODULE__{kind: :schema, target: target} = entry) do
-    with :ok <- Joi.validate_static(target),
-         true <- Joi.Schema.schema?(target),
-         true <- Joi.Schema.map_shaped?(target) do
-      {:ok, entry}
-    else
-      {:error, reason} -> {:error, {:invalid_catalog_entry, :target, reason}}
-      false -> {:error, {:invalid_catalog_entry, :target, "schema targets must accept map-shaped data"}}
-    end
-  end
-
-  defp validate_target(%__MODULE__{target: target} = entry) do
-    case Joi.validate_static(target) do
-      :ok -> {:ok, entry}
-      {:error, reason} -> {:error, {:invalid_catalog_entry, :target, reason}}
+      not valid_atom?(entry.provider) -> {:error, {:invalid_catalog_entry, :provider, entry.provider}}
+      not valid_identifier?(entry.id) -> {:error, {:invalid_catalog_entry, :id, entry.id}}
+      not (is_integer(entry.vsn) and entry.vsn > 0) -> {:error, {:invalid_catalog_entry, :vsn, entry.vsn}}
+      not valid_atom?(entry.application) -> {:error, {:invalid_catalog_entry, :application, entry.application}}
+      true -> {:ok, entry}
     end
   end
 
   defp valid_atom?(value), do: is_atom(value) and value not in [nil, true, false]
-  defp valid_kind?(value), do: valid_atom?(value) and value != :alias
-  defp valid_text?(nil), do: true
-  defp valid_text?(value), do: is_binary(value) and String.valid?(value)
 end

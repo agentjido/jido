@@ -75,20 +75,6 @@ defmodule Jido.Test.Action.Fixtures.Actions.Multiply do
   def run(%{value: value, amount: amount}, _context), do: {:ok, %{value: value * amount}}
 end
 
-defmodule Jido.Test.Action.Fixtures.Actions.Divide do
-  @moduledoc false
-  use Jido.Action,
-    name: "divide",
-    description: "Divides first value by second value",
-    schema: Jido.Joi.object(%{value: Jido.Joi.float(), amount: Jido.Joi.float() |> Jido.Joi.default(2.0)})
-
-  def run(%{value: value, amount: amount}, _context) when amount != 0 do
-    {:ok, %{value: value / amount}}
-  end
-
-  def run(_params, _context), do: raise("Cannot divide by zero")
-end
-
 defmodule Jido.Test.Action.Fixtures.Actions.ContextEcho do
   @moduledoc false
   use Jido.Action,
@@ -122,142 +108,12 @@ defmodule Jido.Test.Action.Fixtures.Actions.ExtrasAction do
   end
 end
 
-defmodule Jido.Test.Action.Fixtures.Actions.NoneExtrasAction do
-  @moduledoc false
-  use Jido.Action, name: "none_extras_action"
-
-  def run(params, _context), do: {:ok, params, :none}
-end
-
-defmodule Jido.Test.Action.Fixtures.Actions.OutputEnvelopeAction do
-  @moduledoc false
-  use Jido.Action,
-    name: "output_envelope_action",
-    description: "Returns an explicit action output envelope",
-    schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
-
-  def run(%{value: value}, _context) do
-    {:ok, Jido.Action.Output.raw(%{value: value}, meta: %{source: :test})}
-  end
-end
-
-defmodule Jido.Test.Action.Fixtures.Actions.MapProbeAction do
-  @moduledoc false
-  use Jido.Action, name: "map_probe_action"
-
-  def run(%{test_pid: test_pid, index: index} = params, _context) when is_pid(test_pid) do
-    send(test_pid, {__MODULE__, :started, index, self()})
-
-    if Map.get(params, :block, false) do
-      receive do
-        :release -> :ok
-      end
-    end
-
-    case Map.get(params, :outcome, :ok) do
-      :ok ->
-        output = %{index: index, value: Map.get(params, :value)}
-
-        if Map.get(params, :extras, false) do
-          {:ok, output, [:request]}
-        else
-          {:ok, output}
-        end
-
-      {:error, message} ->
-        {:error, message}
-
-      :kill ->
-        Process.exit(self(), :kill)
-    end
-  end
-end
-
-defmodule Jido.Test.Action.Fixtures.Actions.CountedMapAction do
-  @moduledoc false
-  @behaviour Jido.Action
-
-  def validate_params(%{test_pid: test_pid, index: index} = params) do
-    send(test_pid, {__MODULE__, :input, index})
-    {:ok, params}
-  end
-
-  def run(%{test_pid: test_pid, index: index} = params, _context) do
-    send(test_pid, {__MODULE__, :run, index})
-    {:ok, params}
-  end
-
-  def validate_output(%{test_pid: test_pid, index: index} = output) do
-    send(test_pid, {__MODULE__, :output, index})
-    {:ok, output}
-  end
-end
-
-defmodule Jido.Test.Action.Fixtures.Actions.ReduceProbeAction do
-  @moduledoc false
-  use Jido.Action, name: "reduce_probe_action"
-
-  def run(
-        %{
-          accumulator: accumulator,
-          item: item,
-          index: index,
-          item_id: item_id
-        } = params,
-        context
-      ) do
-    if test_pid = Map.get(context, :test_pid) do
-      send(test_pid, {__MODULE__, :called, index, item_id, item, accumulator})
-    end
-
-    case Map.get(params, :outcome, :map) do
-      :map ->
-        values = Map.get(accumulator, :values, [])
-
-        {:ok, %{values: values ++ [item], indexes: Map.get(accumulator, :indexes, []) ++ [index]}}
-
-      :subtract ->
-        {:ok, %{value: Map.fetch!(accumulator, :value) - item}}
-
-      :output ->
-        values = accumulator.value.values
-        {:ok, Jido.Action.Output.raw(%{values: values ++ [item]}, meta: %{source: :reduce})}
-
-      :scalar ->
-        {:ok, :invalid_reduce_output}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-end
-
-defmodule Jido.Test.Action.Fixtures.Actions.RecorderAction do
-  @moduledoc false
-  use Jido.Action, name: "recorder_action"
-
-  def run(params, %{test_pid: test_pid}) when is_pid(test_pid) do
-    send(test_pid, {__MODULE__, params})
-    {:ok, params}
-  end
-
-  def run(params, _context), do: {:ok, params}
-end
-
 defmodule Jido.Test.Action.Fixtures.ActionWithFlowFunction do
   @moduledoc false
   use Jido.Action, name: "action_with_flow_function"
 
   def flow, do: :not_a_flow_artifact
   def run(params, _context), do: {:ok, Map.put(params, :executed_as, :action)}
-end
-
-defmodule Jido.Test.Action.Fixtures.ListOutputAction do
-  @moduledoc false
-  use Jido.Action, name: "list_output_action"
-
-  @impl true
-  def run(_params, _context), do: {:ok, %{items: [%{value: 1}, %{value: 2}]}}
 end
 
 defmodule Jido.Test.Action.Fixtures.ConcurrencyProbeAction do
@@ -285,36 +141,4 @@ defmodule Jido.Test.Action.Fixtures.ConcurrencyProbeAction do
     Agent.update(probe, &Map.update!(&1, :running, fn running -> running - 1 end))
     result
   end
-end
-
-defmodule Jido.Test.Action.Fixtures.Increment do
-  @moduledoc false
-  use Jido.Action,
-    name: "iterator_increment",
-    schema: Jido.Joi.object(%{count: Jido.Joi.integer(), index: Jido.Joi.integer()}),
-    output_schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
-
-  @impl true
-  def run(%{count: count, index: index}, context) do
-    if is_pid(context[:test_pid]), do: send(context.test_pid, {__MODULE__, index})
-    {:ok, %{count: count + 1}}
-  end
-end
-
-defmodule Jido.Test.Action.Fixtures.Envelope do
-  @moduledoc false
-  use Jido.Action,
-    name: "iterator_envelope",
-    schema: Jido.Joi.object(%{count: Jido.Joi.integer(), index: Jido.Joi.integer()})
-
-  @impl true
-  def run(%{count: count}, _context) do
-    {:ok, Jido.Action.Output.raw(%{count: count + 1}, meta: %{source: :iterate_test})}
-  end
-end
-
-defmodule Jido.Test.Action.Fixtures.StateStruct do
-  @moduledoc false
-  @enforce_keys [:count]
-  defstruct [:count]
 end

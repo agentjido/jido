@@ -175,6 +175,9 @@ defmodule Jido.Test.Perf.Signal.Measure do
   end
 
   defp trace_resources(workload) do
+    # Owner cancellation must reach the observer's cleanup block. The measured
+    # caller and its unlinked descendants are stopped there, outside timing.
+    Process.flag(:trap_exit, true)
     observer = self()
     table = :ets.new(:bench_owned, [:set, :private])
 
@@ -238,7 +241,7 @@ defmodule Jido.Test.Perf.Signal.Measure do
     after
       try do
         stop_processes([caller])
-        stop_descendants(fence(state))
+        stop_descendants(fence(Map.put(state, :cleanup, true)))
       after
         Process.demonitor(caller_ref, [:flush])
         :ets.delete(table)
@@ -261,12 +264,16 @@ defmodule Jido.Test.Perf.Signal.Measure do
   defp stop_processes(pids) do
     monitors = Enum.map(pids, &{&1, Process.monitor(&1)})
     Enum.each(pids, &Process.exit(&1, :kill))
-    Enum.each(monitors, fn {pid, ref} -> await_down(pid, ref) end)
+    Enum.each(monitors, fn {pid, ref} -> await_down(pid, ref, false) end)
   end
 
-  defp await_down(pid, ref) do
+  defp await_down(pid, ref, cancel? \\ true) do
     receive do
-      {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+      {:DOWN, ^ref, :process, ^pid, _reason} ->
+        :ok
+
+      {:EXIT, _watcher, {:benchmark_owner_exit, reason}} ->
+        if cancel?, do: raise("benchmark owner exited: #{inspect(reason)}"), else: await_down(pid, ref, false)
     after
       @timeout -> raise "owned process did not stop: #{inspect(pid)}"
     end
@@ -314,6 +321,11 @@ defmodule Jido.Test.Perf.Signal.Measure do
     do: %{state | pending: [{pid, ref} | state.pending]}
 
   defp handle({:bench_result, result}, state), do: %{state | result: result}
+
+  defp handle({:EXIT, _watcher, {:benchmark_owner_exit, _reason}}, %{cleanup: true} = state), do: state
+
+  defp handle({:EXIT, _watcher, {:benchmark_owner_exit, reason}}, _state),
+    do: raise("benchmark owner exited: #{inspect(reason)}")
 
   defp handle({:DOWN, ref, :process, _pid, reason}, %{caller_ref: ref} = state) do
     result = if reason == :normal, do: state.result, else: {:error, inspect(reason)}
@@ -372,6 +384,23 @@ defmodule Jido.Test.Perf.Signal.Measure do
 
     {pid, ref} =
       spawn_monitor(fn ->
+        worker = self()
+
+        # Start this inside the worker so owner death cannot leave a worker
+        # between creation and watcher setup. Monitoring a dead owner is safe.
+        spawn(fn ->
+          owner_ref = Process.monitor(parent)
+          worker_ref = Process.monitor(worker)
+
+          receive do
+            {:DOWN, ^owner_ref, :process, ^parent, reason} ->
+              Process.exit(worker, {:benchmark_owner_exit, reason})
+
+            {:DOWN, ^worker_ref, :process, ^worker, _reason} ->
+              :ok
+          end
+        end)
+
         result =
           try do
             {:ok, fun.()}

@@ -22,8 +22,8 @@ defmodule Jido.Examples.Compilation.StoredJSON do
 
   def catalog do
     Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-      {"jido/examples/compilation/json_echo", 1} => {:action, Echo},
-      {"jido/examples/compilation/empty_schema", 1} => {:schema, Jido.Joi.map()}
+      {"jido/examples/compilation/json_echo", 1} => Echo,
+      {"jido/examples/compilation/empty_schema", 1} => Jido.Joi.map()
     })
   end
 

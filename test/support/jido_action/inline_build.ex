@@ -45,9 +45,9 @@ defmodule Jido.Test.Action.InlineBuild do
     output
   end
 
-  def probe(fixture, offset \\ 1) do
+  def probe(fixture) do
     fixture
-    |> elixir([Path.join(fixture.scripts, "probe.exs")], offset)
+    |> elixir([Path.join(fixture.scripts, "probe.exs")])
     |> result!()
   end
 
@@ -61,7 +61,7 @@ defmodule Jido.Test.Action.InlineBuild do
       fixture,
       Path.join(release, "bin/inline_consumer"),
       ["eval", script],
-      env(fixture, 1, release)
+      env(fixture, release)
     )
     |> result!()
   end
@@ -69,7 +69,7 @@ defmodule Jido.Test.Action.InlineBuild do
   def beams(fixture) do
     fixture
     |> ebin()
-    |> Path.join("Elixir.Jido.Action.Generated.Inline.*.beam")
+    |> Path.join("Elixir.Jido.{Action,Flow}.Generated.Inline.*.beam")
     |> Path.wildcard()
     |> Enum.map(&Path.basename/1)
     |> Enum.sort()
@@ -77,13 +77,13 @@ defmodule Jido.Test.Action.InlineBuild do
 
   def ebin(fixture), do: Path.join(fixture.build, "lib/inline_consumer/ebin")
 
-  defp elixir(fixture, args, offset \\ 1) do
+  defp elixir(fixture, args) do
     paths = Enum.flat_map([ebin(fixture) | fixture.paths], &["-pa", &1])
     args = paths ++ ["-r", Path.join(fixture.scripts, "guard.exs")] ++ args
-    run(fixture, System.find_executable("elixir"), args, env(fixture, offset, ebin(fixture)))
+    run(fixture, System.find_executable("elixir"), args, env(fixture, ebin(fixture)))
   end
 
-  defp env(fixture, offset, artifacts) do
+  defp env(fixture, artifacts) do
     [
       {"MIX_ENV", "test"},
       {"MIX_BUILD_PATH", fixture.build},
@@ -92,7 +92,6 @@ defmodule Jido.Test.Action.InlineBuild do
       {"ERL_FLAGS", "+S 2:2 +SDcpu 1 +SDio 1"},
       {"ELIXIR_ERL_OPTIONS", nil},
       {"RELEASE_DISTRIBUTION", "none"},
-      {"INLINE_OFFSET", Integer.to_string(offset)},
       {"INLINE_ARTIFACT_ROOT", artifacts},
       {"INLINE_GUARD", Path.join(fixture.scripts, "guard.exs")},
       {"INLINE_PROBE", Path.join(fixture.scripts, "probe.exs")}

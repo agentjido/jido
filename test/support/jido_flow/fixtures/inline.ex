@@ -103,18 +103,18 @@ defmodule Jido.Test.Flow.Fixtures.InlineAuthoring do
 
   def registry do
     Catalog.from_targets!(__MODULE__, :jido, %{
-      {"actions/demo/empty/v1", 1} => {:action, InlineParityFlow.step_action("empty")},
-      {"actions/demo/named/v1", 1} => {:action, InlineParityFlow.step_action("named")},
-      {"actions/demo/multiple/v1", 1} => {:action, InlineParityFlow.step_action("multiple")},
-      {"actions/demo/sole-map/v1", 1} => {:action, InlineParityFlow.step_action("sole_map")},
-      {"schemas/map/v1", 1} => {:schema, Jido.Joi.map()},
-      {"schemas/object/v1", 1} => {:schema, Jido.Joi.object(%{})},
-      {"atoms/name", 1} => {:atom, :name},
-      {"atoms/raw-name", 1} => {:atom, :raw_name},
-      {"atoms/prefix", 1} => {:atom, :prefix},
-      {"atoms/payload", 1} => {:atom, :payload},
-      {"atoms/purpose", 1} => {:atom, :purpose},
-      {"atoms/owner", 1} => {:atom, :owner}
+      {"actions/demo/empty/v1", 1} => InlineParityFlow.step_action("empty"),
+      {"actions/demo/named/v1", 1} => InlineParityFlow.step_action("named"),
+      {"actions/demo/multiple/v1", 1} => InlineParityFlow.step_action("multiple"),
+      {"actions/demo/sole-map/v1", 1} => InlineParityFlow.step_action("sole_map"),
+      {"schemas/map/v1", 1} => Jido.Joi.map(),
+      {"schemas/object/v1", 1} => Jido.Joi.object(%{}),
+      {"atoms/name", 1} => :name,
+      {"atoms/raw-name", 1} => :raw_name,
+      {"atoms/prefix", 1} => :prefix,
+      {"atoms/payload", 1} => :payload,
+      {"atoms/purpose", 1} => :purpose,
+      {"atoms/owner", 1} => :owner
     })
   end
 end
@@ -175,77 +175,5 @@ defmodule Jido.Test.Flow.Fixtures.InlineLexicalFlow do
 
   defp after_step(value) do
     value <> "?"
-  end
-end
-
-defmodule Jido.Test.Flow.Fixtures.InlineResultFlow do
-  @moduledoc false
-  use Jido.Flow, name: "inline_result"
-  alias Jido.Action.Output
-  alias Jido.Test.Action.Fixtures.Actions.Add
-
-  flow do
-    step("result", %{mode: mode, value: value} <- input()) do
-      case mode do
-        :map -> {:ok, %{value: value}}
-        :output -> {:ok, Output.raw(value)}
-        :extras -> {:ok, %{value: value}, [%{effect: :requested}]}
-        :raise -> raise "inline body failed"
-        :throw -> throw({:inline_throw, value})
-        :exit -> exit({:inline_exit, value})
-        :invalid_callback -> :not_a_result_tuple
-        :invalid_output -> {:ok, value}
-        :continue -> {:continue, %{value: value, amount: 2}, Add}
-      end
-    end
-
-    output(result("result"))
-  end
-end
-
-defmodule Jido.Test.Flow.Fixtures.InlineControlledFlow do
-  @moduledoc false
-  use Jido.Flow, name: "inline_controlled"
-
-  flow do
-    step("third", [value <- input(:third), ctx <- context()]) do
-      controlled(value, ctx)
-    end
-
-    step("second", [value <- input(:second), ctx <- context()]) do
-      controlled(value, ctx)
-    end
-
-    step("first", [value <- input(:first), ctx <- context()]) do
-      controlled(value, ctx)
-    end
-
-    output(%{
-      values: [result("first", :value), result("second", :value), result("third", :value)]
-    })
-  end
-
-  defp controlled(value, %{test_pid: test_pid, token: token} = ctx) do
-    if probe = ctx[:probe] do
-      Agent.update(probe, fn state ->
-        running = state.running + 1
-        %{state | running: running, max: max(state.max, running)}
-      end)
-    end
-
-    send(test_pid, {:inline_started, token, value, self()})
-
-    if Map.get(ctx, :block, true) do
-      receive do
-        {:release, ^token} -> :ok
-      end
-    end
-
-    if probe = ctx[:probe] do
-      Agent.update(probe, &%{&1 | running: &1.running - 1})
-    end
-
-    send(test_pid, {:inline_finished, token, value})
-    {:ok, %{value: value}}
   end
 end

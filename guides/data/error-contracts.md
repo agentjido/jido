@@ -6,7 +6,7 @@ Match on the struct, the public type, or the stable code. Do not match on a mess
 
 ## Error types
 
-Jido has six error structs. Each one has a `:message`, a `:details` map, and the fields below. `Jido.Error.type/1` maps each one to a public type.
+Jido has five error structs. Each one has a `:message`, a `:details` map, and the fields below. `Jido.Error.type/1` maps each one to a public type.
 
 | Struct | Extra fields | Public type |
 | --- | --- | --- |
@@ -14,21 +14,20 @@ Jido has six error structs. Each one has a `:message`, a `:details` map, and the
 | `Jido.Error.ExecutionError` | `:phase` | `:execution_error`. With `phase: :planning`, `:planning_error` |
 | `Jido.Error.RoutingError` | `:target` | `:routing_error` |
 | `Jido.Error.TimeoutError` | `:timeout` | `:timeout` |
-| `Jido.Error.CompensationError` | `:original_error`, `:compensated`, `:result` | `:compensation_error` |
 | `Jido.Error.InternalError` | None | `:internal` |
 
 ## Create an error
 
-Each constructor takes a message and options. Keys that a constructor does not reserve go into `:details`, and an explicit `:details` map wins over those keys. `Jido.Error.compensation_error/2` is the exception. It reads only its named options and `:details`.
+Each constructor takes a message and options. Keys that a constructor does not reserve go into `:details`, and an explicit `:details` map wins over those keys.
 
 ```elixir
 alias Jido.Error
 
 %Error.ValidationError{kind: :input, subject: :email} =
-  Error.validation_error("Invalid email", field: :email)
+  Error.validation_error("Invalid email", kind: :input, subject: :email)
 
 %Error.ValidationError{kind: :action, subject: Billing.ChargeInvoice} =
-  Error.validation_error("Unknown Action", action: Billing.ChargeInvoice)
+  Error.validation_error("Unknown Action", kind: :action, subject: Billing.ChargeInvoice)
 
 %Error.ValidationError{kind: :config, details: %{setting: :timeout}} =
   Error.config_error("Bad timeout", setting: :timeout)
@@ -42,7 +41,6 @@ alias Jido.Error
 
 %Error.TimeoutError{timeout: 5_000} = Error.timeout_error("Gateway timed out", timeout: 5_000)
 
-%Error.CompensationError{compensated: false} = Error.compensation_error("Refund failed")
 
 %Error.InternalError{details: %{reason: :closed}} = Error.internal_error("Socket closed", reason: :closed)
 ```
@@ -142,9 +140,9 @@ alias Jido.Error
 %{
   type: :validation_error,
   message: "Invalid email",
-  details: %{field: :email, kind: :input, subject: :email},
+  details: %{kind: :input, subject: :email},
   retryable?: false
-} = Error.to_map(Error.validation_error("Invalid email", field: :email))
+} = Error.to_map(Error.validation_error("Invalid email", kind: :input, subject: :email))
 ```
 
 The struct fields, such as `:kind`, `:phase`, `:code`, and `:path`, appear inside `:details`. The projection has no top-level `:code`.
@@ -158,7 +156,7 @@ The projection bounds and cleans `:details` as it copies them.
 | Container depth | 4 levels. Deeper containers become `"[DEPTH_LIMIT]"` |
 | Items in one map or list | 20. The rest are dropped |
 | String length | 512 characters, followed by `"...(truncated)"` |
-| Nested causes in a compensation error | 2 |
+| Nested error groups | 2 |
 | Key contains `apikey`, `authorization`, `credential`, `password`, `privatekey`, `query`, `secret`, or `token` | Value becomes `"[REDACTED]"` |
 | Key contains `stacktrace` | Value becomes `"[OMITTED]"` |
 | PID, function, reference, tuple | An inspected string |
@@ -192,25 +190,12 @@ The rules key off field names. A secret under an innocent key, or inside a messa
 
 ## Normalize a foreign failure
 
-`Jido.Error.normalize/1` converts any failure into an exception in the shared taxonomy. Jido errors pass through unchanged.
+Each domain converts foreign failures at its own boundary. Use a shared constructor with explicit details.
 
-| Input | Result |
-| --- | --- |
-| A Jido error | Unchanged |
-| `{:error, reason}` | `reason`, normalized |
-| `ArgumentError` | `Jido.Error.ValidationError` |
-| `RuntimeError` | `Jido.Error.ExecutionError` |
-| Another exception | `Jido.Error.InternalError`, with the exception in `details.reason` |
-| Binary | `Jido.Error.InternalError`, with the binary as its message |
-| Any other term | `Jido.Error.InternalError`, with the message `"Jido operation failed"` |
-
-```elixir
-alias Jido.Error
-
-%Error.ValidationError{message: "bad total"} = Error.normalize(%ArgumentError{message: "bad total"})
-%Error.ExecutionError{} = Error.normalize(%RuntimeError{message: "gateway down"})
-%Error.InternalError{details: %{reason: :closed}} = Error.normalize({:error, :closed})
-```
+`CompensationError`, `compensation_error/2`, and `normalize/1` are removed.
+Represent a compensation failure with `execution_error/2` and domain details.
+Use explicit `kind:` and `subject:` options in `validation_error/2`.
+The `field:` and `action:` keys are ordinary details and do not select a kind or subject.
 
 `Jido.Error.to_map/1` and `Jido.Error.type/1` also accept values that are not Jido errors. A map with a recognized `:type` or `:class` uses that type. A map with an atom `:code` and a list `:path` becomes `:validation_error`. Everything else becomes `:internal`.
 

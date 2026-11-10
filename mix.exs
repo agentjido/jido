@@ -45,9 +45,6 @@ defmodule Jido.MixProject do
         coveralls: :test,
         "coveralls.json": :test,
         quality: :test,
-        "quality.contract": :test,
-        "quality.coverage": :test,
-        "quality.report": :test,
         "test.authoring": :test,
         "test.all": :test,
         "test.bench": :test,
@@ -59,8 +56,7 @@ defmodule Jido.MixProject do
         "test.load": :test,
         "test.peer": :test,
         "test.property": :test,
-        "test.services": :test,
-        "test.system": :test
+        "test.services": :test
       ]
     ]
   end
@@ -337,7 +333,7 @@ defmodule Jido.MixProject do
   defp test_coverage do
     [
       tool: ExCoveralls,
-      output: "tmp/quality/coverage/coverdata",
+      output: "cover",
       ignore_modules: [
         ~r/^Inspect\.Jido/,
         ~r/^Jido\.Test\./,
@@ -407,7 +403,6 @@ defmodule Jido.MixProject do
         "reach.check --arch --smells"
       ],
       quality: [
-        "quality.contract",
         "compile --warnings-as-errors",
         "format --check-formatted",
         "credo --strict --min-priority higher",
@@ -433,23 +428,7 @@ defmodule Jido.MixProject do
         run_tagged_tests("test/property", :property, args)
         check_property_report!(args, :property)
       end,
-      "test.services": test_alias("test/external", :service),
-      "test.system": test_alias("test/system", :system),
-      "quality.contract": "test test/quality/quality_contract_test.exs --seed 0",
-      "quality.coverage": fn args ->
-        Mix.Task.run("app.start")
-        Code.require_file("test/quality/support/contract.exs")
-        Code.require_file("test/quality/support/component_proof.exs")
-        Code.require_file("test/quality/support/coverage.exs")
-        Jido.Quality.Coverage.run!(File.cwd!(), args)
-      end,
-      "quality.report": fn args ->
-        Mix.Task.run("app.start")
-        Code.require_file("test/quality/support/contract.exs")
-        Code.require_file("test/quality/support/component_proof.exs")
-        Code.require_file("test/quality/support/report.exs")
-        Jido.Quality.Report.run!(File.cwd!(), args)
-      end
+      "test.services": test_alias("test/external", :service)
     ]
   end
 
@@ -471,14 +450,12 @@ defmodule Jido.MixProject do
 
   defp run_test_ci([]) do
     [
-      ["quality.contract"],
       ["test", "--seed", "0"],
       ["test.authoring"],
       ["test.contracts"],
       ["test.examples"],
       ["test.property"],
       ["test.fuzz"],
-      ["test.system"],
       ["test.load"],
       ["test.peer"],
       ["test.bench"]
@@ -518,10 +495,8 @@ defmodule Jido.MixProject do
       ~r/^test\/examples\/support\//,
       ~r{^test/perf/(?:jido_ai/(?:react_fresh_workflow|react_memory|react_state_growth|react_stress|react_support)|jido_exec/flow_run|jido_flow/(?:dsl_compile|flow_compile)|jido_signal/run)\.exs$},
       ~r{^test/perf/(?:jido_signal/support|support)/},
-      ~r/^test\/quality\/support\//,
       ~r{^test/property/(?:support|[^/]+/support)/},
-      ~r{^test/external/(?:support|(?:minio|redis)/support\.exs)},
-      ~r|^test/system/jido_agent_server/support/|
+      ~r{^test/external/(?:support|(?:minio|redis)/support\.exs)}
     ]
   end
 

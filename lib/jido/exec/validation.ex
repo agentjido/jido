@@ -97,7 +97,8 @@ defmodule Jido.Exec.Validation do
       {:ok, {:error, reason}} ->
         {:error,
          Error.validation_error("Action #{phase} validation failed", %{
-           action: module,
+           kind: :action,
+           subject: module,
            phase: phase,
            reason: reason
          })}

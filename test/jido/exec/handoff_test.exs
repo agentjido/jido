@@ -270,10 +270,10 @@ defmodule Jido.Exec.HandoffTest do
 
     registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"map", 1} => {:schema, Jido.Joi.map()},
-        {"decide", 1} => {:action, Decide},
-        {"expand", 1} => {:action, Expand},
-        {"value", 1} => {:atom, :value}
+        {"map", 1} => Jido.Joi.map(),
+        {"decide", 1} => Decide,
+        {"expand", 1} => Expand,
+        {"value", 1} => :value
       })
 
     assert {:ok, document} = Codec.encode(data, registry)

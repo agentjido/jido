@@ -15,7 +15,7 @@ defmodule Jido.Catalog.Discovery do
   users. Discovery is an inventory service. It does not grant permission to
   execute a discovered module.
 
-  Use `list/0`, `list/1`, `get/2`, and `get_by_target/2` for all entry kinds.
+  Use `get/2` and `get_by_target/1` for registered values.
 
   Inline Actions remain implementation details of their owner modules.
 
@@ -31,7 +31,7 @@ defmodule Jido.Catalog.Discovery do
   alias Jido.Catalog.{Entry, Manifest}
   alias Jido.Codec.{Contract, Index}
 
-  @snapshot_key {:jido, :catalog_snapshot}
+  @publication_key {:jido, :catalog}
   @default_applications :loaded
   @option_keys [:applications, :modules]
   @included_plugins [
@@ -45,13 +45,10 @@ defmodule Jido.Catalog.Discovery do
   ]
   @base_entry %{
     id: "jido/schemas/map",
-    kind: :schema,
     vsn: 1,
     target: Jido.Joi.map(),
     provider: Jido.Codec,
-    application: :jido,
-    name: "Map schema",
-    description: "The default Jido map schema"
+    application: :jido
   }
 
   @doc false
@@ -77,8 +74,8 @@ defmodule Jido.Catalog.Discovery do
   @spec catalog() :: Catalog.t()
   def catalog do
     case published() do
-      :not_initialized -> raise_not_initialized()
-      {:error, reason} -> raise_initialization_failed(reason)
+      :not_ready -> raise_not_ready()
+      {:error, reason} -> raise_build_failed(reason)
       %{catalog: %Catalog{} = catalog} -> catalog
     end
   end
@@ -87,33 +84,29 @@ defmodule Jido.Catalog.Discovery do
   @spec codec_index() :: Index.t()
   def codec_index do
     case published() do
-      :not_initialized -> raise_not_initialized()
-      {:error, reason} -> raise_initialization_failed(reason)
+      :not_ready -> raise_not_ready()
+      {:error, reason} -> raise_build_failed(reason)
       %{codecs: %Index{} = codecs} -> codecs
     end
   end
 
-  @doc "Lists all discovered entries, or entries of one kind."
+  @doc "Lists all registered entries."
   @spec list() :: [Entry.t()]
   def list, do: Catalog.list(catalog())
-
-  @doc "Lists discovered entries of one kind."
-  @spec list(Entry.kind()) :: [Entry.t()]
-  def list(kind), do: Catalog.list(catalog(), kind)
 
   @doc "Returns a discovered entry for a stable identifier and `vsn`."
   @spec get(String.t(), pos_integer()) :: Entry.t() | nil
   def get(id, vsn), do: Catalog.get(catalog(), id, vsn)
 
-  @doc "Returns a discovered entry for an exact kind and target."
-  @spec get_by_target(Entry.kind(), term()) :: Entry.t() | nil
-  def get_by_target(kind, target), do: Catalog.get_by_target(catalog(), kind, target)
+  @doc "Returns a discovered registration for a value."
+  @spec get_by_target(term()) :: Entry.t() | nil
+  def get_by_target(target), do: Catalog.get_by_target(catalog(), target)
 
   @doc "Rebuilds and atomically replaces the complete Catalog and Codec index."
   @spec refresh(keyword()) :: :ok | {:error, term()}
   def refresh(opts \\ []) do
-    with {:ok, snapshot} <- build_snapshot(opts) do
-      locked(fn -> :persistent_term.put(@snapshot_key, snapshot) end)
+    with {:ok, publication} <- build_publication(opts) do
+      locked(fn -> :persistent_term.put(@publication_key, publication) end)
       :ok
     end
   end
@@ -124,16 +117,16 @@ defmodule Jido.Catalog.Discovery do
   def initialize(opts \\ []) do
     scan_base = published()
 
-    with {:ok, snapshot} <- build_snapshot(opts) do
+    with {:ok, publication} <- build_publication(opts) do
       locked(fn ->
-        if published() == scan_base, do: :persistent_term.put(@snapshot_key, snapshot)
+        if published() == scan_base, do: :persistent_term.put(@publication_key, publication)
       end)
 
       :ok
     end
   end
 
-  defp build_snapshot(opts) do
+  defp build_publication(opts) do
     with {:ok, sources} <- discovery_modules(opts),
          {:ok, entries, codecs} <- discover_all(sources),
          {:ok, base_entry} <- Entry.new(@base_entry),
@@ -154,7 +147,7 @@ defmodule Jido.Catalog.Discovery do
       {:error, reason} ->
         locked(fn ->
           unless match?(%{catalog: %Catalog{}, codecs: %Index{}}, published()),
-            do: :persistent_term.put(@snapshot_key, {:error, reason})
+            do: :persistent_term.put(@publication_key, {:error, reason})
         end)
 
         Logger.warning("Jido Catalog Discovery did not refresh: #{inspect(reason)}")
@@ -231,7 +224,7 @@ defmodule Jido.Catalog.Discovery do
   end
 
   defp validate_modules(modules) do
-    if Enum.all?(modules, &valid_module_source?/1),
+    if not List.improper?(modules) and Enum.all?(modules, &valid_module_source?/1),
       do: {:ok, modules},
       else: {:error, {:invalid_modules, modules}}
   end
@@ -244,7 +237,7 @@ defmodule Jido.Catalog.Discovery do
   defp validate_atoms(_name, []), do: {:ok, []}
 
   defp validate_atoms(name, values) do
-    if Enum.all?(values, &valid_atom?/1) do
+    if not List.improper?(values) and Enum.all?(values, &valid_atom?/1) do
       {:ok, values}
     else
       {:error, {invalid_atom_list(name), values}}
@@ -367,19 +360,19 @@ defmodule Jido.Catalog.Discovery do
     |> Enum.member?(Jido.Codec.Contract)
   end
 
-  defp published, do: :persistent_term.get(@snapshot_key, :not_initialized)
+  defp published, do: :persistent_term.get(@publication_key, :not_ready)
 
-  defp raise_not_initialized do
+  defp raise_not_ready do
     raise Jido.Codec.Error.internal(
-            :catalog_not_initialized,
-            "Catalog is not initialized"
+            :catalog_not_ready,
+            "Catalog is not ready"
           )
   end
 
-  defp raise_initialization_failed(reason) do
+  defp raise_build_failed(reason) do
     raise Jido.Codec.Error.internal(
-            :catalog_initialization_failed,
-            "Catalog initialization failed: #{inspect(reason)}",
+            :catalog_build_failed,
+            "Catalog build failed: #{inspect(reason)}",
             %{reason: reason}
           )
   end

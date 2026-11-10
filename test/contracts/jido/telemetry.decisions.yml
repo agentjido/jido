@@ -6,8 +6,8 @@
 
 - id: telemetry-test-ownership
   date: 2026-10-20
-  decision: Move Telemetry, Debug, and tracing unit suites to test/contract/jido.telemetry while keeping the real SDK exporter suite under test/system.
-  driver: The focused contract proves component decisions. The system suite proves integration with a supervised SDK and AgentServer.
+  decision: Move Telemetry, Debug, and tracing unit suites to test/contract/jido.telemetry with a separate real SDK exporter integration suite.
+  driver: The focused contract proves component decisions. The separate suite tested integration with a supervised SDK and AgentServer; it was removed on 2026-11-10.
   approved_by: Component hardening pass
 
 - id: telemetry-mutation-profile

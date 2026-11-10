@@ -60,8 +60,8 @@ defmodule Jido.Agent.Codec do
       agent = %{agent | routes: routes}
 
       encode_map(agent,
-        module: &optional_reference(&1, registry, [:agent]),
-        schema: &encode_reference(&1, registry, [:schema]),
+        module: &optional_reference(&1, registry),
+        schema: &encode_reference(&1, registry),
         initial_state: &Value.encode(&1, registry),
         metadata: &Value.encode(&1, registry),
         routes: &encode_list(&1, fn route -> encode_route(route, registry) end),
@@ -79,8 +79,8 @@ defmodule Jido.Agent.Codec do
     decode_map(
       fields,
       [
-        module: &optional_resolve(&1, registry, :agent),
-        schema: &Reference.decode(registry, &1, :schema),
+        module: &optional_resolve(&1, registry),
+        schema: &Reference.decode(registry, &1),
         initial_state: fn value ->
           if Map.has_key?(fields, "initial_state"),
             do: Value.decode(value, registry),
@@ -100,7 +100,7 @@ defmodule Jido.Agent.Codec do
   end
 
   @doc false
-  def encode_route(route, registry, reference \\ &encode_reference/3) do
+  def encode_route(route, registry, reference \\ &encode_reference/2) do
     encode_map(route,
       as: &Value.encode(&1, registry),
       defaults: &Value.encode(&1, registry),
@@ -171,7 +171,7 @@ defmodule Jido.Agent.Codec do
 
   defp encode_handler(%{kind: kind, target: target}, registry, reference)
        when kind in [:action, :flow, :transform] do
-    with {:ok, target} <- reference.(target, registry, kind),
+    with {:ok, target} <- reference.(target, registry),
          do: {:ok, %{"kind" => Atom.to_string(kind), "target" => target}}
   end
 
@@ -194,7 +194,8 @@ defmodule Jido.Agent.Codec do
        when map_size(handler) == 2 and kind in ["action", "flow", "transform"] do
     kind = String.to_existing_atom(kind)
 
-    with {:ok, target} <- at(Reference.decode(registry, target, kind), ["target"]),
+    with {:ok, target} <- at(Reference.decode(registry, target), ["target"]),
+         :ok <- at(handler_module(target, kind), ["target"]),
          do: {:ok, %{kind: kind, target: target}}
   end
 
@@ -273,7 +274,7 @@ defmodule Jido.Agent.Codec do
   end
 
   defp encode_nested_definition(module, registry) when is_atom(module),
-    do: encode_reference(module, registry, :agent)
+    do: encode_reference(module, registry)
 
   defp encode_nested_definition(_definition, _registry),
     do: Error.validation_result(:invalid_definition, [], "Invalid nested Agent definition")
@@ -288,7 +289,7 @@ defmodule Jido.Agent.Codec do
   end
 
   defp decode_nested_definition(value, registry),
-    do: Reference.decode(registry, value, :agent)
+    do: module_reference(value, registry)
 
   defp encode_connection(connection, registry) do
     encode_map(connection,
@@ -314,7 +315,7 @@ defmodule Jido.Agent.Codec do
 
   defp encode_plugin(plugin, registry) do
     encode_map(plugin,
-      provider: &encode_reference(&1, registry, :plugin),
+      provider: &encode_reference(&1, registry),
       data: &Extension.encode_authoring_data(plugin.provider, &1, registry),
       id: nil,
       vsn: nil
@@ -348,7 +349,7 @@ defmodule Jido.Agent.Codec do
   defp decode_plugin(plugin, registry) do
     with {:ok, plugin} <-
            decode_map(plugin,
-             provider: &Reference.decode(registry, &1, :plugin),
+             provider: &module_reference(&1, registry),
              data: nil,
              id: nil,
              vsn: nil
@@ -362,24 +363,38 @@ defmodule Jido.Agent.Codec do
     end
   end
 
-  defp optional_reference(nil, _registry, _kinds), do: {:ok, nil}
+  defp optional_reference(nil, _registry), do: {:ok, nil}
 
-  defp optional_reference(value, registry, kinds),
-    do: encode_reference(value, registry, kinds)
+  defp optional_reference(value, registry),
+    do: encode_reference(value, registry)
 
-  defp optional_resolve(nil, _registry, _kind), do: {:ok, nil}
+  defp optional_resolve(nil, _registry), do: {:ok, nil}
 
-  defp optional_resolve(value, registry, kind),
-    do: Reference.decode(registry, value, kind)
+  defp optional_resolve(value, registry),
+    do: module_reference(value, registry)
 
-  defp encode_reference(value, registry, kinds) do
-    case Reference.encode(registry, kinds, value) do
+  defp module_reference(value, registry) do
+    with {:ok, target} <- Reference.decode(registry, value), :ok <- available_module(target), do: {:ok, target}
+  end
+
+  defp handler_module({module, _function, _arity}, :transform), do: available_module(module)
+  defp handler_module(target, _kind), do: available_module(target)
+
+  defp available_module(module) do
+    if is_atom(module) and module not in [nil, true, false] and Code.ensure_loaded?(module),
+      do: :ok,
+      else:
+        Error.validation_result(:module_not_available, [], "Registered Agent module is not available", %{module: module})
+  end
+
+  defp encode_reference(value, registry) do
+    case Reference.encode(registry, value) do
       {:ok, reference} ->
         {:ok, reference}
 
       {:error, %CatalogError{}} ->
         Error.validation_result(:unknown_reference, [], "Agent Catalog has no reference for a value", %{
-          kinds: List.wrap(kinds)
+          target: value
         })
     end
   end

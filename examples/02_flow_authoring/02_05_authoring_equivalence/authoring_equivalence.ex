@@ -31,9 +31,9 @@ defmodule Jido.Examples.Compilation.AuthoringEquivalence do
 
   def catalog do
     Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-      {"jido/examples/compilation/equivalent_echo", 1} => {:action, Echo},
-      {"jido/examples/compilation/message", 1} => {:atom, :message},
-      {"jido/examples/compilation/empty_schema", 1} => {:schema, Jido.Joi.map()}
+      {"jido/examples/compilation/equivalent_echo", 1} => Echo,
+      {"jido/examples/compilation/message", 1} => :message,
+      {"jido/examples/compilation/empty_schema", 1} => Jido.Joi.map()
     })
   end
 

@@ -104,6 +104,8 @@ defmodule Jido.Agent.Turn do
       ) do
     {:error,
      Error.validation_error("Agent Turn source Signal does not match the received Signal",
+       kind: :input,
+       subject: :source_signal,
        field: :source_signal,
        details: %{
          expected_signal_id: source_signal.id,
@@ -193,6 +195,8 @@ defmodule Jido.Agent.Turn do
   defp validate_execution_mode(mode) do
     {:error,
      Error.validation_error("Agent Turn execution_mode must be :managed or :durable",
+       kind: :input,
+       subject: :execution_mode,
        field: :execution_mode,
        details: %{value: mode}
      )}
@@ -201,6 +205,8 @@ defmodule Jido.Agent.Turn do
   defp invalid_input(value) do
     {:error,
      Error.validation_error("Agent Turn input must be a map, keyword list, or nil",
+       kind: :input,
+       subject: :input,
        field: :input,
        details: %{value: value}
      )}
@@ -216,6 +222,8 @@ defmodule Jido.Agent.Turn do
       {:error, issues} ->
         {:error,
          Error.validation_error("Agent Turn source_signal is invalid",
+           kind: :input,
+           subject: :source_signal,
            field: :source_signal,
            details: %{issues: issues}
          )}
@@ -225,6 +233,8 @@ defmodule Jido.Agent.Turn do
   defp validate_source_signal(value) do
     {:error,
      Error.validation_error("Agent Turn source_signal must be a Jido.Signal or nil",
+       kind: :input,
+       subject: :source_signal,
        field: :source_signal,
        details: %{value: value}
      )}

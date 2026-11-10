@@ -362,6 +362,8 @@ defmodule Jido.Signal.Dispatch do
     if should_normalize_errors?() do
       {:error,
        Error.validation_error("Invalid dispatch configuration", %{
+         kind: :input,
+         subject: "dispatch_config",
          field: "dispatch_config",
          value: dispatch_config_shape(invalid_config),
          reason: :invalid_dispatch_config
@@ -406,6 +408,8 @@ defmodule Jido.Signal.Dispatch do
     if should_normalize_errors?() do
       {:error,
        Error.validation_error("Invalid adapter configuration", %{
+         kind: :input,
+         subject: "config",
          field: "config",
          adapter: adapter,
          reason: reason,

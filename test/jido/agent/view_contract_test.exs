@@ -10,14 +10,14 @@ defmodule Jido.Agent.ViewContractTest do
 
   defp registry do
     Catalog.from_targets!(__MODULE__, :jido, %{
-      {"agents/counter", 1} => {:agent, CounterAgent},
-      {"agents/core", 1} => {:agent, Agent},
-      {"schemas/counter", 1} => {:schema, CounterAgent.definition().schema},
-      {"schemas/empty", 1} => {:schema, Jido.Joi.object(%{})},
-      {"actions/add", 1} => {:action, Add},
-      {"flows/contract", 1} => {:flow, F.Flow},
-      {"transforms/view", 1} => {:transform, {__MODULE__, :transform, 1}},
-      {"atoms/add", 1} => {:atom, :add}
+      {"agents/counter", 1} => CounterAgent,
+      {"agents/core", 1} => Agent,
+      {"schemas/counter", 1} => CounterAgent.definition().schema,
+      {"schemas/empty", 1} => Jido.Joi.object(%{}),
+      {"actions/add", 1} => Add,
+      {"flows/contract", 1} => F.Flow,
+      {"transforms/view", 1} => {__MODULE__, :transform, 1},
+      {"atoms/add", 1} => :add
     })
   end
 
@@ -228,8 +228,8 @@ defmodule Jido.Agent.ViewContractTest do
 
     stable_without_action =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"agents/counter", 1} => {:agent, CounterAgent},
-        {"schemas/counter", 1} => {:schema, CounterAgent.definition().schema}
+        {"agents/counter", 1} => CounterAgent,
+        {"schemas/counter", 1} => CounterAgent.definition().schema
       })
 
     assert {:error, %{message: message}} = View.project(definition, stable_without_action)

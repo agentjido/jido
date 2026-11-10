@@ -80,12 +80,12 @@ defmodule Jido.Codec.RuntimeCodecTest do
   end
 
   setup do
-    previous = :persistent_term.get({:jido, :catalog_snapshot}, :not_initialized)
+    previous = :persistent_term.get({:jido, :catalog}, :not_ready)
 
     on_exit(fn ->
-      if previous == :not_initialized,
-        do: :persistent_term.erase({:jido, :catalog_snapshot}),
-        else: :persistent_term.put({:jido, :catalog_snapshot}, previous)
+      if previous == :not_ready,
+        do: :persistent_term.erase({:jido, :catalog}),
+        else: :persistent_term.put({:jido, :catalog}, previous)
     end)
 
     :ok =
@@ -106,15 +106,15 @@ defmodule Jido.Codec.RuntimeCodecTest do
   end
 
   test "uses Discovery only when routing needs the published Catalog", %{catalog: catalog} do
-    snapshot = :persistent_term.get({:jido, :catalog_snapshot})
-    :persistent_term.erase({:jido, :catalog_snapshot})
+    snapshot = :persistent_term.get({:jido, :catalog})
+    :persistent_term.erase({:jido, :catalog})
     assert {:ok, _document} = Jido.Codec.encode(flow(), catalog: catalog)
     assert {:error, [%Issue{code: :invalid_json}]} = Jido.Codec.decode_json("{")
     assert {:error, [%Issue{code: :invalid_document}]} = Jido.Codec.decode([])
 
     assert_raise Jido.Codec.Error.InternalError, fn -> Jido.Codec.encode(flow()) end
 
-    :persistent_term.put({:jido, :catalog_snapshot}, snapshot)
+    :persistent_term.put({:jido, :catalog}, snapshot)
     assert {:ok, document} = Jido.Codec.encode(flow())
     assert {:ok, %Flow{}} = Jido.Codec.decode(document)
   end

@@ -1,5 +1,5 @@
 defmodule Jido.Catalog.Error do
-  @moduledoc "An invalid Catalog reference, kind, or construction input."
+  @moduledoc "An invalid Catalog reference or registration."
 
   use Splode.Error,
     class: :invalid,

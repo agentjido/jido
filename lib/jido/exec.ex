@@ -887,6 +887,8 @@ defmodule Jido.Exec do
   defp invalid_context(context) do
     {:error,
      Jido.Error.validation_error("context must be a map or keyword list", %{
+       kind: :input,
+       subject: :context,
        field: :context,
        value: context
      })}

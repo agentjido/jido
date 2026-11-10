@@ -1,4 +1,5 @@
 Code.require_file("../support/runner.exs", __DIR__)
+Code.require_file("../support/child_process.exs", __DIR__)
 
 defmodule Jido.Test.Perf.AI.ReActStress do
   @moduledoc false
@@ -37,8 +38,6 @@ defmodule Jido.Test.Perf.AI.ReActStress do
   end
 
   defp isolated_case!(settings) do
-    mix = System.find_executable("mix") || raise "mix executable was not found"
-
     arguments = [
       "run",
       "--no-compile",
@@ -56,16 +55,13 @@ defmodule Jido.Test.Perf.AI.ReActStress do
       "1"
     ]
 
-    {output, status} =
-      System.cmd(mix, arguments,
+    output =
+      Jido.Test.Perf.ChildProcess.mix!(arguments,
         env: [
           {"MIX_ENV", Atom.to_string(Mix.env())},
           {"ERL_FLAGS", "+S 2:2 +SDcpu 1 +SDio 1"}
-        ],
-        stderr_to_stdout: true
+        ]
       )
-
-    if status != 0, do: raise("ReAct benchmark child failed:\n#{output}")
 
     output
     |> String.split("\n")

@@ -52,10 +52,10 @@ defmodule Jido.AI.Reasoning.Strategies.ChainOfThoughtTest do
   test "the Agent round-trips through the shared Agent authoring codec" do
     registry =
       Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-        {"jido.ai/agents/chain-of-thought", 1} => {:agent, ChainOfThoughtAgent},
-        {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
-        {"jido.ai/reasoning/chain-of-thought", 1} => {:flow, ChainOfThought},
-        {"jido.ai/schemas/chain-of-thought-agent-state", 1} => {:schema, ChainOfThoughtAgent.definition().schema}
+        {"jido.ai/agents/chain-of-thought", 1} => ChainOfThoughtAgent,
+        {"jido.ai/agent", 1} => Jido.AI.Agent.Plugin,
+        {"jido.ai/reasoning/chain-of-thought", 1} => ChainOfThought,
+        {"jido.ai/schemas/chain-of-thought-agent-state", 1} => ChainOfThoughtAgent.definition().schema
       })
 
     assert {:ok, json} =

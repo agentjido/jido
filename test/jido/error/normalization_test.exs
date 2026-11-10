@@ -7,20 +7,10 @@ defmodule Jido.Error.NormalizationTest do
   @tag obligation: "jido.error.I1"
   test "constructors accept map options and keep their owned fields" do
     validation = Error.validation_error("Invalid", %{kind: :config, subject: :timeout})
-    action = Error.validation_error("Bad action", %{action: SomeAction})
+    action = Error.validation_error("Bad action", %{kind: :action, subject: SomeAction})
     execution = Error.execution_error("Failed", %{phase: :planning, reason: :timeout})
     routing = Error.routing_error("No route", %{target: :agent, details: %{reason: :unknown}})
     timeout = Error.timeout_error("Timed out", %{timeout: 3_000, details: %{operation: :fetch}})
-    original = Error.execution_error("Original")
-
-    compensation =
-      Error.compensation_error("Compensated", %{
-        original_error: original,
-        compensated: true,
-        result: :ok,
-        details: %{action: :rollback}
-      })
-
     internal = Error.internal_error("Unexpected", %{details: %{reason: :unknown}})
 
     assert {validation.kind, validation.subject} == {:config, :timeout}
@@ -28,9 +18,6 @@ defmodule Jido.Error.NormalizationTest do
     assert {execution.phase, execution.details} == {:planning, %{reason: :timeout}}
     assert {routing.target, routing.details} == {:agent, %{reason: :unknown}}
     assert {timeout.timeout, timeout.details} == {3_000, %{operation: :fetch}}
-
-    assert {compensation.original_error, compensation.compensated, compensation.result, compensation.details} ==
-             {original, true, :ok, %{action: :rollback}}
 
     assert internal.details == %{reason: :unknown}
   end
@@ -42,7 +29,6 @@ defmodule Jido.Error.NormalizationTest do
       Error.execution_error("Failed", details: :invalid),
       Error.routing_error("No route", details: :invalid),
       Error.timeout_error("Timed out", details: :invalid),
-      Error.compensation_error("Failed", details: :invalid),
       Error.internal_error("Internal", details: :invalid),
       UnknownError.exception(message: "Unknown", details: :invalid)
     ]

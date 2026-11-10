@@ -31,17 +31,17 @@ defmodule Jido.Examples.Plugins.DSL.Agent do
     definition = definition()
 
     Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-      {"agents/thresholds", 1} => {:agent, __MODULE__},
-      {"schemas/thresholds", 1} => {:schema, definition.schema},
-      {"actions/threshold-add", 1} => {:action, hd(definition.routes).handler.target},
-      {"plugins/thresholds", 1} => {:plugin, Jido.Examples.Plugins.DSL.Thresholds},
-      {"atoms/add", 1} => {:atom, :add},
-      {"atoms/on", 1} => {:atom, :on},
-      {"atoms/thresholds", 1} => {:atom, :thresholds},
-      {"atoms/at", 1} => {:atom, :at},
-      {"atoms/name", 1} => {:atom, :name},
-      {"atoms/first", 1} => {:atom, :first},
-      {"atoms/third", 1} => {:atom, :third}
+      {"agents/thresholds", 1} => __MODULE__,
+      {"schemas/thresholds", 1} => definition.schema,
+      {"actions/threshold-add", 1} => hd(definition.routes).handler.target,
+      {"plugins/thresholds", 1} => Jido.Examples.Plugins.DSL.Thresholds,
+      {"atoms/add", 1} => :add,
+      {"atoms/on", 1} => :on,
+      {"atoms/thresholds", 1} => :thresholds,
+      {"atoms/at", 1} => :at,
+      {"atoms/name", 1} => :name,
+      {"atoms/first", 1} => :first,
+      {"atoms/third", 1} => :third
     })
   end
 end

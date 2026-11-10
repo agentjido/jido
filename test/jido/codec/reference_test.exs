@@ -11,35 +11,27 @@ defmodule Jido.Codec.ReferenceTest do
   setup do
     catalog =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"tests/action", 1} => {:action, Action}
+        {"tests/action", 1} => Action
       })
 
     %{catalog: catalog}
   end
 
   test "encodes and decodes exact typed references", %{catalog: catalog} do
-    assert Reference.encode(catalog, :action, Action) ==
+    assert Reference.encode(catalog, Action) ==
              {:ok, %{"id" => "tests/action", "vsn" => 1}}
 
-    assert Reference.decode(
-             catalog,
-             %{"id" => "tests/action", "vsn" => 1},
-             :action
-           ) == {:ok, Action}
+    assert Reference.decode(catalog, %{"id" => "tests/action", "vsn" => 1}) == {:ok, Action}
   end
 
-  test "rejects malformed, unknown, and wrong-kind documents", %{catalog: catalog} do
+  test "rejects malformed references and leaves target roles to consumers", %{catalog: catalog} do
     assert {:error, %Error{details: %{field: "extra"}}} =
-             Reference.decode(
-               catalog,
-               %{"id" => "tests/action", "vsn" => 1, "extra" => true},
-               :action
-             )
+             Reference.decode(catalog, %{"id" => "tests/action", "vsn" => 1, "extra" => true})
 
     assert {:error, %Error{details: %{field: "id"}}} =
-             Reference.decode(catalog, %{"vsn" => 1}, :action)
+             Reference.decode(catalog, %{"vsn" => 1})
 
-    assert {:error, %Error{details: %{actual: :action, expected: :flow}}} =
-             Reference.decode(catalog, %{"id" => "tests/action", "vsn" => 1}, :flow)
+    assert {:ok, Action} =
+             Reference.decode(catalog, %{"id" => "tests/action", "vsn" => 1})
   end
 end

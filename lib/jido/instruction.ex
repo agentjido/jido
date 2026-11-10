@@ -419,6 +419,8 @@ defmodule Jido.Instruction do
   defp fetch_target(_attrs) do
     {:error,
      Error.validation_error("Invalid instruction configuration", %{
+       kind: :input,
+       subject: :target,
        field: :target,
        reason: :missing
      })}
@@ -461,6 +463,8 @@ defmodule Jido.Instruction do
   defp require_map_field(value, field) do
     {:error,
      Error.validation_error("Instruction binding #{field} must be a map", %{
+       kind: :input,
+       subject: field,
        field: field,
        value: value,
        reason: :invalid_binding_data

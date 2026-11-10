@@ -37,17 +37,17 @@ end
 
 catalog =
   Jido.Catalog.from_targets!(DocumentGuide, :jido, %{
-    {"agents/ticket", 1} => {:agent, DocumentGuide.TicketAgent},
-    {"schemas/ticket", 1} => {:schema, DocumentGuide.TicketAgent.definition().schema},
-    {"actions/assign-ticket", 1} => {:action, DocumentGuide.AssignTicket},
-    {"atoms/assign", 1} => {:atom, :assign},
-    {"atoms/queue", 1} => {:atom, :queue}
+    {"agents/ticket", 1} => DocumentGuide.TicketAgent,
+    {"schemas/ticket", 1} => DocumentGuide.TicketAgent.definition().schema,
+    {"actions/assign-ticket", 1} => DocumentGuide.AssignTicket,
+    {"atoms/assign", 1} => :assign,
+    {"atoms/queue", 1} => :queue
   })
 
 %Jido.Catalog{} = catalog
 ```
 
-Each key is `{id, vsn}`, and each value is `{kind, target}`. See [Catalog and Discovery](../data/catalog.md).
+Each key is `{id, vsn}`, and each value is the registered target. See [Catalog and Discovery](../data/catalog.md).
 
 ## Encode a definition
 
@@ -100,14 +100,17 @@ Decoding resolves only entries in the Catalog you pass, so the Catalog decides w
 
 ## Know what must be in the Catalog
 
-| Definition part | Catalog kind |
+| Definition part | Registered value |
 | --- | --- |
-| `module`, when set | `:agent` |
-| The state schema | `:schema` |
-| An Action or Flow route target | `:action`, `:flow` |
-| A `{module, function, 1}` transform target | `:transform` |
-| A Plugin provider | `:plugin` |
-| An atom in data, such as a helper name or Map key | `:atom` |
+| `module`, when set | Agent module |
+| The state schema | Joi schema |
+| An Action or Flow route target | Action or Flow module |
+| A transform target | `{module, function, 1}` tuple |
+| A Plugin provider | Plugin module |
+| An atom in data, such as a helper name or Map key | Atom value |
+
+The Agent reader checks these values for each field. A module that cannot load
+returns an error during decoding.
 
 A missing entry returns a `Jido.Codec.Error.InvalidError`.
 

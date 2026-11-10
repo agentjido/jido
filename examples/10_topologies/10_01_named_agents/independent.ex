@@ -15,12 +15,12 @@ defmodule Jido.Examples.Topology.Independent do
   @doc "Stable references for a stored topology with Plugin-bearing members."
   def registry do
     Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-      {"agents/independent", 1} => {:agent, __MODULE__},
-      {"agents/cell", 1} => {:agent, Jido.Examples.Topology.Independent.Cell},
-      {"schemas/owner", 1} => {:schema, definition().schema},
-      {"atoms/left", 1} => {:atom, :left},
-      {"atoms/right", 1} => {:atom, :right},
-      {"atoms/label", 1} => {:atom, :label}
+      {"agents/independent", 1} => __MODULE__,
+      {"agents/cell", 1} => Jido.Examples.Topology.Independent.Cell,
+      {"schemas/owner", 1} => definition().schema,
+      {"atoms/left", 1} => :left,
+      {"atoms/right", 1} => :right,
+      {"atoms/label", 1} => :label
     })
   end
 end

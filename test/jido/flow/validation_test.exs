@@ -19,9 +19,9 @@ defmodule Jido.Flow.ValidationTest do
 
   defp registry do
     Catalog.from_targets!(__MODULE__, :jido, %{
-      {"action", 1} => {:action, ProbeAction},
-      {"schema", 1} => {:schema, Jido.Joi.map()},
-      {"flow", 1} => {:flow, NestedFlow}
+      {"action", 1} => ProbeAction,
+      {"schema", 1} => Jido.Joi.map(),
+      {"flow", 1} => NestedFlow
     })
   end
 
@@ -528,7 +528,7 @@ end
     assert error.line == 4
   end
 
-  test "unloaded targets remain valid for inert construction and decoding" do
+  test "hydration rejects a registered module that is not available" do
     component =
       Jido.Test.Flow.Component.step!(
         name: "one",
@@ -547,11 +547,14 @@ end
 
     registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"unloaded", 1} => {:action, NotLoadedAction},
-        {"schema", 1} => {:schema, Jido.Joi.map()}
+        {"unloaded", 1} => NotLoadedAction,
+        {"schema", 1} => Jido.Joi.map()
       })
 
     assert {:ok, document} = Codec.encode(flow, registry)
-    assert {:ok, ^flow} = Codec.diagnose(document, registry)
+    assert {:error, %Jido.Error.Invalid{errors: [error]}} = Codec.diagnose(document, registry)
+    assert error.message == "stored Flow module is not available"
+    assert error.details.module == NotLoadedAction
+    assert error.details.path == ["components", 0, "call", "target"]
   end
 end

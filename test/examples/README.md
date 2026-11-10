@@ -14,8 +14,7 @@ Every paired test must:
 
 Executable test modules use the production `Jido.Examples.*` namespace.
 Shared loaders and fixtures use `Jido.Test.Examples.*`. Each catalog entry
-names its component, and each paired test owns one executable documentation
-claim in `test/quality/component_proof.yml`.
+names its component and pairs a source lesson with its executable test.
 
 This pattern prevents default `mix test` from loading example source:
 

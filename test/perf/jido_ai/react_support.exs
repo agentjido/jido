@@ -181,6 +181,7 @@ defmodule Jido.Test.Perf.AI.ReActSupport do
       Enum.map_reduce(1..requests, initial, fn request_number, current ->
         started = System.monotonic_time()
         {:ok, next, [%Reply{signal: reply}]} = Agent.cmd(current, request(request_number))
+        elapsed_us = elapsed_us(started)
         validate_reply!(reply)
         session = next.state.session
 
@@ -189,7 +190,7 @@ defmodule Jido.Test.Perf.AI.ReActSupport do
           |> Map.merge(%{
             id: "request/#{request_number}",
             request: request_number,
-            elapsed_us: elapsed_us(started),
+            elapsed_us: elapsed_us,
             thread_entries: length(session.thread.entries),
             session_external_bytes: :erlang.external_size(session),
             model_calls: reply.data.model_calls,
@@ -212,6 +213,7 @@ defmodule Jido.Test.Perf.AI.ReActSupport do
       agent = Agent.instantiate!(id: "fresh-#{request_number}")
       started = System.monotonic_time()
       {:ok, next, [%Reply{signal: reply}]} = Agent.cmd(agent, Agent.request_signal!(params))
+      execution_us = elapsed_us(started)
       validate_reply!(reply)
 
       sizes(next)
@@ -219,7 +221,7 @@ defmodule Jido.Test.Perf.AI.ReActSupport do
         id: "request/#{request_number}",
         request: request_number,
         compile_us: compile_us,
-        execution_us: elapsed_us(started),
+        execution_us: execution_us,
         workflow_components: map_size(workflow.components),
         workflow_external_bytes: :erlang.external_size(workflow),
         thread_entries: length(next.state.session.thread.entries),

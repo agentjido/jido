@@ -571,14 +571,30 @@ defmodule Jido.Agent.CodecTest do
     end
   end
 
+  @tag obligation: "jido.agent.I20"
+  test "hydration fails when a registered Agent provenance module is absent" do
+    definition = Jido.Agent.define!(%{name: "missing_module", module: __MODULE__.AbsentModule})
+
+    catalog =
+      Catalog.from_targets!(__MODULE__, :jido, %{
+        {"agent/missing", 1} => __MODULE__.AbsentModule,
+        {"agent/schema", 1} => definition.schema
+      })
+
+    assert {:ok, document} = Jido.Agent.Codec.encode(definition, catalog)
+
+    assert {:error, [%Jido.Codec.Issue{code: :module_not_available, path: ["definition", "module"]}]} =
+             Jido.Agent.Codec.decode(document, catalog)
+  end
+
   defp registry(definition, target) do
     entries = %{
-      {"schemas/agent", 1} => {:schema, definition.schema},
-      {"atoms/by", 1} => {:atom, :by}
+      {"schemas/agent", 1} => definition.schema,
+      {"atoms/by", 1} => :by
     }
 
     entries =
-      if target, do: Map.put(entries, {"actions/target", 1}, {:action, target}), else: entries
+      if target, do: Map.put(entries, {"actions/target", 1}, target), else: entries
 
     Catalog.from_targets!(__MODULE__, :jido, entries)
   end

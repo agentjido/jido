@@ -24,11 +24,11 @@ defmodule Jido.Flow.Codec do
 
   @impl true
   @spec encode(term(), term()) :: {:ok, document()} | {:error, Exception.t()}
-  def encode(%Flow{} = flow, %Catalog{} = catalog) do
+  def encode(%Flow{} = flow, catalog) when is_struct(catalog, Catalog) or catalog == :current do
     with {:ok, flow} <- Flow.validate(flow), do: Writer.encode(flow, catalog)
   end
 
-  def encode(value, %Catalog{}),
+  def encode(value, catalog) when is_struct(catalog, Catalog) or catalog == :current,
     do: {:error, Error.validation_error("expected a Jido.Flow artifact", %{value: value})}
 
   def encode(_flow, catalog),
@@ -48,9 +48,9 @@ defmodule Jido.Flow.Codec do
   end
 
   @doc false
-  @spec diagnose(document(), Catalog.t()) ::
+  @spec diagnose(document(), Catalog.source()) ::
           {:ok, Flow.t()} | {:error, Error.Invalid.t()}
-  def diagnose(document, %Catalog{} = catalog) do
+  def diagnose(document, catalog) when is_struct(catalog, Catalog) or catalog == :current do
     case Reader.decode(document, catalog) do
       {:ok, attrs, paths} ->
         case Definition.diagnose_lowered(attrs) do

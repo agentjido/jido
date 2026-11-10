@@ -314,6 +314,12 @@ defmodule Jido.Signal.Catalog do
   defp identity(signal), do: %{type: signal.type, dataschema: signal.dataschema}
 
   defp error(code, details) do
+    details =
+      case Map.fetch(details, :field) do
+        {:ok, field} -> Map.merge(details, %{kind: :input, subject: field})
+        :error -> details
+      end
+
     {:error, Error.validation_error(Map.fetch!(@error_messages, code), Map.put(details, :code, code))}
   end
 end

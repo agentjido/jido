@@ -224,8 +224,8 @@ defmodule Jido.Exec.WaitsTest do
 
     registry =
       Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-        {"map", 1} => {:schema, Jido.Joi.map()},
-        {"id", 1} => {:atom, :id}
+        {"map", 1} => Jido.Joi.map(),
+        {"id", 1} => :id
       })
 
     assert {:ok, encoded} = Jido.Test.Flow.Codec.encode(data, registry)

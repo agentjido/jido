@@ -42,12 +42,12 @@ defmodule Jido.Examples.AI.JSONAgent do
   @doc "Returns the allowlist used to encode and decode the Agent document."
   def registry do
     Catalog.from_targets!(__MODULE__, :jido, %{
-      {"jido.ai/agents/simple", 3} => {:agent, SimpleAgent},
-      {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
-      {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
-      {"jido.ai/examples/tools/add", 1} => {:action, Jido.Examples.AI.Tools.Add},
-      {"jido.ai/examples/tools/multiply", 1} => {:action, Jido.Examples.AI.Tools.Multiply},
-      {"jido.ai/schemas/simple-agent-state", 1} => {:schema, definition().schema}
+      {"jido.ai/agents/simple", 3} => SimpleAgent,
+      {"jido.ai/agent", 1} => Jido.AI.Agent.Plugin,
+      {"jido.ai/reasoning/react", 1} => ReAct,
+      {"jido.ai/examples/tools/add", 1} => Jido.Examples.AI.Tools.Add,
+      {"jido.ai/examples/tools/multiply", 1} => Jido.Examples.AI.Tools.Multiply,
+      {"jido.ai/schemas/simple-agent-state", 1} => definition().schema
     })
   end
 

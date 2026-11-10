@@ -50,7 +50,7 @@ defmodule Jido.Codec do
   end
 
   @default_maximum_json_bytes 8_388_608
-  @catalog_snapshot_key {:jido, :catalog_snapshot}
+  @catalog_publication_key {:jido, :catalog}
   @option_keys [:catalog, :codec, :maximum_json_bytes]
 
   @typedoc "A JSON object produced or consumed by a document codec."
@@ -81,8 +81,8 @@ defmodule Jido.Codec do
 
   Routing by document `type` needs the published codec index, and resolving
   references without `:catalog` needs the published Catalog. Until Discovery
-  publishes them, this returns an Issue with the code `:catalog_not_initialized`
-  or `:catalog_initialization_failed`.
+  publishes them, this returns an Issue with the code `:catalog_not_ready`
+  or `:catalog_build_failed`.
   """
   @spec decode_json(String.t(), keyword()) :: {:ok, struct()} | {:error, [Issue.t()]}
   def decode_json(json, opts \\ []) do
@@ -206,6 +206,7 @@ defmodule Jido.Codec do
         invalid_codec_return(codec)
     end
   rescue
+    error in Error.InternalError -> issue(error.code, [], error.message, error.details)
     error -> codec_failure(codec, :error, Exception.message(error))
   catch
     kind, reason -> codec_failure(codec, kind, inspect(reason, limit: 20, printable_limit: 1_000))
@@ -228,6 +229,9 @@ defmodule Jido.Codec do
          )}
     end
   rescue
+    error in Error.InternalError ->
+      {:error, error}
+
     error ->
       {:error,
        Error.internal(
@@ -403,38 +407,45 @@ defmodule Jido.Codec do
 
   defp catalog!(opts) do
     case Keyword.get(opts, :catalog) do
-      nil -> published_catalog!()
-      %Catalog{} = catalog -> catalog
-      value -> raise ArgumentError, "Catalog is invalid: #{inspect(value)}"
+      nil ->
+        _catalog = current_catalog!()
+        :current
+
+      %Catalog{} = catalog ->
+        catalog
+
+      value ->
+        raise ArgumentError, "Catalog is invalid: #{inspect(value)}"
     end
   end
 
-  defp published_catalog! do
-    case :persistent_term.get(@catalog_snapshot_key, :not_initialized) do
+  @doc false
+  def current_catalog! do
+    case :persistent_term.get(@catalog_publication_key, :not_ready) do
       %{catalog: %Catalog{} = catalog} -> catalog
-      {:error, reason} -> raise_catalog_initialization_failed(reason)
-      :not_initialized -> raise_catalog_not_initialized()
+      {:error, reason} -> raise_catalog_build_failed(reason)
+      :not_ready -> raise_catalog_not_ready()
     end
   end
 
   defp published_codec_index! do
-    case :persistent_term.get(@catalog_snapshot_key, :not_initialized) do
+    case :persistent_term.get(@catalog_publication_key, :not_ready) do
       %{codecs: %Index{} = index} -> index
-      {:error, reason} -> raise_catalog_initialization_failed(reason)
-      :not_initialized -> raise_catalog_not_initialized()
+      {:error, reason} -> raise_catalog_build_failed(reason)
+      :not_ready -> raise_catalog_not_ready()
     end
   end
 
-  defp raise_catalog_initialization_failed(reason) do
+  defp raise_catalog_build_failed(reason) do
     raise Error.internal(
-            :catalog_initialization_failed,
-            "Catalog initialization failed: #{inspect(reason)}",
+            :catalog_build_failed,
+            "Catalog build failed: #{inspect(reason)}",
             %{reason: reason}
           )
   end
 
-  defp raise_catalog_not_initialized do
-    raise Error.internal(:catalog_not_initialized, "Catalog is not initialized")
+  defp raise_catalog_not_ready do
+    raise Error.internal(:catalog_not_ready, "Catalog is not ready")
   end
 
   defp document_error(%Document.Error{} = error),

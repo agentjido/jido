@@ -10,8 +10,8 @@ defmodule Jido.Codec.ValueTest do
   test "round trips portable values and registered atoms" do
     registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"atoms/count", 1} => {:atom, :count},
-        {"atoms/ready", 1} => {:atom, :ready}
+        {"atoms/count", 1} => :count,
+        {"atoms/ready", 1} => :ready
       })
 
     value = %{"status" => :ready, 3 => [true, nil], count: 2}
@@ -39,8 +39,8 @@ defmodule Jido.Codec.ValueTest do
   test "sorts map entries by the encoded key" do
     registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"atoms/z-write-a", 1} => {:atom, :a},
-        {"atoms/a-write-z", 1} => {:atom, :z}
+        {"atoms/z-write-a", 1} => :a,
+        {"atoms/a-write-z", 1} => :z
       })
 
     assert {:ok, %{"entries" => entries}} = Value.encode(%{a: 1, z: 2}, registry)
@@ -67,11 +67,11 @@ defmodule Jido.Codec.ValueTest do
              Value.encode(%{{:unsupported, :key} => self()}, registry)
   end
 
-  test "Catalog rejects a non-atom target for an atom entry" do
-    assert {:error, {:invalid_catalog_manifest, __MODULE__, _reason}} =
-             Catalog.from_targets(__MODULE__, :jido, %{
-               {"atoms/invalid", 1} => {:atom, "not-an-atom"}
-             })
+  test "portable atom decoding validates the resolved value" do
+    registry = Catalog.from_targets!(__MODULE__, :jido, %{{"atoms/invalid", 1} => "not-an-atom"})
+
+    assert {:error, %Error{reason: :atom}} =
+             Value.decode(%{"$type" => "atom", "id" => "atoms/invalid", "vsn" => 1}, registry)
   end
 
   test "decode rejects invalid UTF-8 strings at every value position" do
@@ -91,8 +91,8 @@ defmodule Jido.Codec.ValueTest do
   test "decode rejects a plain map that would become a struct" do
     registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"atoms/struct", 1} => {:atom, :__struct__},
-        {"atoms/uri", 1} => {:atom, URI}
+        {"atoms/struct", 1} => :__struct__,
+        {"atoms/uri", 1} => URI
       })
 
     encoded = %{
@@ -142,7 +142,7 @@ defmodule Jido.Codec.ValueTest do
 
   test "every decoded portable value can be encoded again" do
     registry =
-      Catalog.from_targets!(__MODULE__, :jido, %{{"atoms/ready", 1} => {:atom, :ready}})
+      Catalog.from_targets!(__MODULE__, :jido, %{{"atoms/ready", 1} => :ready})
 
     for encoded <- [
           nil,

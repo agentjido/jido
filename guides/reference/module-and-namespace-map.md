@@ -217,12 +217,11 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 
 | Module | Purpose |
 | --- | --- |
-| `Jido.Catalog` | An immutable, revisioned inventory of trusted Jido definitions. |
+| `Jido.Catalog` | A passive registry of explicitly registered values. |
 | `Jido.Catalog.Discovery` | Builds and atomically publishes the application-wide Catalog. |
 | `Jido.Catalog.Entry` | One stable definition in a Jido Catalog. |
-| `Jido.Catalog.Error` | An invalid Catalog reference, kind, or construction input. |
+| `Jido.Catalog.Error` | An invalid Catalog reference or construction input. |
 | `Jido.Catalog.Manifest` | A validated static Catalog contribution from one OTP application. |
-| `Jido.Catalog.View` | An immutable filtered view of a Jido Catalog. |
 
 ### Jido.Codec
 
@@ -247,7 +246,6 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | Module | Purpose |
 | --- | --- |
 | `Jido.Error` | Unified error handling for the Jido ecosystem using Splode. |
-| `Jido.Error.CompensationError` | Error for saga compensation failures. |
 | `Jido.Error.ExecutionError` | Error for runtime execution failures. |
 | `Jido.Error.InternalError` | Error for unexpected internal failures. |
 | `Jido.Error.RoutingError` | Error for signal routing and dispatch failures. |

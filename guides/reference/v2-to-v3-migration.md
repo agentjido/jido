@@ -455,7 +455,7 @@ The V2 Mix tasks are gone: `mix jido.install`, `mix jido.gen.agent`, `mix jido.g
 
 ## Errors
 
-`Jido.Error` keeps `Jido.Error.ValidationError`, `Jido.Error.ExecutionError`, `Jido.Error.RoutingError`, `Jido.Error.TimeoutError`, `Jido.Error.CompensationError`, and `Jido.Error.InternalError`. Errors from Actions, Signals, and Flows use these same structs. A Plugin rejection from `c:Jido.Plugin.prepare/2` or `c:Jido.Plugin.admit/3` can still return your own reason. See [Jido Error Contracts](../data/error-contracts.md).
+`Jido.Error` keeps `Jido.Error.ValidationError`, `Jido.Error.ExecutionError`, `Jido.Error.RoutingError`, `Jido.Error.TimeoutError`, and `Jido.Error.InternalError`. Errors from Actions, Signals, and Flows use these same structs. A Plugin rejection from `c:Jido.Plugin.prepare/2` or `c:Jido.Plugin.admit/3` can still return your own reason. See [Jido Error Contracts](../data/error-contracts.md).
 
 ## Checklist
 

@@ -170,7 +170,7 @@ These survey counts are orientation data. They can overlap or drift and must not
 15. Give direct, AgentServer-managed, and durable execution the same Flow semantics. Execution contexts add lifecycle policy but do not change Flow meaning.
 16. Put typed wait and continuation values in `Jido.Exec`. AgentServer owns their live admission, expiry, single-resume, and recovery lifecycle. Persistence owns their durable representation.
 17. Publish stable semantic events for AgentServer, Flow, Actions, and Plugins under `Jido.Telemetry`. Status, history, tracing, and a live inspector derive from those events.
-18. Add `Jido.Catalog.View` as a filtered inventory value. It can restrict visible kinds and targets, but it does not authorize execution.
+18. Keep Catalog passive: resolve registered values by ID and version. Consumers validate domain roles. See ADR 0004.
 19. Keep Ash, Spark, Runic, and application-specific frameworks out of the required public Agent model. Integrations use external packages, Actions, Flows, Plugins, and Catalog manifests.
 20. Keep code sandboxing outside the actor kernel. An optional sandbox capability can call approved Actions, but OTP process isolation is not a sandbox.
 21. Treat source-aware validation and inspection data as namespace contracts. Generated modules cannot be the only source of errors, status, or plans.
@@ -215,7 +215,7 @@ modules, functions, argument shapes, return shapes, or call paths.
   owner for each policy and no compatibility-only path to that owner.
 - Data types belong below the runtimes that use them.
 - Encoding and portability rules belong to Codec.
-- Stable definition identity, version, kind, provider, and target lookup belong to Catalog.
+- Registered value identity, version, provider, and target lookup belong to Catalog.
 - Catalog is application-wide inventory. It is not authorization.
 - Installed Jido-aware packages contribute deterministic static Catalog manifests.
 - Flow is the only Agent behavior boundary. Actions are Flow leaf work units.
@@ -226,7 +226,6 @@ modules, functions, argument shapes, return shapes, or call paths.
 - Typed waits and continuations are Exec values. AgentServer owns their live lifecycle.
 - Plugin capabilities own their state and lifecycle facets. They cannot bypass the Agent commit boundary.
 - Semantic events are public observation data. Telemetry and tracing do not decide behavior.
-- Catalog views filter inventory. They do not grant authority.
 - Validation, authorization, process isolation, and sandboxing are separate controls.
 - The basic Agent path cannot require Ash, Spark, Runic, or another application framework.
 - Configuration ownership follows its consumer. Plugin option references belong to `Jido.Plugin.Config`; instance options remain under `Jido.Instance`.
@@ -353,11 +352,11 @@ The current included Plugin list is AI, Scheduler, Sensor Manager, Bus Manager, 
 
 ### Catalog
 
-`Jido.Catalog` is the application-wide, immutable inventory of trusted definitions. It owns stable IDs, versions, kinds, targets, providers, and deterministic revision data.
+`Jido.Catalog` is a passive registry of values under stable IDs and versions. It records registration sources; consumers validate domain roles.
 
-`Jido.Catalog.Discovery` collects static manifests from installed Jido-aware OTP applications, validates the complete result, and publishes one atomic revision. All Jido instances use the same revision. Catalog is inventory, not execution permission.
+`Jido.Catalog.Discovery` collects static manifests from installed Jido-aware OTP applications, validates the complete result, and publishes the current Catalog asynchronously. Failed refreshes keep the last valid Catalog. Registration does not grant execution permission.
 
-`Jido.Catalog.View` filters an immutable Catalog for one Agent, Plugin, application boundary, or request. It does not make an authorization decision. The Action or application service still enforces authority when work runs.
+Catalog has no semantic kinds, filtered Views, revision tracking, or operation snapshots. Hydration uses current lookups; callers can supply an explicit Catalog. See [ADR 0004](../adr/0004-passive-catalog-reference-resolution.md).
 
 ### Developer experience and authority
 
@@ -383,7 +382,6 @@ flowchart TD
   App --> Included["Included Plugin capabilities"]
 
   CatalogDiscovery --> Catalog["Jido.Catalog"]
-  CatalogView["Jido.Catalog.View"] --> Catalog
 
   Instance --> Server["Jido.AgentServer"]
   Server --> Agent["Jido.Agent"]
@@ -521,7 +519,6 @@ Disposition terms:
 | `Jido.Error.RoutingError` | Keep | Canonical routing exception |
 | `Jido.Error.TimeoutError` | Keep | Canonical timeout exception |
 | `Jido.Error.InternalError` | Keep | Canonical internal exception |
-| `Jido.Error.CompensationError` | Keep | Canonical compensation exception |
 
 ### Codec
 
@@ -555,7 +552,6 @@ Disposition terms:
 | `Jido.Catalog` | Added | Application-wide immutable definition inventory and query API |
 | `Jido.Catalog.Entry` | Added | Stable ID, version, kind, target, provider, and descriptive metadata |
 | `Jido.Catalog.Manifest` | Added | Static package and provider contribution validation |
-| `Jido.Catalog.View` | Added | Immutable filtered inventory for one Agent, Plugin, application boundary, or request; it does not authorize execution |
 | `Jido.Catalog.Discovery` | Added | Composition-owned collection and atomic application-wide publication; `included_plugins/0` publishes the exact first-party list for this release |
 
 ### Joi and expression primitives

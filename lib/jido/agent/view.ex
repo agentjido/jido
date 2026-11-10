@@ -42,7 +42,7 @@ defmodule Jido.Agent.View do
            limit(Map.get(opts, :operation_limit, @default_operation_limit)),
          {:ok, agent} <- definition(source),
          {:ok, agent_type} <- agent_type(agent.module, catalog),
-         {:ok, schema} <- Reference.encode(catalog, :schema, agent.schema),
+         {:ok, schema} <- Reference.encode(catalog, agent.schema),
          {:ok, operations} <- operations(agent.routes, catalog, limit),
          view <- build(agent, agent_type, schema, operations),
          :ok <- Document.check(view) do
@@ -51,7 +51,7 @@ defmodule Jido.Agent.View do
   end
 
   defp agent_type(nil, _registry), do: {:ok, nil}
-  defp agent_type(module, catalog), do: Reference.encode(catalog, :agent, module)
+  defp agent_type(module, catalog), do: Reference.encode(catalog, module)
 
   defp definition(%Agent{} = agent) do
     Agent.validate(agent)
@@ -80,12 +80,12 @@ defmodule Jido.Agent.View do
     with {:ok, operation} <-
            route
            |> Map.put(:defaults, %{})
-           |> AgentCodec.encode_route(registry, &encode_reference/3),
+           |> AgentCodec.encode_route(registry, &encode_reference/2),
          do: {:ok, Map.delete(operation, "defaults")}
   end
 
-  defp encode_reference(target, registry, kind),
-    do: Reference.encode(registry, kind, target)
+  defp encode_reference(target, registry),
+    do: Reference.encode(registry, target)
 
   defp build(agent, agent_type, schema, operations) do
     %{

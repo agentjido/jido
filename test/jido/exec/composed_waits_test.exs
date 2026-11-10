@@ -464,10 +464,10 @@ defmodule Jido.Exec.ComposedWaitsTest do
 
     registry =
       Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-        {"map", 1} => {:schema, Jido.Joi.map()},
-        {"decide", 1} => {:action, Decide},
-        {"expand", 1} => {:action, Expand},
-        {"id", 1} => {:atom, :id}
+        {"map", 1} => Jido.Joi.map(),
+        {"decide", 1} => Decide,
+        {"expand", 1} => Expand,
+        {"id", 1} => :id
       })
 
     assert {:ok, document} = Jido.Test.Flow.Codec.encode(definition, registry)
@@ -530,10 +530,10 @@ defmodule Jido.Exec.ComposedWaitsTest do
 
     registry =
       Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-        {"map", 1} => {:schema, Jido.Joi.map()},
-        {"child", 1} => {:action, Child},
-        {"record", 1} => {:action, Record},
-        {"id", 1} => {:atom, :id}
+        {"map", 1} => Jido.Joi.map(),
+        {"child", 1} => Child,
+        {"record", 1} => Record,
+        {"id", 1} => :id
       })
 
     assert {:ok, encoded} = Jido.Test.Flow.Codec.encode(definition, registry)

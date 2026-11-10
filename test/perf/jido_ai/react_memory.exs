@@ -14,6 +14,7 @@
 # Use JIDO_MEMORY_BENCH_PROFILE=expanded to run the larger comparison matrix.
 
 Code.require_file("../support/result.exs", __DIR__)
+Code.require_file("../support/child_process.exs", __DIR__)
 
 defmodule Jido.Test.Perf.AI.ReActMemory.Tool do
   use Jido.Action,
@@ -547,12 +548,10 @@ defmodule Jido.Test.Perf.AI.ReActMemory do
   end
 
   defp run_isolated_case(scenario) do
-    mix = System.find_executable("mix") || raise "mix executable was not found"
     script = Path.relative_to_cwd(__ENV__.file)
 
-    {output, status} =
-      System.cmd(
-        mix,
+    output =
+      Jido.Test.Perf.ChildProcess.mix!(
         [
           "run",
           "--no-compile",
@@ -570,12 +569,8 @@ defmodule Jido.Test.Perf.AI.ReActMemory do
           Integer.to_string(scenario.iteration)
         ],
         env: [{"MIX_ENV", Atom.to_string(Mix.env())}],
-        stderr_to_stdout: true
+        timeout: 660_000
       )
-
-    if status != 0 do
-      raise "isolated case failed for #{inspect(scenario)}:\n#{output}"
-    end
 
     output
     |> String.split("\n")
@@ -651,7 +646,7 @@ defmodule Jido.Test.Perf.AI.ReActMemory do
   end
 
   defp report(results, sample_ms, profile) do
-    metadata = metadata(sample_ms, profile)
+    metadata = metadata(results, sample_ms, profile)
 
     artifact = %{
       benchmark_result_schema_version: Result.schema_version(),
@@ -671,23 +666,26 @@ defmodule Jido.Test.Perf.AI.ReActMemory do
     end
   end
 
-  defp metadata(sample_ms, profile) do
+  defp metadata(results, sample_ms, profile) do
+    scenarios =
+      results
+      |> Enum.map(
+        &Map.take(&1, [:strategy, :mode, :workload, :rounds, :tools_per_round, :max_concurrency, :payload_bytes])
+      )
+      |> Enum.uniq()
+
     Result.metadata("jido.ai.react.memory", profile, %{
-      concurrency: "up to #{profile_max_concurrency(profile)} tools",
+      input_size:
+        "#{length(scenarios)} scenarios; rounds #{results |> Enum.map(& &1.rounds) |> Enum.uniq() |> Enum.join(", ")}",
+      concurrency: "up to #{results |> Enum.map(& &1.max_concurrency) |> Enum.max()} tools",
+      sample_count: results |> Enum.map(& &1.iteration) |> Enum.uniq() |> length(),
+      scenarios: scenarios,
       jido_revision: git_revision(),
       runic: Application.spec(:runic, :vsn) |> to_string(),
       schedulers: :erlang.system_info(:schedulers_online),
       sample_ms: sample_ms,
       system_architecture: :erlang.system_info(:system_architecture) |> List.to_string()
     })
-  end
-
-  defp profile_max_concurrency(profile) do
-    profile
-    |> profile_defaults()
-    |> Map.fetch!(:workloads)
-    |> Enum.map(&Map.fetch!(@workloads, &1).max_concurrency)
-    |> Enum.max()
   end
 
   defp write_artifact!(artifact) do
@@ -800,6 +798,7 @@ defmodule Jido.Test.Perf.AI.ReActMemory do
   defp print_round_growth(results) do
     lines =
       results
+      |> Enum.filter(&(&1.outcome == "completed"))
       |> Enum.group_by(&{&1.strategy, &1.mode, &1.workload, &1.iteration})
       |> Enum.sort()
       |> Enum.flat_map(fn {{strategy, mode, workload, iteration}, cases} ->
@@ -834,7 +833,7 @@ defmodule Jido.Test.Perf.AI.ReActMemory do
         recursive = Enum.find(cases, &(&1.strategy == "recursive"))
         iterative = Enum.find(cases, &(&1.strategy == "iterative"))
 
-        if recursive && iterative do
+        if recursive && iterative && recursive.outcome == "completed" && iterative.outcome == "completed" do
           [
             "  #{mode}/#{workload}, #{rounds} rounds, run #{iteration}, " <>
               "iterative / recursive: " <>

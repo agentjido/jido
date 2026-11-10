@@ -66,8 +66,6 @@ jobs:
             command: mix test.property --warnings-as-errors
           - name: Bounded fuzz
             command: mix test.fuzz --warnings-as-errors
-          - name: Local system
-            command: mix test.system --warnings-as-errors
           - name: Load
             command: mix test.load --warnings-as-errors
           - name: Peer
@@ -88,34 +86,6 @@ jobs:
           key: mix-${{ runner.os }}-otp27-elixir1.18-${{ hashFiles('mix.lock') }}
       - run: mix deps.get
       - run: ${{ matrix.command }}
-
-  objective-quality:
-    name: Objective quality gate
-    needs: required
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
-        with:
-          otp-version: "27.3"
-          elixir-version: "1.18.4"
-      - uses: actions/cache@v4
-        with:
-          path: |
-            deps
-            _build
-          key: mix-${{ runner.os }}-otp27-elixir1.18-${{ hashFiles('mix.lock') }}
-      - run: mix deps.get
-      - run: mix quality.coverage
-      - run: mix quality.report
-      - name: Upload objective quality evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: objective-quality-${{ github.sha }}
-          path: tmp/quality
-          if-no-files-found: warn
 
   extended:
     name: ${{ matrix.name }}
@@ -158,9 +128,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: extended-${{ strategy.job-index }}-${{ github.sha }}
-          path: |
-            tmp/perf
-            tmp/quality
+          path: tmp/perf
           if-no-files-found: ignore
 
   services:

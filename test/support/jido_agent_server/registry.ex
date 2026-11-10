@@ -28,7 +28,7 @@ defmodule Jido.Test.AgentServer.Registry do
     |> Enum.sort_by(fn {kind, value} -> {kind, :erlang.term_to_binary(value)} end)
     |> Enum.with_index(1)
     |> Map.new(fn {{kind, value}, index} ->
-      {{"#{kind}/test-#{index}", 1}, {kind, value}}
+      {{"#{kind}/test-#{index}", 1}, value}
     end)
     |> then(&Catalog.from_targets!(__MODULE__, :jido, &1))
   end

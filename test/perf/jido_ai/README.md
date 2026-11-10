@@ -29,6 +29,12 @@ The tests validate completed model and tool work before they accept any metric.
 They also run both manual scripts with two requests and validate their JSON
 reports. Timing and memory values are recorded, not used as pass thresholds.
 
+The memory quick test requires a completed request with two model calls, one
+tool round, and one tool call. Manual memory profiles retain failed cases as
+diagnostic results. Ratios use completed cases only. Report metadata records
+the resolved scenario settings, including environment overrides and repeats.
+The focused execution timers stop before retained-size measurement starts.
+
 Run the two focused runners with:
 
 ```console

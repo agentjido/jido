@@ -5,8 +5,8 @@ defmodule Jido.Catalog.ManifestTest do
 
   test "adds package ownership and sorts static entries" do
     entries = [
-      %{id: "example/z", vsn: 1, kind: :flow, target: __MODULE__.Z},
-      %{id: "example/a", vsn: 2, kind: :action, target: __MODULE__.A}
+      %{id: "example/z", vsn: 1, target: __MODULE__.Z},
+      %{id: "example/a", vsn: 2, target: __MODULE__.A}
     ]
 
     assert {:ok, %Manifest{} = manifest} = Manifest.new(__MODULE__, :example, entries)
@@ -23,7 +23,6 @@ defmodule Jido.Catalog.ManifestTest do
       Entry.new!(%{
         id: "example/item",
         vsn: 1,
-        kind: :action,
         target: __MODULE__.Target,
         provider: __MODULE__.Other,
         application: :other

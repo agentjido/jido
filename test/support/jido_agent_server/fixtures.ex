@@ -3,7 +3,7 @@ defmodule Jido.Test.AgentServer.Fixtures do
 
   alias Jido.Flow
   alias Jido.Flow.Ref
-  alias __MODULE__.{Add, InvokeDecision, InvokeExpander}
+  alias __MODULE__.Add
 
   def two_step_flow do
     Flow.new!(%{
@@ -30,26 +30,6 @@ defmodule Jido.Test.AgentServer.Fixtures do
         }
       ],
       output: Ref.result("second")
-    })
-  end
-
-  def invoke_flow do
-    invoke =
-      %{
-        kind: :invoke,
-        name: "invoke",
-        decision: InvokeDecision,
-        expander: InvokeExpander,
-        params: %{
-          by: Ref.input(:by),
-          label: Ref.input(:label)
-        }
-      }
-
-    Flow.new!(%{
-      name: "agent_server_invoke_flow",
-      components: [invoke],
-      output: Ref.result("invoke")
     })
   end
 end
@@ -111,33 +91,6 @@ defmodule Jido.Test.AgentServer.Fixtures.BlockingAdd do
   end
 end
 
-defmodule Jido.Test.AgentServer.Fixtures.ContinueToAdd do
-  @moduledoc false
-
-  use Jido.Action,
-    name: "agent_server_continue_to_add"
-
-  alias Jido.Test.AgentServer.Fixtures.Add
-
-  @impl Jido.Action
-  def run(params, _context), do: {:continue, params, Add}
-end
-
-defmodule Jido.Test.AgentServer.Fixtures.ReentrantCall do
-  @moduledoc false
-
-  use Jido.Action,
-    name: "agent_server_reentrant_call"
-
-  @impl Jido.Action
-  def run(%{server: server, test_pid: test_pid}, context) do
-    signal = Jido.Signal.new!("counter.reentrant", %{}, source: "/agent-reentrant-action")
-    result = Jido.AgentServer.call(server, signal, 1_000)
-    send(test_pid, {:agent_reentrant_result, result})
-    {:ok, context.agent_state}
-  end
-end
-
 defmodule Jido.Test.AgentServer.Fixtures.ObserveExecutionBoundary do
   @moduledoc false
 
@@ -149,28 +102,6 @@ defmodule Jido.Test.AgentServer.Fixtures.ObserveExecutionBoundary do
     send(test_pid, {:agent_execution_boundary, params, context})
     {:ok, context.agent_state}
   end
-end
-
-defmodule Jido.Test.AgentServer.Fixtures.InvokeDecision do
-  @moduledoc false
-
-  use Jido.Action,
-    name: "agent_server_invoke_decision"
-
-  @impl Jido.Action
-  def run(params, _context), do: {:ok, params}
-end
-
-defmodule Jido.Test.AgentServer.Fixtures.InvokeExpander do
-  @moduledoc false
-
-  use Jido.Action,
-    name: "agent_server_invoke_expander"
-
-  alias Jido.Test.AgentServer.Fixtures.Add
-
-  @impl Jido.Action
-  def run(params, _context), do: {:continue, params, Add}
 end
 
 defmodule Jido.Test.AgentServer.Fixtures.Fail do
@@ -191,28 +122,6 @@ defmodule Jido.Test.AgentServer.Fixtures.InvalidState do
 
   @impl Jido.Action
   def run(_params, _context), do: {:ok, %{count: :invalid, history: []}}
-end
-
-defmodule Jido.Test.AgentServer.Fixtures.TestDirective do
-  @moduledoc false
-
-  @enforce_keys [:name, :test_pid]
-  defstruct @enforce_keys
-end
-
-defmodule Jido.Test.AgentServer.Fixtures.WithDirective do
-  @moduledoc false
-
-  use Jido.Action,
-    name: "agent_server_with_directive"
-
-  alias Jido.Test.AgentServer.Fixtures.{Add, TestDirective}
-
-  @impl Jido.Action
-  def run(%{directive_name: name, test_pid: test_pid} = params, context) do
-    {:ok, state} = Add.run(params, context)
-    {:ok, state, [%TestDirective{name: name, test_pid: test_pid}]}
-  end
 end
 
 defmodule Jido.Test.AgentServer.Fixtures.InvalidBehavior do

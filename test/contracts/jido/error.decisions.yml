@@ -63,3 +63,8 @@
   decision: Accept the full 344-mutant profile with 330 killed mutants, 14 invalid mutations, no survivor, no timeout, and a 100.0 percent score.
   driver: Exact inside-limit and outside-limit tests now protect message, compensation-cause, and retry-hint traversal.
   approved_by: User-requested component review
+- id: trim-error-compatibility-api
+  date: 2026-11-10
+  decision: Keep Splode and the five active public error types. Remove CompensationError, compensation_error/2, normalize/1, and the field/action constructor aliases. Migrate callers to explicit kind and subject options. Domains own foreign failure conversion.
+  driver: The removed compatibility type and normalization helper have no production callers. Explicit constructor options remove duplicate forms.
+  approved_by: User-approved utility design review cuts

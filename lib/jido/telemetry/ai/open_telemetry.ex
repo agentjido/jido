@@ -65,8 +65,15 @@ defmodule Jido.Telemetry.AI.OpenTelemetry do
   def handle_event([:jido, :ai, kind, ending], measurements, metadata, _config)
       when kind in [:agent, :tool] and ending in [:stop, :exception] do
     case span_key(kind, metadata) do
-      nil -> :ok
-      key -> finish_span(CorrelationStore.take(key), kind, ending, metadata, measurements)
+      nil ->
+        :ok
+
+      key ->
+        try do
+          finish_span(CorrelationStore.take(key), kind, ending, metadata, measurements)
+        after
+          restore_tool_context(key)
+        end
     end
   catch
     _, _ -> :ok
@@ -235,48 +242,34 @@ defmodule Jido.Telemetry.AI.OpenTelemetry do
 
   defp finish_span(nil, _kind, _ending, _metadata, _measurements), do: :ok
 
-  defp finish_span(%{span: span} = stored, kind, ending, metadata, measurements) do
+  defp finish_span(%{span: span}, kind, ending, metadata, measurements) do
     error_type = error_type(kind, ending, metadata)
     attrs = attributes(kind, metadata, measurements) |> maybe_put("error.type", error_type)
 
-    try do
-      safely(fn -> call(:otel_span, :set_attributes, [span, attrs]) end)
+    safely(fn -> call(:otel_span, :set_attributes, [span, attrs]) end)
 
-      if error_type do
-        safely(fn -> call(:otel_span, :set_status, [span, :error, error_type]) end)
-      end
-
-      safely(fn -> call(:otel_span, :end_span, [span]) end)
-    after
-      detach(Map.get(stored, :restore_context))
+    if error_type do
+      safely(fn -> call(:otel_span, :set_status, [span, :error, error_type]) end)
     end
+
+    safely(fn -> call(:otel_span, :end_span, [span]) end)
 
     :ok
   end
 
   defp store_span(key, kind, span, metadata) do
-    stored =
-      case kind do
-        :tool ->
-          case attach_span(span) do
-            {:ok, restore_context} ->
-              %{
-                span: span,
-                metadata: metadata,
-                owner: self(),
-                restore_context: restore_context
-              }
+    stored = %{span: span, metadata: metadata, owner: self()}
 
-            :error ->
-              %{span: span, metadata: metadata, owner: self()}
-          end
+    if CorrelationStore.put_new(key, stored, on_expire: {__MODULE__, :expire_span}) do
+      if kind == :tool do
+        restore_tool_context(key)
 
-        _other ->
-          %{span: span, metadata: metadata, owner: self()}
+        case attach_span(span) do
+          {:ok, token} -> Process.put({__MODULE__, :tool_context, key}, {span, token})
+          :error -> :ok
+        end
       end
-
-    unless CorrelationStore.put_new(key, stored, on_expire: {__MODULE__, :expire_span}) do
-      detach(Map.get(stored, :restore_context))
+    else
       safely(fn -> call(:otel_span, :end_span, [span]) end)
     end
 
@@ -285,7 +278,7 @@ defmodule Jido.Telemetry.AI.OpenTelemetry do
 
   @doc false
   @spec expire_span(term(), map()) :: :ok
-  def expire_span(_key, %{span: span} = stored) do
+  def expire_span(key, %{span: span} = stored) do
     error_type = "jido.ai.telemetry.correlation_expired"
 
     safely(fn -> call(:otel_span, :set_attributes, [span, %{"error.type" => error_type}]) end)
@@ -293,13 +286,28 @@ defmodule Jido.Telemetry.AI.OpenTelemetry do
     safely(fn -> call(:otel_span, :end_span, [span]) end)
 
     if Map.get(stored, :owner) == self() do
-      detach(Map.get(stored, :restore_context))
+      restore_tool_context(key, span)
     end
 
     :ok
   end
 
   def expire_span(_key, _stored), do: :ok
+
+  # The sweep can remove a span in another process. Keep its restore token in
+  # the tool owner until the terminal event, even when the span has expired.
+  defp restore_tool_context(key, expected_span \\ nil) do
+    context_key = {__MODULE__, :tool_context, key}
+
+    case Process.get(context_key) do
+      {span, token} when is_nil(expected_span) or span == expected_span ->
+        Process.delete(context_key)
+        detach(token)
+
+      _other ->
+        :ok
+    end
+  end
 
   defp attach_span(span) do
     current = call(:otel_ctx, :get_current, [])

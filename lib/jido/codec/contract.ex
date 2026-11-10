@@ -5,6 +5,10 @@ defmodule Jido.Codec.Contract do
   A current writer publishes a runtime `target/0` and implements both
   `encode/2` and `decode/2`. A historical reader returns `nil` from `target/0`
   and implements only `decode/2`.
+
+  Callbacks receive an explicit Catalog or `:current`. Use `Jido.Codec.Reference`
+  and `Jido.Codec.Value` for reference lookup. With `:current`, each lookup reads
+  the current publication; the operation does not pin a Catalog.
   """
 
   @typedoc "A JSON object produced or consumed by a document codec."
@@ -20,11 +24,11 @@ defmodule Jido.Codec.Contract do
   @callback target() :: module() | nil
 
   @doc "Encodes one runtime value as a versioned document."
-  @callback encode(term(), Jido.Catalog.t()) ::
+  @callback encode(term(), Jido.Catalog.source()) ::
               {:ok, document()} | {:error, Exception.t()}
 
   @doc "Decodes one versioned document through a trusted Catalog."
-  @callback decode(term(), Jido.Catalog.t()) ::
+  @callback decode(term(), Jido.Catalog.source()) ::
               {:ok, struct()} | {:error, [Jido.Codec.Issue.t()]}
 
   @optional_callbacks encode: 2

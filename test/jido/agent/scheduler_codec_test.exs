@@ -80,7 +80,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
     assert {:error,
             [
               %Jido.Codec.Issue{
-                details: %{identifier: "plugins/scheduler", kind: :plugin}
+                details: %{identifier: "plugins/scheduler"}
               }
             ]} =
              Jido.Test.AgentServer.Registry.decode_json(json, missing_plugin)
@@ -150,15 +150,15 @@ defmodule Jido.Agent.SchedulerCodecTest do
 
   defp registry(definition) do
     Catalog.from_targets!(__MODULE__, :jido, %{
-      {"schemas/counter", 1} => {:schema, definition.schema},
-      {"actions/queue", 1} => {:action, QueueTick},
-      {"flows/queue", 1} => {:flow, QueueFlow},
-      {"actions/tick", 1} => {:action, Tick},
-      {"plugins/scheduler", 1} => {:plugin, Scheduler},
-      {"atoms/retry-delay", 1} => {:atom, :retry_delay_ms},
-      {"atoms/count", 1} => {:atom, :count},
-      {"atoms/scheduler", 1} => {:atom, :scheduler},
-      {"atoms/cron", 1} => {:atom, :cron}
+      {"schemas/counter", 1} => definition.schema,
+      {"actions/queue", 1} => QueueTick,
+      {"flows/queue", 1} => QueueFlow,
+      {"actions/tick", 1} => Tick,
+      {"plugins/scheduler", 1} => Scheduler,
+      {"atoms/retry-delay", 1} => :retry_delay_ms,
+      {"atoms/count", 1} => :count,
+      {"atoms/scheduler", 1} => :scheduler,
+      {"atoms/cron", 1} => :cron
     })
   end
 end

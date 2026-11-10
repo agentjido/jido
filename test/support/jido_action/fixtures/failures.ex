@@ -14,38 +14,6 @@ defmodule Jido.Test.Action.Fixtures.Actions.InvalidValidationResultAction do
   def run(params, _context), do: {:ok, params}
 end
 
-defmodule Jido.Test.Action.Fixtures.Actions.InvalidValidatedParamsAction do
-  @moduledoc false
-  @behaviour Jido.Action
-  def validate_params(_params), do: {:ok, 42}
-  def validate_output(output), do: {:ok, output}
-  def run(params, _context), do: {:ok, %{params: params}}
-end
-
-defmodule Jido.Test.Action.Fixtures.Actions.InvalidValidatedOutputAction do
-  @moduledoc false
-  @behaviour Jido.Action
-  def validate_params(params), do: {:ok, params}
-  def validate_output(_output), do: {:ok, 42}
-  def run(_params, _context), do: {:ok, %{value: 1}}
-end
-
-defmodule Jido.Test.Action.Fixtures.Actions.RaisingValidationAction do
-  @moduledoc false
-  @behaviour Jido.Action
-  def validate_params(_params), do: raise("validator failed")
-  def validate_output(output), do: {:ok, output}
-  def run(params, _context), do: {:ok, params}
-end
-
-defmodule Jido.Test.Action.Fixtures.Actions.RaisingOutputValidationAction do
-  @moduledoc false
-  @behaviour Jido.Action
-  def validate_params(params), do: {:ok, params}
-  def validate_output(_output), do: raise("output validator failed")
-  def run(params, _context), do: {:ok, params}
-end
-
 defmodule Jido.Test.Action.Fixtures.Actions.StacktraceValidationAction do
   @moduledoc false
   @behaviour Jido.Action
@@ -101,15 +69,6 @@ defmodule Jido.Test.Action.Fixtures.Actions.UnsupportedResult do
   def run(_params, _context), do: :not_a_result_tuple
 end
 
-defmodule Jido.Test.Action.Fixtures.Actions.ThrowingAction do
-  @moduledoc false
-  use Jido.Action,
-    name: "throwing_action",
-    description: "Throws during execution"
-
-  def run(_params, _context), do: throw(:thrown_value)
-end
-
 defmodule Jido.Test.Action.Fixtures.Actions.StacktraceAction do
   @moduledoc false
   @behaviour Jido.Action
@@ -126,42 +85,12 @@ defmodule Jido.Test.Action.Fixtures.Actions.StacktraceAction do
   def exit_from_action, do: exit(:stacktrace_probe_exited)
 end
 
-defmodule Jido.Test.Action.Fixtures.Actions.RawOutputAction do
-  @moduledoc false
-  use Jido.Action, name: "raw_output_action"
-
-  def run(%{value: value}, _context), do: {:ok, value}
-end
-
-defmodule Jido.Test.Action.Fixtures.Actions.RawOutputWithExtrasAction do
-  @moduledoc false
-  use Jido.Action, name: "raw_output_with_extras_action"
-
-  def run(%{value: value}, _context), do: {:ok, value, [:request]}
-end
-
 defmodule Jido.Test.Action.Fixtures.Actions.ErrorWithExtrasAction do
   @moduledoc false
   use Jido.Action, name: "error_with_extras_action"
 
   def run(%{reason: reason}, _context), do: {:error, reason, %{ignored: true}}
   def run(_params, _context), do: {:error, :bad_with_extras, %{ignored: true}}
-end
-
-defmodule Jido.Test.Action.Fixtures.Actions.ExceptionErrorAction do
-  @moduledoc false
-  use Jido.Action, name: "exception_error_action"
-
-  def run(_params, _context) do
-    {:error, Jido.Error.execution_error("already wrapped", %{source: :test})}
-  end
-end
-
-defmodule Jido.Test.Action.Fixtures.Actions.AtomErrorAction do
-  @moduledoc false
-  use Jido.Action, name: "atom_error_action"
-
-  def run(_params, _context), do: {:error, :bad_atom}
 end
 
 defmodule Jido.Test.Action.Fixtures.Actions.TupleErrorAction do
@@ -176,97 +105,6 @@ defmodule Jido.Test.Action.Fixtures.Actions.KillingAction do
   use Jido.Action, name: "killing_action"
 
   def run(_params, _context), do: Process.exit(self(), :kill)
-end
-
-defmodule Jido.Test.Action.Fixtures.ShortListOutputAction do
-  @moduledoc false
-  use Jido.Action, name: "short_list_output_action"
-
-  @impl true
-  def run(_params, _context), do: {:ok, %{items: [%{value: 1}]}}
-end
-
-defmodule Jido.Test.Action.Fixtures.ImproperListOutputAction do
-  @moduledoc false
-  use Jido.Action, name: "improper_list_output_action"
-
-  @impl true
-  def run(_params, _context) do
-    {:ok, Jido.Action.Output.raw(%{items: [%{value: 1} | :tail]})}
-  end
-end
-
-defmodule Jido.Test.Action.Fixtures.ControlledErrorAction do
-  @moduledoc false
-  @behaviour Jido.Action
-
-  def validate_params(params), do: {:ok, params}
-  def validate_output(output), do: {:ok, output}
-
-  def run(%{message: message} = params, _context) do
-    maybe_notify_start(params)
-    maybe_block(params)
-    {:error, message}
-  end
-
-  defp maybe_notify_start(%{key: key, test_pid: test_pid}) do
-    send(test_pid, {__MODULE__, :started, key, self()})
-  end
-
-  defp maybe_notify_start(_params), do: :ok
-
-  defp maybe_block(%{block: true, key: key}) do
-    receive do
-      {:release, ^key} -> :ok
-    end
-  end
-
-  defp maybe_block(_params), do: :ok
-end
-
-defmodule Jido.Test.Action.Fixtures.FailsSecond do
-  @moduledoc false
-  use Jido.Action,
-    name: "iterator_fails_second",
-    schema: Jido.Joi.object(%{count: Jido.Joi.integer(), index: Jido.Joi.integer()}),
-    output_schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
-
-  @impl true
-  def run(%{index: index} = params, context) do
-    if is_pid(context[:test_pid]), do: send(context.test_pid, {__MODULE__, index})
-
-    if index == 1 do
-      {:error, "second body failed"}
-    else
-      {:ok, %{count: params.count + 1}}
-    end
-  end
-end
-
-defmodule Jido.Test.Action.Fixtures.RetryableFailure do
-  @moduledoc false
-  use Jido.Action,
-    name: "iterator_retryable_failure",
-    schema: Jido.Joi.object(%{count: Jido.Joi.integer(), index: Jido.Joi.integer()})
-
-  @impl true
-  def run(_params, _context) do
-    {:error,
-     Jido.Error.execution_error("retryable body failed", %{
-       retry: true,
-       rejected_payload: %{secret: "must not leave the target boundary"}
-     })}
-  end
-end
-
-defmodule Jido.Test.Action.Fixtures.ReturnedException do
-  @moduledoc false
-  use Jido.Action,
-    name: "iterator_returned_exception",
-    schema: Jido.Joi.object(%{count: Jido.Joi.integer(), index: Jido.Joi.integer()})
-
-  @impl true
-  def run(_params, _context), do: {:error, RuntimeError.exception("returned body exception")}
 end
 
 defmodule Jido.Test.Action.Fixtures.InvalidOutput do

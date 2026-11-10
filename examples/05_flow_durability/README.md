@@ -12,9 +12,6 @@ These supported offline lessons use the current `Jido.Exec` and
 | `05_05_cancellation` | Cancel active Map work. |
 | `05_06_telemetry` | Correlate Jido and Runic telemetry. |
 
-Lessons `03_04`, `03_05`, `03_06`, `03_09`, `03_10`, `03_11`, `03_13`,
-and `03_14` have executable deferred probes under `test/system/jido_exec/gaps`.
-
 Run the supported group with:
 
 ```sh

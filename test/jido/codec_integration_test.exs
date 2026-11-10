@@ -25,14 +25,14 @@ defmodule Jido.CodecIntegrationTest do
 
     @impl Jido.Agent.Extension
     def encode_authoring_data(%{target: target}, registry) do
-      with {:ok, reference} <- Reference.encode(registry, :action, target),
+      with {:ok, reference} <- Reference.encode(registry, target),
            do: {:ok, %{"target" => reference}}
     end
 
     @impl Jido.Agent.Extension
     def decode_authoring_data(%{"target" => reference} = data, registry)
         when map_size(data) == 1 do
-      with {:ok, target} <- Reference.decode(registry, reference, :action),
+      with {:ok, target} <- Reference.decode(registry, reference),
            do: {:ok, %{target: target}}
     end
 
@@ -59,7 +59,6 @@ defmodule Jido.CodecIntegrationTest do
     def __jido_catalog_manifest__ do
       %{
         id: "tests/schemas/sample-agent",
-        kind: :schema,
         vsn: 1,
         target: Agent.definition().schema
       }
@@ -67,12 +66,12 @@ defmodule Jido.CodecIntegrationTest do
   end
 
   setup do
-    registry = :persistent_term.get({:jido, :catalog_snapshot}, :not_initialized)
+    registry = :persistent_term.get({:jido, :catalog}, :not_ready)
 
     on_exit(fn ->
-      if registry == :not_initialized,
-        do: :persistent_term.erase({:jido, :catalog_snapshot}),
-        else: :persistent_term.put({:jido, :catalog_snapshot}, registry)
+      if registry == :not_ready,
+        do: :persistent_term.erase({:jido, :catalog}),
+        else: :persistent_term.put({:jido, :catalog}, registry)
     end)
   end
 
@@ -92,13 +91,13 @@ defmodule Jido.CodecIntegrationTest do
     catalog = Jido.Catalog.Discovery.catalog()
     codecs = Jido.Catalog.Discovery.codec_index()
 
-    assert %{kind: :agent, target: Agent} =
+    assert %{target: Agent} =
              Catalog.get(catalog, "tests/agents/sample", 1)
 
-    assert %{kind: :plugin, target: Extension} =
+    assert %{target: Extension} =
              Catalog.get(catalog, "tests/plugins/authoring", 2)
 
-    assert %{kind: :plugin, target: Plugin} =
+    assert %{target: Plugin} =
              Catalog.get(catalog, "tests/plugins/sample", 3)
 
     assert Index.codec(codecs, "jido.agent.definition", 1) ==
@@ -140,9 +139,9 @@ defmodule Jido.CodecIntegrationTest do
 
     catalog =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"tests/schemas/referenced-extension-agent", 1} => {:schema, definition.schema},
-        {"tests/plugins/referenced", 1} => {:plugin, ReferencedExtension},
-        {"tests/actions/referenced", 1} => {:action, ReferencedAction}
+        {"tests/schemas/referenced-extension-agent", 1} => definition.schema,
+        {"tests/plugins/referenced", 1} => ReferencedExtension,
+        {"tests/actions/referenced", 1} => ReferencedAction
       })
 
     assert {:ok, document} =
@@ -162,8 +161,8 @@ defmodule Jido.CodecIntegrationTest do
 
     restricted =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"tests/schemas/referenced-extension-agent", 1} => {:schema, definition.schema},
-        {"tests/plugins/referenced", 1} => {:plugin, ReferencedExtension}
+        {"tests/schemas/referenced-extension-agent", 1} => definition.schema,
+        {"tests/plugins/referenced", 1} => ReferencedExtension
       })
 
     assert {:error, _issues} =

@@ -18,27 +18,23 @@ defmodule Jido.Flow.GeneratedRegistryTest do
     assert {:ok, ^document, ^registry} = Codec.encode(flow)
 
     assert {:ok, Add} =
-             Catalog.resolve(registry, {"actions/generated-1", 1}, :action)
+             Catalog.resolve(registry, {"actions/generated-1", 1})
 
     assert {:ok, Multiply} =
-             Catalog.resolve(registry, {"actions/generated-2", 1}, :action)
+             Catalog.resolve(registry, {"actions/generated-2", 1})
 
     assert {:ok, NestedFlow} =
-             Catalog.resolve(registry, {"flows/generated-1", 1}, :flow)
+             Catalog.resolve(registry, {"flows/generated-1", 1})
 
     assert {:ok, generated_schema} =
-             Catalog.resolve(registry, {"schemas/generated-1", 1}, :schema)
+             Catalog.resolve(registry, {"schemas/generated-1", 1})
 
     assert Jido.Joi.Schema.kind(generated_schema) == :map
 
     for {atom, index} <-
           Enum.with_index([:add, :amount, :count, :items, :kind, :owner, :value], 1) do
       assert {:ok, ^atom} =
-               Catalog.resolve(
-                 registry,
-                 {"atoms/generated-#{index}", 1},
-                 :atom
-               )
+               Catalog.resolve(registry, {"atoms/generated-#{index}", 1})
     end
 
     assert {:ok, ^flow} = Codec.decode(document, registry)
@@ -61,8 +57,8 @@ defmodule Jido.Flow.GeneratedRegistryTest do
       })
 
     assert {:ok, _subset_document, subset_registry} = Codec.encode(subset)
-    assert {:ok, original_reference} = Catalog.reference(registry, :action, action)
-    assert {:ok, subset_reference} = Catalog.reference(subset_registry, :action, action)
+    assert {:ok, original_reference} = Catalog.reference(registry, action)
+    assert {:ok, subset_reference} = Catalog.reference(subset_registry, action)
     refute original_reference == subset_reference
 
     assert {:error, %ValidationError{}} = Codec.decode(document, subset_registry)

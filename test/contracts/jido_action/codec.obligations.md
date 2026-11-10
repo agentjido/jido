@@ -21,7 +21,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.codec.I6 — Stored identifiers use the trusted Catalog
 - **scope:** `Jido.Codec.encode/2, Jido.Codec.decode/2, Jido.Flow.Codec`
-- **must:** Resolve stored Flow target, schema, and atom identifiers only through exact versioned trusted Catalog entries of the required kind. Reject versionless, unknown, or wrong-kind identifiers without running Action work.
+- **must:** Resolve stored Flow target, schema, and atom identifiers only through exact versioned registered Catalog entries. Flow owns target-shape and schema validation after lookup; execution owns callback validation. Reject versionless, unknown, or unsuitable references without running Action work.
 - **kind:** security
 - **status:** active
 

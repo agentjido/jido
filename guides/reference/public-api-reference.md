@@ -772,22 +772,19 @@ Compiles Joi-backed JSON codecs and routes trusted versioned documents.
 
 ### `Jido.Catalog`
 
-An immutable, revisioned inventory of trusted Jido definitions.
+A passive registry of explicitly registered values.
 
 | Function | Summary |
 | --- | --- |
-| `Jido.Catalog.from_targets/3` | Builds a Catalog from a compact map of owned typed targets. |
+| `Jido.Catalog.from_targets/3` | Builds an explicit Catalog from a map of references to values. |
 | `Jido.Catalog.from_targets!/3` | Builds a Catalog from a compact target map or raises its error. |
 | `Jido.Catalog.get/3` | Returns the exact Entry for a stable ID and version. |
-| `Jido.Catalog.get/4` | Returns the exact Entry when its kind also matches. |
-| `Jido.Catalog.get_by_target/3` | Returns the Entry for one exact kind and target. |
+| `Jido.Catalog.get_by_target/2` | Returns a registered Entry for a value. |
 | `Jido.Catalog.list/1` | Lists all Entries in deterministic order. |
-| `Jido.Catalog.list/2` | Lists Entries of one kind in deterministic order. |
 | `Jido.Catalog.new/1` | Builds an immutable Catalog from Entries or Manifests. |
 | `Jido.Catalog.new!/1` | Builds an immutable Catalog or raises `ArgumentError`. |
-| `Jido.Catalog.reference/3` | Returns the stable reference for one target of an accepted kind. |
-| `Jido.Catalog.resolve/3` | Resolves one exact reference of the required kind. |
-| `Jido.Catalog.revision/1` | Returns the deterministic Catalog revision. |
+| `Jido.Catalog.reference/2` | Returns a registered reference for a value. |
+| `Jido.Catalog.resolve/2` | Resolves one exact registered reference. |
 
 ### `Jido.Catalog.Discovery`
 
@@ -797,10 +794,9 @@ Builds and atomically publishes the application-wide Catalog.
 | --- | --- |
 | `Jido.Catalog.Discovery.catalog/0` | Returns the current immutable application-wide Catalog. |
 | `Jido.Catalog.Discovery.get/2` | Returns a discovered entry for a stable identifier and `vsn`. |
-| `Jido.Catalog.Discovery.get_by_target/2` | Returns a discovered entry for an exact kind and target. |
+| `Jido.Catalog.Discovery.get_by_target/1` | Returns a discovered registration for a value. |
 | `Jido.Catalog.Discovery.included_plugins/0` | Lists the first-party Plugin modules included in this Jido release. |
-| `Jido.Catalog.Discovery.list/0` | Lists all discovered entries, or entries of one kind. |
-| `Jido.Catalog.Discovery.list/1` | Lists discovered entries of one kind. |
+| `Jido.Catalog.Discovery.list/0` | Lists all registered entries. |
 | `Jido.Catalog.Discovery.ready?/0` | Returns true when the first Catalog build is complete. |
 | `Jido.Catalog.Discovery.refresh/1` | Rebuilds and atomically replaces the complete Catalog and Codec index. |
 
@@ -859,11 +855,9 @@ Unified error handling for the Jido ecosystem using Splode.
 | Function | Summary |
 | --- | --- |
 | `Jido.Error.code/1` | Returns the registered Jido program code carried by an error. |
-| `Jido.Error.compensation_error/2` | Creates a compensation error. |
 | `Jido.Error.config_error/2` | Creates a configuration validation error. |
 | `Jido.Error.execution_error/2` | Creates an execution error. |
 | `Jido.Error.internal_error/2` | Creates an internal error. |
-| `Jido.Error.normalize/1` | Normalizes a foreign failure into the shared Jido taxonomy. |
 | `Jido.Error.prefix_path/2` | Prefixes a structured error path. |
 | `Jido.Error.prefix_result_path/2` | Prefixes the field path in a validation error result. |
 | `Jido.Error.retryable?/1` | Returns whether an error is safe to retry by default. |

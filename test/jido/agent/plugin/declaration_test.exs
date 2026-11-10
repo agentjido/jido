@@ -28,7 +28,7 @@ defmodule Jido.Agent.Plugin.DeclarationTest do
     def sections, do: []
 
     def __jido_catalog_manifest__,
-      do: %{id: id(), kind: :plugin, target: __MODULE__, vsn: vsn()}
+      do: %{id: id(), target: __MODULE__, vsn: vsn()}
 
     def lower(_dsl, config), do: {:ok, config}
     def normalize(data), do: {:ok, data}

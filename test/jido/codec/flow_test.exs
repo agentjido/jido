@@ -132,9 +132,7 @@ defmodule Jido.Flow.CodecTest do
     refute existing_atom?(unknown_atom)
 
     for {identifier, message, path} <- [
-          {unknown_action, "unknown flow catalog reference", ["components", 0, "call", "target", "id"]},
-          {"flows/not-an-action", "flow catalog reference has the wrong entry kind",
-           ["components", 0, "call", "target", "id"]}
+          {unknown_action, "unknown flow catalog reference", ["components", 0, "call", "target", "id"]}
         ] do
       invalid =
         replace_component(
@@ -158,7 +156,7 @@ defmodule Jido.Flow.CodecTest do
       |> Enum.reject(&(&1.id == "atoms/marker" and &1.vsn == 1))
       |> Catalog.new!()
 
-    assert {:error, %ValidationError{details: %{kind: :atom}}} =
+    assert {:error, %ValidationError{}} =
              Codec.encode(flow, missing_binding)
 
     assert {:error,
@@ -182,7 +180,7 @@ defmodule Jido.Flow.CodecTest do
     assert {:error,
             %ValidationError{
               message: "unknown flow catalog reference",
-              details: %{identifier: ^unknown_atom, kind: :atom}
+              details: %{identifier: ^unknown_atom}
             }} = Codec.decode(replace_component(document, 0, invalid), registry)
 
     refute existing_atom?(unknown_action)
@@ -352,10 +350,10 @@ defmodule Jido.Flow.CodecTest do
 
     missing_action =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"codec_test/add", 1} => {:action, Add},
-        {"codec_test/fast", 1} => {:atom, :fast},
-        {"codec_test/value", 1} => {:atom, :value},
-        {"codec_test/mode", 1} => {:atom, :mode}
+        {"codec_test/add", 1} => Add,
+        {"codec_test/fast", 1} => :fast,
+        {"codec_test/value", 1} => :value,
+        {"codec_test/mode", 1} => :mode
       })
 
     assert {:error, %ValidationError{} = error} = Codec.encode(flow, missing_action)
@@ -364,10 +362,10 @@ defmodule Jido.Flow.CodecTest do
 
     missing_atom =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"codec_test/add", 1} => {:action, Add},
-        {"codec_test/multiply", 1} => {:action, Multiply},
-        {"codec_test/value", 1} => {:atom, :value},
-        {"codec_test/mode", 1} => {:atom, :mode}
+        {"codec_test/add", 1} => Add,
+        {"codec_test/multiply", 1} => Multiply,
+        {"codec_test/value", 1} => :value,
+        {"codec_test/mode", 1} => :mode
       })
 
     assert {:error, %ValidationError{} = error} = Codec.encode(flow, missing_atom)
@@ -689,10 +687,9 @@ defmodule Jido.Flow.CodecTest do
 
     assert name_error.details.path == ["name"]
 
-    assert {:error, {:invalid_catalog_manifest, __MODULE__, _reason}} =
-             Catalog.from_targets(__MODULE__, :jido, %{
-               {"schemas/bad", 1} => {:schema, fn -> :not_static end}
-             })
+    bad_catalog = Catalog.from_targets!(__MODULE__, :jido, %{{"schemas/bad", 1} => fn -> :not_static end})
+    invalid = Map.put(document, "schema", %{"id" => "schemas/bad", "vsn" => 1})
+    assert {:error, %ValidationError{}} = Codec.decode(invalid, bad_catalog)
   end
 
   test "diagnose collects required fields for every component kind" do
@@ -897,7 +894,7 @@ defmodule Jido.Flow.CodecTest do
     end
 
     assert {:error, _reason} =
-             Catalog.from_targets(__MODULE__, :jido, %{invalid => {:action, Add}})
+             Catalog.from_targets(__MODULE__, :jido, %{invalid => Add})
 
     assert {:ok, document} = Codec.encode(flow, registry)
 
@@ -956,7 +953,7 @@ defmodule Jido.Flow.CodecTest do
     end
   end
 
-  test "Action and Flow identifiers have distinct trusted kinds" do
+  test "Catalog registers values and Flow decoding validates their roles" do
     flow =
       Jido.Test.Flow.Builder.new!(%{
         name: "one_subflow",
@@ -966,11 +963,11 @@ defmodule Jido.Flow.CodecTest do
 
     wrong_registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"targets/child", 1} => {:action, NestedFlow},
-        {"schemas/map", 1} => {:schema, Jido.Joi.map()}
+        {"targets/child", 1} => NestedFlow,
+        {"schemas/map", 1} => Jido.Joi.map()
       })
 
-    assert {:error, %ValidationError{}} = Codec.encode(flow, wrong_registry)
+    assert {:ok, _} = Codec.encode(flow, wrong_registry)
 
     document = %{
       "type" => "jido.flow",
@@ -997,7 +994,15 @@ defmodule Jido.Flow.CodecTest do
       }
     }
 
-    assert {:error, %ValidationError{}} = Codec.decode(document, wrong_registry)
+    assert {:ok, _} = Codec.decode(document, wrong_registry)
+
+    invalid_catalog =
+      Catalog.from_targets!(__MODULE__, :jido, %{
+        {"targets/child", 1} => %{invalid: :module},
+        {"schemas/map", 1} => Jido.Joi.map()
+      })
+
+    assert {:error, %ValidationError{}} = Codec.decode(document, invalid_catalog)
   end
 
   test "unknown module text is never resolved without a Registry entry" do
@@ -1262,8 +1267,8 @@ defmodule Jido.Flow.CodecTest do
 
     registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"actions/add", 1} => {:action, Add},
-        {"schemas/map", 1} => {:schema, Jido.Joi.map()}
+        {"actions/add", 1} => Add,
+        {"schemas/map", 1} => Jido.Joi.map()
       })
 
     assert {:error, %ValidationError{}} = Codec.encode(flow, registry)
@@ -1347,10 +1352,10 @@ defmodule Jido.Flow.CodecTest do
 
   defp inline_probe_registry do
     Catalog.from_targets!(__MODULE__, :jido, %{
-      {"actions/mark/v1", 1} => {:action, InlineProbeFlow.step_action("mark")},
-      {"flows/not-an-action", 1} => {:flow, NestedFlow},
-      {"atoms/marker", 1} => {:atom, :marker},
-      {"schemas/map/v1", 1} => {:schema, Jido.Joi.map()}
+      {"actions/mark/v1", 1} => InlineProbeFlow.step_action("mark"),
+      {"flows/not-an-action", 1} => NestedFlow,
+      {"atoms/marker", 1} => :marker,
+      {"schemas/map/v1", 1} => Jido.Joi.map()
     })
   end
 

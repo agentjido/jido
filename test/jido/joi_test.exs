@@ -6,6 +6,10 @@ defmodule Jido.JoiTest do
   test "facade excludes Zoi functions outside the Jido contract" do
     refute function_exported?(Joi, :email, 0)
     refute function_exported?(Joi, :from_json_schema, 1)
+
+    for name <- [:base64, :base64url, :ipv4, :ipv6, :null], arity <- [0, 1] do
+      refute function_exported?(Joi, name, arity)
+    end
   end
 
   test "schemas stay interoperable across facade operations" do

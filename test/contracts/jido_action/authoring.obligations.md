@@ -11,17 +11,17 @@ modules:
 
 Define the `Jido.Codec` storage guarantees that document owners can use
 without depending on the Flow document format. Each owner still owns its
-envelope, version, fields, reference kinds, and semantic validation.
+envelope, version, fields, resolved value roles, and semantic validation.
 
-### jido_action.authoring.I1 — Typed identifiers are stable and inert
-- **scope:** `Jido.Catalog.new/1, Jido.Catalog.from_targets/3, Jido.Catalog.resolve/3, Jido.Catalog.reference/3`
-- **must:** Validate bounded stable identifiers, explicit positive versions, supported atom kinds, and one reference for each exact typed value. Reserve `:alias` and support other package-defined kinds without loading modules, running work, deriving module names, or creating atoms from stored identifiers. Reject versionless references, invalid entries, unknown identifiers, wrong kinds, and duplicate writes.
+### jido_action.authoring.I1 — Registered identifiers are stable and inert
+- **scope:** `Jido.Catalog.new/1, Jido.Catalog.from_targets/3, Jido.Catalog.resolve/2, Jido.Catalog.reference/2`
+- **must:** Resolve only explicitly registered ID/version pairs without loading modules, running work, deriving modules from stored IDs, or creating atoms. Reject malformed or unknown references and duplicate ID/version registrations. Apply authoring defaults before publication. Consumers own domain validation. Normal lookups use the current Catalog; explicit Catalogs take precedence.
 - **kind:** security
 - **status:** active
 
 ### jido_action.authoring.I2 — Portable values have a closed round-trip grammar
 - **scope:** `Jido.Codec.Value.encode/2, Jido.Codec.Value.decode/2`
-- **must:** Round trip valid JSON scalars, proper lists, plain maps with supported keys, and atoms registered as kind `:atom`. Every successful decode must be encodable with the same Catalog. Reject invalid UTF-8, improper lists, structs, unsupported values or keys, duplicate decoded keys, invalid tags, and non-atom atom bindings. Complete-document limits are checked before portable value decoding.
+- **must:** Round trip valid JSON scalars, proper lists, plain maps with supported keys, and registered atoms. Every successful decode must be encodable with the same Catalog. Reject invalid UTF-8, improper lists, structs, unsupported values or keys, duplicate decoded keys, invalid tags, and non-atom atom bindings. Complete-document limits are checked before portable value decoding.
 - **kind:** persisted-format
 - **status:** active
 

@@ -675,7 +675,7 @@ defmodule Jido.Telemetry.AI do
   defp agent_definition(module) when is_atom(module) and not is_nil(module) do
     authoring =
       if function_exported?(module, :__jido_catalog_manifest__, 0),
-        do: module.__jido_catalog_manifest__(),
+        do: module.__jido_catalog_manifest__() |> List.wrap() |> hd(),
         else: %{}
 
     case module.definition() do
@@ -908,6 +908,9 @@ defmodule Jido.Telemetry.AI do
 
   defp format_fields(fields) do
     fields
+    |> Enum.filter(fn {_key, value} ->
+      is_atom(value) or is_number(value) or (is_binary(value) and String.valid?(value))
+    end)
     |> Enum.sort_by(fn {key, _value} -> to_string(key) end)
     |> Enum.map_join(" ", fn {key, value} -> "#{key}=#{format_value(value)}" end)
   end
@@ -915,7 +918,6 @@ defmodule Jido.Telemetry.AI do
   defp format_value(value) when is_atom(value), do: Atom.to_string(value)
   defp format_value(value) when is_binary(value), do: value |> escape() |> truncate(128)
   defp format_value(value) when is_number(value) or is_boolean(value), do: to_string(value)
-  defp format_value(value), do: inspect(value, limit: 4, printable_limit: 128)
 
   defp escape(value) do
     for <<codepoint::utf8 <- value>>, into: "" do

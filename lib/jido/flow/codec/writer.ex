@@ -9,7 +9,7 @@ defmodule Jido.Flow.Codec.Writer do
   alias Jido.Flow.Codec.{Limits, Value}
 
   @doc false
-  @spec encode(Jido.Flow.t(), Catalog.t()) ::
+  @spec encode(Jido.Flow.t(), Catalog.source()) ::
           {:ok, map()} | {:error, Exception.t()}
   def encode(flow, registry) do
     case do_encode(flow, registry) do
@@ -59,7 +59,7 @@ defmodule Jido.Flow.Codec.Writer do
   defp encode_schema(schema, registry) do
     if schema == Jido.Joi.map(),
       do: {:ok, nil},
-      else: reference(registry, :schema, schema)
+      else: reference(registry, schema)
   end
 
   defp put_schema(document, _field, nil), do: document
@@ -80,7 +80,7 @@ defmodule Jido.Flow.Codec.Writer do
   defp field(:meta, value, registry), do: Value.encode_data(value, registry, 0)
 
   defp field(:schema, value, registry) do
-    reference(registry, :schema, value)
+    reference(registry, value)
   end
 
   defp field({:call, _, _}, call, registry) do
@@ -112,13 +112,13 @@ defmodule Jido.Flow.Codec.Writer do
   end
 
   defp target(target, registry) do
-    with {:ok, reference} <- reference(registry, target.kind, target.target) do
+    with {:ok, reference} <- reference(registry, target.target) do
       {:ok, %{"kind" => Atom.to_string(target.kind), "target" => reference}}
     end
   end
 
-  defp reference(registry, kind, target) do
-    with {:error, %CatalogError{} = error} <- Reference.encode(registry, kind, target) do
+  defp reference(registry, target) do
+    with {:error, %CatalogError{} = error} <- Reference.encode(registry, target) do
       {:error, %{error | details: Map.put(error.details, :target, target)}}
     end
   end

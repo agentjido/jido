@@ -91,7 +91,7 @@ defmodule Jido.Session do
       session
       | rev: session.rev + (thread.rev - session.thread.rev),
         thread: thread,
-        updated_at: thread.updated_at
+        updated_at: max(session.updated_at, thread.updated_at)
     }
     |> validate!()
   end

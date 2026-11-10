@@ -43,6 +43,8 @@ defmodule Jido.Thread.Entry do
   @doc "Returns a portable encoded Entry map."
   @spec encode(t()) :: map()
   def encode(%__MODULE__{} = entry) do
+    validate!(entry)
+
     %{
       "id" => entry.id,
       "seq" => entry.seq,

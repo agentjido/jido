@@ -36,8 +36,7 @@ Expected result: all examples pass without network access or credentials.
 
 The examples use deterministic local stores and controlled faults. Use the
 persistence conformance suites for all local adapters and the optional service
-suites for shared external adapters. See the
-[source manifest](../../test/quality/source_manifest.yml) for placement and ownership decisions.
+suites for shared external adapters.
 
 Continue with [Durable Agents](../14_durable_agents/README.md) for an abrupt whole-BEAM
 restart proof and the proposed execution recovery learning path.

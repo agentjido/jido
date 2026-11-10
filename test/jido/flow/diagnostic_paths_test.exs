@@ -132,8 +132,8 @@ defmodule Jido.Flow.DiagnosticPathsTest do
 
   defp registry do
     Catalog.from_targets!(__MODULE__, :jido, %{
-      {"actions/echo", 1} => {:action, EchoParamsAction},
-      {"schemas/map", 1} => {:schema, Jido.Joi.map()}
+      {"actions/echo", 1} => EchoParamsAction,
+      {"schemas/map", 1} => Jido.Joi.map()
     })
   end
 

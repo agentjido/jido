@@ -60,7 +60,7 @@ defmodule Jido.Test.Flow.GeneratedCodec do
       |> Enum.sort_by(&sort_key(kind, &1))
       |> Enum.with_index(1)
       |> Enum.map(fn {value, index} ->
-        {{"#{Map.fetch!(@namespaces, kind)}/generated-#{index}", 1}, {kind, value}}
+        {{"#{Map.fetch!(@namespaces, kind)}/generated-#{index}", 1}, value}
       end)
     end)
     |> Map.new()

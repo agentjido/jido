@@ -41,6 +41,15 @@ defmodule InlineConsumer.Host do
 
   defmacro decorate(value), do: quote(do: "[" <> unquote(value) <> "]")
 
+  defmacro embedded_flow(path, options, do: body) do
+    compiled = Jido.Flow.Inline.compile!(path, options, body, __CALLER__)
+
+    quote do
+      unquote(compiled.declaration_ast)
+      unquote(compiled.target_ast)
+    end
+  end
+
   def run(owner, name, value, context) do
     target = Inline.target!(owner, host: __MODULE__, declaration: name, role: :action)
     Jido.Exec.run(target, owner.params(name, value), context)

@@ -54,27 +54,24 @@ end
 
 A document never holds a module name or an atom. It holds Catalog references, so the Catalog must list every target and every atom in the Flow. That includes atom keys in `params` and `meta`, atoms in reference paths, and atom values.
 
-`Jido.Catalog.from_targets!/3` takes a provider module, an OTP application, and a map of `{id, vsn}` keys to `{kind, target}` values.
+`Jido.Catalog.from_targets!/3` takes a provider module, an OTP application, and a map of `{id, vsn}` keys to registered values.
 
 ```elixir
 defmodule OrderStore.Catalog do
   def build do
     Jido.Catalog.from_targets!(__MODULE__, :order_store, %{
-      {"orders/load", 1} => {:action, OrderStore.LoadOrder},
-      {"orders/charge", 1} => {:action, OrderStore.ChargeOrder},
-      {"orders/atoms/order_id", 1} => {:atom, :order_id},
-      {"orders/atoms/total_cents", 1} => {:atom, :total_cents}
+      {"orders/load", 1} => OrderStore.LoadOrder,
+      {"orders/charge", 1} => OrderStore.ChargeOrder,
+      {"orders/atoms/order_id", 1} => :order_id,
+      {"orders/atoms/total_cents", 1} => :total_cents
     })
   end
 end
 ```
 
-| Entry kind | Use it for |
-| --- | --- |
-| `:action` | An Action target. |
-| `:flow` | A Flow module target of a `:subflow` component. |
-| `:atom` | An atom key, atom path segment, or atom value. |
-| `:schema` | A Joi schema in `:schema`, `:output_schema`, or Iterate state. A Flow-level `Jido.Joi.map()` needs no entry, but an Iterate state schema always does. |
+Catalog registers values by ID and version without semantic kinds. The Flow
+reader validates target shape and schemas after lookup. Execution validates
+callbacks. See [Catalog and Discovery](../data/catalog.md).
 
 ## Encode and decode
 
@@ -130,7 +127,7 @@ Encoding reports failure differently. It returns `{:error, exception}` with a `J
 ```elixir
 partial_catalog =
   Jido.Catalog.from_targets!(OrderStore.Catalog, :order_store, %{
-    {"orders/atoms/order_id", 1} => {:atom, :order_id}
+    {"orders/atoms/order_id", 1} => :order_id
   })
 
 {:error, error} =
@@ -160,8 +157,8 @@ Action and Flow modules publish themselves. To publish atoms and schemas, define
 defmodule OrderStore.CatalogEntries do
   def __jido_catalog_manifest__ do
     [
-      %{id: "orders/atoms/order_id", kind: :atom, vsn: 1, target: :order_id},
-      %{id: "orders/atoms/total_cents", kind: :atom, vsn: 1, target: :total_cents}
+      %{id: "orders/atoms/order_id", vsn: 1, target: :order_id},
+      %{id: "orders/atoms/total_cents", vsn: 1, target: :total_cents}
     ]
   end
 end
@@ -175,7 +172,7 @@ With a published Catalog, you can drop both options:
 {:ok, restored} = Jido.Codec.decode_json(json)
 ```
 
-The first scan runs asynchronously when `:jido` starts. Until it finishes, encoding without `:catalog` raises a `Jido.Codec.Error.InternalError` with the message `Catalog is not initialized`. Decoding returns `{:error, [issue]}` with the code `:catalog_not_initialized`. Decoding without `:codec` needs the published index even when you pass `:catalog`, so it returns this issue too.
+The first scan runs asynchronously when `:jido` starts. Until it finishes, encoding without `:catalog` raises a `Jido.Codec.Error.InternalError` with the message `Catalog is not ready`. Decoding returns `{:error, [issue]}` with the code `:catalog_not_ready`. Decoding without `:codec` needs the published index even when you pass `:catalog`, so it returns this issue too.
 
 Call `Jido.Catalog.Discovery.ready?/0` to check the scan. Call `Jido.Catalog.Discovery.refresh/1` to rebuild the Catalog after loading more applications.
 

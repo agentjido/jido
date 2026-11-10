@@ -1,4 +1,5 @@
 Code.require_file("react_support.exs", __DIR__)
+Code.require_file("../support/child_process.exs", __DIR__)
 
 defmodule Jido.AI.Perf.ReActTest do
   use ExUnit.Case, async: false
@@ -93,22 +94,59 @@ defmodule Jido.AI.Perf.ReActTest do
         assert Result.validate(report) == []
         assert report["metadata"]["profile"] == "quick"
         assert length(report["cases"]) == 1
+        [result] = report["cases"]
+        assert result["outcome"] == "completed"
+        assert result["failure"] == nil
+        assert result["model_calls"] == 2
+        assert result["tool_rounds"] == 1
+        assert result["tool_calls"] == 1
         report
       end
 
     assert reports |> Enum.map(&Result.case_inventory/1) |> Enum.uniq() |> length() == 1
   end
 
-  defp run_mix_report!(arguments, output, extra_environment \\ []) do
-    {log, status} =
-      System.cmd(
-        System.find_executable("mix"),
-        arguments,
-        env: [{"MIX_ENV", "test"} | extra_environment],
-        stderr_to_stdout: true
+  test "memory metadata records resolved workload overrides" do
+    output = Path.expand("tmp/perf/jido_ai/memory-smoke/overrides.json")
+
+    report =
+      run_mix_report!(
+        ["run", "--no-compile", "--no-deps-check", "test/perf/jido_ai/react_memory.exs"],
+        output,
+        [
+          {"JIDO_MEMORY_BENCH_PROFILE", "quick"},
+          {"JIDO_MEMORY_BENCH_OUTPUT", "json"},
+          {"JIDO_MEMORY_BENCH_FILE", output},
+          {"JIDO_MEMORY_BENCH_WORKLOADS", "parallel"},
+          {"JIDO_MEMORY_BENCH_ROUNDS", "2"},
+          {"JIDO_MEMORY_BENCH_REPEATS", "2"},
+          {"JIDO_MEMORY_BENCH_PAYLOAD_BYTES", "128"}
+        ]
       )
 
-    assert status == 0, "benchmark failed:\n#{log}"
+    assert Result.validate(report) == []
+    assert report["metadata"]["concurrency"] == "up to 4 tools"
+    assert report["metadata"]["sample_count"] == 2
+    assert report["metadata"]["input_size"] == "1 scenarios; rounds 2"
+
+    assert report["metadata"]["scenarios"] == [
+             %{
+               "strategy" => "iterative",
+               "mode" => "direct",
+               "workload" => "parallel",
+               "rounds" => 2,
+               "tools_per_round" => 4,
+               "max_concurrency" => 4,
+               "payload_bytes" => 128
+             }
+           ]
+
+    assert length(report["cases"]) == 2
+    assert Enum.all?(report["cases"], &(&1["outcome"] == "completed"))
+  end
+
+  defp run_mix_report!(arguments, output, extra_environment \\ []) do
+    Jido.Test.Perf.ChildProcess.mix!(arguments, env: [{"MIX_ENV", "test"} | extra_environment])
     assert File.regular?(output)
     output |> File.read!() |> JSON.decode!()
   end

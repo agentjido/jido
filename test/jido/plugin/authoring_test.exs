@@ -138,7 +138,7 @@ defmodule Jido.Plugin.AuthoringTest do
                 id: "",
                 vsn: 1,
                 manifest_vsn: 1,
-                authoring: %{id: "", kind: :plugin, target: EmptyId, vsn: 1}
+                authoring: %{id: "", target: EmptyId, vsn: 1}
               }
             }} =
              Normalizer.normalize_all([EmptyId])

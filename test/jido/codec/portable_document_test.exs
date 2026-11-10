@@ -38,16 +38,16 @@ defmodule Jido.Codec.PortableDocumentTest do
   test "a second document owner composes the public Catalog, Document, and Value APIs" do
     registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"atoms/example", 1} => {:atom, :example},
-        {"atoms/kind", 1} => {:atom, :kind},
-        {"flows/foreign", 1} => {:flow, __MODULE__}
+        {"atoms/example", 1} => :example,
+        {"atoms/kind", 1} => :kind,
+        {"flows/foreign", 1} => __MODULE__
       })
 
     assert {:ok, document} = ExampleCodec.encode(%{kind: :example}, registry)
     assert {:ok, %{kind: :example}} = ExampleCodec.decode(document, registry)
 
     assert {:ok, __MODULE__} =
-             Catalog.resolve(registry, {"flows/foreign", 1}, :flow)
+             Catalog.resolve(registry, {"flows/foreign", 1})
 
     oversized = %{
       "type" => "wrong.owner",

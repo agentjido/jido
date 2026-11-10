@@ -74,8 +74,8 @@ end
 
 catalog =
   Jido.Catalog.from_targets!(RefundIdentity.Definition, :refunds, %{
-    {"refunds/issue", 1} => {:action, RefundIdentity.Issue},
-    {"refunds/atoms/amount_cents", 1} => {:atom, :amount_cents}
+    {"refunds/issue", 1} => RefundIdentity.Issue,
+    {"refunds/atoms/amount_cents", 1} => :amount_cents
   })
 
 options = [catalog: catalog, codec: Jido.Flow.Codec]
@@ -147,8 +147,8 @@ Save the digest beside the document when you review it. Compare it after each lo
 ```elixir
 catalog =
   Jido.Catalog.from_targets!(RefundIdentity.Definition, :refunds, %{
-    {"refunds/issue", 1} => {:action, RefundIdentity.Issue},
-    {"refunds/atoms/amount_cents", 1} => {:atom, :amount_cents}
+    {"refunds/issue", 1} => RefundIdentity.Issue,
+    {"refunds/atoms/amount_cents", 1} => :amount_cents
   })
 
 options = [catalog: catalog, codec: Jido.Flow.Codec]
@@ -196,9 +196,9 @@ end
 
 catalog =
   Jido.Catalog.from_targets!(RefundIdentity.Definition, :refunds, %{
-    {"refunds/issue", 1} => {:action, RefundIdentity.Issue},
-    {"refunds/issue", 2} => {:action, RefundIdentity.IssueV2},
-    {"refunds/atoms/amount_cents", 1} => {:atom, :amount_cents}
+    {"refunds/issue", 1} => RefundIdentity.Issue,
+    {"refunds/issue", 2} => RefundIdentity.IssueV2,
+    {"refunds/atoms/amount_cents", 1} => :amount_cents
   })
 
 options = [catalog: catalog, codec: Jido.Flow.Codec]
@@ -227,14 +227,14 @@ Remove the old entry only after you migrate its documents. A document that refer
 ```elixir
 current_catalog =
   Jido.Catalog.from_targets!(RefundIdentity.Definition, :refunds, %{
-    {"refunds/issue", 2} => {:action, RefundIdentity.IssueV2},
-    {"refunds/atoms/amount_cents", 1} => {:atom, :amount_cents}
+    {"refunds/issue", 2} => RefundIdentity.IssueV2,
+    {"refunds/atoms/amount_cents", 1} => :amount_cents
   })
 
 full_catalog =
   Jido.Catalog.from_targets!(RefundIdentity.Definition, :refunds, %{
-    {"refunds/issue", 1} => {:action, RefundIdentity.Issue},
-    {"refunds/atoms/amount_cents", 1} => {:atom, :amount_cents}
+    {"refunds/issue", 1} => RefundIdentity.Issue,
+    {"refunds/atoms/amount_cents", 1} => :amount_cents
   })
 
 {:ok, old_json} =

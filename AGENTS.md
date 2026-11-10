@@ -35,7 +35,7 @@ The focused AI components are `jido.ai.agent_authoring`, `jido.ai.conversation`,
 
 `.reach.exs` is the source of truth for code dependency layers. Covenant is the source of truth for behavior ownership and proof. Each Covenant component owns modules from one Reach layer. Each module has no more than one primary Covenant owner. A component test can use a lower layer, but the component does not own that lower layer.
 
-Some active Covenant IDs still start with `jido_action.` or `jido_ai.`. These are legacy IDs. Use `jido.*` IDs for new architecture work and update the component proof in the same change.
+Some active Covenant IDs still start with `jido_action.` or `jido_ai.`. These are legacy IDs. Use `jido.*` IDs for new architecture work and update the component contracts in the same change.
 
 ## Work rules
 
@@ -46,7 +46,6 @@ Some active Covenant IDs still start with `jido_action.` or `jido_ai.`. These ar
 - Record a lasting architecture decision in `docs/adr/` and update its index.
 - Run focused tests and `mix format --check-formatted` before handoff. For architecture changes, also run `mix reach.check --arch --smells` and the Covenant checks for the changed component.
 - Run `mix test.authoring` for public authoring compatibility and `mix test.contracts` for all Covenant contracts. Both commands run in `mix test.ci`.
-- Run `mix quality.coverage` before `mix quality.report`. The report runs all required offline suites and fails on missing, stale, unowned, or unresolved evidence. Provider and external-service suites stay opt-in.
 - Do not edit generated files in `_build/`, `cover/`, or `deps/`.
 
 ## Change verification matrix
@@ -61,12 +60,11 @@ It does not select live provider or external-service tests.
 | Public DSL, JSON, codec, or authoring | `mix test.authoring` |
 | Supported numbered example | `mix test.examples` |
 | Generated invariant or public API fuzz surface | `mix test.property` and `mix test.fuzz` |
-| Runtime, persistence, recovery, or process cleanup | `mix test.system` and, when applicable, `mix test.peer` |
+| Runtime, persistence, recovery, or process cleanup | The focused runtime tests and, when applicable, `mix test.peer` |
 | Concurrency, ownership, or sustained execution | `mix test.load` |
 | Benchmark runner or metric | `mix test.bench`, then the changed documented `mix bench.*` command |
 | Covenant component behavior | `mix test.contracts` |
 | Namespace, dependency direction, or architecture | `mix reach.check --arch --smells` |
-| Quality contract, ownership, or coverage | `mix quality.contract`, `mix quality.coverage`, then `mix quality.report` |
 | External adapter | The documented `mix test.services` target with a dedicated test service |
 | Live AI provider | `mix test.live` with `JIDO_LIVE_OPENAI_API_KEY` set to an approved test key |
 

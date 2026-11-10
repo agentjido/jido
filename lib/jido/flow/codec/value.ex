@@ -10,7 +10,7 @@ defmodule Jido.Flow.Codec.Value do
   alias Jido.Flow.Codec.{Limits, Paths}
 
   @doc false
-  @spec encode_expression(term(), Catalog.t(), non_neg_integer()) ::
+  @spec encode_expression(term(), Catalog.source(), non_neg_integer()) ::
           {:ok, term()} | {:error, Exception.t()}
   def encode_expression(%Jido.Expr.Operation{} = expression, registry, depth) do
     with :ok <- Limits.depth(depth),
@@ -45,9 +45,9 @@ defmodule Jido.Flow.Codec.Value do
   def encode_expression(value, registry, depth), do: encode_data(value, registry, depth)
 
   @doc false
-  @spec encode_data(term(), Catalog.t(), non_neg_integer()) ::
+  @spec encode_data(term(), Catalog.source(), non_neg_integer()) ::
           {:ok, term()} | {:error, Exception.t()}
-  def encode_data(value, %Catalog{} = registry, depth) do
+  def encode_data(value, registry, depth) when is_struct(registry, Catalog) or registry == :current do
     with :ok <- Limits.depth(depth) do
       value
       |> AuthoringValue.encode(registry)
@@ -99,7 +99,7 @@ defmodule Jido.Flow.Codec.Value do
   end
 
   @doc false
-  @spec decode(term(), Catalog.t(), list(), list(), :expression | :data) ::
+  @spec decode(term(), Catalog.source(), list(), list(), :expression | :data) ::
           {:ok, term(), Paths.t()} | {:error, [Exception.t()]}
   def decode(value, registry, stored, canonical, mode \\ :expression),
     do: decode(value, registry, stored, canonical, mode, 0)

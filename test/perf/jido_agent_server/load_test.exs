@@ -12,7 +12,15 @@ defmodule Jido.AgentServer.Perf.LoadTest do
       schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
 
     @impl true
-    def run(%{amount: amount}, %{agent_state: state}), do: {:ok, %{count: state.count + amount}}
+    def run(%{amount: amount}, %{agent_state: state, observer: observer, run_ref: run_ref}) do
+      send(observer, {run_ref, :started, amount, self()})
+
+      receive do
+        {^run_ref, :release} -> {:ok, %{count: state.count + amount}}
+      after
+        30_000 -> raise "load command was not released"
+      end
+    end
   end
 
   defmodule Counter do
@@ -27,7 +35,7 @@ defmodule Jido.AgentServer.Perf.LoadTest do
     end
   end
 
-  test "repeated 100-Agent cycles release all activation processes", c do
+  test "repeated 100-Agent cycles overlap commands and release all activation processes", c do
     results =
       for cycle <- 1..3 do
         started = System.monotonic_time(:microsecond)
@@ -37,13 +45,42 @@ defmodule Jido.AgentServer.Perf.LoadTest do
             {:ok, server} =
               Jido.Test.AgentServer.Assertions.start_agent(c.jido, Counter, id: unique_id("load-#{cycle}-#{index}"))
 
-            if index <= 20 do
-              assert {:ok, %{state: %{count: ^index}}, []} =
-                       Server.call(server, signal("runtime.load.increment", %{amount: index}))
-            end
-
             server
           end
+
+        observer = self()
+        run_ref = make_ref()
+
+        calls =
+          servers
+          |> Enum.take(20)
+          |> Enum.with_index(1)
+          |> Enum.map(fn {server, index} ->
+            Task.async(fn ->
+              result =
+                Server.call(server, signal("runtime.load.increment", %{amount: index}),
+                  timeout: 60_000,
+                  context: %{observer: observer, run_ref: run_ref}
+                )
+
+              {index, result}
+            end)
+          end)
+
+        # Every Action must be running before any Action can complete.
+        actions =
+          for index <- 1..20 do
+            assert_receive {^run_ref, :started, ^index, pid}, 10_000
+            pid
+          end
+
+        assert MapSet.size(MapSet.new(actions)) == 20
+        Enum.each(actions, &send(&1, {run_ref, :release}))
+
+        for call <- calls do
+          assert {index, {:ok, %{state: %{count: count}}, []}} = Task.await(call, 60_000)
+          assert count == index
+        end
 
         monitored =
           servers
@@ -69,6 +106,7 @@ defmodule Jido.AgentServer.Perf.LoadTest do
         %{
           cycle: cycle,
           agents: length(servers),
+          concurrent_commands: length(calls),
           monitored_processes: length(monitored),
           elapsed_us: System.monotonic_time(:microsecond) - started
         }

@@ -418,10 +418,10 @@ defmodule Jido.AI.AgentTest do
 
     registry =
       Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-        {id, 1} => {:agent, name},
-        {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
-        {"jido.ai/tests/schema-driven-reasoning", 1} => {:flow, Jido.Test.AI.Agent.SchemaDrivenReasoning},
-        {"jido.ai/tests/schema-agent-state-#{suffix}", 1} => {:schema, name.definition().schema}
+        {id, 1} => name,
+        {"jido.ai/agent", 1} => Jido.AI.Agent.Plugin,
+        {"jido.ai/tests/schema-driven-reasoning", 1} => Jido.Test.AI.Agent.SchemaDrivenReasoning,
+        {"jido.ai/tests/schema-agent-state-#{suffix}", 1} => name.definition().schema
       })
 
     assert {:ok, json} =
@@ -670,8 +670,8 @@ defmodule Jido.AI.AgentTest do
   test "Flow tools round-trip through Agent authoring data" do
     registry =
       Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-        {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
-        {"jido.ai/examples/tools/add-flow", 1} => {:flow, Tools.AddFlow}
+        {"jido.ai/reasoning/react", 1} => ReAct,
+        {"jido.ai/examples/tools/add-flow", 1} => Tools.AddFlow
       })
 
     data = %{reasoning: ReAct, defaults: %{}, tools: [Tools.AddFlow]}
@@ -1031,23 +1031,23 @@ defmodule Jido.AI.AgentTest do
 
   defp simple_agent_registry do
     Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-      {"jido.ai/agents/simple", 3} => {:agent, SimpleAgent},
-      {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
-      {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
-      {"jido.ai/examples/tools/add", 1} => {:action, Tools.Add},
-      {"jido.ai/examples/tools/multiply", 1} => {:action, Tools.Multiply},
-      {"jido.ai/schemas/simple-agent-state", 1} => {:schema, SimpleAgent.definition().schema}
+      {"jido.ai/agents/simple", 3} => SimpleAgent,
+      {"jido.ai/agent", 1} => Jido.AI.Agent.Plugin,
+      {"jido.ai/reasoning/react", 1} => ReAct,
+      {"jido.ai/examples/tools/add", 1} => Tools.Add,
+      {"jido.ai/examples/tools/multiply", 1} => Tools.Multiply,
+      {"jido.ai/schemas/simple-agent-state", 1} => SimpleAgent.definition().schema
     })
   end
 
   defp configured_agent_registry do
     Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-      {"jido.ai/agents/configured", 1} => {:agent, ConfiguredAgent},
-      {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
-      {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
-      {"jido.ai/examples/tools/add", 1} => {:action, Tools.Add},
-      {"jido.ai/examples/tools/multiply", 1} => {:action, Tools.Multiply},
-      {"jido.ai/schemas/configured-agent-state", 1} => {:schema, ConfiguredAgent.definition().schema}
+      {"jido.ai/agents/configured", 1} => ConfiguredAgent,
+      {"jido.ai/agent", 1} => Jido.AI.Agent.Plugin,
+      {"jido.ai/reasoning/react", 1} => ReAct,
+      {"jido.ai/examples/tools/add", 1} => Tools.Add,
+      {"jido.ai/examples/tools/multiply", 1} => Tools.Multiply,
+      {"jido.ai/schemas/configured-agent-state", 1} => ConfiguredAgent.definition().schema
     })
   end
 

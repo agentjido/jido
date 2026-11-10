@@ -59,20 +59,14 @@ mix test.authoring
 mix test.examples
 mix test.property
 mix test.fuzz
-mix test.system
 mix test.load
 mix test.peer
 mix test.bench
 mix quality
-mix quality.coverage
-mix quality.report
 mix reach.check --arch --smells
 ```
 
-`mix quality.coverage` measures the package, all active Covenant components, and each required offline suite. Run it
-before `mix quality.report`. The report writes JSON and text evidence under `tmp/quality/` and fails when a required
-suite, obligation, component proof, coverage rule, or stability record is not satisfied. Live provider and external
-service checks are separate opt-in commands.
+Live provider and external service checks are separate opt-in commands.
 
 `mix quality` blocks highest-priority Credo findings, compile warnings,
 Dialyzer errors, ExDNA errors, Reach architecture errors, and formatting

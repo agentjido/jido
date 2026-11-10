@@ -6,17 +6,22 @@ defmodule Jido.Flow.AccumulationTest do
   alias Jido.Flow.{Codec, Definition}
   alias Jido.Test.Flow.Codec, as: Codec
 
+  defmodule AvailableAction do
+    use Jido.Action, name: "accumulation_fixture"
+    def run(params, _context), do: {:ok, params}
+  end
+
   defp document do
     registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"action", 1} => {:action, UnloadedAction},
-        {"schema", 1} => {:schema, Jido.Joi.map()}
+        {"action", 1} => AvailableAction,
+        {"schema", 1} => Jido.Joi.map()
       })
 
     flow =
       Jido.Test.Flow.Builder.new!(
         name: "ordered",
-        components: [Jido.Test.Flow.Component.step!(name: "one", action: UnloadedAction)],
+        components: [Jido.Test.Flow.Component.step!(name: "one", action: AvailableAction)],
         output: %{}
       )
 
@@ -154,7 +159,7 @@ defmodule Jido.Flow.AccumulationTest do
     case Definition.component(%{
            kind: :step,
            name: "component",
-           action: UnloadedAction,
+           action: AvailableAction,
            needs: needs
          }) do
       {:ok, {_name, node}} -> {:ok, Jido.Flow.Graph.needs(node)}

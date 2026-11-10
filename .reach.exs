@@ -33,7 +33,6 @@
       "Jido.Catalog.Entry",
       "Jido.Catalog.Error",
       "Jido.Catalog.Manifest",
-      "Jido.Catalog.View",
       "Jido.Codec",
       "Jido.Codec.Contract",
       "Jido.Codec.Reference",

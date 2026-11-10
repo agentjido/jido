@@ -20,7 +20,7 @@ defmodule Jido.Flow.Codec.Reader do
   @on_error %{"fail_fast" => :fail_fast, "collect_errors" => :collect_errors}
 
   @doc false
-  @spec decode(term(), Catalog.t()) ::
+  @spec decode(term(), Catalog.source()) ::
           {:ok, map(), Paths.t()} | {:error, [Exception.t()]}
   def decode(%{} = document, registry) when not is_struct(document) do
     with :ok <- Limits.check(document),
@@ -201,14 +201,39 @@ defmodule Jido.Flow.Codec.Reader do
     do: failure("stored Flow target must be a map", stored)
 
   defp resolve(value, kind, registry, stored, canonical) do
-    with {:ok, resolved} <- Reference.decode(registry, value, kind) do
+    with {:ok, resolved} <- Reference.decode(registry, value),
+         :ok <- validate_target(resolved, kind) do
       {:ok, resolved, %{canonical => stored}}
     else
+      {:error, %Error.ValidationError{} = error} ->
+        {:error, [Error.prefix_path(error, stored)]}
+
       {:error, %CatalogError{} = error} ->
         error = flow_catalog_error(error)
         {:error, [Error.prefix_path(error, registry_error_path(value, error, stored))]}
     end
   end
+
+  defp validate_target(value, kind) when kind in [:action, :flow] do
+    cond do
+      not is_atom(value) or value in [nil, true, false] ->
+        {:error, Error.validation_error("stored Flow target must be a module", %{expected: kind})}
+
+      not Code.ensure_loaded?(value) ->
+        {:error, Error.validation_error("stored Flow module is not available", %{module: value})}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_target(value, :schema) do
+    if Jido.Joi.Schema.schema?(value) and Jido.Joi.Schema.map_shaped?(value),
+      do: :ok,
+      else: {:error, Error.validation_error("stored Flow schema must accept map-shaped data")}
+  end
+
+  defp validate_target(_value, _kind), do: :ok
 
   defp registry_error_path(%{}, %{details: %{field: field}}, stored)
        when is_binary(field),

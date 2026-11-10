@@ -1,3 +1,5 @@
+Code.require_file("helpers.exs", __DIR__)
+
 defmodule Jido.Test.Perf.Signal.Receiver do
   @moduledoc false
   use GenServer
@@ -22,6 +24,7 @@ defmodule Jido.Test.Perf.Signal.Fixtures do
   alias Jido.Signal
   alias Jido.Signal.{Bus, Codec, Dispatch, Router}
   alias Jido.Test.Perf.Signal.Receiver
+  import Jido.Test.Perf.Signal.Helpers, only: [plain: 4, empty_mailbox!: 0, expect!: 2]
 
   def workloads(size, payload) when size in 1..32 do
     event = signal(payload)
@@ -54,13 +57,13 @@ defmodule Jido.Test.Perf.Signal.Fixtures do
     attrs = Map.drop(wire, ["id", "specversion"])
 
     [
-      simple("signal/new", attrs, fn _ -> Signal.new(attrs) end, fn {:ok, result} ->
+      plain("signal/new", attrs, fn _ -> Signal.new(attrs) end, fn {:ok, result} ->
         expect!(is_binary(result.id) and byte_size(result.id) > 0, true)
         expect!(%{result | id: event.id}, event)
       end),
-      simple("signal/new_fixed", wire, fn _ -> Signal.new(wire) end, &expect!(&1, {:ok, event})),
-      simple("signal/to_map", event, fn _ -> Codec.to_map(event) end, &expect!(&1, wire)),
-      simple(
+      plain("signal/new_fixed", wire, fn _ -> Signal.new(wire) end, &expect!(&1, {:ok, event})),
+      plain("signal/to_map", event, fn _ -> Codec.to_map(event) end, &expect!(&1, wire)),
+      plain(
         "signal/from_map",
         wire,
         fn _ -> Codec.from_map(wire) end,
@@ -73,7 +76,7 @@ defmodule Jido.Test.Perf.Signal.Fixtures do
     for format <- [:json, :erlang_term],
         {:ok, encoded} = Codec.serialize(event, format: format),
         workload <- [
-          simple(
+          plain(
             "serialization/#{format}/encode",
             event,
             fn _ -> Codec.serialize(event, format: format) end,
@@ -81,7 +84,7 @@ defmodule Jido.Test.Perf.Signal.Fixtures do
               expect!(Codec.deserialize(result, format: format), {:ok, event})
             end
           ),
-          simple(
+          plain(
             "serialization/#{format}/decode",
             encoded,
             fn _ -> Codec.deserialize(encoded, format: format) end,
@@ -121,26 +124,26 @@ defmodule Jido.Test.Perf.Signal.Fixtures do
     expected = [:priority, count, :single_first, :single_second, :less_specific, :multi]
 
     [
-      simple("router/build", mixed_specs, fn _ -> Router.new(mixed_specs) end, fn {:ok, router} ->
+      plain("router/build", mixed_specs, fn _ -> Router.new(mixed_specs) end, fn {:ok, router} ->
         expect!(Router.count(router), count + 5)
         expect!(Router.route(router, matching), {:ok, expected})
       end),
-      simple(
+      plain(
         "router/exact",
         exact,
         fn _ -> Router.route(exact, matching) end,
         &expect!(&1, {:ok, [count]})
       ),
-      simple(
+      plain(
         "router/wildcard",
         mixed,
         fn _ -> Router.route(mixed, matching) end,
         &expect!(&1, {:ok, expected})
       ),
-      simple("router/miss", mixed, fn _ -> Router.route(mixed, missing) end, fn
+      plain("router/miss", mixed, fn _ -> Router.route(mixed, missing) end, fn
         {:error, %Jido.Error.RoutingError{}} -> :ok
       end),
-      simple(
+      plain(
         "router/predicate",
         conditional,
         fn _ -> Router.route(conditional, matching) end,
@@ -151,7 +154,7 @@ defmodule Jido.Test.Perf.Signal.Fixtures do
 
   defp dispatch_cases(size, event) do
     noop =
-      simple(
+      plain(
         "dispatch/noop",
         event,
         fn _ -> Dispatch.dispatch(event, {:noop, []}) end,
@@ -321,25 +324,6 @@ defmodule Jido.Test.Perf.Signal.Fixtures do
     expect!(Enum.all?(records, &(is_binary(&1.id) and byte_size(&1.id) > 0)), true)
   end
 
-  defp empty_mailbox! do
-    receive do
-      {:signal, _event} -> raise "unexpected Signal delivery"
-      {:signal, _id, _record} -> raise "unexpected durable delivery"
-    after
-      0 -> :ok
-    end
-  end
-
-  defp simple(name, retained, run, check) do
-    %{
-      name: name,
-      retained: retained,
-      setup: fn _ -> nil end,
-      run: run,
-      check: fn result, _ -> check.(result) end
-    }
-  end
-
   defp start_receiver! do
     {:ok, pid} = Receiver.start_link()
     pid
@@ -354,10 +338,5 @@ defmodule Jido.Test.Perf.Signal.Fixtures do
     after
       5_000 -> raise "benchmark process did not stop"
     end
-  end
-
-  defp expect!(actual, expected) do
-    if actual != expected, do: raise("benchmark returned an incorrect result")
-    :ok
   end
 end

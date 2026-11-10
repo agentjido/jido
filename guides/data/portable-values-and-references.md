@@ -20,9 +20,9 @@ end
 
 catalog =
   Jido.Catalog.from_targets!(PortableGuide.ChargeInvoice, :billing, %{
-    {"billing/charge-invoice", 1} => {:action, PortableGuide.ChargeInvoice},
-    {"billing/atoms/status", 1} => {:atom, :status},
-    {"billing/atoms/paid", 1} => {:atom, :paid}
+    {"billing/charge-invoice", 1} => PortableGuide.ChargeInvoice,
+    {"billing/atoms/status", 1} => :status,
+    {"billing/atoms/paid", 1} => :paid
   })
 ```
 
@@ -62,7 +62,7 @@ The decoded value equals the original, including the atom and integer keys.
 | Valid UTF-8 binary | Unchanged |
 | Proper list | List of encoded items |
 | Plain map | `%{"$type" => "map", "entries" => [%{"key" => key, "value" => value}]}` |
-| Atom in the Catalog as kind `:atom` | `%{"$type" => "atom", "id" => id, "vsn" => vsn}` |
+| Registered atom | `%{"$type" => "atom", "id" => id, "vsn" => vsn}` |
 
 Map entries are sorted by key: integers, then strings, then atom references, then Booleans. The same value therefore encodes to the same entry order.
 
@@ -83,7 +83,7 @@ Every failure below returns `{:error, %Jido.Codec.Value.Error{}}` unless the tab
 | On decode: a map without a valid `"$type"` shape | `:tag` |
 | On decode: a map entry without exactly `"key"` and `"value"` | `:map_entry` |
 | On decode: two entries with the same decoded key | `:duplicate_key` |
-| Atom missing from the Catalog, or a reference to an entry of another kind | Returns `%Jido.Catalog.Error{}`, with the location in `details.path` |
+| Atom missing from the Catalog, or a reference that cannot resolve | Returns `%Jido.Catalog.Error{}`, with the location in `details.path` |
 
 ```elixir
 alias Jido.Codec.Value
@@ -99,16 +99,15 @@ alias Jido.Codec.Value
 
 ## Catalog references
 
-`Jido.Codec.Reference.encode/3` turns a target into a two-field map. `Jido.Codec.Reference.decode/3` resolves that map and checks the entry kind. Both accept one kind or a list of kinds.
+`Jido.Codec.Reference.encode/2` turns a registered value into a two-field map. `Jido.Codec.Reference.decode/2` resolves that map. The consumer validates the resolved value for its field.
 
 ```elixir
 alias Jido.Codec.Reference
 
-{:ok, reference} = Reference.encode(catalog, :action, PortableGuide.ChargeInvoice)
+{:ok, reference} = Reference.encode(catalog, PortableGuide.ChargeInvoice)
 %{"id" => "billing/charge-invoice", "vsn" => 1} = reference
 
-{:ok, PortableGuide.ChargeInvoice} = Reference.decode(catalog, reference, :action)
-{:ok, PortableGuide.ChargeInvoice} = Reference.decode(catalog, reference, [:flow, :action])
+{:ok, PortableGuide.ChargeInvoice} = Reference.decode(catalog, reference)
 ```
 
 A reference never holds a module name, so a document cannot name a module that the Catalog does not list. Failures return `%Jido.Catalog.Error{}` with structured details.
@@ -116,14 +115,11 @@ A reference never holds a module name, so a document cannot name a module that t
 ```elixir
 alias Jido.Codec.Reference
 
-{:error, %{message: "Catalog reference has the wrong entry kind", details: %{expected: :flow, actual: :action}}} =
-  Reference.decode(catalog, %{"id" => "billing/charge-invoice", "vsn" => 1}, :flow)
-
 {:error, %{message: "Catalog reference has unsupported vsn", details: %{supported_vsns: [1]}}} =
-  Reference.decode(catalog, %{"id" => "billing/charge-invoice", "vsn" => 2}, :action)
+  Reference.decode(catalog, %{"id" => "billing/charge-invoice", "vsn" => 2})
 
 {:error, %{message: "Catalog reference must contain only id and vsn", details: %{field: "note"}}} =
-  Reference.decode(catalog, %{"id" => "billing/charge-invoice", "vsn" => 1, "note" => "x"}, :action)
+  Reference.decode(catalog, %{"id" => "billing/charge-invoice", "vsn" => 1, "note" => "x"})
 ```
 
 `Jido.Codec.Reference.parse/1` validates the shape without a Catalog and returns `{:ok, {id, vsn}}`. Resolving a reference only finds an inventory entry. Apply your own authorization before you run the target. See [Flow Security](../flow-runtime/flow-security.md).

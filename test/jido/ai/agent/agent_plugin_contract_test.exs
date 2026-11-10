@@ -70,8 +70,8 @@ defmodule Jido.AI.Agent.PluginContractTest do
   test "Plugin authoring data round-trips and returns located codec errors" do
     registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"contract/reasoning", 1} => {:flow, ReAct},
-        {"contract/add", 1} => {:action, Add}
+        {"contract/reasoning", 1} => ReAct,
+        {"contract/add", 1} => Add
       })
 
     data = %{reasoning: ReAct, defaults: %{model: "contract:model"}, tools: [Add]}
@@ -102,7 +102,7 @@ defmodule Jido.AI.Agent.PluginContractTest do
 
     registry_without_tool =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"contract/reasoning", 1} => {:flow, ReAct}
+        {"contract/reasoning", 1} => ReAct
       })
 
     assert {:error, %CatalogError{}} = Plugin.encode_authoring_data(data, registry_without_tool)
@@ -112,8 +112,8 @@ defmodule Jido.AI.Agent.PluginContractTest do
 
     invalid_tool_registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"contract/reasoning", 1} => {:flow, ReAct},
-        {"contract/invalid-tool", 1} => {:action, String}
+        {"contract/reasoning", 1} => ReAct,
+        {"contract/invalid-tool", 1} => String
       })
 
     invalid_tool_document = %{document | "tools" => [%{"id" => "contract/invalid-tool", "vsn" => 1}]}

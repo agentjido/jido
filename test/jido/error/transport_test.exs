@@ -385,7 +385,7 @@ defmodule Jido.Error.TransportTest do
       end
     end
 
-    test "bounds nested public messages and compensation causes before rendering them" do
+    test "bounds nested public messages before rendering them" do
       for key <- [:message, "message"] do
         within_limit = Enum.reduce(1..4, "visible", fn _, message -> %{key => message} end)
         outside_limit = Enum.reduce(1..5, "hidden", fn _, message -> %{key => message} end)
@@ -397,28 +397,6 @@ defmodule Jido.Error.TransportTest do
         assert Error.to_map(%{message: outside_limit}).message == "[DEPTH_LIMIT]"
         assert Error.to_map(%{message: non_message}).message =~ "visible"
       end
-
-      within_cause_limit =
-        Enum.reduce(1..2, %MessageProbeError{probe: self()}, fn n, cause ->
-          Error.compensation_error("within #{n}", original_error: cause)
-        end)
-
-      Error.to_map(within_cause_limit)
-      assert_received :message_rendered
-
-      outside_cause_limit =
-        Enum.reduce(1..3, %MessageProbeError{probe: self()}, fn n, cause ->
-          Error.compensation_error("outside #{n}", original_error: cause)
-        end)
-
-      projection = Error.to_map(outside_cause_limit)
-
-      refute_received :message_rendered
-
-      assert projection.details.original_error.details.original_error.details.original_error ==
-               "[DEPTH_LIMIT]"
-
-      refute Jason.encode!(projection) =~ "private-marker-9387"
     end
 
     test "canonicalizes known and unknown atom and string error types" do

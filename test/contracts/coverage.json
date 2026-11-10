@@ -115,7 +115,7 @@
         "jido.agent.I20": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 13,
+          "passing": 14,
           "status": "active",
           "testable": true,
           "tests": [
@@ -129,6 +129,7 @@
             "test Codec retains route defaults and writes definitions only",
             "test Codec validates the current executable kind",
             "test Codec version 1 encodes selectors and rejects other versions",
+            "test hydration fails when a registered Agent provenance module is absent",
             "test portable definitions reject arbitrary values and obsolete Registry kinds",
             "test the trusted JSON codec returns the portable definition",
             "test wildcard routes work and static structs are not portable authoring values"
@@ -2290,7 +2291,7 @@
         "jido.error.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 23,
+          "passing": 22,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2301,20 +2302,19 @@
             "test Splode interop to_error/1 preserves unknown error message for plain values",
             "test Splode interop to_map/1 keeps stack frames out of class error messages",
             "test all error modules normalize malformed details to an empty map",
-            "test compensation_error/2 creates a compensation error for failed compensation",
-            "test compensation_error/2 creates a compensation error for successful compensation",
             "test constructors accept map options and keep their owned fields",
             "test execution_error/2 creates an execution error",
             "test execution_error/2 creates an execution error with details",
             "test execution_error/2 creates an execution error with planning phase",
+            "test execution_error/2 keeps compensation data in execution details",
             "test execution_error/2 stores unknown keyword opts in details",
             "test internal_error/2 creates an internal error",
             "test internal_error/2 creates an internal error with details",
             "test routing_error/2 creates a routing error",
             "test timeout_error/2 creates a timeout error",
-            "test validation_error/2 creates a validation error for action (convenience)",
+            "test validation_error/2 creates a validation error for an action",
             "test validation_error/2 creates a validation error with explicit kind and subject",
-            "test validation_error/2 creates a validation error with field (infers kind: :input)",
+            "test validation_error/2 creates a validation error with input kind and subject",
             "test validation_error/2 creates a validation error with message",
             "test validation_error/2 keeps domain kind values in details"
           ]
@@ -2334,7 +2334,7 @@
         "jido.error.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 26,
+          "passing": 25,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2344,7 +2344,6 @@
             "test stable program codes extracts registered codes without making messages part of the contract",
             "test stable program codes keeps the exact version 1 projection shape and nests its program code",
             "test stable program codes publishes one closed Jido-owned code registry",
-            "test to_map/1 converts compensation error to map",
             "test to_map/1 converts execution error to map with type execution_error",
             "test to_map/1 converts execution error with phase: :planning to map with type planning_error",
             "test to_map/1 converts internal error to map with type internal",
@@ -2369,11 +2368,10 @@
         "jido.error.I4": {
           "failing": 0,
           "kind": "security",
-          "passing": 44,
+          "passing": 43,
           "status": "active",
           "testable": true,
           "tests": [
-            "test to_map/1 converts compensation error to map",
             "test to_map/1 converts execution error to map with type execution_error",
             "test to_map/1 converts execution error with phase: :planning to map with type planning_error",
             "test to_map/1 converts internal error to map with type internal",
@@ -2393,7 +2391,7 @@
             "test to_map/1 recognizes the complete public type vocabulary",
             "test to_map/1 sanitizes nested details for public transport payloads",
             "test transport boundaries bounds long invalid binaries and redacts them under sensitive keys",
-            "test transport boundaries bounds nested public messages and compensation causes before rendering them",
+            "test transport boundaries bounds nested public messages before rendering them",
             "test transport boundaries canonicalizes known and unknown atom and string error types",
             "test transport boundaries contains exception message and inspection failures",
             "test transport boundaries keeps invalid binary leaves safe for JSON transport",
@@ -2422,11 +2420,10 @@
         "jido.error.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 19,
+          "passing": 18,
           "status": "active",
           "testable": true,
           "tests": [
-            "test to_map/1 converts compensation error to map",
             "test to_map/1 converts execution error to map with type execution_error",
             "test to_map/1 converts execution error with phase: :planning to map with type planning_error",
             "test to_map/1 converts internal error to map with type internal",
@@ -2461,7 +2458,7 @@
             "test Splode interop to_error/1 preserves unknown error message for plain values",
             "test Splode interop to_map/1 keeps stack frames out of class error messages",
             "test transport boundaries bounds long invalid binaries and redacts them under sensitive keys",
-            "test transport boundaries bounds nested public messages and compensation causes before rendering them",
+            "test transport boundaries bounds nested public messages before rendering them",
             "test transport boundaries canonicalizes known and unknown atom and string error types",
             "test transport boundaries contains exception message and inspection failures",
             "test transport boundaries keeps invalid binary leaves safe for JSON transport",
@@ -3884,7 +3881,6 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test Catalog rejects a non-atom target for an atom entry",
             "test a second document owner composes the public Catalog, Document, and Value APIs",
             "test decode rejects a plain map that would become a struct",
             "test decode rejects invalid UTF-8 strings at every value position",
@@ -3893,6 +3889,7 @@
             "test enforces depth before recursive encode and decode",
             "test every decoded portable value can be encoded again",
             "test keeps the full path for an unregistered nested atom",
+            "test portable atom decoding validates the resolved value",
             "test rejects unregistered atoms and nonportable values",
             "test rejects unsupported map keys before it sorts portable keys",
             "test round trips Boolean map keys in deterministic order",
@@ -4224,7 +4221,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test Action and Flow identifiers have distinct trusted kinds",
+            "test Catalog registers values and Flow decoding validates their roles",
             "test Codec bounds total decode work across permitted collections",
             "test Codec rejects invalid UTF-8 at every portable string boundary",
             "test Codec rejects invalid public boundary values and root records",
@@ -4748,9 +4745,9 @@
             "test data and Codec diagnostics use the same dependency order",
             "test direct, map, DSL, and stored graphs agree on valid and invalid dependencies",
             "test duplicates and missing references aggregate without cycle or Handoff cascades",
+            "test hydration rejects a registered module that is not available",
             "test missing references and cycles identify their source declaration",
-            "test nil output retains canonical and stored graph error precedence",
-            "test unloaded targets remain valid for inert construction and decoding"
+            "test nil output retains canonical and stored graph error precedence"
           ]
         },
         "jido_action.flow.I9": {

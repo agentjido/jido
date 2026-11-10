@@ -16,8 +16,8 @@ defmodule Jido.Error.ApiTest do
       assert error.message == "Invalid input"
     end
 
-    test "creates a validation error with field (infers kind: :input)" do
-      error = Error.validation_error("Invalid field", field: :email)
+    test "creates a validation error with input kind and subject" do
+      error = Error.validation_error("Invalid field", kind: :input, subject: :email)
 
       assert error.message == "Invalid field"
       assert error.kind == :input
@@ -31,8 +31,8 @@ defmodule Jido.Error.ApiTest do
       assert error.subject == :timeout
     end
 
-    test "creates a validation error for action (convenience)" do
-      error = Error.validation_error("Action not found", action: SomeAction)
+    test "creates a validation error for an action" do
+      error = Error.validation_error("Action not found", kind: :action, subject: SomeAction)
 
       assert error.message == "Action not found"
       assert error.kind == :action
@@ -50,6 +50,13 @@ defmodule Jido.Error.ApiTest do
 
   describe "execution_error/2" do
     @describetag obligation: "jido.error.I1"
+    test "keeps compensation data in execution details" do
+      error = Error.execution_error("Refund failed", code: :refund_failed, compensated: false)
+
+      assert %Error.ExecutionError{details: %{code: :refund_failed, compensated: false}} = error
+      assert Error.to_map(error).type == :execution_error
+    end
+
     test "creates an execution error" do
       error = Error.execution_error("Execution failed")
 
@@ -103,34 +110,6 @@ defmodule Jido.Error.ApiTest do
       assert %Error.TimeoutError{} = error
       assert error.message == "Operation timed out"
       assert error.timeout == 5000
-    end
-  end
-
-  describe "compensation_error/2" do
-    @describetag obligation: "jido.error.I1"
-    test "creates a compensation error for successful compensation" do
-      original = Error.execution_error("Original failure")
-
-      error =
-        Error.compensation_error("Compensated",
-          original_error: original,
-          compensated: true,
-          result: %{refund: true}
-        )
-
-      assert %Error.CompensationError{} = error
-      assert error.compensated == true
-      assert error.original_error == original
-      assert error.result == %{refund: true}
-    end
-
-    test "creates a compensation error for failed compensation" do
-      original = Error.execution_error("Original failure")
-
-      error = Error.compensation_error("Compensation failed", original_error: original)
-
-      assert error.compensated == false
-      assert error.original_error == original
     end
   end
 
@@ -215,8 +194,9 @@ defmodule Jido.Error.ApiTest do
     @describetag obligation: ["jido.error.I3", "jido.error.I4", "jido.error.I5"]
     @to_map_cases [
       # {description, error_expr, expected_type}
-      {"validation error with field", Error.validation_error("Invalid", field: :email), :validation_error},
-      {"validation error with kind: :action", Error.validation_error("Bad action", action: SomeAction),
+      {"validation error with field", Error.validation_error("Invalid", kind: :input, subject: :email),
+       :validation_error},
+      {"validation error with kind: :action", Error.validation_error("Bad action", kind: :action, subject: SomeAction),
        :invalid_action},
       {"validation error with kind: :config", Error.validation_error("Bad config", kind: :config), :config_error},
       {"execution error", Error.execution_error("Failed"), :execution_error},
@@ -239,12 +219,12 @@ defmodule Jido.Error.ApiTest do
     end
 
     test "converts validation error to public map without stacktrace" do
-      error = Error.validation_error("Invalid", field: :email)
+      error = Error.validation_error("Invalid", kind: :input, subject: :email)
       result = Error.to_map(error)
 
       assert result.type == :validation_error
       assert result.message == "Invalid"
-      assert result.details == %{field: :email, kind: :input, subject: :email}
+      assert result.details == %{kind: :input, subject: :email}
       assert result.retryable? == false
       refute Map.has_key?(result, :stacktrace)
     end
@@ -259,25 +239,6 @@ defmodule Jido.Error.ApiTest do
       assert %{type: :validation_error, details: %{errors: errors}} = Error.to_map(group)
       assert Enum.map(errors, & &1.message) == ["First", "Second"]
       assert Enum.map(errors, & &1.details.path) == [[:first], [:second]]
-    end
-
-    test "converts compensation error to map" do
-      original = Error.execution_error("Original")
-
-      error =
-        Error.compensation_error("Compensated",
-          original_error: original,
-          compensated: true,
-          result: %{refund: true}
-        )
-
-      result = Error.to_map(error)
-
-      assert result.type == :compensation_error
-      assert result.details.compensated == true
-      assert result.details.result == %{refund: true}
-      assert result.details.original_error.type == :execution_error
-      assert result.details.original_error.message == "Original"
     end
 
     test "keeps each error module's public fields in details" do
@@ -381,7 +342,6 @@ defmodule Jido.Error.ApiTest do
         {Error.execution_error("failed"), true},
         {Error.routing_error("missing"), true},
         {Error.timeout_error("late"), true},
-        {Error.compensation_error("undo failed"), true},
         {Error.internal_error("failed"), true}
       ]
 
@@ -400,7 +360,6 @@ defmodule Jido.Error.ApiTest do
         :execution_error,
         :routing_error,
         :timeout,
-        :compensation_error,
         :internal
       ]
 
@@ -464,7 +423,7 @@ defmodule Jido.Error.ApiTest do
   describe "Splode interop" do
     @describetag obligation: ["jido.error.I1", "jido.error.I6"]
     test "to_error/1 keeps Jido validation errors typed and classified" do
-      error = Error.validation_error("Invalid", field: :email)
+      error = Error.validation_error("Invalid", kind: :input, subject: :email)
       converted = Error.to_error(error)
 
       assert %Error.ValidationError{} = converted
@@ -473,7 +432,7 @@ defmodule Jido.Error.ApiTest do
     end
 
     test "to_class/1 wraps typed errors in the corresponding class" do
-      error = Error.validation_error("Invalid", field: :email)
+      error = Error.validation_error("Invalid", kind: :input, subject: :email)
       class_error = Error.to_class(error)
 
       assert %Error.Invalid{} = class_error
@@ -490,7 +449,7 @@ defmodule Jido.Error.ApiTest do
     end
 
     test "Codec internal errors keep an internal type" do
-      error = Jido.Codec.Error.internal(:catalog_not_initialized, "Catalog is not initialized")
+      error = Jido.Codec.Error.internal(:catalog_not_ready, "Catalog is not ready")
 
       assert Error.type(error) == :internal
       assert %{type: :internal, retryable?: true} = Error.to_map(error)

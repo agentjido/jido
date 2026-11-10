@@ -40,14 +40,14 @@ defmodule Jido.Examples.Workflow.SequentialFlowTest do
 
     catalog =
       Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-        {"actions/double", 1} => {:action, Example.Pipeline.step_action("double")},
-        {"actions/finish", 1} => {:action, Example.Finish},
-        {"schemas/input", 1} => {:schema, flow.schema},
-        {"schemas/output", 1} => {:schema, flow.output_schema},
-        {"atoms/amount", 1} => {:atom, :amount},
-        {"atoms/failure", 1} => {:atom, :failure},
-        {"atoms/none", 1} => {:atom, :none},
-        {"atoms/value", 1} => {:atom, :value}
+        {"actions/double", 1} => Example.Pipeline.step_action("double"),
+        {"actions/finish", 1} => Example.Finish,
+        {"schemas/input", 1} => flow.schema,
+        {"schemas/output", 1} => flow.output_schema,
+        {"atoms/amount", 1} => :amount,
+        {"atoms/failure", 1} => :failure,
+        {"atoms/none", 1} => :none,
+        {"atoms/value", 1} => :value
       })
 
     opts = [catalog: catalog, codec: Codec]

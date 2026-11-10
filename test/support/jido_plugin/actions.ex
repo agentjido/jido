@@ -1,24 +1,3 @@
-defmodule Jido.Test.Plugin.Action do
-  @moduledoc false
-  use Jido.Action, name: "plugin_test_action"
-
-  def run(_params, _context), do: {:ok, %{}}
-end
-
-defmodule Jido.Test.Plugin.AnotherAction do
-  @moduledoc false
-  use Jido.Action,
-    name: "plugin_test_another_action",
-    schema: Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
-
-  def run(%{value: value}, _context), do: {:ok, %{value: value}}
-end
-
-defmodule Jido.Test.Plugin.NotAnAction do
-  @moduledoc false
-  def some_function, do: :ok
-end
-
 defmodule Jido.Test.Plugin.Actions do
   @moduledoc """
   Shared test actions for Jido test suite.

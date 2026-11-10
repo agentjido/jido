@@ -251,6 +251,8 @@ defmodule Jido.Signal.Router do
         {:halt,
          {:error,
           Error.validation_error("Expected Route struct", %{
+            kind: :input,
+            subject: "route",
             field: "route",
             value: invalid
           })}}
@@ -438,6 +440,8 @@ defmodule Jido.Signal.Router do
     if String.contains?(path, "*") do
       {:error,
        Error.validation_error("Signal module type must be an exact route path", %{
+         kind: :input,
+         subject: "path",
          field: "path",
          value: module,
          type: path
@@ -452,6 +456,8 @@ defmodule Jido.Signal.Router do
   defp invalid_path(path) do
     {:error,
      Error.validation_error("Expected a route path string or a Jido.Signal module", %{
+       kind: :input,
+       subject: "path",
        field: "path",
        value: path
      })}

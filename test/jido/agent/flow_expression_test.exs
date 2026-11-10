@@ -66,12 +66,12 @@ defmodule Jido.Agent.FlowExpressionTest do
 
     flow_registry =
       Jido.Catalog.from_targets!(__MODULE__, :jido, %{
-        {"actions/amount", 1} => {:action, Amount},
-        {"schemas/input", 1} => {:schema, flow.schema},
-        {"schemas/output", 1} => {:schema, flow.output_schema},
-        {"atoms/amount", 1} => {:atom, :amount},
-        {"atoms/agent-state", 1} => {:atom, :agent_state},
-        {"atoms/count", 1} => {:atom, :count}
+        {"actions/amount", 1} => Amount,
+        {"schemas/input", 1} => flow.schema,
+        {"schemas/output", 1} => flow.output_schema,
+        {"atoms/amount", 1} => :amount,
+        {"atoms/agent-state", 1} => :agent_state,
+        {"atoms/count", 1} => :count
       })
 
     flow_opts = [catalog: flow_registry, codec: Jido.Flow.Codec]

@@ -138,8 +138,8 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
 
     registry =
       Catalog.from_targets!(__MODULE__, :jido, %{
-        {"add", 1} => {:action, Add},
-        {"map", 1} => {:schema, Jido.Joi.map()}
+        {"add", 1} => Add,
+        {"map", 1} => Jido.Joi.map()
       })
 
     assert {:ok, document} = Codec.encode(flow, registry)

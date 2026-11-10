@@ -513,7 +513,7 @@ defmodule Jido.Plugin.Normalizer do
          {:ok, id} <- read_authoring_value(module, :id),
          {:ok, vsn} <- read_authoring_value(module, :vsn),
          {:ok, authoring} <- read_authoring_value(module, :__jido_catalog_manifest__) do
-      expected = %{id: id, kind: :plugin, target: module, vsn: vsn}
+      expected = %{id: id, target: module, vsn: vsn}
 
       if is_binary(id) and byte_size(id) > 0 and vsn === manifest_vsn and
            authoring === expected do

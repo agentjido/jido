@@ -13,6 +13,7 @@ defmodule Jido.Codec.Value do
   """
 
   alias Jido.Catalog
+  alias Jido.Codec.Reference
   alias Jido.Catalog.Error, as: CatalogError
   alias Jido.Codec.Document
 
@@ -45,12 +46,12 @@ defmodule Jido.Codec.Value do
   end
 
   @doc "Encodes one portable value with registered atom identifiers."
-  @spec encode(term(), Catalog.t()) :: {:ok, term()} | {:error, Exception.t()}
-  def encode(value, %Catalog{} = catalog), do: encode(value, catalog, 0, [])
+  @spec encode(term(), Catalog.source()) :: {:ok, term()} | {:error, Exception.t()}
+  def encode(value, catalog), do: encode(value, catalog, 0, [])
 
   @doc "Decodes one portable value through a trusted Catalog."
-  @spec decode(term(), Catalog.t()) :: {:ok, term()} | {:error, Exception.t()}
-  def decode(value, %Catalog{} = catalog), do: decode(value, catalog, 0, [])
+  @spec decode(term(), Catalog.source()) :: {:ok, term()} | {:error, Exception.t()}
+  def decode(value, catalog), do: decode(value, catalog, 0, [])
 
   defp encode(_value, _registry, depth, path) when depth > @maximum_depth,
     do: depth_error(path, depth)
@@ -63,8 +64,8 @@ defmodule Jido.Codec.Value do
     do: portable_string(value, path)
 
   defp encode(value, registry, _depth, path) when is_atom(value) do
-    case Catalog.reference(registry, :atom, value) do
-      {:ok, {id, vsn}} ->
+    case Reference.encode(registry, value) do
+      {:ok, %{"id" => id, "vsn" => vsn}} ->
         {:ok, %{"$type" => "atom", "id" => id, "vsn" => vsn}}
 
       {:error, %CatalogError{} = exception} ->
@@ -110,7 +111,7 @@ defmodule Jido.Codec.Value do
 
   defp decode(%{"$type" => "atom", "id" => id, "vsn" => vsn} = value, registry, _depth, path)
        when map_size(value) == 3 do
-    case Catalog.resolve(registry, {id, vsn}, :atom) do
+    case Reference.decode(registry, %{"id" => id, "vsn" => vsn}) do
       {:ok, atom} when is_atom(atom) -> {:ok, atom}
       {:ok, _value} -> error(:atom, "codec atom reference must resolve to an atom", path)
       {:error, %CatalogError{} = exception} -> prefix_catalog_error({:error, exception}, path)

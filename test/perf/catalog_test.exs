@@ -13,18 +13,11 @@ defmodule Jido.Perf.CatalogTest do
     catalog = Catalog.load!()
     assert Catalog.validate(catalog) == []
 
-    {:ok, proof_map} =
-      YamlElixir.read_from_file(Path.expand("../quality/component_proof.yml", __DIR__))
-
-    components = MapSet.new(proof_map["components"], & &1["id"])
-
     readme = File.read!(Path.join(__DIR__, "README.md"))
 
     for family <- catalog["families"] do
       assert readme =~ family["command"], "missing quick command for #{family["id"]}"
-      assert family["component"] in components
       assert family["component"] in family["components"]
-      assert Enum.all?(family["components"], &(&1 in components))
       assert File.regular?(Path.join(@root, family["evidence"]))
 
       if family["mode"] == "benchmark" do

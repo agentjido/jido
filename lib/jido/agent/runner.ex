@@ -426,6 +426,8 @@ defmodule Jido.Agent.Runner do
       {:error, _error} ->
         {:error,
          Error.validation_error("Agent Signal data must be a map, keyword list, or nil",
+           kind: :input,
+           subject: :data,
            field: :data,
            details: %{signal_id: signal.id, data: signal.data}
          )}

@@ -17,6 +17,19 @@ This page is the index for Jido project documentation.
 ## Current document groups
 
 - [Architecture decision records](adr/README.md)
+- [Error component](components/error.md)
+- [ID component](components/id.md)
+- [Joi component](components/joi.md)
+- [Expression component](components/expr.md)
+- [Trace component](components/trace.md)
+- [Codec component](components/codec.md)
+- [Catalog component](components/catalog.md)
+- [Session component](components/session.md)
+- [Thread component](components/thread.md)
+- [Instruction component](components/instruction.md)
+- [Telemetry component](components/telemetry.md)
+- [Persistence component](components/persistence.md)
+- [Signal component and sub-components](components/signal.md)
 - [Module dependency map](architecture/module-dependency-map.md)
 - [Package vision](architecture/package-vision.md)
 - [Supported examples](../examples/README.md)
@@ -24,7 +37,5 @@ This page is the index for Jido project documentation.
 
 ## Plans at required paths
 
-- [Test Flow authoring suite plan](plans/2026-11-04-1255-test-flow-authoring-suite-plan.md)
-- [Test tree refactor plan](plans/2026-11-04-1314-refactor-jido-test-tree-plan.md)
 
 These plans stay at their current paths because project files use those paths.

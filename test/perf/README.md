@@ -36,3 +36,18 @@ warm-up, sample count, metrics, and units for each profile.
 Use reports only for comparisons made with the same family, profile, code, and
 compatible environment. Timing and memory values are evidence, not portable
 pass limits.
+
+## Child VM lifetime
+
+`support/child_process.exs` owns child VM startup, captured output, and failure
+reporting. It starts a lifetime guard before Mix loads. If the caller exits,
+port closure closes the child's standard input and the guard stops that VM.
+This also stops nested benchmark VMs through their own guards.
+
+The runner normally allows 120 seconds per command. Isolated memory scenarios
+allow 660 seconds to cover their existing request limit. The parent kills a
+child that exceeds its deadline. A child-side fallback runs five seconds later.
+These are safety limits, not performance pass limits.
+
+`child_process_test.exs` checks command failure, deadline expiry, parent loss,
+and parent loss with a nested child VM.

@@ -33,11 +33,11 @@ defmodule Jido.Agent.Extension do
   @callback verify_connection(map(), map()) :: :ok | {:error, term()}
 
   @doc "Encodes normalized provider data for an Agent authoring document."
-  @callback encode_authoring_data(map(), Catalog.t()) ::
+  @callback encode_authoring_data(map(), Catalog.source()) ::
               {:ok, term()} | {:error, term()}
 
   @doc "Decodes provider data from an Agent authoring document."
-  @callback decode_authoring_data(term(), Catalog.t()) ::
+  @callback decode_authoring_data(term(), Catalog.source()) ::
               {:ok, term()} | {:error, term()}
 
   @optional_callbacks encode_authoring_data: 2, decode_authoring_data: 2, derive_routes: 1
@@ -50,12 +50,12 @@ defmodule Jido.Agent.Extension do
         sections: unquote(Keyword.get(opts, :sections, [])),
         imports: unquote(Keyword.get(opts, :imports, []))
 
-      def id, do: unquote(Keyword.fetch!(opts, :id))
+      def id, do: unquote(Keyword.get(opts, :id, Atom.to_string(__CALLER__.module)))
       def vsn, do: unquote(Keyword.get(opts, :vsn, 1))
 
       @doc false
       def __jido_catalog_manifest__ do
-        %{id: id(), kind: :plugin, vsn: vsn(), target: __MODULE__}
+        %{id: id(), vsn: vsn(), target: __MODULE__}
       end
 
       def lower(_dsl, config), do: {:ok, config}
@@ -91,16 +91,16 @@ defmodule Jido.Agent.Extension do
   end
 
   @doc false
-  @spec encode_authoring_data(module(), map(), Catalog.t()) ::
+  @spec encode_authoring_data(module(), map(), Catalog.source()) ::
           {:ok, term()} | {:error, term()}
-  def encode_authoring_data(provider, data, %Catalog{} = catalog) do
+  def encode_authoring_data(provider, data, catalog) when is_struct(catalog, Catalog) or catalog == :current do
     authoring_data(provider, :encode_authoring_data, data, catalog, &Value.encode/2)
   end
 
   @doc false
-  @spec decode_authoring_data(module(), term(), Catalog.t()) ::
+  @spec decode_authoring_data(module(), term(), Catalog.source()) ::
           {:ok, term()} | {:error, term()}
-  def decode_authoring_data(provider, data, %Catalog{} = catalog) do
+  def decode_authoring_data(provider, data, catalog) when is_struct(catalog, Catalog) or catalog == :current do
     authoring_data(provider, :decode_authoring_data, data, catalog, &Value.decode/2)
   end
 
@@ -142,7 +142,7 @@ defmodule Jido.Agent.Extension do
 
   defp plugin(module) do
     authoring = module.__jido_catalog_manifest__()
-    expected = %{id: module.id(), kind: :plugin, target: module, vsn: module.vsn()}
+    expected = %{id: module.id(), target: module, vsn: module.vsn()}
 
     if Jido.Plugin in behaviours(module) and authoring === expected do
       :ok

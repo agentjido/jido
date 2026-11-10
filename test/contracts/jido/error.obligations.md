@@ -17,7 +17,7 @@ inside a domain component or runtime retry and recovery policy.
 ### jido.error.I1 — Fixed taxonomy and constructors
 
 - **scope:** Splode classes, public error modules, constructors
-- **must:** Provide the five invalid, execution, routing, timeout, and internal classes. Keep the six documented public error modules with their fixed class and fields. Accept keyword or map options, normalize details to a map, apply documented defaults, and keep CompensationError as an execution-class compatibility type.
+- **must:** Provide the five invalid, execution, routing, timeout, and internal classes. Keep the five documented public error modules with their fixed class and fields. Accept keyword or map options, normalize details to a map, apply documented defaults.
 - **kind:** functional
 - **status:** active
 
@@ -38,7 +38,7 @@ inside a domain component or runtime retry and recovery policy.
 ### jido.error.I4 — Bounded safe transport
 
 - **scope:** public messages and details
-- **must:** Bound container depth, nested message and compensation-cause traversal, collection size, text, and keys. Redact sensitive-key values, omit stacktrace-key values, contain improper lists and opaque terms, repair invalid UTF-8, and produce JSON-encodable values without exposing rejected private data.
+- **must:** Bound container depth, nested message and error-group traversal, collection size, text, and keys. Redact sensitive-key values, omit stacktrace-key values, contain improper lists and opaque terms, repair invalid UTF-8, and produce JSON-encodable values without exposing rejected private data.
 - **kind:** security
 - **status:** active
 
