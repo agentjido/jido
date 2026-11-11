@@ -39,6 +39,16 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
     def run(_params, _context), do: Process.exit(self(), :kill)
   end
 
+  defmodule ClassificationCrashAction do
+    @behaviour Jido.Action
+
+    def __jido_codec_kind__, do: raise("classification failed")
+    def on_before_validate_params(params), do: {:ok, params}
+    def validate_params(params), do: {:ok, params}
+    def validate_output(output), do: {:ok, output}
+    def run(params, _context), do: {:ok, params}
+  end
+
   test "run/4 executes under the application Task Supervisor by default" do
     expected_group_leader = Process.group_leader()
     caller = run_blocking(BlockingAction, [])
@@ -64,25 +74,77 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
     send(group_leader, :stop)
   end
 
-  test "run/4 accepts an injected Task Supervisor" do
-    supervisor = start_supervised!(Task.Supervisor)
-    expected_group_leader = Process.group_leader()
-    caller = run_blocking(BlockingAction, task_supervisor: supervisor)
-
-    assert_receive {:action_started, action_pid, ^expected_group_leader}, 1_000
-    assert action_pid in Task.Supervisor.children(supervisor)
-    refute action_pid in Task.Supervisor.children(Jido.Exec.TaskSupervisor)
-
-    send(action_pid, :release)
-    assert_caller_result(caller, {:ok, %{released: true}})
-  end
-
   test "an untrappable Action exit does not exit the caller" do
     assert {:error, %Jido.Error.ExecutionError{phase: :execution_task, details: details}} =
              Exec.run(KillingAction)
 
     assert details.reason == :killed
     assert Process.alive?(self())
+  end
+
+  test "target resolution cannot exit the caller" do
+    assert {:error, %Jido.Error.ExecutionError{phase: :execution_task, details: details}} =
+             Exec.run(ClassificationCrashAction)
+
+    assert match?({{%RuntimeError{message: "classification failed"}, _stacktrace}, _call}, details.reason) or
+             match?({%RuntimeError{message: "classification failed"}, _stacktrace}, details.reason)
+
+    assert Process.alive?(self())
+  end
+
+  defmodule MapBlockingAction do
+    use Jido.Action, name: "exec_immediate_map_blocking"
+
+    @impl true
+    def run(%{item: item}, %{observer: observer}) do
+      send(observer, {:map_action_started, item, self()})
+
+      receive do
+        :release -> {:ok, %{item: item}}
+      end
+    end
+  end
+
+  test "max_concurrency is one limit across independent Maps" do
+    flow =
+      Flow.new!(%{
+        name: "exec_immediate_global_map_limit",
+        components: [
+          %{
+            kind: :map,
+            name: "left",
+            collection: [1, 2],
+            action: MapBlockingAction,
+            params: %{item: Ref.item()}
+          },
+          %{
+            kind: :map,
+            name: "right",
+            collection: [3, 4],
+            action: MapBlockingAction,
+            params: %{item: Ref.item()}
+          }
+        ],
+        output: %{left: Ref.result("left"), right: Ref.result("right")}
+      })
+
+    caller = run_blocking(flow, max_concurrency: 2)
+
+    assert_receive {:map_action_started, _item, first}, 1_000
+    assert_receive {:map_action_started, _item, second}, 1_000
+    refute_received {:map_action_started, _item, _pid}
+
+    send(first, :release)
+    assert_receive {:map_action_started, _item, third}, 1_000
+    send(second, :release)
+    assert_receive {:map_action_started, _item, fourth}, 1_000
+    send(third, :release)
+    send(fourth, :release)
+
+    assert_caller_result(caller, fn
+      {:ok, %{left: left, right: right}} -> length(left) == 2 and length(right) == 2
+      _result -> false
+    end)
   end
 
   describe "caller exit" do
@@ -219,6 +281,12 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
       result = Exec.run(target, %{}, %{observer: owner}, opts)
       send(owner, {:caller_result, self(), result})
     end)
+  end
+
+  defp assert_caller_result({caller, monitor}, expected) when is_function(expected, 1) do
+    assert_receive {:caller_result, ^caller, result}, 1_000
+    assert expected.(result)
+    assert_receive {:DOWN, ^monitor, :process, ^caller, :normal}, 1_000
   end
 
   defp assert_caller_result({caller, monitor}, expected) do

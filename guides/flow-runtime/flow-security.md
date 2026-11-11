@@ -172,7 +172,7 @@ A Handoff target cannot carry bound context or metadata. A context bound in an I
 | Iterate | 1 to 10,000 iterations, required | `max_iterations` or `repeat` |
 | Map and Reduce collection size | None | Validate length in the Flow schema |
 | Accepted wait inputs | 1,024 per execution | Fixed |
-| Concurrent runs | None by default | A `Task.Supervisor` with `max_children`, passed as `:task_supervisor` |
+| Concurrent runs | None by default | Limit calls in the host that invokes `Jido.Exec.run/4` |
 
 `Jido.Exec.run/4` waits with no caller-side limit, so an Action without a `:timeout` can hold the caller until it stops. Check collection size for any input you do not control.
 
@@ -204,7 +204,7 @@ An Action module that changes after a graph is built fails with `details.reason:
 - Your code authorizes the caller before `Jido.Exec.run/4`, `Jido.Durable.start/4`, and `Jido.AgentServer.deliver_wait/4`.
 - Each Flow has an input schema, and it bounds list lengths for untrusted collections.
 - Invoke and Handoff targets come from a fixed table.
-- Each external call has a `:timeout`, and non-idempotent Actions return `retry: false` or dedupe with `Jido.Exec.effect_id/4`.
+- Each external call has a `:timeout`, and non-idempotent Actions return `retry: false` or use an application idempotency key.
 - No secret appears in params, Action output, or a logged error.
 
 ## Next steps

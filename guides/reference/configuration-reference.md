@@ -142,7 +142,6 @@ Pass these to `Jido.Exec.run/4` or in the AgentServer `:exec_opts` option.
 | `:base_delay_ms` | `0` | Non-negative integer | The base for the delay rule. |
 | `:max_delay_ms` | `0` | Non-negative integer | The upper limit for each delay. |
 | `:max_concurrency` | `Jido.Exec`: `config :jido, :max_concurrency`. Turn: serial. | Positive integer | Concurrent Flow work. A Turn's Flow steps run one at a time unless you set this in `:exec_opts`. |
-| `:task_supervisor` | The application's task supervisor | A local PID, registered name, or `{:via, module, name}` | The owner of the execution task. `Jido.Exec.run/4` only. |
 | `:hooks` | None | A keyword list | `:exec_opts` only. Accepts `on_dispatch/2`, `on_complete/3`, `on_failed/3`, `on_idle/1`, `on_persistence_error/3`, and `transform_runnables/2`. |
 
 See [Execution Policy](../actions/action-execution-policy.md).

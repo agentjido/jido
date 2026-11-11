@@ -1,6 +1,6 @@
 # Execution Policy
 
-This guide lists the options that bound one Action run: timeouts, retries, backoff, and the owning process. The caller sets policy at each `Jido.Exec.run/4` call. An Action does not declare it.
+This guide lists the options that bound one Action run: timeouts, retries, backoff, and concurrency. The caller sets policy at each `Jido.Exec.run/4` call. An Action does not declare it.
 
 ## Options
 
@@ -12,7 +12,6 @@ This guide lists the options that bound one Action run: timeouts, retries, backo
 | `:base_delay_ms` | `0` | Non-negative integer | Base for the delay rule |
 | `:max_delay_ms` | `0` | Non-negative integer | Upper limit for every delay |
 | `:max_concurrency` | See [Concurrency](#concurrency) | Positive integer | Concurrent Flow work. No effect on one Action. |
-| `:task_supervisor` | The Jido application task supervisor | Local pid, registered name, or `{:via, module, name}` | Owner of the execution task. `Jido.Exec.run/4` only. |
 
 Options apply to `Jido.Exec.run/4`. An unknown or invalid option returns a configuration error, and no work runs.
 
@@ -55,7 +54,7 @@ end
 
 Killing the process does not undo work already done. A request sent to another system can still complete. A process that the Action started without a link can keep running, and the caller must clean it up.
 
-In a Flow, the timeout applies to each attempt of each Action, so the whole Flow can run longer than the value. A timed-out Action can also stop before it emits its telemetry stop event.
+In a Flow, the timeout applies to each attempt of each authored component, so the whole Flow can run longer than the value. A composite component can run more than one Action inside that attempt. A timed-out Action can also stop before it emits its telemetry stop event.
 
 ## Retry a failure
 
@@ -162,7 +161,7 @@ The delay blocks the execution task. `:timeout` does not limit it, because it ap
 - A crash or kill in the Action returns an error. It does not exit the caller.
 - The task keeps the caller's group leader, so `IO` output goes to the same place.
 - If the caller exits, Jido kills the task and the processes linked to it.
-- The Jido application task supervisor owns the task unless you pass `:task_supervisor`.
+- The Jido application task supervisor owns the task.
 
 ```elixir
 defmodule Payments.CrashingCharge do
@@ -174,17 +173,6 @@ end
 
 {:error, %Jido.Error.ExecutionError{phase: :execution_task, details: %{reason: :killed}}} =
   Jido.Exec.run(Payments.CrashingCharge)
-```
-
-Pass your own supervisor to bound or isolate work. It must be a running local process. A supervisor that is not running returns an error without running the Action.
-
-```elixir
-{:ok, payments_tasks} = Task.Supervisor.start_link()
-
-{:ok, %{pong: true}} = Jido.Exec.run(Payments.Ping, %{}, %{}, task_supervisor: payments_tasks)
-
-{:error, %Jido.Error.ValidationError{message: "Task Supervisor is not running"}} =
-  Jido.Exec.run(Payments.Ping, %{}, %{}, task_supervisor: :no_such_supervisor)
 ```
 
 ## Concurrency
@@ -201,7 +189,7 @@ config :jido, max_concurrency: 4
 
 ## Apply policy in a Flow
 
-Policy passed to `Jido.Exec.run/4` applies to every Action in the Flow. A retry repeats only the failing Action, and completed steps do not run again.
+Policy passed to `Jido.Exec.run/4` applies to every authored component in the Flow. A retry repeats the complete failing component. For Map, Parallel, Reduce, Iterate, Invoke, and a child Flow call, this can repeat Actions that completed inside that component. Components that completed before the failing component do not run again.
 
 ```elixir
 defmodule Payments.CaptureStep do

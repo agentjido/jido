@@ -1,16 +1,16 @@
 defmodule Jido.Test.Exec.RunnerHarness do
   @moduledoc false
 
-  alias Jido.Exec.{Frame, Runtime}
+  alias Jido.Exec.Runtime
   alias Jido.Instruction
   alias Runic.Runner
   alias Runic.Workflow
 
   def start(runner, id, target, params \\ %{}, context \\ %{}, opts \\ []) do
     with {:ok, instruction} <- Instruction.resolve(target, params, context),
-         {:ok, instruction} <- Runtime.flow_input(instruction),
+         {:ok, instruction} <- Runtime.flow_instruction(instruction),
          :ok <- Runtime.portable(instruction),
-         {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}),
+         {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}, []),
          :ok <- Jido.Exec.Node.Wait.validate_host(workflow),
          {:ok, policy, worker_opts} <- options(opts),
          {:ok, pid} <- Runner.start_workflow(runner, id, workflow, worker_opts) do
@@ -22,7 +22,7 @@ defmodule Jido.Test.Exec.RunnerHarness do
              run_context: %{
                _global:
                  instruction.context
-                 |> Runtime.context(true)
+                 |> Runtime.caller_context()
                  |> Map.put(:__jido_exec_max_concurrency__, worker_opts[:max_concurrency])
              },
              scheduler_policies: [{:default, policy}]
@@ -51,7 +51,7 @@ defmodule Jido.Test.Exec.RunnerHarness do
             run_context: %{
               _global:
                 context
-                |> Runtime.context(true)
+                |> Runtime.caller_context()
                 |> Map.put(:__jido_exec_max_concurrency__, worker_opts[:max_concurrency])
             },
             scheduler_policies: [{:default, policy}]
@@ -99,8 +99,7 @@ defmodule Jido.Test.Exec.RunnerHarness do
     end
   end
 
-  defp input(%Instruction{kind: :action}), do: %{}
-  defp input(%Instruction{kind: :flow, params: params}), do: Frame.new(params)
+  defp input(%Instruction{kind: :flow, params: params}), do: params
 
   defp identity(id),
     do: Runic.Identity.digest(:execution, :erlang.term_to_binary(id, [:deterministic]))

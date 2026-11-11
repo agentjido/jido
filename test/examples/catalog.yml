@@ -166,90 +166,86 @@ examples:
   readme: examples/03_flow_execution/03_01_single_action/README.md
   source: examples/03_flow_execution/03_01_single_action/single_action.ex
   test: test/examples/03_flow_execution/03_01_single_action/single_action_test.exs
-- id: 03_02_three_step_flow
+- id: 03_02_steps_and_references
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_02_three_step_flow/README.md
-  source: examples/03_flow_execution/03_02_three_step_flow/three_step_flow.ex
-  test: test/examples/03_flow_execution/03_02_three_step_flow/three_step_flow_test.exs
-- id: 03_03_serial_then_parallel
+  readme: examples/03_flow_execution/03_02_steps_and_references/README.md
+  source: examples/03_flow_execution/03_02_steps_and_references/steps_and_references.ex
+  test: test/examples/03_flow_execution/03_02_steps_and_references/steps_and_references_test.exs
+- id: 03_03_choice
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_03_serial_then_parallel/README.md
-  source: examples/03_flow_execution/03_03_serial_then_parallel/serial_then_parallel.ex
-  test: test/examples/03_flow_execution/03_03_serial_then_parallel/serial_then_parallel_test.exs
-- id: 03_04_choice
+  readme: examples/03_flow_execution/03_03_choice/README.md
+  source: examples/03_flow_execution/03_03_choice/choice.ex
+  test: test/examples/03_flow_execution/03_03_choice/choice_test.exs
+- id: 03_04_parallel
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_04_choice/README.md
-  source: examples/03_flow_execution/03_04_choice/choice.ex
-  test: test/examples/03_flow_execution/03_04_choice/choice_test.exs
-- id: 03_05_map_reduce
+  readme: examples/03_flow_execution/03_04_parallel/README.md
+  source: examples/03_flow_execution/03_04_parallel/parallel.ex
+  test: test/examples/03_flow_execution/03_04_parallel/parallel_test.exs
+- id: 03_05_map
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_05_map_reduce/README.md
-  source: examples/03_flow_execution/03_05_map_reduce/map_reduce.ex
-  test: test/examples/03_flow_execution/03_05_map_reduce/map_reduce_test.exs
-- id: 03_06_loop_invoke_wait
+  readme: examples/03_flow_execution/03_05_map/README.md
+  source: examples/03_flow_execution/03_05_map/map.ex
+  test: test/examples/03_flow_execution/03_05_map/map_test.exs
+- id: 03_06_reduce
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_06_loop_invoke_wait/README.md
-  source: examples/03_flow_execution/03_06_loop_invoke_wait/loop_invoke_wait.ex
-  test: test/examples/03_flow_execution/03_06_loop_invoke_wait/loop_invoke_wait_test.exs
-- id: 03_07_parallel
+  readme: examples/03_flow_execution/03_06_reduce/README.md
+  source: examples/03_flow_execution/03_06_reduce/reduce.ex
+  test: test/examples/03_flow_execution/03_06_reduce/reduce_test.exs
+- id: 03_07_iterate
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_07_parallel/README.md
-  source: examples/03_flow_execution/03_07_parallel/parallel.ex
-  test: test/examples/03_flow_execution/03_07_parallel/parallel_test.exs
-- id: 03_08_map
+  readme: examples/03_flow_execution/03_07_iterate/README.md
+  source: examples/03_flow_execution/03_07_iterate/iterate.ex
+  test: test/examples/03_flow_execution/03_07_iterate/iterate_test.exs
+- id: 03_08_subflow
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_08_map/README.md
-  source: examples/03_flow_execution/03_08_map/map.ex
-  test: test/examples/03_flow_execution/03_08_map/map_test.exs
-- id: 03_09_reduce
+  readme: examples/03_flow_execution/03_08_subflow/README.md
+  source: examples/03_flow_execution/03_08_subflow/subflow.ex
+  test: test/examples/03_flow_execution/03_08_subflow/subflow_test.exs
+- id: 03_09_invoke
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_09_reduce/README.md
-  source: examples/03_flow_execution/03_09_reduce/reduce.ex
-  test: test/examples/03_flow_execution/03_09_reduce/reduce_test.exs
-- id: 03_10_iterate
+  readme: examples/03_flow_execution/03_09_invoke/README.md
+  source: examples/03_flow_execution/03_09_invoke/invoke.ex
+  test: test/examples/03_flow_execution/03_09_invoke/invoke_test.exs
+- id: 03_10_handoff
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_10_iterate/README.md
-  source: examples/03_flow_execution/03_10_iterate/iterate.ex
-  test: test/examples/03_flow_execution/03_10_iterate/iterate_test.exs
-- id: 03_11_child_flow
+  readme: examples/03_flow_execution/03_10_handoff/README.md
+  source: examples/03_flow_execution/03_10_handoff/handoff.ex
+  test: test/examples/03_flow_execution/03_10_handoff/handoff_test.exs
+- id: 03_11_effects_and_failure
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_11_child_flow/README.md
-  source: examples/03_flow_execution/03_11_child_flow/child_flow.ex
-  test: test/examples/03_flow_execution/03_11_child_flow/child_flow_test.exs
+  readme: examples/03_flow_execution/03_11_effects_and_failure/README.md
+  source: examples/03_flow_execution/03_11_effects_and_failure/effects_and_failure.ex
+  test: test/examples/03_flow_execution/03_11_effects_and_failure/effects_and_failure_test.exs
 - id: 03_12_wait_and_signal
   category: flow
   component: jido_action.execution
   readme: examples/03_flow_execution/03_12_wait_and_signal/README.md
   source: examples/03_flow_execution/03_12_wait_and_signal/wait_and_signal.ex
   test: test/examples/03_flow_execution/03_12_wait_and_signal/wait_and_signal_test.exs
-- id: 03_13_controlled_execution
+- id: 03_13_compile_to_runic
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_13_controlled_execution/README.md
-  source: examples/03_flow_execution/03_13_controlled_execution/controlled_execution.ex
-  test: test/examples/03_flow_execution/03_13_controlled_execution/controlled_execution_test.exs
-- id: 03_14_effects_and_failure
+  readme: examples/03_flow_execution/03_13_compile_to_runic/README.md
+  source: examples/03_flow_execution/03_13_compile_to_runic/compile_to_runic.ex
+  auxiliary_sources:
+  - examples/03_flow_execution/03_13_compile_to_runic/run.exs
+  test: test/examples/03_flow_execution/03_13_compile_to_runic/compile_to_runic_test.exs
+- id: 03_14_runic_runner
   category: flow
   component: jido_action.execution
-  readme: examples/03_flow_execution/03_14_effects_and_failure/README.md
-  source: examples/03_flow_execution/03_14_effects_and_failure/effects_and_failure.ex
-  test: test/examples/03_flow_execution/03_14_effects_and_failure/effects_and_failure_test.exs
-- id: 03_15_dynamic_invoke
-  category: flow
-  component: jido_action.execution
-  readme: examples/03_flow_execution/03_15_dynamic_invoke/README.md
-  source: examples/03_flow_execution/03_15_dynamic_invoke/dynamic_invoke.ex
-  test: test/examples/03_flow_execution/03_15_dynamic_invoke/dynamic_invoke_test.exs
+  readme: examples/03_flow_execution/03_14_runic_runner/README.md
+  source: examples/03_flow_execution/03_14_runic_runner/runic_runner.ex
+  test: test/examples/03_flow_execution/03_14_runic_runner/runic_runner_test.exs
 - id: 04_01_sequential_flow
   category: agent
   component: jido.agent_evaluation
@@ -308,60 +304,30 @@ examples:
   auxiliary_sources:
   - examples/04_agent_workflows/04_09_flow_directives/effects.ex
   test: test/examples/04_agent_workflows/04_09_flow_directives/flow_directives_test.exs
-- id: 05_01_run_identity
-  category: flow
-  component: jido_action.execution
-  readme: examples/05_flow_durability/05_01_run_identity/README.md
-  source: examples/05_flow_durability/05_01_run_identity/run_identity.ex
-  test: test/examples/05_flow_durability/05_01_run_identity/run_identity_test.exs
-- id: 05_02_snapshot_and_resume
-  category: flow
-  component: jido_action.execution
-  readme: examples/05_flow_durability/05_02_snapshot_and_resume/README.md
-  source: examples/05_flow_durability/05_02_snapshot_and_resume/snapshot_and_resume.ex
-  test: test/examples/05_flow_durability/05_02_snapshot_and_resume/snapshot_and_resume_test.exs
-- id: 05_03_process_recovery
-  category: flow
-  component: jido_action.execution
-  readme: examples/05_flow_durability/05_03_process_recovery/README.md
-  source: examples/05_flow_durability/05_03_process_recovery/process_recovery.ex
-  test: test/examples/05_flow_durability/05_03_process_recovery/process_recovery_test.exs
-- id: 05_04_run_inspection
-  category: flow
-  component: jido_action.execution
-  readme: examples/05_flow_durability/05_04_run_inspection/README.md
-  source: examples/05_flow_durability/05_04_run_inspection/run_inspection.ex
-  test: test/examples/05_flow_durability/05_04_run_inspection/run_inspection_test.exs
-- id: 05_05_cancellation
-  category: flow
-  component: jido_action.execution
-  readme: examples/05_flow_durability/05_05_cancellation/README.md
-  source: examples/05_flow_durability/05_05_cancellation/cancellation.ex
-  test: test/examples/05_flow_durability/05_05_cancellation/cancellation_test.exs
-- id: 05_06_telemetry
-  category: flow
-  component: jido_action.execution
-  readme: examples/05_flow_durability/05_06_telemetry/README.md
-  source: examples/05_flow_durability/05_06_telemetry/telemetry.ex
-  test: test/examples/05_flow_durability/05_06_telemetry/telemetry_test.exs
-- id: 05_07_cron_signal
+- id: 05_01_start_and_result
   category: durable
   component: jido.durable
-  readme: examples/05_flow_durability/05_07_cron_signal/README.md
-  source: examples/05_flow_durability/05_07_cron_signal/cron_signal.ex
-  test: test/examples/05_flow_durability/05_07_cron_signal/cron_signal_test.exs
-- id: 05_08_timed_wait
+  readme: examples/05_flow_durability/05_01_start_and_result/README.md
+  source: examples/05_flow_durability/05_01_start_and_result/start_and_result.ex
+  test: test/examples/05_flow_durability/05_01_start_and_result/start_and_result_test.exs
+- id: 05_02_restart_recovery
   category: durable
   component: jido.durable
-  readme: examples/05_flow_durability/05_08_timed_wait/README.md
-  source: examples/05_flow_durability/05_08_timed_wait/timed_wait.ex
-  test: test/examples/05_flow_durability/05_08_timed_wait/timed_wait_test.exs
-- id: 05_09_direct_flow
+  readme: examples/05_flow_durability/05_02_restart_recovery/README.md
+  source: examples/05_flow_durability/05_02_restart_recovery/restart_recovery.ex
+  test: test/examples/05_flow_durability/05_02_restart_recovery/restart_recovery_test.exs
+- id: 05_03_signal_resume
   category: durable
   component: jido.durable
-  readme: examples/05_flow_durability/05_09_direct_flow/README.md
-  source: examples/05_flow_durability/05_09_direct_flow/direct_flow.ex
-  test: test/examples/05_flow_durability/05_09_direct_flow/direct_flow_test.exs
+  readme: examples/05_flow_durability/05_03_signal_resume/README.md
+  source: examples/05_flow_durability/05_03_signal_resume/signal_resume.ex
+  test: test/examples/05_flow_durability/05_03_signal_resume/signal_resume_test.exs
+- id: 05_04_timed_resume
+  category: durable
+  component: jido.durable
+  readme: examples/05_flow_durability/05_04_timed_resume/README.md
+  source: examples/05_flow_durability/05_04_timed_resume/timed_resume.ex
+  test: test/examples/05_flow_durability/05_04_timed_resume/timed_resume_test.exs
 - id: 06_01_human_approval
   category: flow
   component: jido_action.flow

@@ -392,7 +392,7 @@ defmodule Jido.AgentServer.DurableTurn.WaitIntegrationTest do
 
     assert Probe.records() == []
 
-    for key <- [:__jido_wait_host__, :__jido_wait_result__, :__jido_exec_durable__] do
+    for key <- [:__jido_wait_host__, :__jido_wait_result__] do
       assert {:error, _} = Server.call(server, request, context: %{key => %{now: 0}})
     end
 

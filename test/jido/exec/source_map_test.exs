@@ -55,11 +55,11 @@ defmodule Jido.Exec.SourceMapTest do
   test "Exec automatically applies a Flow module source map" do
     expected = FailingFlow.__jido_flow_source_map__()[[:components, "fail"]]
 
-    workflow = Exec.compile!(FailingFlow)
+    workflow = Jido.Exec.Compiler.compile!(FailingFlow)
     node = Runic.Workflow.get_component(workflow, "fail")
-    assert node.flow.location == expected
+    assert node.location == expected
 
-    fact = Runic.Workflow.Fact.new(value: Jido.Exec.Frame.new(%{}))
+    fact = Runic.Workflow.Fact.new(value: %{input: %{}, results: %{}})
     assert {:ok, runnable} = Runic.Workflow.Invokable.prepare(node, workflow, fact)
     failed = Runic.Workflow.Invokable.execute(node, runnable)
     assert failed.status == :failed
@@ -83,15 +83,15 @@ defmodule Jido.Exec.SourceMapTest do
   end
 
   @tag obligation: "jido_action.boundary.I5"
-  test "Flow Instructions transmute to the compiled Runic Workflow" do
+  test "Flow Instructions compile to a Runic Workflow" do
     instruction = Instruction.new!(target: FailingFlow)
 
-    assert %Runic.Workflow{} = Runic.Transmutable.to_workflow(instruction)
+    assert {:ok, %Runic.Workflow{}} = Exec.compile(instruction, [])
   end
 
   @tag obligation: "jido_action.boundary.I2"
   test "compiler catches a non-local Flow definition failure" do
-    assert {:error, error} = Exec.compile(ThrowingFlow)
+    assert {:error, error} = Exec.compile(ThrowingFlow, [])
     assert error.details.kind == :throw
     assert error.details.reason == :flow_failed
   end

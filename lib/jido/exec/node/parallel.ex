@@ -3,14 +3,16 @@ defmodule Jido.Exec.Node.Parallel do
 
   use Runic.Workflow.SingleOutput, batch_parent: false
 
-  alias Jido.Exec.{Fact, Frame}
-  alias Jido.Exec.Node.Action
+  alias Jido.Error
+  alias Jido.Exec.{ActionBoundary, ValueResolver}
+  alias Jido.Exec.Result, as: ExecResult
+  alias Jido.Exec.Node.{Lifecycle, Targets}
   alias Runic.Identity
-  alias Runic.Workflow
   alias Runic.Workflow.SingleOutput.{Context, Result}
 
-  @enforce_keys [:id, :name, :hash, :component, :actions, :on_error]
-  defstruct [:id, :name, :hash, :component, :actions, :on_error, :location, :node_path]
+  @derive {Inspect, only: [:id, :name, :node_path]}
+  @enforce_keys [:id, :name, :hash, :definition, :target_versions, :node_path]
+  defstruct [:id, :name, :hash, :definition, :target_versions, :node_path, :location]
 
   @type t :: %__MODULE__{}
 
@@ -21,188 +23,183 @@ defmodule Jido.Exec.Node.Parallel do
       Keyword.validate!(opts, [
         :id,
         :name,
-        :component,
-        :actions,
-        :on_error,
+        :definition,
         :location,
-        :node_path
+        :node_path,
+        :target_versions
       ])
 
     id = Keyword.fetch!(opts, :id)
+    name = Keyword.fetch!(opts, :name)
+    definition = Keyword.fetch!(opts, :definition)
 
     %__MODULE__{
       id: id,
-      name: Keyword.fetch!(opts, :name),
-      hash: Identity.digest(:component_definition, %{kind: "jido_parallel", version: 1, id: id}),
-      component: Keyword.fetch!(opts, :component),
-      actions: Keyword.fetch!(opts, :actions),
-      on_error: Keyword.fetch!(opts, :on_error),
+      name: name,
+      hash:
+        Identity.digest(:component_definition, %{
+          kind: :jido_flow_parallel,
+          version: 1,
+          id: inspect(id)
+        }),
+      definition: definition,
+      target_versions: Keyword.get_lazy(opts, :target_versions, fn -> Targets.versions(definition) end),
       location: Keyword.get(opts, :location),
-      node_path: Keyword.get(opts, :node_path, [Keyword.fetch!(opts, :component)])
+      node_path: Keyword.get(opts, :node_path, [name])
     }
-  end
-
-  @doc false
-  @spec connect(t(), [term()], Workflow.t()) :: Workflow.t()
-  def connect(%__MODULE__{} = node, parents, %Workflow{} = workflow) do
-    actions =
-      node.actions
-      |> Enum.with_index()
-      |> Enum.map(fn {action, index} ->
-        flow = %{
-          component: node.component,
-          mode: {:parallel, node.on_error, index, action.name},
-          params: action.call.params,
-          location: node.location,
-          node_path: node.node_path ++ [action.name]
-        }
-
-        Action.new(action.call,
-          flow: flow,
-          id: {node.id, :action, index, action.name},
-          name: internal_name(node, "action", index, action.name)
-        )
-      end)
-
-    join = actions |> Enum.map(& &1.hash) |> Runic.Workflow.Join.new()
-
-    {workflow, parent} = join_parents(workflow, parents)
-
-    workflow = Enum.reduce(actions, workflow, &connect_from(&2, parent, &1))
-
-    workflow = Enum.reduce(actions, workflow, &Workflow.add_step(&2, &1, join))
-
-    workflow
-    |> Workflow.add_step(join, node)
-    |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: :parallel})
-    |> Workflow.register_component(node)
   end
 
   @impl Runic.Workflow.SingleOutput
   @doc false
   @spec run(t(), term(), Context.t()) :: Result.t()
   def run(%__MODULE__{} = node, input, %Context{} = context) do
-    case complete(node, Fact.unwrap(input)) do
-      {:ok, frame} ->
-        Fact.result(input, context, frame)
+    Lifecycle.run(node, input, context, fn bindings ->
+      state = ValueResolver.resolver_state(bindings, context.runtime)
+
+      with :ok <- Targets.compatible(node.target_versions) do
+        node.definition.actions
+        |> Enum.with_index()
+        |> concurrent_map(context.runtime, fn {action, index} ->
+          run_action(action, index, state, node, context)
+        end)
+        |> Enum.map(fn
+          {:task_exit, {action, index}, reason} ->
+            error = ExecResult.normalize({:task_crashed, reason})
+            {:error, action.name, parallel_error(error, node, action, index)}
+
+          outcome ->
+            outcome
+        end)
+        |> parallel_result(node.definition.on_error)
+      end
+    end)
+  end
+
+  defp run_action(action, index, state, node, context) do
+    case ValueResolver.resolve(action.call.params, state) do
+      {:ok, params} ->
+        case ActionBoundary.call(action.call, params, node, context, {:parallel, action.name}) do
+          {:ok, value, effects} -> {:ok, action.name, value, effects}
+          {:error, error} -> {:error, action.name, parallel_error(error, node, action, index)}
+        end
 
       {:error, error} ->
-        Result.failure(
-          Jido.Exec.Validation.attach_source(error, node.location, %{
-            node: node.component,
-            node_path: node.node_path
-          })
-        )
+        {:error, action.name, parallel_error(error, node, action, index)}
     end
   end
 
-  defp complete(node, outcomes) when is_list(outcomes) do
-    with :ok <- validate_outcomes(node, outcomes),
-         {:ok, frame} <- outcomes |> Enum.map(&elem(&1, 3)) |> Frame.merge() do
-      {results, effects} = results(node.on_error, outcomes)
-      {:ok, Frame.put_result(frame, node.component, results, effects)}
+  defp parallel_result(outcomes, :fail_fast) do
+    case Enum.find(outcomes, &match?({:error, _, _}, &1)) do
+      {:error, _name, error} ->
+        {:error, error}
+
+      nil ->
+        values = Enum.map(outcomes, fn {:ok, name, value, _effects} -> %{name: name, value: value} end)
+        effects = Enum.flat_map(outcomes, fn {:ok, _name, _value, effects} -> effects end)
+        {:ok, values, effects}
     end
   end
 
-  defp complete(_node, value), do: invalid_outcomes(value)
+  defp parallel_result(outcomes, :collect_errors) do
+    {values, effect_groups} =
+      Enum.map_reduce(outcomes, [], fn
+        {:ok, name, value, effects}, groups ->
+          {%{name: name, status: :ok, value: value}, [effects | groups]}
 
-  defp validate_outcomes(node, outcomes) do
-    expected = Enum.with_index(node.actions, fn action, index -> {index, action.name} end)
-    actual = Enum.map(outcomes, &outcome_identity(&1, node.on_error))
+        {:error, name, error}, groups ->
+          {%{name: name, status: :error, error: collected_error(error)}, groups}
+      end)
 
-    if actual == expected, do: :ok, else: invalid_outcomes(outcomes)
+    {:ok, values, effect_groups |> Enum.reverse() |> Enum.concat()}
   end
 
-  defp outcome_identity(
-         {:jido_parallel_action, index, name, _frame, {:ok, _value, effects}},
-         _on_error
-       ) do
-    if is_list(effects) and not List.improper?(effects), do: {index, name}, else: :invalid
+  defp concurrent_map(items, runtime, fun) do
+    max_concurrency = Map.get(runtime, :__jido_exec_max_concurrency__, 1)
+
+    if max_concurrency > 1 and length(items) > 1 do
+      items
+      |> Task.async_stream(fun,
+        ordered: true,
+        max_concurrency: max_concurrency,
+        timeout: :infinity
+      )
+      |> Enum.zip(items)
+      |> Enum.map(fn
+        {{:ok, value}, _item} -> value
+        {{:exit, reason}, item} -> {:task_exit, item, reason}
+      end)
+    else
+      Enum.map(items, fun)
+    end
   end
 
-  defp outcome_identity(
-         {:jido_parallel_action, index, name, _frame, {:error, _error}},
-         :collect_errors
-       ),
-       do: {index, name}
-
-  defp outcome_identity(_outcome, _on_error), do: :invalid
-
-  defp results(:fail_fast, outcomes) do
-    Enum.map_reduce(outcomes, [], fn
-      {:jido_parallel_action, _index, name, _frame, {:ok, value, action_effects}}, effects ->
-        {%{name: name, value: value}, [action_effects | effects]}
-    end)
-    |> ordered_effects()
+  defp parallel_error(error, node, action, index) do
+    position_error(error, node, %{
+      action_index: index,
+      action_name: action.name,
+      target: action.call.target,
+      node_path: node.node_path ++ [action.name]
+    })
   end
 
-  defp results(:collect_errors, outcomes) do
-    Enum.map_reduce(outcomes, [], fn
-      {:jido_parallel_action, _index, name, _frame, {:ok, value, action_effects}}, effects ->
-        {%{name: name, status: :ok, value: value}, [action_effects | effects]}
-
-      {:jido_parallel_action, _index, name, _frame, {:error, error}}, effects ->
-        {%{name: name, status: :error, error: error}, effects}
-    end)
-    |> ordered_effects()
+  defp position_error(%{details: details} = error, node, extra) when is_map(details) do
+    %{error | details: details |> Map.merge(extra) |> Map.put_new(:node, node.name)}
   end
 
-  defp ordered_effects({results, reversed_effects}),
-    do: {results, reversed_effects |> Enum.reverse() |> Enum.concat()}
+  defp position_error(error, _node, _extra), do: error
 
-  defp invalid_outcomes(value) do
-    {:error,
-     Jido.Error.execution_error("Parallel received invalid Action outcomes", %{
-       reason: :invalid_parallel_outcomes,
-       value: value
-     })}
-  end
-
-  defp join_parents(workflow, []), do: {workflow, nil}
-  defp join_parents(workflow, [parent]), do: {workflow, parent}
-
-  defp join_parents(workflow, parents) do
-    join = parents |> Enum.map(& &1.hash) |> Runic.Workflow.Join.new()
-    workflow = Enum.reduce(parents, workflow, &Workflow.add_step(&2, &1, join))
-    {workflow, join}
-  end
-
-  defp connect_from(workflow, nil, child), do: Workflow.add_step(workflow, child)
-  defp connect_from(workflow, parent, child), do: Workflow.add_step(workflow, parent, child)
-
-  defp internal_name(node, kind, index, name) do
-    index = index |> Integer.to_string() |> String.pad_leading(10, "0")
-    "__jido_parallel__/#{node.name}/#{kind}/#{index}/#{name}"
+  defp collected_error(error) do
+    error
+    |> Error.to_map()
+    |> Map.update!(:details, &Map.delete(&1, :stacktrace))
   end
 end
 
 defimpl Runic.Identity.Projectable, for: Jido.Exec.Node.Parallel do
-  def identity_document(node) do
-    %{kind: :jido_parallel, version: 1, id: inspect(node.id)}
-  end
+  def identity_document(node),
+    do: %{kind: :jido_flow_parallel, version: 1, id: inspect(node.id)}
 end
 
 defimpl Runic.Component, for: Jido.Exec.Node.Parallel do
   alias Jido.Exec.Node.Parallel
+  alias Runic.Workflow
 
   def connectable?(_node, _other), do: true
-  def connect(node, to, workflow), do: Parallel.connect(node, List.wrap(to), workflow)
 
-  def source(node) do
+  def connect(%Parallel{} = node, parents, workflow) when is_list(parents) do
+    join = parents |> Enum.map(& &1.hash) |> Workflow.Join.new()
+    workflow = Enum.reduce(parents, workflow, &Workflow.add_step(&2, &1, join))
+    connect(node, join, workflow)
+  end
+
+  def connect(%Parallel{} = node, parent, workflow) do
+    workflow
+    |> Workflow.add_step(parent, node)
+    |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: :parallel})
+    |> Workflow.register_component(node)
+  end
+
+  def source(%Parallel{} = node) do
     quote do
       Jido.Exec.Node.Parallel.new(
         id: unquote(Macro.escape(node.id)),
         name: unquote(node.name),
-        component: unquote(node.component),
-        actions: unquote(Macro.escape(node.actions)),
-        on_error: unquote(node.on_error),
+        definition: unquote(Macro.escape(node.definition)),
+        target_versions: unquote(Macro.escape(node.target_versions)),
         location: unquote(Macro.escape(node.location)),
         node_path: unquote(Macro.escape(node.node_path))
       )
     end
   end
 
-  def hash(node), do: node.hash
-  def inputs(_node), do: [in: [type: :any]]
-  def outputs(_node), do: [out: [type: :any]]
+  def hash(%Parallel{hash: hash}), do: hash
+  def inputs(_node), do: [bindings: [type: :any, doc: "Parallel bindings"]]
+
+  def outputs(_node) do
+    [
+      value: [type: :any, doc: "Ordered Parallel results"],
+      effects: [type: :any, doc: "Ordered Parallel effects"],
+      control: [type: :any, doc: "Parallel control result"]
+    ]
+  end
 end

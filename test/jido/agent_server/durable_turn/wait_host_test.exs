@@ -3,7 +3,7 @@ defmodule Jido.AgentServer.DurableTurn.WaitHostTest do
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: true
 
   alias Jido.Durable.Runtime, as: WaitHost
-  alias Jido.Exec.{Frame, Runtime}
+  alias Jido.Exec.Runtime
   alias Runic.Workflow
   alias Runic.Workflow.{CausalContext, Fact, Runnable}
   alias Runic.Workflow.Events.FactProduced
@@ -34,11 +34,11 @@ defmodule Jido.AgentServer.DurableTurn.WaitHostTest do
   end
 
   defp waiting(flow \\ Approval) do
-    {:ok, workflow} = Jido.Exec.compile(flow)
+    {:ok, workflow} = Jido.Exec.compile(flow, [])
 
     workflow
     |> Workflow.put_run_context(%{_global: Runtime.wait_context(%{}, "execution", 100)})
-    |> Workflow.react_until_satisfied(Frame.new(%{id: 7}))
+    |> Workflow.react_until_satisfied(Jido.Exec.Fact.local_value(%{id: 7}))
   end
 
   defp input(workflow, id \\ "one") do
@@ -222,7 +222,6 @@ defmodule Jido.AgentServer.DurableTurn.WaitHostTest do
   test "the production host supplies a current clock and durable validation" do
     context = WaitHost.wait_context(%{custom: true}, "host", nil)
     assert context.custom
-    assert context.__jido_exec_durable__
     assert is_function(context.__jido_wait_host__.clock, 0)
     before = System.system_time(:millisecond)
     assert context.__jido_wait_host__.clock.() >= before

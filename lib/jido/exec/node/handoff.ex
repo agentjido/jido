@@ -1,12 +1,17 @@
 defmodule Jido.Exec.Node.Handoff do
   @moduledoc false
 
-  alias Jido.Exec.Node.Action
-  alias Runic.Identity
-  alias Runic.Workflow
+  use Runic.Workflow.SingleOutput, batch_parent: false
 
-  @enforce_keys [:id, :name, :hash, :component, :selector]
-  defstruct [:id, :name, :hash, :component, :selector, :location, :node_path]
+  alias Jido.Error
+  alias Jido.Exec.{ActionBoundary, Runtime, ValueResolver}
+  alias Jido.Exec.Node.{Lifecycle, Targets}
+  alias Runic.Identity
+  alias Runic.Workflow.SingleOutput.{Context, Result}
+
+  @derive {Inspect, only: [:id, :name, :node_path]}
+  @enforce_keys [:id, :name, :hash, :definition, :target_versions, :node_path]
+  defstruct [:id, :name, :hash, :definition, :target_versions, :node_path, :location]
 
   @type t :: %__MODULE__{}
 
@@ -17,144 +22,120 @@ defmodule Jido.Exec.Node.Handoff do
       Keyword.validate!(opts, [
         :id,
         :name,
-        :component,
-        :selector,
+        :definition,
         :location,
-        :node_path
+        :node_path,
+        :target_versions
       ])
 
     id = Keyword.fetch!(opts, :id)
+    name = Keyword.fetch!(opts, :name)
+    definition = Keyword.fetch!(opts, :definition)
 
     %__MODULE__{
       id: id,
-      name: Keyword.fetch!(opts, :name),
+      name: name,
       hash:
         Identity.digest(:component_definition, %{
-          kind: "jido_handoff",
+          kind: :jido_flow_handoff,
           version: 1,
           id: inspect(id)
         }),
-      component: Keyword.fetch!(opts, :component),
-      selector: Keyword.fetch!(opts, :selector),
+      definition: definition,
+      target_versions: Keyword.get_lazy(opts, :target_versions, fn -> Targets.versions(definition) end),
       location: Keyword.get(opts, :location),
-      node_path: Keyword.get(opts, :node_path, [Keyword.fetch!(opts, :component)])
+      node_path: Keyword.get(opts, :node_path, [name])
     }
   end
 
+  @impl Runic.Workflow.SingleOutput
   @doc false
-  @spec connect(t(), [term()], Workflow.t()) :: Workflow.t()
-  def connect(%__MODULE__{} = node, parents, %Workflow{} = workflow) do
-    flow = %{
-      component: node.component,
-      mode: :handoff,
-      params: node.selector.params,
-      location: node.location,
-      node_path: node.node_path
-    }
+  @spec run(t(), term(), Context.t()) :: Result.t()
+  def run(%__MODULE__{} = node, input, %Context{} = context) do
+    Lifecycle.run(node, input, context, fn bindings ->
+      state = ValueResolver.resolver_state(bindings, context.runtime)
+      selector = node.definition.selector
 
-    selector =
-      Action.new(node.selector,
-        flow: flow,
-        id: {node.id, :selector},
-        name: "__jido_handoff__/#{node.name}/selector"
-      )
-
-    workflow
-    |> connect_from(parents, selector)
-    |> Workflow.add_step(selector, node)
-    |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: :handoff})
-    |> Workflow.register_component(node)
+      with :ok <- Targets.compatible(node.target_versions),
+           {:ok, params} <- ValueResolver.resolve(selector.params, state) do
+        select(selector, params, node, context)
+      end
+    end)
   end
 
-  defp connect_from(workflow, [], child), do: Workflow.add_step(workflow, child)
-  defp connect_from(workflow, [parent], child), do: Workflow.add_step(workflow, parent, child)
-  defp connect_from(workflow, parents, child), do: Workflow.add_step(workflow, parents, child)
+  defp select(selector, params, node, context) do
+    case ActionBoundary.run(selector, params, node, context, :handoff_selector, :handoff) do
+      {:handoff, input, target} ->
+        with {:ok, instruction} <- Runtime.handoff(target, input) do
+          {:ok, instruction, [], :handoff}
+        end
+
+      {:error, error} ->
+        {:error, error}
+
+      other ->
+        returned =
+          case other do
+            {:ok, value, effects, :none} -> {:ok, value, effects}
+            value -> value
+          end
+
+        {:error,
+         Error.execution_error("Handoff selector must return a handoff control result", %{
+           action: selector.target,
+           phase: :run,
+           return: returned,
+           reason: :invalid_handoff_return
+         })}
+    end
+  end
 end
 
 defimpl Runic.Identity.Projectable, for: Jido.Exec.Node.Handoff do
-  def identity_document(node), do: %{kind: :jido_handoff, version: 1, id: inspect(node.id)}
-end
-
-defimpl Runic.Workflow.Invokable, for: Jido.Exec.Node.Handoff do
-  alias Jido.Exec.Frame
-  alias Runic.Workflow
-  alias Runic.Workflow.{CausalContext, Runnable}
-  alias Runic.Workflow.Events.{ActivationConsumed, FactProduced}
-
-  def match_or_execute(_node), do: :execute
-
-  def invoke(node, workflow, fact) do
-    {:ok, runnable} = prepare(node, workflow, fact)
-    Workflow.apply_runnable(workflow, execute(node, runnable))
-  end
-
-  def prepare(node, workflow, fact) do
-    context =
-      CausalContext.new(
-        node_hash: node.hash,
-        input_fact: fact,
-        run_context: Workflow.get_run_context(workflow, node.name),
-        ancestry_depth: Workflow.ancestry_depth(workflow, fact)
-      )
-
-    {:ok, Runnable.new(node, fact, context)}
-  end
-
-  def execute(node, %Runnable{input_fact: fact, context: context} = runnable) do
-    case Jido.Exec.Fact.value(fact) do
-      {:jido_handoff, frame, component, request, effects} ->
-        value = Frame.put_result(frame, component, request, effects)
-
-        result =
-          Jido.Exec.Fact.child(fact,
-            value: value,
-            meta: %{jido: %{control: :handoff}},
-            ancestry: {node.hash, fact.hash}
-          )
-
-        Runnable.complete(
-          runnable,
-          result,
-          [
-            FactProduced.new(result,
-              producer_label: :produced,
-              weight: context.ancestry_depth + 1
-            ),
-            %ActivationConsumed{fact_hash: fact.hash, node_hash: node.hash, from_label: :runnable}
-          ],
-          []
-        )
-
-      value ->
-        Runnable.fail(runnable, {:invalid_handoff_control, value})
-    end
-  rescue
-    error -> Runnable.fail(runnable, error)
-  catch
-    kind, reason -> Runnable.fail(runnable, {kind, reason})
-  end
+  def identity_document(node),
+    do: %{kind: :jido_flow_handoff, version: 1, id: inspect(node.id)}
 end
 
 defimpl Runic.Component, for: Jido.Exec.Node.Handoff do
   alias Jido.Exec.Node.Handoff
+  alias Runic.Workflow
 
   def connectable?(_node, _other), do: true
-  def connect(node, to, workflow), do: Handoff.connect(node, List.wrap(to), workflow)
 
-  def source(node) do
+  def connect(%Handoff{} = node, parents, workflow) when is_list(parents) do
+    join = parents |> Enum.map(& &1.hash) |> Workflow.Join.new()
+    workflow = Enum.reduce(parents, workflow, &Workflow.add_step(&2, &1, join))
+    connect(node, join, workflow)
+  end
+
+  def connect(%Handoff{} = node, parent, workflow) do
+    workflow
+    |> Workflow.add_step(parent, node)
+    |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: :handoff})
+    |> Workflow.register_component(node)
+  end
+
+  def source(%Handoff{} = node) do
     quote do
       Jido.Exec.Node.Handoff.new(
         id: unquote(Macro.escape(node.id)),
         name: unquote(node.name),
-        component: unquote(node.component),
-        selector: unquote(Macro.escape(node.selector)),
+        definition: unquote(Macro.escape(node.definition)),
+        target_versions: unquote(Macro.escape(node.target_versions)),
         location: unquote(Macro.escape(node.location)),
         node_path: unquote(Macro.escape(node.node_path))
       )
     end
   end
 
-  def hash(node), do: node.hash
-  def inputs(_node), do: [in: [type: :any]]
-  def outputs(_node), do: [out: [type: :any]]
+  def hash(%Handoff{hash: hash}), do: hash
+  def inputs(_node), do: [bindings: [type: :any, doc: "Handoff bindings"]]
+
+  def outputs(_node) do
+    [
+      value: [type: :any, doc: "Successor instruction"],
+      effects: [type: :any, doc: "Handoff effects"],
+      control: [type: :any, doc: "Handoff control result"]
+    ]
+  end
 end

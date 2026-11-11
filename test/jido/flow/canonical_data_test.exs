@@ -196,7 +196,7 @@ defmodule Jido.Flow.CanonicalDataTest do
     flow = step_flow()
 
     assert Flow.validate(flow) == {:ok, flow}
-    assert Jido.Exec.Compiler.validate(flow) == {:ok, flow}
+    assert {:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow, [])
 
     invalid_params = put_in(flow.components["step"].call, replace_params(flow, Ref.item()))
     assert_invalid_canonical(invalid_params)
@@ -259,7 +259,7 @@ defmodule Jido.Flow.CanonicalDataTest do
   end
 
   defp assert_invalid_canonical(flow) do
-    for validate <- [&Flow.validate/1, &Jido.Exec.Compiler.validate/1] do
+    for validate <- [&Flow.validate/1, &Jido.Exec.compile(&1, [])] do
       assert {:error, %ValidationError{}} = validate.(flow)
     end
   end
@@ -287,8 +287,8 @@ defmodule Jido.Flow.CanonicalDataTest do
     assert reversed.components["c"].needs == ["b", "a"]
     assert Jido.Flow.semantic_identity(ordered) == Jido.Flow.semantic_identity(reversed)
 
-    assert Jido.Exec.compile!(ordered) |> Runic.Workflow.get_component("c") |> Map.get(:id) ==
-             Jido.Exec.compile!(reversed) |> Runic.Workflow.get_component("c") |> Map.get(:id)
+    assert Jido.Exec.Compiler.compile!(ordered) |> Runic.Workflow.get_component("c") |> Map.get(:id) ==
+             Jido.Exec.Compiler.compile!(reversed) |> Runic.Workflow.get_component("c") |> Map.get(:id)
   end
 
   test "to_map and explain keep references distinct from literal maps" do

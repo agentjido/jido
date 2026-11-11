@@ -163,7 +163,7 @@ defmodule Jido.Flow.DSL.ModuleCompiler do
       Module.delete_attribute(__MODULE__, :__jido_inline_generated__)
 
       def compiled,
-        do: Jido.Exec.compile!(flow(), source_map: __jido_flow_source_map__())
+        do: Jido.Exec.Compiler.compile!(flow(), source_map: __jido_flow_source_map__())
 
       def run(params, context), do: Jido.Exec.run(__MODULE__, params, context)
     end

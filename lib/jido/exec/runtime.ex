@@ -2,17 +2,16 @@ defmodule Jido.Exec.Runtime do
   @moduledoc false
 
   alias Jido.Error
-  alias Jido.Exec.{Frame, Validation, Wait}
+  alias Jido.Exec.{Validation, Wait}
   alias Jido.Flow.Preparation
   alias Jido.Instruction
   alias Runic.Workflow
-  alias Runic.Workflow.{Fact, Invokable, Runnable}
+  alias Runic.Workflow.{Fact, Invokable, Runnable, SchedulerPolicy}
   alias Runic.Workflow.Events.{ActivationConsumed, FactProduced}
 
   @typep local_type :: :pid | :port | :reference | :function
 
   @reserved [
-    :__jido_exec_durable__,
     :__jido_exec_max_concurrency__,
     :__jido_wait_host__,
     :__jido_wait_result__,
@@ -21,6 +20,99 @@ defmodule Jido.Exec.Runtime do
 
   @max_concurrency_key {__MODULE__, :max_concurrency}
   @quiet_failure_log_key {__MODULE__, :quiet_failure_log}
+  @execution_option_keys [
+    :timeout,
+    :max_attempts,
+    :backoff,
+    :base_delay_ms,
+    :max_delay_ms,
+    :max_concurrency
+  ]
+  @policy_keys [
+    :timeout_ms,
+    :max_retries,
+    :backoff,
+    :base_delay_ms,
+    :max_delay_ms,
+    :on_failure,
+    :retry_if
+  ]
+
+  @doc false
+  @spec execution_options(keyword(), keyword()) ::
+          {:ok, SchedulerPolicy.t(), pos_integer()} | {:error, Exception.t()}
+  def execution_options(opts, defaults \\ []) do
+    keys = if Keyword.keyword?(opts), do: Keyword.keys(opts), else: []
+
+    timeout = option(opts, defaults, :timeout, :infinity)
+    max_attempts = option(opts, defaults, :max_attempts, 1)
+    backoff = option(opts, defaults, :backoff, :none)
+    base_delay_ms = option(opts, defaults, :base_delay_ms, 0)
+    max_delay_ms = option(opts, defaults, :max_delay_ms, 0)
+    max_concurrency = option(opts, defaults, :max_concurrency, 1)
+
+    cond do
+      not Keyword.keyword?(opts) ->
+        option_error("execution options must be a keyword list")
+
+      keys != Enum.uniq(keys) ->
+        option_error("execution option keys must be unique")
+
+      keys -- @execution_option_keys != [] ->
+        option_error("unknown execution options", %{options: keys -- @execution_option_keys})
+
+      timeout != :infinity and not non_negative_integer?(timeout) ->
+        option_error("timeout must be non-negative or :infinity")
+
+      not positive_integer?(max_attempts) ->
+        option_error("max_attempts must be a positive integer")
+
+      backoff not in [:none, :linear, :exponential, :jitter] ->
+        option_error("invalid backoff policy")
+
+      not non_negative_integer?(base_delay_ms) ->
+        option_error("base_delay_ms must be non-negative")
+
+      not non_negative_integer?(max_delay_ms) ->
+        option_error("max_delay_ms must be non-negative")
+
+      not positive_integer?(max_concurrency) ->
+        option_error("max_concurrency must be a positive integer", %{
+          option: :max_concurrency,
+          value: max_concurrency
+        })
+
+      true ->
+        {:ok,
+         %SchedulerPolicy{
+           timeout_ms: timeout,
+           max_retries: max_attempts - 1,
+           backoff: backoff,
+           base_delay_ms: base_delay_ms,
+           max_delay_ms: max_delay_ms,
+           on_failure: :halt,
+           retry_if: {Jido.Error, :retryable?, []}
+         }, max_concurrency}
+    end
+  end
+
+  @doc false
+  @spec execution_policy(keyword(), keyword()) :: {:ok, map()} | {:error, Exception.t()}
+  def execution_policy(opts, defaults \\ []) do
+    with {:ok, policy, _max_concurrency} <- execution_options(opts, defaults) do
+      {:ok, policy |> Map.from_struct() |> Map.take(@policy_keys)}
+    end
+  end
+
+  defp option(opts, defaults, key, fallback) do
+    if Keyword.keyword?(opts),
+      do: Keyword.get(opts, key, Keyword.get(defaults, key, fallback)),
+      else: fallback
+  end
+
+  defp positive_integer?(value), do: is_integer(value) and value > 0
+  defp non_negative_integer?(value), do: is_integer(value) and value >= 0
+  defp option_error(message, details \\ %{}), do: {:error, Error.config_error(message, details)}
 
   @doc false
   @spec user_context(map()) :: map()
@@ -31,14 +123,6 @@ defmodule Jido.Exec.Runtime do
     if waits?,
       do: Map.put(context, :jido_exec_capabilities, [:waits]),
       else: context
-  end
-
-  @doc false
-  @spec context(map(), boolean()) :: map()
-  def context(context, durable? \\ false) do
-    context
-    |> caller_context()
-    |> Map.put(:__jido_exec_durable__, durable?)
   end
 
   @doc false
@@ -89,6 +173,23 @@ defmodule Jido.Exec.Runtime do
   end
 
   @doc false
+  @spec with_quiet_failure_logging((-> result)) :: result when result: term()
+  def with_quiet_failure_logging(work) when is_function(work, 0) do
+    if Process.get(@quiet_failure_log_key) do
+      work.()
+    else
+      quiet_failure_log()
+
+      try do
+        work.()
+      after
+        Process.delete(@quiet_failure_log_key)
+        Logger.delete_process_level(self())
+      end
+    end
+  end
+
+  @doc false
   @spec max_concurrency() :: pos_integer()
   def max_concurrency do
     case Process.get(@max_concurrency_key, 1) do
@@ -98,7 +199,7 @@ defmodule Jido.Exec.Runtime do
   end
 
   @doc false
-  @spec run(Jido.Exec.task_supervisor(), pid(), (-> term())) :: term()
+  @spec run(GenServer.server(), pid(), (-> term())) :: term()
   def run(task_supervisor, group_leader, work) do
     caller = self()
     trace_context = Jido.Trace.Context.capture()
@@ -155,13 +256,13 @@ defmodule Jido.Exec.Runtime do
   end
 
   @doc false
-  @spec flow_input(Jido.Instruction.t()) :: {:ok, Jido.Instruction.t()} | {:error, Exception.t()}
-  def flow_input(%Instruction{kind: :action} = instruction), do: {:ok, instruction}
+  @spec flow_instruction(Jido.Instruction.t()) ::
+          {:ok, Jido.Instruction.t()} | {:error, Exception.t()}
+  def flow_instruction(%Instruction{kind: :flow} = instruction), do: {:ok, instruction}
 
-  def flow_input(%Instruction{kind: :flow} = instruction) do
-    with {:ok, params} <-
-           Validation.input(instruction.target, instruction.params, %{phase: :flow_input}) do
-      {:ok, %{instruction | params: params}}
+  def flow_instruction(%Instruction{kind: :action, target: action} = instruction) do
+    with {:ok, flow} <- Jido.Flow.from_action(action) do
+      {:ok, %{instruction | kind: :flow, target: flow}}
     end
   end
 
@@ -329,11 +430,10 @@ defmodule Jido.Exec.Runtime do
     node = Map.fetch!(workflow.graph.vertices, record.node_hash)
     fact = Map.fetch!(workflow.graph.vertices, record.input_id)
 
-    with {:ok, runnable} <- Invokable.prepare(node, workflow, fact),
-         {:ok, frame} <- Frame.merge(Jido.Exec.Fact.value(fact)) do
+    with {:ok, runnable} <- Invokable.prepare(node, workflow, fact) do
       output =
         Jido.Exec.Fact.child(fact,
-          value: Frame.put_result(frame, node.component, Wait.result(wait, choice), []),
+          value: %{value: Wait.result(wait, choice), effects: [], control: :none},
           ancestry: {node.hash, fact.hash}
         )
 

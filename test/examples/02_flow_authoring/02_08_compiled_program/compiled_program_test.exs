@@ -25,6 +25,7 @@ defmodule Jido.Examples.Compilation.CompiledProgramTest do
                 }
               }}
 
-    assert map_size(Jido.Exec.compile!(flow).components) >= 2
+    assert {:ok, workflow} = Jido.Exec.compile(flow, [])
+    assert map_size(workflow.components) >= 2
   end
 end

@@ -19,8 +19,8 @@ defmodule Jido.Exec.StoredFlowTest do
              |> Codec.decode(registry)
 
     assert restored == flow
-    assert {:ok, original_workflow} = Exec.compile(flow)
-    assert {:ok, restored_workflow} = Exec.compile(restored)
+    assert {:ok, original_workflow} = Exec.compile(flow, [])
+    assert {:ok, restored_workflow} = Exec.compile(restored, [])
 
     for step <- 1..10 do
       name = "step_#{step}"

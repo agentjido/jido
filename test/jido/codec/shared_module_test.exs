@@ -87,7 +87,7 @@ defmodule Jido.Codec.SharedModuleTest do
       refute_received :validated_output
     end
 
-    assert {:ok, workflow} = Exec.compile(PreparedFlow)
+    assert {:ok, workflow} = Exec.compile(PreparedFlow, [])
     assert %Jido.Exec.Node.Action{} = Runic.Workflow.get_component(workflow, "echo")
   end
 
@@ -114,7 +114,7 @@ defmodule Jido.Codec.SharedModuleTest do
       flow =
         Flow.new!(%{name: "wrong_kind", components: [component], output: Ref.result("child")})
 
-      assert {:error, error} = Exec.compile(flow)
+      assert {:error, error} = Exec.compile(flow, [])
       assert error.details.actual == :flow
       assert error.details.expected == :action
     end

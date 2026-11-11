@@ -2,16 +2,7 @@ defmodule Jido.Durable.Runtime do
   @moduledoc false
 
   @wait_input_limit 1_024
-  @execution_option_keys [
-    :timeout,
-    :max_attempts,
-    :backoff,
-    :base_delay_ms,
-    :max_delay_ms,
-    :max_concurrency
-  ]
-
-  alias Jido.Exec.{Frame, Runtime, Wait}
+  alias Jido.Exec.{Runtime, Wait}
   alias Jido.Persistence.ContinuationStore
   alias Runic.Runner
   alias Runic.Workflow
@@ -41,7 +32,7 @@ defmodule Jido.Durable.Runtime do
 
     with :ok <- validate_now(now),
          :ok <- stop_existing_execution(runner, id),
-         {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}),
+         {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}, []),
          :ok <- ContinuationStore.register(instance, id, persistence, owner),
          {:ok, saved} <-
            ContinuationStore.update_workflow(instance, id, &resolve_wait_inputs(&1, now)),
@@ -148,7 +139,7 @@ defmodule Jido.Durable.Runtime do
     floor = acceptance_time(workflow, now)
 
     context
-    |> Runtime.context(true)
+    |> Runtime.caller_context()
     |> Map.put(:__jido_exec_max_concurrency__, max_concurrency)
     |> Runtime.wait_context(execution_id, fn -> max(now, floor) end)
   end
@@ -187,54 +178,20 @@ defmodule Jido.Durable.Runtime do
 
   @doc false
   def validate_execution_options(opts) do
-    keyword? = is_list(opts) and Keyword.keyword?(opts)
-    keys = if keyword?, do: Keyword.keys(opts), else: []
-
-    cond do
-      not keyword? ->
-        option_error("durable exec_opts must be a keyword list", opts)
-
-      keys != Enum.uniq(keys) ->
-        option_error("durable exec_opts keys must be unique", opts)
-
-      keys -- @execution_option_keys != [] ->
-        option_error("durable exec_opts contain unsupported keys", opts)
-
-      not valid_timeout?(Keyword.get(opts, :timeout, :infinity)) ->
-        option_error("durable timeout must be non-negative or :infinity", opts)
-
-      not positive_integer?(Keyword.get(opts, :max_attempts, 1)) ->
-        option_error("durable max_attempts must be positive", opts)
-
-      Keyword.get(opts, :backoff, :none) not in [:none, :linear, :exponential, :jitter] ->
-        option_error("durable backoff is invalid", opts)
-
-      not non_negative_integer?(Keyword.get(opts, :base_delay_ms, 500)) ->
-        option_error("durable base_delay_ms must be non-negative", opts)
-
-      not non_negative_integer?(Keyword.get(opts, :max_delay_ms, 30_000)) ->
-        option_error("durable max_delay_ms must be non-negative", opts)
-
-      not positive_integer?(Keyword.get(opts, :max_concurrency, 1)) ->
-        option_error("durable max_concurrency must be positive", opts)
-
-      true ->
-        :ok
+    case Runtime.execution_options(opts, durable_policy_defaults()) do
+      {:ok, _policy, _max_concurrency} -> :ok
+      {:error, error} -> option_error(Exception.message(error), opts)
     end
   end
 
   @doc false
   def execution_policy(opts) do
-    %{
-      timeout_ms: Keyword.get(opts, :timeout, :infinity),
-      max_retries: Keyword.get(opts, :max_attempts, 1) - 1,
-      backoff: Keyword.get(opts, :backoff, :none),
-      base_delay_ms: Keyword.get(opts, :base_delay_ms, 500),
-      max_delay_ms: Keyword.get(opts, :max_delay_ms, 30_000),
-      on_failure: :halt,
-      retry_if: {Jido.Error, :retryable?, []}
-    }
+    {:ok, policy} = Runtime.execution_policy(opts, durable_policy_defaults())
+    policy
   end
+
+  defp durable_policy_defaults,
+    do: [base_delay_ms: 500, max_delay_ms: 30_000, max_concurrency: 1]
 
   defp notifying_hooks(hooks, notify) do
     user_complete = hooks[:on_complete]
@@ -269,8 +226,7 @@ defmodule Jido.Durable.Runtime do
         )
 
       {:error, :not_found} ->
-        with {:ok, instruction} <- Runtime.flow_input(instruction),
-             {:ok, worker} <-
+        with {:ok, worker} <-
                Runner.start_workflow(
                  runner,
                  id,
@@ -299,8 +255,7 @@ defmodule Jido.Durable.Runtime do
     if Runner.lookup(runner, id), do: Runner.cancel(runner, id), else: :ok
   end
 
-  defp execution_input(%Jido.Instruction{kind: :flow, params: params}), do: Frame.new(params)
-  defp execution_input(%Jido.Instruction{kind: :action}), do: %{}
+  defp execution_input(%Jido.Instruction{params: params}), do: params
 
   defp waiting(workflow),
     do: {:waiting, Runtime.pending_waits(workflow), Runtime.next_wait_deadline(workflow)}
@@ -378,10 +333,6 @@ defmodule Jido.Durable.Runtime do
 
   defp validate_now(now) when is_integer(now) and now >= 0, do: :ok
   defp validate_now(_now), do: wait_error(:invalid_clock)
-  defp valid_timeout?(:infinity), do: true
-  defp valid_timeout?(value), do: non_negative_integer?(value)
-  defp positive_integer?(value), do: is_integer(value) and value > 0
-  defp non_negative_integer?(value), do: is_integer(value) and value >= 0
   defp now, do: System.system_time(:millisecond)
 
   defp option_error(message, opts) do

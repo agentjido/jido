@@ -59,16 +59,8 @@ defmodule Jido.Exec.ErrorPathsTest do
       assert {:error, %ValidationError{}} = Exec.run(Add, %{}, %{}, :bad)
       assert {:error, %ValidationError{}} = Exec.run(Add, %{}, %{}, bogus: true)
 
-      assert {:error, %ValidationError{details: %{reason: :duplicate_option}}} =
-               Exec.run(Add, %{}, %{},
-                 task_supervisor: Jido.Exec.TaskSupervisor,
-                 task_supervisor: Jido.Exec.TaskSupervisor
-               )
-
-      assert {:error, %ValidationError{}} = Exec.run(Add, %{}, %{}, task_supervisor: 123)
-
-      assert {:error, %ValidationError{message: "Task Supervisor lookup failed"}} =
-               Exec.run(Add, %{}, %{}, task_supervisor: {:via, :no_such_registry, :name})
+      assert {:error, %ValidationError{}} =
+               Exec.run(Add, %{}, %{}, task_supervisor: Jido.Exec.TaskSupervisor)
     end
 
     @tag obligation: "jido_action.boundary.I6"
@@ -190,15 +182,9 @@ defmodule Jido.Exec.ErrorPathsTest do
   describe "compile/2" do
     @tag obligation: "jido_action.boundary.I6"
     test "invalid targets and options return configuration errors" do
-      assert {:error, %ValidationError{}} = Exec.compile("not a target")
+      assert {:error, %ValidationError{}} = Exec.compile("not a target", [])
       assert {:error, %ValidationError{}} = Exec.compile(Add, :bad)
       assert {:error, %ValidationError{}} = Exec.compile(Add, bogus: true)
-      assert %Runic.Workflow{} = Exec.compile!(Add, id: :root)
-      assert_raise ValidationError, fn -> Exec.compile!("not a target") end
-
-      assert_raise ArgumentError, fn ->
-        Jido.Exec.Node.Action.new(Jido.Instruction.new!(target: InputFlow))
-      end
     end
   end
 

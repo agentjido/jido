@@ -73,7 +73,7 @@ defmodule Jido.Flow.GeneratedRegistryTest do
       })
 
     assert {:ok, _document, %Catalog{}} = Codec.encode(flow)
-    assert {:error, %ValidationError{}} = Jido.Exec.compile(flow)
+    assert {:error, %ValidationError{}} = Jido.Exec.compile(flow, [])
     assert {:error, %ValidationError{}} = Codec.encode(:invalid)
   end
 end

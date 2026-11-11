@@ -8,7 +8,6 @@ defmodule Jido.Exec.Result do
     Execution,
     ExecutionUncertain,
     Fact,
-    RunnableDispatched,
     RunnableFailed
   }
 
@@ -24,7 +23,7 @@ defmodule Jido.Exec.Result do
   @doc false
   def runnable_order(runnable) do
     {elem(Runic.Workflow.Runnable.order_key(runnable), 0), Map.get(runnable.node, :name),
-     map_item_index(runnable.input_fact), Runic.Workflow.Runnable.activation_id(runnable)}
+     Runic.Workflow.Runnable.activation_id(runnable)}
   end
 
   @doc false
@@ -55,43 +54,8 @@ defmodule Jido.Exec.Result do
 
   defp failure_order(failure, workflow) do
     {depth, activation} = failure.order_key || {0, nil}
-
-    index =
-      case failure.error do
-        %{details: %{item_index: index}} -> index
-        _error -> failure_item_index(workflow, activation)
-      end
-
-    {depth, failure.node_name, index}
+    {depth, failure.node_name, activation, workflow.name}
   end
-
-  defp failure_item_index(workflow, activation) do
-    Enum.find_value(workflow.runnable_events, 0, fn
-      %RunnableDispatched{order_key: {_depth, ^activation}, input_fact: fact} ->
-        map_item_index(fact)
-
-      %ExecutionUncertain{members: members} ->
-        Enum.find_value(members || [], fn
-          %{order_key: {_depth, ^activation}, input_fact_id: id} ->
-            map_item_index(Map.get(workflow.graph.vertices, id))
-
-          _member ->
-            nil
-        end)
-
-      _event ->
-        nil
-    end)
-  end
-
-  defp map_item_index(%Fact{} = fact) do
-    case Jido.Exec.Fact.value(fact) do
-      {:jido_map_item, index, _id, _params} -> index
-      _value -> 0
-    end
-  end
-
-  defp map_item_index(_fact), do: 0
 
   defp result_fact(workflow, nil, resolver) do
     case Workflow.results(workflow, nil, facts: true) do

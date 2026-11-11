@@ -271,7 +271,7 @@ defmodule TestFlowsTour.ManagedTest do
     id = "expense-#{System.unique_integer([:positive])}"
 
     assert {:ok, instruction} = Jido.Instruction.resolve(TestFlowsTour.ApproveExpense, input)
-    assert {:ok, workflow} = Jido.Exec.compile(instruction)
+    assert {:ok, workflow} = Jido.Exec.compile(instruction, [])
 
     assert {:ok, _worker} =
              Runic.Runner.start_workflow(runner, id, workflow,
@@ -286,7 +286,7 @@ defmodule TestFlowsTour.ManagedTest do
              Runic.Runner.start_execution(
                runner,
                id,
-               Jido.Exec.Fact.local_value(Jido.Exec.Frame.new(instruction.params)),
+               Jido.Exec.Fact.local_value(instruction.params),
                execution_id: execution_id,
                run_context: %{_global: instruction.context}
              )

@@ -89,6 +89,10 @@ defmodule Jido.Telemetry.Exec do
 
   @doc false
   @spec result_metadata(kind(), term()) :: map()
+  def result_metadata(_kind, {:ok, _value, effects, :none}) when is_list(effects) do
+    %{outcome: :ok, effect_count: length(effects)}
+  end
+
   def result_metadata(_kind, {:ok, _value}), do: %{outcome: :ok, effect_count: 0}
 
   def result_metadata(_kind, {:ok, _value, effects}) when is_list(effects) do
@@ -126,19 +130,13 @@ defmodule Jido.Telemetry.Exec do
 
   defp flow_component_metadata(_metadata), do: %{}
 
-  defp component_kind(%{mode: {:map, _on_error}}), do: :map
-
-  defp component_kind(%{mode: {:parallel, _on_error, _index, _name}}),
-    do: :parallel
-
-  defp component_kind(%{mode: {:loop, %{kind: kind}}}) when kind in [:reduce, :iterate], do: kind
-  defp component_kind(%{mode: {:invoke, _phase}}), do: :invoke
-  defp component_kind(%{mode: :handoff}), do: :handoff
-  defp component_kind(%{mode: :choice}), do: :choice
-  defp component_kind(%{component: component}) when not is_nil(component), do: :step
+  defp component_kind(%{kind: :call}), do: :step
+  defp component_kind(%{kind: kind}), do: kind
   defp component_kind(_metadata), do: nil
 
-  defp invoke_phase(%{mode: {:invoke, phase}}), do: phase
+  defp invoke_phase(%{kind: :invoke, role: :invoke_decision}), do: :decision
+  defp invoke_phase(%{kind: :invoke, role: :invoke_expander}), do: :expander
+  defp invoke_phase(%{kind: :invoke, role: :invoke_target}), do: :target
   defp invoke_phase(_metadata), do: nil
 
   defp default_node_path(nil), do: nil

@@ -579,7 +579,7 @@ defmodule Jido.AgentServer.HandoffTest do
 
   @tag obligation: "jido.agent_server.handoff.I2"
   test "a released Handoff rejects a changed execution fingerprint" do
-    signal = Jido.Signal.new!("handoff.test", %{count: 1}, source: "/test")
+    signal = signal("handoff", %{count: 1})
     agent = Agent.instantiate!(id: "handoff-fingerprint")
     instruction = Jido.Instruction.new!(target: Successor, params: %{count: 1})
 

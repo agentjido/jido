@@ -272,7 +272,8 @@ defmodule Jido.Flow do
     with {:ok, %Jido.Instruction{kind: :action}} <- Jido.Instruction.resolve(action),
          :ok <- Jido.Instruction.validate(action) do
       new(%{
-        name: "one_step_#{action.name()}",
+        name: "one_step_#{action_name(action)}",
+        output_schema: Jido.Joi.any(),
         components: [
           %{
             kind: :step,
@@ -307,6 +308,10 @@ defmodule Jido.Flow do
      Error.validation_error("one-step Flow requires an Action module", %{
        target: action
      })}
+  end
+
+  defp action_name(action) do
+    if function_exported?(action, :name, 0), do: action.name(), else: Atom.to_string(action)
   end
 
   @doc "Builds the canonical one-step Flow for an Action module, or raises."

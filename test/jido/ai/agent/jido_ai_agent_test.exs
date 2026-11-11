@@ -144,15 +144,11 @@ defmodule Jido.AI.AgentTest do
                  kind: :invoke,
                  decision: %{target: Actions.FinishLoop},
                  expander: %{target: Actions.ExpandNext}
-               },
-               "finalize" => %{
-                 kind: :call,
-                 call: %{target: SharedActions.FinalizeTurn}
                }
              }
            } = program.flow()
 
-    assert map_size(program.flow().components) == 6
+    assert map_size(program.flow().components) == 5
 
     assert %Jido.Flow{components: model_components} = ReAct.ModelRound.flow()
     assert map_size(model_components) == 6
@@ -266,11 +262,11 @@ defmodule Jido.AI.AgentTest do
 
     tool_targets =
       tool_flow
-      |> Jido.Exec.compile!()
-      |> then(& &1.graph.vertices)
-      |> Enum.map(&elem(&1, 1))
-      |> Enum.filter(&match?(%Jido.Exec.Node.Action{flow: %{mode: {:parallel, _, _, _}}}, &1))
-      |> Enum.map(& &1.instruction.target)
+      |> Jido.Exec.Compiler.compile!()
+      |> Runic.Workflow.get_component!("tools")
+      |> then(fn %Jido.Exec.Node.Parallel{definition: definition} ->
+        Enum.map(definition.actions, & &1.call.target)
+      end)
 
     assert tool_targets == [Actions.ExecuteTool, Actions.ExecuteTool]
 
@@ -294,7 +290,8 @@ defmodule Jido.AI.AgentTest do
 
     outcome = %{turn: :done, result: %{status: :completed}}
 
-    assert {:ok, ^outcome} = Actions.ExpandNext.run(%{kind: :complete, output: outcome}, %{})
+    assert {:continue, %{outcome: ^outcome}, SharedActions.FinalizeTurn} =
+             Actions.ExpandNext.run(%{kind: :complete, output: outcome}, %{})
   end
 
   test "an inline reasoning block compiles to the direct root Flow" do

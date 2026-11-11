@@ -200,7 +200,6 @@ defmodule Jido.Agent.Validation do
           :agent_topology,
           :signal,
           :plugin_inputs,
-          :__jido_exec_durable__,
           :__jido_wait_host__,
           :__jido_wait_result__
         ],

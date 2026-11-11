@@ -47,7 +47,7 @@ defmodule Jido.AI.Reasoning do
          params = Jido.AI.RequestPolicy.narrow(params, route.defaults, input),
          :ok <- Jido.AI.Toolset.validate(actions),
          {:ok, instruction} <- Jido.Instruction.resolve(reasoning, params, %{}),
-         {:ok, workflow} <- Jido.Exec.compile(instruction) do
+         {:ok, workflow} <- Jido.Exec.compile(instruction, []) do
       {:ok,
        %{
          agent: agent,

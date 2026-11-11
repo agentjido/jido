@@ -6,9 +6,11 @@ defmodule Jido.Exec.ApiTest do
   alias Jido.Test.Action.Fixtures.Actions.{Add, BasicAction, ErrorAction, ExtrasAction}
 
   @tag obligation: "jido_action.boundary.I5"
-  test "compile/2 returns a real one-node Runic Workflow" do
-    assert {:ok, %Runic.Workflow{} = workflow} = Exec.compile(Add)
-    assert %Jido.Exec.Node.Action{} = Runic.Workflow.get_component(workflow, "add_one")
+  test "compile/2 lowers an Action to its canonical one-step Flow" do
+    assert {:ok, %Runic.Workflow{} = workflow} = Exec.compile(Add, [])
+
+    assert %Jido.Exec.Node.Action{call: %{kind: :action, target: Add}} =
+             Runic.Workflow.get_component(workflow, "action")
   end
 
   @tag obligation: "jido_action.boundary.I5"
@@ -66,8 +68,8 @@ defmodule Jido.Exec.ApiTest do
   end
 
   @tag obligation: "jido_action.boundary.I6"
-  test "invalid compile and Task Supervisor options return configuration errors" do
-    assert {:error, %Jido.Error.ValidationError{details: %{option: :name}}} =
+  test "invalid compile options return configuration errors" do
+    assert {:error, %Jido.Error.ValidationError{details: %{options: [:name]}}} =
              Exec.compile(Add, name: %{})
 
     flow =
@@ -80,15 +82,6 @@ defmodule Jido.Exec.ApiTest do
     for option <- [name: "root", id: :root] do
       assert {:error, %Jido.Error.ValidationError{}} = Exec.compile(flow, [option])
     end
-
-    {:ok, supervisor} = Task.Supervisor.start_link()
-    Process.unlink(supervisor)
-    monitor = Process.monitor(supervisor)
-    Process.exit(supervisor, :kill)
-    assert_receive {:DOWN, ^monitor, :process, ^supervisor, :killed}
-
-    assert {:error, %Jido.Error.ValidationError{message: "Task Supervisor is not running"}} =
-             Exec.run(Add, %{value: 1, amount: 1}, %{}, task_supervisor: supervisor)
   end
 
   @tag obligation: "jido_action.boundary.I1"
@@ -124,7 +117,7 @@ defmodule Jido.Exec.ApiTest do
 
     assert Exec.run(StructSchemaAction, %{id: 1}) == {:ok, %{id: 1}}
     assert Exec.run(AtomSchemaAction, %{mode: :fast}) == {:ok, %{mode: :fast}}
-    assert {:ok, %Runic.Workflow{}} = Exec.compile(AtomSchemaAction)
+    assert {:ok, %Runic.Workflow{}} = Exec.compile(AtomSchemaAction, [])
   end
 
   defmodule Fail do
@@ -132,6 +125,69 @@ defmodule Jido.Exec.ApiTest do
 
     @impl true
     def run(%{label: label}, _context), do: {:error, label}
+  end
+
+  defmodule WaitProbe do
+    use Jido.Action, name: "exec_api_wait_probe"
+
+    @impl true
+    def run(%{owner: owner}, _context) do
+      send(owner, :wait_probe_ran)
+      {:ok, %{}}
+    end
+  end
+
+  defmodule NestedWaitFlow do
+    use Jido.Flow, name: "exec_api_nested_wait"
+
+    flow do
+      await "approval", event: "approved"
+      output result("approval")
+    end
+  end
+
+  @tag obligation: "jido_action.boundary.I6"
+  test "run/4 rejects waits before Action work starts" do
+    flow =
+      Jido.Flow.new!(%{
+        name: "exec_api_wait_rejection",
+        components: [
+          %{
+            kind: :step,
+            name: "probe",
+            action: WaitProbe,
+            params: %{owner: Jido.Flow.Ref.context(:owner)}
+          },
+          %{kind: :await, name: "wait", event: "continue", needs: ["probe"]}
+        ],
+        output: Jido.Flow.Ref.result("wait")
+      })
+
+    assert {:error, %Jido.Error.ValidationError{}} = Exec.run(flow, %{}, %{owner: self()})
+    refute_received :wait_probe_ran
+  end
+
+  @tag obligation: "jido_action.boundary.I6"
+  test "run/4 rejects nested waits before parent Action work starts" do
+    flow =
+      Jido.Flow.new!(%{
+        name: "exec_api_nested_wait_rejection",
+        components: [
+          %{
+            kind: :step,
+            name: "probe",
+            action: WaitProbe,
+            params: %{owner: Jido.Flow.Ref.context(:owner)}
+          },
+          %{kind: :subflow, name: "child", flow: NestedWaitFlow, params: %{}, needs: ["probe"]}
+        ],
+        output: Jido.Flow.Ref.result("child")
+      })
+
+    assert {:error, %Jido.Error.ValidationError{details: %{reason: :nested_wait}}} =
+             Exec.run(flow, %{}, %{owner: self()})
+
+    refute_received :wait_probe_ran
   end
 
   @tag obligation: "jido_action.boundary.I6"

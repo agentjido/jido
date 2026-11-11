@@ -1,7 +1,7 @@
 defmodule Jido.Exec.BoundaryRulesTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Exec.{Frame, Runtime, ValueResolver}
+  alias Jido.Exec.{Runtime, ValueResolver}
   alias Jido.Flow.Ref
 
   describe "durable values" do
@@ -22,35 +22,6 @@ defmodule Jido.Exec.BoundaryRulesTest do
                  %{list: [1 | 2], bits: <<5::size(3)>>, nested: {:ok, [%{a: 1}]}},
                  :value
                )
-    end
-  end
-
-  describe "Flow frames" do
-    test "merge equal branches and reject conflicting or foreign data" do
-      left = Frame.put_result(Frame.new(%{x: 1}), "a", %{value: 1}, [])
-      right = Frame.put_result(Frame.new(%{x: 1}), "b", %{value: 2}, [])
-
-      assert {:ok, merged} = Frame.merge([left, right])
-      assert {:ok, %{value: 2}} = Frame.fetch_result(merged, "b")
-
-      conflict = Frame.put_result(Frame.new(%{x: 1}), "a", %{value: 9}, [])
-
-      assert {:error, %{details: %{reason: :conflicting_flow_frame, component: "a"}}} =
-               Frame.merge([left, conflict])
-
-      assert {:error, %{details: %{reason: :incompatible_flow_frames}}} =
-               Frame.merge([left, Frame.new(%{x: 2})])
-
-      assert {:error, %{details: %{reason: :incompatible_flow_frames}}} =
-               Frame.merge([left, :bad])
-
-      assert {:error, %{details: %{reason: :invalid_flow_frame}}} = Frame.merge(:bad)
-
-      nested_left = Frame.nest(left, %{y: 1})
-      nested_right = Frame.nest(left, %{y: 1})
-      assert {:ok, nested} = Frame.merge([nested_left, nested_right])
-      assert Frame.effects_for(nested, "missing") == []
-      assert Frame.fetch_result(nested, "missing") == :error
     end
   end
 

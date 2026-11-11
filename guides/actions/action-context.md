@@ -173,7 +173,6 @@ signal = Jido.Signal.new!("ticket.handled", %{}, source: "/support")
 Exec strips these keys from the context it passes to `run/2`:
 
 - `:jido_exec_capabilities`
-- `:__jido_exec_durable__`
 - `:__jido_exec_max_concurrency__`
 - `:__jido_wait_host__`
 - `:__jido_wait_result__`

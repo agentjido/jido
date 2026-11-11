@@ -43,7 +43,7 @@ defmodule Jido.Flow.ExecutableKindTest do
         )
 
       assert {:error, %ValidationError{details: details}} =
-               Jido.Exec.Compiler.validate(flow)
+               Jido.Exec.compile(flow, [])
 
       assert details.component == component.name
       assert details.actual == :flow

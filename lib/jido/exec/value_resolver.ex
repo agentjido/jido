@@ -7,6 +7,16 @@ defmodule Jido.Exec.ValueResolver do
   alias Jido.Flow.Ref
 
   @doc false
+  @spec resolver_state(map(), map()) :: map()
+  def resolver_state(bindings, runtime) do
+    %{
+      input: Map.fetch!(bindings, :input),
+      context: runtime,
+      results: Map.get(bindings, :results, %{})
+    }
+  end
+
+  @doc false
   @spec condition(boolean() | Ref.t() | Expr.t(), map(), String.t(), term()) ::
           {:ok, boolean()} | {:error, Exception.t()}
   def condition(value, state, node, option) do

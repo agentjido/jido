@@ -217,7 +217,7 @@ defmodule Jido.AgentServer.Lifecycle do
     end
   end
 
-  def execution_policy(opts), do: DurableRuntime.execution_policy(opts)
+  def execution_policy(opts), do: opts |> Keyword.delete(:hooks) |> DurableRuntime.execution_policy()
 
   def execution_hooks(hooks, trace) do
     hooks = Enum.map(hooks, fn {name, fun} -> {name, safe_hook(name, fun)} end)
@@ -467,7 +467,10 @@ defmodule Jido.AgentServer.Lifecycle do
 
   def accept_continuation(data, prepared) do
     with {:ok, instruction} <- durable_flow_instruction(prepared),
-         {:ok, _} <- validate_flow_input(instruction),
+         {:ok, _params} <-
+           Jido.Exec.Validation.input(instruction.target, instruction.params, %{
+             phase: :flow_input
+           }),
          do:
            Continuation.running(%{
              id: data.active.turn_id,
@@ -617,12 +620,6 @@ defmodule Jido.AgentServer.Lifecycle do
   end
 
   defp durable_flow_instruction(_prepared), do: {:error, :not_durable_flow}
-
-  defp validate_flow_input(instruction),
-    do:
-      Jido.Exec.Validation.input(instruction.target, instruction.params, %{
-        phase: :flow_input
-      })
 
   defp continuation_expiry(%{deadline: :infinity}), do: :infinity
 

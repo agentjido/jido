@@ -1,7 +1,7 @@
 defmodule Jido.Exec.WaitExtensionsTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Exec.{Frame, Runtime, Wait}
+  alias Jido.Exec.{Runtime, Wait}
   alias Jido.Flow.Ref
   alias Runic.Workflow
 
@@ -20,11 +20,11 @@ defmodule Jido.Exec.WaitExtensionsTest do
   end
 
   defp waiting(target \\ Approval, execution_id \\ "execution", clock \\ 100) do
-    {:ok, workflow} = Jido.Exec.compile(target)
+    {:ok, workflow} = Jido.Exec.compile(target, [])
 
     workflow
     |> Workflow.put_run_context(%{_global: Runtime.wait_context(%{}, execution_id, clock)})
-    |> Workflow.react_until_satisfied(Frame.new(%{id: 7}))
+    |> Workflow.react_until_satisfied(%{id: 7})
   end
 
   defp candidate(id, at, order \\ 0) do
@@ -115,14 +115,13 @@ defmodule Jido.Exec.WaitExtensionsTest do
     clock = fn -> Process.get(key) end
     context = Runtime.wait_context(%{custom: true}, "clock", clock)
     assert context.custom
-    refute Map.get(context, :__jido_exec_durable__, false)
     Process.put(key, 321)
-    {:ok, workflow} = Jido.Exec.compile(Approval)
+    {:ok, workflow} = Jido.Exec.compile(Approval, [])
 
     workflow =
       workflow
       |> Workflow.put_run_context(%{_global: context})
-      |> Workflow.react_until_satisfied(Frame.new(%{id: 7}))
+      |> Workflow.react_until_satisfied(%{id: 7})
 
     [request] = Runtime.pending_waits(workflow)
     assert request.opened_at == 321
@@ -165,12 +164,12 @@ defmodule Jido.Exec.WaitExtensionsTest do
         output: Ref.result("message")
       })
 
-    {:ok, workflow} = Jido.Exec.compile(flow)
+    {:ok, workflow} = Jido.Exec.compile(flow, [])
 
     workflow =
       workflow
       |> Workflow.put_run_context(%{_global: Runtime.wait_context(%{}, "local", 100)})
-      |> Workflow.react_until_satisfied(Jido.Exec.Fact.local_root(Frame.new(%{})))
+      |> Workflow.react_until_satisfied(Jido.Exec.Fact.local_value(%{}))
 
     [request] = Runtime.pending_waits(workflow)
     pid = self()

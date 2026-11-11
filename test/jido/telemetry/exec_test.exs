@@ -44,31 +44,29 @@ defmodule Jido.Telemetry.ExecTest do
            ]
   end
 
-  test "Invoke and Handoff Action metadata use the new control names" do
+  test "Invoke and Handoff Action metadata use authored component boundaries" do
     instruction = Instruction.new!(target: Add)
 
-    invoke =
-      Jido.Exec.Node.Action.new(instruction,
-        id: :invoke,
-        name: "invoke_selector",
-        flow: %{component: "next", mode: {:invoke, :expander}}
-      )
+    invoke = %{
+      instruction: instruction,
+      name: "invoke",
+      flow: %{component: "next", kind: :invoke, role: :invoke_expander}
+    }
 
-    handoff =
-      Jido.Exec.Node.Action.new(instruction,
-        id: :handoff,
-        name: "handoff_selector",
-        flow: %{component: "next", mode: :handoff}
-      )
+    handoff = %{
+      instruction: instruction,
+      name: "handoff",
+      flow: %{component: "next", kind: :handoff, role: :handoff_selector}
+    }
 
     assert %{
-             node_name: "invoke_selector",
+             node_name: "invoke",
              component_kind: :invoke,
              invoke_phase: :expander
            } = Jido.Telemetry.Exec.action_metadata(invoke, %Context{})
 
     assert %{
-             node_name: "handoff_selector",
+             node_name: "handoff",
              component_kind: :handoff
            } = handoff_metadata = Jido.Telemetry.Exec.action_metadata(handoff, %Context{})
 

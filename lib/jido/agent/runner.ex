@@ -143,14 +143,17 @@ defmodule Jido.Agent.Runner do
         exec_opts,
         plugin_specs
       ) do
-    turn = %Turn{
-      executable: instruction,
-      execution_mode: execution_mode(instruction.kind),
-      route: %{state: %{source: :output, path: []}, reply: nil},
-      source_signal: source_signal
-    }
+    agent_specs = Plugin.specs(plugin_specs)
 
     with :ok <- at(:input, Validation.validate_caller_context(context)),
+         {:ok, selected} <-
+           at(:route, select(agent, source_signal, plugin_inputs, agent_specs)),
+         turn = %{
+           selected
+           | executable: instruction,
+             execution_mode: execution_mode(instruction.kind),
+             input: instruction.params
+         },
          {:ok, turn} <- at(:route, Turn.validate_selected(turn)),
          {:ok, schema} <-
            at(:input, Plugin.compose_schema_from_specs(agent.schema, plugin_specs)) do
@@ -163,7 +166,7 @@ defmodule Jido.Agent.Runner do
          context,
          exec_opts,
          plugin_inputs,
-         Plugin.specs(plugin_specs)
+         agent_specs
        )}
     end
   end

@@ -21,7 +21,7 @@ defmodule Jido.Exec.ObservationTest do
   end
 
   test "a successful new input does not inherit an earlier input's failure" do
-    workflow = Exec.compile!(SometimesFails)
+    workflow = Jido.Exec.Compiler.compile!(SometimesFails)
     {workflow, first} = Workflow.execute(workflow, %{fail: true})
     assert {:error, _} = Exec.result(workflow, first)
 
@@ -30,13 +30,13 @@ defmodule Jido.Exec.ObservationTest do
   end
 
   test "observation projects the declared result and preserves effects" do
-    workflow = Exec.compile!(WithEffects)
+    workflow = Jido.Exec.Compiler.compile!(WithEffects)
     {workflow, observation} = Workflow.execute(workflow, %{value: 3})
     assert Exec.result(workflow, observation) == {:ok, %{value: 3}, [:saved]}
   end
 
   test "a running observation cannot return an already produced result" do
-    {workflow, observation} = Workflow.execute(Exec.compile!(Add), %{value: 1, amount: 2})
+    {workflow, observation} = Workflow.execute(Jido.Exec.Compiler.compile!(Add), %{value: 1, amount: 2})
     observation = %{observation | quiescent?: false}
 
     assert {:error, %Jido.Error.ExecutionError{details: details}} =
@@ -46,7 +46,7 @@ defmodule Jido.Exec.ObservationTest do
   end
 
   test "earlier observations select their own result after another input completes" do
-    {workflow, first} = Workflow.execute(Exec.compile!(Add), %{value: 1, amount: 2})
+    {workflow, first} = Workflow.execute(Jido.Exec.Compiler.compile!(Add), %{value: 1, amount: 2})
     {workflow, second} = Workflow.execute(workflow, %{value: 5, amount: 2})
 
     assert Exec.result(workflow, first) == {:ok, %{value: 3}}
@@ -54,8 +54,8 @@ defmodule Jido.Exec.ObservationTest do
   end
 
   test "an observation cannot select another input's result" do
-    {workflow, _first} = Workflow.execute(Exec.compile!(Add), %{value: 1, amount: 2})
-    {_other, observation} = Workflow.execute(Exec.compile!(Add), %{value: 5, amount: 2})
+    {workflow, _first} = Workflow.execute(Jido.Exec.Compiler.compile!(Add), %{value: 1, amount: 2})
+    {_other, observation} = Workflow.execute(Jido.Exec.Compiler.compile!(Add), %{value: 5, amount: 2})
 
     assert {:error, %Jido.Error.ExecutionError{details: details}} =
              Exec.result(workflow, observation)
@@ -64,7 +64,7 @@ defmodule Jido.Exec.ObservationTest do
   end
 
   test "stopped admission cannot return a successful output" do
-    {workflow, observation} = Workflow.execute(Exec.compile!(Add), %{value: 1, amount: 2})
+    {workflow, observation} = Workflow.execute(Jido.Exec.Compiler.compile!(Add), %{value: 1, amount: 2})
     observation = %{observation | admission: :stopped}
 
     assert {:error, %Jido.Error.ExecutionError{details: details}} =
@@ -74,7 +74,7 @@ defmodule Jido.Exec.ObservationTest do
   end
 
   test "a computed result does not acknowledge failed persistence" do
-    {workflow, observation} = Workflow.execute(Exec.compile!(Add), %{value: 1, amount: 2})
+    {workflow, observation} = Workflow.execute(Jido.Exec.Compiler.compile!(Add), %{value: 1, amount: 2})
 
     observation = %{
       observation

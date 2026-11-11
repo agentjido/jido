@@ -2,6 +2,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
   alias Jido.Joi
   @moduledoc "Expands each trusted AI routing decision into its next executable."
 
+  alias Jido.AI.Reasoning.Actions.FinalizeTurn
   alias Jido.AI.Reasoning.ReAct.ToolRound
 
   use Jido.Action,
@@ -13,19 +14,32 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
     output_schema: Joi.map()
 
   @impl Jido.Action
-  def run(%{kind: :complete, output: output}, _context), do: {:ok, output}
+  def run(%{kind: :complete, output: output}, _context),
+    do: {:continue, %{outcome: output}, FinalizeTurn}
 
-  def run(%{kind: :model, input: input, target: target}, _context),
-    do: {:continue, input, target}
+  def run(%{kind: :model, input: input, target: target}, context),
+    do: continue_or_handoff(input, target, context)
 
-  def run(%{kind: :review, input: input, target: target}, _context),
-    do: {:continue, input, target}
+  def run(%{kind: :review, input: input, target: target}, context),
+    do: continue_or_handoff(input, target, context)
 
   def run(%{kind: :tools, input: %{turn: turn} = input, target: target}, context) do
-    with {:ok, flow} <- ToolRound.build(turn, context, continuation: target) do
-      {:continue, input, flow}
+    handoff? = Jido.Exec.supports?(context, :waits)
+
+    with {:ok, flow} <-
+           ToolRound.build(turn, context,
+             continuation: target,
+             handoff_continuation: handoff?
+           ) do
+      continue_or_handoff(input, flow, context)
     end
   end
 
   def run(%{kind: :tools}, _context), do: {:error, :invalid_tool_calls}
+
+  defp continue_or_handoff(input, target, context) do
+    if Jido.Exec.supports?(context, :waits),
+      do: {:handoff, input, target},
+      else: {:continue, input, target}
+  end
 end

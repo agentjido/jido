@@ -84,11 +84,10 @@ A Flow output must be a map or a `Jido.Action.Output`. Wrap a list such as a Map
 | `:base_delay_ms` | `0` | Base delay between attempts |
 | `:max_delay_ms` | `0` | Upper bound for the delay |
 | `:max_concurrency` | See below | Limit on concurrent Flow work |
-| `:task_supervisor` | Jido's task supervisor | A local PID, registered name, or `{:via, module, name}` |
 
-The policy applies to every Action in the run, not to the run as a whole. A Flow with three Actions and `timeout: 5_000` can take longer than five seconds.
+The policy applies to every authored component in the run, not to the run as a whole. A Flow with three components and `timeout: 5_000` can take longer than five seconds. A composite component can run more than one Action inside one attempt.
 
-A retry happens only when `Jido.Error.retryable?/1` returns true. Timeouts, raised exceptions, and most Action errors are retryable by default, so `max_attempts` can repeat an Action that already reached an external system. Validation and config errors are not retried. Mark a failure as final with `retry: false`. See [Flow Errors](flow-errors.md#retries).
+A retry happens only when `Jido.Error.retryable?/1` returns true. Timeouts, raised exceptions, and most Action errors are retryable by default. A retry repeats the complete authored component, including completed work inside a composite component. Validation and config errors are not retried. Mark a failure as final with `retry: false`. See [Flow Errors](flow-errors.md#retries).
 
 ```elixir
 defmodule ExecutionGuide.ChargeCard do
@@ -127,13 +126,11 @@ Result order does not depend on finish order. Map and Parallel results keep inpu
 - An Action crash, even `:kill`, returns `{:error, error}`. It cannot exit the caller.
 - If the caller exits, a watcher kills the task and the processes linked to it.
 
-Pass `:task_supervisor` to run under your own `Task.Supervisor` and to apply its limits. The supervisor must be alive on the local node. Otherwise the call returns a config error before any work starts.
-
 Your Action does not run in the calling process. A PID passed through context still works during immediate execution, but `self()` inside the Action is not the caller.
 
 ## Know what a Flow compiles to
 
-`Jido.Exec.compile/2` turns any target into a `Runic.Workflow`. An Action becomes a one-node Workflow, and a Flow becomes a larger one. Runic plans runnable work and applies the policy. Jido validates params and output around each Action call.
+`Jido.Exec.compile/2` turns any target into a `Runic.Workflow`. An Action first becomes its canonical one-step Flow. Runic plans runnable work and applies the policy. Jido validates params and output around each Action call.
 
 `Jido.Exec.run/4` validates Flow input, compiles, and runs. A Flow that contains `await`, `timer`, or `selection` fails with a `:unsupported_host` config error because immediate execution cannot suspend.
 

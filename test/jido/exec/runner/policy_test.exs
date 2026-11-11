@@ -56,6 +56,19 @@ defmodule Jido.Exec.Runner.PolicyTest do
     end
   end
 
+  defmodule FailFastMapAction do
+    use Jido.Action, name: "exec_fail_fast_map"
+
+    @impl true
+    def run(%{item: item, owner: owner}, _context) do
+      send(owner, {:map_item_started, item})
+
+      if item == 0,
+        do: {:error, Error.execution_error("stop", %{retry: false})},
+        else: {:ok, %{item: item}}
+    end
+  end
+
   test "Runic PolicyDriver owns timeouts" do
     assert {:error, %Error.TimeoutError{timeout: 10}} =
              Exec.run(TimeoutAction, %{}, %{}, timeout: 10)
@@ -86,7 +99,31 @@ defmodule Jido.Exec.Runner.PolicyTest do
              Exec.run(TimeoutAction, %{}, %{}, timeout: 5, max_attempts: 3)
   end
 
-  @tag obligation: ["jido_action.execution.I18", "jido_action.execution.I24"]
+  test "a serial fail-fast Map does not start later items" do
+    flow =
+      Jido.Flow.new!(%{
+        name: "exec_serial_fail_fast_map",
+        components: [
+          %{
+            kind: :map,
+            name: "items",
+            collection: [0, 1],
+            action: FailFastMapAction,
+            params: %{item: Jido.Flow.Ref.item(), owner: Jido.Flow.Ref.context(:owner)},
+            on_error: :fail_fast
+          }
+        ],
+        output: Jido.Flow.Ref.result("items")
+      })
+
+    assert {:error, %Error.ExecutionError{message: "stop"}} =
+             Exec.run(flow, %{}, %{owner: self()}, max_concurrency: 1)
+
+    assert_received {:map_item_started, 0}
+    refute_received {:map_item_started, 1}
+  end
+
+  @tag obligation: "jido_action.execution.I18"
   test "retry attempts keep one activation and one logical effect identity" do
     {:ok, counter} = Agent.start_link(fn -> 0 end)
 
@@ -99,10 +136,10 @@ defmodule Jido.Exec.Runner.PolicyTest do
 
     workflow =
       instruction
-      |> Exec.compile!()
+      |> Jido.Exec.Compiler.compile!()
       |> Runic.Workflow.enable_event_emission()
       |> Runic.Workflow.put_run_context(%{_global: instruction.context})
-      |> Runic.Workflow.react_until_satisfied(%{},
+      |> Runic.Workflow.react_until_satisfied(instruction.params,
         scheduler_policies: [
           {:default,
            %{
@@ -116,7 +153,10 @@ defmodule Jido.Exec.Runner.PolicyTest do
       )
 
     dispatched =
-      Enum.filter(workflow.runnable_events, &match?(%Runic.Workflow.RunnableDispatched{}, &1))
+      Enum.filter(workflow.runnable_events, fn
+        %Runic.Workflow.RunnableDispatched{node_name: "action"} -> true
+        _event -> false
+      end)
 
     assert [first, second, third] = dispatched
     assert first.activation_id == second.activation_id
@@ -126,15 +166,14 @@ defmodule Jido.Exec.Runner.PolicyTest do
     assert [%Runic.Workflow.RunnableCompleted{} = completed] =
              Enum.filter(
                workflow.runnable_events,
-               &match?(%Runic.Workflow.RunnableCompleted{}, &1)
+               &match?(
+                 %Runic.Workflow.RunnableCompleted{
+                   result_fact: %{meta: %{jido: %{effects: [:notify]}}}
+                 },
+                 &1
+               )
              )
 
     assert completed.result_fact.meta.jido.effects == [:notify]
-
-    first_id =
-      Exec.effect_id(:retry_effect, completed.activation_id, completed.result_fact.id, 0)
-
-    assert Exec.effect_id(:retry_effect, first.activation_id, completed.result_fact.id, 0) ==
-             first_id
   end
 end

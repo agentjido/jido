@@ -25,12 +25,6 @@ defmodule Jido.Exec.Fact do
   @max_local_depth 32
 
   @doc false
-  @spec local_root(term()) :: Fact.t()
-  def local_root(value) do
-    Fact.new(value: wrap(value), meta: @local_identity)
-  end
-
-  @doc false
   @spec child(Fact.t(), keyword()) :: Fact.t()
   def child(%Fact{} = parent, opts) do
     parent.value
@@ -38,13 +32,9 @@ defmodule Jido.Exec.Fact do
     |> Fact.new()
   end
 
-  @doc false
-  @spec child_options(term(), map(), keyword()) :: keyword()
-  def child_options(input, metadata, opts) do
+  defp child_options(input, metadata, opts) do
     if local?(input, metadata) do
-      opts
-      |> Keyword.update!(:value, &wrap/1)
-      |> Keyword.update(:meta, @local_identity, &put_local_identity/1)
+      local_options(opts)
     else
       opts
     end
@@ -55,6 +45,12 @@ defmodule Jido.Exec.Fact do
   def result(input, context, value, metadata \\ %{}) do
     opts = child_options(input, context.input_metadata, value: value, meta: metadata)
     Result.value(Keyword.fetch!(opts, :value), metadata: Keyword.fetch!(opts, :meta))
+  end
+
+  defp local_options(opts) do
+    opts
+    |> Keyword.update!(:value, &wrap/1)
+    |> Keyword.update(:meta, @local_identity, &put_local_identity/1)
   end
 
   @doc false
@@ -78,14 +74,6 @@ defmodule Jido.Exec.Fact do
   defp wrap(%Identity{} = value, _depth), do: value
   defp wrap(%LocalValue{} = value, _depth), do: value
   defp wrap(value, depth) when depth >= @max_local_depth, do: local_value(value)
-
-  defp wrap(%Runic.Workflow.Batch.Input{} = input, _depth) do
-    %{input | items: Enum.map(input.items, &local_value/1), parent: local_value(input.parent)}
-  end
-
-  defp wrap(%Runic.Workflow.ChildInvocation{} = request, _depth) do
-    %{request | input: local_value(request.input)}
-  end
 
   defp wrap(%_{} = value, _depth) do
     if portable_struct?(value), do: value, else: local_value(value)
@@ -151,6 +139,10 @@ defmodule Jido.Exec.Fact do
   defp portable_struct?(value) do
     Runic.Identity.Projectable.impl_for(value) != Runic.Identity.Projectable.Any
   end
+
+  @doc false
+  @spec localize(term()) :: term()
+  def localize(value), do: wrap(value)
 
   @doc false
   @spec local_value(term()) :: LocalValue.t()

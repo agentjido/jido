@@ -1,24 +1,25 @@
 ---
 modules:
   - Jido.Exec
+  - Jido.Exec.ActionBoundary
   - Jido.Exec.Compiler
-  - Jido.Exec.NestedCompiler
   - Jido.Exec.Fact
   - Jido.Exec.Fact.LocalValue
-  - Jido.Exec.Frame
+  - Jido.Exec.Node.Action
   - Jido.Exec.Node.Choice
-  - Jido.Exec.Node.Choice.Branch
-  - Jido.Exec.Node.Choice.Selector
+  - Jido.Exec.Node.FlowTarget
   - Jido.Exec.Node.Handoff
-  - Jido.Exec.Node.Invoke
-  - Jido.Exec.Node.Invoke.Finish
   - Jido.Exec.Node.Input
-  - Jido.Exec.Node.Loop
-  - Jido.Exec.Node.Loop.Start
-  - Jido.Exec.Node.Loop.StateMachine
+  - Jido.Exec.Node.Invoke
+  - Jido.Exec.Node.Iterate
+  - Jido.Exec.Node.Lifecycle
   - Jido.Exec.Node.Map
-  - Jido.Exec.Node.Map.Collection
   - Jido.Exec.Node.Output
+  - Jido.Exec.Node.Parallel
+  - Jido.Exec.Node.Reduce
+  - Jido.Exec.Node.Subflow
+  - Jido.Exec.Node.Targets
+  - Jido.Exec.Node.Wait
   - Jido.Exec.Runtime
   - Jido.Telemetry.Exec
   - Jido.Exec.ValueResolver
@@ -37,7 +38,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.execution.I18 — Policy bounds attempts and preserves outcome order
 - **scope:** `Jido.Exec.run/4, Jido.Durable, Runic.Runner`
-- **must:** Timeout applies to each attempt; max_attempts counts the first attempt and retries only eligible errors. Apply one concurrency policy to nested and collection work while Reduce and Iterate remain serial. Halting failure stops new admission while admitted work can finish. Defined result and failure order do not depend on completion order.
+- **must:** Timeout applies to each authored component attempt; max_attempts counts the first attempt and retries only eligible errors. Map and Parallel can use bounded concurrency inside one component while Reduce and Iterate remain serial. A composite retry repeats the complete component. Defined result and failure order do not depend on completion order.
 - **kind:** ordering
 - **status:** active
 
@@ -61,19 +62,13 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.execution.I22 — Recovery preserves acknowledged stored progress
 - **scope:** `Jido.Durable, Jido.Durable.Runtime, Runic.Runner.Store`
-- **must:** Restore acknowledged stored completed work and continue remaining Action, Map, Iterate, nested Flow, Invoke, and Handoff progress with the same public value and effects. Jido Durable selects a supported Runic rehydration mode. Preserve dynamic invocation occurrence identity and reject incompatible changed targets. Recovery restores runtime context and policy from the Jido durable record. Work completed after the last acknowledged checkpoint can repeat; no exactly-once execution or effect delivery is promised.
+- **must:** Restore acknowledged authored component boundaries and continue remaining components with the same public value and effects. Jido Durable selects a supported Runic rehydration mode. Reject incompatible changed targets. Recovery restores runtime context and policy from the Jido durable record. Work inside an unacknowledged composite component can repeat; no exactly-once execution or effect delivery is promised.
 - **kind:** persisted-format
 - **status:** active
 
 ### jido_action.execution.I23 — Telemetry retains bounded documented event shapes
 - **scope:** `Jido.Telemetry.Exec, Jido.Exec.run/4, Jido.Durable, Runic.Runner`
 - **must:** Emit documented Action-attempt and immediate-Flow events with measurements, outcome, and correlation fields. Start and stop metadata omit params, context, results, and full errors. Retries have separate attempt identities. Runner events belong to Runic. Timeout or process death can prevent Action stop events; caller death can prevent Flow stop.
-- **kind:** functional
-- **status:** active
-
-### jido_action.execution.I24 — Effect identity excludes retry attempt identity
-- **scope:** `Jido.Exec.effect_id/4`
-- **must:** For fixed execution, activation, output, and effect index, derive the same logical effect identity across attempts. A changed output identity or index can change it. The host owns deduplication and effect delivery; the identity does not provide exactly-once effects.
 - **kind:** functional
 - **status:** active
 

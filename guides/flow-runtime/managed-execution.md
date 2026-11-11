@@ -18,22 +18,21 @@ params = %{invoice_id: "inv-77", cents: 4_200}
 context = %{ledger: MyApp.Ledger}
 
 {:ok, instruction} = Jido.Instruction.resolve(MyApp.PayInvoice, params, context)
-{:ok, workflow} = Jido.Exec.compile(instruction)
+{:ok, workflow} = Jido.Exec.compile(instruction, [])
 ```
 
-Runic receives a Jido Flow frame as its input. `Jido.Exec.Frame` and
-`Jido.Exec.Fact` are low-level bridge modules. Their use is part of the cost of
-choosing this escape hatch.
+Runic receives the canonical Flow input directly. Use `Jido.Exec.Fact` only
+when the input contains process-local values that Runic cannot identify as
+portable data.
 
 ```elixir
 input =
   instruction.params
-  |> Jido.Exec.Frame.new()
   |> Jido.Exec.Fact.local_value()
 ```
 
-For a compiled Action, use `%{}` as the frame value. The resolved Instruction
-already holds the Action parameters.
+The same input rule applies to an Action because Exec lowers it to a one-step
+Flow.
 
 ## Start a Runner
 

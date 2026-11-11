@@ -24,15 +24,6 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
     end
   end
 
-  defmodule BatchFlow do
-    use Jido.Flow, name: "checkpoint_batch_flow"
-
-    flow do
-      map "items", collection: input(:items), action: Increment, params: %{value: item()}
-      output %{items: result("items")}
-    end
-  end
-
   defmodule Bytes do
     @behaviour Jido.Persistence.Store
 
@@ -108,7 +99,6 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
 
     defp barrier_key?(:fact, key) do
       String.contains?(key, ":facts:") and
-        not String.ends_with?(key, ":facts:head") and
         not String.ends_with?(key, ":facts:index")
     end
   end
@@ -162,41 +152,11 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
-  test "stores cumulative frame facts as bounded references and restores exact values", c do
-    session = large_session()
-    root = Jido.Exec.Frame.new(%{session: session})
+  test "stores and restores one complete fact value", c do
+    value = %{input: %{session: large_session()}, results: %{}}
 
-    assert :ok = Store.save_fact(c.id, :root, root, c.jido)
-
-    {last, full_bytes} =
-      Enum.reduce(1..8, {root, encoded_bytes(root)}, fn step, {parent, total} ->
-        child =
-          Jido.Exec.Frame.put_result(
-            parent,
-            "step_#{step}",
-            %{session: session, output: step},
-            []
-          )
-
-        hash = {:fact, step}
-        assert :ok = Store.save_fact(c.id, hash, child, c.jido)
-        assert {:ok, ^child} = Store.load_fact(c.id, hash, c.jido)
-        {child, total + encoded_bytes(child)}
-      end)
-
-    assert {:ok, ^last} = Store.load_fact(c.id, {:fact, 8}, c.jido)
-
-    stored_fact_bytes =
-      Agent.get(c.store, fn records ->
-        for {key, bytes} <- records,
-            String.contains?(key, ":facts:"),
-            not String.ends_with?(key, ":head"),
-            reduce: 0 do
-          total -> total + byte_size(bytes)
-        end
-      end)
-
-    assert stored_fact_bytes < div(full_bytes, 10)
+    assert :ok = Store.save_fact(c.id, :fact, value, c.jido)
+    assert {:ok, ^value} = Store.load_fact(c.id, :fact, c.jido)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
@@ -264,7 +224,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
   test "stores a JoinCompleted result as a fact reference", c do
-    value = [Jido.Exec.Frame.new(%{session: large_session()})]
+    value = [%{input: %{session: large_session()}, results: %{}}]
 
     event = %Runic.Workflow.Events.JoinCompleted{
       join_hash: :join,
@@ -358,7 +318,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
   test "an unchanged workflow transition preserves the saved graph", c do
-    {:ok, workflow} = Jido.Exec.compile(F.Flow)
+    {:ok, workflow} = Jido.Exec.compile(F.Flow, [])
     workflow = Runic.Workflow.enable_event_emission(workflow)
     log = Runic.Workflow.event_log(workflow)
 
@@ -374,12 +334,12 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
   test "workflow transitions hydrate the active frontier and keep history as references", c do
-    {:ok, workflow} = Jido.Exec.compile(HydrationFlow)
+    {:ok, workflow} = Jido.Exec.compile(HydrationFlow, [])
 
     executed =
       workflow
       |> Runic.Workflow.enable_event_emission()
-      |> Runic.Workflow.react_until_satisfied(Jido.Exec.Frame.new(%{value: 0}))
+      |> Runic.Workflow.react_until_satisfied(Jido.Exec.Fact.local_value(%{value: 0}))
 
     events =
       (Runic.Workflow.build_log(executed) ++ Enum.reverse(executed.uncommitted_events))
@@ -404,46 +364,13 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
-  test "workflow transitions fully hydrate a native Batch", c do
-    {:ok, workflow} = Jido.Exec.compile(BatchFlow)
-
-    executed =
-      workflow
-      |> Runic.Workflow.enable_event_emission()
-      |> Runic.Workflow.react_until_satisfied(Jido.Exec.Frame.new(%{items: [1, 2]}))
-
-    events =
-      (Runic.Workflow.build_log(executed) ++ Enum.reverse(executed.uncommitted_events))
-      |> Enum.map(fn
-        %Runic.Workflow.Events.FactProduced{} = event ->
-          assert :ok = Store.save_fact(c.id, event.hash, event.value, c.jido)
-          %{event | value: nil}
-
-        event ->
-          event
-      end)
-
-    assert {:ok, _batch_count} = Store.append(c.id, events, c.jido)
-
-    assert {:ok, restored} =
-             Store.update_workflow(c.jido, c.id, fn current -> {:ok, current} end)
-
-    refute Enum.any?(restored.graph.vertices, fn {_hash, vertex} ->
-             is_struct(vertex, Runic.Workflow.FactRef)
-           end)
-
-    assert Jido.Exec.Result.project(restored) ==
-             {:ok, %{items: [%{value: 2}, %{value: 3}]}}
-  end
-
-  @tag obligation: "jido.agent_server.durable_turn.I2"
   test "workflow transitions reject a missing frontier fact", c do
-    {:ok, workflow} = Jido.Exec.compile(HydrationFlow)
+    {:ok, workflow} = Jido.Exec.compile(HydrationFlow, [])
 
     executed =
       workflow
       |> Runic.Workflow.enable_event_emission()
-      |> Runic.Workflow.react_until_satisfied(Jido.Exec.Frame.new(%{value: 0}))
+      |> Runic.Workflow.react_until_satisfied(Jido.Exec.Fact.local_value(%{value: 0}))
 
     events = Runic.Workflow.build_log(executed) ++ Enum.reverse(executed.uncommitted_events)
 
@@ -553,8 +480,6 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
       ]
     }
   end
-
-  defp encoded_bytes(term), do: term |> :erlang.term_to_binary([:deterministic]) |> byte_size()
 
   defp use_barrier_store(c, stage) do
     config =

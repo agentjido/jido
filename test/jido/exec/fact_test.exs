@@ -16,12 +16,12 @@ defmodule Jido.Exec.FactTest do
     reference = make_ref()
 
     for value <- [[1 | :tail], [reference | :tail], %{nested: {[1 | :tail], [[2 | :tail]]}}] do
-      assert value === value |> JidoFact.local_root() |> JidoFact.value()
+      assert value === value |> local_root() |> JidoFact.value()
     end
   end
 
   test "native facts propagate local identity from wrapped improper lists" do
-    root = JidoFact.local_root([1 | :tail])
+    root = local_root([1 | :tail])
     native_fact = RunicFact.new(value: [root.value], ancestry: {:native_join, root.hash})
 
     child =
@@ -40,9 +40,11 @@ defmodule Jido.Exec.FactTest do
     assert JidoFact.unwrap(value) === [reference | :tail]
 
     for input <- [value, [1 | :tail]] do
-      opts = JidoFact.child_options(input, %{}, value: [1 | :tail])
-      assert opts[:meta] == %{jido: %{identity_mode: :local}}
-      assert JidoFact.unwrap(opts[:value]) === [1 | :tail]
+      parent = local_root(input)
+      child = JidoFact.child(parent, value: [1 | :tail], ancestry: {:jido_node, parent.hash})
+
+      assert child.meta == %{jido: %{identity_mode: :local}}
+      assert JidoFact.value(child) === [1 | :tail]
     end
   end
 
@@ -54,7 +56,7 @@ defmodule Jido.Exec.FactTest do
 
   test "local facts preserve process-local values across native Runic facts" do
     reference = make_ref()
-    root = JidoFact.local_root(%{reference: reference})
+    root = local_root(%{reference: reference})
 
     native_fact =
       RunicFact.new(
@@ -74,7 +76,7 @@ defmodule Jido.Exec.FactTest do
   test "local facts bound deeply nested identity documents" do
     value = Enum.reduce(1..100, :leaf, fn _index, nested -> [nested] end)
 
-    assert value == value |> JidoFact.local_root() |> JidoFact.value()
+    assert value == value |> local_root() |> JidoFact.value()
   end
 
   test "canonical facts still reject process-local child values" do
@@ -83,5 +85,12 @@ defmodule Jido.Exec.FactTest do
     assert_raise CanonicalError, fn ->
       JidoFact.child(parent, value: make_ref(), ancestry: {:jido_node, parent.hash})
     end
+  end
+
+  defp local_root(value) do
+    RunicFact.new(
+      value: JidoFact.localize(value),
+      meta: %{jido: %{identity_mode: :local}}
+    )
   end
 end

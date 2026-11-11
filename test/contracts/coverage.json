@@ -16,9 +16,9 @@
       "covered": 34
     },
     "jido_action": {
-      "active": 53,
-      "coverage": 1.0,
-      "covered": 53
+      "active": 52,
+      "coverage": 0.9231,
+      "covered": 48
     },
     "jido_ai": {
       "active": 44,
@@ -1680,7 +1680,7 @@
         "jido.agent_server.durable_turn.I2": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 18,
+          "passing": 16,
           "status": "active",
           "testable": true,
           "tests": [
@@ -1689,7 +1689,6 @@
             "test an unchanged workflow transition preserves the saved graph",
             "test checkpoint keys use the stable unpadded encoding",
             "test execution identity isolates partitions, Agents, and command IDs",
-            "test fact deltas cut a live durable Turn below one quarter of full fact snapshots",
             "test old runtime cleanup cannot remove or collect a replacement owner's checkpoint",
             "test ordinary IDs have no execution store",
             "test rejects a conflicting value for one fact identity",
@@ -1698,8 +1697,7 @@
             "test repairs a tail chunk before the next append",
             "test retries a concurrent fact index update",
             "test stores a JoinCompleted result as a fact reference",
-            "test stores cumulative frame facts as bounded references and restores exact values",
-            "test workflow transitions fully hydrate a native Batch",
+            "test stores and restores one complete fact value",
             "test workflow transitions hydrate the active frontier and keep history as references",
             "test workflow transitions reject a missing frontier fact"
           ]
@@ -1737,13 +1735,12 @@
         "jido.agent_server.durable_turn.I5": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 7,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
             "test AgentServer loss restores a pending wait without rerunning Actions",
             "test activation loss resumes the current Turn at step 6",
-            "test fact deltas cut a live durable Turn below one quarter of full fact snapshots",
             "test recovery resolves the saved input_write before the reply",
             "test recovery resolves the saved intent_write before the reply",
             "test server loss resumes the current Turn at step 6",
@@ -3923,251 +3920,165 @@
         "jido_action.boundary.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 19,
+          "passing": 12,
           "status": "active",
           "testable": true,
           "tests": [
             "test Action and Flow validators protect each execution boundary",
             "test a Flow module input error reports Flow context",
-            "test a validator map success keeps input structs separate from output envelope rules",
             "test absent validation targets preserve input and output values",
-            "test custom validator success must contain a map or a valid output envelope",
             "test custom validators reject scalar success at root and nested boundaries",
-            "test data Flow schemas run once at root and nested boundaries",
-            "test input validation fails the Runnable",
+            "test data Flow schemas run once at the root boundary",
             "test managed Flow input failures preserve the validator error",
             "test module validators run once and retain each transformation",
-            "test original callback and validator stacktraces remain in both documented fields",
             "test preparation and Action schemas run once with explicit key preservation",
-            "test root and nested data Flow input schemas reject scalar transformations",
+            "test root data Flow input schemas reject scalar transformations",
             "test run/4 projects validation failures",
             "test run/4 validates an Action outside the calling process",
-            "test schema validation retains context when a transformation returns a scalar",
-            "test selected Action validation failures keep their Flow location",
-            "test validator exception errors retain the original exception",
-            "test validator failures use the shared error fields"
+            "test schema validation retains context when a transformation returns a scalar"
           ]
         },
         "jido_action.boundary.I10": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 1,
           "status": "active",
           "testable": true,
           "tests": [
-            "test a duplicate start leaves the existing Worker intact",
-            "test managed Flow input failures preserve the validator error",
-            "test managed execution fails a process-local Action result before persistence",
-            "test managed execution rejects process-local input before it starts",
-            "test managed input accepts a safe local struct without canonical expansion"
+            "test managed Flow input failures preserve the validator error"
           ]
         },
         "jido_action.boundary.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 8,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Action and Flow validators protect each execution boundary",
+            "test Action validator and callback failures validator and callback returns become public errors",
+            "test an Action failure stops dependent Flow work",
+            "test compiler catches a non-local Flow definition failure",
+            "test control component failures in a nested Flow keep the parent path",
+            "test run/4 projects Action exceptions",
+            "test run/4 reports the same failure for serial and concurrent execution",
+            "test run/4 validates an Action outside the calling process"
+          ]
+        },
+        "jido_action.boundary.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 11,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Action and Flow validators protect each execution boundary",
+            "test Flow output validation includes the DSL output location",
+            "test custom output validators reject malformed envelopes at root and nested boundaries",
+            "test custom validators reject scalar success at root and nested boundaries",
+            "test data Flow output validates envelopes without running the output schema",
+            "test data Flow schemas run once at the root boundary",
+            "test data and module Flows apply the same map output rule",
+            "test module validators run once and retain each transformation",
+            "test preparation and Action schemas run once with explicit key preservation",
+            "test root data Flow output schemas reject scalar transformations",
+            "test schema validation retains context when a transformation returns a scalar"
+          ]
+        },
+        "jido_action.boundary.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test custom output validators reject malformed envelopes at root and nested boundaries",
+            "test data Flow output validates envelopes without running the output schema",
+            "test deferred effects use canonical component order after a branch join",
+            "test run/4 returns deferred effects"
+          ]
+        },
+        "jido_action.boundary.I5": {
           "failing": 0,
           "kind": "functional",
           "passing": 15,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Action and Flow validators protect each execution boundary",
-            "test Action validator and callback failures validator and callback returns become public errors",
-            "test Invoke Finish projects invalid target input as a failed result",
-            "test an Action exception fails the Runnable with a structured error",
-            "test an Action failure stops dependent Flow work",
-            "test an invalid Action return fails the Runnable",
-            "test callback errors retain exact messages reasons and failure details",
-            "test compiler catches a non-local Flow definition failure",
-            "test control component failures in a nested Flow keep the parent path",
-            "test hook failures publish no Fact and discard deferred changes",
-            "test original callback and validator stacktraces remain in both documented fields",
-            "test run/4 projects Action exceptions",
-            "test run/4 reports the same failure for serial and concurrent execution",
-            "test run/4 validates an Action outside the calling process",
-            "test selected Action failures return no executable effects"
-          ]
-        },
-        "jido_action.boundary.I3": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 19,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test Action and Flow validators protect each execution boundary",
-            "test Flow output validation includes the DSL output location",
-            "test a preserved output keeps its validated root struct through a Flow",
-            "test an output validator cannot conceal an invalid callback success value",
-            "test custom output validators cannot pass a malformed output envelope",
-            "test custom output validators reject malformed envelopes at root and nested boundaries",
-            "test custom validator success must contain a map or a valid output envelope",
-            "test custom validators reject scalar success at root and nested boundaries",
-            "test data Flow output validates envelopes without running the output schema",
-            "test data Flow schemas run once at root and nested boundaries",
-            "test data and module Flows apply the same map output rule",
-            "test module validators run once and retain each transformation",
-            "test original callback and validator stacktraces remain in both documented fields",
-            "test preparation and Action schemas run once with explicit key preservation",
-            "test root and nested data Flow output schemas reject scalar transformations",
-            "test schema validation retains context when a transformation returns a scalar",
-            "test selected Action validation failures keep their Flow location",
-            "test validator exception errors retain the original exception",
-            "test validator failures use the shared error fields"
-          ]
-        },
-        "jido_action.boundary.I4": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 12,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test a direct Invoke result retains decision and expander effects",
-            "test a preserved output keeps its validated root struct through a Flow",
-            "test an Action continuation uses a native Call and keeps ordered effects",
-            "test an output validator cannot conceal an invalid callback success value",
-            "test custom output validators cannot pass a malformed output envelope",
-            "test custom output validators reject malformed envelopes at root and nested boundaries",
-            "test data Flow output validates envelopes without running the output schema",
-            "test deferred effects use canonical component order after a branch join",
-            "test invalid effect lists retain their rejected value and Action detail",
-            "test native completion preserves local values from marked and wrapped input Facts",
-            "test run/4 returns deferred effects",
-            "test successful output keeps application metadata and effects through the native lifecycle"
-          ]
-        },
-        "jido_action.boundary.I5": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 32,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test Action components expose native ports connections and reconstructed result ports",
-            "test Action schemas are available through the Runic Component ports",
             "test Exec automatically applies a Flow module source map",
-            "test Flow Instructions transmute to the compiled Runic Workflow",
+            "test Flow Instructions compile to a Runic Workflow",
             "test Flow parameters read input, prior results, and runtime context",
-            "test Instructions and Action nodes transmute to Runic workflows",
-            "test Invoke connection handles zero and multiple parents",
-            "test Runic prepares, executes, and applies an Action",
             "test a nested Flow waits for every parent dependency",
             "test a rebuilt Flow rejects changed Action code and keeps its Flow location",
-            "test a rebuilt mixed join waits for its continued Invoke target",
-            "test an Action Instruction becomes a stable Action",
-            "test an Action participates in a native SingleOutput batch",
-            "test an Invoke joins more than one dependency before its decision",
+            "test a rebuilt parent Flow rejects changed child Flow code",
             "test an Invoke rebuilds and runs its dynamic Flow target",
             "test caller Instruction metadata does not select Flow execution behavior",
-            "test compile/2 returns a real one-node Runic Workflow",
-            "test dynamic target identity includes the Invoke and selected target",
+            "test compile/2 lowers an Action to its canonical one-step Flow",
             "test every component kind rebuilds from its build log and returns the same result",
             "test independent branches join through Runic readiness",
-            "test native completion preserves local values from marked and wrapped input Facts",
-            "test native construction rejects a wrong Instruction kind and unresolved target",
-            "test native hooks defer graph changes until successful application",
-            "test native identity distinguishes targets and IDs while excluding call data",
-            "test native root input overrides Instruction params and wraps scalar input",
-            "test normal atoms keep Runic's normal Transmutable behavior",
             "test root Action and Flow result ports rebuild from component logs",
-            "test root compilation retains local term IDs without putting them in the native hash document",
             "test run/4 executes Actions after Joi projects their schemas",
             "test run/4 executes a bound Instruction through the same path",
-            "test run/4 executes an Action module through Runic",
-            "test successful output keeps application metadata and effects through the native lifecycle"
+            "test run/4 executes an Action module through Runic"
           ]
         },
         "jido_action.boundary.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 9,
+          "passing": 11,
           "status": "active",
           "testable": true,
           "tests": [
             "test compile/2 invalid targets and options return configuration errors",
-            "test invalid compile and Task Supervisor options return configuration errors",
+            "test invalid compile options return configuration errors",
             "test result projection errors result reports missing and failed output",
             "test run/4 caps the fallback concurrency at ten schedulers",
             "test run/4 options and targets an unknown target and invalid Flow input return structured errors",
             "test run/4 options and targets invalid option shapes return configuration errors",
             "test run/4 rejects an invalid package concurrency configuration",
             "test run/4 rejects invalid max_concurrency values",
+            "test run/4 rejects nested waits before parent Action work starts",
+            "test run/4 rejects waits before Action work starts",
             "test run/4 uses the package configuration and an explicit option overrides it"
           ]
         },
         "jido_action.boundary.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 15,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Map can collect Action errors as ordered data",
-            "test Map collects parameter reference failures without item identity",
-            "test Map handles a large collection read from Flow input",
-            "test Map item IDs follow the Flow, component name, and source index",
-            "test Map uses native Batch and keeps input order",
-            "test a completed batch preserves local execution for a following Action",
-            "test a fail_fast parameter reference failure is a Jido error with the node details",
-            "test a failed Map Action retains its source item position",
-            "test a non-enumerable collection is a Jido error with the node details",
-            "test an empty native batch has no item invocation",
-            "test native batches preserve local item values",
-            "test native batches retry fail-fast items but keep collected errors as data",
-            "test nested Map exports rebuild with separate native batches",
-            "test repeated native executions have separate batches and keep public item IDs",
-            "test shared parent data stays outside native item Facts"
+            "test Map collect-errors keeps ordered values and omits failed effects",
+            "test Map collection keeps reference failures separate from item identity",
+            "test Map fail-fast errors identify the failed item",
+            "test Map preserves effects in item order",
+            "test Map preserves item order and exposes item coordinates",
+            "test Map rejects a non-enumerable collection",
+            "test a rebuilt Map keeps item order",
+            "test compile lowers one Map to one dedicated Runic Map component"
           ]
         },
         "jido_action.boundary.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 44,
+          "passing": 14,
           "status": "active",
           "testable": true,
           "tests": [
             "test DSL, maps, and stored definitions return the same handoff",
-            "test Handoff connection keeps selector data for zero and multiple parents",
-            "test Invoke Finish projects invalid target input as a failed result",
-            "test Invoke connection handles zero and multiple parents",
             "test a Handoff joins more than one dependency before its selector",
-            "test a bound action Instruction keeps merged params and context",
-            "test a bound flow Instruction keeps merged params and context",
-            "test a direct Invoke result retains decision and expander effects",
-            "test a direct expander result does not create a Call",
             "test a nested Flow cannot terminate its parent with a handoff",
-            "test a rebuilt mixed join waits for its continued Invoke target",
             "test a root Action cannot hand off",
-            "test a selected wait target needs a wait-capable execution host",
             "test a terminal handoff validates the successor without running it",
-            "test an Action continuation keeps local parent and target values",
-            "test an Action continuation uses a native Call and keeps ordered effects",
-            "test an Invoke expander cannot hand off",
-            "test an Invoke joins more than one dependency before its decision",
-            "test an expander continuation runs a runtime Flow target",
-            "test an expander continuation runs the selected target",
-            "test an invalid continuation target fails the expander Runnable",
             "test an ordinary Step cannot hand off",
-            "test bound continuation data gives dynamic targets distinct identities",
-            "test completion and target predicates reject missing or unrelated values",
-            "test continued Invoke results join after both targets finish",
-            "test different continuation modules have distinct target identities",
-            "test different input occurrences use their own Action parameters",
-            "test different runtime Flow values have distinct target identities",
-            "test downstream components run after the Invoke completion gate",
-            "test dynamic target identity includes the Invoke and selected target",
-            "test expander effects must be a proper list",
-            "test expander errors with discarded effects keep the Action reason",
             "test handoff Flow telemetry reports its outcome and effects",
             "test handoff normalization rejects invalid targets and non-portable open input",
-            "test invalid call data for a bound continuation returns a structured error",
             "test invalid selector output keeps the Handoff failure contract",
             "test invalid successor input fails without an executable effect batch",
             "test managed results retain the same terminal contract across restore",
-            "test more than one Invoke can run when the static graph permits it",
             "test ordinary data and validator output cannot grant control",
             "test runtime Flow successors survive native snapshot and event replay",
-            "test selected Action failures return no executable effects",
-            "test selected Action validation failures keep their Flow location",
             "test selector errors retain their reason and discard requested effects"
           ]
         },
@@ -4265,132 +4176,87 @@
       }
     },
     "jido_action.execution": {
-      "active": 9,
+      "active": 8,
       "app": "jido_action",
-      "coverage": 1.0,
-      "covered": 9,
+      "coverage": 0.5,
+      "covered": 4,
       "form": "light",
       "obligations": {
         "jido_action.execution.I17": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Choice uses Runic Conditions and selects the first matching branch",
-            "test an option named fallback remains separate from the default branch"
+            "test Choice does not resolve parameters for an unselected call",
+            "test Choice preserves effects from the selected Action",
+            "test Choice runs its fallback when no option matches",
+            "test Choice runs only the first matching option",
+            "test a Choice condition error keeps the Choice source path",
+            "test a rebuilt Choice keeps its ordered selection",
+            "test a selected Action failure does not run the Choice fallback",
+            "test an option named fallback is distinct from the Choice fallback",
+            "test compile lowers one Choice to one dedicated Runic Choice component"
           ]
         },
         "jido_action.execution.I18": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 8,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test Runic PolicyDriver owns retry and backoff policy",
             "test Runic PolicyDriver owns timeouts",
-            "test managed failure selection follows component order after active work drains",
+            "test a serial fail-fast Map does not start later items",
             "test max_attempts retries only errors marked retryable",
-            "test native Map failure stops admission and selects the same item at each concurrency",
-            "test native Map outcomes and effects keep input order after later items finish first",
-            "test retry attempts keep one activation and one logical effect identity",
-            "test serial managed admission selects the same first failure as concurrent admission"
+            "test retry attempts keep one activation and one logical effect identity"
           ]
         },
         "jido_action.execution.I19": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 1,
+          "passing": 0,
           "status": "active",
           "testable": true,
-          "tests": [
-            "test native Map outcomes and effects keep input order after later items finish first"
-          ]
+          "tests": []
         },
         "jido_action.execution.I20": {
           "failing": 0,
           "kind": "functional",
-          "passing": 23,
+          "passing": 11,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Worker death stops active Action with timeout 60000",
-            "test Worker death stops active Action with timeout :infinity",
             "test a normal Action exit fails once under concurrent and timed execution",
             "test an untrappable Action exit does not exit the caller",
             "test caller exit stops an Action that runs in the execution task",
             "test caller exit stops an Action that runs under a Runic timeout",
             "test caller exit stops concurrent Flow Actions",
-            "test cancel confirms death of an active timed Action",
-            "test cancellation stops a selected Invoke Action",
-            "test failed persistent stop keeps the same Worker and active Action",
-            "test managed execution outlives caller exit kill",
-            "test managed execution outlives caller exit normal",
-            "test managed execution releases finished Action tasks",
-            "test managed execution retains an uncertain Action after a process crash",
-            "test native Map cancellation stops active items and admits no later item",
-            "test run/4 accepts an injected Task Supervisor",
+            "test max_concurrency is one limit across independent Maps",
             "test run/4 executes under the application Task Supervisor by default",
             "test run/4 leaves no linked helper process after completion",
             "test run/4 preserves the caller group leader",
             "test run/4 stops its caller watcher when the execution task exits normally",
-            "test stop confirms active Action death with timeout 60000",
-            "test stop confirms active Action death with timeout :infinity",
-            "test the native executor uses the Runner supervisor and Worker group leader"
+            "test target resolution cannot exit the caller"
           ]
         },
         "jido_action.execution.I21": {
           "failing": 0,
           "kind": "functional",
-          "passing": 24,
+          "passing": 0,
           "status": "active",
           "testable": true,
-          "tests": [
-            "test a caller advances one Runic unit and inspects the workflow until completion",
-            "test a failed unit returns terminal Runic state and blocks dependent work",
-            "test automatic dispatch remains the default",
-            "test failure selection survives resume after completion order [:a, :b]",
-            "test failure selection survives resume after completion order [:b, :a]",
-            "test later inputs keep distinct identities and do not replace the managed result",
-            "test managed Action targets keep context out of the Runic store",
-            "test managed execution keeps a DateTime Action result as a local value",
-            "test managed execution rejects non-portable Instruction metadata",
-            "test managed execution uses the package concurrency configuration",
-            "test managed failure selection follows component order after active work drains",
-            "test managed results use a Runic input occurrence and reject active work",
-            "test manual execution resumes from durable Runic state",
-            "test missing managed executions keep the Runner lookup error",
-            "test native Map selects the first item after a later task crash and recovery",
-            "test resume/4 falls back to full recovery for a native Batch",
-            "test resume/4 keeps historical facts as references by default",
-            "test resume/4 restores context, policy, and the managed result",
-            "test resume/4 uses full recovery for a Store without fact storage",
-            "test resumed execution keeps snapshot results and rejects active recovery",
-            "test serial managed admission selects the same first failure as concurrent admission",
-            "test snapshot projection retains Jido errors for durable internals",
-            "test stopped admission stays busy until already admitted work completes",
-            "test the default executor uses a partitioned Runner Task Supervisor"
-          ]
+          "tests": []
         },
         "jido_action.execution.I22": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 9,
+          "passing": 0,
           "status": "active",
           "testable": true,
-          "tests": [
-            "test Runic restores Iterate state at the next body activation",
-            "test Runic restores a completed Handoff value and effects",
-            "test Runic restores a ten-step Flow at the sixth Action",
-            "test Runic restores an Invoke action target without replaying its routing Actions",
-            "test Runic restores an Invoke flow target without replaying its routing Actions",
-            "test Runic restores progress inside a nested Flow",
-            "test Runic restores unfinished Map items without replaying completed items",
-            "test an accepted Invoke Action is not repeated after a manual checkpoint",
-            "test managed resume rejects changed Action code"
-          ]
+          "tests": []
         },
         "jido_action.execution.I23": {
           "failing": 0,
@@ -4400,7 +4266,7 @@
           "testable": true,
           "tests": [
             "test Action retry spans keep one activation and identify each attempt",
-            "test Invoke and Handoff Action metadata use the new control names",
+            "test Invoke and Handoff Action metadata use authored component boundaries",
             "test a Flow span stops when its execution task is killed",
             "test a failed immediate Flow stops both semantic spans with error outcomes",
             "test a returned Action error stops its span with an error outcome",
@@ -4410,40 +4276,13 @@
             "test managed execution combines Jido Action spans with Runic runtime events"
           ]
         },
-        "jido_action.execution.I24": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test retry attempts keep one activation and one logical effect identity"
-          ]
-        },
         "jido_action.execution.I25": {
           "failing": 0,
           "kind": "security",
-          "passing": 16,
+          "passing": 0,
           "status": "active",
           "testable": true,
-          "tests": [
-            "test Actions can read stable execution host capabilities",
-            "test DSL, data and Codec share one wait model",
-            "test a 90-day wait releases work and saves an absolute deadline",
-            "test a timer wins an equal-time input and removes all losing waits",
-            "test bound Invoke target context cannot claim host capabilities",
-            "test buffers are bounded and expired early input does not consume capacity",
-            "test caller context cannot claim execution host capabilities",
-            "test cancelled snapshots reject input and all future deadlines",
-            "test duplicate input IDs are inert and conflicting IDs fail",
-            "test early addressed input survives restore and is consumed once",
-            "test invalid clocks, non-portable inputs, and malformed definitions fail",
-            "test native event replay retains pending waits and accepted results",
-            "test nested Invoke and Flow Actions retain genuine host capabilities",
-            "test ordinary Exec rejects wait definitions before work starts",
-            "test supports? returns false for malformed capability data",
-            "test wait IDs include the execution occurrence"
-          ]
+          "tests": []
         }
       }
     },
@@ -4709,7 +4548,7 @@
         "jido_action.flow.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 31,
+          "passing": 30,
           "status": "active",
           "testable": true,
           "tests": [
@@ -4718,9 +4557,8 @@
             "test Parallel can collect named Action errors as ordered data",
             "test Parallel collects parameter reference failures under the named Action",
             "test Parallel fail-fast errors identify the authored Action",
-            "test Parallel inline declarations compile to ordinary Action nodes",
+            "test Parallel inline declarations compile to one authored component node",
             "test Parallel joins all referenced upstream components before it starts its Actions",
-            "test Parallel rejects invalid internal join outcomes and supports Runic composition",
             "test Parallel requires a non-empty list with unique named Actions",
             "test Parallel starts all Actions before it joins ordered results and effects",
             "test Spark derives a Subflow and map authoring declares its kind",
@@ -4743,7 +4581,7 @@
             "test public inspection exposes needs and sorted effective dependencies",
             "test runtime DSL lowering preserves Invoke and Handoff declarations",
             "test the Parallel DSL accepts only Action declarations",
-            "test the compiled graph keeps each Action visible and rebuilds"
+            "test the compiled graph keeps Parallel as one authored boundary and rebuilds"
           ]
         },
         "jido_action.flow.I8": {
@@ -6388,8 +6226,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 325,
-    "coverage": 1.0,
-    "covered": 325
+    "active": 324,
+    "coverage": 0.9877,
+    "covered": 320
   }
 }

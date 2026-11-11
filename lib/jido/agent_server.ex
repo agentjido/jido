@@ -2780,8 +2780,9 @@ defmodule Jido.AgentServer do
              prepared.turn.input,
              prepared.context
            ),
+         {:ok, instruction} <- Jido.Exec.Runtime.flow_instruction(instruction),
          {:ok, input} <- execution_input(instruction),
-         {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}),
+         {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}, []),
          :ok <- Jido.Exec.Node.Wait.validate_host(workflow),
          {:ok, worker} <-
            Runner.start_workflow(runner, id, workflow,
@@ -2796,14 +2797,12 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp execution_input(%Jido.Instruction{kind: :action}), do: {:ok, %{}}
-
   defp execution_input(%Jido.Instruction{kind: :flow} = instruction) do
     with {:ok, params} <-
            Jido.Exec.Validation.input(instruction.target, instruction.params, %{
              phase: :flow_input
            }),
-         do: {:ok, Jido.Exec.Frame.new(params)}
+         do: {:ok, params}
   end
 
   defp execution_order(runnable) do

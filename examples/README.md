@@ -9,9 +9,9 @@ between `examples/` and a chapter.
 | [`00_quick_start`](00_quick_start/README.md) | Graph-first AI, including one opt-in live lesson | 3 |
 | [`01_agent_basics`](01_agent_basics/README.md) | Agent basics | 8 |
 | [`02_flow_authoring`](02_flow_authoring/README.md) | Flow definitions, DSL, and JSON | 8 |
-| [`03_flow_execution`](03_flow_execution/README.md) | Flow execution | 15 |
+| [`03_flow_execution`](03_flow_execution/README.md) | Flow execution | 14 |
 | [`04_agent_workflows`](04_agent_workflows/README.md) | Agent workflows | 9 |
-| [`05_flow_durability`](05_flow_durability/README.md) | Durable Flow runs | 6 |
+| [`05_flow_durability`](05_flow_durability/README.md) | Durable Flow runs | 4 |
 | [`06_flow_patterns`](06_flow_patterns/README.md) | Flow patterns | 3 |
 | [`07_flow_distribution`](07_flow_distribution/README.md) | Distributed Flow work | 0 |
 | [`08_runtime`](08_runtime/README.md) | Agent runtime | 15 |
@@ -24,7 +24,7 @@ between `examples/` and a chapter.
 | [`15_ai_basics`](15_ai_basics/README.md) | AI basics | 9 |
 | [`16_ai_conversations`](16_ai_conversations/README.md) | AI conversations and sessions | 5 |
 
-The offline catalog has 117 lessons. The graph-first chapter also has one
+The offline catalog has 114 lessons. The graph-first chapter also has one
 opt-in live-provider lesson. Each chapter README lists its lessons in order.
 
 The machine-readable register is

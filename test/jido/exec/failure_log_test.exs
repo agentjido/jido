@@ -57,6 +57,24 @@ defmodule Jido.Exec.FailureLogTest do
     end
   end
 
+  defmodule NestedFailureFlow do
+    use Jido.Flow, name: "failure_log_nested_child"
+
+    flow do
+      step "fail", action: Boom, params: %{}
+      output result("fail")
+    end
+  end
+
+  defmodule ParentNestedFailureFlow do
+    use Jido.Flow, name: "failure_log_nested_parent"
+
+    flow do
+      step "child", action: NestedFailureFlow, params: %{}
+      output result("child")
+    end
+  end
+
   defmodule ClauseStepFlow do
     use Jido.Flow, name: "failure_log_clause_step_flow"
 
@@ -172,13 +190,14 @@ defmodule Jido.Exec.FailureLogTest do
     end
   end
 
-  test "the capture sees Runic's line when a caller drives Runic directly" do
-    workflow = Jido.Exec.compile!(Jido.Instruction.new!(target: Boom, params: %{card: @param}))
+  test "direct Runic failure logs omit bound input parameters" do
+    workflow = Jido.Exec.Compiler.compile!(Boom)
 
-    log = logged(fn -> Runic.Workflow.execute(workflow, %{}) end)
+    log = logged(fn -> Runic.Workflow.execute(workflow, %{card: @param}) end)
 
     assert log =~ "Runnable failed"
-    assert log =~ @param
+    assert log =~ @reason
+    refute log =~ @param
   end
 
   test "Exec.run with an Action target logs no params or context" do
@@ -192,6 +211,11 @@ defmodule Jido.Exec.FailureLogTest do
 
   test "Exec.run with a Flow target logs no step literals" do
     log = logged(fn -> assert {:error, _} = Jido.Exec.run(LiteralFlow, %{}, @context) end)
+    assert_no_sentinel(log)
+  end
+
+  test "Exec.run logs no nested Flow failure details" do
+    log = logged(fn -> assert {:error, _} = Jido.Exec.run(ParentNestedFailureFlow, %{}, @context) end)
     assert_no_sentinel(log)
   end
 

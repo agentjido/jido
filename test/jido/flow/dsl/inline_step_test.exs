@@ -530,9 +530,9 @@ defmodule Jido.Flow.DSL.InlineStepTest do
     module = Module.concat(__MODULE__, InertFlow)
     flow = module.flow()
     assert {:ok, ^flow} = Jido.Flow.validate(flow)
-    assert {:ok, ^flow} = Jido.Exec.Compiler.validate(flow)
+    assert {:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow, [])
     assert {:ok, _} = Jido.Flow.explain(flow)
-    assert {:ok, _} = Jido.Exec.compile(flow)
+    assert {:ok, _} = Jido.Exec.compile(flow, [])
     assert is_map(Jido.Flow.to_map(flow))
     refute_received {:inline_work, _}
 

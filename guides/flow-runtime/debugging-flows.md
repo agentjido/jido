@@ -90,7 +90,7 @@ true = is_binary(digest)
 
 ```elixir
 {:ok, %Jido.Flow{}} = Jido.Flow.validate(flow)
-{:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow)
+{:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow, [])
 
 {:error, %Jido.Error.ValidationError{}} =
   Jido.Flow.new(%{

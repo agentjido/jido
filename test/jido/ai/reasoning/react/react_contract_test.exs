@@ -94,7 +94,7 @@ defmodule Jido.AI.Reasoning.ReAct.ContractTest do
   @tag obligation: ["jido_ai.react.I1", "jido_ai.react.I2", "jido_ai.react.I3"]
   test "the standard ReAct graphs expose every ordered component" do
     assert %Jido.Flow{components: root_components} = ReAct.flow()
-    assert map_size(root_components) == 6
+    assert map_size(root_components) == 5
 
     assert %{
              "start_request" => %{kind: :call, call: %{target: SharedActions.StartRequest}},
@@ -111,8 +111,7 @@ defmodule Jido.AI.Reasoning.ReAct.ContractTest do
                kind: :invoke,
                decision: %{target: Jido.AI.Reasoning.ReAct.Actions.FinishLoop},
                expander: %{target: ExpandNext}
-             },
-             "finalize" => %{kind: :call, call: %{target: SharedActions.FinalizeTurn}}
+             }
            } = root_components
 
     assert %Jido.Flow{components: model_components} = ReAct.ModelRound.flow()

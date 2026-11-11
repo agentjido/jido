@@ -3,14 +3,14 @@ defmodule Jido.Exec.Node.Choice do
 
   use Runic.Workflow.SingleOutput, batch_parent: false
 
-  alias Jido.Exec.Node.Action
-  alias Jido.Exec.Node.Choice.{Branch, Selector}
+  alias Jido.Exec.{ActionBoundary, ValueResolver}
+  alias Jido.Exec.Node.{Lifecycle, Targets}
   alias Runic.Identity
   alias Runic.Workflow.SingleOutput.{Context, Result}
-  alias Runic.Workflow
 
-  @enforce_keys [:id, :name, :hash, :component, :options, :fallback]
-  defstruct [:id, :name, :hash, :component, :options, :fallback, :location, :node_path]
+  @derive {Inspect, only: [:id, :name, :node_path]}
+  @enforce_keys [:id, :name, :hash, :definition, :target_versions, :node_path]
+  defstruct [:id, :name, :hash, :definition, :target_versions, :node_path, :location]
 
   @type t :: %__MODULE__{}
 
@@ -18,158 +18,106 @@ defmodule Jido.Exec.Node.Choice do
   @spec new(keyword()) :: t()
   def new(opts) do
     opts =
-      Keyword.validate!(opts, [:id, :name, :component, :options, :fallback, :location, :node_path])
+      Keyword.validate!(opts, [
+        :id,
+        :name,
+        :definition,
+        :location,
+        :node_path,
+        :target_versions
+      ])
 
     id = Keyword.fetch!(opts, :id)
     name = Keyword.fetch!(opts, :name)
+    definition = Keyword.fetch!(opts, :definition)
 
     %__MODULE__{
       id: id,
       name: name,
-      hash: Identity.digest(:component_definition, %{kind: "jido_choice", version: 1, id: id}),
-      component: Keyword.fetch!(opts, :component),
-      options: Keyword.fetch!(opts, :options),
-      fallback: Keyword.fetch!(opts, :fallback),
+      hash:
+        Identity.digest(:component_definition, %{
+          kind: :jido_flow_choice,
+          version: 1,
+          id: inspect(id)
+        }),
+      definition: definition,
+      target_versions: Keyword.get_lazy(opts, :target_versions, fn -> Targets.versions(definition) end),
       location: Keyword.get(opts, :location),
-      node_path: Keyword.get(opts, :node_path, [Keyword.fetch!(opts, :component)])
+      node_path: Keyword.get(opts, :node_path, [name])
     }
   end
 
-  @doc false
-  @spec connect(t(), [term()], Workflow.t()) :: Workflow.t()
-  def connect(%__MODULE__{} = node, parents, %Workflow{} = workflow) do
-    paths = Enum.map(node.options, &{{:option, &1.name}, &1.call}) ++ [{:fallback, node.fallback}]
-
-    selector =
-      Selector.new(
-        id: {node.id, :selector},
-        name: internal_name(node, "selector", "route"),
-        component: node.component,
-        options: node.options,
-        location: node.location,
-        node_path: node.node_path
-      )
-
-    workflow = connect_from(workflow, parents, selector)
-
-    workflow =
-      Enum.reduce(paths, workflow, fn {route, call}, current ->
-        path = route_path(route)
-
-        branch =
-          Branch.new(
-            id: {node.id, :branch, route},
-            name: internal_name(node, "branch", path),
-            component: node.component,
-            option: route,
-            location: node.location,
-            node_path: node.node_path
-          )
-
-        condition =
-          condition({node.id, :condition, route}, internal_name(node, "if", path))
-
-        flow = %{
-          component: node.component,
-          mode: :choice,
-          location: node.location,
-          node_path: node.node_path
-        }
-
-        action =
-          Action.new(call,
-            flow: flow,
-            id: {node.id, :action, route},
-            name: internal_name(node, "action", path)
-          )
-
-        current
-        |> Workflow.add_step(selector, branch)
-        |> Workflow.add_step(branch, condition)
-        |> Workflow.add_step(condition, action)
-        |> Workflow.add_step(action, node)
-      end)
-
-    workflow
-    |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: :choice})
-    |> Workflow.register_component(node)
-  end
-
-  @doc false
-  @spec condition(term(), term()) :: struct()
-  def condition(id, name) do
-    hash =
-      Identity.digest(:component_definition, %{kind: "jido_choice_condition", version: 1, id: id})
-
-    source =
-      quote do
-        Jido.Exec.Node.Choice.condition(unquote(Macro.escape(id)), unquote(name))
-      end
-
-    %Runic.Workflow.Condition{
-      name: name,
-      hash: hash,
-      work: &__MODULE__.selected?/1,
-      arity: 1,
-      closure: Runic.Closure.new(source, %{}, nil),
-      meta_refs: []
-    }
-  end
-
-  @doc false
-  @spec selected?(term()) :: boolean()
-  def selected?({:jido_choice_branch, true, _frame}), do: true
-  def selected?(_value), do: false
-
-  @doc false
-  @spec pass(term()) :: {:ok, term()}
-  def pass({:jido_flow_frame, 1, _input, _results, _effects} = frame), do: {:ok, frame}
-
-  def pass({:jido_nested_flow_frame, 1, _parent, _child} = frame), do: {:ok, frame}
-
-  defp connect_from(workflow, [], child), do: Workflow.add_step(workflow, child)
-  defp connect_from(workflow, [parent], child), do: Workflow.add_step(workflow, parent, child)
-  defp connect_from(workflow, parents, child), do: Workflow.add_step(workflow, parents, child)
-
-  defp internal_name(node, kind, path), do: "__jido_choice__/#{node.name}/#{kind}/#{path}"
-  defp route_path({:option, name}), do: "option/#{name}"
-  defp route_path(:fallback), do: "fallback"
   @impl Runic.Workflow.SingleOutput
   @doc false
   @spec run(t(), term(), Context.t()) :: Result.t()
-  def run(%__MODULE__{}, input, %Context{} = context) do
-    {:ok, value} = pass(Jido.Exec.Fact.unwrap(input))
-    Jido.Exec.Fact.result(input, context, value)
+  def run(%__MODULE__{} = node, input, %Context{} = context) do
+    Lifecycle.run(node, input, context, fn bindings ->
+      state = ValueResolver.resolver_state(bindings, context.runtime)
+
+      with :ok <- Targets.compatible(node.target_versions),
+           {:ok, call} <- choose(node.definition, state, node.name),
+           {:ok, params} <- ValueResolver.resolve(call.params, state) do
+        ActionBoundary.call(call, params, node, context, :choice)
+      end
+    end)
+  end
+
+  defp choose(%{options: options, fallback: fallback}, state, component) do
+    Enum.reduce_while(options, {:ok, fallback}, fn option, _fallback ->
+      case ValueResolver.condition(option.condition, state, component, option.name) do
+        {:ok, true} -> {:halt, {:ok, option.call}}
+        {:ok, false} -> {:cont, {:ok, fallback}}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
   end
 end
 
 defimpl Runic.Identity.Projectable, for: Jido.Exec.Node.Choice do
-  def identity_document(node) do
-    %{kind: :jido_choice, version: 1, id: inspect(node.id)}
-  end
+  def identity_document(node),
+    do: %{kind: :jido_flow_choice, version: 1, id: inspect(node.id)}
 end
 
 defimpl Runic.Component, for: Jido.Exec.Node.Choice do
   alias Jido.Exec.Node.Choice
+  alias Runic.Workflow
 
   def connectable?(_node, _other), do: true
-  def connect(node, to, workflow), do: Choice.connect(node, List.wrap(to), workflow)
 
-  def source(node) do
+  def connect(%Choice{} = node, parents, workflow) when is_list(parents) do
+    join = parents |> Enum.map(& &1.hash) |> Workflow.Join.new()
+    workflow = Enum.reduce(parents, workflow, &Workflow.add_step(&2, &1, join))
+    connect(node, join, workflow)
+  end
+
+  def connect(%Choice{} = node, parent, workflow) do
+    workflow
+    |> Workflow.add_step(parent, node)
+    |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: :choice})
+    |> Workflow.register_component(node)
+  end
+
+  def source(%Choice{} = node) do
     quote do
       Jido.Exec.Node.Choice.new(
         id: unquote(Macro.escape(node.id)),
         name: unquote(node.name),
-        component: unquote(node.component),
-        options: unquote(Macro.escape(node.options)),
-        fallback: unquote(Macro.escape(node.fallback)),
+        definition: unquote(Macro.escape(node.definition)),
+        target_versions: unquote(Macro.escape(node.target_versions)),
         location: unquote(Macro.escape(node.location)),
         node_path: unquote(Macro.escape(node.node_path))
       )
     end
   end
 
-  def hash(node), do: node.hash
-  def inputs(_node), do: [in: [type: :any]]
-  def outputs(_node), do: [out: [type: :any]]
+  def hash(%Choice{hash: hash}), do: hash
+  def inputs(_node), do: [bindings: [type: :any, doc: "Choice bindings"]]
+
+  def outputs(_node) do
+    [
+      value: [type: :any, doc: "Selected Action value"],
+      effects: [type: :any, doc: "Selected Action effects"],
+      control: [type: :any, doc: "Choice control result"]
+    ]
+  end
 end

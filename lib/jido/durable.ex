@@ -8,8 +8,9 @@ defmodule Jido.Durable do
   The execution reference is portable and contains no process identity.
 
   `start/4` and `resume/3` run until the Flow completes, fails, becomes
-  uncertain, or opens a wait. Each execution unit is checkpointed before the
-  next unit starts.
+  uncertain, or opens a wait. Each authored Flow component boundary is
+  checkpointed before the next component starts. Work inside an unfinished
+  composite component can repeat after recovery.
 
   `signal/5` saves one Signal as input to an open wait, then continues the Flow
   until its next durable stop. Equal retries are inert because the Signal ID
@@ -251,18 +252,9 @@ defmodule Jido.Durable do
 
   defp durable_instruction(target, params, context) do
     with {:ok, instruction} <- Jido.Instruction.resolve(target, params, context),
-         {:ok, instruction} <- lower_action(instruction),
-         {:ok, instruction} <- ExecRuntime.flow_input(instruction),
+         {:ok, instruction} <- ExecRuntime.flow_instruction(instruction),
          :ok <- ExecRuntime.portable(instruction) do
       {:ok, instruction}
-    end
-  end
-
-  defp lower_action(%Jido.Instruction{kind: :flow} = instruction), do: {:ok, instruction}
-
-  defp lower_action(%Jido.Instruction{kind: :action, target: action} = instruction) do
-    with {:ok, flow} <- Jido.Flow.from_action(action) do
-      {:ok, %{instruction | kind: :flow, target: flow}}
     end
   end
 

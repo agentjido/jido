@@ -313,53 +313,12 @@ defmodule Jido.Exec.HandoffTest do
         output: Ref.result("next")
       })
 
-    rebuilt = flow |> Exec.compile!() |> Runic.Workflow.build_log() |> Runic.Workflow.from_log()
+    rebuilt = flow |> Jido.Exec.Compiler.compile!() |> Runic.Workflow.build_log() |> Runic.Workflow.from_log()
 
-    {completed, observation} =
-      Runic.Workflow.execute(rebuilt, Jido.Exec.Fact.local_value(Jido.Exec.Frame.new(%{})))
+    {completed, observation} = Runic.Workflow.execute(rebuilt, %{})
 
     assert Jido.Test.Exec.RunnerHarness.result(completed, observation) ==
              {:handoff, %Instruction{target: Target, kind: :action, params: %{value: 5}}, []}
-  end
-
-  test "Handoff connection keeps selector data for zero and multiple parents" do
-    instruction = Instruction.new!(target: Echo)
-
-    left = Jido.Exec.Node.Action.new(instruction, id: :left, name: "left")
-    right = Jido.Exec.Node.Action.new(instruction, id: :right, name: "right")
-
-    root = handoff_node(:root, Instruction.new!(target: SelectTwo))
-
-    assert %Runic.Workflow{} =
-             Jido.Exec.Node.Handoff.connect(root, [], Runic.Workflow.new())
-
-    selector = Instruction.new!(target: SelectTwo, params: %{right: 3})
-    join = handoff_node(:join, selector)
-    assert root.hash != join.hash
-
-    workflow = Runic.Workflow.new() |> Runic.Workflow.add(left) |> Runic.Workflow.add(right)
-
-    assert %Runic.Workflow{} =
-             connected =
-             Jido.Exec.Node.Handoff.connect(join, [left, right], workflow)
-
-    selector_node =
-      Enum.find(Multigraph.vertices(connected.graph), fn
-        %Jido.Exec.Node.Action{flow: %{mode: :handoff}} -> true
-        _node -> false
-      end)
-
-    assert %Jido.Exec.Node.Action{
-             name: "__jido_handoff__/next_join/selector",
-             instruction: %Instruction{params: %{right: 3}},
-             flow: %{
-               component: "next",
-               mode: :handoff,
-               params: %{right: 3},
-               location: {:file, 12, 4},
-               node_path: ["outer", "next"]
-             }
-           } = selector_node
   end
 
   test "handoff normalization rejects invalid targets and non-portable open input" do
@@ -418,16 +377,5 @@ defmodule Jido.Exec.HandoffTest do
       components: [%{kind: :handoff, name: "next", selector: selector}],
       output: Ref.result("next")
     })
-  end
-
-  defp handoff_node(id, selector) do
-    Jido.Exec.Node.Handoff.new(
-      id: id,
-      name: "next_#{id}",
-      component: "next",
-      selector: selector,
-      location: {:file, 12, 4},
-      node_path: ["outer", "next"]
-    )
   end
 end

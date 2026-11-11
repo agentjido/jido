@@ -168,7 +168,7 @@ unchecked =
 
 {:ok, ^unchecked} = Jido.Flow.validate(unchecked)
 
-{:error, compile_error} = Jido.Exec.compile(unchecked)
+{:error, compile_error} = Jido.Exec.compile(unchecked, [])
 :missing_behaviour = compile_error.details.reason
 ```
 

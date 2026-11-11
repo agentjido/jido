@@ -26,6 +26,6 @@ defmodule Jido.Flow.ValidationInertnessTest do
              Flow.dependencies(flow)
 
     assert {:ok, %{name: "inert_validation"}} = Flow.explain(flow)
-    assert {:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow)
+    assert {:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow, [])
   end
 end

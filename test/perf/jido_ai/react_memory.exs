@@ -510,7 +510,7 @@ defmodule Jido.Test.Perf.AI.ReActMemory do
 
   defp runic_metrics(strategy) do
     started_at = System.monotonic_time()
-    workflow = Jido.Exec.compile!(reasoning_module(strategy))
+    workflow = Jido.Exec.Compiler.compile!(reasoning_module(strategy))
     compile_us = elapsed_us(started_at)
     sizes = term_sizes(workflow)
 

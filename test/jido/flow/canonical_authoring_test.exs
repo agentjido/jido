@@ -440,7 +440,7 @@ defmodule Jido.Flow.CanonicalAuthoringTest do
 
     compiled_forms =
       for flow <- [direct, built, decoded, Jido.Flow.CanonicalAuthoringTest.SparkMixedFlow.flow()] do
-        assert {:ok, compiled} = Jido.Exec.compile(flow)
+        assert {:ok, compiled} = Jido.Exec.compile(flow, [])
         Runic.Workflow.build_log(compiled)
       end
 
@@ -663,7 +663,7 @@ defmodule Jido.Flow.CanonicalAuthoringTest do
   test "canonical public operations accept one Flow and reject other subjects" do
     flow = FlowAuthoring.math_flow!()
     assert Jido.Test.Flow.Builder.new(flow) == {:ok, flow}
-    assert %Runic.Workflow{} = Jido.Exec.compile!(flow, source_map: %{})
+    assert %Runic.Workflow{} = Jido.Exec.Compiler.compile!(flow, source_map: %{})
     assert %{name: "math_flow", components: [_first, _second]} = Flow.to_map(flow)
     assert {:ok, %{"double" => %{references: ["add_one"]}}} = Flow.dependencies(flow)
     assert {:ok, %{kind: :flow, name: "math_flow"}} = Flow.explain(flow)
@@ -671,14 +671,13 @@ defmodule Jido.Flow.CanonicalAuthoringTest do
     assert is_binary(digest)
     assert is_binary(uuid)
     assert {:ok, ^flow} = Flow.validate(flow)
-    assert {:ok, ^flow} = Jido.Exec.Compiler.validate(flow)
+    assert {:ok, %Runic.Workflow{}} = Jido.Exec.compile(flow, [])
 
     for operation <- [
           &Flow.dependencies/1,
           &Flow.explain/1,
           &Flow.semantic_identity/1,
-          &Flow.validate/1,
-          &Jido.Exec.Compiler.validate/1
+          &Flow.validate/1
         ] do
       assert {:error, error} = operation.(:not_a_flow)
       assert Exception.message(error) == "expected a Jido.Flow artifact"
@@ -696,7 +695,7 @@ defmodule Jido.Flow.CanonicalAuthoringTest do
         output: Ref.result("missing")
       )
 
-    assert_raise Jido.Error.ValidationError, fn -> Jido.Exec.compile!(invalid) end
+    assert_raise Jido.Error.ValidationError, fn -> Jido.Exec.Compiler.compile!(invalid) end
 
     assert_raise Jido.Error.ValidationError, fn ->
       Jido.Test.Flow.Builder.new!(name: "missing_output")

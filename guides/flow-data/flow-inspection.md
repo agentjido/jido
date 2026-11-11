@@ -142,7 +142,7 @@ edited = put_in(flow.components["audit"].needs, ["notify"])
 These checks are inert, so they do not load a target. `Jido.Exec.compile/2` checks that each target is a usable Action or Flow and returns a Runic workflow. It also runs no Action.
 
 ```elixir
-{:ok, %Runic.Workflow{}} = Jido.Exec.compile(ShippingInspection.Definition.flow())
+{:ok, %Runic.Workflow{}} = Jido.Exec.compile(ShippingInspection.Definition.flow(), [])
 ```
 
 ## Inspect a Flow module

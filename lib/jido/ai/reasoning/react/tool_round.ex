@@ -1,7 +1,7 @@
 defmodule Jido.AI.Reasoning.ReAct.ToolRound do
   @moduledoc false
 
-  alias Jido.AI.Reasoning.ReAct.Actions.{ExecuteTool, RecordToolResults}
+  alias Jido.AI.Reasoning.ReAct.Actions.{ExecuteTool, ExpandNext, RecordToolResults}
   alias Jido.AI.Toolset
   alias Jido.Flow.Ref
   alias Jido.Joi
@@ -27,7 +27,11 @@ defmodule Jido.AI.Reasoning.ReAct.ToolRound do
       when is_map(turn) and is_map(context) and is_list(opts) do
     with {:ok, calls} <- resolve_calls(turn.tools, turn.model_outcome.tool_calls),
          :ok <- Telemetry.record_tool_calls(context, tool_call_index(calls)) do
-      build_flow(calls, Keyword.get(opts, :continuation))
+      build_flow(
+        calls,
+        Keyword.get(opts, :continuation),
+        Keyword.get(opts, :handoff_continuation, false)
+      )
     end
   end
 
@@ -47,14 +51,14 @@ defmodule Jido.AI.Reasoning.ReAct.ToolRound do
 
   defp resolve_calls(_tools, calls), do: {:error, {:invalid_tool_calls, calls}}
 
-  defp build_flow(calls, continuation) do
+  defp build_flow(calls, continuation, handoff_continuation?) do
     components = [parallel(calls), record(calls)]
 
     {schema, components, output} =
       if continuation do
         {
           Joi.object(%{turn: Joi.any(), routes: Joi.map()}),
-          components ++ [continuation(continuation)],
+          components ++ [continuation(continuation, handoff_continuation?)],
           Ref.result("model")
         }
       else
@@ -101,12 +105,25 @@ defmodule Jido.AI.Reasoning.ReAct.ToolRound do
     }
   end
 
-  defp continuation(target) do
+  defp continuation(target, false) do
     %{
       kind: :subflow,
       name: "model",
       flow: target,
       params: %{turn: Ref.result("record", :turn), routes: Ref.input(:routes)}
+    }
+  end
+
+  defp continuation(target, true) do
+    %{
+      kind: :handoff,
+      name: "model",
+      selector: ExpandNext,
+      params: %{
+        kind: :model,
+        input: %{turn: Ref.result("record", :turn), routes: Ref.input(:routes)},
+        target: target
+      }
     }
   end
 

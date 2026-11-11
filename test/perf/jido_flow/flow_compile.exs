@@ -33,7 +33,7 @@ defmodule Jido.Test.Perf.Flow.Compile do
         compile =
           Runner.measure!(
             "compile/#{width}",
-            fn -> Jido.Exec.compile!(flow) end,
+            fn -> Jido.Exec.Compiler.compile!(flow) end,
             &check_program!(&1, width),
             settings
           )

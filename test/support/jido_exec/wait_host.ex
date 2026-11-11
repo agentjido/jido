@@ -1,7 +1,7 @@
 defmodule Jido.Test.Exec.WaitHost do
   @moduledoc false
 
-  alias Jido.Exec.{Frame, Runtime}
+  alias Jido.Exec.Runtime
   alias Jido.Exec.Wait, as: WaitValue
   alias Jido.Exec.Node.Wait
   alias Runic.Workflow
@@ -38,9 +38,9 @@ defmodule Jido.Test.Exec.WaitHost do
          true <- is_integer(limit) and limit > 0,
          :ok <- Runtime.validate_local(execution_id, :execution_id),
          {:ok, instruction} <- Jido.Instruction.resolve(target, params, context),
-         {:ok, instruction} <- Runtime.flow_input(instruction),
+         {:ok, instruction} <- Runtime.flow_instruction(instruction),
          :ok <- Runtime.portable(instruction),
-         {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}) do
+         {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}, []) do
       context = instruction.context
 
       state = %{
@@ -52,11 +52,9 @@ defmodule Jido.Test.Exec.WaitHost do
         cancelled?: false
       }
 
-      input = if instruction.kind == :flow, do: Frame.new(instruction.params), else: %{}
-
       fact =
         Fact.new(
-          value: input,
+          value: instruction.params,
           id:
             Runic.Identity.digest(
               :fact_occurrence,
@@ -71,7 +69,11 @@ defmodule Jido.Test.Exec.WaitHost do
         |> runtime(context, state)
         |> Workflow.react_until_satisfied(fact)
 
-      {:ok, settle(workflow, context, state)}
+      workflow = settle(workflow, context, state)
+
+      if failure?(workflow),
+        do: Jido.Exec.Result.project(workflow),
+        else: {:ok, workflow}
     else
       false -> error(:invalid_buffer_limit)
       {:error, _} = error -> error
@@ -294,7 +296,7 @@ defmodule Jido.Test.Exec.WaitHost do
       Workflow.put_run_context(workflow, %{
         _global:
           context
-          |> Runtime.context(true)
+          |> Runtime.caller_context()
           |> Runtime.wait_context(state.execution_id, state.now)
       })
 

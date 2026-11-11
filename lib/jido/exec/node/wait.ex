@@ -1,12 +1,12 @@
 defmodule Jido.Exec.Node.Wait do
   @moduledoc false
-  alias Jido.Exec.{Frame, ValueResolver}
+  alias Jido.Exec.ValueResolver
   alias Jido.Exec.Wait, as: WaitValue
   alias Runic.Workflow.{Fact, Runnable}
   alias Runic.Workflow.Events.{ActivationConsumed, FactProduced}
 
-  @enforce_keys [:id, :name, :hash, :component, :options, :node_path]
-  defstruct [:id, :name, :hash, :component, :options, :node_path, :location]
+  @enforce_keys [:id, :name, :hash, :options, :node_path]
+  defstruct [:id, :name, :hash, :options, :node_path, :location]
   @type t :: %__MODULE__{}
 
   @doc false
@@ -35,10 +35,11 @@ defmodule Jido.Exec.Node.Wait do
 
     case Map.get(runtime, :__jido_wait_host__) do
       %{execution_id: execution_id, clock: clock} ->
+        bindings = Jido.Exec.Fact.value(runnable.input_fact)
+
         with {:ok, now} <- read_clock(clock),
-             {:ok, frame} <- Frame.merge(Jido.Exec.Fact.value(runnable.input_fact)),
              {:ok, options} <-
-               resolve_options(node.options, Frame.resolver_state(frame, runtime), now) do
+               resolve_options(node.options, ValueResolver.resolver_state(bindings, runtime), now) do
           {:ok, request} =
             WaitValue.record(%{
               id: to_string(Runic.Identity.derive(:activation, [execution_id, runnable.activation_id])),
@@ -113,9 +114,7 @@ defmodule Jido.Exec.Node.Wait do
        else: :ok
   end
 
-  @doc false
-  @spec unsupported() :: Exception.t()
-  def unsupported,
+  defp unsupported,
     do:
       Jido.Error.config_error("execution host does not support waits", %{
         reason: :unsupported_host,
@@ -161,6 +160,9 @@ defimpl Runic.Component, for: Jido.Exec.Node.Wait do
   end
 
   def hash(node), do: node.hash
-  def inputs(_node), do: [in: [type: :any]]
-  def outputs(_node), do: [out: [type: :any]]
+  def inputs(_node), do: [bindings: [type: :any]]
+
+  def outputs(_node) do
+    [value: [type: :any], effects: [type: :any], control: [type: :any]]
+  end
 end

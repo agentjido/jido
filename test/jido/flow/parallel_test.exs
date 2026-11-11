@@ -63,15 +63,12 @@ end
 defmodule Jido.Flow.ParallelTest do
   use Covenant.Case, component: "jido_action.flow", async: false
 
-  require Runic
-
   alias Jido.Exec
   alias Jido.Flow
   alias Jido.Flow.Ref
   alias Jido.Test.Action.Fixtures.Actions.{Add, Multiply}
   alias Jido.Test.Codec.Fixtures.CodecRegistry
   alias Jido.Test.Flow.Codec, as: Codec
-  alias Runic.Workflow.SingleOutput.{Context, Result}
 
   defmodule Fail do
     use Jido.Action, name: "parallel_fail"
@@ -131,9 +128,9 @@ defmodule Jido.Flow.ParallelTest do
   end
 
   @tag obligation: "jido_action.flow.I7"
-  test "Parallel inline declarations compile to ordinary Action nodes" do
+  test "Parallel inline declarations compile to one authored component node" do
     flow = Jido.Flow.ParallelTest.InlineDSLFlow.flow()
-    workflow = Exec.compile!(flow)
+    workflow = Jido.Exec.Compiler.compile!(flow)
 
     targets =
       flow.components["tools"].actions
@@ -149,10 +146,11 @@ defmodule Jido.Flow.ParallelTest do
            end)
 
     graph_targets =
-      workflow.graph.vertices
-      |> Enum.map(&elem(&1, 1))
-      |> Enum.filter(&match?(%Jido.Exec.Node.Action{}, &1))
-      |> Enum.map(& &1.instruction.target)
+      workflow
+      |> Runic.Workflow.get_component!("tools")
+      |> then(fn %Jido.Exec.Node.Parallel{definition: definition} ->
+        Enum.map(definition.actions, & &1.call.target)
+      end)
 
     assert Enum.sort(graph_targets) == Enum.sort(targets)
 
@@ -191,16 +189,14 @@ defmodule Jido.Flow.ParallelTest do
   end
 
   @tag obligation: "jido_action.flow.I7"
-  test "the compiled graph keeps each Action visible and rebuilds" do
+  test "the compiled graph keeps Parallel as one authored boundary and rebuilds" do
     flow = parallel_flow()
-    workflow = Exec.compile!(flow)
+    workflow = Jido.Exec.Compiler.compile!(flow)
 
-    actions =
-      workflow.graph.vertices
-      |> Enum.map(&elem(&1, 1))
-      |> Enum.filter(&match?(%Jido.Exec.Node.Action{}, &1))
+    assert %Jido.Exec.Node.Parallel{definition: %{kind: :parallel, actions: actions}} =
+             Runic.Workflow.get_component(workflow, "tools")
 
-    assert Enum.map(actions, & &1.instruction.target) |> Enum.sort() == Enum.sort([Add, Multiply])
+    assert Enum.map(actions, & &1.call.target) |> Enum.sort() == Enum.sort([Add, Multiply])
 
     rebuilt = workflow |> Runic.Workflow.build_log() |> Runic.Workflow.from_log()
 
@@ -462,45 +458,6 @@ defmodule Jido.Flow.ParallelTest do
   end
 
   @tag obligation: "jido_action.flow.I7"
-  test "Parallel rejects invalid internal join outcomes and supports Runic composition" do
-    parallel = parallel_flow() |> Exec.compile!() |> Runic.Workflow.get_component!("tools")
-
-    invalid_shapes = [
-      :not_a_list,
-      [:not_an_action_outcome],
-      [
-        {:jido_parallel_action, 0, "add", Jido.Exec.Frame.new(%{}), :invalid},
-        {:jido_parallel_action, 1, "multiply", Jido.Exec.Frame.new(%{}), {:ok, %{}, []}}
-      ]
-    ]
-
-    for input <- invalid_shapes do
-      assert %Result{status: :failure, error: error} =
-               Jido.Exec.Node.Parallel.run(parallel, input, %Context{})
-
-      assert error.details.reason == :invalid_parallel_outcomes
-      assert error.details.node == "tools"
-    end
-
-    assert Runic.Component.connectable?(parallel, nil)
-
-    assert %Runic.Workflow{} =
-             Jido.Exec.Node.Parallel.connect(parallel, [], Runic.Workflow.new())
-
-    left = Runic.step(fn value -> value end, name: :left)
-    right = Runic.step(fn value -> value end, name: :right)
-    workflow = Runic.Workflow.new() |> Runic.Workflow.add(left) |> Runic.Workflow.add(right)
-    connected = Jido.Exec.Node.Parallel.connect(parallel, [left, right], workflow)
-
-    assert Enum.any?(connected.graph.vertices, fn {_id, node} ->
-             match?(
-               %Runic.Workflow.Join{joins: [left_hash, right_hash]}
-               when left_hash == left.hash and right_hash == right.hash,
-               node
-             )
-           end)
-  end
-
   defp parallel_flow do
     Flow.new!(%{
       name: "parallel_dsl",
@@ -523,8 +480,7 @@ defmodule Jido.Flow.ParallelTest do
   end
 
   defp rebuilt_result(workflow, input) do
-    {workflow, observation} =
-      Runic.Workflow.execute(workflow, Jido.Exec.Frame.new(input))
+    {workflow, observation} = Runic.Workflow.execute(workflow, input)
 
     Exec.result(workflow, observation)
   end

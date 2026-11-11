@@ -74,8 +74,8 @@ defmodule Jido.Flow.GraphIdentityTest do
           assert restored == flow
           assert Flow.semantic_identity(restored) == Flow.semantic_identity(flow)
 
-          assert {:flow, digest, nil, "echo"} =
-                   Jido.Exec.compile!(flow)
+          assert {:flow, digest, "echo"} =
+                   Jido.Exec.Compiler.compile!(flow)
                    |> Runic.Workflow.get_component("echo")
                    |> Map.fetch!(:id)
 
@@ -155,8 +155,8 @@ defmodule Jido.Flow.GraphIdentityTest do
 
     for flow <- flows do
       assert {:ok, identity} = Flow.semantic_identity(flow)
-      assert {:ok, compiled} = Jido.Exec.compile(flow)
-      assert {:flow, digest, nil, "first"} = Runic.Workflow.get_component(compiled, "first").id
+      assert {:ok, compiled} = Jido.Exec.compile(flow, [])
+      assert {:flow, digest, "first"} = Runic.Workflow.get_component(compiled, "first").id
       assert digest == identity.digest
     end
   end
@@ -183,7 +183,7 @@ defmodule Jido.Flow.GraphIdentityTest do
     assert Flow.semantic_identity(first) == Flow.semantic_identity(second)
   end
 
-  defp workflow_log(flow), do: flow |> Jido.Exec.compile!() |> Runic.Workflow.build_log()
+  defp workflow_log(flow), do: flow |> Jido.Exec.Compiler.compile!() |> Runic.Workflow.build_log()
 
   # Durable Runic component IDs derive from this digest. Erlang guarantees
   # deterministic term encoding only within one OTP release, so this fixed

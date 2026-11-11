@@ -191,53 +191,6 @@ defmodule Jido.AgentServer.DurableTurn.RuntimeTest do
     eventually(fn -> record_count(c.tmp_dir) == 1 end)
   end
 
-  @tag obligation: ["jido.agent_server.durable_turn.I2", "jido.agent_server.durable_turn.I5"]
-  test "fact deltas cut a live durable Turn below one quarter of full fact snapshots", c do
-    server = start(c)
-    id = Server.agent(server).id
-    blob = String.duplicate("durable frame payload ", 20_000)
-    pending = Server.submit(server, signal("request", %{value: 0, blob: blob}))
-
-    assert_receive {:durable_barrier, :step_6, action}, 5_000
-    turn_id = Server.status(server).active.turn_id
-    execution_id = {:jido_execution, Jido.Instance.NamespaceRegistry.namespace(c.jido), nil, id, turn_id}
-
-    assert {:ok, workflow} =
-             Runic.Runner.get_workflow(Jido.Instance.Names.exec_runner(c.jido), execution_id)
-
-    full_fact_bytes =
-      workflow
-      |> Runic.Workflow.facts()
-      |> Enum.map(&encoded_bytes(&1.value))
-      |> Enum.sum()
-
-    stored_execution_bytes = execution_record_bytes(c.tmp_dir)
-
-    assert stored_execution_bytes < div(full_fact_bytes, 4),
-           "stored #{stored_execution_bytes} bytes for #{full_fact_bytes} bytes of full facts"
-
-    server_monitor = Process.monitor(server)
-    action_monitor = Process.monitor(action)
-    Process.exit(server, :kill)
-    assert_receive {:DOWN, ^server_monitor, :process, ^server, :killed}, 5_000
-    assert_receive {:DOWN, ^action_monitor, :process, ^action, _}, 5_000
-
-    restored = replacement(c, id, server)
-    assert_receive {:durable_barrier, :step_6, _}, 5_000
-
-    assert {:ok, restored_workflow} =
-             Runic.Runner.get_workflow(Jido.Instance.Names.exec_runner(c.jido), execution_id)
-
-    restored_vertices = Map.values(restored_workflow.graph.vertices)
-    assert Enum.any?(restored_vertices, &is_struct(&1, Runic.Workflow.FactRef))
-    assert Enum.any?(restored_vertices, &is_struct(&1, Runic.Workflow.Fact))
-
-    F.Probe.release()
-    eventually(fn -> Server.agent(restored).state == %{count: 10} end)
-    assert F.Probe.records() == Enum.to_list(1..6) ++ Enum.to_list(6..10)
-    assert {:error, _} = Server.await(pending)
-  end
-
   @tag obligation: "jido.agent_server.durable_turn.I1"
   test "nonportable command context is rejected before execution", c do
     server = start(c)
@@ -515,16 +468,4 @@ defmodule Jido.AgentServer.DurableTurn.RuntimeTest do
     assert F.Probe.records() == Enum.to_list(1..6)
     assert {:error, _} = Server.await(pending)
   end
-
-  defp execution_record_bytes(path) do
-    path
-    |> Path.join("records")
-    |> File.ls!()
-    |> Enum.map(&File.read!(Path.join([path, "records", &1])))
-    |> Enum.reject(&is_map(:erlang.binary_to_term(&1)))
-    |> Enum.map(&byte_size/1)
-    |> Enum.sum()
-  end
-
-  defp encoded_bytes(term), do: term |> :erlang.term_to_binary([:deterministic]) |> byte_size()
 end

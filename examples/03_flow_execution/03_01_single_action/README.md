@@ -1,5 +1,5 @@
 # Single Action
 
-Run an Action module, a bound Instruction, and an explicit Output. The example
-also shows that Runic execution rejects Action continuation tuples. Expected
-arithmetic results are 5 and 8.
+`Jido.Exec` lowers an Action to a canonical one-step Flow. The compiled Runic
+workflow contains one input node, one `Jido.Exec.Node.Action` named `action`,
+and one output node. Running the Action with 3 and 2 returns `%{value: 5}`.

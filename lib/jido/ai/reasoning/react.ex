@@ -9,7 +9,7 @@ defmodule Jido.AI.Reasoning.ReAct do
   review, and all recipe Actions are public modules under this namespace.
   """
 
-  alias Jido.AI.Reasoning.Actions.{FinalizeTurn, GuardInput, StartRequest}
+  alias Jido.AI.Reasoning.Actions.{GuardInput, StartRequest}
   alias Jido.AI.Reasoning.ReAct.Actions.{Advance, ExpandNext, FinishLoop, Initialize}
 
   @default_instructions "Answer concisely. Use the available tools when they help. You can request multiple tools in one response."
@@ -160,10 +160,6 @@ defmodule Jido.AI.Reasoning.ReAct do
         state: result("loop", :state)
       }
 
-    step "finalize",
-      action: FinalizeTurn,
-      params: %{outcome: result("continuation")}
-
-    output result("finalize")
+    output result("continuation")
   end
 end

@@ -1,19 +1,20 @@
 # 05 Flow Durability
 
-These supported offline lessons use the current `Jido.Exec`,
-`Jido.Durable`, and `Runic.Runner` contracts.
+These lessons show the small `Jido.Durable` contract. A durable run starts
+from a `Jido.Signal`, uses the persistence adapter of its Jido instance, and
+stops at each authored Flow component boundary.
+
+Use `Jido.Exec.run/4` for an in-memory run. Use `Jido.Durable` only when the
+run must survive process or instance replacement. Timers and cron schedules
+belong to the host. Durable saves their Flow state but does not start a
+scheduler.
 
 | ID | Lesson |
 | --- | --- |
-| `05_01_run_identity` | Inspect one direct Runic execution identity. |
-| `05_02_snapshot_and_resume` | Restore a completed checkpoint. |
-| `05_03_process_recovery` | Restore interrupted pending work. |
-| `05_04_run_inspection` | Inspect active and complete work. |
-| `05_05_cancellation` | Cancel active Map work. |
-| `05_06_telemetry` | Correlate Jido and Runic telemetry. |
-| `05_07_cron_signal` | Deliver a host-built cron occurrence Signal to a durable wait. |
-| `05_08_timed_wait` | Resume a durable timer from its saved wake time. |
-| `05_09_direct_flow` | Run one durable Flow without an Agent or AgentServer. |
+| `05_01_start_and_result` | Start from a Signal and read the normal Exec result. |
+| `05_02_restart_recovery` | Restore an open wait after a Jido instance restart. |
+| `05_03_signal_resume` | Resume a wait with a host-created cron Signal. |
+| `05_04_timed_resume` | Resume a saved timer at its reported wake time. |
 
 Run the supported group with:
 

@@ -2,7 +2,6 @@ defmodule Jido.Exec.RebuildTest do
   use Covenant.Case, component: "jido_action.boundary", async: true
 
   alias Jido.Exec
-  alias Jido.Exec.Frame
   alias Jido.Flow.Ref
   alias Jido.Error.ValidationError
   alias Jido.Test.Action.Fixtures.Actions.{Add, EchoParamsAction}
@@ -133,27 +132,12 @@ defmodule Jido.Exec.RebuildTest do
   end
 
   @tag obligation: "jido_action.boundary.I5"
-  test "Instructions and Action nodes transmute to Runic workflows" do
-    instruction = Jido.Instruction.new!(target: Add, params: %{value: 1, amount: 1})
-
-    assert %Jido.Exec.Node.Action{} = Runic.Transmutable.to_component(instruction)
-    assert %Workflow{} = Runic.Transmutable.transmute(instruction)
-
-    node = Runic.Transmutable.to_component(instruction)
-    assert ^node = Runic.Transmutable.to_component(node)
-    assert %Workflow{} = Runic.Transmutable.transmute(node)
-
-    flow_instruction = Jido.Instruction.new!(target: Child)
-    assert %Workflow{} = Runic.Transmutable.to_workflow(flow_instruction)
-  end
-
-  @tag obligation: "jido_action.boundary.I5"
   test "root Action and Flow result ports rebuild from component logs" do
-    action = Exec.compile!(Add)
+    action = Jido.Exec.Compiler.compile!(Add)
     rebuilt_action = action |> Workflow.build_log() |> Workflow.from_log()
-    assert rebuilt_action.output_ports == [result: [type: :any, from: "add_one"]]
+    assert [result: [type: :any, from: _name]] = rebuilt_action.output_ports
 
-    flow = Exec.compile!(Child)
+    flow = Jido.Exec.Compiler.compile!(Child)
     rebuilt_flow = flow |> Workflow.build_log() |> Workflow.from_log()
     assert [result: [type: :any, from: _name]] = rebuilt_flow.output_ports
   end
@@ -176,7 +160,7 @@ defmodule Jido.Exec.RebuildTest do
       })
 
     expected_version = target.module_info(:md5)
-    build_log = flow |> Exec.compile!() |> Workflow.build_log()
+    build_log = flow |> Jido.Exec.Compiler.compile!() |> Workflow.build_log()
 
     :code.purge(target)
     :code.delete(target)
@@ -188,7 +172,7 @@ defmodule Jido.Exec.RebuildTest do
     {completed, observation} =
       rebuilt
       |> Workflow.put_run_context(%{_global: %{}})
-      |> Workflow.execute(Jido.Exec.Fact.local_value(Frame.new(%{})))
+      |> Workflow.execute(%{})
 
     assert {:error, %ValidationError{details: details} = error} =
              Exec.result(completed, observation)
@@ -203,13 +187,55 @@ defmodule Jido.Exec.RebuildTest do
     refute details.expected == details.actual
   end
 
+  @tag obligation: "jido_action.boundary.I5"
+  test "a rebuilt parent Flow rejects changed child Flow code" do
+    target = Module.concat(__MODULE__, "ReloadedFlow#{System.unique_integer([:positive])}")
+    compile_reload_flow(target, 1)
+
+    on_exit(fn ->
+      :code.purge(target)
+      :code.delete(target)
+    end)
+
+    parent =
+      Jido.Flow.new!(%{
+        name: "rebuild_changed_child_flow",
+        components: [%{kind: :subflow, name: "child", flow: target, params: %{}}],
+        output: Ref.result("child")
+      })
+
+    expected_version = target.module_info(:md5)
+    build_log = parent |> Jido.Exec.Compiler.compile!() |> Workflow.build_log()
+
+    :code.purge(target)
+    :code.delete(target)
+    compile_reload_flow(target, 2)
+    actual_version = target.module_info(:md5)
+
+    {completed, observation} =
+      build_log
+      |> Workflow.from_log()
+      |> Workflow.put_run_context(%{_global: %{}})
+      |> Workflow.execute(%{})
+
+    assert {:error, %ValidationError{details: details} = error} =
+             Exec.result(completed, observation)
+
+    assert error.message == "Flow target code changed after the graph was built"
+    assert details.reason == :incompatible_target
+    assert details.node == "child"
+    assert details.target == target
+    assert details.expected == expected_version
+    assert details.actual == actual_version
+  end
+
   defp rebuilt_output(flow, input) do
-    rebuilt = flow |> Exec.compile!() |> Workflow.build_log() |> Workflow.from_log()
+    rebuilt = flow |> Jido.Exec.Compiler.compile!() |> Workflow.build_log() |> Workflow.from_log()
 
     workflow =
       rebuilt
       |> Workflow.put_run_context(%{_global: %{}})
-      |> Workflow.react_until_satisfied(Workflow.Fact.new(value: Frame.new(input)),
+      |> Workflow.react_until_satisfied(Workflow.Fact.new(value: input),
         scheduler_policies: [{:default, %{on_failure: :halt}}]
       )
 
@@ -224,6 +250,36 @@ defmodule Jido.Exec.RebuildTest do
 
       @impl true
       def run(_params, _context), do: {:ok, %{version: #{version}}}
+    end
+    """)
+  end
+
+  defp compile_reload_flow(target, version) do
+    Code.compile_string("""
+    defmodule #{inspect(target)} do
+      @behaviour Jido.Flow
+
+      @impl true
+      def flow do
+        Jido.Flow.new!(%{
+          name: "reloaded_flow",
+          components: [
+            %{
+              kind: :step,
+              name: "version",
+              action: Jido.Test.Action.Fixtures.Actions.Add,
+              params: %{value: #{version}, amount: 0}
+            }
+          ],
+          output: %{version: Jido.Flow.Ref.result("version", :value)}
+        })
+      end
+
+      @impl true
+      def validate_params(params), do: {:ok, params}
+
+      @impl true
+      def validate_output(output), do: {:ok, output}
     end
     """)
   end

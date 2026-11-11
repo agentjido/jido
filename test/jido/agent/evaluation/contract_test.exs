@@ -141,7 +141,6 @@ defmodule Jido.Agent.EvaluationContractTest do
           :agent_topology,
           :plugin_inputs,
           :signal,
-          :__jido_exec_durable__,
           :__jido_wait_host__,
           :__jido_wait_result__
         ] do

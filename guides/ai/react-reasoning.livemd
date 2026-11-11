@@ -17,14 +17,13 @@ The root Flow is fixed and short:
 1. `start_request` loads the Session, selects tools, and appends the user message.
 2. `input_guard` checks the input.
 3. `loop` is a Flow Iterate component. Each iteration runs one model call and acts on the result.
-4. `continuation` ends the loop, or waits for [Tool Review](tool-review.md).
-5. `finalize` records the outcome and returns the new state and the reply.
+4. `continuation` finalizes the outcome or hands control to [Tool Review](tool-review.md).
 
 ```elixir
 Jido.AI.Reasoning.ReAct.flow().components |> Map.keys() |> Enum.sort()
 ```
 
-The cell returns the component names in alphabetical order: `["continuation", "finalize", "initialize", "input_guard", "loop", "start_request"]`. `initialize` builds the loop's starting state.
+The cell returns the component names in alphabetical order: `["continuation", "initialize", "input_guard", "loop", "start_request"]`. `initialize` builds the loop's starting state. `continuation` calls `FinalizeTurn` for a completed request. It is not a separate Flow node.
 
 Each iteration calls `Jido.AI.Reasoning.ReAct.Actions.Advance`. It projects the conversation, calls the model, applies the output guard, records the attempt, checks for repeated tool calls, and decides what comes next. Then one of these happens:
 
@@ -37,7 +36,7 @@ Each iteration calls `Jido.AI.Reasoning.ReAct.Actions.Advance`. It projects the 
 | Non-retryable model error | The request ends with `:failed`. |
 | Output rejected | The model gets a repair instruction, within the same attempt limits. |
 | A limit reached | The request ends with `:blocked` and reason code `:limits`. |
-| Tool review required | The loop ends, and the Flow waits. |
+| Tool review required | The root Flow hands off to the Tool Review Flow, which owns the durable wait. |
 
 The Iterate component allows at most 17 iterations. `limits.model_calls` has a maximum of 16, so that limit always comes first.
 

@@ -198,10 +198,10 @@ Each record belongs to one execution, identified by namespace, partition, Agent 
 | --- | --- |
 | A batch count | How many event batches are confirmed |
 | Event batches | One key per ordered batch of workflow events |
-| Facts | One key per produced value, stored in full or as a delta against an earlier value, when that is smaller |
-| A fact head and index | The latest value for delta encoding, and the list used for collection |
+| Facts | One key per complete produced value, with a digest |
+| A fact index | The list used for collection |
 
-The batch write is the commit point. If a writer stops between writing a batch and updating its count, the next read finds the batch and repairs the count. Deltas form chains of at most 32 steps, and each value carries a SHA-256 digest that recovery verifies.
+The batch write is the commit point. If a writer stops between writing a batch and updating its count, the next read finds the batch and repairs the count. Each fact value carries a SHA-256 digest that recovery verifies.
 
 ## What recovery checks
 

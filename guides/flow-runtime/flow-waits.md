@@ -121,7 +121,7 @@ wait = wait_for_open.(wait_for_open, 200)
 true = is_integer(Jido.Exec.Wait.next_deadline([wait]))
 ```
 
-A wait has a stable `id`, the `execution_id` of its Turn, a `path` through nested Flows, resolved `options`, and `opened_at`. Each timer option has an absolute `deadline` in UTC Unix milliseconds. Save the `id` wherever your callback needs it. The struct holds portable data only.
+A wait has a stable `id`, the `execution_id` of its Turn, its authored component `path`, resolved `options`, and `opened_at`. Each timer option has an absolute `deadline` in UTC Unix milliseconds. Save the `id` wherever your callback needs it. The struct holds portable data only.
 
 Reads stay available while the Flow waits. Other state-changing Turns stay queued until this Turn finishes.
 
@@ -172,8 +172,7 @@ A timer resolves with no Signal, so a Flow with only a timer needs nothing deliv
 ## Combine waits with other components
 
 - Independent waits can be open at once. `status` lists them all, and you deliver to each by ID. They can resolve in any order.
-- A nested Flow can wait. The wait `path` includes the parent, and effects from earlier children are kept.
-- An Invoke can select a target Flow that waits.
+- Put each wait on the executed root Flow. A nested Flow and a Flow selected by Invoke are atomic authored components and cannot suspend inside that boundary.
 - Map and Iterate reject a Flow body that waits. The Flow module fails at compile time with a "wrong target kind" error. Map and Iterate call Action modules only.
 
 ## Restart, hibernate, and cancel

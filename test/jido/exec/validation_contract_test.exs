@@ -7,7 +7,6 @@ defmodule Jido.Exec.ValidationContractTest do
   alias Jido.Exec.Validation
   alias Jido.Flow
   alias Jido.Flow.Ref
-  alias Runic.Workflow.SingleOutput.{Context, Result}
 
   @moduletag capture_log: true
 
@@ -236,7 +235,7 @@ defmodule Jido.Exec.ValidationContractTest do
   end
 
   @tag obligation: "jido_action.boundary.I1"
-  test "root and nested data Flow input schemas reject scalar transformations" do
+  test "root data Flow input schemas reject scalar transformations" do
     flow = data_flow(%{name: "scalar_input", schema: scalar_schema(), output: %{}})
 
     for run <- data_boundaries(flow) do
@@ -256,8 +255,21 @@ defmodule Jido.Exec.ValidationContractTest do
     start_supervised!({Runic.Runner, name: runner})
 
     for failure <- [:raise, :throw, :exit, :invalid, :reason, :exception] do
+      id = make_ref()
+
+      assert {:ok, _worker} =
+               Jido.Test.Exec.RunnerHarness.start(runner, id, FlowValidator, %{
+                 phase: :input,
+                 failure: failure
+               })
+
       assert {:error, error} =
-               Jido.Test.Exec.RunnerHarness.start(runner, make_ref(), FlowValidator, %{phase: :input, failure: failure})
+               Jido.Test.Eventually.eventually(fn ->
+                 case Jido.Test.Exec.RunnerHarness.result(runner, id) do
+                   {:error, %{details: %{reason: :execution_active}}} -> false
+                   result -> result
+                 end
+               end)
 
       assert error.details.phase == :flow_input
       refute Map.has_key?(error.details, :non_portable_durable_value)
@@ -265,7 +277,7 @@ defmodule Jido.Exec.ValidationContractTest do
   end
 
   @tag obligation: "jido_action.boundary.I3"
-  test "root and nested data Flow output schemas reject scalar transformations" do
+  test "root data Flow output schemas reject scalar transformations" do
     flow = data_flow(%{name: "scalar_output", output_schema: scalar_schema(), output: %{}})
 
     for run <- data_boundaries(flow) do
@@ -302,7 +314,7 @@ defmodule Jido.Exec.ValidationContractTest do
   end
 
   @tag obligation: ["jido_action.boundary.I1", "jido_action.boundary.I3"]
-  test "data Flow schemas run once at root and nested boundaries" do
+  test "data Flow schemas run once at the root boundary" do
     flow =
       data_flow(%{
         name: "transformed_data",
@@ -367,45 +379,12 @@ defmodule Jido.Exec.ValidationContractTest do
 
   defp boundaries(FlowValidator, phase) do
     root_phase = if phase == :input, do: :flow_input, else: :flow_output
-    nested_phase = if phase == :input, do: :subflow_input, else: :subflow_output
-    [{FlowValidator, root_phase, nil}, {ParentFlow, nested_phase, ["child"]}]
+    [{FlowValidator, root_phase, nil}, {ParentFlow, root_phase, ["child"]}]
   end
 
   defp component_location?(ActionValidator, _phase), do: true
   defp component_location?(_target, :input), do: true
   defp component_location?(_target, :output), do: false
 
-  defp data_boundaries(flow), do: [&Exec.run(flow, &1), &resolve_nested(flow, &1)]
-
-  defp resolve_nested(flow, params) do
-    input =
-      Jido.Exec.Node.Input.new(
-        id: :input,
-        name: "child_input",
-        component: "child",
-        params: Ref.input([]),
-        validator: flow,
-        node_path: ["child"]
-      )
-
-    output =
-      Jido.Exec.Node.Output.new(
-        id: :output,
-        name: "child_output",
-        output: flow.output,
-        effect_order: [],
-        validator: flow,
-        parent_component: "child"
-      )
-
-    with {:ok, frame} <- Jido.Exec.Node.Input.resolve(input, Jido.Exec.Frame.new(params), %{}) do
-      case Jido.Exec.Node.Output.run(output, frame, %Context{}) do
-        %Result{status: :value, value: parent} ->
-          {:ok, Jido.Exec.Frame.resolver_state(parent, %{}).results["child"]}
-
-        %Result{status: :failure, error: error} ->
-          {:error, error}
-      end
-    end
-  end
+  defp data_boundaries(flow), do: [&Exec.run(flow, &1)]
 end

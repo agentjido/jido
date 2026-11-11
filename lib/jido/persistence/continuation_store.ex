@@ -3,15 +3,13 @@ defmodule Jido.Persistence.ContinuationStore do
   @behaviour Runic.Runner.Store
 
   alias Jido.Persistence.Store
-  alias Jido.Exec.Frame.Delta
   alias Jido.Exec.Runtime
   alias __MODULE__.JoinCompletedRef
-  alias Runic.Workflow.{Batch, Fact, FactRef, FactResolver, Rehydration}
+  alias Runic.Workflow.{Fact, FactResolver, Rehydration}
 
   @prefix "jido:execution:"
   @fact_tag :jido_fact_value
   @fact_version 1
-  @max_fact_delta_depth 32
   @fact_index_write_attempts 8
 
   # Durable Flow Turns use the Agent persistence adapter. Ordinary Turns save
@@ -101,7 +99,7 @@ defmodule Jido.Persistence.ContinuationStore do
 
   def load_fact({:jido_execution, _, _, _, _} = id, hash, jido) do
     with {:ok, config} <- config(jido, id),
-         {:ok, value, _depth} <- load_fact_value(config, id, hash, %{}) do
+         {:ok, value} <- load_fact_value(config, id, hash) do
       {:ok, value}
     end
   end
@@ -167,12 +165,7 @@ defmodule Jido.Persistence.ContinuationStore do
   defp rehydrate_frontier(events, id, jido) do
     workflow = Runic.Workflow.from_events(events, nil, fact_mode: :ref)
 
-    required =
-      if Batch.present?(workflow) do
-        for {hash, %FactRef{}} <- workflow.graph.vertices, into: MapSet.new(), do: hash
-      else
-        Rehydration.classify(workflow).hot
-      end
+    required = Rehydration.classify(workflow).hot
 
     resolver = FactResolver.new({__MODULE__, {id, jido}})
     {workflow, resolver} = Rehydration.resolve_hot(workflow, required, resolver)
@@ -258,16 +251,14 @@ defmodule Jido.Persistence.ContinuationStore do
         accept_existing_fact(config, id, hash, value)
 
       {:error, :not_found} ->
-        with {:ok, base_hash, head_condition} <- read_fact_head(config, id),
-             {:ok, record} <- fact_record(config, id, base_hash, value),
-             :ok <- record_fact_hash(config, id, hash) do
+        with :ok <- record_fact_hash(config, id, hash) do
           case Store.compare_and_swap(
                  config,
                  fact_key(id, hash),
                  :not_found,
-                 encode(record)
+                 encode(full_fact_record(value))
                ) do
-            :ok -> advance_fact_head(config, id, head_condition, hash)
+            :ok -> :ok
             {:error, :conflict} -> accept_existing_fact(config, id, hash, value)
             error -> error
           end
@@ -279,7 +270,7 @@ defmodule Jido.Persistence.ContinuationStore do
   end
 
   defp accept_existing_fact(config, id, hash, value) do
-    with {:ok, stored, _depth} <- load_fact_value(config, id, hash, %{}),
+    with {:ok, stored} <- load_fact_value(config, id, hash),
          true <- stored === value do
       record_fact_hash(config, id, hash)
     else
@@ -288,98 +279,22 @@ defmodule Jido.Persistence.ContinuationStore do
     end
   end
 
-  defp fact_record(_config, _id, nil, value), do: {:ok, full_fact_record(value)}
-
-  defp fact_record(config, id, base_hash, value) do
-    with {:ok, base, depth} <- load_fact_value(config, id, base_hash, %{}) do
-      full = full_fact_record(value)
-
-      case Delta.encode(base, value) do
-        {:delta, encoded} when depth < @max_fact_delta_depth ->
-          delta =
-            {@fact_tag, @fact_version, depth + 1, fact_digest(value), {:delta, base_hash}, encoded}
-
-          {:ok, if(encoded_size(delta) < encoded_size(full), do: delta, else: full)}
-
-        _full ->
-          {:ok, full}
-      end
-    end
-  end
-
   defp full_fact_record(value),
     do: {@fact_tag, @fact_version, 0, fact_digest(value), :full, value}
 
-  defp load_fact_value(config, id, hash, seen) do
-    if Map.has_key?(seen, hash) do
-      {:error, :invalid_execution_checkpoint}
-    else
-      with {:ok, bytes, _condition} <- Store.read(config, fact_key(id, hash)),
-           {:ok, record} <- decode(bytes) do
-        decode_fact_record(config, id, record, Map.put(seen, hash, true))
-      end
+  defp load_fact_value(config, id, hash) do
+    with {:ok, bytes, _condition} <- Store.read(config, fact_key(id, hash)),
+         {:ok, record} <- decode(bytes) do
+      decode_fact_record(record)
     end
   end
 
-  defp decode_fact_record(
-         _config,
-         _id,
-         {@fact_tag, @fact_version, 0, digest, :full, value},
-         _seen
-       )
+  defp decode_fact_record({@fact_tag, @fact_version, 0, digest, :full, value})
        when is_binary(digest) and byte_size(digest) == 32 do
-    with :ok <- verify_fact_digest(value, digest), do: {:ok, value, 0}
+    with :ok <- verify_fact_digest(value, digest), do: {:ok, value}
   end
 
-  defp decode_fact_record(
-         config,
-         id,
-         {@fact_tag, @fact_version, depth, digest, {:delta, base_hash}, encoded},
-         seen
-       )
-       when is_integer(depth) and depth > 0 and depth <= @max_fact_delta_depth and
-              is_binary(digest) and byte_size(digest) == 32 do
-    with {:ok, base, base_depth} <- load_fact_value(config, id, base_hash, seen),
-         true <- depth == base_depth + 1,
-         {:ok, value} <- Delta.decode(base, encoded),
-         :ok <- verify_fact_digest(value, digest) do
-      {:ok, value, depth}
-    else
-      _invalid -> {:error, :invalid_execution_checkpoint}
-    end
-  end
-
-  defp decode_fact_record(_config, _id, _record, _seen),
-    do: {:error, :invalid_execution_checkpoint}
-
-  defp read_fact_head(config, id) do
-    case Store.read(config, fact_head_key(id)) do
-      {:ok, bytes, condition} ->
-        case decode(bytes) do
-          {:ok, {:jido_fact_head, 1, hash}} -> {:ok, hash, condition}
-          _invalid -> {:error, :invalid_execution_checkpoint}
-        end
-
-      {:error, :not_found} ->
-        {:ok, nil, :not_found}
-
-      error ->
-        error
-    end
-  end
-
-  defp advance_fact_head(config, id, condition, hash) do
-    case Store.compare_and_swap(
-           config,
-           fact_head_key(id),
-           condition,
-           encode({:jido_fact_head, 1, hash})
-         ) do
-      :ok -> :ok
-      {:error, :conflict} -> :ok
-      error -> error
-    end
-  end
+  defp decode_fact_record(_record), do: {:error, :invalid_execution_checkpoint}
 
   defp record_fact_hash(config, id, hash),
     do: record_fact_hash(config, id, hash, @fact_index_write_attempts)
@@ -490,7 +405,7 @@ defmodule Jido.Persistence.ContinuationStore do
       fact_keys = for hash <- Enum.uniq(indexed_hashes), do: fact_key(id, hash)
 
       Enum.each(
-        [key(id), fact_head_key(id), fact_index_key(id) | batch_keys ++ fact_keys],
+        [key(id), fact_index_key(id) | batch_keys ++ fact_keys],
         &delete_record(config, &1)
       )
     end
@@ -501,7 +416,6 @@ defmodule Jido.Persistence.ContinuationStore do
   defp key(id), do: @prefix <> Base.url_encode64(:erlang.term_to_binary(id), padding: false)
 
   defp batch_key(id, index), do: key(id) <> ":batches:" <> Integer.to_string(index)
-  defp fact_head_key(id), do: key(id) <> ":facts:head"
   defp fact_index_key(id), do: key(id) <> ":facts:index"
 
   defp fact_key(id, hash) do
@@ -517,5 +431,4 @@ defmodule Jido.Persistence.ContinuationStore do
   end
 
   defp encode(value), do: :erlang.term_to_binary(value, [:deterministic])
-  defp encoded_size(value), do: value |> encode() |> byte_size()
 end
