@@ -127,7 +127,7 @@ defmodule Jido.Agent.StateTest do
     assert agent.state == %{config: %{second: 4}, count: 3, optional: nil}
 
     assert {:error, %Jido.Error.ValidationError{code: :incomplete_state}} =
-             Agent.transition(agent, %{optional: nil})
+             Jido.Agent.Validation.transition(agent, %{optional: nil})
   end
 
   def mutate(value, opts) do
@@ -245,7 +245,7 @@ defmodule Jido.Agent.StateTest do
       assert {:error, %{__exception__: true}} =
                Agent.validate(%{agent | state: state})
 
-      assert {:error, %{__exception__: true}} = Agent.transition(agent, state)
+      assert {:error, %{__exception__: true}} = Jido.Agent.Validation.transition(agent, state)
       assert agent.state === %{nested: %{count: 1}}
     end
   end
@@ -257,12 +257,12 @@ defmodule Jido.Agent.StateTest do
     agent = Agent.instantiate!(definition, id: Jido.Id.uuid7())
     assert agent.state === %{}
     assert {:ok, ^agent} = Agent.validate(agent)
-    assert {:ok, ^agent} = Agent.transition(agent, %{})
+    assert {:ok, ^agent} = Jido.Agent.Validation.transition(agent, %{})
 
     assert {:ok, %{state: %{count: 1}}} =
              Agent.instantiate(definition, id: Jido.Id.uuid7(), state: %{count: nil})
 
-    assert {:error, _} = Agent.transition(agent, %{count: nil})
+    assert {:error, _} = Jido.Agent.Validation.transition(agent, %{count: nil})
   end
 
   @tag obligation: "jido.agent.I8"
@@ -299,7 +299,7 @@ defmodule Jido.Agent.StateTest do
         state: %{nested: %{count: 1}}
       )
 
-    assert {:error, _} = Agent.transition(agent, %{nested: %{count: 1, other: 2}})
+    assert {:error, _} = Jido.Agent.Validation.transition(agent, %{nested: %{count: 1, other: 2}})
     assert {:ok, ^agent} = Agent.validate(agent)
   end
 

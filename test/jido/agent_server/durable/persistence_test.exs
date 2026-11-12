@@ -22,8 +22,12 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
     end
 
     def compare_and_swap(key, expected, value, opts) do
-      %{rev: revision} = :erlang.binary_to_term(value, [:safe])
-      mode = if revision == 0, do: :ok, else: Elixir.Agent.get(opts[:control], & &1.write)
+      record = :erlang.binary_to_term(value, [:safe])
+
+      mode =
+        if match?(%{rev: revision} when revision > 0, record),
+          do: Elixir.Agent.get(opts[:control], & &1.write),
+          else: :ok
 
       case mode do
         :ok ->
@@ -183,8 +187,8 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
     send(writer, :release)
     assert {:ok, %{state: %{count: 1}}, []} = Server.await(pending)
     assert {:ok, %{state: %{count: 2}}, []} = Server.await(queued)
-    assert {:ok, %{state: %{count: 2}}, 2} = load(c)
-    assert Server.status(server).state_version == 2
+    assert {:ok, %{state: %{count: 2}}, 4} = load(c)
+    assert Server.status(server).state_version == 4
     F.clean(Jido.Instance.Names.exec_runner(c.jido))
   end
 
@@ -203,18 +207,18 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
     server = ready(c)
     assert_receive {:resource, old_resource, %{plugin_state: 7, state_version: 0}}, 1_000
     assert {:ok, _, []} = Server.call(server, F.signal())
-    assert_receive {:committed, 1}, 1_000
+    assert_receive {:committed, 2}, 1_000
     assert record(c).checkpoint.agent.state.resource == %{saved_resource: 8}
     :ok = Server.stop(server)
     F.down(old_resource)
     restored = ready(c, persistence_mode: :restore)
-    assert_receive {:resource, new_resource, %{plugin_state: 8, state_version: 1}}, 1_000
+    assert_receive {:resource, new_resource, %{plugin_state: 8, state_version: 2}}, 1_000
     assert new_resource != old_resource
     assert Server.agent(restored).state == %{count: 1, resource: 8}
-    assert Server.status(restored).state_version == 1
+    assert Server.status(restored).state_version == 2
     assert {:ok, _, []} = Server.call(restored, F.signal())
-    assert_receive {:committed, 2}, 1_000
-    assert {:ok, %{state: %{count: 2, resource: 9}}, 2} = load(c)
+    assert_receive {:committed, 4}, 1_000
+    assert {:ok, %{state: %{count: 2, resource: 9}}, 4} = load(c)
   end
 
   @tag obligation: ["jido.agent_server.durable.I3", "jido.agent_server.durable.I4"]
@@ -232,10 +236,10 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
       |> Jido.Agent.instantiate!(id: c.agent.id)
 
     c = %{c | agent: agent}
-    server = ready(c)
+    server = ready(c, persistence_timeout: 15_000)
     assert_receive {:resource, resource, %{plugin_state: 7, state_version: 0}}, 1_000
     assert {:ok, committed, []} = Server.call(server, F.signal())
-    assert_receive {:committed, 1}, 1_000
+    assert_receive {:committed, 2}, 1_000
     {_phase, data} = :sys.get_state(server)
     Storage.configure(c.storage, :read, :gate)
     Process.exit(resource, :kill)
@@ -244,31 +248,62 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
 
     # The supervisor can be waiting for the postponed Plugin start. Read the
     # worker identity from its checkpoint table without calling the supervisor.
-    replacement = :ets.lookup_element(data.activation_state, :worker, 2)
+    replacement =
+      eventually(fn -> initializing_worker(data.activation_state, server) end,
+        timeout: 1_000
+      )
+
     request = :gen_statem.send_request(replacement, {:plugin_init, Plugin})
-    assert Server.status(replacement).phase == :initializing
     assert :gen_statem.wait_response(request, 0) == :timeout
     refute_received {:resource, _, _}
 
     Storage.configure(c.storage, :read, :ok)
     send(reader, :release)
+    release_storage_readers()
 
-    assert {:reply, {:ok, %{plugin_state: 8, state_version: 1}}} =
-             :gen_statem.wait_response(request, 1_000)
+    assert {:reply, {:ok, %{plugin_state: 8, state_version: 2}}} =
+             :gen_statem.wait_response(request, 5_000)
 
-    assert_receive {:resource, fresh, %{plugin_state: 8, state_version: 1}}, 1_000
+    assert_receive {:resource, fresh, %{plugin_state: 8, state_version: 2}}, 5_000
     assert fresh != resource
     assert Server.await_ready(replacement) == :ok
     assert Server.agent(replacement) == committed
   end
 
+  defp initializing_worker(table, previous) do
+    case :ets.lookup(table, :worker) do
+      [{:worker, pid}] when is_pid(pid) and pid != previous ->
+        try do
+          if Process.alive?(pid) and Server.status(pid).phase == :initializing,
+            do: pid
+        catch
+          :exit, _reason -> nil
+        end
+
+      _other ->
+        nil
+    end
+  end
+
+  defp release_storage_readers do
+    receive do
+      {:storage, :read, reader} ->
+        send(reader, :release)
+        release_storage_readers()
+    after
+      100 -> :ok
+    end
+  end
+
   @tag obligation: ["jido.agent_server.durable.I3", "jido.agent_server.durable.I7"]
   test "worker death after durable write restores stored commit without replay", c do
+    Code.ensure_loaded!(Runic.Identity)
     server = ready(c)
     root = Server.activation(server)
     Storage.configure(c.storage, :write, :written_gate)
     Server.submit(server, F.signal())
     assert_receive {:storage, :written, writer}, 1_000
+    Storage.configure(c.storage, :write, :ok)
     assert Server.agent(server).state.count == 0
     assert record(c).rev == 1
     Process.exit(server, :kill)
@@ -279,9 +314,9 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
 
     replacement = Server.Supervisor.worker(root)
     assert Server.await_ready(replacement) == :ok
-    assert Server.agent(replacement).state.count == 1
-    assert Server.status(replacement).state_version == 1
-    assert record(c).rev == 1
+    assert_eventually(Server.agent(replacement).state.count == 1, timeout: 5_000)
+    assert Server.status(replacement).state_version == 2
+    assert record(c).rev == 2
     F.clean(Jido.Instance.Names.exec_runner(c.jido))
   end
 
@@ -337,7 +372,7 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
       )
 
     F.down(root)
-    assert record(c).rev == 1
+    assert record(c).rev == 2
   end
 
   for {name, update} <- [
@@ -395,23 +430,28 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
     :ok = Server.stop(local)
 
     server = ready(c)
-    root = Server.activation(server)
-    assert {:error, %Jido.Error.ExecutionError{}} = Server.call(server, F.signal())
-    F.down(root)
-    assert {:ok, %{state: %{handle: nil}}, 0} = load(c)
+
+    assert {:error, %Jido.Error.ExecutionError{message: "Flow output is not portable data"}} =
+             Server.call(server, F.signal())
+
+    assert Process.alive?(server)
+    assert Server.status(server).durable_turn.status == :failed
+    assert {:ok, %{state: %{handle: nil}}, 2} = load(c)
   end
 
   @tag obligation: "jido.agent_server.durable.I8"
-  test "custom Agent checkpoint conversion protects portable records", c do
+  test "custom Agent checkpoints do not bypass durable Flow output portability", c do
     c = %{c | agent: CustomAgent.instantiate!(id: c.agent.id, state: %{handle: self()})}
     server = ready(c)
-    assert {:ok, %{state: %{handle: handle}}, []} = Server.call(server, F.signal())
-    assert is_pid(handle)
+
+    assert {:error, %Jido.Error.ExecutionError{message: "Flow output is not portable data"}} =
+             Server.call(server, F.signal())
+
     assert record(c).checkpoint.state_format == :custom
     :ok = Server.stop(server)
     restored = ready(c, persistence_mode: :restore)
     assert Server.agent(restored).state.handle == nil
-    assert Server.status(restored).state_version == 1
+    assert Server.status(restored).state_version == 2
   end
 
   @tag obligation: ["jido.agent_server.durable.I3", "jido.agent_server.durable.I4"]
@@ -485,7 +525,7 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
     server = ready(c, persistence: :inherit)
     assert record(c).rev == 0
     assert {:ok, _, []} = Server.call(server, F.signal())
-    assert record(c).rev == 1
+    assert record(c).rev == 2
   end
 
   @tag obligation: ["jido.agent_server.durable.I1", "jido.agent_server.durable.I2"]
@@ -515,7 +555,7 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
 
   @tag obligation: ["jido.agent_server.durable.I5", "jido.agent_server.durable.I6"]
   test "expected revision rejects a record behind the live revision", c do
-    server = ready(c)
+    server = ready(c, default_dispatch: {:pid, target: self()})
     root = Server.activation(server)
     initial = record(c)
     assert {:ok, _, []} = Server.call(server, F.signal())
@@ -553,10 +593,7 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
     Storage.configure(c.storage, :write, :unknown)
     signal = Jido.Signal.new!("saved.effect", %{}, source: "/server-contract")
 
-    directive = %Jido.Agent.Directive.Emit{
-      signal: signal,
-      dispatch: {:pid, target: self(), delivery_mode: :sync}
-    }
+    directive = %Jido.Agent.Directive.Emit{signal: signal, dispatch: nil}
 
     assert {:error, _} = Server.call(server, F.signal(%{mode: :batch, directives: [directive]}))
     F.down(root)
@@ -576,9 +613,10 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
     assert {:error, _} = Server.call(server, F.signal())
     F.down(root)
     assert record(c).rev == 1
+    Storage.configure(c.storage, :write, :ok)
     restored = ready(c, persistence_mode: :restore)
-    assert Server.agent(restored).state.count == 1
-    assert Server.status(restored).state_version == 1
+    assert_eventually(Server.agent(restored).state.count == 1, timeout: 5_000)
+    assert Server.status(restored).state_version == 2
   end
 
   @tag obligation: "jido.agent_server.durable.I8"
@@ -597,6 +635,7 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
 
   @tag obligation: "jido.agent_server.durable.I6"
   test "late successful write is indeterminate even when its reply precedes the timer", c do
+    Code.ensure_loaded!(Runic.Identity)
     server = ready(c, persistence_timeout: 100)
     root = Server.activation(server)
     Storage.configure(c.storage, :write, :gate)
@@ -617,8 +656,9 @@ defmodule Jido.AgentServer.Durable.PersistenceTest do
 
     F.down(root)
     assert record(c).rev == 1
+    Storage.configure(c.storage, :write, :ok)
     restored = ready(c, persistence_mode: :restore)
-    assert Server.agent(restored).state.count == 1
+    assert_eventually(Server.agent(restored).state.count == 1, timeout: 5_000)
   end
 
   @tag obligation: "jido.agent_server.durable.I6"

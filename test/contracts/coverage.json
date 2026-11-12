@@ -1,14 +1,14 @@
 {
   "apps": {
     "jido": {
-      "active": 120,
+      "active": 118,
       "coverage": 1.0,
-      "covered": 120
+      "covered": 118
     },
     "jido.agent_server": {
-      "active": 74,
+      "active": 73,
       "coverage": 1.0,
-      "covered": 74
+      "covered": 73
     },
     "jido.plugin": {
       "active": 34,
@@ -17,8 +17,8 @@
     },
     "jido_action": {
       "active": 52,
-      "coverage": 0.9231,
-      "covered": 48
+      "coverage": 1.0,
+      "covered": 52
     },
     "jido_ai": {
       "active": 44,
@@ -28,10 +28,10 @@
   },
   "components": {
     "jido.agent": {
-      "active": 24,
+      "active": 22,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 24,
+      "covered": 22,
       "form": "light",
       "obligations": {
         "jido.agent.I1": {
@@ -57,7 +57,7 @@
         "jido.agent.I10": {
           "failing": 0,
           "kind": "functional",
-          "passing": 22,
+          "passing": 23,
           "status": "active",
           "testable": true,
           "tests": [
@@ -73,6 +73,7 @@
             "test a Plugin route cannot conflict with a stored route",
             "test agent is a reserved provider section",
             "test composed Plugin state follows the same schema policy",
+            "test internal definition passes can defer Plugin schema validation",
             "test lowering and endpoint projection return the complete contribution",
             "test normalization and verification reject invalid provider data",
             "test provider identity and core namespaces are unique",
@@ -231,101 +232,37 @@
             "test member identities require positive slots and nonempty binary IDs",
             "test one Agent owns immediate named members and logical output connections",
             "test related validation can be deferred but invalid public member forms still fail",
-            "test topology values have exact empty, state, member, and connection forms"
-          ]
-        },
-        "jido.agent.I26": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 10,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test cancelled edits and set-to-original produce an empty Diff",
-            "test composition preserves a valid state when no definition edit exists",
-            "test internal definition passes can defer Plugin schema validation",
-            "test invalid state, malformed batches, and runtime work fail without a candidate",
-            "test malformed set values cannot crash later edits",
-            "test only the final graph must resolve and removals do not cascade",
-            "test operation preconditions fail with an index and preserve the source",
-            "test route edits have strict identities and the Diff reports net changes",
-            "test state validation does not fill missing nested defaults during a transition",
-            "test the final graph resolves after the batch and removals do not cascade"
+            "test topology values have exact empty, member, and connection forms"
           ]
         },
         "jido.agent.I27": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 30,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test AgentServer validates Reply against the current requester",
-            "test Diff reports exact final values and order for each collection and state",
-            "test Diff reports top-level definition changes made by a full upgrade",
-            "test Directive constructors preserve every supported option and explicit nil",
-            "test Flow and module handler updates use the same route value",
-            "test Signal Directives require and normalize one complete Signal",
-            "test agent CRUD preserves order and replacement resets omitted fields",
-            "test built-in identity and validation cover runtime and definition Directives",
-            "test cancelled edits and set-to-original produce an empty Diff",
-            "test composition applies definition mutations and rejects duplicate Directive options",
-            "test connection CRUD uses endpoint/path identity and replacement defaults",
-            "test counted destinations need broadcast after the complete batch",
-            "test custom Directive validation contains changed types, invalid results, and faults",
-            "test custom Directives can override the default validator",
-            "test custom Directives can use the behavior before their struct is defined",
-            "test domain and runtime constructors have separate noun_verb APIs",
-            "test malformed set values cannot crash later edits",
-            "test mutations do not create helper functions",
-            "test operation preconditions fail with an index and preserve the source",
-            "test route add accepts executable, transform, and forward forms",
-            "test route edits have strict identities and the Diff reports net changes",
-            "test route mutations retain mappings and reject stale mappings atomically",
-            "test route removal changes the candidate and leaves the source unchanged",
-            "test route reorder changes first-match selection and rejects incomplete permutations",
-            "test route update shallow replaces defaults and route replacement fills defaults",
-            "test routes_set preserves order and rejects invalid contracts and helper collisions",
-            "test strict noun_verb edits preserve order and replace omitted fields with defaults",
-            "test the final graph resolves after the batch and removals do not cascade",
-            "test the mutation Directive set is closed and exact",
-            "test unknown fields and identity edits fail instead of adding hidden data"
-          ]
-        },
-        "jido.agent.I28": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 11,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test authoring validates nested initial values and exact parent references",
-            "test binding copies one state value without replacing the authored references",
-            "test connection checks return unchecked and rejected proofs",
-            "test connection selection validates the type and preserves declaration order",
-            "test counted destinations need broadcast after the complete batch",
-            "test invalid endpoint and delivery values fail at the final topology boundary",
-            "test only the final graph must resolve and removals do not cascade",
-            "test provider endpoints participate in normalization and proof checks",
-            "test removing an accepted input checks existing connections at the final boundary",
-            "test the final graph resolves after the batch and removals do not cascade",
-            "test topology replacement rejects duplicate connection identities with different delivery"
-          ]
-        },
-        "jido.agent.I29": {
           "failing": 0,
           "kind": "functional",
           "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Directive constructors preserve every supported option and explicit nil",
-            "test Plugin changes preserve state and require explicit migration and disposal",
-            "test Plugin edit errors identify the Plugin and retain passive contributions",
-            "test Plugin state initialization, configuration, migration, and removal stay explicit",
-            "test changed Plugin detection compares declarations in both directions",
-            "test definition Plugin edits add no state and remove needs no state discard",
-            "test internal definition passes can defer Plugin schema validation"
+            "test AgentServer validates Reply against the current requester",
+            "test Directive constructors preserve runtime values",
+            "test Signal Directives require and normalize one complete Signal",
+            "test built-in identity and validation cover runtime Directives",
+            "test custom Directive validation contains changed types, invalid results, and faults",
+            "test custom Directives can override the default validator",
+            "test custom Directives can use the behavior before their struct is defined"
+          ]
+        },
+        "jido.agent.I28": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test authoring validates static nested initial values",
+            "test connection checks return unchecked and rejected proofs",
+            "test connection selection validates the type and preserves declaration order",
+            "test invalid endpoint and delivery values fail at the final topology boundary",
+            "test provider endpoints participate in normalization and proof checks"
           ]
         },
         "jido.agent.I3": {
@@ -353,15 +290,13 @@
         "jido.agent.I30": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
-            "test authoring validates nested initial values and exact parent references",
-            "test binding copies one state value without replacing the authored references",
-            "test binding resolves nested state references and returns complete child values",
-            "test binding returns member overrides without instantiating the child",
-            "test composition preserves a valid state when no definition edit exists"
+            "test authoring validates static nested initial values",
+            "test binding returns complete static child values",
+            "test binding returns member overrides without instantiating the child"
           ]
         },
         "jido.agent.I31": {
@@ -509,11 +444,10 @@
         "jido.agent_evaluation.I1": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 5,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Turn validation normalizes input and rejects source substitution",
             "test failure does not undo Action work and malformed routing remains structured",
             "test forward routes return the unchanged Signal in one explicit Directive",
             "test the first declared matching route selects one target and merges defaults shallowly",
@@ -527,18 +461,17 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test the AgentServer Handoff boundary keeps the successor Turn and candidate complete",
+            "test the AgentServer Handoff boundary keeps the successor instruction and candidate complete",
             "test the AgentServer evaluation boundary keeps stages closed"
           ]
         },
         "jido.agent_evaluation.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Turn validation normalizes input and rejects source substitution",
             "test map, duplicate keyword and nil input use the original source Signal",
             "test the first declared matching route selects one target and merges defaults shallowly"
           ]
@@ -616,15 +549,14 @@
         "jido.agent_evaluation.I9": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test Agent.cmd returns a terminal Handoff without running its successor",
             "test emission requests normalize once without a route output contract",
             "test failure does not undo Action work and malformed routing remains structured",
-            "test one batch cannot change a Plugin and run its owned Directive",
-            "test the AgentServer Handoff boundary keeps the successor Turn and candidate complete",
+            "test the AgentServer Handoff boundary keeps the successor instruction and candidate complete",
             "test the complete Directive batch builds one candidate without dispatch"
           ]
         }
@@ -1367,61 +1299,50 @@
         "jido.agent_server.composition.I5": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 6,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
-            "test a bare worker rejects composition changes before committing",
             "test a declared Bus does not make another provider endpoint executable",
-            "test an accepted Plugin declaration is committed before runtime handoff",
-            "test route mutations commit as data and a failed batch keeps the revision",
-            "test runtime validation rejects provider endpoints that have no live implementation",
-            "test topology mutations start accepted members"
+            "test runtime validation rejects provider endpoints that have no live implementation"
           ]
         },
         "jido.agent_server.composition.I6": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 6,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
-            "test durable member identities retain only the same accepted slots",
-            "test persistent members restore by their accepted slot identity",
-            "test startup binds initial inputs and a state-only commit resizes the topology",
-            "test the next Turn waits until the accepted topology is ready",
-            "test topology count changes keep unchanged processes and connection edits keep all processes",
-            "test topology mutations start accepted members"
+            "test member_activation loss retains member work, sibling commits, and topology identities",
+            "test member_server loss retains member work, sibling commits, and topology identities",
+            "test root_activation loss retains member work, sibling commits, and topology identities",
+            "test root_server loss retains member work, sibling commits, and topology identities"
           ]
         },
         "jido.agent_server.composition.I7": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
-            "test a post-commit topology startup failure keeps the accepted checkpoint",
-            "test persistent members restore by their accepted slot identity",
-            "test replacement stops only the changed member and recovery rebuilds the accepted topology"
+            "test member_activation loss retains member work, sibling commits, and topology identities",
+            "test member_server loss retains member work, sibling commits, and topology identities",
+            "test root_activation loss retains member work, sibling commits, and topology identities",
+            "test root_server loss retains member work, sibling commits, and topology identities"
           ]
         },
         "jido.agent_server.composition.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 9,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
             "test a member output with no live destination marks an effect failed and keeps the owner",
-            "test accepted connections route outputs through counted agents and back to the root",
-            "test declared local buses route outputs and stop with the supervisor",
             "test killing a destination member under traffic never stops the owner",
-            "test outputs from a mutation Turn use the accepted connections",
-            "test removing an accepted Bus declaration stops its complete local resource",
-            "test root fallback, manual child delivery, and stale targets have explicit results",
-            "test topology connections take priority over default dispatch",
-            "test topology mutations start accepted members"
+            "test root fallback, manual child delivery, and stale targets have explicit results"
           ]
         },
         "jido.agent_server.composition.I9": {
@@ -1431,7 +1352,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test permanent runtime agents restart and temporary agents release their names"
+            "test child restart refreshes inspection and a stopped tag can be reused"
           ]
         }
       }
@@ -1469,37 +1390,34 @@
         "jido.agent_server.durable.I11": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 1,
           "status": "active",
           "testable": true,
           "tests": [
-            "test snapshots pair the accepted definition and state with their revision",
-            "test startup snapshots reject provisional state"
+            "test a complete definition upgrade keeps the stable Ref and replaces the PID"
           ]
         },
         "jido.agent_server.durable.I12": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 5,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
-            "test an explicit upgrade changes schema and routes without using the source definition",
-            "test durable and local recovery retain a live upgrade",
-            "test invalid upgrades preserve the complete accepted Agent and revision",
-            "test live upgrades serialize with Turns and preserve the previous snapshot until commit",
-            "test upgrade options are closed and accept the documented Map form"
+            "test a complete definition upgrade keeps the stable Ref and replaces the PID",
+            "test persistent upgrade saves the new definition before restart",
+            "test upgrade rejects active work and never queues behind it",
+            "test upgrade requires a trusted Catalog and a valid complete migrated state"
           ]
         },
         "jido.agent_server.durable.I13": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 1,
           "status": "active",
           "testable": true,
           "tests": [
-            "test durable operations stay on the typed AgentServer facade",
-            "test upgrade options are closed and accept the documented Map form"
+            "test durable operations stay on the typed AgentServer facade"
           ]
         },
         "jido.agent_server.durable.I2": {
@@ -1600,7 +1518,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test custom Agent checkpoint conversion protects portable records",
+            "test custom Agent checkpoints do not bypass durable Flow output portability",
             "test durable save rejects local handles without changing local state rules",
             "test nonportable initial state fails create without saving a record"
           ]
@@ -1640,8 +1558,8 @@
           "testable": true,
           "tests": [
             "test Flow acceptance keeps only the complete portable recovery receipt",
-            "test Flow acceptance propagates instruction resolution failure",
-            "test Flow acceptance reports input validation phase and rejects Action instructions",
+            "test Flow acceptance rejects a missing prepared instruction",
+            "test Flow acceptance reports input validation phase and accepts lowered Actions",
             "test a rejected acceptance save starts no Action",
             "test nonportable command context is rejected before execution",
             "test recovery resolves the saved input_write before the reply",
@@ -1812,11 +1730,10 @@
         "jido.agent_server.durable_turn.I9": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 8,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Flow mutation Directives commit with state and restore without reapplying",
             "test a saved completion does not replay post-commit hooks",
             "test a stored completion is recovered after the commit reply is lost",
             "test bad_output failure saves a terminal Turn without changing Agent state",
@@ -1965,7 +1882,7 @@
           "testable": true,
           "tests": [
             "test Bus targets inherit their instance and retain an explicit foreign scope",
-            "test Signal preparation receives the complete Turn and instance context",
+            "test Signal preparation receives the complete command and instance context",
             "test default dispatch and explicit override carry causation",
             "test explicit Signal directives dispatch in order with the turn trace and causation",
             "test nil Emit defaults to self after commit",
@@ -2022,12 +1939,11 @@
         "jido.agent_server.handoff.I1": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 16,
+          "passing": 15,
           "status": "active",
           "testable": true,
           "tests": [
             "test Handoff runs the successor as a new Turn and returns only its result",
-            "test Plugin reconciliation finishes before the successor result",
             "test a Handoff without commit hooks uses the Directive timeout",
             "test a Handoff without hooks or Directives takes the direct terminal path",
             "test cancellation in handoff pending accepts every chain selector",
@@ -2067,10 +1983,10 @@
       }
     },
     "jido.agent_server.plugin_runtime": {
-      "active": 13,
+      "active": 12,
       "app": "jido.agent_server",
       "coverage": 1.0,
-      "covered": 13,
+      "covered": 12,
       "form": "light",
       "obligations": {
         "jido.agent_server.plugin_runtime.I1": {
@@ -2099,7 +2015,7 @@
             "test root loss settles a bounded sibling start before group recovery",
             "test root loss stops another Plugin root that traps exits",
             "test runtime root loss stops the activation and the other root",
-            "test runtime selection rejects unsafe changes and selects only a dispatch owner",
+            "test runtime selection selects only a dispatch owner",
             "test startup and readiness errors stop every provisional root",
             "test startup timeout closes admission and cleans a bounded exit-trapping start",
             "test startup timeout stops a blocked Supervisor root and its exit-trapping descendant",
@@ -2130,21 +2046,6 @@
             "test invalid batches and failed turns do not notify Plugins",
             "test owned hooks and Plugin dispatch reject synchronous turn requests",
             "test server shutdown stops a blocked commit hook"
-          ]
-        },
-        "jido.agent_server.plugin_runtime.I12": {
-          "failing": 0,
-          "kind": "ordering",
-          "passing": 6,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test cancelled preparation resumes the root without publishing a candidate",
-            "test one commit replaces every changed runtime root",
-            "test replacement notifies unchanged Plugins and later commits use the new root",
-            "test runtime roots rebuild from committed state and stop after removal",
-            "test runtime selection rejects unsafe changes and selects only a dispatch owner",
-            "test unsafe changes fail before commit and failed pause resumes the root"
           ]
         },
         "jido.agent_server.plugin_runtime.I13": {
@@ -2273,7 +2174,7 @@
             "test callback adapters preserve explicit errors and report invalid or raised results",
             "test callbacks receive the live runtime root",
             "test owned directives use Plugin dispatch after all hooks with a narrow committed context",
-            "test runtime selection rejects unsafe changes and selects only a dispatch owner"
+            "test runtime selection selects only a dispatch owner"
           ]
         }
       }
@@ -2747,7 +2648,7 @@
             "test public operations reject invalid Agent and identity input",
             "test revision checks accept only one valid predecessor",
             "test snapshot and record callbacks receive only their bounded context",
-            "test state and changed definition share one storage revision; conflicts retain bytes",
+            "test state and replacement definition share one storage revision; conflicts retain bytes",
             "test the documented public API excludes persistence implementation helpers"
           ]
         },
@@ -2874,7 +2775,7 @@
             "test a changed source module cannot change saved fields or select new callbacks",
             "test a matching envelope cannot hide a different Agent ID in the checkpoint",
             "test a stale source schema does not replace saved schema or routes",
-            "test complete mutated definition and state round trip without a source module",
+            "test complete definition and state round trip without a source module",
             "test custom snapshots reject malformed data and changed converted identity",
             "test custom state conversion cannot replace the accepted definition",
             "test nested portable values survive a save and load",
@@ -4178,8 +4079,8 @@
     "jido_action.execution": {
       "active": 8,
       "app": "jido_action",
-      "coverage": 0.5,
-      "covered": 4,
+      "coverage": 1.0,
+      "covered": 8,
       "form": "light",
       "obligations": {
         "jido_action.execution.I17": {
@@ -4217,10 +4118,12 @@
         "jido_action.execution.I19": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 0,
+          "passing": 1,
           "status": "active",
           "testable": true,
-          "tests": []
+          "tests": [
+            "test a directly run Action counts its effects"
+          ]
         },
         "jido_action.execution.I20": {
           "failing": 0,
@@ -4245,18 +4148,28 @@
         "jido_action.execution.I21": {
           "failing": 0,
           "kind": "functional",
-          "passing": 0,
+          "passing": 7,
           "status": "active",
           "testable": true,
-          "tests": []
+          "tests": [
+            "test a computed result does not acknowledge failed persistence",
+            "test a running observation cannot return an already produced result",
+            "test a successful new input does not inherit an earlier input's failure",
+            "test an observation cannot select another input's result",
+            "test earlier observations select their own result after another input completes",
+            "test observation projects the declared result and preserves effects",
+            "test stopped admission cannot return a successful output"
+          ]
         },
         "jido_action.execution.I22": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 0,
+          "passing": 1,
           "status": "active",
           "testable": true,
-          "tests": []
+          "tests": [
+            "test independent waits retain partial joins through replay"
+          ]
         },
         "jido_action.execution.I23": {
           "failing": 0,
@@ -4279,10 +4192,12 @@
         "jido_action.execution.I25": {
           "failing": 0,
           "kind": "security",
-          "passing": 0,
+          "passing": 1,
           "status": "active",
           "testable": true,
-          "tests": []
+          "tests": [
+            "test supports?/2 accepts only host-supplied capabilities"
+          ]
         }
       }
     },
@@ -6226,8 +6141,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 324,
-    "coverage": 0.9877,
-    "covered": 320
+    "active": 321,
+    "coverage": 1.0,
+    "covered": 321
   }
 }

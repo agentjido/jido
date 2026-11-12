@@ -107,14 +107,6 @@ This component has no DSL or forwarding facade.
 - **kind:** ordering
 - **status:** active
 
-### jido.agent_server.plugin_runtime.I12 — Safe live runtime replacement
-
-- **scope:** live Plugin configuration changes
-- **must:** Require existing autonomous roots that change to implement idempotent `quiesce/2` and `resume/2`. Quiesce affected roots before commit. Resume them after rejection, cancellation, or failed preparation. After commit, stop affected roots and rebuild them from the accepted owned state and revision before admission opens. Notify unchanged Plugins in declaration order and do not notify a replaced root for the replacement commit.
-- **why:** Accepted Plugin data must be the authority for its live runtime without overlapping old and new generations.
-- **kind:** ordering
-- **status:** active
-
 ### jido.agent_server.plugin_runtime.I13 — Public live Plugin API
 
 - **scope:** `Jido.AgentServer.Plugin.state/2`, `Jido.Plugin.Context.Admission`, `Jido.Plugin.Context.Commit`

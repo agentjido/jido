@@ -1,59 +1,25 @@
-# 08_14 State Migration
+# 08_14 Offline Snapshot Migration
 
-One snapshot upgrade Action changes a wallet schema, version, and state together.
-The Agent ID and origin module stay the same.
+One snapshot upgrade Action changes the definition and state of an inactive
+portable Agent snapshot.
 
-## Read the code
+## Read and run
 
-[StateMigration](state_migration.ex) defines a version 1 wallet and one named
-Action, `WalletV1ToV2`. The Action receives `%{snapshot: snapshot}` and returns
-`{:ok, %{snapshot: upgraded_snapshot}}`. It also accepts version 2 snapshots.
-
-## Run it
+Read [the Agent and upgrade Action](state_migration.ex), then
+[the tests](state_migration_test.exs).
 
 ```sh
 mix test.examples examples/08_runtime/08_14_state_migration
 ```
 
-```elixir
-alias Jido.AgentServer, as: Server
-alias Jido.Examples.StateMigration
-alias Jido.Examples.StateMigration.WalletV1ToV2
-alias Jido.Persistence
+`Jido.Persistence.upgrade/3` is an offline data operation. It does not contact
+an AgentServer. The Action receives `%{snapshot: snapshot}` and returns one
+complete portable snapshot with no Directives. A later restore uses that saved
+definition and state.
 
-{:ok, server} = Jido.start_agent(MyJido, StateMigration)
-:ok = Server.await_ready(server)
-before = Server.snapshot(server)
-{:ok, upgraded, []} = Server.upgrade(server, WalletV1ToV2)
-
-{:ok, saved} = Persistence.snapshot(before.agent)
-{:ok, upgraded_offline} = Persistence.upgrade(saved, WalletV1ToV2)
-{:ok, saved_upgrade} = Persistence.snapshot(upgraded_offline)
-{:ok, restored} = Persistence.restore(saved_upgrade)
-```
-
-Expected state: `%{wallet: %{format: 2, amount: 100, currency: "USD"}}`.
-Invalid target data leaves the live Agent and its revision unchanged.
-
-## Behavior and limits
-
-`Server.snapshot/1` returns the accepted Agent and its runtime revision.
-`Persistence.snapshot/1` captures a portable definition and state.
-`Persistence.restore/1` restores that saved definition. It does not rebuild the
-Agent from the current source definition or run an upgrade automatically.
-
-The Action has no external effects and returns no directives. A repeated upgrade
-preserves the version 2 data. Each successful live upgrade can advance the
-runtime revision. This example does not coordinate upgrades across Agents.
-
-## Files
-
-- [Source](state_migration.ex)
-- [Tests](state_migration_test.exs)
+Use `Jido.AgentServer.upgrade/3` for an idle running activation. That API takes
+a complete trusted Agent Codec document and can use a separate state migration
+Action or Flow. See [Whole Definition Upgrade](../08_12_definition_changes/README.md).
 
 Previous: [Stable Reference](../08_13_stable_reference/README.md) |
 Next: [Pending Job Recovery](../08_15_pending_job_recovery/README.md)
-
-Read this lesson before [Definition Revision](../../13_persistence/13_08_definition_revision/README.md).
-This lesson teaches the upgrade Action. The next lesson adds saved code
-references and restore rejection. Together they form one upgrade path.

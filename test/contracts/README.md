@@ -122,8 +122,8 @@ occurrence identity, clock rules, and future-timer recovery. It does not own
 durable business delivery or acknowledgement.
 
 `jido.agent` owns Agent definitions and instances, state schemas, the Agent
-DSL, logical topology, extension contributions, definition mutation and Diff
-data, the Agent document codec adapter, and safe Agent views. It uses shared
+DSL, static logical topology, fixed extension contributions, the Agent document
+codec adapter, and safe Agent views. It uses shared
 Codec, Registry, Document, Value, and Discovery behavior from
 `jido_action`. It does not own pure evaluation, Agent references, AgentServer
 lifecycle, Directive dispatch, persistence, or bundled Plugin runtime behavior.
@@ -151,11 +151,11 @@ runtime child restart policy, or durable storage.
 
 `jido.agent_server.plugin_runtime` owns live Plugin readiness, admission,
 post-commit callbacks, outbound Signal preparation, Plugin Directive dispatch,
-and safe live Plugin replacement. It does not own the generic Plugin SDK,
+and runtime-root recovery. It does not own the generic Plugin SDK,
 Agent evaluation, the commit, or durable storage.
 
 `jido.agent_server.composition` owns child relationships, adoption, accepted
-topology member reconciliation, local topology Buses, connection delivery, and
+static topology member startup, local topology Buses, connection delivery, and
 runtime child lifetime. It does not own pure topology validation, Plugin
 callbacks, durable storage, or Turn evaluation.
 

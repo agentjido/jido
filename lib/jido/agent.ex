@@ -14,9 +14,7 @@ defmodule Jido.Agent do
   for outputs. Plugins add explicit, validated data to `plugins`.
   """
   alias Jido.Agent.{Schema, Validation}
-  alias Jido.Agent.Plugin.Declaration
   alias Jido.Agent.Runner
-  alias Jido.Catalog
   alias Jido.Error
   alias Jido.Signal
 
@@ -35,13 +33,8 @@ defmodule Jido.Agent do
   @optional_callbacks checkpoint: 2, restore: 2, initialize: 2
 
   @schema Schema.agent_schema()
-  @defaults Schema.defaults()
   @enforce_keys Joi.enforce_keys(@schema)
   defstruct Joi.struct_fields(@schema)
-  @doc false
-  def __schema__, do: @schema
-  @doc false
-  def __defaults__, do: @defaults
 
   @doc "Returns the state schema, including Plugin-owned fields."
   @spec schema(t()) :: Joi.schema()
@@ -116,16 +109,15 @@ defmodule Jido.Agent do
   current parent Agent. Forward destinations are portable definition data.
   They do not contain process or transport values.
 
-  The `topology` section accepts named `agent` members and a `connections`
-  section with `connect` declarations. `state/1` creates a reference to one
-  parent state field. Selected providers can add their own sections and
-  imports.
+  The `topology` section accepts named static `agent` members and a
+  `connections` section with `connect` declarations. Selected providers can
+  add their own sections and imports.
 
   Compilation lowers this DSL to the same canonical value that `define/1`
   builds from a map.
   """
   defmacro __using__(opts) do
-    opts = options!(opts, __CALLER__)
+    opts = Jido.Agent.DSL.options!(opts, __CALLER__)
 
     quote do
       use Jido.Action.Inline
@@ -134,40 +126,6 @@ defmodule Jido.Agent do
       import Jido.Agent.DSL.Macros
       import Jido.Agent.Directive, only: [emit: 1, emit: 2]
       import Jido.Plugin.Config, only: [env: 1]
-    end
-  end
-
-  @doc false
-  def options!(quoted_options, caller) do
-    options = prepare_options!(quoted_options, caller)
-
-    case Declaration.normalize(Keyword.get(options, :plugins, [])) do
-      {:ok, declarations} ->
-        options
-        |> Keyword.delete(:plugins)
-        |> Keyword.put(:plugin_providers, Enum.map(declarations, & &1.provider))
-        |> Keyword.put(:plugin_declarations, declarations)
-
-      {:error, error} ->
-        raise error
-    end
-  end
-
-  @doc false
-  @spec prepare_options!(Macro.t(), Macro.Env.t()) :: keyword()
-  def prepare_options!(quoted_options, %Macro.Env{} = caller) do
-    {options, _binding} = Code.eval_quoted(quoted_options, [], caller)
-
-    unless Keyword.keyword?(options) and
-             Enum.uniq(Keyword.keys(options)) == Keyword.keys(options) do
-      raise ArgumentError, "Agent requires unique keyword options"
-    end
-
-    options = Keyword.put_new(options, :id, Atom.to_string(caller.module))
-
-    case Catalog.validate_identifier(options[:id]) do
-      :ok -> options
-      {:error, error} -> raise error
     end
   end
 
@@ -224,35 +182,6 @@ defmodule Jido.Agent do
   def instantiate!(source, opts \\ []),
     do: source |> instantiate(opts) |> Jido.Error.unwrap!()
 
-  @doc "Applies ordered data mutations and returns the candidate and its final Diff."
-  @spec mutate(t(), [Jido.Agent.Directive.t()]) ::
-          {:ok, t(), Jido.Agent.Diff.t()} | {:error, term()}
-  def mutate(%__MODULE__{} = agent, directives), do: Jido.Agent.Mutation.apply(agent, directives)
-
-  @doc false
-  @spec input_signal(definition(), String.t(), map(), keyword() | map()) ::
-          {:ok, Signal.t()} | {:error, term()}
-  def input_signal(definition, type, data, opts \\ []) do
-    with {:ok, opts} <-
-           Schema.options(opts, [:source, :id, :time, :subject, :datacontenttype]),
-         source = Map.get(opts, :source, definition.signal_source),
-         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Schema.nonempty(source), :source),
-         :ok <- Jido.Agent.Schema.plain_map(data) do
-      Jido.Signal.new(type, data, Map.put(opts, :source, source))
-    end
-  end
-
-  @doc false
-  @spec input_signal!(definition(), String.t(), map(), keyword() | map()) ::
-          Signal.t() | no_return()
-  def input_signal!(definition, type, data, opts \\ []) do
-    case input_signal(definition, type, data, opts) do
-      {:ok, signal} -> signal
-      {:error, %{__exception__: true} = error} -> raise error
-      {:error, reason} -> raise ArgumentError, "invalid input Signal: #{inspect(reason)}"
-    end
-  end
-
   @doc "Builds one Agent-owned Signal from an Action context without dispatching it."
   @spec build_signal(map(), String.t(), map()) :: {:ok, Signal.t()} | {:error, term()}
   def build_signal(
@@ -270,14 +199,6 @@ defmodule Jido.Agent do
      Error.validation_error("Agent Signal construction requires an Agent Action context",
        details: %{required_keys: [:agent_signal_source, :signal]}
      )}
-  end
-
-  @doc false
-  @spec transition(instance(), term()) :: {:ok, instance()} | {:error, Exception.t()}
-  def transition(%__MODULE__{} = agent, next_state) do
-    with {:ok, agent, _specs, schema} <- Validation.validate_instance_with_plugins(agent) do
-      Runner.transition_validated(agent, next_state, schema)
-    end
   end
 
   @doc """
@@ -298,13 +219,13 @@ defmodule Jido.Agent do
       if not is_map(agent.state) or is_struct(agent.state) do
         invalid("Agent.set/2 requires an instance", %{id: agent.id, state: agent.state})
       else
-        transition(agent, Map.merge(agent.state, attrs))
+        Validation.transition(agent, Map.merge(agent.state, attrs))
       end
     end
   end
 
   @doc """
-  Runs one complete Turn through `Jido.Exec.run/4` without an AgentServer.
+  Runs one complete command through `Jido.Exec.run/4` without an AgentServer.
 
   Route selection uses the first matching declared route. Signal data can be a
   map, a keyword list, or `nil`. Route defaults are merged once, and Signal

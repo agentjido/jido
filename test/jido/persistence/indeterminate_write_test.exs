@@ -16,21 +16,22 @@ defmodule Jido.Persistence.IndeterminateWriteTest do
     def compare_and_swap(key, expected, value, opts) do
       :ok = Store.compare_and_swap(key, expected, value, Keyword.put(opts, :write_result, :ok))
 
-      if :erlang.binary_to_term(value, [:safe]).rev == 0 do
-        :ok
-      else
-        raise "stored write reply lost"
+      case :erlang.binary_to_term(value, [:safe]) do
+        %{rev: 2} -> raise "stored write reply lost"
+        _other -> :ok
       end
     end
   end
 
   setup do
-    observer = self()
+    observer = Module.concat(__MODULE__, "Observer#{System.unique_integer([:positive])}")
+    Process.register(self(), observer)
 
     {:ok,
      store: {Store, store: start_supervised!(Store)},
      id: unique_id("indeterminate-write"),
-     turn_context: %{reply_to: observer}}
+     observer: observer,
+     turn_context: %{emit_reply: true}}
   end
 
   test "a confirmed write commits state and permits post-commit output", c do
@@ -49,9 +50,9 @@ defmodule Jido.Persistence.IndeterminateWriteTest do
                     }},
                    5_000
 
-    assert Jido.Test.AgentServer.Assertions.committed(pid) == %{agent: agent, state_version: 1}
+    assert Jido.Test.AgentServer.Assertions.committed(pid) == %{agent: agent, state_version: 2}
 
-    assert {:ok, ^agent, 1} =
+    assert {:ok, ^agent, 2} =
              Persistence.load_agent_with_revision(c.store, Probe, c.id, instance: c.jido)
   end
 
@@ -92,7 +93,8 @@ defmodule Jido.Persistence.IndeterminateWriteTest do
              Jido.Test.AgentServer.Assertions.start_agent(c.jido, Probe,
                id: c.id,
                persistence: {LostReply, opts},
-               persistence_mode: :create
+               persistence_mode: :create,
+               default_dispatch: {:pid, target: self()}
              )
 
     {:ok, route_signal_4} = Probe.increment_signal(%{request_id: "first", amount: 1})
@@ -114,13 +116,14 @@ defmodule Jido.Persistence.IndeterminateWriteTest do
 
     Jido.Test.AgentServer.Assertions.start_agent(c.jido, Probe,
       id: c.id,
-      persistence: {Store, Keyword.put(opts, :write_result, write_result)},
-      persistence_mode: :create
+      persistence: {Store, opts |> Keyword.put(:write_result, write_result) |> Keyword.put(:fault_revision, 2)},
+      persistence_mode: :create,
+      default_dispatch: {:pid, target: self()}
     )
   end
 
   defp assert_stored_first(c) do
-    assert {:ok, %{state: %{count: 1}}, 1} =
+    assert {:ok, %{state: %{count: 1}}, 2} =
              Persistence.load_agent_with_revision(c.store, Probe, c.id, instance: c.jido)
   end
 

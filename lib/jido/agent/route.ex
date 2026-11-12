@@ -7,6 +7,61 @@ defmodule Jido.Agent.Route do
   @helper_name ~r/\A[a-z][a-z0-9_]*\z/
   @route_fields [:path, :as, :defaults, :handler, :state, :reply]
 
+  @type route_ref :: String.t() | {String.t(), atom() | nil}
+
+  @doc false
+  @spec identity(map()) :: {String.t(), atom() | nil}
+  def identity(%{path: path, as: as}), do: {path, as}
+
+  @doc false
+  @spec validate_reference(term()) :: :ok | {:error, term()}
+  def validate_reference(path) when is_binary(path), do: Schema.path(path)
+
+  def validate_reference({path, nil}) do
+    Schema.path(path)
+  end
+
+  def validate_reference({path, as}) do
+    with :ok <- Schema.path(path), do: Schema.name(as)
+  end
+
+  def validate_reference(_value),
+    do: Error.validation_result(:invalid_route_reference, [], "Expected a route path or {path, alias}")
+
+  @doc false
+  @spec resolve([map()], route_ref()) :: {:ok, map()} | {:error, term()}
+  def resolve(routes, reference) when is_list(routes) do
+    with :ok <- validate_reference(reference) do
+      matches = Enum.filter(routes, &matches_reference?(&1, reference))
+
+      case matches do
+        [route] ->
+          {:ok, route}
+
+        [] ->
+          Error.validation_result(:route_not_found, [], "Route reference does not exist", %{
+            reference: reference
+          })
+
+        _many ->
+          Error.validation_result(:ambiguous_route_reference, [], "Route path requires an alias", %{
+            reference: reference
+          })
+      end
+    end
+  end
+
+  @doc false
+  @spec index([map()], route_ref()) :: {:ok, non_neg_integer()} | {:error, term()}
+  def index(routes, reference) when is_list(routes) do
+    with {:ok, route} <- resolve(routes, reference) do
+      {:ok, Enum.find_index(routes, &(&1 === route))}
+    end
+  end
+
+  defp matches_reference?(route, {path, as}), do: identity(route) == {path, as}
+  defp matches_reference?(route, path), do: route.path == path
+
   def normalize(value, related? \\ true) do
     with {:ok, route} <- Schema.fields(value, @route_fields, %{as: nil, defaults: %{}, reply: nil}),
          :ok <- Error.prefix_result_path(Schema.path(route[:path]), :path),
@@ -284,6 +339,8 @@ defmodule Jido.Agent.Route do
   defp forward_target(_target),
     do: Error.validation_result(:invalid_forward_target, [], "Forward requires agent(name) or parent()")
 
+  @doc "Selects the first declared route that accepts one exact Signal type."
+  @spec select(map() | [map()], String.t()) :: {:ok, map()} | {:error, term()}
   def select(%{routes: routes}, type), do: select(routes, type)
 
   def select(routes, type) when is_list(routes) do

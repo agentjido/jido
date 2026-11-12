@@ -189,7 +189,7 @@ defmodule ConnectGuide.Dispatch do
 
   topology do
     agent :notifiers, ConnectGuide.Notifier do
-      count state(:notifiers)
+      count 3
     end
 
     connections do
@@ -224,21 +224,10 @@ For the Bus API outside a topology, see [Signal Bus](../signals/signal-bus-and-s
 
 ## Read connection checks
 
-Jido validates each connection when it validates the definition. The destination must have a route for the path, unless the path contains a wildcard. This cell shows that rejection.
-
-```elixir
-broken =
-  Jido.Agent.mutate(ConnectGuide.Desk.definition(), [
-    Jido.Agent.Directive.connection_add("order.receipt", from: :receipts, to: :packer)
-  ])
-
-{:error, %Jido.Error.ValidationError{code: :unaccepted_type}} = broken
-:rejected
-```
-
-The cell returns `:rejected`.
-
-Jido cannot prove that a source produces a type. `Jido.Agent.Topology.checks/3` therefore reports `:unchecked` for every connection that passes, with a reason of `:unknown_outputs` or `:wildcard_coverage`.
+Jido validates every connection as part of the complete definition. It cannot
+prove that a source produces a type. `Jido.Agent.Topology.checks/3` therefore
+reports `:unchecked` for every valid connection, with a reason of
+`:unknown_outputs` or `:wildcard_coverage`.
 
 ```elixir
 resolver = fn definition, _opts -> {:ok, definition} end
@@ -285,5 +274,4 @@ Both calls return `:ok`.
 
 ## Next steps
 
-- [Change Live Composition](change-live-composition.md) edits these connections from a Turn.
-- [Topology Reconciliation](topology-reconciliation.md) explains when members and Buses start and stop.
+- [Parent and Child Agents](parent-and-child-agents.md) explains runtime children.

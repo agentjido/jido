@@ -11,9 +11,8 @@ resources. These are parts of one extension contract.
 3. [State Middleware](11_03_state_middleware/README.md) — read the complete candidate and reduce one owned field.
 4. [Plugin DSL](11_04_plugin_dsl/README.md) — add a section and named entities to Agent syntax; use the same Plugin through Map and JSON authoring.
 5. [Composition](11_05_composition/README.md) — combine pure and live inputs in one Agent.
-6. [Live Plugin Changes](11_06_live_plugin_changes/README.md) — change runtime options and restore the accepted Plugin after hibernation.
-7. [Identity](11_07_identity/README.md) — combine signature checks with live replay protection.
-8. [Secure Signal](11_08_secure_signal/README.md) — decrypt input and encrypt output in Plugin order.
+6. [Identity](11_07_identity/README.md) — combine signature checks with live replay protection.
+7. [Secure Signal](11_08_secure_signal/README.md) — decrypt input and encrypt output in Plugin order.
 
 Numbers are stable IDs. Use this reading order. Each lesson keeps its teaching
 code local. Small copies of input and identity Plugins make the composition

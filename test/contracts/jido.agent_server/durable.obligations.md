@@ -107,11 +107,11 @@ component has no DSL.
 - **kind:** functional
 - **status:** active
 
-### jido.agent_server.durable.I12 — Snapshot upgrade coordination
+### jido.agent_server.durable.I12 — Whole definition upgrade
 
 - **scope:** `Jido.AgentServer.upgrade/3`
-- **must:** Serialize an explicit snapshot upgrade Action with Turns. Run portable snapshot conversion and upgrade outside the server. Reject malformed results and returned Directives. Hand the restored target to composition validation, then use the normal revision, durable save, local checkpoint, and reconciliation boundaries. Preserve the accepted Agent and revision on rejection and restore an accepted durable upgrade after recovery.
-- **why:** A definition upgrade must use the same accepted-state boundaries as other work.
+- **must:** Accept one complete Agent Codec document through an explicit trusted Catalog. Require an idle supervised activation. Reject busy work without queueing. Optionally run one Action or Flow that maps the old state to the complete new state and returns no Directives. Validate the full definition and state, save with revision control, replace the activation under the same stable Ref, and allow the AgentServer PID to change. Do not migrate an active durable Flow.
+- **why:** A definition replacement must be explicit, complete, trusted, and separate from normal Agent work.
 - **kind:** ordering
 - **status:** active
 

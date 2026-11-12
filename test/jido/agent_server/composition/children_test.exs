@@ -134,7 +134,11 @@ defmodule Jido.AgentServer.Composition.ChildrenTest do
     F.clean(c.runner)
   end
 
-  @tag obligation: ["jido.agent_server.composition.I1", "jido.agent_server.composition.I4"]
+  @tag obligation: [
+         "jido.agent_server.composition.I1",
+         "jido.agent_server.composition.I4",
+         "jido.agent_server.composition.I9"
+       ]
   test "child restart refreshes inspection and a stopped tag can be reused", c do
     parent = F.start(%{c | agent: agent("parent")})
     {:ok, first} = Server.spawn_child(parent, agent("child"), :child)

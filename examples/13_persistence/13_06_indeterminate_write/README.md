@@ -21,7 +21,8 @@ another command.
 
 ## Important behavior
 
-Stored bytes do not prove that the live Turn committed. Recovery must read the authoritative record before work continues.
+Stored bytes do not prove that the live command committed. Recovery must read
+the authoritative record before work continues.
 
 ## Limits
 

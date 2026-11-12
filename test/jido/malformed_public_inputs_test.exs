@@ -2,11 +2,10 @@ defmodule Jido.MalformedPublicInputsTest do
   use Jido.Test.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.{Extension, Turn}
-  alias Jido.Error.ValidationError
+  alias Jido.Agent.Extension
+  alias Jido.Agent.Validation
   alias Jido.Persistence
   alias Jido.Signal
-  alias Jido.Test.AgentServer.Fixtures.Add
 
   test "Plugin lowering rejects improper declarations and invalid DSL data" do
     for {declarations, dsl} <- [
@@ -29,12 +28,12 @@ defmodule Jido.MalformedPublicInputsTest do
     end
   end
 
-  test "Turn input accepts maps and keyword lists but rejects malformed lists" do
-    assert {:ok, %Turn{}} = Turn.new(Add, %{by: 1})
-    assert {:ok, %Turn{}} = Turn.new(Add, by: 1)
+  test "Agent input normalization accepts maps and keyword lists but rejects malformed lists" do
+    assert {:ok, %{by: 1}} = Validation.normalize_input(%{by: 1})
+    assert {:ok, %{by: 1}} = Validation.normalize_input(by: 1)
 
     for input <- [[1], [{:by, 1}, 2], [{:by, 1} | :invalid]] do
-      assert {:error, %ValidationError{subject: :input}} = Turn.new(Add, input)
+      assert {:error, :invalid_input} = Validation.normalize_input(input)
     end
   end
 

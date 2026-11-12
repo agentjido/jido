@@ -1,5 +1,5 @@
 defmodule Jido.Examples.StateMigration do
-  @moduledoc "Upgrades a wallet definition and its state with one snapshot Action."
+  @moduledoc "Migrates one portable wallet snapshot while the Agent is inactive."
 
   defmodule WalletV1ToV2 do
     @moduledoc "Converts a version 1 wallet snapshot to version 2."

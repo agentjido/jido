@@ -1,7 +1,7 @@
 defmodule Jido.Agent.EvaluationContractTest do
   use Covenant.Case, component: "jido.agent_evaluation", async: true
   alias Jido.Agent
-  alias Jido.Agent.{Directive, Runner, Turn}
+  alias Jido.Agent.{Directive, Runner}
   alias Jido.AgentServer.Command
   alias Jido.Signal
   alias Jido.Test.Agent.Contract, as: F
@@ -68,16 +68,16 @@ defmodule Jido.Agent.EvaluationContractTest do
 
     assert {:ok,
             %Runner.Prepared{
-              turn: %Turn{
-                executable: %Jido.Flow{
+              instruction: %Jido.Instruction{
+                kind: :flow,
+                target: %Jido.Flow{
                   components: %{
                     "action" => %{call: %{kind: :action, target: F.Return}}
                   }
                 },
-                execution_mode: :managed,
-                input: %{amount: 7, nested: %{a: 9}},
-                source_signal: ^signal
-              }
+                params: %{amount: 7, nested: %{a: 9}}
+              },
+              source_signal: ^signal
             }} = Runner.prepare(source, signal, [])
 
     assert {:ok, ^source, []} = Agent.cmd(source, signal, context: %{observer: self()})
@@ -246,18 +246,6 @@ defmodule Jido.Agent.EvaluationContractTest do
     assert {:error, _} =
              Agent.cmd(source, F.signal(%{directives: [%Directive.Emit{signal: :invalid}]}))
 
-    change =
-      Directive.route_add("next", F.Return)
-
-    output = %{source.state | count: 2}
-
-    assert {:ok, candidate, [^change]} =
-             Agent.cmd(source, F.signal(%{output: output, directives: [change]}))
-
-    assert candidate.state == output
-    assert Enum.map(candidate.routes, & &1.path) == ["test.run", "next"]
-    assert source.state.count == 0
-
     refute_received {:signal, _}
   end
 
@@ -294,36 +282,6 @@ defmodule Jido.Agent.EvaluationContractTest do
              Agent.cmd(source, %{request | data: %{directives: [reply, reply]}})
   end
 
-  @tag obligation: "jido.agent_evaluation.I9"
-  test "one batch cannot change a Plugin and run its owned Directive" do
-    assert {:error, _reason} =
-             Agent.cmd(
-               F.instance(),
-               F.signal(%{
-                 directives: [Directive.plugin_add(F.Effects), %F.Effect{value: 1}]
-               })
-             )
-
-    assert {:ok, owned, _} =
-             Agent.cmd(
-               F.instance(),
-               F.signal(%{directives: [Directive.plugin_add(F.Effects)]})
-             )
-
-    assert {:error, %{code: :plugin_change_with_owned_directive}} =
-             Agent.cmd(
-               owned,
-               F.signal(%{
-                 directives: [Directive.plugin_configure(F.Effects, []), %F.Effect{value: 1}]
-               })
-             )
-
-    assert {:ok, next, [%F.Effect{}]} =
-             Agent.cmd(owned, F.signal(%{directives: [%F.Effect{value: 1}]}))
-
-    assert next.state.effects == 1
-  end
-
   @tag obligation: ["jido.agent_evaluation.I7", "jido.agent_evaluation.I9"]
   test "emission requests normalize once without a route output contract" do
     source = F.instance(signal_source: "/contract")
@@ -351,16 +309,6 @@ defmodule Jido.Agent.EvaluationContractTest do
     assert output.type == "effect.allowed"
     assert output.source == source.signal_source
     assert output.data == %{value: 1}
-
-    assert {:ok, _, [%Directive.RouteAdd{}]} =
-             Agent.cmd(
-               source,
-               F.signal(%{
-                 directives: [
-                   Directive.route_add("next", F.Return)
-                 ]
-               })
-             )
 
     for {request, code} <- [
           {%{kind: :emit, type: "effect.allowed", data: %{}, unknown: true}, :unknown_fields},
@@ -491,20 +439,6 @@ defmodule Jido.Agent.EvaluationContractTest do
              Agent.cmd(source, F.signal(%{count: 4}))
   end
 
-  @tag obligation: ["jido.agent_evaluation.I1", "jido.agent_evaluation.I2"]
-  test "Turn validation normalizes input and rejects source substitution" do
-    source = F.signal()
-    other = F.signal(%{}, "other")
-    assert {:ok, unbound} = Turn.new(F.Return, nil)
-    assert Turn.new!(F.Return, %{}).input == %{}
-    assert {:ok, bound} = Turn.bind_source(unbound, source)
-    assert {:ok, %Turn{input: %{}}} = Turn.validate_selected(bound)
-    assert {:ok, ^bound} = Turn.bind_source(bound, source)
-    assert {:error, %{__exception__: true}} = Turn.bind_source(bound, other)
-    assert {:error, %{__exception__: true}} = Turn.new(F.Return, :invalid)
-    assert {:error, %{__exception__: true}} = Turn.validate(:invalid)
-  end
-
   @tag obligation: "jido.agent_evaluation.I10"
   test "the AgentServer evaluation boundary keeps stages closed" do
     source = F.signal()
@@ -513,7 +447,7 @@ defmodule Jido.Agent.EvaluationContractTest do
     {:ok, command} = Command.new(agent, source)
     assert {:ok, prepared} = Runner.prepare_admitted(command, source, [], specs)
     assert prepared.agent === agent
-    assert prepared.turn.source_signal === source
+    assert prepared.source_signal === source
     assert {:ok, ^agent, []} = Runner.finish_for_server(prepared, {:ok, agent.state})
 
     assert {:error, :compose,
@@ -549,7 +483,7 @@ defmodule Jido.Agent.EvaluationContractTest do
   end
 
   @tag obligation: ["jido.agent_evaluation.I9", "jido.agent_evaluation.I10"]
-  test "the AgentServer Handoff boundary keeps the successor Turn and candidate complete" do
+  test "the AgentServer Handoff boundary keeps the successor instruction and candidate complete" do
     agent = F.instance()
     signal = F.signal(%{count: 1})
     {:ok, command} = Command.new(agent, signal, %{caller: :retained})
@@ -560,22 +494,16 @@ defmodule Jido.Agent.EvaluationContractTest do
             %Runner.Prepared{
               agent: ^agent,
               signal: ^signal,
-              turn: %Turn{
-                executable: %Jido.Instruction{
-                  kind: :flow,
-                  target: %Jido.Flow{
-                    components: %{
-                      "action" => %{call: %{kind: :action, target: HandoffTarget}}
-                    }
-                  },
-                  params: %{count: 2}
+              instruction: %Jido.Instruction{
+                kind: :flow,
+                target: %Jido.Flow{
+                  components: %{
+                    "action" => %{call: %{kind: :action, target: HandoffTarget}}
+                  }
                 },
-                execution_mode: :managed,
-                input: %{},
-                route: %{state: %{source: :output, path: []}, reply: nil},
-                source_signal: ^signal
+                params: %{count: 2},
+                context: %{caller: :retained, signal: ^signal}
               },
-              context: %{caller: :retained, signal: ^signal},
               exec_opts: [timeout: 10]
             } = prepared} =
              Runner.prepare_admitted_handoff(
@@ -586,12 +514,10 @@ defmodule Jido.Agent.EvaluationContractTest do
                specs
              )
 
-    change = Directive.route_add("next", F.Return)
+    assert {:handoff, candidate, ^instruction, []} =
+             Runner.finish_for_server(prepared, {:handoff, instruction, []})
 
-    assert {:handoff, candidate, ^instruction, [^change]} =
-             Runner.finish_for_server(prepared, {:handoff, instruction, [change]})
-
-    assert Enum.map(candidate.routes, & &1.path) == ["test.run", "next"]
+    assert Agent.definition(candidate) == Agent.definition(agent)
   end
 
   @tag obligation: ["jido.agent_evaluation.I6", "jido.agent_evaluation.I8"]

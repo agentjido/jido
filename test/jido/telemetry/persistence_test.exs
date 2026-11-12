@@ -271,6 +271,7 @@ defmodule Jido.Telemetry.PersistenceTest do
         Jido.AgentServer.call(pid, Jido.Signal.new!("runtime.record", %{event: :saved}, source: "/test"))
 
       assert write_reason(id) == :commit
+      assert write_reason(id) == :commit
 
       :ok = Jido.AgentServer.hibernate(pid)
       assert write_reason(id) == :hibernate

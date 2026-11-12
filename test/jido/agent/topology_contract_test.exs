@@ -88,8 +88,7 @@ defmodule Jido.Agent.TopologyContractTest do
   end
 
   @tag obligation: "jido.agent.I25"
-  test "topology values have exact empty, state, member, and connection forms" do
-    assert Topology.state(:count) === %{kind: :state, key: :count}
+  test "topology values have exact empty, member, and connection forms" do
     assert Topology.empty?(%{agents: [], connections: []}) === true
 
     for value <- [
@@ -392,25 +391,17 @@ defmodule Jido.Agent.TopologyContractTest do
   end
 
   @tag obligation: "jido.agent.I30"
-  test "binding resolves nested state references and returns complete child values" do
+  test "binding returns complete static child values" do
     definition =
       Agent.define!(%{
         name: "topology_binding",
-        schema:
-          Jido.Joi.object(%{
-            copies: Jido.Joi.integer() |> Jido.Joi.default(2),
-            value: Jido.Joi.string() |> Jido.Joi.default("seed")
-          }),
         topology: %{
           agents: [
             %{
               name: :child,
               definition: Child,
-              count: Topology.state(:copies),
-              initial_state: %{
-                value: Topology.state(:value),
-                items: [Topology.state(:value)]
-              }
+              count: 2,
+              initial_state: %{value: "seed", items: ["seed"]}
             }
           ]
         }
@@ -424,16 +415,9 @@ defmodule Jido.Agent.TopologyContractTest do
                 count: 2,
                 state: %{value: "seed", items: ["seed"]}
               }
-            ]} = bind_topology(definition, %{copies: 2, value: "seed"})
+            ]} = bind_topology(definition, %{ignored: true})
 
     assert child === Child.definition()
-
-    assert {:error,
-            %Jido.Error.ValidationError{
-              code: :missing_state_field,
-              path: [:topology, :agents, 0],
-              details: %{key: :copies}
-            }} = bind_topology(definition, %{value: "seed"})
   end
 
   @tag obligation: "jido.agent.I30"
@@ -470,7 +454,7 @@ defmodule Jido.Agent.TopologyContractTest do
   end
 
   @tag obligation: ["jido.agent.I28", "jido.agent.I30"]
-  test "authoring validates nested initial values and exact parent references" do
+  test "authoring validates static nested initial values" do
     assert {:error, %Jido.Error.ValidationError{}} =
              Agent.define(%{
                name: "invalid_nested_initial",
@@ -489,29 +473,28 @@ defmodule Jido.Agent.TopologyContractTest do
                }
              })
 
-    assert {:error, %Jido.Error.ValidationError{code: :unknown_state_field, details: %{key: :missing}}} =
+    assert {:error, %Jido.Error.ValidationError{}} =
              Agent.define(%{
-               name: "unknown_parent_reference",
+               name: "dynamic_count",
                topology: %{
                  agents: [
-                   %{name: :child, definition: Child, count: Topology.state(:missing)}
+                   %{name: :child, definition: Child, count: %{kind: :state, key: :count}}
                  ]
                }
              })
 
     definition =
       Agent.define!(%{
-        name: "nested_parent_references",
-        schema: Jido.Joi.object(%{label: Jido.Joi.string()}),
+        name: "nested_static_values",
         topology: %{
           agents: [
             %{
               name: :child,
               definition: StructuredChild,
               initial_state: %{
-                settings: %{label: Topology.state(:label), enabled: true},
+                settings: %{label: "bound", enabled: true},
                 metadata: %{key: :literal},
-                labels: ["literal", Topology.state(:label)]
+                labels: ["literal", "bound"]
               }
             }
           ]
@@ -527,6 +510,6 @@ defmodule Jido.Agent.TopologyContractTest do
                   labels: ["literal", "bound"]
                 }
               }
-            ]} = bind_topology(definition, %{label: "bound"})
+            ]} = bind_topology(definition, %{ignored: true})
   end
 end

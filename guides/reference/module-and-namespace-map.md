@@ -163,31 +163,12 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | Module | Purpose |
 | --- | --- |
 | `Jido.Agent` | Author Agent definitions as Maps or with the Spark DSL. |
-| `Jido.Agent.Diff` | Final data differences. |
-| `Jido.Agent.Directive` | Changes and runtime work returned by an Agent executable turn. |
-| `Jido.Agent.Directive.AgentAdd` | Agent data mutation. |
-| `Jido.Agent.Directive.AgentRemove` | Agent data mutation. |
-| `Jido.Agent.Directive.AgentReplace` | Agent data mutation. |
+| `Jido.Agent.Directive` | Runtime work returned by an Agent executable command. |
 | `Jido.Agent.Directive.AgentSend` | Sends one Signal to a tracked Agent activation after commit. |
-| `Jido.Agent.Directive.AgentUpdate` | Agent data mutation. |
-| `Jido.Agent.Directive.ConnectionAdd` | Agent data mutation. |
-| `Jido.Agent.Directive.ConnectionRemove` | Agent data mutation. |
-| `Jido.Agent.Directive.ConnectionReplace` | Agent data mutation. |
-| `Jido.Agent.Directive.ConnectionUpdate` | Agent data mutation. |
 | `Jido.Agent.Directive.Emit` | Dispatches one Signal after the Agent state commit. |
 | `Jido.Agent.Directive.ParentSend` | Sends one Signal to the current parent Agent after commit. |
-| `Jido.Agent.Directive.PluginAdd` | Agent data mutation. |
-| `Jido.Agent.Directive.PluginConfigure` | Agent data mutation. |
-| `Jido.Agent.Directive.PluginRemove` | Agent data mutation. |
 | `Jido.Agent.Directive.Reply` | Represents one correlated Signal response to the current request. |
-| `Jido.Agent.Directive.RouteAdd` | Agent data mutation. |
-| `Jido.Agent.Directive.RouteRemove` | Agent data mutation. |
-| `Jido.Agent.Directive.RouteReplace` | Agent data mutation. |
-| `Jido.Agent.Directive.RouteUpdate` | Agent data mutation. |
-| `Jido.Agent.Directive.RoutesReorder` | Agent data mutation. |
-| `Jido.Agent.Directive.RoutesSet` | Agent data mutation. |
 | `Jido.Agent.Directive.ServerStop` | Stops the AgentServer after the Agent state commit. |
-| `Jido.Agent.Directive.TopologySet` | Agent data mutation. |
 | `Jido.Agent.Plugin` | Executes the Agent callbacks of `Jido.Plugin`. |
 | `Jido.Agent.Plugin.FSM` | Adds deterministic finite-state route control to one Agent. |
 | `Jido.Agent.Plugin.Preparation` | Read-only input for one pure Agent Plugin preparation callback. |
@@ -196,7 +177,6 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | `Jido.Agent.Ref` | Stable identity for one logical Agent. |
 | `Jido.Agent.Route` | Pure route normalization and selection. |
 | `Jido.Agent.Topology` | Logical members and output connections. |
-| `Jido.Agent.Turn` | A prepared executable turn for one Agent Signal. |
 | `Jido.Agent.View` | Builds a safe, framework-neutral view of one Agent. |
 
 ### Jido.AgentServer

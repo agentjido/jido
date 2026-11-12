@@ -149,7 +149,7 @@ The root's revision commits a topology change together with its state. Slot iden
 - Removing a member and adding it back gives new identities, and a pending Turn of the old member does not come back.
 - Changing the member's definition or bound initial state gives all its slots new identities.
 
-A retired identity's record stays in the store. Jido does not collect it and has no public listing of member records, so keep track of the IDs if you must remove them. [Change Live Composition](../composition/change-live-composition.md) shows how to apply these changes.
+A retired identity's record stays in the store. Jido does not collect it and has no public listing of member records. A complete definition upgrade can replace the static topology while the activation is idle.
 
 ## Know the limits
 
@@ -179,6 +179,6 @@ alias Jido.AgentServer, as: Server
 
 ## Next steps
 
-- [Topology Reconciliation](../composition/topology-reconciliation.md) explains how the root starts and stops members.
+- [Declare Agent Topology](../composition/declare-agent-topology.livemd) explains static members.
 - [Durable Turns and Flows](durable-turns-and-flows.livemd) covers member Flow recovery.
 - [Deletion and Tombstones](deletion-and-tombstones.md) covers the remaining records.

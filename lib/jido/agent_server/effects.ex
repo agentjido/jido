@@ -3,7 +3,6 @@ defmodule Jido.AgentServer.Effects do
 
   alias Jido.Agent
   alias Jido.Agent.Directive.{AgentSend, Emit, ParentSend, Reply, ServerStop}
-  alias Jido.Agent.Mutation
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Directive.{AgentStart, AgentStop, ErrorReport, ProcessStart}
   alias Jido.AgentServer.Topology
@@ -174,9 +173,6 @@ defmodule Jido.AgentServer.Effects do
 
   defp validate(directive, config) do
     cond do
-      Mutation.mutation?(directive) ->
-        :ok
-
       config.directive_handler != nil ->
         :ok
 
@@ -200,7 +196,7 @@ defmodule Jido.AgentServer.Effects do
   defp validate_runtime_target(name, config) do
     with :ok <- validate_target(name, config) do
       if Enum.any?(config.agent.topology.agents, &(&1.name == name)),
-        do: {:error, :topology_agent_requires_mutation},
+        do: {:error, :static_topology_member},
         else: :ok
     end
   end

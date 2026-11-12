@@ -1,5 +1,6 @@
 defmodule Jido.Exec.ObservationTest do
   use ExUnit.Case, async: true
+  @moduletag obligation: "jido_action.execution.I21"
 
   alias Jido.Exec
   alias Jido.Test.Action.Fixtures.Actions.Add

@@ -1,7 +1,7 @@
 defmodule Jido.Agent.Runner do
   @moduledoc false
 
-  alias Jido.Agent.{Mutation, Plugin, Turn, Validation}
+  alias Jido.Agent.{Plugin, Validation}
   alias Jido.Agent.Directive.ServerStop
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
   alias Jido.Error
@@ -22,8 +22,9 @@ defmodule Jido.Agent.Runner do
       :agent,
       :schema,
       :signal,
-      :turn,
-      :context,
+      :source_signal,
+      :route,
+      :instruction,
       :exec_opts,
       :plugin_specs
     ]
@@ -33,8 +34,9 @@ defmodule Jido.Agent.Runner do
             agent: map(),
             schema: Jido.Joi.schema(),
             signal: Jido.Signal.t(),
-            turn: Jido.Agent.Turn.t(),
-            context: map(),
+            source_signal: Jido.Signal.t(),
+            route: map(),
+            instruction: Jido.Instruction.t(),
             exec_opts: keyword(),
             plugin_specs: [Jido.Plugin.Spec.Agent.t()]
           }
@@ -49,9 +51,9 @@ defmodule Jido.Agent.Runner do
     with {:ok, prepared} <- prepare(agent, signal, opts),
          result <-
            Jido.Exec.run(
-             prepared.turn.executable,
-             prepared.turn.input,
-             prepared.context,
+             prepared.instruction,
+             %{},
+             %{},
              prepared.exec_opts
            ) do
       finish(prepared, result)
@@ -63,16 +65,6 @@ defmodule Jido.Agent.Runner do
           {:ok, Prepared.t()} | {:error, term()}
   def prepare(agent, %Signal{} = signal, opts) do
     prepare_direct(agent, signal, opts) |> unstage()
-  end
-
-  @doc false
-  @spec transition_validated(map(), term(), Jido.Joi.schema()) ::
-          {:ok, map()} | {:error, Exception.t()}
-  def transition_validated(agent, next_state, schema) do
-    with :ok <-
-           Jido.Error.prefix_result_path(Jido.Agent.Schema.complete(schema, next_state), :state) do
-      {:ok, %{agent | state: next_state}}
-    end
   end
 
   @doc false
@@ -97,7 +89,7 @@ defmodule Jido.Agent.Runner do
     agent_specs = Plugin.specs(plugin_specs)
 
     with :ok <- at(:input, Validation.validate_caller_context(context)),
-         {:ok, turn} <-
+         {:ok, selection} <-
            at(
              :route,
              select(
@@ -108,18 +100,22 @@ defmodule Jido.Agent.Runner do
              )
            ),
          {:ok, schema} <-
-           at(:input, Plugin.compose_schema_from_specs(agent.schema, plugin_specs)) do
-      {:ok,
-       prepared(
-         agent,
-         schema,
-         signal,
-         turn,
-         context,
-         exec_opts,
-         plugin_inputs,
-         agent_specs
-       )}
+           at(:input, Plugin.compose_schema_from_specs(agent.schema, plugin_specs)),
+         {:ok, prepared} <-
+           at(
+             :route,
+             prepared(
+               agent,
+               schema,
+               signal,
+               selection,
+               context,
+               exec_opts,
+               plugin_inputs,
+               agent_specs
+             )
+           ) do
+      {:ok, prepared}
     end
   end
 
@@ -148,26 +144,23 @@ defmodule Jido.Agent.Runner do
     with :ok <- at(:input, Validation.validate_caller_context(context)),
          {:ok, selected} <-
            at(:route, select(agent, source_signal, plugin_inputs, agent_specs)),
-         turn = %{
-           selected
-           | executable: instruction,
-             execution_mode: execution_mode(instruction.kind),
-             input: instruction.params
-         },
-         {:ok, turn} <- at(:route, Turn.validate_selected(turn)),
          {:ok, schema} <-
-           at(:input, Plugin.compose_schema_from_specs(agent.schema, plugin_specs)) do
-      {:ok,
-       prepared(
-         agent,
-         schema,
-         signal,
-         turn,
-         context,
-         exec_opts,
-         plugin_inputs,
-         agent_specs
-       )}
+           at(:input, Plugin.compose_schema_from_specs(agent.schema, plugin_specs)),
+         {:ok, prepared} <-
+           at(
+             :route,
+             prepared(
+               agent,
+               schema,
+               signal,
+               %{selected | executable: instruction, input: instruction.params},
+               context,
+               exec_opts,
+               plugin_inputs,
+               agent_specs
+             )
+           ) do
+      {:ok, prepared}
     end
   end
 
@@ -188,19 +181,21 @@ defmodule Jido.Agent.Runner do
          {:ok, signal} <- at(:input, Validation.normalize_signal(signal)),
          plugin_specs = Plugin.specs(specs),
          {:ok, plugin_inputs} <- at(:prepare, Plugin.prepare(agent, signal, plugin_specs)),
-         {:ok, turn} <-
+         {:ok, selection} <-
            at(:route, select(agent, signal, plugin_inputs, plugin_specs)) do
-      {:ok,
-       prepared(
-         agent,
-         schema,
-         signal,
-         turn,
-         caller_context,
-         exec_opts,
-         plugin_inputs,
-         plugin_specs
-       )}
+      at(
+        :route,
+        prepared(
+          agent,
+          schema,
+          signal,
+          selection,
+          caller_context,
+          exec_opts,
+          plugin_inputs,
+          plugin_specs
+        )
+      )
     end
   end
 
@@ -208,7 +203,7 @@ defmodule Jido.Agent.Runner do
          agent,
          schema,
          signal,
-         turn,
+         selection,
          caller_context,
          exec_opts,
          plugin_inputs,
@@ -225,15 +220,22 @@ defmodule Jido.Agent.Runner do
         signal: signal
       })
 
-    %Prepared{
-      agent: agent,
-      schema: schema,
-      signal: signal,
-      turn: turn,
-      context: context,
-      exec_opts: exec_opts,
-      plugin_specs: plugin_specs
-    }
+    with {:ok, instruction} <-
+           Jido.Instruction.resolve(selection.executable, selection.input, context),
+         :ok <- Jido.Instruction.validate_resolved(instruction),
+         {:ok, instruction} <- Jido.Exec.Runtime.flow_instruction(instruction) do
+      {:ok,
+       %Prepared{
+         agent: agent,
+         schema: schema,
+         signal: signal,
+         source_signal: selection.source_signal,
+         route: selection.route,
+         instruction: instruction,
+         exec_opts: exec_opts,
+         plugin_specs: plugin_specs
+       }}
+    end
   end
 
   defp finish(%Prepared{} = prepared, result) do
@@ -254,17 +256,13 @@ defmodule Jido.Agent.Runner do
              PluginPipeline.run(
                {:ok, prepared.agent.state, directives},
                prepared.agent,
-               prepared.turn.source_signal,
-               prepared.context.plugin_inputs,
+               prepared.source_signal,
+               prepared.instruction.context.plugin_inputs,
                prepared.plugin_specs
              )
            ),
-         result =
-           if(Enum.any?(directives, &Mutation.mutation?/1),
-             do: Mutation.apply(prepared.agent, state, directives),
-             else: transition_validated(prepared.agent, state, prepared.schema)
-           ),
-         {:ok, agent} <- at(:validate, result) do
+         {:ok, agent} <-
+           at(:validate, transition_validated(prepared.agent, state, prepared.schema)) do
       {:handoff, agent, instruction, directives}
     end
   end
@@ -281,52 +279,37 @@ defmodule Jido.Agent.Runner do
              PluginPipeline.run(
                {:ok, state, directives},
                prepared.agent,
-               prepared.turn.source_signal,
-               prepared.context.plugin_inputs,
+               prepared.source_signal,
+               prepared.instruction.context.plugin_inputs,
                prepared.plugin_specs
              )
            ),
-         result =
-           if(Enum.any?(directives, &Mutation.mutation?/1),
-             do: Mutation.apply(prepared.agent, state, directives),
-             else: transition_validated(prepared.agent, state, prepared.schema)
-           ),
-         {:ok, agent} <- at(:validate, result) do
+         {:ok, agent} <-
+           at(:validate, transition_validated(prepared.agent, state, prepared.schema)) do
       {:ok, agent, directives}
     end
   end
 
   defp select(agent, signal, plugin_inputs, plugin_specs) do
     with {:ok, route} <- Plugin.select_route(agent, signal, plugin_inputs, plugin_specs),
-         {:ok, turn} <-
-           (case route.handler do
-              %{kind: kind, target: target} when kind in [:action, :flow] ->
-                with {:ok, input} <- merge_route_input(route, signal),
-                     do:
-                       {:ok,
-                        %Turn{
-                          executable: target,
-                          execution_mode: execution_mode(kind),
-                          input: input,
-                          route: route
-                        }}
-
-              handler ->
-                {:ok,
-                 %Turn{
-                   executable: Jido.Agent.Turn.SignalHandler,
-                   execution_mode: :managed,
-                   input: %{handler: handler},
-                   route: route
-                 }}
-            end),
-         {:ok, turn} <- Turn.bind_source(turn, signal) do
-      Turn.validate_selected(turn)
+         {:ok, executable, input} <- selection(route, signal) do
+      {:ok,
+       %{
+         executable: executable,
+         input: input,
+         route: route,
+         source_signal: signal
+       }}
     end
   end
 
-  defp execution_mode(:flow), do: :durable
-  defp execution_mode(:action), do: :managed
+  defp selection(%{handler: %{kind: kind, target: target}} = route, signal)
+       when kind in [:action, :flow] do
+    with {:ok, input} <- merge_route_input(route, signal), do: {:ok, target, input}
+  end
+
+  defp selection(%{handler: handler}, _signal),
+    do: {:ok, Jido.Agent.Runner.SignalHandler, %{handler: handler}}
 
   defp normalize_exec_result({:ok, output}), do: normalize_exec_result({:ok, output, []})
 
@@ -355,7 +338,7 @@ defmodule Jido.Agent.Runner do
   end
 
   defp project_route_result(%Prepared{} = prepared, output, directives) do
-    route = prepared.turn.route
+    route = prepared.route
 
     with {:ok, state} <- project_state(route.state, output, prepared.agent.state),
          :ok <- Jido.Error.prefix_result_path(Jido.Agent.Schema.plain_map(state), :state),
@@ -405,11 +388,11 @@ defmodule Jido.Agent.Runner do
 
   defp build_reply_signal(type, data, %Prepared{} = prepared) do
     with {:ok, signal} <- Signal.new(type, data, source: prepared.agent.signal_source),
-         {:ok, _request, trace} <- Signal.Context.ensure_trace(prepared.turn.source_signal),
+         {:ok, _request, trace} <- Signal.Context.ensure_trace(prepared.source_signal),
          {:ok, signal} <-
            Signal.Context.put_trace(
              signal,
-             Jido.Trace.with_causation(trace, prepared.turn.source_signal.id)
+             Jido.Trace.with_causation(trace, prepared.source_signal.id)
            ) do
       {:ok, signal}
     else
@@ -422,7 +405,7 @@ defmodule Jido.Agent.Runner do
   end
 
   defp merge_route_input(route, %Signal{} = signal) do
-    case Turn.normalize_input(signal.data) do
+    case normalize_input(signal.data) do
       {:ok, input} ->
         Jido.Agent.Route.params(route, input)
 
@@ -434,6 +417,15 @@ defmodule Jido.Agent.Runner do
            field: :data,
            details: %{signal_id: signal.id, data: signal.data}
          )}
+    end
+  end
+
+  defp normalize_input(nil), do: {:ok, %{}}
+  defp normalize_input(value), do: Validation.normalize_input(value)
+
+  defp transition_validated(agent, next_state, schema) do
+    with :ok <- Jido.Error.prefix_result_path(Jido.Agent.Schema.complete(schema, next_state), :state) do
+      {:ok, %{agent | state: next_state}}
     end
   end
 

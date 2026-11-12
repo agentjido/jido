@@ -62,14 +62,17 @@ defmodule Jido.AgentServer.Supervisor do
   @doc false
   def start_worker(opts, activation) do
     state = Keyword.fetch!(opts, :activation_state)
+    persistence = opts[:persistence]
     # The recovery group has stopped its owned DynamicSupervisor. Its children
     # are not checkpoints; keep only independent relationships across recovery.
     :ets.match_delete(state, {{:child, :_}, %{placement: :owned}})
 
     checkpoint =
-      if opts[:persistence] in [nil, false],
-        do: restore_checkpoint(state, opts[:agent]),
-        else: {:ok, opts[:agent], 0}
+      case restore_checkpoint(state, opts[:agent]) do
+        {:ok, _agent, revision} = restored when revision > 0 -> restored
+        _ when persistence in [nil, false] -> restore_checkpoint(state, opts[:agent])
+        _ -> {:ok, opts[:agent], 0}
+      end
 
     with {:ok, agent, revision} <- checkpoint,
          opts = Keyword.merge(opts, agent: agent, state_version: revision),
@@ -83,8 +86,7 @@ defmodule Jido.AgentServer.Supervisor do
     with [{:checkpoint, agent, revision}] <- :ets.lookup(state, :checkpoint),
          true <- is_integer(revision) and revision >= 0,
          {:ok, agent} <- Jido.Agent.Validation.validate_instance(agent),
-         true <- agent.id == initial.id,
-         true <- agent.module == initial.module do
+         true <- agent.id == initial.id do
       {:ok, agent, revision}
     else
       _ -> {:error, :invalid_local_checkpoint}

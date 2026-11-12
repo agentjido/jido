@@ -19,7 +19,7 @@ defmodule Jido.Examples.Persistence.HibernateAndThawTest do
 
     {:ok, signal} = Example.increment_signal(%{amount: 4})
     assert {:ok, %{state: %{count: 4}}, []} = Server.call(server, signal)
-    assert Server.snapshot(server).state_version == 1
+    assert Server.snapshot(server).state_version == 2
 
     monitor = Process.monitor(server)
     assert :ok = Jido.hibernate(jido, server)
@@ -27,7 +27,7 @@ defmodule Jido.Examples.Persistence.HibernateAndThawTest do
 
     assert {:ok, restored} = Example.thaw(jido, id, persistence)
     assert :ok = Jido.AgentServer.await_ready(restored)
-    assert Server.snapshot(restored) == %{agent: Server.agent(restored), state_version: 1}
+    assert Server.snapshot(restored) == %{agent: Server.agent(restored), state_version: 2}
     assert Server.agent(restored).state.count == 4
   end
 

@@ -1,4 +1,4 @@
-defmodule Jido.Agent.Turn.SignalHandler do
+defmodule Jido.Agent.Runner.SignalHandler do
   alias Jido.Joi
   @moduledoc false
   use Jido.Action,

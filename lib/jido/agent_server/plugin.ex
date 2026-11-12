@@ -1,7 +1,6 @@
 defmodule Jido.AgentServer.Plugin do
   @moduledoc "Live Plugin state access and lifecycle policy for one AgentServer."
 
-  alias Jido.Error
   alias Jido.AgentServer.Command
   alias Jido.AgentServer.Plugin.Callbacks
   alias Jido.Plugin.Init
@@ -21,24 +20,6 @@ defmodule Jido.AgentServer.Plugin do
       %{agent_server: %{dispatch?: true}} = owner -> owner
       _ -> nil
     end
-  end
-
-  @doc false
-  def validate_changes(specs, changed) do
-    Enum.reduce_while(specs, :ok, fn spec, :ok ->
-      if spec.module in changed and match?(%{runtime?: true}, spec.agent_server) and
-           not function_exported?(spec.module, :quiesce, 2) do
-        {:halt,
-         Error.validation_result(
-           :plugin_quiescence_required,
-           [:plugins],
-           "Plugin changes require quiesce and resume callbacks",
-           %{plugin: spec.module}
-         )}
-      else
-        {:cont, :ok}
-      end
-    end)
   end
 
   @doc false
@@ -93,32 +74,6 @@ defmodule Jido.AgentServer.Plugin do
       data.plugin_refs,
       data.state_version
     )
-  end
-
-  @doc false
-  def pause(specs, refs, callback) do
-    Enum.reduce_while(specs, :ok, fn spec, :ok ->
-      result =
-        bounded(fn ->
-          Jido.Plugin.invoke(
-            spec.module,
-            spec.module,
-            callback,
-            [Map.get(refs, spec.module), spec.agent_server.options],
-            "Plugin configuration boundary failed"
-          )
-        end)
-
-      if result == :ok,
-        do: {:cont, :ok},
-        else: {:halt, {:error, {callback, spec.module, result}}}
-    end)
-  end
-
-  @doc false
-  def rebuild(data, owner, changed) do
-    with :ok <- remove_roots(data.activation, changed),
-         do: bootstrap(data, owner)
   end
 
   @doc false
@@ -216,30 +171,5 @@ defmodule Jido.AgentServer.Plugin do
         _ -> {:halt, {:error, :plugin_not_ready}}
       end
     end)
-  end
-
-  defp bounded(fun) do
-    task = Task.async(fun)
-
-    case Task.yield(task, 5_000) || Task.shutdown(task, :brutal_kill) do
-      {:ok, result} -> result
-      _ -> {:error, :plugin_control_timeout}
-    end
-  end
-
-  defp remove_roots(activation, changed) do
-    Enum.reduce_while(changed, :ok, fn module, :ok ->
-      case remove_root(activation, {:plugin, module}) do
-        :ok -> {:cont, :ok}
-        error -> {:halt, error}
-      end
-    end)
-  end
-
-  defp remove_root(root, id) do
-    case Supervisor.terminate_child(root, id) do
-      :ok -> Supervisor.delete_child(root, id)
-      {:error, :not_found} -> :ok
-    end
   end
 end

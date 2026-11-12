@@ -26,17 +26,12 @@ defmodule Jido.Examples.Topology.HierarchyTest do
     assert Jido.agent_count(jido) == 0
   end
 
-  test "removing a nested owner stops its complete subtree", %{jido: jido} do
+  test "stopping the root stops its complete static subtree", %{jido: jido} do
     server = start_topology(jido, Hierarchy)
     [team] = members(server)
     monitors = monitor_runtime(Server.activation(team))
-    assert {:ok, signal} = Hierarchy.team_remove_signal()
-    assert {:ok, accepted, [_]} = Server.call(server, signal)
-    assert accepted.topology.agents == []
-    assert :ok = Server.await_ready(server)
-    assert_down(monitors)
-    assert members(server) == []
-    assert Jido.agent_count(jido) == 1
     stop_topology(server)
+    assert_down(monitors)
+    assert Jido.agent_count(jido) == 0
   end
 end

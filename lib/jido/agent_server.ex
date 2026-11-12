@@ -54,8 +54,12 @@ defmodule Jido.AgentServer do
   @typedoc "One committed Agent and revision read in the same server event."
   @type snapshot :: %{agent: Jido.Agent.instance(), state_version: non_neg_integer()}
 
-  @typedoc "One option for a serialized snapshot upgrade."
-  @type upgrade_option :: {:context, map()} | {:timeout, timeout()}
+  @typedoc "One option for a complete Agent definition upgrade."
+  @type upgrade_option ::
+          {:catalog, Jido.Catalog.t()}
+          | {:migrate, term()}
+          | {:context, map()}
+          | {:timeout, timeout()}
 
   require Logger
 
@@ -866,8 +870,10 @@ defmodule Jido.AgentServer do
   end
 
   defp initialize_plugins(data) do
-    case Jido.Agent.Mutation.bind(data.agent) do
-      {:ok, agent} ->
+    case Jido.Agent.Topology.bind(data.agent, data.agent.state, &Jido.Agent.Validation.resolve/2) do
+      {:ok, _members} ->
+        agent = data.agent
+
         {:ok, specs} =
           Jido.Plugin.Normalizer.normalize_runtime(
             Jido.Agent.Plugin.declarations(agent),
@@ -961,21 +967,37 @@ defmodule Jido.AgentServer do
   end
 
   @doc """
-  Runs a snapshot upgrade Action through the serial commit boundary.
+  Replaces one idle activation with a complete trusted Agent definition.
 
-  Options can be a unique keyword list or plain Map. They are `context:` with
-  a plain Map and `timeout:` with a valid wait timeout. A successful upgrade
-  returns the accepted Agent with no Directives.
+  The required `catalog:` option resolves references in the Agent Codec
+  document. The optional `migrate:` Action or Flow receives `%{state: state}`
+  and must return the complete new state with no Directives. `context:` is a
+  plain Map. `timeout:` is a valid wait timeout.
+
+  The activation must be idle and supervised. A successful upgrade validates
+  and saves the new Agent, then restarts its AgentServer. Its stable
+  `Jido.Agent.Ref` stays the same. Its PID can change.
   """
   @spec upgrade(server(), term(), map() | [upgrade_option()]) ::
           {:ok, Agent.instance(), []} | {:error, term()}
-  def upgrade(server, action, opts \\ []) do
-    with {:ok, options} <- Jido.Agent.Schema.options(opts, [:context, :timeout]),
+  def upgrade(server, document, opts \\ []) do
+    with {:ok, options} <-
+           Jido.Agent.Schema.options(opts, [:catalog, :migrate, :context, :timeout]),
+         %Jido.Catalog{} = catalog <- Map.get(options, :catalog),
          context = Map.get(options, :context, %{}),
          :ok <- Jido.Agent.Schema.plain_map(context),
          timeout = Map.get(options, :timeout, 5_000),
-         :ok <- Lifecycle.validate_wait(timeout) do
-      :gen_statem.call(server, {:upgrade, make_ref(), action, context}, timeout)
+         :ok <- Lifecycle.validate_wait(timeout),
+         {:ok, definition} <-
+           Jido.Codec.decode(document, catalog: catalog, codec: Jido.Agent.Codec) do
+      :gen_statem.call(
+        server,
+        {:upgrade, definition, Map.get(options, :migrate), context},
+        timeout
+      )
+    else
+      nil -> invalid_options("upgrade requires an explicit Jido.Catalog")
+      {:error, _reason} = error -> error
     end
   end
 
@@ -1304,33 +1326,38 @@ defmodule Jido.AgentServer do
   def handle_event({:call, from}, :snapshot, _phase, data),
     do: {:keep_state_and_data, reply(from, Lifecycle.snapshot(data.agent, data.state_version))}
 
-  def handle_event({:call, from}, {:upgrade, token, action, context}, :idle, data) do
-    data = %{
-      data
-      | postponed: MapSet.delete(data.postponed, token),
-        queued_from: Map.delete(data.queued_from, token)
-    }
+  def handle_event(
+        {:call, from},
+        {:upgrade, definition, migration, context},
+        :idle,
+        data
+      ) do
+    cond do
+      is_nil(data.activation) ->
+        {:keep_state_and_data, reply(from, {:error, :activation_required})}
 
-    if data.admission_mode == :open do
-      signal = Signal.new!("jido.agent_server.upgrade", %{}, source: "/agent_server")
-      start_turn({:call, from}, signal, context, data, {:upgrade, action})
-    else
-      reject_turn({:call, from}, {:not_admitting, data.admission_mode}, data)
+      data.admission_mode == :open ->
+        signal = Signal.new!("jido.agent_server.upgrade", %{}, source: "/agent_server")
+
+        start_turn(
+          {:call, from},
+          signal,
+          context,
+          data,
+          {:upgrade, definition, migration}
+        )
+
+      true ->
+        reject_turn({:call, from}, {:not_admitting, data.admission_mode}, data)
     end
   end
 
-  def handle_event({:call, from}, {:upgrade, token, _action, _context}, _phase, data) do
-    if Lifecycle.reentrant?({:call, from}, data) or Lifecycle.bootstrap_caller?(from, data),
-      do: reject_turn({:call, from}, :reentrant_turn, data),
-      else: postpone_turn({:call, from}, token, data)
-  end
+  def handle_event({:call, from}, {:upgrade, _definition, _migration, _context}, _phase, _data),
+    do: {:keep_state_and_data, reply(from, {:error, :agent_busy})}
 
-  def handle_event(:cast, {kind, _source, _signal}, phase, data)
+  def handle_event(:cast, {kind, _source, _signal}, phase, _data)
       when kind in [:topology_output, :topology_bus] and
-             (phase in [:initializing, :restoring] or
-                (phase == :effects and is_map(data.active) and
-                   :erlang.is_map_key(:reconciling, data.active) and
-                   :erlang.map_get(:reconciling, data.active) == true)),
+             phase in [:initializing, :restoring],
       do: {:keep_state_and_data, [:postpone]}
 
   def handle_event(:cast, {:topology_output, tag, signal}, _phase, data) do
@@ -1359,12 +1386,6 @@ defmodule Jido.AgentServer do
     else
       {:keep_state, %{data | ready_waiters: [from | data.ready_waiters]}}
     end
-  end
-
-  def handle_event({:call, from}, :await_ready, :effects, %{active: %{reconciling: true}} = data) do
-    if Lifecycle.reentrant?({:call, from}, data),
-      do: {:keep_state_and_data, reply(from, {:error, :reentrant_turn})},
-      else: {:keep_state, %{data | ready_waiters: [from | data.ready_waiters]}}
   end
 
   def handle_event({:call, from}, :await_ready, _phase, _data),
@@ -1515,19 +1536,6 @@ defmodule Jido.AgentServer do
 
   def handle_event(:info, {:persistence_timeout, id}, :saving, %{active: %{turn_id: id}} = data),
     do: stop_durable(data, :indeterminate)
-
-  def handle_event(
-        :info,
-        {:composition_timeout, id},
-        :effects,
-        %{active: %{turn_id: id, reconciling: true}} = data
-      ),
-      do:
-        stop_failed(
-          data,
-          execution_error("Composition readiness timed out", :composition_timeout),
-          :effects
-        )
 
   def handle_event(:internal, :effect_next, :effects, data), do: next_effect(data)
 
@@ -2201,12 +2209,19 @@ defmodule Jido.AgentServer do
           prepare_turn(agent, signal, context, data)
         end)
 
-      {:upgrade, action} ->
+      {:upgrade, definition, migration} ->
+        active = Map.put(active, :restart_after_commit, true)
+
         operation(:upgrade, %{data | active: active}, fn ->
-          with {:ok, candidate} <- Lifecycle.upgrade(agent, action, context),
-               {:ok, candidate} <- Jido.Agent.Mutation.bind(candidate),
-               {:ok, candidate} <- identify_topology(data, candidate),
-               :ok <- validate_composition(data, candidate, []) do
+          with {:ok, candidate} <-
+                 Lifecycle.upgrade_definition(agent, definition, migration, context),
+               {:ok, candidate} <-
+                 Jido.Agent.Topology.identify(
+                   agent,
+                   candidate,
+                   &Jido.Agent.Validation.resolve/2
+                 ),
+               :ok <- Topology.validate(candidate) do
             {:ok, candidate, []}
           end
         end)
@@ -2335,9 +2350,6 @@ defmodule Jido.AgentServer do
       execute: :starting,
       settle: :settling,
       cleanup: :cleaning,
-      reconfigure: :reconfiguring,
-      resume_plugins: :cleaning,
-      reconcile: :effects,
       save: :saving,
       policy: :policy,
       commit_hook: :effects,
@@ -2353,8 +2365,8 @@ defmodule Jido.AgentServer do
        when kind in [:prepare, :restore_turn, :restore_handoff] do
     data = put_in(data.active.prepared, prepared)
 
-    case {prepared.turn.execution_mode, Lifecycle.durable_instruction(prepared)} do
-      {:durable, {:ok, %{kind: :flow}}} when data.persistence not in [nil, false] ->
+    case Lifecycle.durable_instruction(prepared) do
+      {:ok, %{kind: :flow}} when data.persistence not in [nil, false] ->
         if kind in [:restore_turn, :restore_handoff] do
           start_durable_worker(put_in(data.active.durable, true))
         else
@@ -2373,7 +2385,7 @@ defmodule Jido.AgentServer do
           end
         end
 
-      {_execution_mode, _instruction} ->
+      _instruction ->
         owner = self()
         runner = data.runner
         id = data.active.turn_id
@@ -2590,37 +2602,6 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp operation_result(:reconfigure, :ok, data), do: finish(data, data.active.result)
-  defp operation_result(:reconfigure, {:error, reason}, data), do: finish(data, {:error, reason})
-
-  defp operation_result(:resume_plugins, :ok, data) do
-    data = put_in(data.active.paused_plugins, [])
-    finish_result(data, data.active.result)
-  end
-
-  defp operation_result(:resume_plugins, _, data),
-    do: stop_failed(data, execution_error("Plugin resume failed", :plugin_resume_failed), :cleaning)
-
-  defp operation_result(:reconcile, {:ok, refs, _members}, data) do
-    Process.cancel_timer(data.active.effect_timer)
-    replies = Enum.flat_map(data.ready_waiters, &reply(&1, :ok))
-    data = %{data | plugin_refs: refs, ready_waiters: []}
-    data = put_in(data.active.reconciling, false)
-    data = put_in(data.active.paused_plugins, [])
-
-    case begin_effects(data, data.active.effects) do
-      {:next_state, phase, next, actions} -> {:next_state, phase, next, replies ++ actions}
-    end
-  end
-
-  defp operation_result(:reconcile, _, data),
-    do:
-      stop_failed(
-        data,
-        execution_error("Committed composition is not ready", :composition_not_ready),
-        :effects
-      )
-
   defp operation_result(:policy, decision, data) do
     if System.monotonic_time(:millisecond) >= data.active.policy_deadline,
       do: complete_terminal(data, {:stop, :error_policy_timeout}),
@@ -2774,14 +2755,9 @@ defmodule Jido.AgentServer do
   end
 
   defp start_worker(runner, id, owner, prepared, exec_opts) do
-    with {:ok, instruction} <-
-           Jido.Instruction.resolve(
-             prepared.turn.executable,
-             prepared.turn.input,
-             prepared.context
-           ),
-         {:ok, instruction} <- Jido.Exec.Runtime.flow_instruction(instruction),
-         {:ok, input} <- execution_input(instruction),
+    instruction = prepared.instruction
+
+    with {:ok, input} <- execution_input(instruction),
          {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}, []),
          :ok <- Jido.Exec.Node.Wait.validate_host(workflow),
          {:ok, worker} <-
@@ -2832,9 +2808,7 @@ defmodule Jido.AgentServer do
         {:error, if(match?({:error, _}, result), do: :running, else: :settling), reason}
 
       {:ok, candidate, directives} ->
-        with {:ok, candidate} <- Jido.Agent.Mutation.bind(candidate),
-             {:ok, candidate} <- identify_topology(config, candidate),
-             :ok <- validate_composition(config, candidate, directives),
+        with :ok <- immutable_definition(config.agent, candidate),
              :ok <- Effects.validate_batch(directives, %{config | agent: candidate}) do
           {:ok, candidate, directives}
         else
@@ -2842,15 +2816,19 @@ defmodule Jido.AgentServer do
         end
 
       {:handoff, candidate, instruction, directives} ->
-        with {:ok, candidate} <- Jido.Agent.Mutation.bind(candidate),
-             {:ok, candidate} <- identify_topology(config, candidate),
-             :ok <- validate_composition(config, candidate, directives),
+        with :ok <- immutable_definition(config.agent, candidate),
              :ok <- Effects.validate_batch(directives, %{config | agent: candidate}) do
           {:handoff, candidate, instruction, directives}
         else
           {:error, reason} -> {:error, :directives, reason}
         end
     end
+  end
+
+  defp immutable_definition(source, candidate) do
+    if Agent.definition(source) == Agent.definition(candidate),
+      do: :ok,
+      else: {:error, :agent_definition_changed}
   end
 
   defp execution_error(message, reason),
@@ -2888,7 +2866,7 @@ defmodule Jido.AgentServer do
     {:stop_and_reply, {:shutdown, :execution_lifecycle_failed}, replies, data}
   end
 
-  defp postpone_turn(type, token, data, reply_gate \\ nil) do
+  defp postpone_turn(type, token, data, reply_gate) do
     case Lifecycle.queue_decision(data.postponed, token, data.max_postponed_signals) do
       :duplicate ->
         {:keep_state_and_data, [:postpone]}
@@ -2924,32 +2902,6 @@ defmodule Jido.AgentServer do
 
   defp turn_rejection({:call, from}, reason, _data), do: reply(from, {:error, reason})
 
-  defp identify_topology(%{persistence: persistence, agent: before}, candidate)
-       when persistence not in [nil, false],
-       do:
-         Jido.Agent.Topology.identify(
-           before,
-           candidate,
-           &Jido.Agent.Validation.resolve/2
-         )
-
-  defp identify_topology(_data, candidate), do: {:ok, candidate}
-
-  defp validate_composition(data, candidate, directives) do
-    changed = Jido.Agent.Mutation.changed_plugins(data.agent, candidate, directives)
-
-    if is_nil(data.activation) and composition_requires_activation?(candidate, changed) do
-      {:error, :activation_required}
-    else
-      with :ok <- Topology.validate(candidate),
-           do: Plugin.validate_changes(data.plugin_specs, changed)
-    end
-  end
-
-  defp composition_requires_activation?(candidate, changed) do
-    Topology.requires_activation?(candidate) or changed != []
-  end
-
   defp finish(
          %{active: %{persisted: true, durable_finalized: false}} = data,
          {:error, _} = result
@@ -2962,27 +2914,6 @@ defmodule Jido.AgentServer do
       |> put_in([:active, :durable_next], {:finish, result})
 
     durable_write(:durable_terminal, data, data.agent, receipt)
-  end
-
-  defp finish(%{active: active} = data, {:ok, _candidate, _directives} = result)
-       when not is_map_key(active, :configuration_checked) do
-    configure_commit(data, active, result)
-  end
-
-  defp finish(
-         %{active: active} = data,
-         {:handoff, _candidate, _instruction, _directives} = result
-       )
-       when not is_map_key(active, :configuration_checked) do
-    configure_commit(data, active, result)
-  end
-
-  defp finish(%{active: %{paused_plugins: [_ | _] = paused}} = data, {:error, _} = result) do
-    data = put_in(data.active.result, result)
-
-    operation(:resume_plugins, data, fn ->
-      Plugin.pause(paused, data.plugin_refs, :resume)
-    end)
   end
 
   defp finish(
@@ -3019,7 +2950,19 @@ defmodule Jido.AgentServer do
     data = %{data | server_turn: receipt}
 
     operation(:save, %{data | active: active}, fn ->
-      Lifecycle.save(data, candidate, data.state_version + 1, data.state_version, receipt)
+      save_opts =
+        if Map.get(data.active, :restart_after_commit, false),
+          do: [previous_agent_module: data.agent.module],
+          else: []
+
+      Lifecycle.save(
+        data,
+        candidate,
+        data.state_version + 1,
+        data.state_version,
+        receipt,
+        save_opts
+      )
     end)
   end
 
@@ -3045,42 +2988,25 @@ defmodule Jido.AgentServer do
     data = %{data | server_turn: receipt}
 
     operation(:save, %{data | active: active}, fn ->
-      Lifecycle.save(data, candidate, data.state_version + 1, data.state_version, receipt)
+      save_opts =
+        if Map.get(data.active, :restart_after_commit, false),
+          do: [previous_agent_module: data.agent.module],
+          else: []
+
+      Lifecycle.save(
+        data,
+        candidate,
+        data.state_version + 1,
+        data.state_version,
+        receipt,
+        save_opts
+      )
     end)
   end
 
   defp finish(data, {:ok, _, _} = result), do: publish_commit(data, result)
   defp finish(data, {:handoff, _, _, _} = result), do: publish_commit(data, result)
   defp finish(data, result), do: finish_result(data, result)
-
-  defp configure_commit(data, active, result) do
-    {candidate, directives} = success_candidate_and_directives(result)
-    changed = Jido.Agent.Mutation.changed_plugins(data.agent, candidate, directives)
-
-    paused =
-      Enum.filter(
-        data.plugin_specs,
-        &(&1.module in changed and match?(%{runtime?: true}, &1.agent_server))
-      )
-
-    active =
-      Map.merge(active, %{
-        configuration_checked: true,
-        paused_plugins: paused,
-        changed_plugins: changed,
-        diff: Jido.Agent.Diff.between(data.agent, candidate),
-        result: result
-      })
-
-    data = %{data | active: active}
-
-    if paused == [],
-      do: finish(data, result),
-      else:
-        operation(:reconfigure, data, fn ->
-          Plugin.pause(paused, data.plugin_refs, :quiesce)
-        end)
-  end
 
   defp stop_durable(data, reason),
     do: stop_failed(data, execution_error("Required durable commit failed", reason), :saving)
@@ -3111,23 +3037,9 @@ defmodule Jido.AgentServer do
         result when elem(result, 0) in [:ok, :handoff] ->
           {candidate, directives} = success_candidate_and_directives(result)
 
-          {:ok, specs} =
-            Jido.Plugin.Normalizer.normalize_runtime(
-              Jido.Agent.Plugin.declarations(candidate),
-              data.plugin_runtime_options
-            )
-
-          active =
-            Map.merge(data.active, %{
-              composition_changed: Topology.changed?(data.active.diff, data.agent, candidate),
-              commit_plugins: Enum.reject(specs, &(&1.module in data.active.changed_plugins))
-            })
-
           {%{
              data
              | agent: candidate,
-               plugin_specs: specs,
-               active: active,
                state_version: data.state_version + 1,
                error_count: 0
            }, :succeeded, :commit, length(directives)}
@@ -3154,24 +3066,26 @@ defmodule Jido.AgentServer do
       |> put_in([:active, :result], result)
       |> record_outcome(status, stage, status == :succeeded, count)
 
-    case result do
-      result when elem(result, 0) in [:ok, :handoff] ->
-        {_candidate, directives} = success_candidate_and_directives(result)
-        effects = Enum.reject(directives, &Jido.Agent.Mutation.mutation?/1)
+    cond do
+      Map.get(next.active, :restart_after_commit, false) and
+          elem(result, 0) in [:ok, :handoff] ->
+        complete_terminal(next, :restart)
 
-        if next.active.composition_changed or next.active.changed_plugins != [] do
-          begin_reconciliation(next, effects)
-        else
-          if effects != [] or PluginCallbacks.commit_specs(next.plugin_specs) != [],
-            do: begin_effects(next, effects),
-            else: complete_terminal(next, :continue)
+      true ->
+        case result do
+          result when elem(result, 0) in [:ok, :handoff] ->
+            {_candidate, directives} = success_candidate_and_directives(result)
+
+            if directives != [] or PluginCallbacks.commit_specs(next.plugin_specs) != [],
+              do: begin_effects(next, directives),
+              else: complete_terminal(next, :continue)
+
+          {:error, _} when status == :failed ->
+            apply_failure_policy(next)
+
+          _ ->
+            complete_terminal(next, :continue)
         end
-
-      {:error, _} when status == :failed ->
-        apply_failure_policy(next)
-
-      _ ->
-        complete_terminal(next, :continue)
     end
   end
 
@@ -3180,38 +3094,6 @@ defmodule Jido.AgentServer do
 
   defp success_candidate_and_directives({:handoff, candidate, _instruction, directives}),
     do: {candidate, directives}
-
-  defp begin_reconciliation(data, effects) do
-    owner = self()
-    replies = commit_replies(data.active)
-
-    active =
-      Map.merge(data.active, %{
-        from: if(handoff_result?(data.active.result), do: data.active.from, else: nil),
-        cancel_waiters: [],
-        effects: effects,
-        reconciling: true,
-        effect_deadline: System.monotonic_time(:millisecond) + data.readiness_timeout,
-        effect_timer:
-          Process.send_after(
-            self(),
-            {:composition_timeout, data.active.turn_id},
-            data.readiness_timeout
-          )
-      })
-
-    data = %{data | active: active}
-    runtime = Map.put(data, :owner, owner)
-
-    {:next_state, phase, next} =
-      operation(:reconcile, data, fn ->
-        with {:ok, refs} <- Plugin.rebuild(runtime, owner, data.active.changed_plugins),
-             {:ok, members} <- Topology.reconcile(runtime),
-             do: {:ok, refs, members}
-      end)
-
-    {:next_state, phase, next, replies}
-  end
 
   defp begin_effects(data, directives) do
     active = data.active
@@ -3433,6 +3315,13 @@ defmodule Jido.AgentServer do
     if data.active.policy_timer, do: Process.cancel_timer(data.active.policy_timer)
 
     case {decision, handoff_result?(data.active.result)} do
+      {:restart, false} ->
+        replies = reply(data.active.from, data.active.result) ++ cancel_replies(data.active, :ok)
+        ReplyGate.done(data.active.requester)
+        TraceContext.clear()
+        next = %{data | active: nil}
+        {:stop_and_reply, :definition_upgrade, replies, next}
+
       {:continue, true} ->
         begin_handoff_release(data)
 

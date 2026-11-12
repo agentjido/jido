@@ -57,13 +57,13 @@ defmodule Jido.Agent.StateIntersectionTest do
       )
 
     candidate = %{nested: %{a: 5, b: 6}}
-    assert {:ok, updated} = Agent.transition(agent, candidate)
+    assert {:ok, updated} = Jido.Agent.Validation.transition(agent, candidate)
     assert updated.state === candidate
     assert {:ok, checkpoint} = Jido.Persistence.snapshot(updated)
     assert Jido.Persistence.restore(checkpoint) === {:ok, updated}
 
     for invalid <- [%{nested: %{a: 5}}, %{nested: %{b: 6}}, %{nested: %{a: nil, b: 6}}] do
-      assert {:error, %{__exception__: true}} = Agent.transition(updated, invalid)
+      assert {:error, %{__exception__: true}} = Jido.Agent.Validation.transition(updated, invalid)
 
       assert {:error, %{__exception__: true}} =
                Jido.Persistence.restore(%{

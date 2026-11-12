@@ -81,7 +81,7 @@ defmodule Jido.Agent.DirectiveContractTest do
   end
 
   @tag obligation: "jido.agent.I27"
-  test "built-in identity and validation cover runtime and definition Directives" do
+  test "built-in identity and validation cover runtime Directives" do
     signal = Signal.new!("event", %{}, source: "/test")
     request = Signal.new!("request", %{}, source: "/test")
     reply = Signal.new!("response", %{value: 1}, source: "/test")
@@ -96,14 +96,7 @@ defmodule Jido.Agent.DirectiveContractTest do
       Runtime.agent_stop(:child),
       Runtime.error_report(:failed, :action),
       Runtime.process_start({Elixir.Agent, fn -> 0 end}),
-      Directive.server_stop(),
-      Directive.agent_add(:child, Jido.Test.AgentServer.Fixtures.CounterAgent),
-      Directive.agent_remove(:child),
-      Directive.route_add("event", Jido.Test.Agent.Contract.Add, state: %{source: :output, path: []}),
-      Directive.route_remove("event"),
-      Directive.connection_add("event", from: :root, to: :child),
-      Directive.connection_remove("event", from: :root, to: :child),
-      Directive.plugin_add(Jido.Test.Agent.Contract.Stateless)
+      Directive.server_stop()
     ]
 
     for directive <- directives do
@@ -220,8 +213,8 @@ defmodule Jido.Agent.DirectiveContractTest do
             }} = Directive.validate(%Throws{})
   end
 
-  @tag obligation: ["jido.agent.I27", "jido.agent.I29"]
-  test "Directive constructors preserve every supported option and explicit nil" do
+  @tag obligation: "jido.agent.I27"
+  test "Directive constructors preserve runtime values" do
     signal = Signal.new!("event", %{}, source: "/test")
     {:ok, reply} = Signal.put_context(signal, "jidocausationid", "request-id")
     assert Directive.emit("event", %{}) === %{kind: :emit, type: "event", data: %{}}
@@ -235,50 +228,6 @@ defmodule Jido.Agent.DirectiveContractTest do
 
     assert {:error, _} = Directive.emit("event.*", %{})
     assert {:error, _} = Directive.emit("event", [])
-
-    assert %{count: 2, initial_state: %{count: 1}} =
-             Directive.agent_add(:child, Jido.Test.AgentServer.Fixtures.CounterAgent,
-               count: 2,
-               initial_state: %{count: 1}
-             )
-
-    assert %{count: 3, initial_state: %{count: 2}} =
-             Directive.agent_replace(:child, Jido.Test.AgentServer.Fixtures.CounterAgent,
-               count: 3,
-               initial_state: %{count: 2}
-             )
-
-    assert %{as: :run, defaults: %{amount: 1}} =
-             Directive.route_add("run", Jido.Test.Agent.Contract.Add,
-               as: :run,
-               defaults: %{amount: 1}
-             )
-
-    assert %{as: :next, defaults: %{amount: 2}} =
-             Directive.route_replace("run", Jido.Test.Agent.Contract.Add,
-               as: :next,
-               defaults: %{amount: 2}
-             )
-
-    assert %{from: :root, to: :child} =
-             Directive.connection_remove("run", from: :root, to: :child)
-
-    assert %{delivery: :broadcast} =
-             Directive.connection_replace("run",
-               from: :root,
-               to: :child,
-               delivery: :broadcast
-             )
-
-    assert %{options: [start: 1], initial: :default} =
-             Directive.plugin_add(Jido.Test.Agent.Contract.First, start: 1)
-
-    assert %{options: [], initial: {:value, nil}} =
-             Directive.plugin_add(Jido.Test.Agent.Contract.First, [], initial: nil)
-
-    assert_raise ArgumentError, fn ->
-      Directive.plugin_add(Jido.Test.Agent.Contract.First, [], initial: 1, initial: 2)
-    end
   end
 end
 

@@ -2,11 +2,10 @@ defmodule Jido.Agent.Directive do
   alias Jido.Joi
 
   @moduledoc """
-  Changes and runtime work returned by an Agent executable turn.
+  Runtime work returned by an Agent executable turn.
 
   The terminal Action or Flow output is complete next Agent state. Plugin-owned
   fields must remain unchanged until their owning Plugin reduces the batch.
-  Topology and Plugin Directives edit definition data on that same candidate.
   Plugin-owned Directives can change their owner's state during reduction and
   request runtime work after commit. `Jido.AgentServer` commits the candidate
   before it dispatches runtime work. A dispatch failure does not undo that
@@ -35,7 +34,6 @@ defmodule Jido.Agent.Directive do
   alias Jido.Agent.Directive.Kind
   alias Jido.Error
   alias Jido.Signal
-  alias __MODULE__.{PluginAdd, PluginConfigure, PluginRemove}
   alias Jido.Signal.Context, as: SignalContext
 
   @callback validate(directive :: struct()) :: {:ok, struct()} | {:error, term()}
@@ -105,11 +103,7 @@ defmodule Jido.Agent.Directive do
     parse(module.schema(), Map.from_struct(directive))
   end
 
-  def validate(%{__struct__: module} = directive) do
-    if Kind.mutation_module?(module),
-      do: Jido.Agent.Mutation.validate(directive),
-      else: validate_custom(module, directive)
-  end
+  def validate(%{__struct__: module} = directive), do: validate_custom(module, directive)
 
   def validate(value) do
     {:error,
@@ -229,130 +223,6 @@ defmodule Jido.Agent.Directive do
     end)
   end
 
-  @doc "Replaces the complete topology data."
-  @spec topology_set(map()) :: __MODULE__.TopologySet.t()
-  def topology_set(topology), do: %__MODULE__.TopologySet{topology: topology}
-
-  @doc "Adds one named logical Agent member."
-  @spec agent_add(atom(), Jido.Agent.definition() | module(), keyword()) ::
-          __MODULE__.AgentAdd.t()
-  def agent_add(name, definition, opts \\ []),
-    do:
-      struct!(
-        __MODULE__.AgentAdd,
-        mutation_options(opts, [:count, :initial_state]) ++ [name: name, definition: definition]
-      )
-
-  @doc "Updates selected fields of one named logical Agent member."
-  @spec agent_update(atom(), map()) :: __MODULE__.AgentUpdate.t()
-  def agent_update(name, changes), do: %__MODULE__.AgentUpdate{name: name, changes: changes}
-
-  @doc "Replaces one named logical Agent member."
-  @spec agent_replace(atom(), Jido.Agent.definition() | module(), keyword()) ::
-          __MODULE__.AgentReplace.t()
-  def agent_replace(name, definition, opts \\ []),
-    do:
-      struct!(
-        __MODULE__.AgentReplace,
-        mutation_options(opts, [:count, :initial_state]) ++ [name: name, definition: definition]
-      )
-
-  @doc "Removes one named logical Agent member."
-  @spec agent_remove(atom()) :: __MODULE__.AgentRemove.t()
-  def agent_remove(name), do: %__MODULE__.AgentRemove{name: name}
-
-  @doc "Adds one Agent route."
-  @spec route_add(String.t(), map(), keyword()) :: __MODULE__.RouteAdd.t()
-  def route_add(path, handler, opts \\ []),
-    do:
-      struct!(
-        __MODULE__.RouteAdd,
-        mutation_options(opts, [:as, :defaults, :state, :reply]) ++ [path: path, handler: handler]
-      )
-
-  @doc "Updates selected fields of one Agent route."
-  @spec route_update(String.t(), map()) :: __MODULE__.RouteUpdate.t()
-  def route_update(path, changes), do: %__MODULE__.RouteUpdate{path: path, changes: changes}
-
-  @doc "Replaces one Agent route."
-  @spec route_replace(String.t(), map(), keyword()) :: __MODULE__.RouteReplace.t()
-  def route_replace(path, handler, opts \\ []),
-    do:
-      struct!(
-        __MODULE__.RouteReplace,
-        mutation_options(opts, [:as, :defaults, :state, :reply]) ++ [path: path, handler: handler]
-      )
-
-  @doc "Removes one Agent route."
-  @spec route_remove(String.t()) :: __MODULE__.RouteRemove.t()
-  def route_remove(path), do: %__MODULE__.RouteRemove{path: path}
-
-  @doc "Sets the complete order of the current Agent routes."
-  @spec routes_reorder([String.t()]) :: __MODULE__.RoutesReorder.t()
-  def routes_reorder(paths), do: %__MODULE__.RoutesReorder{paths: paths}
-
-  @doc "Replaces the complete Agent route list."
-  @spec routes_set([map()]) :: __MODULE__.RoutesSet.t()
-  def routes_set(routes), do: %__MODULE__.RoutesSet{routes: routes}
-
-  @doc "Adds one logical output connection."
-  @spec connection_add(String.t(), keyword()) :: __MODULE__.ConnectionAdd.t()
-  def connection_add(path, opts),
-    do:
-      struct!(
-        __MODULE__.ConnectionAdd,
-        mutation_options(opts, [:from, :to, :delivery]) ++ [path: path]
-      )
-
-  @doc "Updates the delivery fields of one logical output connection."
-  @spec connection_update(String.t(), keyword()) :: __MODULE__.ConnectionUpdate.t()
-  def connection_update(path, opts),
-    do:
-      struct!(
-        __MODULE__.ConnectionUpdate,
-        mutation_options(opts, [:from, :to, :changes]) ++ [path: path]
-      )
-
-  @doc "Replaces one logical output connection."
-  @spec connection_replace(String.t(), keyword()) :: __MODULE__.ConnectionReplace.t()
-  def connection_replace(path, opts),
-    do:
-      struct!(
-        __MODULE__.ConnectionReplace,
-        mutation_options(opts, [:from, :to, :delivery]) ++ [path: path]
-      )
-
-  @doc "Removes one logical output connection."
-  @spec connection_remove(String.t(), keyword()) :: __MODULE__.ConnectionRemove.t()
-  def connection_remove(path, opts),
-    do: struct!(__MODULE__.ConnectionRemove, mutation_options(opts, [:from, :to]) ++ [path: path])
-
-  @doc "Adds one runtime Plugin declaration and initializes its owned state."
-  @spec plugin_add(module(), keyword(), keyword()) :: PluginAdd.t()
-  def plugin_add(module, options \\ [], opts \\ []) do
-    opts = mutation_options(opts, [:initial])
-
-    %PluginAdd{
-      module: module,
-      options: options,
-      initial: if(Keyword.has_key?(opts, :initial), do: {:value, opts[:initial]}, else: :default)
-    }
-  end
-
-  @doc "Changes one runtime Plugin declaration with an optional state migration."
-  @spec plugin_configure(module(), keyword(), keyword()) :: PluginConfigure.t()
-  def plugin_configure(module, options, opts \\ []),
-    do: %PluginConfigure{
-      module: module,
-      options: options,
-      migrate: mutation_options(opts, [:migrate])[:migrate]
-    }
-
-  @doc "Removes one runtime Plugin declaration with an explicit state policy."
-  @spec plugin_remove(module(), keyword()) :: PluginRemove.t()
-  def plugin_remove(module, opts \\ []),
-    do: %PluginRemove{module: module, state: mutation_options(opts, [:state])[:state]}
-
   defp envelope(%{signal: signal}, _definition), do: {:ok, signal}
 
   defp envelope(%{type: type, data: data}, definition),
@@ -384,13 +254,6 @@ defmodule Jido.Agent.Directive do
       {:error, issues} ->
         Error.validation_result(:invalid_signal, [], "Invalid Signal envelope", %{issues: issues})
     end
-  end
-
-  defp mutation_options(opts, allowed) do
-    unless Keyword.keyword?(opts) and Enum.uniq(Keyword.keys(opts)) == Keyword.keys(opts),
-      do: raise(ArgumentError, "Expected unique keyword options")
-
-    Keyword.validate!(opts, allowed)
   end
 
   defp validate_reply_causation(%Reply{signal: signal} = directive) do

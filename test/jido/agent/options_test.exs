@@ -12,7 +12,7 @@ defmodule Jido.Agent.DSLOptionsTest do
   end
 
   test "prepares public options with the same default Agent ID" do
-    options = Jido.Agent.prepare_options!(quote(do: [name: "prepared"]), __ENV__)
+    options = Jido.Agent.DSL.prepare_options!(quote(do: [name: "prepared"]), __ENV__)
 
     assert options[:name] == "prepared"
     assert options[:id] == Atom.to_string(__MODULE__)
@@ -22,7 +22,7 @@ defmodule Jido.Agent.DSLOptionsTest do
 
   test "keeps an explicit ID and public Plugin declarations" do
     options =
-      Jido.Agent.prepare_options!(
+      Jido.Agent.DSL.prepare_options!(
         quote(do: [name: "prepared", id: "test/prepared", plugins: [OptionalPlugin]]),
         __ENV__
       )
@@ -34,12 +34,12 @@ defmodule Jido.Agent.DSLOptionsTest do
   test "rejects malformed, repeated, and invalid identity options" do
     for quoted <- [quote(do: :invalid), quote(do: [name: "first", name: "second"])] do
       assert_raise ArgumentError, ~r/unique keyword options/, fn ->
-        Jido.Agent.prepare_options!(quoted, __ENV__)
+        Jido.Agent.DSL.prepare_options!(quoted, __ENV__)
       end
     end
 
     assert_raise Jido.Catalog.Error, ~r/Catalog identifier/, fn ->
-      Jido.Agent.prepare_options!(quote(do: [name: "invalid", id: "bad id"]), __ENV__)
+      Jido.Agent.DSL.prepare_options!(quote(do: [name: "invalid", id: "bad id"]), __ENV__)
     end
   end
 

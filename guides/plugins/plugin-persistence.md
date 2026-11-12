@@ -145,7 +145,7 @@ On a live server with `persistence:`, a failed `dump/3` fails the save of that c
 
 ## Change a Plugin that has stored data
 
-A stored record holds the Agent's Plugin declarations and code references. After a Plugin module changes, loading an older record returns an error with code `:changed_reference` until an explicit upgrade runs. [Checkpoints and Upgrades](../durability/checkpoints-and-data-upgrades.md) covers that path. To change a Plugin's options or state shape in a running Agent, see [Live Reconfiguration](plugin-live-reconfiguration.md).
+A stored record holds the Agent's Plugin declarations and code references. After a Plugin module changes, loading an older record returns an error with code `:changed_reference` until an explicit upgrade runs. [Checkpoints and Upgrades](../durability/checkpoints-and-data-upgrades.md) covers that path. Replace Plugin options or state shape through a complete Agent definition upgrade.
 
 ## Next steps
 

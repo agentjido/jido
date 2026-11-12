@@ -86,11 +86,12 @@ defmodule Jido.AgentServer.ControlTest do
     F.closed(server)
     assert {:error, :commit_in_progress} = Server.cancel(server)
     assert nil == Task.yield(control, 0)
+    F.storage_mode(c, :ok)
     send(task, :release)
     assert {:ok, agent, _} = Server.await(pending)
     assert agent.state.count == 1
     assert :ok = Task.await(control, 1_500)
-    assert Server.status(server).state_version == 1
+    assert Server.status(server).state_version == 2
   end
 
   @tag obligation: "jido.agent_server.I85"

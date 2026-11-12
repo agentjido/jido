@@ -52,7 +52,7 @@ defmodule Jido.AgentServer.Durable.ControlTest do
 
     assert :ok = Server.await_ready(restored)
     assert Server.agent(restored) == committed
-    assert Server.status(restored).state_version == 1
+    assert Server.status(restored).state_version == 2
   end
 
   @tag obligation: "jido.agent_server.durable.I9"

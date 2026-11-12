@@ -160,7 +160,7 @@ The server does this work in a separate task, so it can still answer reads:
 2. `admit/3` runs for each Plugin, in declaration order. This callback runs only on the live path, and it can reject the Turn.
 3. Route selection picks the first route whose path matches the Signal type. A Plugin that defines `select_route/2` can choose among the matches. No match returns a validation error with the code `:unmatched_input`.
 4. Route defaults merge with the Signal data. The Signal data wins on an equal key.
-5. Jido builds a `Jido.Agent.Turn`. An Action route becomes a one-step Flow here, so every Turn runs a Flow.
+5. Jido prepares one Runner command. An Action route becomes a one-step Flow, so every selected executable uses the same execution path.
 
 The handler context now holds `:agent_state`, `:signal`, `:plugin_inputs`, and the other keys listed in [Agent Turns and Replies](../agents/turns-state-and-replies.md#what-the-handler-sees).
 

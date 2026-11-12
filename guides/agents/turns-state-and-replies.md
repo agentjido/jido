@@ -98,7 +98,7 @@ A Turn runs these steps in order. The first failure stops it.
 4. **Run the handler.** `cmd/3` runs the Action or Flow through `Jido.Exec.run/4`. A live AgentServer compiles it with `Jido.Exec.compile/2` and runs it in a Runic Worker.
 5. **Project the output.** The route's `state` and `reply` selectors produce the next state and any reply Directive.
 6. **Reduce Plugins.** Jido rejects a change to Plugin-owned state, validates every Directive, and lets each Plugin update its own field.
-7. **Validate the candidate.** Jido checks the complete next state against the schema, and applies any definition mutations.
+7. **Validate the candidate.** Jido checks the complete next state against the schema and preserves the definition.
 
 The result is one of:
 
@@ -187,7 +187,11 @@ A reply needs a caller who can receive it. `Jido.AgentServer.cast/3` has none, s
 
 ## Managed and durable Turns
 
-`Jido.Agent.Turn` is the prepared form of a Turn. Its `execution_mode` separates behavior from host lifecycle. A route with an Action runs as `:managed`, in the live AgentServer. A route with an authored Flow runs as `:durable`, which uses the durable Flow lifecycle when the AgentServer has persistence. `Jido.Agent.cmd/3` runs both in the calling process. See [Durable Turns and Flows](../durability/durable-turns-and-flows.livemd).
+The internal Runner lowers every selected Action or Flow to one Flow
+instruction. `Jido.Agent.cmd/3` runs it in the calling process. An AgentServer
+with persistence uses the durable Flow lifecycle. An AgentServer without
+persistence runs the same instruction without durable checkpoints. See
+[Durable Turns and Flows](../durability/durable-turns-and-flows.livemd).
 
 ## Related
 

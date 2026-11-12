@@ -45,5 +45,5 @@ ownership, routing, or fencing.
 - [Source](stable_reference.ex)
 - [Tests](stable_reference_test.exs)
 
-Previous: [Definition Changes and Diff](../08_12_definition_changes/README.md) |
+Previous: [Whole Definition Upgrade](../08_12_definition_changes/README.md) |
 Next: [State Migration](../08_14_state_migration/README.md)

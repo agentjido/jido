@@ -96,7 +96,7 @@ defmodule Jido.AI.RequestPolicy do
   defp tighter(agent_value, value), do: min(agent_value, value)
 
   defp request(%{signal: %{data: data}}) do
-    case Jido.Agent.Turn.normalize_input(data) do
+    case Jido.Agent.Validation.normalize_input(data) do
       {:ok, request} -> request
       {:error, _reason} -> %{}
     end

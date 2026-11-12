@@ -3,12 +3,10 @@ modules:
   - Jido.Agent
   - Jido.Agent.Callback
   - Jido.Agent.Codec
-  - Jido.Agent.Diff
   - Jido.Agent.Directive
   - Jido.Agent.Directive.Kind
   - Jido.Agent.DSL.Entry
   - Jido.Agent.Directive.Emit
-  - Jido.Agent.Mutation
   - Jido.Agent.Schema
   - Jido.Agent.Topology
   - Jido.Agent.Validation
@@ -19,7 +17,7 @@ modules:
 
 Protect the Agent-specific value and authoring boundary. This component owns
 canonical Agent definitions and instances, state schemas, the Agent DSL,
-logical topology, Plugin contributions, definition mutation and Diff data,
+logical topology, fixed Plugin contributions,
 the Agent document codec adapter, and safe Agent views. Agent validation
 failures use `Jido.Error.ValidationError` with a code and field path.
 
@@ -154,7 +152,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I24 — Public Agent entry points
 
 - **scope:** `Jido.Agent`
-- **must:** Keep `use Jido.Agent`, `schema/1`, `define/1`, `define!/1`, `validate/1`, `definition?/1`, `instance?/1`, `definition/1`, `instantiate/1,2`, `instantiate!/1,2`, `mutate/2`, `set/2`, and `cmd/2,3` as the documented and typed Agent facade. Keep runtime projection, direct Signal-helper support, raw schema data, and transition functions hidden. Do not restore removed `new`, `validate_instance`, `complete_schema`, `handle_signal`, `checkpoint`, or `restore` wrappers.
+- **must:** Keep `use Jido.Agent`, `schema/1`, `define/1`, `define!/1`, `validate/1`, `definition?/1`, `instance?/1`, `definition/1`, `instantiate/1,2`, `instantiate!/1,2`, `set/2`, and `cmd/2,3` as the documented and typed Agent facade. Keep runtime projection, direct Signal-helper support, raw schema data, and transition functions hidden. Do not restore removed `new`, `validate_instance`, `complete_schema`, `handle_signal`, `checkpoint`, `restore`, or `mutate` wrappers.
 - **kind:** functional
 - **status:** active
 
@@ -174,44 +172,30 @@ not restore or claim the retired standalone `jido.topology` component.
 
 **Definition composition**
 
-### jido.agent.I25 — One topology value
+### jido.agent.I25 — Static topology value
 
 - **scope:** `Jido.Agent.define/1`, `Jido.Agent.Topology`
-- **must:** A leaf has empty agent and connection lists. Mutation can add a named member and an explicit broadcast connection. Root is reserved, and removed legacy topology collections remain invalid.
+- **must:** A leaf has empty agent and connection lists. A definition can declare named members and explicit connections. Member counts and initial state are static values. Root is reserved, and removed legacy topology collections remain invalid.
 - **kind:** functional
 - **status:** active
 
-### jido.agent.I26 — Atomic definition edits
+### jido.agent.I27 — Runtime Directive values
 
-- **scope:** `Jido.Agent.mutate/2`
-- **must:** Apply ordered definition changes to one candidate. Reject an invalid edit batch without changing the source.
+- **scope:** `Jido.Agent.Directive`
+- **must:** Construct and validate the closed core runtime Directive set and declared custom Directives. Runtime Directives do not edit Agent definition data.
 - **kind:** functional
 - **status:** active
 
-### jido.agent.I27 — Ordered definition edits
+### jido.agent.I28 — Complete topology validation
 
-- **scope:** `Jido.Agent.mutate/2`, `Jido.Agent.Directive`
-- **must:** Apply strict add, update, replace, remove, and reorder operations in batch order. Preserve unrelated values and report the net Diff.
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.Topology`
+- **must:** Resolve endpoint references in the complete definition, reject unknown endpoints, validate accepted Signal types, preserve connection order, and require broadcast delivery for a counted destination.
 - **kind:** functional
 - **status:** active
 
-### jido.agent.I28 — Final topology validation
-
-- **scope:** `Jido.Agent.Topology`, `Jido.Agent.mutate/2`
-- **must:** Resolve endpoint references after the complete batch, reject a removed endpoint that remains connected, and require broadcast delivery for a counted destination.
-- **kind:** functional
-- **status:** active
-
-### jido.agent.I29 — Plugin declaration edits
-
-- **scope:** `Jido.Agent.mutate/2`, `Jido.Agent.Directive`
-- **must:** Initialize new Plugin state, preserve compatible state, and require explicit disposal or migration when a Plugin declaration changes.
-- **kind:** functional
-- **status:** active
-
-### jido.agent.I30 — Current-state topology binding
+### jido.agent.I30 — Static topology binding
 
 - **scope:** `Jido.Agent.Topology.bind/2`
-- **must:** Resolve copied child state and counts from the supplied parent state without changing the stored symbolic definition or retaining a prior bound value.
+- **must:** Resolve each child definition and return its static count and initial state without starting a process or changing the source definition.
 - **kind:** functional
 - **status:** active

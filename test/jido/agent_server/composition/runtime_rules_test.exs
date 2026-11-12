@@ -3,10 +3,7 @@ defmodule Jido.AgentServer.Composition.RuntimeRulesTest do
   use Covenant.Case, component: "jido.agent_server.composition", async: false
 
   alias Jido.Agent
-  alias Jido.Agent.Diff
-  alias Jido.Agent.Directive, as: D
   alias Jido.AgentServer, as: Server
-  alias Jido.Agent.Topology, as: AgentTopology
   alias Jido.AgentServer.Topology
   alias Jido.Test.Agent.EvolutionFixtures, as: E
   alias Jido.Test.AgentServer.Contract, as: F
@@ -20,41 +17,6 @@ defmodule Jido.AgentServer.Composition.RuntimeRulesTest do
 
   defp extension(provider, data) do
     %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}
-  end
-
-  @tag obligation: "jido.agent_server.composition.I6"
-  test "durable member identities retain only the same accepted slots" do
-    assert {:ok, added, _} = Agent.mutate(E.agent(), [D.agent_add(:workers, E.Worker, count: 2)])
-    declaration = Map.put(hd(added.topology.agents), :identities, %{1 => "one", 2 => "two"})
-    added = put_in(added.topology.agents, [declaration])
-
-    assert {:ok, initial} = AgentTopology.identify(nil, added, &Agent.Validation.resolve/2)
-    assert hd(initial.topology.agents).identities == %{1 => "one", 2 => "two"}
-
-    assert {:ok, grown, _} = Agent.mutate(initial, [D.agent_update(:workers, %{count: 3})])
-    assert {:ok, grown} = AgentTopology.identify(initial, grown, &Agent.Validation.resolve/2)
-    grown_ids = hd(grown.topology.agents).identities
-    assert grown_ids[1] == "one"
-    assert grown_ids[2] == "two"
-    assert is_binary(grown_ids[3]) and grown_ids[3] not in ["one", "two"]
-
-    assert {:ok, smaller, _} = Agent.mutate(grown, [D.agent_update(:workers, %{count: 1})])
-    assert {:ok, smaller} = AgentTopology.identify(grown, smaller, &Agent.Validation.resolve/2)
-    assert hd(smaller.topology.agents).identities == %{1 => "one"}
-
-    assert {:ok, regrown, _} = Agent.mutate(smaller, [D.agent_update(:workers, %{count: 2})])
-    assert {:ok, regrown} = AgentTopology.identify(smaller, regrown, &Agent.Validation.resolve/2)
-    regrown_ids = hd(regrown.topology.agents).identities
-    assert regrown_ids[1] == "one"
-    assert is_binary(regrown_ids[2]) and regrown_ids[2] not in ["one", "two", grown_ids[2]]
-
-    assert {:ok, changed, _} =
-             Agent.mutate(regrown, [D.agent_update(:workers, %{initial_state: %{count: 7}})])
-
-    assert {:ok, changed} = AgentTopology.identify(regrown, changed, &Agent.Validation.resolve/2)
-    changed_ids = hd(changed.topology.agents).identities
-    assert changed_ids[1] != regrown_ids[1]
-    assert changed_ids[2] != regrown_ids[2]
   end
 
   @tag obligation: "jido.agent_server.composition.I5"
@@ -111,9 +73,7 @@ defmodule Jido.AgentServer.Composition.RuntimeRulesTest do
 
     assert {:error, %{code: :unsupported_runtime_endpoint}} = Topology.validate(agent)
 
-    plain = E.agent()
-    with_bus = %{plain | plugins: [bus]}
-    assert Topology.changed?(Diff.between(plain, with_bus), plain, with_bus)
+    with_bus = %{E.agent() | plugins: [bus]}
     assert Topology.requires_activation?(with_bus)
   end
 

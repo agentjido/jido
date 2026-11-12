@@ -434,11 +434,6 @@ defmodule Jido.Plugin.Normalizer do
 
   defp validate_pair(package, agent, server, persistence) do
     cond do
-      function_exported?(package, :quiesce, 2) != function_exported?(package, :resume, 2) ->
-        PluginBoundary.validation_error("Plugin must define both quiesce/2 and resume/2", %{
-          plugin: package
-        })
-
       not is_nil(persistence) and (is_nil(agent) or is_nil(agent.state_key)) ->
         PluginBoundary.validation_error("Persistence Plugin facet requires a stateful Agent facet", %{
           plugin: package

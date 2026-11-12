@@ -96,8 +96,6 @@ defmodule Jido.Plugin.NormalizerTest do
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
     def child_spec(_init), do: %{id: __MODULE__, start: {Task, :start_link, [fn -> :ok end]}}
     def await_ready(_runtime, _opts), do: :ok
-    def quiesce(_runtime, _opts), do: :ok
-    def resume(_runtime, _opts), do: :ok
     def after_commit(_runtime, _commit, _opts), do: :ok
     def dump(value, _context, _opts), do: {:ok, value}
     def load(value, _context, _opts), do: {:ok, value}
@@ -113,16 +111,6 @@ defmodule Jido.Plugin.NormalizerTest do
     use Jido.Plugin
     def state_spec(_opts), do: {:loaded, Jido.Joi.integer()}
     def load(value, _context, _opts), do: {:ok, value}
-  end
-
-  defmodule QuiesceOnly do
-    use Jido.Plugin
-    def quiesce(_runtime, _opts), do: :ok
-  end
-
-  defmodule ResumeOnly do
-    use Jido.Plugin
-    def resume(_runtime, _opts), do: :ok
   end
 
   defmodule UnownedDispatch do
@@ -185,8 +173,6 @@ defmodule Jido.Plugin.NormalizerTest do
                dispatch: 4,
                child_spec: 1,
                await_ready: 2,
-               quiesce: 2,
-               resume: 2,
                after_commit: 3
              ],
              persistence: [dump: 3, load: 3]
@@ -405,10 +391,6 @@ defmodule Jido.Plugin.NormalizerTest do
     for package <- [DumpOnly, LoadOnly] do
       assert {:error, %{details: %{plugin: ^package}}} =
                Normalizer.normalize_all([package])
-    end
-
-    for package <- [QuiesceOnly, ResumeOnly] do
-      assert {:error, %{details: %{plugin: ^package}}} = Normalizer.normalize_all([package])
     end
 
     assert {:error, %{details: %{plugin: UnownedDispatch}}} =

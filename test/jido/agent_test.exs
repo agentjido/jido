@@ -3,7 +3,6 @@ defmodule Jido.AgentTest do
 
   alias Jido.Agent
   alias Jido.AgentServer.Command
-  alias Jido.Agent.Turn
   alias Jido.Signal
 
   alias Jido.Test.AgentServer.Fixtures.{
@@ -66,7 +65,7 @@ defmodule Jido.AgentTest do
     end
 
     def handle_signal(%Jido.Signal{type: "custom.add", data: data}, _agent) do
-      Jido.Agent.Turn.new(Jido.Test.AgentServer.Fixtures.Add, Map.put(data, :label, "custom"))
+      {:ok, Map.put(data, :label, "custom")}
     end
 
     def handle_signal(
@@ -254,7 +253,7 @@ defmodule Jido.AgentTest do
 
     signal = Signal.new!("counter.add", %{by: 1}, source: "/test")
 
-    assert {:error, %{__exception__: true}} = Agent.transition(definition, %{})
+    assert {:error, %{__exception__: true}} = Jido.Agent.Validation.transition(definition, %{})
     assert {:error, %{__exception__: true}} = Agent.set(definition, %{})
 
     assert {:error, %{__exception__: true}} =
@@ -284,12 +283,15 @@ defmodule Jido.AgentTest do
              Agent.validate(%{definition | state: %{count: 0, history: []}})
   end
 
-  test "exposes the shared Joi Agent schema and the Turn schema" do
+  test "keeps preparation details off the public Agent facade" do
     assert function_exported?(Agent, :schema, 1)
     refute function_exported?(Agent, :to_map, 1)
     refute function_exported?(Agent, :new, 2)
     refute function_exported?(Agent, :new!, 2)
-    assert {:ok, Turn} = Jido.Joi.Schema.struct_module(Turn.schema())
+    refute Code.ensure_loaded?(Jido.Agent.Turn)
+    refute function_exported?(Agent, :mutate, 2)
+    refute Code.ensure_loaded?(Jido.Agent.Diff)
+    refute Code.ensure_loaded?(Jido.Agent.Mutation)
   end
 
   test "builds instances from a module that uses Jido.Agent" do
@@ -364,14 +366,14 @@ defmodule Jido.AgentTest do
 
     assert {:ok,
             %Jido.Agent.Runner.Prepared{
-              turn: %Turn{
-                executable: %Jido.Flow{
+              instruction: %Jido.Instruction{
+                kind: :flow,
+                target: %Jido.Flow{
                   components: %{
                     "action" => %{call: %{kind: :action, target: Add}}
                   }
                 },
-                execution_mode: :managed,
-                input: %{by: 2, label: "one"}
+                params: %{by: 2, label: "one"}
               }
             }} = Jido.Agent.Runner.prepare(agent, signal, [])
   end
@@ -389,28 +391,28 @@ defmodule Jido.AgentTest do
 
     assert {:ok,
             %Jido.Agent.Runner.Prepared{
-              turn: %Turn{
-                executable: %Jido.Flow{
+              instruction: %Jido.Instruction{
+                kind: :flow,
+                target: %Jido.Flow{
                   components: %{
                     "action" => %{call: %{kind: :action, target: Add}}
                   }
-                },
-                execution_mode: :managed,
-                source_signal: ^signal
-              }
+                }
+              },
+              source_signal: ^signal
             }} = Jido.Agent.Runner.prepare(agent, signal, [])
   end
 
   test "replaces and validates the complete Agent state" do
     agent = build!(name: "counter", schema: schema()) |> instance!()
 
-    assert {:ok, next} = Agent.transition(agent, %{count: 3, history: ["done"]})
+    assert {:ok, next} = Jido.Agent.Validation.transition(agent, %{count: 3, history: ["done"]})
     assert next.state == %{count: 3, history: ["done"]}
     assert next.id == agent.id
     assert next.schema == agent.schema
 
     assert {:error, %{__exception__: true}} =
-             Agent.transition(agent, %{count: :invalid, history: []})
+             Jido.Agent.Validation.transition(agent, %{count: :invalid, history: []})
   end
 
   test "merges an explicit data mutation through the Agent schema" do
@@ -614,7 +616,7 @@ defmodule Jido.AgentTest do
       agent = instance!(definition)
 
       assert {:error, %{__exception__: true}} =
-               Agent.transition(agent, %{count: 0, history: [], extra: true})
+               Jido.Agent.Validation.transition(agent, %{count: 0, history: [], extra: true})
     end
 
     test "set replaces supplied fields and keeps other state and the source Agent" do
@@ -655,14 +657,14 @@ defmodule Jido.AgentTest do
 
         assert {:ok,
                 %Jido.Agent.Runner.Prepared{
-                  turn: %Turn{
-                    executable: %Jido.Flow{
+                  instruction: %Jido.Instruction{
+                    kind: :flow,
+                    target: %Jido.Flow{
                       components: %{
                         "action" => %{call: %{kind: :action, target: Add}}
                       }
                     },
-                    execution_mode: :managed,
-                    input: input
+                    params: input
                   }
                 }} = Jido.Agent.Runner.prepare(routed, signal, [])
 
@@ -843,36 +845,16 @@ defmodule Jido.AgentTest do
       assert {:error, %{__exception__: true}} = Command.validate(:command)
     end
 
-    test "validates Action and Flow turn input values" do
-      flow = Jido.Test.AgentServer.Fixtures.two_step_flow()
-      signal = Signal.new!("counter.add", %{by: 1}, source: "/test")
+    test "preparation rejects invalid executable input shapes" do
+      agent = agent_with_route("counter.add", Add)
 
-      assert {:ok,
-              %Turn{
-                executable: %Jido.Flow{
-                  components: %{
-                    "action" => %{call: %{kind: :action, target: Add}}
-                  }
-                },
-                execution_mode: :managed,
-                input: %{by: 1}
-              }} = Turn.new(Add, %{by: 1})
+      invalid = Signal.new!("counter.add", "invalid input", source: "/test")
+      assert {:error, %Jido.Error.ValidationError{subject: :data}} = Agent.Runner.prepare(agent, invalid, [])
 
-      assert %Turn{executable: ^flow, input: []} = Turn.new!(flow, [])
+      valid = Signal.new!("counter.add", %{by: 1}, source: "/test")
 
-      assert {:ok, %Turn{source_signal: ^signal}} = Turn.new(Add, %{by: 1}, signal)
-      assert %Turn{source_signal: ^signal} = Turn.new!(Add, %{by: 1}, signal)
-
-      assert {:error, %{__exception__: true}} = Turn.new(Add, "invalid input")
-      assert {:error, %_{} = _error} = Turn.new(String, %{})
-
-      assert {:error, %{__exception__: true}} =
-               Turn.validate(%Turn{executable: Add, input: %{}, source_signal: :invalid})
-
-      assert {:error, %Jido.Error.ValidationError{subject: :execution_mode}} =
-               Turn.validate(%Turn{executable: Add, execution_mode: :invalid})
-
-      assert_raise Jido.Error.ValidationError, fn -> Turn.new!(Add, "invalid input") end
+      assert {:ok, %Jido.Agent.Runner.Prepared{instruction: %{kind: :flow}}} =
+               Agent.Runner.prepare(agent, valid, [])
     end
   end
 

@@ -1,6 +1,6 @@
 # Declare Agent Topology
 
-This tutorial declares an order desk with named members, a group sized from Agent state, and a nested team, and then starts it under one owner. Run the cells in order.
+This tutorial declares an order desk with fixed named members and a nested team, and then starts it under one owner. Run the cells in order.
 
 ## Install Jido
 
@@ -14,7 +14,7 @@ Mix.install([
 
 A `topology` section lists members with `agent`. The second argument is an Agent module or a definition. `count` defaults to 1 and `initial_state` defaults to `%{}`.
 
-`state(:key)` refers to a field in the enclosing Agent's state. It works for `count` and anywhere inside `initial_state`.
+Both `count` and `initial_state` are static definition data.
 
 ```elixir
 defmodule TopologyGuide.Packer do
@@ -43,21 +43,14 @@ end
 defmodule TopologyGuide.Desk do
   use Jido.Agent, name: "order_desk"
 
-  state do
-    schema Jido.Joi.object(%{
-             packer_count: Jido.Joi.integer() |> Jido.Joi.default(2),
-             site: Jido.Joi.string() |> Jido.Joi.default("north")
-           })
-  end
-
   topology do
     agent :auditor, TopologyGuide.Packer do
       initial_state %{station: "audit"}
     end
 
     agent :packers, TopologyGuide.Packer do
-      count state(:packer_count)
-      initial_state %{station: state(:site)}
+      count 2
+      initial_state %{station: "north"}
     end
   end
 end
@@ -66,39 +59,29 @@ TopologyGuide.Desk.definition().topology.agents
 |> Enum.map(&{&1.name, &1.count, &1.initial_state})
 ```
 
-The cell returns plain data. References stay symbolic because a definition has no state yet:
+The cell returns plain static data:
 
 ```text
 [
   {:auditor, 1, %{station: "audit"}},
-  {:packers, %{key: :packer_count, kind: :state}, %{station: %{key: :site, kind: :state}}}
+  {:packers, 2, %{station: "north"}}
 ]
 ```
 
 ## Bind members without starting them
 
-An instance has state, so Jido can resolve its references. `Jido.Agent.instantiate/2` checks that the bound values are valid, and starts nothing.
+`Jido.Agent.Topology.bind/3` resolves each member definition and returns its
+static count and initial state. It starts nothing.
 
 ```elixir
-{:error, %Jido.Error.ValidationError{code: :invalid_positive, path: path}} =
-  Jido.Agent.instantiate(TopologyGuide.Desk, id: "desk-empty", state: %{packer_count: 0})
-
-path
-```
-
-The cell returns `[:topology, :agents, 1, :count]`.
-
-`Jido.Agent.Topology.bind/3` shows the resolved values. Its third argument resolves each member definition.
-
-```elixir
-desk = TopologyGuide.Desk.instantiate!(id: "desk-preview", state: %{packer_count: 3})
+desk = TopologyGuide.Desk.instantiate!(id: "desk-preview")
 resolver = fn definition, _opts -> {:ok, definition} end
 
 {:ok, bound} = Jido.Agent.Topology.bind(desk, desk.state, resolver)
 Enum.map(bound, &{&1.name, &1.count, &1.state})
 ```
 
-The cell returns `[{:auditor, 1, %{station: "audit"}}, {:packers, 3, %{station: "north"}}]`.
+The cell returns `[{:auditor, 1, %{station: "audit"}}, {:packers, 2, %{station: "north"}}]`.
 
 ## Start the owner
 
@@ -235,7 +218,6 @@ end
 
 {:error, %{code: :reserved_name}} = member.(%{name: :root})
 {:error, %{code: :invalid_positive}} = member.(%{count: 0})
-{:error, %{code: :unknown_state_field}} = member.(%{count: Jido.Agent.Topology.state(:missing)})
 {:error, %{code: :invalid_state}} = member.(%{initial_state: %{packed: "many"}})
 {:error, %{code: :unresolved_definition}} = member.(%{definition: TopologyGuide.Missing})
 :rejected
@@ -246,5 +228,4 @@ The cell returns `:rejected` after every case fails with its expected code. A me
 ## Next steps
 
 - [Connect Agent Outputs](connect-agent-outputs.livemd) sends Signals between these members.
-- [Change Live Composition](change-live-composition.md) edits members from a Turn.
 - [Agent Callbacks](../agents/agent-callbacks.md) covers `initialize/2`.

@@ -411,10 +411,8 @@ defmodule Jido.AgentServer.Lifecycle do
     end
   end
 
-  def save(data, agent, revision, expected_revision, server_turn) do
-    Jido.Persistence.save_agent(
-      data.persistence,
-      agent,
+  def save(data, agent, revision, expected_revision, server_turn, opts \\ []) do
+    persistence_opts =
       persistence_options(data) ++
         [
           revision: revision,
@@ -423,7 +421,14 @@ defmodule Jido.AgentServer.Lifecycle do
           # Only hibernation saves without a new revision.
           reason: if(revision == expected_revision, do: :hibernate, else: :commit)
         ]
-    )
+
+    case Keyword.fetch(opts, :previous_agent_module) do
+      {:ok, module} ->
+        Jido.Persistence.replace_agent(data.persistence, agent, module, persistence_opts)
+
+      :error ->
+        Jido.Persistence.save_agent(data.persistence, agent, persistence_opts)
+    end
   end
 
   def write_result(result, deadline) do
@@ -439,9 +444,43 @@ defmodule Jido.AgentServer.Lifecycle do
 
   def snapshot(agent, revision), do: %{agent: agent, state_version: revision}
 
-  def upgrade(agent, action, context) do
-    with {:ok, snapshot} <- Jido.Persistence.snapshot(agent, context: context),
-         do: Jido.Persistence.upgrade(snapshot, action, context: context)
+  def upgrade_definition(agent, definition, migration, context) do
+    with {:ok, definition} <- Validation.resolve(definition),
+         {:ok, state} <- migrate_state(agent.state, migration, context),
+         candidate = %{definition | id: agent.id, state: state},
+         {:ok, candidate} <- Validation.validate_instance(candidate) do
+      {:ok, candidate}
+    end
+  end
+
+  defp migrate_state(state, nil, _context), do: {:ok, state}
+
+  defp migrate_state(state, migration, context) do
+    case Jido.Exec.run(migration, %{state: state}, context, []) do
+      {:ok, next} when is_map(next) and not is_struct(next) ->
+        {:ok, next}
+
+      {:ok, next, []} when is_map(next) and not is_struct(next) ->
+        {:ok, next}
+
+      {:ok, _next, [_ | _]} ->
+        Jido.Error.validation_result(
+          :invalid_definition_migration,
+          [:migrate],
+          "Agent definition migration cannot return Directives"
+        )
+
+      {:error, _reason} = error ->
+        error
+
+      result ->
+        Jido.Error.validation_result(
+          :invalid_definition_migration,
+          [:migrate],
+          "Agent definition migration must return a complete state Map",
+          %{result: result}
+        )
+    end
   end
 
   @doc false
@@ -462,8 +501,11 @@ defmodule Jido.AgentServer.Lifecycle do
     :ets.insert(state, {:checkpoint, agent, revision})
   end
 
-  def durable_instruction(prepared),
-    do: Jido.Instruction.resolve(prepared.turn.executable, prepared.turn.input, prepared.context)
+  def durable_instruction(%{instruction: %Jido.Instruction{} = instruction}),
+    do: {:ok, instruction}
+
+  def durable_instruction(_prepared),
+    do: Jido.Error.validation_result(:invalid_prepared_instruction, [], "Prepared Agent work has no instruction")
 
   def accept_continuation(data, prepared) do
     with {:ok, instruction} <- durable_flow_instruction(prepared),
@@ -477,7 +519,7 @@ defmodule Jido.AgentServer.Lifecycle do
              signal: data.active.source_signal,
              admitted_signal: prepared.signal,
              context:
-               Map.drop(prepared.context, [
+               Map.drop(prepared.instruction.context, [
                  :agent_id,
                  :agent_module,
                  :agent_signal_source,
@@ -488,7 +530,7 @@ defmodule Jido.AgentServer.Lifecycle do
                  :turn_id,
                  :trace_context
                ]),
-             plugin_inputs: prepared.context.plugin_inputs,
+             plugin_inputs: prepared.instruction.context.plugin_inputs,
              target: instruction.target,
              expires_at: continuation_expiry(data.active)
            })
@@ -529,7 +571,7 @@ defmodule Jido.AgentServer.Lifecycle do
            Continuation.release_handoff(receipt, %{
              expires_at: continuation_expiry(data.active),
              admitted_signal: prepared.signal,
-             plugin_inputs: prepared.context.plugin_inputs
+             plugin_inputs: prepared.instruction.context.plugin_inputs
            }),
          do: validate_continuation_receipt(data, released)
   end
@@ -581,7 +623,7 @@ defmodule Jido.AgentServer.Lifecycle do
         data.runner,
         id,
         instruction,
-        data.active.prepared.context,
+        data.active.prepared.instruction.context,
         instance: data.jido,
         persistence: data.persistence,
         owner: owner,
@@ -611,15 +653,13 @@ defmodule Jido.AgentServer.Lifecycle do
   def invalid_options(message),
     do: {:error, Jido.Error.validation_error(message, kind: :config)}
 
-  defp durable_flow_instruction(%{turn: %{execution_mode: :durable}} = prepared) do
+  defp durable_flow_instruction(prepared) do
     case durable_instruction(prepared) do
       {:ok, %{kind: :flow} = instruction} -> {:ok, instruction}
       {:ok, _instruction} -> {:error, :not_durable_flow}
       error -> error
     end
   end
-
-  defp durable_flow_instruction(_prepared), do: {:error, :not_durable_flow}
 
   defp continuation_expiry(%{deadline: :infinity}), do: :infinity
 

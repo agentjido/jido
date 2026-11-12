@@ -191,7 +191,6 @@ defmodule Jido.MixProject do
          {"Transforms and Forwards", "guides/agents/route-transforms-and-forwards.md"},
          {"Agent Turns and Replies", "guides/agents/turns-state-and-replies.md"},
          {"State and Directives", "guides/agents/agent-results-and-directives.md"},
-         {"Mutations and Diffs", "guides/agents/agent-mutations-and-diffs.livemd"},
          {"Documents and Views", "guides/agents/agent-documents-and-views.md"},
          {"Agent Callbacks", "guides/agents/agent-callbacks.md"},
          {"Test Agent Definitions", "guides/agents/testing-agent-definitions.livemd"}
@@ -201,9 +200,7 @@ defmodule Jido.MixProject do
          {"Composition Vocabulary", "guides/composition/composition-vocabulary.md"},
          {"Declare Agent Topology", "guides/composition/declare-agent-topology.livemd"},
          {"Connect Agent Outputs", "guides/composition/connect-agent-outputs.livemd"},
-         {"Parent and Child Agents", "guides/composition/parent-and-child-agents.md"},
-         {"Change Live Composition", "guides/composition/change-live-composition.md"},
-         {"Topology Reconciliation", "guides/composition/topology-reconciliation.md"}
+         {"Parent and Child Agents", "guides/composition/parent-and-child-agents.md"}
        ]},
       {:Signals,
        [
@@ -227,7 +224,6 @@ defmodule Jido.MixProject do
          {"Supervised Resources", "guides/plugins/plugin-supervised-resources.livemd"},
          {"Post-Commit Work", "guides/plugins/plugin-post-commit-work.md"},
          {"Plugin Persistence", "guides/plugins/plugin-persistence.md"},
-         {"Live Reconfiguration", "guides/plugins/plugin-live-reconfiguration.md"},
          {"Test Plugins", "guides/plugins/testing-plugins.livemd"}
        ]},
       {:"Built-In Plugins",

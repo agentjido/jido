@@ -61,6 +61,7 @@ defmodule Jido.Exec.ActionEffectCountTest do
     send(test_pid, {:action_stop, metadata.action, metadata.outcome, metadata.effect_count})
   end
 
+  @tag obligation: "jido_action.execution.I19"
   test "a directly run Action counts its effects" do
     assert {:ok, _, [:first, :second]} = Jido.Exec.run(Effects)
     assert_received {:action_stop, Effects, :ok, 2}

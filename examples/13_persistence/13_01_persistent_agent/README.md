@@ -1,6 +1,6 @@
 # 13_01 Persistent Agent
 
-An Agent creates revision zero, commits each successful Turn, and restores the exact saved state and revision.
+An Agent creates revision zero, saves each durable command, and restores the exact saved state and revision.
 
 ## What you will learn
 
@@ -15,11 +15,15 @@ Read [the persistent Agent](persistent_agent.ex), then the [identity probe](chec
 
 `mix test.examples examples/13_persistence/13_01_persistent_agent`
 
-Expected result: each successful Turn advances the saved revision. Restore returns the exact state. A checkpoint with another Agent ID is rejected.
+Expected result: each successful durable command saves its execution intent and
+its terminal Agent state. It advances the saved revision twice. Restore returns
+the exact state. A checkpoint with another Agent ID is rejected.
 
 ## Important behavior
 
-An identical-state success is still a commit and gets a new revision. Invalid input does not create a commit. A required missing record fails startup.
+An identical-state success still saves the execution intent and terminal Agent
+state. Invalid Action input saves its intent and terminal failure without a
+state change. A required missing record fails startup.
 
 ## Limits
 

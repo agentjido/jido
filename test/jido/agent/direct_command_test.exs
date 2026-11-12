@@ -73,28 +73,6 @@ defmodule Jido.Agent.DirectCommandTest do
     end
   end
 
-  defmodule Worker do
-    use Jido.Agent, name: "direct_worker"
-
-    routes do
-      route "work", Jido.Agent.DirectCommandTest.Update
-    end
-  end
-
-  defmodule Owned do
-    use Jido.Plugin, id: "test.direct.owned"
-    def state_spec(_), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
-
-    def reduce(reduction, _opts) do
-      send(self(), :reduced)
-      {:ok, reduction.plugin_state + 1}
-    end
-  end
-
-  defmodule Label do
-    use Jido.Plugin, id: "test.direct.label"
-  end
-
   defmodule UnknownDirective do
     use Jido.Agent.Directive
     defstruct []
@@ -126,8 +104,6 @@ defmodule Jido.Agent.DirectCommandTest do
   end
 
   defp signal(type \\ "work", data \\ %{}), do: Signal.new!(type, data, source: "/test")
-
-  defp owned, do: %{id: Owned.id(), provider: Owned, vsn: Owned.vsn(), data: %{}}
 
   test "DSL and independent Map and struct definitions produce the exact same command result" do
     fields = %{
@@ -217,53 +193,6 @@ defmodule Jido.Agent.DirectCommandTest do
       assert {:error, _} = Agent.cmd(before, signal("work", input))
       assert before.state === %{count: 0, label: "same"}
     end
-  end
-
-  test "definition changes are validated as one complete local candidate" do
-    member = %{name: :worker, definition: Worker, count: 1, initial_state: %{}}
-    change = Directive.agent_add(:worker, Worker)
-    before = instance()
-
-    assert {:ok, after_agent, [^change]} =
-             Agent.cmd(before, signal("work", %{directives: [change]}))
-
-    assert after_agent.topology.agents == [member]
-    assert before.topology.agents == []
-    assert {:error, _} = Agent.cmd(before, signal("work", %{directives: [change, change]}))
-  end
-
-  test "Plugin directives add, configure and remove owned state without starting services" do
-    before = instance()
-    add = Directive.plugin_add(Owned)
-    assert {:ok, added, [^add]} = Agent.cmd(before, signal("work", %{directives: [add]}))
-    assert added.state.owned == 0
-    assert length(added.plugins) == 1
-
-    assert {:ok, removed, [_]} =
-             Agent.cmd(
-               added,
-               signal("work", %{directives: [Directive.plugin_remove(Owned, state: :discard)]})
-             )
-
-    refute Map.has_key?(removed.state, :owned)
-    assert removed.plugins == []
-    assert before.plugins == []
-  end
-
-  test "Plugin edits preserve extension data and declaration order" do
-    label = %{id: Label.id(), provider: Label, vsn: Label.vsn(), data: %{label: "keep"}}
-    before = instance([action()], [owned(), label])
-    configure = Directive.plugin_configure(Owned, [])
-    assert {:ok, after_agent, [_]} = Agent.cmd(before, signal("work", %{directives: [configure]}))
-    assert after_agent.plugins === before.plugins
-
-    assert {:ok, removed, [_]} =
-             Agent.cmd(
-               after_agent,
-               signal("work", %{directives: [Directive.plugin_remove(Owned, state: :discard)]})
-             )
-
-    assert removed.plugins === [label]
   end
 
   test "Scheduler owns its Directives and changes schedule state, not definition data" do

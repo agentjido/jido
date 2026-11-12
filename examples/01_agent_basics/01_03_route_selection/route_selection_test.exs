@@ -26,19 +26,16 @@ defmodule Jido.Examples.Basic.RouteSelectionTest do
     end
   end
 
-  test "a wildcard before an exact route takes precedence" do
-    agent = Router.instantiate!(id: unique_id("reordered-routes"))
+  test "route order is part of the fixed definition" do
+    assert Enum.map(Router.definition().routes, & &1.path) == [
+             "examples.basic.route_selection.order.create",
+             "examples.basic.route_selection.order.*",
+             "**"
+           ]
 
-    directive =
-      Jido.Agent.Directive.routes_reorder([
-        "examples.basic.route_selection.order.*",
-        "examples.basic.route_selection.order.create",
-        "**"
-      ])
-
-    assert {:ok, reordered, _diff} = Jido.Agent.mutate(agent, [directive])
-    assert {:ok, selected, []} = Jido.Agent.cmd(reordered, Router.signal!("order.create"))
-    assert selected.state.handler == "order"
+    agent = Router.instantiate!(id: unique_id("declared-routes"))
+    assert {:ok, selected, []} = Jido.Agent.cmd(agent, Router.signal!("order.create"))
+    assert selected.state.handler == "create"
   end
 
   test "an Agent without a fallback returns an unmatched input error" do

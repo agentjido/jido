@@ -10,9 +10,6 @@ starts no processes.
 2. [10_02 Direct Connections](10_02_direct_connections/README.md) — root → worker → sink → root, output contracts, and explicit emission.
 3. [10_03 Local Bus Broadcast](10_03_bus_broadcast/README.md) — declared Bus and counted broadcast.
 4. [10_04 Nested Agents](10_04_nested_agents/README.md) — nested ownership and subtree removal.
-5. [10_05 Topology Mutations](10_05_topology_mutations/README.md) — member edits, state-bound resize, and repeated File-backed hibernate/thaw.
-6. [10_06 Connection Changes](10_06_connection_changes/README.md) — edit edges without replacing Agents, then restore and route through the saved edge.
-
 The IDs follow the recommended reading order.
 
 ## Run the section

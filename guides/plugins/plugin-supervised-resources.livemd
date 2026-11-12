@@ -270,5 +270,4 @@ A missing variable makes `resolve/1` return a `Jido.Error.ValidationError` whose
 ## Next steps
 
 - [Post-Commit Work](plugin-post-commit-work.md) keeps a runtime in step with commits.
-- [Live Reconfiguration](plugin-live-reconfiguration.md) replaces a runtime while the Agent runs.
 - [Control Activations](../agent-servers/inspect-and-control-activations.livemd) covers the Activation's lifecycle.

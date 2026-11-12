@@ -122,7 +122,7 @@ defmodule Jido.Agent.PortableStateTest do
     on_exit(fn -> if Port.info(port), do: Port.close(port) end)
 
     for value <- [self(), port, make_ref(), fn -> :ok end, [1 | :tail], <<5::size(3)>>] do
-      assert {:ok, transitioned} = Agent.transition(agent, %{payload: value})
+      assert {:ok, transitioned} = Jido.Agent.Validation.transition(agent, %{payload: value})
       assert transitioned.state.payload === value
       signal = Signal.new!("local.run", %{payload: value}, source: "/test")
       assert {:ok, candidate, []} = Agent.cmd(agent, signal)
@@ -144,7 +144,7 @@ defmodule Jido.Agent.PortableStateTest do
                state: %{payload: <<5::size(3)>>}
              )
 
-    assert {:error, %{__exception__: true}} = Agent.transition(agent, %{payload: :invalid})
+    assert {:error, %{__exception__: true}} = Jido.Agent.Validation.transition(agent, %{payload: :invalid})
     assert {:error, %{__exception__: true}} = Agent.validate(%{agent | id: ""})
   end
 

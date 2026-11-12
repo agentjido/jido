@@ -47,6 +47,7 @@ defmodule Jido.Agent.Validation do
            Error.prefix_result_path(list(definition.routes, &Route.normalize(&1, related?)), :routes),
          {:ok, routes} <- materialize_routes(routes, route_contributions, related?),
          :ok <- Error.prefix_result_path(Plugin.validate_route_contract(routes, plugins), :routes),
+         :ok <- Error.prefix_result_path(unique(routes, &Route.identity/1), :routes),
          :ok <- Error.prefix_result_path(unique(Enum.reject(routes, &is_nil(&1.as)), & &1.as), :routes),
          :ok <- reply_source(routes, definition.signal_source, related?),
          definition = %{definition | routes: routes, plugins: plugins},
@@ -167,6 +168,15 @@ defmodule Jido.Agent.Validation do
     end
   end
 
+  def normalize_input(nil), do: {:ok, %{}}
+  def normalize_input(value) when is_map(value), do: {:ok, value}
+
+  def normalize_input(value) when is_list(value) do
+    if Keyword.keyword?(value), do: {:ok, Map.new(value)}, else: {:error, :invalid_input}
+  end
+
+  def normalize_input(_value), do: {:error, :invalid_input}
+
   def normalize_signal(%Signal{type: type} = signal) when is_binary(type) do
     with {:ok, signal} <- Jido.Joi.parse(Signal.schema(), signal),
          {:ok, extensions} <- SignalContext.normalize(signal.extensions) do
@@ -230,6 +240,13 @@ defmodule Jido.Agent.Validation do
 
   def validate_instance(value) do
     with {:ok, agent, _specs, _schema} <- validate_instance_with_plugins(value), do: {:ok, agent}
+  end
+
+  def transition(agent, next_state) do
+    with {:ok, agent, _specs, schema} <- validate_instance_with_plugins(agent),
+         :ok <- Error.prefix_result_path(complete(schema, next_state), :state) do
+      {:ok, %{agent | state: next_state}}
+    end
   end
 
   def instantiate(source, opts),

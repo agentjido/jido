@@ -4,41 +4,46 @@ defmodule Jido.Examples.Runtime.DefinitionChangesTest do
   use Jido.Test.Case, async: true
   @moduletag :integration
 
-  alias Jido.{Agent, AgentServer}
-  alias Jido.Agent.{Diff, Directive}
+  alias Jido.AgentServer, as: Server
   alias Jido.Examples.DefinitionChanges, as: Example
+  import Jido.Test.Eventually
 
-  test "pure evaluation returns a final Diff without changing the live Server", %{jido: jido} do
-    {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Example, id: unique_id())
-    before = AgentServer.snapshot(server)
-    assert {:ok, install} = Example.install_signal()
-    assert {:ok, candidate, _} = Agent.cmd(before.agent, install)
-    diff = Diff.between(before.agent, candidate)
-    assert Diff.changed?(diff, :routes)
-    refute Diff.changed?(diff, :agents)
-    assert AgentServer.snapshot(server) == before
+  test "a whole-definition upgrade keeps the Ref and replaces the PID", %{jido: jido} do
+    agent = Example.V1.instantiate!(id: unique_id("definition-upgrade"), state: %{count: 2})
+    {:ok, server} = Jido.start_agent(jido, agent)
+    assert :ok = Server.await_ready(server)
+    {:ok, ref} = Jido.agent_ref(jido, agent.id)
+    {document, catalog} = Example.upgrade_input()
 
-    assert {:ok, ^candidate, _} = AgentServer.call(server, install)
-    assert :ok = AgentServer.await_ready(server)
-    assert {:error, _} = AgentServer.call(server, install)
-    assert AgentServer.snapshot(server) == %{agent: candidate, state_version: 1}
-    work = Jido.Signal.new!("examples.runtime.definition.work.exact", %{}, source: "/examples")
-    assert {:ok, %{state: %{selected: "exact"}}, []} = AgentServer.call(server, work)
-    assert {:ok, remove} = Example.remove_signal()
-    assert {:ok, _, _} = AgentServer.call(server, remove)
-    assert {:ok, %{state: %{selected: "wildcard"}}, []} = AgentServer.call(server, work)
-    assert :ok = Jido.stop_agent(jido, server)
+    assert {:ok, upgraded, []} =
+             Server.upgrade(server, document, catalog: catalog, migrate: Example.Migrate)
+
+    assert upgraded.module == Example.V2
+    assert upgraded.vsn == 2
+    assert upgraded.state == %{total: 12}
+
+    replacement =
+      eventually(fn ->
+        case Jido.resolve_agent(jido, ref) do
+          {:ok, pid} when pid != server -> pid
+          _ -> nil
+        end
+      end)
+
+    refute Process.alive?(server)
+    assert :ok = Server.await_ready(replacement)
+    assert %{agent: ^upgraded, state_version: 1} = Server.snapshot(replacement)
+
+    assert {:ok, next, []} = Jido.call(jido, ref, Example.increment_signal())
+    assert next.state == %{total: 13}
   end
 
-  test "cancelled edits produce an empty final Diff" do
-    agent = Example.instantiate!(id: "diff")
+  test "normal work changes state but not the definition" do
+    agent = Example.V1.instantiate!(id: unique_id("fixed-definition"))
+    definition = Jido.Agent.definition(agent)
 
-    assert {:ok, ^agent, diff} =
-             Agent.mutate(agent, [
-               Directive.route_add("temporary", Example.Exact, state: %{source: :output, path: []}),
-               Directive.route_remove("temporary")
-             ])
-
-    assert Diff.empty?(diff)
+    assert {:ok, changed, []} = Jido.Agent.cmd(agent, Example.increment_signal())
+    assert changed.state == %{count: 1}
+    assert Jido.Agent.definition(changed) == definition
   end
 end

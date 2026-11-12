@@ -14,14 +14,18 @@ defmodule Jido.Examples.Persistence.IndeterminateWriteTest do
     store = {ProbeStore, store: start_supervised!(ProbeStore)}
     {ProbeStore, opts} = store
     id = unique_id("example-indeterminate-write")
-    observer = self()
-    context = %{reply_to: observer}
+    context = %{}
 
     assert {:ok, server} =
              Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Probe,
                id: id,
-               persistence: {ProbeStore, Keyword.put(opts, :write_result, :indeterminate)},
-               persistence_mode: :create
+               persistence:
+                 {ProbeStore,
+                  opts
+                  |> Keyword.put(:write_result, :indeterminate)
+                  |> Keyword.put(:fault_revision, 2)},
+               persistence_mode: :create,
+               default_dispatch: {:pid, target: self()}
              )
 
     monitor = Process.monitor(server)
@@ -34,7 +38,7 @@ defmodule Jido.Examples.Persistence.IndeterminateWriteTest do
     assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000
     assert Jido.whereis_agent(jido, id) == nil
 
-    assert {:ok, %{state: %{count: 1}}, 1} =
+    assert {:ok, %{state: %{count: 1}}, 2} =
              Persistence.load_agent_with_revision(store, Probe, id, instance: jido)
 
     refute_received {:signal, %{type: "examples.persistence.indeterminate_write.applied"}}

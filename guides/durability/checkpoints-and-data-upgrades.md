@@ -211,7 +211,7 @@ The pending Turn cannot resume on changed code either. A changed Flow or Action 
 | --- | --- | --- |
 | `Jido.Persistence.upgrade_agent/5` | The Agent is stopped and saved | The next revision, with compare-and-swap |
 | `Jido.Persistence.upgrade/3` | You hold a snapshot value, such as an export | Nothing. It returns the upgraded Agent |
-| `Jido.AgentServer.upgrade/3` | The Agent is live and its old code is still loaded | A serialized commit. See [Upgrade Live Agents](../agent-servers/upgrade-live-agents.md) |
+| `Jido.AgentServer.upgrade/3` | One supervised activation is idle | A complete trusted definition and state at the next revision, followed by activation restart. See [Upgrade Live Agents](../agent-servers/upgrade-live-agents.md) |
 
 `Jido.Persistence.upgrade/3` runs the same contract with no store.
 

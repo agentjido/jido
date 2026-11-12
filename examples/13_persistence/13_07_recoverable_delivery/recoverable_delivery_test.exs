@@ -51,7 +51,7 @@ defmodule Jido.Examples.Persistence.RecoverableDeliveryTest do
     end)
 
     assert Sink.records(c.jido) == %{"effect-1" => 7}
-    assert Server.snapshot(restored).state_version == 2
+    assert Server.snapshot(restored).state_version == 4
 
     assert :ok = Sink.deliver(c.jido, %Deliver{effect_id: "effect-1", value: 7})
     assert Sink.records(c.jido) == %{"effect-1" => 7}

@@ -17,18 +17,6 @@ defmodule Jido.AgentServer.PluginRuntime.RulesTest do
     def after_commit(_, _, _), do: :ok
   end
 
-  defmodule UnsafeRuntime do
-    use Jido.Plugin
-    def child_spec(_), do: %{id: __MODULE__, start: {Task, :start_link, [fn -> :ok end]}}
-  end
-
-  defmodule SafeRuntime do
-    use Jido.Plugin
-    def child_spec(_), do: %{id: __MODULE__, start: {Task, :start_link, [fn -> :ok end]}}
-    def quiesce(_, _), do: :ok
-    def resume(_, _), do: :ok
-  end
-
   defmodule CallbackPlugin do
     use Jido.Plugin
     def state_spec(_), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
@@ -108,21 +96,10 @@ defmodule Jido.AgentServer.PluginRuntime.RulesTest do
 
   @tag obligation: [
          "jido.agent_server.plugin_runtime.I1",
-         "jido.agent_server.plugin_runtime.I9",
-         "jido.agent_server.plugin_runtime.I12"
+         "jido.agent_server.plugin_runtime.I9"
        ]
-  test "runtime selection rejects unsafe changes and selects only a dispatch owner" do
-    assert {:ok, [safe, unsafe, rootless]} =
-             Jido.Plugin.Normalizer.normalize_all([SafeRuntime, UnsafeRuntime, NoRuntime])
-
-    assert :ok = Plugin.validate_changes([rootless], [NoRuntime])
-    assert :ok = Plugin.validate_changes([safe], [SafeRuntime])
-
-    assert {:error, error} = Plugin.validate_changes([unsafe], [UnsafeRuntime])
-    assert error.code == :plugin_quiescence_required
-    assert error.path == [:plugins]
-    assert error.details.plugin == UnsafeRuntime
-
+  test "runtime selection selects only a dispatch owner" do
+    assert {:ok, [rootless]} = Jido.Plugin.Normalizer.normalize_all([NoRuntime])
     assert Plugin.directive_owner([rootless], %Effect{}) == nil
     assert {:ok, [owner]} = Jido.Plugin.Normalizer.normalize_all([CallbackPlugin])
     assert Plugin.directive_owner([owner], %Effect{}) == owner

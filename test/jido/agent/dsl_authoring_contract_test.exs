@@ -161,12 +161,12 @@ defmodule Jido.Agent.DSLAuthoringContractTest do
       })
 
     assert from_map === Leaf.definition()
-    assert {:ok, ^from_map} = Jido.Joi.parse(Agent.__schema__(), from_map)
+    assert {:ok, ^from_map} = Jido.Joi.parse(Jido.Agent.Schema.agent_schema(), from_map)
 
     assert {:error, _issues} =
-             Jido.Joi.parse(Agent.__schema__(), %{from_map | name: "", vsn: 0})
+             Jido.Joi.parse(Jido.Agent.Schema.agent_schema(), %{from_map | name: "", vsn: 0})
 
-    defaults = Agent.__defaults__()
+    defaults = Jido.Agent.Schema.defaults()
     assert defaults.name == nil
     assert defaults.vsn == 1
     assert defaults.schema == Jido.Joi.object(%{})
@@ -429,7 +429,6 @@ defmodule Jido.Agent.DSLAuthoringContractTest do
           instantiate: 2,
           instantiate!: 1,
           instantiate!: 2,
-          mutate: 2,
           set: 2,
           cmd: 2,
           cmd: 3
@@ -451,7 +450,6 @@ defmodule Jido.Agent.DSLAuthoringContractTest do
           {:function, :definition, 1},
           {:function, :instantiate, 2},
           {:function, :instantiate!, 2},
-          {:function, :mutate, 2},
           {:function, :set, 2},
           {:function, :cmd, 3}
         ] do
@@ -468,25 +466,22 @@ defmodule Jido.Agent.DSLAuthoringContractTest do
           definition: 1,
           instantiate: 2,
           instantiate!: 2,
-          mutate: 2,
           set: 2,
           cmd: 3
         ] do
       assert List.keymember?(specs, key, 0)
     end
 
-    for key <- [
-          {:function, :__schema__, 0},
-          {:function, :__defaults__, 0},
-          {:function, :options!, 2},
-          {:function, :input_signal, 4},
-          {:function, :input_signal!, 4},
-          {:function, :transition, 2}
+    for {name, arity} <- [
+          __schema__: 0,
+          __defaults__: 0,
+          options!: 2,
+          input_signal: 4,
+          input_signal!: 4,
+          transition: 2,
+          runtime_plugins: 1,
+          transition_validated: 3
         ] do
-      assert Map.fetch!(api_docs, key) == :hidden
-    end
-
-    for {name, arity} <- [runtime_plugins: 1, transition_validated: 3] do
       refute function_exported?(Agent, name, arity)
     end
 
@@ -647,25 +642,31 @@ defmodule Jido.Agent.DSLAuthoringContractTest do
   test "one Agent owns immediate named members and logical output connections" do
     assert Leaf.definition().topology === %{agents: [], connections: []}
 
-    assert {:ok, team, _} =
-             Agent.mutate(Leaf.definition(), [
-               Agent.Directive.agent_add(:workers, Leaf, count: 2),
-               Agent.Directive.connection_add("work.request",
-                 from: :root,
-                 to: :workers,
-                 delivery: :broadcast
-               )
-             ])
+    team =
+      Agent.define!(%{
+        name: "team",
+        routes: Leaf.definition().routes,
+        topology: %{
+          agents: [%{name: :workers, definition: Leaf, count: 2}],
+          connections: [
+            %{
+              path: "work.request",
+              from: %{kind: :agent, name: :root},
+              to: %{kind: :agent, name: :workers},
+              delivery: :broadcast
+            }
+          ]
+        }
+      })
 
     assert {:ok, [%{status: :unchecked, reason: :unknown_outputs}]} =
              Agent.Topology.checks(team, [], &Agent.Validation.resolve/2)
 
-    assert {:error, _} = Agent.mutate(team, [Agent.Directive.agent_add(:root, Leaf)])
-
     assert {:error, _} =
-             Agent.mutate(team, [
-               Agent.Directive.connection_add("work.request", from: :workers, to: :workers)
-             ])
+             Agent.define(%{
+               name: "reserved_root",
+               topology: %{agents: [%{name: :root, definition: Leaf}]}
+             })
 
     for key <- [:groups, :resources, :relationships, :includes, :imports, :exports] do
       assert {:error, _} = Agent.define(%{name: "removed", topology: %{key => []}})

@@ -268,12 +268,6 @@
   sort: log-only
   reason: "The contract fixes the error type and structured details. It does not fix human-readable error prose."
 
-- at: "lib/jido/plugin/normalizer.ex:346:32"
-  operator: "string_empty"
-  mutation: "`\"Plugin must define both quiesce/2 and resume/2\"` → `\"\"`"
-  sort: log-only
-  reason: "The contract fixes the error type and structured details. It does not fix human-readable error prose."
-
 - at: "lib/jido/plugin/normalizer.ex:351:32"
   operator: "string_empty"
   mutation: "`\"Persistence Plugin facet requires a stateful Agent facet\"` → `\"\"`"

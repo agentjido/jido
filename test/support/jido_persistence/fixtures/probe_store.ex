@@ -3,9 +3,9 @@ defmodule Jido.Test.Persistence.ProbeStore do
   In-memory byte adapter for persistence boundary tests and examples.
 
   The caller owns the Elixir.Agent process. Conditional writes are atomic in
-  that process. `write_result: :indeterminate` stores each post-bootstrap value
-  and then reports an unknown outcome. Revision zero stays confirmed so a test
-  can activate an Agent before it injects the write fault.
+  that process. `write_result: :indeterminate` stores the selected Agent
+  revision and then reports an unknown outcome. `fault_revision:` defaults to
+  one. Other values and execution checkpoint records stay confirmed.
   """
   use Elixir.Agent
   @behaviour Jido.Persistence.Store
@@ -29,13 +29,14 @@ defmodule Jido.Test.Persistence.ProbeStore do
   @impl true
   def compare_and_swap(key, expected, value, opts) do
     record = :erlang.binary_to_term(value, [:safe])
+    fault_revision = Keyword.get(opts, :fault_revision, 1)
 
     Elixir.Agent.get_and_update(Keyword.fetch!(opts, :store), fn records ->
       if Map.get(records, key, :not_found) == expected do
         result =
-          case if(record.rev == 0,
-                 do: :ok,
-                 else: Keyword.get(opts, :write_result, :ok)
+          case if(match?(%{rev: ^fault_revision}, record),
+                 do: Keyword.get(opts, :write_result, :ok),
+                 else: :ok
                ) do
             :ok -> :ok
             :indeterminate -> {:error, :indeterminate}

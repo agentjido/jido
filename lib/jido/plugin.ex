@@ -42,14 +42,6 @@ defmodule Jido.Plugin do
   `context.plugin_inputs[MyApp.Counter].runtime`.
   `after_commit/3` is a required step before Directive dispatch when defined.
 
-  A live options change or removal requires runtime Plugins to implement both
-  `quiesce/2` and `resume/2`. These callbacks must be idempotent. Quiescence must
-  stop autonomous changes and drain outstanding work before it returns. Resume
-  must also be safe when quiescence did not finish. The old root remains paused
-  through save. Reconciliation replaces it from the accepted state and options.
-  On pre-commit rejection or cancellation, resume reopens the old root. A storage
-  failure stops the Activation. Changed Plugins do not receive `after_commit/3`
-  for the configuration commit; unchanged Plugins keep their normal hooks.
   """
 
   alias Jido.{Error, Joi}
@@ -79,11 +71,6 @@ defmodule Jido.Plugin do
               :ok | {:error, term()}
   @callback child_spec(Init.t()) :: Supervisor.child_spec()
   @callback await_ready(term(), keyword()) :: :ok | {:error, term()}
-
-  @doc "Pauses autonomous work before a live Plugin change. Must be idempotent."
-  @callback quiesce(term(), keyword()) :: :ok | {:error, term()}
-  @doc "Resumes a paused Plugin after a rejected change. Must be idempotent."
-  @callback resume(term(), keyword()) :: :ok | {:error, term()}
 
   @doc """
   Runs after a successful Turn commit and before Directive dispatch.
@@ -119,8 +106,6 @@ defmodule Jido.Plugin do
       dispatch: 4,
       child_spec: 1,
       await_ready: 2,
-      quiesce: 2,
-      resume: 2,
       after_commit: 3
     ],
     persistence: [dump: 3, load: 3]

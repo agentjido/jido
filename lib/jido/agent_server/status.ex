@@ -76,9 +76,7 @@ defmodule Jido.AgentServer.Status do
   def new(runtime_phase, data, mailbox) do
     %__MODULE__{
       phase: public_phase(runtime_phase),
-      ready?:
-        runtime_phase not in [:restoring, :initializing] and
-          not match?(%{reconciling: true}, data.active),
+      ready?: runtime_phase not in [:restoring, :initializing],
       plugin_count: length(data.plugin_specs),
       activation: if(data.activation, do: :supervised, else: :bare),
       parent: parent(data.parent),

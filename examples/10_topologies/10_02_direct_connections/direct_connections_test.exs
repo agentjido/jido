@@ -32,17 +32,23 @@ defmodule Jido.Examples.Topology.DirectConnectionsTest do
     assert Jido.agent_count(jido) == 0
   end
 
-  test "an incompatible destination is rejected without changing the definition" do
+  test "connections are validated as part of the complete definition" do
     definition = Example.definition()
+    assert length(definition.topology.connections) == 2
+
+    invalid =
+      put_in(definition.topology.connections, [
+        %{
+          path: "examples.topology.pipeline.receipt",
+          from: %{kind: :agent, name: :sink},
+          to: %{kind: :agent, name: :worker},
+          delivery: :single
+        }
+      ])
 
     assert {:error, %{code: :unaccepted_type}} =
-             Jido.Agent.mutate(definition, [
-               Jido.Agent.Directive.connection_add("examples.topology.pipeline.receipt",
-                 from: :sink,
-                 to: :worker
-               )
-             ])
-
-    assert length(definition.topology.connections) == 2
+             invalid
+             |> Map.from_struct()
+             |> Jido.Agent.define()
   end
 end

@@ -59,7 +59,7 @@ defmodule Jido.Agent.SelectionTest do
     end
   end
 
-  test "declared routes in Map and DSL definitions prepare the same Turn", %{
+  test "declared routes in Map and DSL definitions prepare the same Flow instruction", %{
     jido: jido
   } do
     defaults = %{value: 7, settings: %{first: 1, second: 2}}
@@ -84,23 +84,21 @@ defmodule Jido.Agent.SelectionTest do
       source = signal(type, data)
 
       assert {:ok, prepared} = Runner.prepare(agent, source, [])
-      turn = prepared.turn
+      instruction = prepared.instruction
 
       if type == "selection.action" do
         assert %Jido.Flow{
                  components: %{
                    "action" => %{call: %{kind: :action, target: ^target}}
                  }
-               } = turn.executable
-
-        assert turn.execution_mode == :managed
+               } = instruction.target
       else
-        assert turn.executable == target
-        assert turn.execution_mode == :durable
+        assert instruction.target == target
       end
 
-      assert turn.input == input
-      assert turn.source_signal == source
+      assert instruction.kind == :flow
+      assert instruction.params == input
+      assert prepared.source_signal == source
 
       assert {:ok, direct, []} = Agent.cmd(agent, source, context: %{observer: self()})
       assert_receive {:executed, ^input, ^source}
@@ -206,9 +204,9 @@ defmodule Jido.Agent.SelectionTest do
       command = %{command | signal: execution_signal}
 
       assert {:ok, prepared} = Runner.prepare_admitted(command, source, [], [])
-      assert prepared.turn.source_signal == source
+      assert prepared.source_signal == source
       assert prepared.signal == execution_signal
-      assert prepared.context.signal == execution_signal
+      assert prepared.instruction.context.signal == execution_signal
     end
   end
 

@@ -79,14 +79,6 @@ defmodule Jido.AgentServer.Topology do
     end
   end
 
-  def changed?(diff, before, after_agent) do
-    Agent.Diff.changed?(diff, :agents) or Agent.Diff.changed?(diff, :connections) or
-      buses(before) != buses(after_agent) or
-      (Agent.Diff.changed?(diff, :state) and
-         AgentTopology.bind(before, before.state, &Agent.Validation.resolve/2) !=
-           AgentTopology.bind(after_agent, after_agent.state, &Agent.Validation.resolve/2))
-  end
-
   def requires_activation?(agent) do
     not AgentTopology.empty?(agent.topology) or buses(agent) != []
   end

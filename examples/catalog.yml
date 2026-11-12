@@ -485,18 +485,6 @@ examples:
   readme: examples/10_topologies/10_04_nested_agents/README.md
   source: examples/10_topologies/10_04_nested_agents/hierarchy.ex
   test: examples/10_topologies/10_04_nested_agents/hierarchy_test.exs
-- id: 10_05_topology_mutations
-  category: topology
-  component: jido.agent_server.composition
-  readme: examples/10_topologies/10_05_topology_mutations/README.md
-  source: examples/10_topologies/10_05_topology_mutations/mutations.ex
-  test: examples/10_topologies/10_05_topology_mutations/mutations_test.exs
-- id: 10_06_connection_changes
-  category: topology
-  component: jido.agent_server.composition
-  readme: examples/10_topologies/10_06_connection_changes/README.md
-  source: examples/10_topologies/10_06_connection_changes/connection_changes.ex
-  test: examples/10_topologies/10_06_connection_changes/connection_changes_test.exs
 - id: 11_01_prepared_input
   category: plugin
   component: jido.plugin
@@ -531,14 +519,6 @@ examples:
   auxiliary_sources:
   - examples/11_plugins/11_05_composition/inputs.ex
   test: examples/11_plugins/11_05_composition/composition_test.exs
-- id: 11_06_live_plugin_changes
-  category: plugin
-  component: jido.plugin
-  readme: examples/11_plugins/11_06_live_plugin_changes/README.md
-  source: examples/11_plugins/11_06_live_plugin_changes/live_plugin_changes.ex
-  auxiliary_sources:
-  - examples/11_plugins/11_06_live_plugin_changes/cache.ex
-  test: examples/11_plugins/11_06_live_plugin_changes/live_plugin_changes_test.exs
 - id: 11_07_identity
   category: plugin
   component: jido.plugin

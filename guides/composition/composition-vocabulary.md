@@ -43,8 +43,7 @@ These terms describe data. Reading or building them starts no process.
 | --- | --- |
 | Topology | The `:agents` and `:connections` data on an Agent definition, read through `Jido.Agent.Topology`. |
 | Member | One named entry in `:agents`. It holds a definition or module, a `count`, and an `initial_state`. The name `:root` is reserved. |
-| Count | How many copies of a member to run. It is a positive integer or a reference to a parent state field. |
-| State reference | A value from `Jido.Agent.Topology.state/1`, written `state(:key)` in the DSL. Jido reads the named parent state field when it binds the member. |
+| Count | How many copies of a member to run. It is a positive integer in the definition. |
 | Connection | One edge in `:connections`. It selects output by Signal type (`path`), source (`from`), and destination (`to`). |
 | Endpoint | The source or destination of a connection. It is a member name, `:root` for the enclosing Agent, or `bus(:name)` for a declared local Bus. |
 | Delivery | The `:delivery` field of a connection, `:single` or `:broadcast`. A destination with a count other than 1 must use `:broadcast`. |
@@ -62,23 +61,23 @@ These terms describe live processes.
 | Runtime child | An Agent started by `Jido.AgentServer.Directive.agent_start/3` or `Jido.AgentServer.spawn_child/4`. It does not appear in the definition. |
 | Tag | The atom or string that names a runtime child under its owner. Tags of topology members are generated and are not part of the API. |
 | Placement | Where a runtime child runs. `:owned` is under the parent's activation. `:independent` is under the instance supervisor. |
-| Binding | Resolving member counts and initial state from one parent state value. `Jido.Agent.Topology.bind/3` does this without starting processes. |
-| Reconciliation | The step where AgentServer makes live members and Buses match the bound topology. See [Topology Reconciliation](topology-reconciliation.md). |
+| Binding | Resolving member definitions and returning their static count and initial state. `Jido.Agent.Topology.bind/3` does this without starting processes. |
 
 ## Choose members or runtime children
 
-Use a member when the Agent always needs that collaborator or when the group size follows Agent state. Use a runtime child when a Turn decides that work needs its own process, such as one Agent per request.
+Use a member when the Agent always needs that collaborator. Use a runtime child when a Turn decides that work needs its own process, such as one Agent per request.
 
 | Question | Declared member | Runtime child |
 | --- | --- | --- |
-| Who decides that it exists? | The definition, plus state references | A Turn or a caller |
+| Who decides that it exists? | The definition | A Turn or a caller |
 | Where is the intent saved? | In the Agent's topology, which a parent snapshot includes | Nowhere, unless your own state records it |
-| Restarted after the owner's worker crashes? | Yes, by reconciliation | Owned children no. Independent children keep running. |
+| Restarted after the owner's worker crashes? | Yes, from the static definition | Owned children no. Independent children keep running. |
 | Addressed by | Member name, with all slots receiving the Signal | Its tag |
-| Stopped by | A mutation, such as `Jido.Agent.Directive.agent_remove/1` | `Jido.AgentServer.Directive.agent_stop/2` or `Jido.AgentServer.stop_child/3` |
+| Stopped by | Stopping or upgrading the owner activation | `Jido.AgentServer.Directive.agent_stop/2` or `Jido.AgentServer.stop_child/3` |
 | Can outlive its owner? | No | Yes, with `placement: :independent` |
 
-The two do not mix for one name. A runtime Directive that starts or stops a member name fails with `:topology_agent_requires_mutation`.
+The two do not mix for one name. A runtime Directive that starts or stops a
+declared member name fails with `:static_topology_member`.
 
 ## What composition does not include
 

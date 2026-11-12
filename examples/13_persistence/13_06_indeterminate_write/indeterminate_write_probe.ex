@@ -3,7 +3,7 @@ defmodule Jido.Examples.Persistence.IndeterminateWrite do
   PERSIST-03: an uncertain persistence write must prevent further work on stale state.
 
   The stored candidate proves Action execution. The output Signal records
-  post-commit dispatch. Its temporary destination stays in caller context.
+  post-commit dispatch. AgentServer supplies its temporary destination.
   """
   use Jido.Agent, name: "examples_indeterminate_write"
 
@@ -27,10 +27,7 @@ defmodule Jido.Examples.Persistence.IndeterminateWrite do
             source: "/examples/persistence/indeterminate_write"
           )
 
-        directives =
-          if sink = context[:reply_to],
-            do: [Jido.AgentServer.Directive.signal_send(output, sink)],
-            else: []
+        directives = [Jido.Agent.Directive.emit(output)]
 
         {:ok, next, directives}
       end

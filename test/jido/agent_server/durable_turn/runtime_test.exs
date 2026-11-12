@@ -141,9 +141,10 @@ defmodule Jido.AgentServer.DurableTurn.RuntimeTest do
     assert :ok = Server.cancel_turn(server, turn_id)
     assert_receive {:DOWN, ^monitor, :process, ^action, _}, 5_000
     assert {:error, _} = Server.await(pending)
+    assert Server.status(server).durable_turn.status == :cancelled
     assert {:ok, agent, []} = Server.await(queued)
     assert agent.state == %{count: 1}
-    assert Server.status(server).durable_turn.status == :cancelled
+    assert Server.status(server).durable_turn.status == :completed
     assert :ok = Server.hibernate(server)
 
     assert {:ok, restored} =
@@ -401,10 +402,16 @@ defmodule Jido.AgentServer.DurableTurn.RuntimeTest do
 
   @tag obligation: "jido.agent_server.durable_turn.I9"
   test "a saved completion does not replay post-commit hooks", c do
-    agent = F.Worker.instantiate!(id: unique_id("hooked"))
+    definition =
+      F.Worker.definition()
+      |> struct!(
+        plugins: [
+          %{id: F.Hook.id(), provider: F.Hook, vsn: F.Hook.vsn(), data: %{}}
+        ]
+      )
+      |> Jido.Agent.define!()
 
-    {:ok, agent} =
-      Jido.Agent.Mutation.apply(agent, agent.state, [Jido.Agent.Directive.plugin_add(F.Hook)])
+    agent = Jido.Agent.instantiate!(definition, id: unique_id("hooked"))
 
     {:ok, server} =
       Jido.start_agent(c.jido, agent, persistence: {Jido.Persistence.File, path: c.tmp_dir})
@@ -424,28 +431,6 @@ defmodule Jido.AgentServer.DurableTurn.RuntimeTest do
     assert F.Probe.records() == Enum.to_list(1..10)
     # Commit acknowledgement precedes post-commit hooks in the existing contract.
     assert {:ok, _, []} = Server.await(pending)
-  end
-
-  @tag obligation: "jido.agent_server.durable_turn.I9"
-  test "Flow mutation Directives commit with state and restore without reapplying", c do
-    server = start(c)
-    id = Server.agent(server).id
-    assert {:ok, agent, [_]} = Server.call(server, signal("topology"))
-    assert :ok = Server.await_ready(server)
-    assert agent.state == %{count: 1}
-    assert [nested] = Server.members(server, :nested)
-    nested_id = Server.agent(nested).id
-    assert {:ok, snapshot} = Jido.Persistence.snapshot(Server.agent(server))
-    assert :ok = Server.hibernate(server)
-
-    assert {:ok, restored} =
-             Jido.thaw(c.jido, F.Worker, id, persistence: {Jido.Persistence.File, path: c.tmp_dir})
-
-    assert :ok = Server.await_ready(restored)
-    assert {:ok, ^snapshot} = Jido.Persistence.snapshot(Server.agent(restored))
-    assert [child] = Server.members(restored, :nested)
-    assert Server.agent(child).id == nested_id
-    assert Server.status(restored).durable_turn.status == :completed
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I11"

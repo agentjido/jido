@@ -1,52 +1,79 @@
 defmodule Jido.Examples.DefinitionChanges do
-  @moduledoc "Adds an exact route ahead of a wildcard through one validated mutation batch."
-  use Jido.Agent, name: "runtime_definition_changes"
-  alias Jido.Agent.Directive, as: D
+  @moduledoc "Builds one trusted complete document for an explicit AgentServer upgrade."
 
-  state do
-    schema Jido.Joi.object(%{selected: Jido.Joi.string() |> Jido.Joi.default("")})
+  alias Jido.Catalog
+
+  defmodule IncrementV1 do
+    @moduledoc false
+    use Jido.Action, name: "runtime_definition_increment_v1"
+
+    @impl true
+    def run(_input, context), do: {:ok, %{count: context.agent_state.count + 1}}
   end
 
-  routes do
-    signal_source "/examples/runtime/definition_changes"
+  defmodule IncrementV2 do
+    @moduledoc false
+    use Jido.Action, name: "runtime_definition_increment_v2"
 
-    route "examples.runtime.definition.install", as: :install do
-      action _input, context: context do
-        {:ok, context.agent_state,
-         [
-           D.route_add(
-             "examples.runtime.definition.work.exact",
-             Jido.Examples.DefinitionChanges.Exact,
-             state: %{source: :output, path: []}
-           ),
-           D.routes_reorder([
-             "examples.runtime.definition.install",
-             "examples.runtime.definition.remove",
-             "examples.runtime.definition.work.exact",
-             "examples.runtime.definition.work.*"
-           ])
-         ]}
-      end
+    @impl true
+    def run(_input, context), do: {:ok, %{total: context.agent_state.total + 1}}
+  end
+
+  defmodule Migrate do
+    @moduledoc false
+    use Jido.Action,
+      name: "runtime_definition_migrate",
+      schema: Jido.Joi.object(%{state: Jido.Joi.map()})
+
+    @impl true
+    def run(%{state: %{count: count}}, _context), do: {:ok, %{total: count + 10}}
+  end
+
+  defmodule V1 do
+    @moduledoc "The active version before the upgrade."
+    use Jido.Agent, name: "runtime_definition_v1", vsn: 1
+
+    state do
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
     end
 
-    route "examples.runtime.definition.remove", as: :remove do
-      action _input, context: context do
-        {:ok, context.agent_state, [D.route_remove("examples.runtime.definition.work.exact")]}
-      end
-    end
-
-    route "examples.runtime.definition.work.*" do
-      action _input, context: context do
-        {:ok, %{context.agent_state | selected: "wildcard"}}
-      end
+    routes do
+      route "examples.runtime.definition.increment", IncrementV1
     end
   end
-end
 
-defmodule Jido.Examples.DefinitionChanges.Exact do
-  @moduledoc "A named Action gives the dynamically installed route a stable code reference."
-  use Jido.Action,
-    name: "runtime_definition_exact"
+  defmodule V2 do
+    @moduledoc "The complete replacement definition."
+    use Jido.Agent, name: "runtime_definition_v2", vsn: 2
 
-  def run(_, context), do: {:ok, %{context.agent_state | selected: "exact"}}
+    state do
+      schema Jido.Joi.object(%{total: Jido.Joi.integer()})
+    end
+
+    routes do
+      route "examples.runtime.definition.increment", IncrementV2
+    end
+  end
+
+  @doc "Returns the trusted Catalog and complete V2 Codec document."
+  def upgrade_input do
+    definition = V2.definition()
+
+    catalog =
+      Catalog.from_targets!(__MODULE__, :jido, %{
+        {"agents/runtime-definition-v2", 1} => V2,
+        {"schemas/runtime-definition-v2", 1} => definition.schema,
+        {"actions/runtime-definition-increment-v2", 1} => IncrementV2
+      })
+
+    {:ok, document} =
+      Jido.Codec.encode(definition, catalog: catalog, codec: Jido.Agent.Codec)
+
+    {document, catalog}
+  end
+
+  @doc "Builds the command used before and after the upgrade."
+  def increment_signal do
+    Jido.Signal.new!("examples.runtime.definition.increment", %{}, source: "/examples")
+  end
 end

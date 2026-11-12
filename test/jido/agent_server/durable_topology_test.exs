@@ -2,8 +2,11 @@ defmodule Jido.AgentServer.DurableTopologyTest do
   use Jido.Test.Case, async: false
   @moduletag :tmp_dir
   @moduletag capture_log: true
+  @moduletag obligation: [
+               "jido.agent_server.composition.I6",
+               "jido.agent_server.composition.I7"
+             ]
 
-  alias Jido.Agent.Directive, as: D
   alias Jido.AgentServer, as: Server
   alias Jido.Test.AgentServer.DurableFixtures, as: F
 
@@ -106,86 +109,6 @@ defmodule Jido.AgentServer.DurableTopologyTest do
       assert {:error, _} = Server.await(pending)
       assert :ok = Server.stop(restored_root)
       assert Jido.agent_count(c.jido) == 0
-    end
-  end
-
-  test "removed and recreated member slots cannot recover old state or pending work", c do
-    root = start(c)
-    root_id = Server.agent(root).id
-    old = member(root, :worker)
-    old_id = Server.agent(old).id
-    assert {:ok, _, []} = Server.call(old, signal("increment"))
-    _pending = Server.submit(old, signal("request", %{value: 0}))
-    assert_receive {:durable_barrier, :step_6, action}, 5_000
-    monitor = Process.monitor(action)
-
-    assert {:ok, _, [_, _, _]} =
-             Server.call(
-               root,
-               signal("mutate", %{
-                 directives: [
-                   D.route_remove("request"),
-                   D.connection_remove("request",
-                     from: %{kind: :agent, name: :root},
-                     to: %{kind: :agent, name: :worker}
-                   ),
-                   D.agent_remove(:worker)
-                 ]
-               })
-             )
-
-    assert :ok = Server.await_ready(root)
-    assert_receive {:DOWN, ^monitor, :process, ^action, _}, 5_000
-
-    assert {:ok, _, [_]} =
-             Server.call(root, signal("mutate", %{directives: [D.agent_add(:worker, F.Worker)]}))
-
-    assert :ok = Server.await_ready(root)
-    new = member(root, :worker)
-    assert Server.agent(new).id != old_id
-    assert Server.agent(new).state.count == 0
-    assert Server.status(new).durable_turn == nil
-    new_id = Server.agent(new).id
-    assert :ok = Server.hibernate(root)
-
-    assert {:ok, awake} =
-             Jido.thaw(c.jido, F.Team, root_id, persistence: {Jido.Persistence.File, path: c.tmp_dir})
-
-    assert :ok = Server.await_ready(awake)
-    restored = member(awake, :worker)
-    assert Server.agent(restored).id == new_id
-    assert Server.status(restored).durable_turn == nil
-    assert Server.agent(restored).state.count == 0
-  end
-
-  test "shrinking and growing member count retains only the surviving slot identities", c do
-    root = start(c)
-    assert Server.members(root, :missing) == []
-
-    resize = fn count ->
-      assert {:ok, _, [_]} =
-               Server.call(
-                 root,
-                 signal("mutate", %{directives: [D.agent_update(:sibling, %{count: count})]})
-               )
-
-      assert :ok = Server.await_ready(root)
-      members = Server.members(root, :sibling)
-      assert length(members) == count
-      members
-    end
-
-    [first, second, third] = resize.(3)
-    retired_ids = Enum.map([second, third], &Server.agent(&1).id)
-    assert {:ok, _, []} = Server.call(first, signal("increment"))
-    assert {:ok, _, []} = Server.call(second, signal("increment"))
-    assert [^first] = resize.(1)
-    assert [^first, new_second, new_third] = resize.(3)
-    assert Server.agent(first).state.count == 1
-
-    for member <- [new_second, new_third] do
-      assert Server.agent(member).id not in retired_ids
-      assert Server.agent(member).state.count == 0
     end
   end
 end

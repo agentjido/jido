@@ -16,7 +16,7 @@ defmodule Jido.Agent.JoiRuntimeTest do
       assert {:ok, agent} = Agent.instantiate(definition, id: "one", state: %{items: input})
       assert agent.state == %{items: expected}
       assert Agent.validate(agent) == {:ok, agent}
-      assert {:error, _} = Agent.transition(agent, %{items: input})
+      assert {:error, _} = Jido.Agent.Validation.transition(agent, %{items: input})
     end
   end
 
@@ -35,7 +35,7 @@ defmodule Jido.Agent.JoiRuntimeTest do
       if is_integer(default) do
         assert {:ok, agent} = result
         assert agent.state == %{item: %{kind: :count, count: 1}}
-        assert {:error, _} = Agent.transition(agent, %{item: %{kind: :count}})
+        assert {:error, _} = Jido.Agent.Validation.transition(agent, %{item: %{kind: :count}})
       else
         assert {:error, _} = result
       end
@@ -59,7 +59,7 @@ defmodule Jido.Agent.JoiRuntimeTest do
       if is_integer(default) do
         assert {:ok, agent} = result
         assert agent.state == %{options: [count: 1]}
-        assert {:error, _} = Agent.transition(agent, %{options: []})
+        assert {:error, _} = Jido.Agent.Validation.transition(agent, %{options: []})
       else
         assert {:error, _} = result
       end

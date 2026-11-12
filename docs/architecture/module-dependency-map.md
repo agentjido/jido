@@ -219,9 +219,9 @@ modules, functions, argument shapes, return shapes, or call paths.
 - Catalog is application-wide inventory. It is not authorization.
 - Installed Jido-aware packages contribute deterministic static Catalog manifests.
 - Flow is the only Agent behavior boundary. Actions are Flow leaf work units.
-- A validated Agent Turn contains a Flow executable and an explicit managed or
-  durable execution mode. AgentServer does not infer lifecycle policy from the
-  normalized executable kind.
+- An Agent route lowers every Action or Flow target to one Flow instruction.
+  Each AgentServer Turn selects managed or durable execution from its
+  persistence capability, not from the authored handler kind.
 - Direct, managed, and durable execution preserve the same Flow meaning.
 - Typed waits and continuations are Exec values. AgentServer owns their live lifecycle.
 - Plugin capabilities own their state and lifecycle facets. They cannot bypass the Agent commit boundary.
@@ -337,7 +337,7 @@ Reach assigns these modules to `value_model`. Their only allowed Jido dependenci
 
 Jido is a configurable actor runtime on OTP:
 
-- `Jido.Agent` is the configurable actor definition and immutable state.
+- `Jido.Agent` is the fixed actor definition and current immutable state value.
 - `Jido.AgentServer` is the OTP shell that owns serialized Turns, commit, effects, recovery, and lifecycle.
 - `Jido.Signal` is the canonical message value.
 - `Jido.Flow` is the Agent behavior boundary.
@@ -665,23 +665,23 @@ Disposition terms:
 | `Jido.Agent.Callback` | Keep | Canonical safe Agent callback invocation and error normalization boundary; avoids coupling validation and persistence to Runner |
 | `Jido.Agent.Codec` | Keep | Agent-owned encoding behavior, if current production use requires it |
 | `Jido.Agent.Command` | Removed | Live admission now belongs to `Jido.AgentServer.Command`; Agent Runner consumes an admitted structural value without a server dependency |
-| `Jido.Agent.Composition` | Removed | State composition and binding now belong to `Jido.Agent.Mutation` |
+| `Jido.Agent.Composition` | Removed | Agent topology is a static definition; runtime child operations belong to AgentServer |
 | `Jido.Agent.Contract` | Removed | Emission normalization now belongs to `Jido.Agent.Directive` |
 | `Jido.Agent.Data` | Removed | Authoring and stored-state checks now belong to `Jido.Agent.Validation` |
-| `Jido.Agent.Diff` | Keep | Distinct final-state difference value |
-| `Jido.Agent.Directive` | Keep | Domain changes and deferred runtime work; owns AgentSend, ParentSend, and ServerStop values and constructors; `Jido.Agent.Directive.Kind` owns built-in classification |
+| `Jido.Agent.Diff` | Removed | Agent evaluation returns the complete next Agent value; no parallel difference model remains |
+| `Jido.Agent.Directive` | Keep | Explicit deferred runtime work after an Agent state decision; owns Emit, Reply, AgentSend, ParentSend, and ServerStop values and constructors; `Jido.Agent.Directive.Kind` owns built-in classification |
 | `Jido.Agent.DSL` | Keep | Agent authoring DSL boundary |
 | `Jido.Agent.Error` | Removed | Agent validation uses `Jido.Error.ValidationError` with path and code |
 | `Jido.Agent.Extension` | Keep | Agent DSL extension behavior |
-| `Jido.Agent.Mutation` | Keep | Pure Agent state and topology changes |
+| `Jido.Agent.Mutation` | Removed | Definition mutation is not part of Agent evaluation; AgentServer upgrade replaces a complete trusted definition |
 | `Jido.Agent.Options` | Removed | Agent macro option preparation now belongs to the public `Jido.Agent` authoring boundary |
 | `Jido.Agent.Plugin` | Keep | Pure Agent-owned Plugin callback execution |
 | `Jido.Agent.Ref` | Keep | Stable logical Agent identity |
 | `Jido.Agent.Route` | Keep | Pure Flow-route normalization and selection; direct Action authoring lowers to a one-step Flow |
-| `Jido.Agent.Runner` | Keep | Pure turn preparation and direct execution; remove AgentServer dependencies |
+| `Jido.Agent.Runner` | Keep internal | Pure route selection, Flow-instruction preparation, result projection, and state validation; no AgentServer dependency |
 | `Jido.Agent.Schema` | Keep | Canonical generic Agent authoring checks, struct schema, defaults, and schema traversal |
-| `Jido.Agent.Topology` | Keep | Logical members and output connections |
-| `Jido.Agent.Turn` | Keep | Process-independent prepared Flow turn with explicit managed or durable execution mode |
+| `Jido.Agent.Topology` | Keep | Static logical members and output connections in an Agent definition |
+| `Jido.Agent.Turn` | Removed | Runner owns one private prepared execution value; the public Agent model needs no second command container |
 | `Jido.Agent.Validation` | Keep | Absorbs Authoring and Data checks |
 | `Jido.Agent.View` | Keep | Safe framework-neutral Agent view |
 
@@ -742,19 +742,18 @@ Disposition terms:
 | `Jido.AgentServer.Durable` | Removed | Durable lifecycle policy now belongs to Lifecycle, durable conversion belongs to Persistence, and stable member identities belong to Agent.Topology |
 | `Jido.AgentServer.DurableTurn` | Removed | Portable suspension data and host-neutral execution belong to Jido.Durable, Agent commit policy belongs to Lifecycle, and workflow bytes belong to Persistence.ContinuationStore |
 | `Jido.AgentServer.Effects` | Keep | Post-commit effect execution boundary |
-| `Jido.AgentServer.Pending` | Keep internal | Private pending-turn record generated inside AgentServer |
+| `Jido.AgentServer.Pending` | Removed | AgentServer keeps active execution state inside its lifecycle data |
 | `Jido.AgentServer.Plugin` | Keep | Canonical live Plugin lifecycle owner |
 | `Jido.AgentServer.RegistrationGuard` | Keep internal | Registry ownership and duplicate-start guard |
 | `Jido.AgentServer.RegistryWorker` | Removed | Bounded Registry startup belongs to RegistrationGuard; there is no separate lifecycle |
 | `Jido.AgentServer.ReplyGate` | Keep internal | Independent reply ordering process |
 | `Jido.AgentServer.Store` | Removed | Its Runic storage callbacks now belong directly to Persistence.ContinuationStore |
 | `Jido.AgentServer.Supervisor` | Keep | Agent runtime supervision boundary |
-| `Jido.AgentServer.Topology` | Keep | Canonical live child, connection, and local Bus topology owner |
+| `Jido.AgentServer.Topology` | Keep | Starts the declared static topology and owns explicit runtime child operations |
 | `Jido.AgentServer.TopologyBus` | Removed | Bus lifecycle and publication now belong to `Jido.AgentServer.Topology` |
-| `Jido.AgentServer.TopologyRuntime` | Removed | Live topology reconciliation now belongs to `Jido.AgentServer.Topology` |
+| `Jido.AgentServer.TopologyRuntime` | Removed | Static topology startup and explicit runtime child operations belong to `Jido.AgentServer.Topology` |
 | `Jido.AgentServer.Lifecycle` | Keep | Canonical Turn, wait, cancellation, commit, effect, and recovery policy owner |
 | `Jido.AgentServer.Status` | Keep | Public typed process-neutral status view for state, active Turn, waits, effects, revision, and last failure |
-| `Jido.AgentServer.Topology` | Added | One live topology reconciliation boundary |
 | `Jido.Instance.Names` | Keep internal | Canonical per-instance runtime naming and partition-key policy |
 | `Jido.Instance.NamespaceRegistry` | Keep | Instance namespace ownership process |
 | `Jido.Instance.Options` | Keep | Instance option materialization and validation |

@@ -25,7 +25,7 @@ stable. Each lesson uses public Jido APIs and deterministic local services.
 
 ## Changes and recovery
 
-1. [Definition Changes and Diff](08_12_definition_changes/README.md): pure mutation and live route changes.
+1. [Whole Definition Upgrade](08_12_definition_changes/README.md): trusted replacement with state migration.
 2. [Stable Reference](08_13_stable_reference/README.md): durable identity after runtime replacement.
 3. [State Migration](08_14_state_migration/README.md): change schema, definition, and state together. Continue with [Definition Revision](../13_persistence/13_08_definition_revision/README.md).
 4. [Pending Job Recovery](08_15_pending_job_recovery/README.md): explicit retry after runtime loss.

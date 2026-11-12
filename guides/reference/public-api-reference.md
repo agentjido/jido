@@ -87,7 +87,7 @@ Implement these to extend Jido. An optional callback can be left out.
 | --- | --- | --- | --- |
 | `Jido.Action` | `c:Jido.Action.run/2` | `c:Jido.Action.on_before_validate_params/1` | [Actions](../actions/actions.md) |
 | `Jido.Agent` | None | `c:Jido.Agent.initialize/2`, `c:Jido.Agent.checkpoint/2`, `c:Jido.Agent.restore/2` | [Agent Callbacks](../agents/agent-callbacks.md) |
-| `Jido.Plugin` | None | `c:Jido.Plugin.state_spec/1`, `c:Jido.Plugin.validate_options/1`, `c:Jido.Plugin.directives/1`, `c:Jido.Plugin.select_route/2`, `c:Jido.Plugin.prepare/2`, `c:Jido.Plugin.reduce/2`, `c:Jido.Plugin.admit/3`, `c:Jido.Plugin.prepare_outbound/4`, `c:Jido.Plugin.dispatch/4`, `c:Jido.Plugin.after_commit/3`, `c:Jido.Plugin.child_spec/1`, `c:Jido.Plugin.await_ready/2`, `c:Jido.Plugin.quiesce/2`, `c:Jido.Plugin.resume/2`, `c:Jido.Plugin.dump/3`, `c:Jido.Plugin.load/3` | [Plugin Design](../plugins/plugin-design.md) |
+| `Jido.Plugin` | None | `c:Jido.Plugin.state_spec/1`, `c:Jido.Plugin.validate_options/1`, `c:Jido.Plugin.directives/1`, `c:Jido.Plugin.select_route/2`, `c:Jido.Plugin.prepare/2`, `c:Jido.Plugin.reduce/2`, `c:Jido.Plugin.admit/3`, `c:Jido.Plugin.prepare_outbound/4`, `c:Jido.Plugin.dispatch/4`, `c:Jido.Plugin.after_commit/3`, `c:Jido.Plugin.child_spec/1`, `c:Jido.Plugin.await_ready/2`, `c:Jido.Plugin.dump/3`, `c:Jido.Plugin.load/3` | [Plugin Design](../plugins/plugin-design.md) |
 | `Jido.Persistence.Store` | `c:Jido.Persistence.Store.get/2`, `c:Jido.Persistence.Store.compare_and_swap/4` | `c:Jido.Persistence.Store.validate_options/1`, `c:Jido.Persistence.Store.put/3`, `c:Jido.Persistence.Store.delete/2` | [Custom Adapters](../storage/custom-persistence-adapter.md) |
 | `Jido.Signal.Dispatch.Adapter` | `c:Jido.Signal.Dispatch.Adapter.options_schema/0`, `c:Jido.Signal.Dispatch.Adapter.deliver/2` | None | [Signal Dispatch Adapters](../signals/dispatch-adapters.md) |
 | `Jido.Signal.Bus.Store` | `c:Jido.Signal.Bus.Store.init/1`, `c:Jido.Signal.Bus.Store.append/2`, `c:Jido.Signal.Bus.Store.read/2`, `c:Jido.Signal.Bus.Store.latest_cursor/1`, `c:Jido.Signal.Bus.Store.put_subscription/2`, `c:Jido.Signal.Bus.Store.list_subscriptions/1`, `c:Jido.Signal.Bus.Store.delete_subscription/2` | None | [Durable Subscriptions](../signals/durable-subscriptions.md) |
@@ -184,7 +184,7 @@ Runs one serialized Agent Turn at a time.
 | `Jido.AgentServer.stop_child/3` | Stops the complete tagged child activation and confirms its shutdown. |
 | `Jido.AgentServer.submit/3` | Submits one turn with optional `context:` and `admission_timeout:` and returns a pending result handle. |
 | `Jido.AgentServer.touch/1` | Restarts the idle budget. |
-| `Jido.AgentServer.upgrade/3` | Runs a snapshot upgrade Action through the serial commit boundary. |
+| `Jido.AgentServer.upgrade/3` | Replaces one idle activation from a complete trusted Agent document and optional state migration. |
 | `Jido.AgentServer.whereis/3` | Looks up an AgentServer in one instance and partition. |
 | `Jido.AgentServer.worker/1` | Returns the live request worker for an activation root, or nil when unavailable. |
 
@@ -217,7 +217,7 @@ The live AgentServer admission envelope.
 | `Jido.AgentServer.Command.new/3` | Creates one validated AgentServer command. |
 | `Jido.AgentServer.Command.validate/1` | Validates one AgentServer command. |
 
-## Agent definitions and Turns
+## Agent definitions and commands
 
 Guides: [Define an Agent](../agents/define-and-instantiate-an-agent.livemd), [State and Directives](../agents/agent-results-and-directives.md).
 
@@ -236,7 +236,6 @@ Author Agent definitions as Maps or with the Spark DSL.
 | `Jido.Agent.instance?/1` | Checks instance shape only. |
 | `Jido.Agent.instantiate/2` | Builds and validates one Agent instance from a definition or compiled Agent module. |
 | `Jido.Agent.instantiate!/2` | Builds one Agent instance or raises its validation error. |
-| `Jido.Agent.mutate/2` | Applies ordered data mutations and returns the candidate and its final Diff. |
 | `Jido.Agent.schema/1` | Returns the state schema, including Plugin-owned fields. |
 | `Jido.Agent.set/2` | Replaces supplied top-level domain fields and validates the complete next state. |
 | `Jido.Agent.validate/1` | Validates a definition or instance, including schema, routes, and provider data. |
@@ -247,43 +246,12 @@ Changes and runtime work returned by an Agent executable turn.
 
 | Function | Summary |
 | --- | --- |
-| `Jido.Agent.Directive.agent_add/3` | Adds one named logical Agent member. |
-| `Jido.Agent.Directive.agent_remove/1` | Removes one named logical Agent member. |
-| `Jido.Agent.Directive.agent_replace/3` | Replaces one named logical Agent member. |
 | `Jido.Agent.Directive.agent_send/2` | Creates a request to send one Signal to a tracked child Agent after commit. |
-| `Jido.Agent.Directive.agent_update/2` | Updates selected fields of one named logical Agent member. |
-| `Jido.Agent.Directive.connection_add/2` | Adds one logical output connection. |
-| `Jido.Agent.Directive.connection_remove/2` | Removes one logical output connection. |
-| `Jido.Agent.Directive.connection_replace/2` | Replaces one logical output connection. |
-| `Jido.Agent.Directive.connection_update/2` | Updates the delivery fields of one logical output connection. |
 | `Jido.Agent.Directive.emit/2` | Creates an emission request. |
 | `Jido.Agent.Directive.parent_send/1` | Creates a request to send one Signal to the parent Agent after commit. |
-| `Jido.Agent.Directive.plugin_add/3` | Adds one runtime Plugin declaration and initializes its owned state. |
-| `Jido.Agent.Directive.plugin_configure/3` | Changes one runtime Plugin declaration with an optional state migration. |
-| `Jido.Agent.Directive.plugin_remove/2` | Removes one runtime Plugin declaration with an explicit state policy. |
 | `Jido.Agent.Directive.reply/1` | Creates one correlated response request. |
-| `Jido.Agent.Directive.route_add/3` | Adds one Agent route. |
-| `Jido.Agent.Directive.route_remove/1` | Removes one Agent route. |
-| `Jido.Agent.Directive.route_replace/3` | Replaces one Agent route. |
-| `Jido.Agent.Directive.route_update/2` | Updates selected fields of one Agent route. |
-| `Jido.Agent.Directive.routes_reorder/1` | Sets the complete order of the current Agent routes. |
-| `Jido.Agent.Directive.routes_set/1` | Replaces the complete Agent route list. |
 | `Jido.Agent.Directive.server_stop/1` | Creates a terminal request to stop the AgentServer after commit. |
-| `Jido.Agent.Directive.topology_set/1` | Replaces the complete topology data. |
 | `Jido.Agent.Directive.validate/1` | Validates one built-in or custom Agent Directive. |
-
-### `Jido.Agent.Turn`
-
-A prepared executable turn for one Agent Signal.
-
-| Function | Summary |
-| --- | --- |
-| `Jido.Agent.Turn.new/2` | Creates and validates one Turn. |
-| `Jido.Agent.Turn.new/3` | Creates and validates one Turn for an unchanged source Signal. |
-| `Jido.Agent.Turn.new!/2` | Creates one Turn or raises its validation error. |
-| `Jido.Agent.Turn.new!/3` | Creates one Turn for an unchanged source Signal or raises its validation error. |
-| `Jido.Agent.Turn.schema/0` | Returns the data schema for a prepared Agent Turn. |
-| `Jido.Agent.Turn.validate/1` | Validates one Agent Turn. |
 
 ### `Jido.Agent.Ref`
 
@@ -315,17 +283,6 @@ Logical members and output connections.
 | `Jido.Agent.Topology.bind/3` | Binds member inputs from one parent state snapshot. |
 | `Jido.Agent.Topology.checks/3` | Reports connection proofs. |
 | `Jido.Agent.Topology.connections_for/3` | Selects all declared output connections for one logical source and type. |
-| `Jido.Agent.Topology.state/1` | Creates a symbolic reference to one parent Agent state field. |
-
-### `Jido.Agent.Diff`
-
-Final data differences.
-
-| Function | Summary |
-| --- | --- |
-| `Jido.Agent.Diff.between/2` | Compares canonical Agent values; order and cancelled edits remain unambiguous. |
-| `Jido.Agent.Diff.changed?/2` | True when one collection or the state changed. |
-| `Jido.Agent.Diff.empty?/1` | True when neither data nor declaration order changed. |
 
 ### `Jido.Agent.View`
 

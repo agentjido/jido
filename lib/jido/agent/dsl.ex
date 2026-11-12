@@ -2,6 +2,8 @@ defmodule Jido.Agent.DSL do
   alias Jido.Joi
   @moduledoc false
   alias Jido.Agent.{Extension, Validation}
+  alias Jido.Agent.Plugin.Declaration
+  alias Jido.Catalog
   alias Jido.Error
   alias Spark.Dsl.Extension, as: E
 
@@ -33,12 +35,12 @@ defmodule Jido.Agent.DSL do
           @spec unquote(helper)(map(), keyword() | map()) ::
                   {:ok, Jido.Signal.t()} | {:error, term()}
           def unquote(helper)(data \\ %{}, opts \\ []),
-            do: Jido.Agent.input_signal(@agent_definition, unquote(route.path), data, opts)
+            do: Jido.Agent.DSL.input_signal(@agent_definition, unquote(route.path), data, opts)
 
           @doc "Builds an input Signal or raises for an invalid Signal input. It does not validate or run the target."
           @spec unquote(bang_helper)(map(), keyword() | map()) :: Jido.Signal.t() | no_return()
           def unquote(bang_helper)(data \\ %{}, opts \\ []),
-            do: Jido.Agent.input_signal!(@agent_definition, unquote(route.path), data, opts)
+            do: Jido.Agent.DSL.input_signal!(@agent_definition, unquote(route.path), data, opts)
         end
       end
 
@@ -67,20 +69,25 @@ defmodule Jido.Agent.DSL do
       end
 
       @doc "Returns the Action or Flow target for one exact executable route."
-      @spec route_executable!(String.t()) :: module() | no_return()
-      def route_executable!(path) do
-        case Enum.find(@agent_definition.routes, &(&1.path == path)) do
-          %{handler: %{kind: :executable, target: target}} ->
+      @spec route_executable!(Jido.Agent.Route.route_ref()) :: module() | no_return()
+      def route_executable!(reference) do
+        case Jido.Agent.Route.resolve(@agent_definition.routes, reference) do
+          {:ok, %{handler: %{kind: :executable, target: target}}} ->
             %{target: target} = Jido.Agent.Route.executable(target) |> Jido.Error.unwrap!()
 
             target
 
-          %{handler: %{kind: kind, target: target}} when kind in [:action, :flow] ->
+          {:ok, %{handler: %{kind: kind, target: target}}} when kind in [:action, :flow] ->
             target
 
-          _route ->
+          {:ok, _route} ->
             raise ArgumentError,
-                  "unknown executable route in #{inspect(__MODULE__)}: #{inspect(path)}"
+                  "route is not executable in #{inspect(__MODULE__)}: #{inspect(reference)}"
+
+          {:error, error} ->
+            raise ArgumentError,
+                  "unknown executable route in #{inspect(__MODULE__)}: #{inspect(reference)} " <>
+                    "(#{Exception.message(error)})"
         end
       end
 
@@ -108,6 +115,59 @@ defmodule Jido.Agent.DSL do
       @doc false
       def __jido_location__, do: {__ENV__.file, __ENV__.line}
       @after_verify {Jido.Agent.DSL, :verify!}
+    end
+  end
+
+  @doc false
+  def options!(quoted_options, caller) do
+    options = prepare_options!(quoted_options, caller)
+
+    case Declaration.normalize(Keyword.get(options, :plugins, [])) do
+      {:ok, declarations} ->
+        options
+        |> Keyword.delete(:plugins)
+        |> Keyword.put(:plugin_providers, Enum.map(declarations, & &1.provider))
+        |> Keyword.put(:plugin_declarations, declarations)
+
+      {:error, error} ->
+        raise error
+    end
+  end
+
+  @doc false
+  @spec prepare_options!(Macro.t(), Macro.Env.t()) :: keyword()
+  def prepare_options!(quoted_options, %Macro.Env{} = caller) do
+    {options, _binding} = Code.eval_quoted(quoted_options, [], caller)
+
+    unless Keyword.keyword?(options) and
+             Enum.uniq(Keyword.keys(options)) == Keyword.keys(options) do
+      raise ArgumentError, "Agent requires unique keyword options"
+    end
+
+    options = Keyword.put_new(options, :id, Atom.to_string(caller.module))
+
+    case Catalog.validate_identifier(options[:id]) do
+      :ok -> options
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc false
+  def input_signal(definition, type, data, opts \\ []) do
+    with {:ok, opts} <- Jido.Agent.Schema.options(opts, [:source, :id, :time, :subject, :datacontenttype]),
+         source = Map.get(opts, :source, definition.signal_source),
+         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Schema.nonempty(source), :source),
+         :ok <- Jido.Agent.Schema.plain_map(data) do
+      Jido.Signal.new(type, data, Map.put(opts, :source, source))
+    end
+  end
+
+  @doc false
+  def input_signal!(definition, type, data, opts \\ []) do
+    case input_signal(definition, type, data, opts) do
+      {:ok, signal} -> signal
+      {:error, %{__exception__: true} = error} -> raise error
+      {:error, reason} -> raise ArgumentError, "invalid input Signal: #{inspect(reason)}"
     end
   end
 

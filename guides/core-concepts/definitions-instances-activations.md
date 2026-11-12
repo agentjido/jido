@@ -58,7 +58,10 @@ true = Jido.Agent.instance?(first)
 
 Nothing has started yet. Building these values starts no process and runs no handler. Each value carries its own copy of the definition data, and a Turn returns a new value. See [Define an Agent](../agents/define-and-instantiate-an-agent.livemd).
 
-The copy matters later. Mutation Directives change the definition data inside one Agent instance, which can make it differ from its module. `Jido.Agent.definition/1` applied to that value returns its current data. See [Mutations and Diffs](../agents/agent-mutations-and-diffs.livemd).
+The definition stays fixed while one activation runs. Normal commands create
+new Agent values with new state and the same definition. Use an explicit
+[whole-definition upgrade](../agent-servers/upgrade-live-agents.md) to replace
+the definition of an idle activation.
 
 Actions and Flows follow the same split. An Action module or a `Jido.Flow` value is a definition. A `Jido.Instruction` binds one to params and context. Running it creates an execution that ends when the work does. See [Instructions and Targets](../actions/instructions.md).
 

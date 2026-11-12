@@ -4,7 +4,6 @@ defmodule Jido.Agent.Topology do
   alias Jido.Agent.{Extension, Plugin, Route, Schema}
   alias Jido.Error
 
-  @type state_reference :: %{kind: :state, key: atom()}
   @type endpoint :: map()
   @type connection :: map()
   @type check :: %{
@@ -18,10 +17,6 @@ defmodule Jido.Agent.Topology do
           count: pos_integer(),
           state: map()
         }
-
-  @doc "Creates a symbolic reference to one parent Agent state field."
-  @spec state(atom()) :: state_reference()
-  def state(key), do: %{kind: :state, key: key}
 
   @doc false
   def empty?(%{agents: [], connections: []}), do: true
@@ -140,12 +135,12 @@ defmodule Jido.Agent.Topology do
     end
   end
 
-  defp member(value, parent, opts, resolver) do
+  defp member(value, _parent, opts, resolver) do
     with {:ok, member} <- entry(:agent, value),
          :ok <- reserved(member.name),
-         :ok <- Error.prefix_result_path(count(member.count, parent.schema), :count),
+         :ok <- Error.prefix_result_path(Schema.positive(member.count), :count),
          :ok <- Error.prefix_result_path(Schema.plain_map(member.initial_state), :initial_state),
-         :ok <- Error.prefix_result_path(references(member.initial_state, parent.schema), :initial_state),
+         :ok <- Error.prefix_result_path(Schema.static(member.initial_state), :initial_state),
          {:ok, definition} <- nested(member[:definition], opts, resolver),
          member = Map.put(member, :definition, definition),
          :ok <- initial(member, opts, resolver) do
@@ -157,36 +152,6 @@ defmodule Jido.Agent.Topology do
     do: Error.validation_result(:reserved_name, :name, "The :root name belongs to the enclosing agent")
 
   defp reserved(_), do: :ok
-  defp count(%{kind: :state} = ref, schema), do: reference(ref, schema)
-  defp count(value, _), do: Schema.positive(value)
-
-  defp reference(value, schema) do
-    with {:ok, ref} <- Schema.fields(value, [:kind, :key]), :ok <- Schema.name(ref[:key]) do
-      if Keyword.has_key?(schema.fields, ref.key),
-        do: :ok,
-        else:
-          Error.validation_result(:unknown_state_field, [], "Parent state field does not exist", %{
-            key: ref.key
-          })
-    end
-  end
-
-  defp references(%{kind: :state} = value, schema), do: reference(value, schema)
-
-  defp references(value, schema) when is_map(value) and not is_struct(value) do
-    with {:ok, _} <-
-           Schema.list(Map.to_list(value), fn {key, v} ->
-             with :ok <- Error.prefix_result_path(references(v, schema), key), do: {:ok, v}
-           end),
-         do: :ok
-  end
-
-  defp references(value, schema) when is_list(value) do
-    with {:ok, _} <- Schema.list(value, fn v -> with :ok <- references(v, schema), do: {:ok, v} end),
-         do: :ok
-  end
-
-  defp references(value, _), do: Schema.static(value)
 
   defp nested(value, opts, resolver) when is_map(value) do
     resolver.(value, opts)
@@ -248,10 +213,6 @@ defmodule Jido.Agent.Topology do
   defp partial_initial(schema, state) do
     partial_value(schema, state) |> Error.prefix_result_path(:initial_state)
   end
-
-  # A symbolic value has no current value during authoring. Validate the known
-  # parts and check the complete value again when an instance binds the input.
-  defp partial_value(_schema, %{kind: :state}), do: :ok
 
   defp partial_value(schema, state) do
     cond do
@@ -419,39 +380,22 @@ defmodule Jido.Agent.Topology do
 
   @doc "Binds member inputs from one parent state snapshot. It starts no processes."
   @spec bind(map(), map(), function()) :: {:ok, [bound_member()]} | {:error, term()}
-  def bind(definition, state, resolver) when is_function(resolver, 2) do
+  def bind(definition, _state, resolver) when is_function(resolver, 2) do
     Schema.list(definition.topology.agents, fn member ->
       with {:ok, child} <- related(member.definition, [], resolver),
-           {:ok, count} <- resolve_ref(member.count, state),
-           :ok <- Error.prefix_result_path(Schema.positive(count), :count),
-           {:ok, initial} <- resolve_ref(member.initial_state, state),
            {:ok, schema} <- state_schema(child),
-           :ok <- partial_initial(schema, initial) do
-        {:ok, %{name: member.name, definition: child, count: count, state: initial}}
+           :ok <- partial_initial(schema, member.initial_state) do
+        {:ok,
+         %{
+           name: member.name,
+           definition: child,
+           count: member.count,
+           state: member.initial_state
+         }}
       end
     end)
     |> Error.prefix_result_path([:topology, :agents])
   end
-
-  defp resolve_ref(%{kind: :state, key: key}, state) do
-    case Map.fetch(state, key) do
-      {:ok, value} -> {:ok, value}
-      :error -> Error.validation_result(:missing_state_field, [], "State reference has no value", %{key: key})
-    end
-  end
-
-  defp resolve_ref(value, state) when is_map(value) and not is_struct(value) do
-    with {:ok, pairs} <-
-           Schema.list(Map.to_list(value), fn {key, v} ->
-             with {:ok, v} <- resolve_ref(v, state), do: {:ok, {key, v}}
-           end),
-         do: {:ok, Map.new(pairs)}
-  end
-
-  defp resolve_ref(value, state) when is_list(value),
-    do: Schema.list(value, &resolve_ref(&1, state))
-
-  defp resolve_ref(value, _), do: {:ok, value}
 
   defp previous_members(nil, _resolver), do: {:ok, []}
   defp previous_members(agent, resolver), do: bind(agent, agent.state, resolver)

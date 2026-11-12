@@ -75,7 +75,7 @@ or what a bundled Plugin does.
 ### jido.plugin.I6 — Server and persistence callback declaration shapes
 
 - **scope:** AgentServer and persistence callbacks declared by `Jido.Plugin`, `Jido.Plugin.Normalizer`
-- **must:** Require one documented AgentServer capability in addition to option validation. Preserve explicit option-validation errors and reject other results. Pair quiesce with resume. Require runtime dispatch to own Directive types. Require persistence dump and load together and require one Agent-owned state field.
+- **must:** Require one documented AgentServer capability in addition to option validation. Preserve explicit option-validation errors and reject other results. Require runtime dispatch to own Directive types. Require persistence dump and load together and require one Agent-owned state field.
 - **why:** A valid declaration must not advertise a callback group that its consumer cannot use.
 - **kind:** functional
 - **status:** active

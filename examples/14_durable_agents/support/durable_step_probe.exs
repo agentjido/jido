@@ -77,22 +77,18 @@ defmodule Jido.Test.Examples.Durable.ObservedAgent do
   @moduledoc false
 
   def new(id) do
-    agent =
-      Jido.Agent.instantiate!(
-        apply(Jido.Examples.Durable.SavedProgress.Agent, :definition, []),
-        id: id
-      )
+    definition = apply(Jido.Examples.Durable.SavedProgress.Agent, :definition, [])
 
-    {:ok, agent} =
-      Jido.Agent.Mutation.apply(agent, agent.state, [
-        Jido.Agent.Directive.route_replace(
-          "examples.durable.saved_progress.run",
-          Jido.Test.Examples.Durable.ObservedFlow,
-          state: %{source: :output, path: []}
-        )
-      ])
+    routes =
+      Enum.map(definition.routes, fn
+        %{path: "examples.durable.saved_progress.run"} = route ->
+          %{route | handler: %{kind: :flow, target: Jido.Test.Examples.Durable.ObservedFlow}}
 
-    agent
+        route ->
+          route
+      end)
+
+    Jido.Agent.instantiate!(%{definition | routes: routes}, id: id)
   end
 end
 

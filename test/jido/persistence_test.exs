@@ -469,7 +469,7 @@ defmodule Jido.PersistenceTest do
 
     assert agent.state.events == [:saved]
 
-    assert {:ok, restored, 1} =
+    assert {:ok, restored, 2} =
              Persistence.load_agent_with_revision(persistence, RuntimeAgent, id, instance: jido)
 
     assert restored.state.events == [:saved]
@@ -502,7 +502,14 @@ defmodule Jido.PersistenceTest do
   test "a persistence conflict removes the stale Server's write authority", %{jido: jido} do
     persistence = adapter(:stale_server)
     agent = RuntimeAgent.instantiate!(id: unique_id("stale-server"))
-    opts = [persistence: persistence, persistence_mode: :create, error_policy: :log_only]
+
+    opts = [
+      persistence: persistence,
+      persistence_mode: :create,
+      error_policy: :log_only,
+      default_dispatch: {:pid, target: self()}
+    ]
+
     assert {:ok, stale} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent, opts)
     monitor = Process.monitor(stale)
     committed = %{agent | state: %{agent.state | events: [:winner]}}
@@ -519,7 +526,7 @@ defmodule Jido.PersistenceTest do
     command =
       Signal.new!(
         "runtime.directive",
-        %{event: :stale, directive: Jido.AgentServer.Directive.signal_send(output, self())},
+        %{event: :stale, directive: Jido.Agent.Directive.emit(output)},
         source: "/test"
       )
 
@@ -559,7 +566,7 @@ defmodule Jido.PersistenceTest do
     assert {:ok, _agent, _} =
              Server.call(pid, Signal.new!("runtime.record", %{event: :next}, source: "/test"))
 
-    assert {:ok, _restored, 8} =
+    assert {:ok, _restored, 9} =
              Persistence.load_agent_with_revision(persistence, RuntimeAgent, id, instance: jido)
   end
 

@@ -78,10 +78,9 @@ A Turn with Directives follows this order:
 2. **Save.** With persistence on, the server saves the candidate.
 3. **Commit.** The candidate becomes the Agent, and `state_version` rises by one.
 4. **Reply.** `Jido.AgentServer.call/3` returns to the caller here.
-5. **Apply changes.** Topology and Plugin changes from mutation Directives take effect, when there are any.
-6. **Run hooks.** Plugin `after_commit/3` callbacks run.
-7. **Run effects.** The remaining Directives run one at a time, in order.
-8. **Finish.** The server records the effect outcome and takes the next queued Turn.
+5. **Run hooks.** Plugin `after_commit/3` callbacks run.
+6. **Run effects.** Directives run one at a time, in order.
+7. **Finish.** The server records the effect outcome and takes the next queued Turn.
 
 `call/3` returns before step 7 finishes, so its return value says nothing about effects. Queued Turns wait for the effects to finish, which makes a later `call/3` a barrier for those effects. It is not a barrier for Turns those effects enqueue: an Emit that casts back to the Agent can run after that call.
 
@@ -112,7 +111,7 @@ The Signal your process receives from a `:pid` dispatch arrives as `{:signal, si
 
 ## Built-in Directives
 
-Mutation Directives change the Agent's definition data on the candidate before commit, so they are not effects. See [Mutations and Diffs](../agents/agent-mutations-and-diffs.livemd). These run after commit:
+These runtime Directives run after commit:
 
 | Constructor | Effect | Rejected before commit when |
 | --- | --- | --- |

@@ -186,6 +186,7 @@ defmodule Jido.Exec.WaitExtensionsTest do
              workflow |> Workflow.react_until_satisfied() |> Jido.Exec.Result.project()
   end
 
+  @tag obligation: "jido_action.execution.I22"
   test "independent waits retain partial joins through replay" do
     flow =
       Jido.Flow.new!(%{

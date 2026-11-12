@@ -63,10 +63,7 @@ defmodule Jido.Test.Persistence.IndeterminateWriteProbe do
             source: "/test/persistence/indeterminate_write"
           )
 
-        directives =
-          if sink = context[:reply_to],
-            do: [Jido.AgentServer.Directive.signal_send(output, sink)],
-            else: []
+        directives = if context[:emit_reply], do: [Jido.Agent.Directive.emit(output)], else: []
 
         {:ok, next, directives}
       end

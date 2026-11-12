@@ -184,7 +184,7 @@ defmodule Jido.Agent.ValidationAuthoringContractTest do
     time = ~U[2026-10-20 12:00:00Z]
 
     assert {:ok, signal} =
-             Agent.input_signal(definition, "work", %{},
+             Jido.Agent.DSL.input_signal(definition, "work", %{},
                source: "/explicit",
                id: "signal-id",
                time: time,

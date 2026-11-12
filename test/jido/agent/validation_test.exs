@@ -169,7 +169,7 @@ defmodule Jido.Agent.ValidationTest do
     assert {:error, %{path: [:schema]}} = Agent.define(%{name: "bad_schema", schema: nil})
   end
 
-  @tag obligation: ["jido.agent.I26", "jido.agent.I29"]
+  @tag obligation: "jido.agent.I10"
   test "internal definition passes can defer Plugin schema validation" do
     attrs = %{name: "deferred", plugins: [entry(InvalidSchemaPlugin)]}
 

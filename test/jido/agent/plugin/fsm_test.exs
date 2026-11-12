@@ -2,7 +2,6 @@ defmodule Jido.Agent.Plugin.FSMTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Directive
   alias Jido.Agent.Plugin.FSM
   alias Jido.Persistence
 
@@ -212,23 +211,6 @@ defmodule Jido.Agent.Plugin.FSMTest do
 
     assert {:ok, ^definition} =
              Jido.Test.AgentServer.Registry.decode(JSON.decode!(JSON.encode!(document)), registry)
-  end
-
-  test "Agent mutation keeps selector and route invariants" do
-    agent = Guide.instantiate!(id: "mutation")
-
-    assert {:error, remove_error} =
-             Agent.mutate(agent, [
-               Directive.plugin_remove(FSM, state: :discard)
-             ])
-
-    assert remove_error.code == :duplicate
-
-    assert {:error, add_error} =
-             Agent.mutate(agent, [Directive.plugin_add(OtherSelector)])
-
-    assert add_error.message == "Only one Agent Plugin can select routes"
-    assert agent.state.fsm == %{definition_vsn: 1, current: :idle}
   end
 
   test "invalid graphs fail during normalization" do

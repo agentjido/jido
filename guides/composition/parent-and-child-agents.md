@@ -216,7 +216,7 @@ end)
 1 = Jido.AgentServer.agent(restarted).state.handled
 ```
 
-An owned child depends on its parent's activation. When the parent's worker crashes, the activation restarts as a group, the owned children stop, and they do not come back. Only your Agent state remembers them, so start them again from a Signal if you still need them. Declared members do return. See [Topology Reconciliation](topology-reconciliation.md).
+An owned child depends on its parent's activation. When the parent's worker crashes, the activation restarts as a group, the owned children stop, and they do not come back. Only your Agent state remembers them, so start them again from a Signal if you still need them. Static declared members return with the activation.
 
 ```elixir
 activation = Jido.AgentServer.activation(triage)

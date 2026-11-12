@@ -101,7 +101,9 @@ Each Directive is a struct with a constructor on `Jido.Agent.Directive`. The Age
 | `Jido.Agent.Directive.parent_send/1` | `Jido.Agent.Directive.ParentSend` | Sends one Signal to the parent Agent. |
 | `Jido.Agent.Directive.server_stop/1` | `Jido.Agent.Directive.ServerStop` | Stops the AgentServer. The default reason is `:normal`. |
 
-The remaining constructors edit definition data. See [Mutations and Diffs](agent-mutations-and-diffs.livemd). Runtime Directives such as `Jido.AgentServer.Directive.AgentStart` are covered in [Runtime Effects](../agent-servers/runtime-directives-and-effects.md).
+Agent Directives request runtime work after the state commit. Runtime child
+Directives such as `Jido.AgentServer.Directive.AgentStart` are covered in
+[Runtime Effects](../agent-servers/runtime-directives-and-effects.md).
 
 ### Emit a Signal
 

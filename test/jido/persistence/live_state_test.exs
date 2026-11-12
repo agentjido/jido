@@ -18,10 +18,7 @@ defmodule Jido.Persistence.LiveStateTest do
       }
 
       effect =
-        Jido.AgentServer.Directive.signal_send(
-          Jido.Signal.new!("local.updated", %{}, source: "/test"),
-          input.observer
-        )
+        Jido.Agent.Directive.emit(Jido.Signal.new!("local.updated", %{}, source: "/test"))
 
       {:ok, state, [effect]}
     end
@@ -118,9 +115,10 @@ defmodule Jido.Persistence.LiveStateTest do
     defdelegate delete(key, opts), to: ETS
 
     def compare_and_swap(key, expected, value, opts) do
-      if :erlang.binary_to_term(value, [:safe]).rev == 0,
-        do: ETS.compare_and_swap(key, expected, value, opts),
-        else: {:error, {:rejected, :storage_unavailable}}
+      case :erlang.binary_to_term(value, [:safe]) do
+        %{rev: revision} when revision > 0 -> {:error, {:rejected, :storage_unavailable}}
+        _other -> ETS.compare_and_swap(key, expected, value, opts)
+      end
     end
   end
 
@@ -229,12 +227,14 @@ defmodule Jido.Persistence.LiveStateTest do
         state: %{payload: self(), owned: %{bits: <<5::3>>}}
       )
 
-    assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(c.jido, initial)
+    assert {:ok, server} =
+             Jido.Test.AgentServer.Assertions.start_agent(c.jido, initial, default_dispatch: {:pid, target: self()})
+
     port = Port.open({:spawn_executable, System.find_executable("true")}, [])
     on_exit(fn -> if Port.info(port), do: Port.close(port) end)
 
     for value <- [self(), port, make_ref(), fn -> :local end, [1 | :tail], <<5::3>>] do
-      input = %{payload: value, observer: self(), owned: %{bits: value}}
+      input = %{payload: value, owned: %{bits: value}}
       assert {:ok, candidate, [_effect]} = Agent.cmd(initial, signal("local.update", input))
       assert candidate.state.owned.bits === value
       assert {:ok, committed, _} = Server.call(server, signal("local.update", input))
@@ -247,57 +247,61 @@ defmodule Jido.Persistence.LiveStateTest do
     assert {:error, _reason} =
              Server.call(
                server,
-               signal("local.update", %{payload: :valid, observer: self(), owned: :invalid})
+               signal("local.update", %{payload: :valid, owned: :invalid})
              )
 
     assert Server.agent(server).state.count == 6
   end
 
-  test "persistent custom and Plugin commits convert before storage and dispatch", c do
+  test "persistent custom and Plugin checkpoints convert before storage and dispatch", c do
     for {module, input} <- [
-          {CustomAgent, %{payload: <<5::3>>}},
-          {PluginAgent, %{payload: :portable, owned: %{bits: <<5::3>>}}}
+          {CustomAgent, %{payload: "portable"}},
+          {PluginAgent, %{payload: :portable, owned: %{bits: "portable"}}}
         ] do
       assert {:ok, server} =
-               Jido.Test.AgentServer.Assertions.start_agent(c.jido, module, persistence: c.persistence)
+               Jido.Test.AgentServer.Assertions.start_agent(c.jido, module,
+                 persistence: c.persistence,
+                 default_dispatch: {:pid, target: self()}
+               )
 
       assert {:ok, committed, _} =
-               Server.call(server, signal("local.update", Map.put(input, :observer, self())))
+               Server.call(server, signal("local.update", input))
 
       assert_receive {:signal, %{type: "local.updated"}}, 1_000
 
-      assert {:ok, ^committed, 1} =
+      assert {:ok, ^committed, 2} =
                Persistence.load_agent_with_revision(c.persistence, module, committed.id, instance: c.jido)
     end
   end
 
   test "checkpoint, conversion, and storage failures neither commit nor dispatch", c do
     cases = [
-      {LocalAgent, ETS, %{payload: <<5::3>>}},
-      {CustomAgent, ETS, %{payload: :invalid_dump}},
-      {CustomAgent, ETS, %{payload: :dump_failure}},
-      {PluginAgent, ETS, %{payload: :portable, owned: %{bits: :invalid_dump}}},
-      {PluginAgent, ETS, %{payload: :portable, owned: %{bits: :dump_failure}}},
-      {PluginAgent, ETS, %{payload: <<5::3>>, owned: %{bits: <<5::3>>}}},
-      {CustomAgent, RejectedStorage, %{payload: <<5::3>>}},
-      {PluginAgent, RejectedStorage, %{payload: :portable, owned: %{bits: <<5::3>>}}}
+      {CustomAgent, ETS, %{payload: :invalid_dump}, 1},
+      {CustomAgent, ETS, %{payload: :dump_failure}, 1},
+      {PluginAgent, ETS, %{payload: :portable, owned: %{bits: :invalid_dump}}, 1},
+      {PluginAgent, ETS, %{payload: :portable, owned: %{bits: :dump_failure}}, 1},
+      {CustomAgent, RejectedStorage, %{payload: "portable"}, 0},
+      {PluginAgent, RejectedStorage, %{payload: :portable, owned: %{bits: "portable"}}, 0}
     ]
 
-    for {module, adapter, input} <- cases do
+    for {module, adapter, input, saved_revision} <- cases do
       persistence = {adapter, elem(c.persistence, 1)}
 
       assert {:ok, server} =
-               Jido.Test.AgentServer.Assertions.start_agent(c.jido, module, persistence: persistence)
+               Jido.Test.AgentServer.Assertions.start_agent(c.jido, module,
+                 persistence: persistence,
+                 default_dispatch: {:pid, target: self()}
+               )
 
       before = Jido.Test.AgentServer.Assertions.committed(server)
       monitor = Process.monitor(server)
 
       assert {:error, %Jido.Error.ExecutionError{message: "Required durable commit failed"}} =
-               Server.call(server, signal("local.update", Map.put(input, :observer, self())))
+               Server.call(server, signal("local.update", input))
 
       assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000
 
-      assert {:ok, saved, 0} =
+      assert {:ok, saved, ^saved_revision} =
                Persistence.load_agent_with_revision(persistence, module, before.agent.id, instance: c.jido)
 
       assert saved == before.agent

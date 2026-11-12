@@ -4,6 +4,12 @@
   driver: The obligation set and mutation profile must follow current code ownership and current public APIs.
   approved_by: User-requested hardening pass
 
+- id: immutable-agent-definition
+  date: 2026-11-11
+  decision: Keep the Agent definition fixed for one activation. Remove mutation and Diff APIs. Use a complete trusted Agent document and an idle AgentServer upgrade to replace a definition.
+  driver: One normal execution path for state changes avoids duplicate definition edit, runtime reconciliation, and recovery rules.
+  approved_by: User-directed Agent boundary refactor
+
 - id: reset-agent-mutation-evidence
   date: 2026-10-19
   decision: Remove the historical survivor ledger and do not claim a current full mutation result until the hardened profile completes.

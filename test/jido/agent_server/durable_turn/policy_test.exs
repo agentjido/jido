@@ -64,15 +64,14 @@ defmodule Jido.AgentServer.DurableTurn.PolicyTest do
     agent = F.Worker.instantiate!(id: "receipt-agent")
     {signal, prepared} = prepared(agent, "request", %{value: 0})
 
-    prepared = %{
-      prepared
-      | context:
-          Map.merge(prepared.context, %{
-            custom: %{portable: true},
-            turn_id: "remove",
-            trace_context: %{remove: true}
-          })
-    }
+    context =
+      Map.merge(prepared.instruction.context, %{
+        custom: %{portable: true},
+        turn_id: "remove",
+        trace_context: %{remove: true}
+      })
+
+    prepared = %{prepared | instruction: %{prepared.instruction | context: context}}
 
     before = System.system_time(:millisecond)
     assert {:ok, receipt} = Lifecycle.accept_continuation(data(signal), prepared)
@@ -89,7 +88,7 @@ defmodule Jido.AgentServer.DurableTurn.PolicyTest do
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I1"
-  test "Flow acceptance reports input validation phase and rejects Action instructions" do
+  test "Flow acceptance reports input validation phase and accepts lowered Actions" do
     agent = F.Worker.instantiate!(id: "input-agent")
     {signal, invalid} = prepared(agent, "request", %{value: "bad"})
 
@@ -97,20 +96,13 @@ defmodule Jido.AgentServer.DurableTurn.PolicyTest do
              Lifecycle.accept_continuation(data(signal), invalid)
 
     {signal, action} = prepared(agent, "increment", %{})
-    assert {:error, :not_durable_flow} = Lifecycle.accept_continuation(data(signal), action)
+    assert {:ok, %{status: :running}} = Lifecycle.accept_continuation(data(signal), action)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I1"
-  test "Flow acceptance propagates instruction resolution failure" do
+  test "Flow acceptance rejects a missing prepared instruction" do
     signal = signal("invalid")
-
-    prepared = %{
-      turn: %{executable: String, input: %{}},
-      context: %{},
-      signal: signal
-    }
-
-    assert {:error, _error} = Lifecycle.accept_continuation(data(signal), prepared)
+    assert {:error, _error} = Lifecycle.accept_continuation(data(signal), %{})
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I3"

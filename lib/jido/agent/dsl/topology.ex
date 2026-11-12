@@ -58,5 +58,4 @@ end
 
 defmodule Jido.Agent.DSL.References do
   @moduledoc false
-  defdelegate state(key), to: Jido.Agent.Topology
 end

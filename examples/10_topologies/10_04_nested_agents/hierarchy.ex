@@ -2,16 +2,6 @@ defmodule Jido.Examples.Topology.Hierarchy do
   @moduledoc "An Agent owns a team whose definition declares two workers."
   use Jido.Agent, name: "topology_hierarchy"
 
-  routes do
-    signal_source "/examples/topology/hierarchy"
-
-    route "examples.topology.hierarchy.team.remove", as: :team_remove do
-      action _input, schema: Jido.Joi.object(%{}), context: context do
-        {:ok, context.agent_state, [Jido.Agent.Directive.agent_remove(:team)]}
-      end
-    end
-  end
-
   topology do
     agent :team, Jido.Examples.Topology.Hierarchy.Team
   end

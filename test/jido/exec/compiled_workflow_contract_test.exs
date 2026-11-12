@@ -441,6 +441,7 @@ defmodule Jido.Exec.CompiledWorkflowContractTest do
     end
   end
 
+  @tag obligation: "jido_action.execution.I25"
   test "supports?/2 accepts only host-supplied capabilities" do
     assert Exec.supports?(%{jido_exec_capabilities: [:waits]}, :waits)
     refute Exec.supports?(%{jido_exec_capabilities: [:future]}, :future)

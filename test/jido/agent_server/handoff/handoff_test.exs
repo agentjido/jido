@@ -97,12 +97,6 @@ defmodule Jido.AgentServer.HandoffTest do
       do: {:error, :controlled_effect_failure}
 
     @impl true
-    def quiesce(_runtime, _opts), do: :ok
-
-    @impl true
-    def resume(_runtime, _opts), do: :ok
-
-    @impl true
     def child_spec(init), do: %{id: __MODULE__, start: {EffectRoot, :start_link, [init]}}
   end
 
@@ -199,22 +193,6 @@ defmodule Jido.AgentServer.HandoffTest do
     end
   end
 
-  defmodule BeforePluginChange do
-    use Jido.Action, name: "agent_server_handoff_before_plugin_change"
-
-    def run(input, context) do
-      output = Jido.Signal.new!("handoff.plugin_reply", %{count: input.count}, source: "/agent")
-      {:ok, output} = Jido.Signal.put_context(output, "jidocausationid", context.signal.id)
-      send(context.observer, {:plugin_reply, output})
-
-      {:ok, %{count: input.count},
-       [
-         Jido.Agent.Directive.plugin_configure(EffectPlugin, marker: :changed),
-         Jido.Agent.Directive.reply(output)
-       ]}
-    end
-  end
-
   defmodule Increment do
     use Jido.Action, name: "agent_server_handoff_increment"
 
@@ -297,16 +275,6 @@ defmodule Jido.AgentServer.HandoffTest do
     flow do
       step "before", action: BeforeReply, params: %{count: input(:count)}
       handoff "next", selector: Select, params: result("before")
-      output result("next")
-    end
-  end
-
-  defmodule PluginChangeFlow do
-    use Jido.Flow, name: "agent_server_plugin_change_handoff_flow"
-
-    flow do
-      step "before", action: BeforePluginChange, params: %{count: input(:count)}
-      handoff "next", selector: SelectBlocking, params: result("before")
       output result("next")
     end
   end
@@ -428,7 +396,6 @@ defmodule Jido.AgentServer.HandoffTest do
       route "effects_blocking_handoff", EffectsBlockingFlow
       route "effects_failing_handoff", EffectsFailingFlow
       route "reply_handoff", ReplyFlow
-      route "plugin_change_handoff", PluginChangeFlow
       route "chain_handoff", ChainFlow
       route "blocking_handoff", BlockingFlow
       route "blocking_flow_handoff", BlockingFlowSuccessorHandoff
@@ -640,50 +607,6 @@ defmodule Jido.AgentServer.HandoffTest do
              {:admit, 1}
              | _rest
            ] = EventLog.events()
-  end
-
-  @tag obligation: "jido.agent_server.handoff.I1"
-  test "Plugin reconciliation finishes before the successor result", c do
-    :ok = EventLog.clear()
-    :ok = Probe.configure(:handoff_reconcile)
-    server = start(c, turn_timeout: :infinity)
-    {_phase, before} = :sys.get_state(server)
-    old_root = Map.fetch!(before.plugin_refs, EffectPlugin)
-
-    pending =
-      Server.submit(server, signal("plugin_change_handoff", %{count: 2}), context: %{observer: self()})
-
-    assert_receive {:plugin_reply, output}, 1_000
-    output_id = output.id
-    refute_received %Jido.Signal{id: ^output_id}
-
-    assert_receive {:durable_barrier, :handoff_reconcile, _reconciler}, 5_000
-    assert {:effects, %{active: %{reconciling: true}}} = :sys.get_state(server)
-    assert {:error, :timeout} = Server.await(pending, 0)
-
-    :ok = Probe.configure(:handoff_successor)
-    :ok = Probe.release()
-    assert_receive {:durable_barrier, :handoff_successor, _successor}, 5_000
-
-    assert {:error, :timeout} = Server.await(pending, 0)
-
-    assert Keyword.fetch!(Jido.Agent.Plugin.declarations(Server.agent(server)), EffectPlugin) ==
-             [marker: :changed]
-
-    {_phase, after_reconciliation} = :sys.get_state(server)
-    new_root = Map.fetch!(after_reconciliation.plugin_refs, EffectPlugin)
-    assert is_pid(new_root)
-    assert new_root != old_root
-
-    assert [:prepare, {:admit, 0} | _] = EventLog.events()
-
-    :ok = Probe.release()
-    assert {:ok, %{state: %{count: 3}}, []} = Server.await(pending, 500)
-    assert_receive %Jido.Signal{id: ^output_id}, 500
-    assert :prepare in EventLog.events()
-    assert {:admit, 1} in EventLog.events()
-    refute {:after_commit, 1} in EventLog.events()
-    assert_eventually({:after_commit, 2} in EventLog.events())
   end
 
   @tag obligation: "jido.agent_server.handoff.I1"

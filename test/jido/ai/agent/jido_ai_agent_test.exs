@@ -654,7 +654,7 @@ defmodule Jido.AI.AgentTest do
     end)
 
     agent = Jido.Agent.instantiate!(definition, id: "json-agent-test")
-    signal = Jido.Agent.input_signal!(definition, "jido.ai.request", %{input: "Complete."})
+    signal = Jido.Agent.DSL.input_signal!(definition, "jido.ai.request", %{input: "Complete."})
 
     assert {:ok, unchanged, [%Jido.Agent.Directive.Reply{signal: reply}]} =
              Jido.Agent.cmd(agent, signal)

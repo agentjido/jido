@@ -204,15 +204,36 @@ defmodule Jido.Persistence do
   def save_agent(source, agent, opts \\ [])
 
   def save_agent(source, %Agent{} = agent, opts) do
+    with :ok <- validate_operation_options(opts, @save_options),
+         do: save_record(source, agent, agent.module, opts)
+  end
+
+  def save_agent(_source, agent, _opts),
+    do: invalid_public_input(:save_agent, %{agent: agent})
+
+  @doc false
+  def replace_agent(source, %Agent{} = agent, previous_module, opts)
+      when is_atom(previous_module) do
+    with :ok <- validate_operation_options(opts, @save_options),
+         do: save_record(source, agent, previous_module, opts)
+  end
+
+  defp save_record(source, agent, previous_module, opts) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
       Store.protect(:compare_and_swap, fn ->
-        with :ok <- validate_operation_options(opts, @save_options),
-             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+        with {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
              {:ok, ref} <- resolve_ref(instance, agent.id, opts),
              {:ok, record} <- build_record(agent, instance, opts, ref),
              {:ok, expected_revision} <- expected_revision(opts),
              {:ok, expected_value} <-
-               current_value(adapter, adapter_opts, record, ref, expected_revision),
+               current_value(
+                 adapter,
+                 adapter_opts,
+                 record,
+                 ref,
+                 expected_revision,
+                 previous_module
+               ),
              {:ok, value} <- Record.encode(record),
              :ok <-
                Store.compare_and_swap(
@@ -226,9 +247,6 @@ defmodule Jido.Persistence do
       end)
     end)
   end
-
-  def save_agent(_source, agent, _opts),
-    do: invalid_public_input(:save_agent, %{agent: agent})
 
   @doc false
   @spec create_agent(adapter_config() | atom(), Agent.t(), keyword()) ::
@@ -462,7 +480,8 @@ defmodule Jido.Persistence do
 
   @doc false
   def open_agent(source, %Agent{} = agent, :create, opts) do
-    with {:ok, agent} <- Jido.Agent.Mutation.bind(agent),
+    with {:ok, _members} <-
+           Jido.Agent.Topology.bind(agent, agent.state, &Jido.Agent.Validation.resolve/2),
          {:ok, agent} <-
            Jido.Agent.Topology.identify(nil, agent, &Jido.Agent.Validation.resolve/2),
          :ok <- create_agent(source, agent, opts),
@@ -531,7 +550,7 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp current_value(adapter, opts, record, ref, expected_revision) do
+  defp current_value(adapter, opts, record, ref, expected_revision, current_module) do
     case Store.read({adapter, opts}, Record.agent_key(ref)) do
       {:error, :not_found} when expected_revision in [:any, 0] ->
         {:ok, :not_found}
@@ -540,8 +559,8 @@ defmodule Jido.Persistence do
         {:error, :conflict}
 
       {:ok, value, condition} ->
-        with {:ok, current} <- decode_record(value, record.agent_module),
-             :ok <- Record.validate(current, ref, record.agent_module),
+        with {:ok, current} <- decode_record(value, current_module),
+             :ok <- Record.validate(current, ref, current_module),
              :ok <- Record.require_active_for_write(current),
              :ok <- check_revision(current, record, expected_revision) do
           {:ok, condition}

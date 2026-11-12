@@ -266,7 +266,7 @@ The Server validates the whole batch before commit and runs it after commit. A f
 | Jido.Sensor, `init/2`, `handle_event/2`, `terminate/2` | Any module with `child_spec/1`, run by `Jido.Plugin.SensorManager`. See [Managed Sensors](../built-in-plugins/managed-sensors.livemd). |
 | Jido.Sensors.Heartbeat | `Jido.Plugin.Heartbeat`. See [Agent Heartbeats](../built-in-plugins/heartbeats.livemd). |
 | Jido.Scheduler, the Agent `schedules` option | `Jido.Plugin.Scheduler`. See [Schedules](../built-in-plugins/scheduler.livemd). |
-| Jido.Pod and its mutation API | The Agent `topology` block and Directives such as `Jido.Agent.Directive.agent_add/3`. See [Declare Agent Topology](../composition/declare-agent-topology.livemd). |
+| Jido.Pod and its mutation API | The static Agent `topology` block for fixed members, or explicit AgentServer child operations for dynamic children. See [Declare Agent Topology](../composition/declare-agent-topology.livemd). |
 | Jido.Agent.WorkerPool, Jido.Agent.InstanceManager | Topology members, or your own bounded workers. V3 has no checkout pool. |
 
 ## Persistence

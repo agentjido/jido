@@ -75,7 +75,6 @@ Each callback has one owner. The owner decides where the callback runs and what 
 | AgentServer | `after_commit/3` | Observe each committed Turn. | [Post-Commit Work](plugin-post-commit-work.md) |
 | AgentServer | `dispatch/4` | Run one owned Directive after commit. | [Custom Directives](plugin-custom-directives.livemd) |
 | AgentServer | `prepare_outbound/4` | Transform or reject an outbound Signal. | [Post-Commit Work](plugin-post-commit-work.md) |
-| AgentServer | `quiesce/2`, `resume/2` | Pause and reopen the runtime around a live change. | [Live Reconfiguration](plugin-live-reconfiguration.md) |
 | Persistence | `dump/3`, `load/3` | Convert the owned value for storage. | [Plugin Persistence](plugin-persistence.md) |
 
 Agent callbacks are pure. They run on both the pure path, `Jido.Agent.cmd/3`, and the live path through `Jido.AgentServer`. AgentServer callbacks run only on the live path. On the pure path `context.plugin_inputs[plugin].runtime` is `nil` and no post-commit callback runs. [Pure or Live Execution](../core-concepts/pure-or-live-execution.md) compares the two paths.
@@ -89,11 +88,10 @@ On the live path, one Turn calls Plugin callbacks in this order:
 3. `select_route/2` on the one Plugin that defines it, if any.
 4. The route handler runs. Jido rejects the result if the handler changed a Plugin-owned field.
 5. Jido validates every Directive, and then runs `reduce/2` for each Plugin in declaration order.
-6. `quiesce/2`, only for runtime Plugins that this Turn adds, changes, or removes.
-7. `dump/3` when the server has persistence configured.
-8. Commit. The caller of `Jido.AgentServer.call/3` receives its result.
-9. `after_commit/3` for each Plugin, in declaration order.
-10. Directives run in batch order. `dispatch/4` handles owned Directives, and `prepare_outbound/4` runs in reverse declaration order for each outbound Signal.
+6. `dump/3` when the server has persistence configured.
+7. Commit. The caller of `Jido.AgentServer.call/3` receives its result.
+8. `after_commit/3` for each Plugin, in declaration order.
+9. Directives run in batch order. `dispatch/4` handles owned Directives, and `prepare_outbound/4` runs in reverse declaration order for each outbound Signal.
 
 A failure before commit fails the Turn with no state change. A failure after commit does not undo the commit. [Post-Commit Work](plugin-post-commit-work.md) covers that case.
 
@@ -181,7 +179,6 @@ The map above is the form a plugin takes in a data-defined Agent. `use Jido.Agen
 |---|---|
 | `reduce/2` requires `state_spec/1`. | A reducer needs a field to own. |
 | `dump/3` and `load/3` come as a pair and require `state_spec/1`. | Conversion applies only to an owned value. |
-| `quiesce/2` and `resume/2` come as a pair. | A pause must be reversible. |
 | `dispatch/4` requires `directives/1` with at least one type. | Dispatch handles only owned types. |
 | An owned Directive needs `reduce/2` or `dispatch/4`. | Something must consume it. |
 | Each owned Directive module defines a struct and `validate/1`. | Jido validates every Directive before commit. |

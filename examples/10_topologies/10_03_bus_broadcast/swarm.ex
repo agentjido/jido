@@ -3,10 +3,7 @@ defmodule Jido.Examples.Topology.Swarm do
   use Jido.Agent, name: "topology_bus_swarm", plugins: [Jido.Plugin.Bus.DSL]
 
   state do
-    schema Jido.Joi.object(%{
-             sent: Jido.Joi.integer() |> Jido.Joi.default(0),
-             worker_count: Jido.Joi.integer() |> Jido.Joi.min(1) |> Jido.Joi.default(3)
-           })
+    schema Jido.Joi.object(%{sent: Jido.Joi.integer() |> Jido.Joi.default(0)})
   end
 
   routes do
@@ -27,7 +24,7 @@ defmodule Jido.Examples.Topology.Swarm do
 
   topology do
     agent :workers, Jido.Examples.Topology.Cell do
-      count state(:worker_count)
+      count 3
       initial_state %{label: "worker"}
     end
 

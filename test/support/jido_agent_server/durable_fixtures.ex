@@ -129,20 +129,6 @@ defmodule Jido.Test.AgentServer.DurableFixtures do
     end
   end
 
-  defmodule TopologyFlow do
-    use Jido.Flow,
-      name: "durable_topology_mutation",
-      schema: Jido.Joi.object(%{})
-
-    flow do
-      step "add_agent", _input <- input() do
-        {:ok, %{count: 1}, [Jido.Agent.Directive.agent_add(:nested, Jido.Test.AgentServer.DurableFixtures.Worker)]}
-      end
-
-      output result("add_agent")
-    end
-  end
-
   defmodule Corrupt do
     @behaviour Jido.Persistence.Store
 
@@ -217,8 +203,6 @@ defmodule Jido.Test.AgentServer.DurableFixtures do
       route "bad_output", BadOutput
 
       route "effects", EffectsFlow
-
-      route "topology", TopologyFlow
 
       route "increment" do
         action _input, context: context do

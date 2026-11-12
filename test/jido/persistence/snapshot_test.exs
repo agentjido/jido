@@ -1,7 +1,6 @@
 defmodule Jido.Persistence.SnapshotTest do
   use Covenant.Case, component: "jido.persistence", async: true
   alias Jido.Agent
-  alias Jido.Agent.Directive, as: D
   alias Jido.Persistence
   alias Jido.Persistence.{Record, Store}
   alias Jido.Test.Agent.EvolutionFixtures, as: F
@@ -82,14 +81,38 @@ defmodule Jido.Persistence.SnapshotTest do
     end
   end
 
+  defp route(path, kind, target) when kind in [:action, :flow],
+    do: %{
+      path: path,
+      handler: %{kind: kind, target: target},
+      state: %{source: :output, path: []}
+    }
+
+  defp route(path, kind, target),
+    do: %{path: path, handler: %{kind: kind, target: target}}
+
+  defp replace_definition(agent, attrs) do
+    definition =
+      agent
+      |> Agent.definition()
+      |> struct!(attrs)
+      |> Agent.define!()
+
+    Agent.instantiate!(definition, id: agent.id, state: agent.state)
+  end
+
   @tag obligation: "jido.persistence.I6"
-  test "complete mutated definition and state round trip without a source module" do
-    assert {:ok, agent, _} =
-             Agent.mutate(F.agent(), [
-               D.route_add("extra", F.Work),
-               D.agent_add(:worker, F.Worker),
-               D.plugin_add(F.Counter)
-             ])
+  test "complete definition and state round trip without a source module" do
+    source = F.agent()
+
+    agent =
+      replace_definition(source, %{
+        routes: source.routes ++ [route("extra", :action, F.Work)],
+        topology: %{agents: [%{name: :worker, definition: F.Worker}], connections: []},
+        plugins: [
+          %{id: F.Counter.id(), provider: F.Counter, vsn: F.Counter.vsn(), data: %{}}
+        ]
+      })
 
     assert {:ok, snapshot} = Persistence.snapshot(agent)
     assert snapshot.format == 1
@@ -109,13 +132,20 @@ defmodule Jido.Persistence.SnapshotTest do
 
   @tag obligation: "jido.persistence.I6"
   test "portable forward targets are not treated as code references" do
-    assert {:ok, agent, _} =
-             Agent.mutate(F.agent(), [
-               D.route_add("send.parent", %{
-                 kind: :forward,
-                 target: %{kind: :parent}
-               })
-             ])
+    source = F.agent()
+
+    agent =
+      replace_definition(source, %{
+        routes:
+          source.routes ++
+            [
+              %{
+                path: "send.parent",
+                handler: %{kind: :forward, target: %{kind: :parent}},
+                state: :unchanged
+              }
+            ]
+      })
 
     assert {:ok, snapshot} = Persistence.snapshot(agent)
     assert Enum.all?(Map.keys(snapshot.references), &is_atom/1)
@@ -426,17 +456,19 @@ defmodule Jido.Persistence.SnapshotTest do
   end
 
   @tag obligation: "jido.persistence.I12"
-  test "state and changed definition share one storage revision; conflicts retain bytes" do
+  test "state and replacement definition share one storage revision; conflicts retain bytes" do
     store = {Persistence.ETS, table: __MODULE__}
     opts = [namespace: "evolution"]
     agent = %{F.agent() | id: "snapshot-#{System.unique_integer([:positive])}"}
     assert :ok = Persistence.create_agent(store, agent, opts)
 
-    assert {:ok, next, _} =
-             Agent.mutate(agent, [
-               D.route_add("new", F.Work),
-               D.plugin_add(F.Counter)
-             ])
+    next =
+      replace_definition(agent, %{
+        routes: agent.routes ++ [route("new", :action, F.Work)],
+        plugins: [
+          %{id: F.Counter.id(), provider: F.Counter, vsn: F.Counter.vsn(), data: %{}}
+        ]
+      })
 
     assert :ok = Persistence.save_agent(store, next, opts ++ [expected_revision: 0, revision: 1])
 
@@ -475,10 +507,7 @@ defmodule Jido.Persistence.SnapshotTest do
   test "custom state conversion cannot replace the accepted definition" do
     original = F.Custom.instantiate!(id: "custom", state: %{count: 4})
 
-    assert {:ok, agent, _} =
-             Agent.mutate(original, [
-               D.route_add("saved", F.Work)
-             ])
+    agent = replace_definition(original, %{routes: [route("saved", :action, F.Work)]})
 
     assert {:ok, snapshot} = Persistence.snapshot(agent)
     assert snapshot.state_format == :custom
@@ -498,18 +527,12 @@ defmodule Jido.Persistence.SnapshotTest do
   test "missing saved declarations stop custom restore before its callback" do
     original = F.Custom.instantiate!(id: "custom-order", state: %{count: 4})
 
-    assert {:ok, action, _} =
-             Agent.mutate(original, [
-               D.route_add("action", F.Work)
-             ])
+    action = replace_definition(original, %{routes: [route("action", :action, F.Work)]})
 
-    assert {:ok, transform, _} =
-             Agent.mutate(original, [
-               D.route_add("transform", %{
-                 kind: :transform,
-                 target: {F.Transform, :run, 1}
-               })
-             ])
+    transform =
+      replace_definition(original, %{
+        routes: [route("transform", :transform, {F.Transform, :run, 1})]
+      })
 
     for {agent, missing} <- [
           {original, F.Custom},
@@ -528,10 +551,7 @@ defmodule Jido.Persistence.SnapshotTest do
 
   @tag obligation: "jido.persistence.I7"
   test "Flow snapshots retain their declared executable dependencies" do
-    assert {:ok, agent, _} =
-             Agent.mutate(F.agent(), [
-               D.route_replace("run", F.Flow)
-             ])
+    agent = replace_definition(F.agent(), %{routes: [route("run", :flow, F.Flow)]})
 
     assert {:ok, snapshot} = Persistence.snapshot(agent)
     assert snapshot.references[F.Flow] == F.Flow.module_info(:md5)

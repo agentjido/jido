@@ -4,7 +4,6 @@ defmodule Jido.AgentServer.Effects.SignalsTest do
 
   import Jido.Test.Eventually
   alias Jido.Agent.Directive.{Emit, ServerStop}
-  alias Jido.Agent.Directive
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.Directive.ErrorReport
   alias Jido.AgentServer.Effects
@@ -190,14 +189,25 @@ defmodule Jido.AgentServer.Effects.SignalsTest do
   end
 
   @tag obligation: "jido.agent_server.effects.I6"
-  test "Signal preparation receives the complete Turn and instance context", c do
+  test "Signal preparation receives the complete command and instance context", c do
     observer = Module.concat(__MODULE__, "Observer#{System.unique_integer([:positive])}")
     Process.register(self(), observer)
 
-    assert {:ok, agent, _} =
-             Jido.Agent.mutate(c.agent, [
-               Directive.plugin_add(SignalContextPlugin, observer: observer)
-             ])
+    definition = Jido.Agent.definition(c.agent)
+
+    contribution = %{
+      id: SignalContextPlugin.id(),
+      provider: SignalContextPlugin,
+      vsn: SignalContextPlugin.vsn(),
+      data: %{observer: observer}
+    }
+
+    definition =
+      definition
+      |> struct!(plugins: definition.plugins ++ [contribution])
+      |> Jido.Agent.define!()
+
+    agent = Jido.Agent.instantiate!(definition, id: c.agent.id, state: c.agent.state)
 
     server =
       F.start(%{c | agent: agent},

@@ -71,7 +71,11 @@ Each `call`, `submit`, and `cast` becomes one Turn request. The server checks it
 6. If the queue is full, it rejects the request with `{:overloaded, details}`.
 7. Otherwise the request waits in the queue.
 
-Queued requests run in arrival order. The server checks a queued request again each time it changes phase, including when the running Turn ends. `Jido.AgentServer.upgrade/3` uses the same queue, and reports closed admission as `{:not_admitting, mode}`.
+Queued requests run in arrival order. The server checks a queued request again
+each time it changes phase, including when the running Turn ends. Definition
+upgrade is an administrative exception: `Jido.AgentServer.upgrade/3` requires
+an idle activation and returns `{:error, :agent_busy}` instead of entering the
+queue.
 
 ## Bound the queue
 

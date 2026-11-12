@@ -8,7 +8,7 @@ Jido is an accessible, configurable actor runtime for Elixir, with AI capabiliti
 
 Jido V3 makes configurable, durable, and observable actors as easy to define and test as ordinary Elixir data, while OTP remains the runtime foundation. The V3 capability leap comes from one coherent runtime contract. It does not come from collecting every feature found in other Agent frameworks.
 
-An Agent is the configurable definition and immutable state of an actor. AgentServer is its OTP runtime shell. A Signal enters the actor mailbox. A Flow defines the actor behavior for that Turn. Actions are the validated units of work inside the Flow. The Flow returns a complete next state plus explicit runtime requests. AgentServer serializes the Turn, commits the accepted state, and owns effects, recovery, timers, and process lifecycle.
+An Agent is the fixed definition and current immutable state value of an actor. AgentServer is its OTP runtime shell. A Signal enters the actor mailbox. A Flow defines the actor behavior for that Turn. Actions are the validated units of work inside the Flow. The Flow returns a complete next state plus explicit runtime requests. AgentServer serializes Turns, commits accepted state, and owns effects, recovery, timers, and process lifecycle.
 
 Plugins add complete capabilities without changing the Agent core. AI, scheduling, sensors, Signal buses, heartbeat, and audit are first-party Plugins. AI reasoning is implemented as a Flow. AI tools are Actions or Flows.
 
@@ -24,7 +24,7 @@ Developer experience is a primary product goal. OTP gives experts excellent prim
 - Jido is a configurable actor runtime with AI capabilities.
 - Jido makes actor and Agent development accessible without hiding the important OTP lifecycle and failure model.
 - An Agent is the configurable definition and state hosted by the actor runtime.
-- A Flow that composes Actions is the behavior boundary for an Agent Turn.
+- A Flow that composes Actions is the behavior boundary for an AgentServer Turn.
 - A direct Action route is convenience syntax. The runtime normalizes it to a one-step Flow.
 - Catalog is application-wide. All Jido instances in the OTP application use the same immutable Catalog revision.
 - Installed Jido packages can contribute definitions to Catalog automatically.
@@ -179,13 +179,15 @@ Recovery classifies an external effect as known complete, known failed, safe to 
 
 ### 3. Flow is the Agent behavior boundary
 
-Flow composes Actions and other Flows. An Agent route selects a Flow as the executable behavior for one Turn. A direct Action route is authoring sugar for a one-step Flow.
+Flow composes Actions and other Flows. An Agent route selects a Flow as the
+executable behavior for one Turn. A direct Action route is authoring sugar
+for a one-step Flow.
 
-A validated `Jido.Agent.Turn` never contains an Action executable. It contains
-a Flow target and an explicit execution context. `:managed` and `:durable`
-change host lifecycle policy, not Flow meaning. Action route sugar currently
-selects managed execution. An authored Flow selects durable execution when its
-AgentServer has persistence.
+`Jido.Agent.Runner` keeps one private prepared execution value. It lowers both
+Action and Flow routes to a Flow instruction before execution. Each
+AgentServer Turn selects managed or durable host policy from the activation's
+persistence capability, not from the authored route kind. Host policy does not
+change Flow meaning.
 
 AI reasoning recipes, business workflows, tool orchestration, waits, handoffs, parallel work, and loops can use the same Flow model and Exec semantics.
 
@@ -475,7 +477,7 @@ These references are tests, not target architectures:
 
 The capability work should proceed in this order:
 
-1. Define one exact Flow and Agent Turn contract.
+1. Define one exact Flow and AgentServer Turn contract.
 2. Define the AgentServer lifecycle, commit, continuation, effect, and recovery state machine.
 3. Make direct tests, source-aware errors, semantic events, status, history, and live inspection excellent.
 4. Define application-wide Catalog contribution and policy-filtered views.
@@ -565,7 +567,7 @@ The vision fails if Jido develops any of these properties:
 The project should prove its value with executable checks and examples:
 
 1. Implement the same configurable actor once with GenServer and once with Jido. State the extra guarantees that Jido provides.
-2. Show that a direct Agent Turn and an AgentServer Turn use the same Flow semantics.
+2. Show that direct Agent evaluation and an AgentServer Turn use the same Flow semantics.
 3. Add one external package to the application and show its definitions in Catalog without host registration code.
 4. Add one Plugin without editing AgentServer or Agent core.
 5. Recover a durable Agent after process failure without replaying an uncertain effect.
@@ -659,7 +661,7 @@ Arrows point from consumer to dependency.
 
 ## Suggested next discussion order
 
-1. Define the exact Agent Turn and Flow contract.
+1. Define the exact AgentServer Turn and Flow contract.
 2. Define the AgentServer lifecycle, continuation, commit, effect, and recovery state machine.
 3. Define the first-hour developer journey and live inspection experience.
 4. Pressure-test one actor against GenServer, Sagents, Aikido, and Alloy.

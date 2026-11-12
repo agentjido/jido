@@ -72,6 +72,6 @@ defmodule Jido.Examples.AI.JSONAgent do
 
   @doc "Builds the standard AI request Signal for an imported definition."
   def request_signal!(definition, params) do
-    Jido.Agent.input_signal!(definition, @request_type, params)
+    Jido.Agent.DSL.input_signal!(definition, @request_type, params)
   end
 end

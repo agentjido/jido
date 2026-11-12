@@ -36,22 +36,19 @@ defmodule Jido.AgentServer.Effects.RuntimeDirectivesTest do
 
     assert {:ok, _, _} =
              turn(server, [
-               D.agent_send(
-                 :worker,
-                 E.signal([D.route_add("extra", E.Work)])
-               )
+               D.agent_send(:worker, E.signal([]))
              ])
 
     settled(server)
-    assert_eventually(length(Server.agent(worker).routes) == 2)
+    assert_eventually(Server.status(worker).state_version == 1)
 
     assert {:ok, _, _} =
              turn(worker, [
-               D.parent_send(E.signal([D.route_add("reply", E.Work)]))
+               D.parent_send(E.signal([]))
              ])
 
     settled(worker)
-    assert_eventually(length(Server.agent(server).routes) == 2)
+    assert_eventually(Server.status(server).state_version == 3)
     assert {:ok, _, _} = turn(server, [R.agent_stop(:worker)])
     settled(server)
     assert Server.children(server) == %{}
@@ -74,10 +71,7 @@ defmodule Jido.AgentServer.Effects.RuntimeDirectivesTest do
           D.parent_send(E.signal([]))
         ] do
       assert {:error, _} =
-               turn(server, [
-                 D.route_add("never", E.Work),
-                 directive
-               ])
+               turn(server, [directive])
 
       assert Server.snapshot(server) == initial
       assert Server.children(server) == %{}
@@ -129,7 +123,7 @@ defmodule Jido.AgentServer.Effects.RuntimeDirectivesTest do
 
     config = put_in(config.agent.topology.agents, [%{name: :worker}])
 
-    assert {:error, :topology_agent_requires_mutation} =
+    assert {:error, :static_topology_member} =
              Effects.validate_batch([R.agent_stop(:worker)], config)
   end
 

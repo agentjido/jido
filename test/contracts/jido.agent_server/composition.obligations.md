@@ -48,26 +48,26 @@ runtime component has no separate DSL.
 - **kind:** ordering
 - **status:** active
 
-### jido.agent_server.composition.I5 — Accepted composition commit
+### jido.agent_server.composition.I5 — Runtime topology validation
 
-- **scope:** route, Plugin, topology, and connection mutations
-- **must:** Validate the complete runtime target before commit. Commit accepted composition data in one Agent revision and do not execute its mutation Directives as effects. Reject a live-resource change on a bare worker. Preserve the prior Agent and revision after rejection. Hand accepted Plugin declarations to the Plugin runtime owner.
-- **why:** Accepted Agent data must be the authority for live composition.
+- **scope:** activation startup and `Jido.AgentServer.Topology.validate/1`
+- **must:** Validate that each static endpoint has a runtime implementation before the activation becomes ready. Reject unsupported provider endpoints. Create local Buses only from the Bus Plugin declaration.
+- **why:** A valid data definition must also have one executable runtime shape.
 - **kind:** ordering
 - **status:** active
 
-### jido.agent_server.composition.I6 — Member reconciliation and readiness
+### jido.agent_server.composition.I6 — Static member startup and readiness
 
-- **scope:** accepted topology agent declarations
-- **must:** Bind member counts and initial state from the accepted parent state. Initialize a member once when reconciliation creates it, with its final child identity and topology context. Restore a saved member without initialization. Preserve stable slot identities for unchanged persistent members, and assign a new identity when a removed or changed slot starts a new lifetime. Keep unchanged member processes, replace changed members, stop removed members, and start missing members under the owning activation. Keep admission closed until every required member is ready.
-- **why:** Live members must match one accepted composition revision before later Turns run.
+- **scope:** static topology agent declarations
+- **must:** Start the fixed member count with the declared initial state. Initialize a new member once with its final child identity and topology context. Restore a saved member without initialization. Preserve durable slot identities across activation recovery. Keep admission closed until every required member is ready.
+- **why:** Live members must match the activation definition before commands run.
 - **kind:** ordering
 - **status:** active
 
 ### jido.agent_server.composition.I7 — Accepted resource recovery
 
-- **scope:** AgentServer startup, worker recovery, and post-commit reconciliation
-- **must:** Rebuild accepted topology members and local buses before readiness without saving process handles. A post-commit resource failure must not undo the accepted local or durable checkpoint and must not reopen admission. Recovery must rebuild the accepted target and keep unaffected members during an ordinary live reconciliation.
+- **scope:** AgentServer startup and worker recovery
+- **must:** Rebuild static topology members and local Buses before readiness without saving process handles. A resource startup failure must not open admission. Recovery must rebuild the activation definition.
 - **why:** Runtime resources are derived from accepted data and cannot become a second authority.
 - **kind:** ordering
 - **status:** active

@@ -39,4 +39,4 @@ Agent placement or cross-node lifecycle guarantees.
 - [Tests](causal_trace_test.exs)
 
 Previous: [Agent Observation](../08_10_agent_observation/README.md) |
-Next: [Definition Changes and Diff](../08_12_definition_changes/README.md)
+Next: [Whole Definition Upgrade](../08_12_definition_changes/README.md)

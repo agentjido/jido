@@ -278,17 +278,6 @@ defmodule Jido.Agent.RouteProjectionTest do
     assert before.state == %{count: 0}
   end
 
-  test "the selected route projects before its mutation changes later turns" do
-    before = agent([project_route()])
-    remove = Directive.route_remove("project")
-    {source, _trace} = request(%{reply: %{value: 1}, directives: [remove]})
-
-    assert {:ok, after_agent, [^remove, %Reply{}]} = Agent.cmd(before, source)
-    assert after_agent.state == %{count: 1}
-    assert after_agent.routes == []
-    assert {:error, %Jido.Error.ValidationError{code: :unmatched_input}} = Agent.cmd(after_agent, source)
-  end
-
   test "direct and live execution use the same projection path", %{jido: jido} do
     before = agent([project_route()])
     {source, _trace} = request(%{reply: %{value: 1}})

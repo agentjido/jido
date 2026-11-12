@@ -343,7 +343,7 @@ defmodule Jido.Persistence.PluginIntegrationTest do
       })
       |> Agent.instantiate!(id: "stored-plugin-state")
 
-    assert {:ok, agent} = Agent.transition(agent, %{owned: %{count: nil}})
+    assert {:ok, agent} = Jido.Agent.Validation.transition(agent, %{owned: %{count: nil}})
     assert :ok = Persistence.save_agent(c.persistence, agent, namespace: "persistence-test")
 
     assert {:ok, ^agent} =
