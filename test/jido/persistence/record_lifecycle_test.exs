@@ -52,13 +52,14 @@ defmodule Jido.Persistence.RecordLifecycleTest do
     assert {:ok, bytes} = ETS.get(key, opts)
 
     assert :erlang.binary_to_term(bytes, [:safe]) == %{
-             fmt: 1,
+             fmt: 2,
              kind: :tombstone,
              namespace: Jido.Instance.NamespaceRegistry.namespace(jido),
              agent_module: RuntimeAgent,
              agent_id: active.id,
              partition: nil,
-             rev: 3
+             rev: 4,
+             agent_rev: 3
            }
 
     assert {:error, :conflict} =
@@ -78,7 +79,7 @@ defmodule Jido.Persistence.RecordLifecycleTest do
 
     assert {:ok, missing_bytes} = ETS.get(missing_key, opts)
 
-    assert %{fmt: 1, kind: :tombstone, rev: 0} =
+    assert %{fmt: 2, kind: :tombstone, rev: 0, agent_rev: 0} =
              :erlang.binary_to_term(missing_bytes, [:safe])
   end
 

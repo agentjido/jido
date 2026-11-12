@@ -2,18 +2,12 @@ defmodule Jido.Agent.Runner do
   @moduledoc false
 
   alias Jido.Agent.{Plugin, Validation}
-  alias Jido.Agent.Directive.ServerStop
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
   alias Jido.Error
   alias Jido.Signal
 
   @type stage :: :route | :prepare | :input | :compose | :validate
-  @type admission :: %{
-          required(:agent) => map(),
-          required(:signal) => Signal.t(),
-          required(:context) => map(),
-          required(:plugin_inputs) => map()
-        }
+  @type admission :: map()
 
   defmodule Prepared do
     @moduledoc false
@@ -70,9 +64,9 @@ defmodule Jido.Agent.Runner do
   @doc false
   @spec prepare_admitted(
           admission(),
-          Signal.t(),
+          term(),
           keyword(),
-          [Jido.Plugin.Spec.t()]
+          term()
         ) ::
           {:ok, Prepared.t()} | {:error, stage(), term()}
   def prepare_admitted(
@@ -122,10 +116,10 @@ defmodule Jido.Agent.Runner do
   @doc false
   @spec prepare_admitted_handoff(
           admission(),
-          Signal.t(),
+          term(),
           Jido.Instruction.t(),
           keyword(),
-          [Jido.Plugin.Spec.t()]
+          term()
         ) :: {:ok, Prepared.t()} | {:error, stage(), term()}
   def prepare_admitted_handoff(
         %{
@@ -362,8 +356,7 @@ defmodule Jido.Agent.Runner do
   end
 
   defp insert_reply(directives, reply) do
-    index = if match?(%ServerStop{}, List.last(directives)), do: -2, else: -1
-    List.insert_at(directives, index, reply)
+    directives ++ [reply]
   end
 
   defp select_output(%{source: :output, path: path}, output, mapping_path) do

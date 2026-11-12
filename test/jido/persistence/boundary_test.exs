@@ -87,7 +87,7 @@ defmodule Jido.Persistence.BoundaryTest do
   @tag obligation: "jido.persistence.I2"
   test "the key contains only the exact Ref tuple", c do
     ref = Agent.Ref.new!(namespace: "record-boundary", partition: "blue", id: c.agent.id)
-    assert "jido:agent:v1:" <> encoded = Persistence.agent_key(ref)
+    assert "jido:agent:v2:" <> encoded = Persistence.agent_key(ref)
 
     assert {ref.namespace, ref.partition, ref.id} ==
              encoded |> Base.url_decode64!(padding: false) |> :erlang.binary_to_term([:safe])
@@ -96,7 +96,7 @@ defmodule Jido.Persistence.BoundaryTest do
       ref = Agent.Ref.new!(namespace: "key", partition: nil, id: id)
       expected = :erlang.term_to_binary({ref.namespace, ref.partition, ref.id})
       expected = Base.url_encode64(expected, padding: false)
-      assert Persistence.agent_key(ref) == "jido:agent:v1:" <> expected
+      assert Persistence.agent_key(ref) == "jido:agent:v2:" <> expected
     end
   end
 
@@ -137,7 +137,7 @@ defmodule Jido.Persistence.BoundaryTest do
 
     assert Record.validate(nil, ref, Basic) == {:error, {:invalid_persistence_record, :shape}}
 
-    assert Record.validate(%{record | fmt: 2}, ref, Basic) ==
+    assert Record.validate(%{record | fmt: 3}, ref, Basic) ==
              {:error, {:invalid_persistence_record, :fmt}}
 
     for vsn <- [nil, 0, "1"] do
@@ -146,11 +146,11 @@ defmodule Jido.Persistence.BoundaryTest do
     end
 
     assert Record.kind(%{format: 99}) == :unknown
-    assert Record.kind(%{fmt: 1, kind: :active}) == :active
-    assert Record.kind(%{fmt: 1, kind: :tombstone}) == :tombstone
+    assert Record.kind(%{fmt: 2, kind: :active}) == :active
+    assert Record.kind(%{fmt: 2, kind: :tombstone}) == :tombstone
     assert Record.kind(%{kind: :active}) == :unknown
-    assert Record.kind(%{fmt: 1, kind: :unknown}) == :unknown
-    assert Record.kind(%{fmt: 1, kind: :future}) == :unknown
+    assert Record.kind(%{fmt: 2, kind: :unknown}) == :unknown
+    assert Record.kind(%{fmt: 2, kind: :future}) == :unknown
     assert Record.kind(%{format: 3, kind: :future}) == :unknown
     assert Record.kind(%{fmt: 3, kind: :active}) == :unknown
 
@@ -177,7 +177,7 @@ defmodule Jido.Persistence.BoundaryTest do
 
     for status <- [:running, :completed, :failed, :cancelled] do
       candidate = %{turn | status: status}
-      assert {:ok, record} = Record.build_active(c.agent, ref, 0, checkpoint, candidate)
+      assert {:ok, record} = Record.build_active(c.agent, ref, 0, 0, checkpoint, candidate)
       assert record.server_turn === candidate
       assert :ok = Record.validate(record, ref, Basic)
     end
@@ -188,7 +188,7 @@ defmodule Jido.Persistence.BoundaryTest do
                server_turn: turn
              )
 
-    assert {:ok, restored, 0, ^turn} =
+    assert {:ok, restored, 0, 0, ^turn} =
              Persistence.load_agent_with_server_turn(
                c.store,
                Basic,
@@ -199,7 +199,7 @@ defmodule Jido.Persistence.BoundaryTest do
     assert restored == c.agent
 
     assert {:ok, _record} =
-             Record.build_active(c.agent, ref, 0, checkpoint, %{turn | id: "x"})
+             Record.build_active(c.agent, ref, 0, 0, checkpoint, %{turn | id: "x"})
 
     invalid = [
       %{turn | id: ""},
@@ -216,7 +216,7 @@ defmodule Jido.Persistence.BoundaryTest do
 
     for candidate <- invalid do
       assert {:error, {:invalid_persistence_record, :server_turn}} =
-               Record.build_active(c.agent, ref, 0, checkpoint, candidate)
+               Record.build_active(c.agent, ref, 0, 0, checkpoint, candidate)
     end
 
     instruction = Jido.Instruction.new!(target: ReceiptAction, params: %{})
@@ -242,7 +242,7 @@ defmodule Jido.Persistence.BoundaryTest do
         ]
 
     for candidate <- accepted_candidates do
-      assert {:ok, record} = Record.build_active(c.agent, ref, 0, checkpoint, candidate)
+      assert {:ok, record} = Record.build_active(c.agent, ref, 0, 0, checkpoint, candidate)
       assert record.server_turn === candidate
     end
 
@@ -264,7 +264,7 @@ defmodule Jido.Persistence.BoundaryTest do
         ]
 
     for candidate <- released_candidates do
-      assert {:ok, record} = Record.build_active(c.agent, ref, 0, checkpoint, candidate)
+      assert {:ok, record} = Record.build_active(c.agent, ref, 0, 0, checkpoint, candidate)
       assert record.server_turn === candidate
     end
 
@@ -292,7 +292,7 @@ defmodule Jido.Persistence.BoundaryTest do
           Map.put(released, :extra, true)
         ] do
       assert {:error, {:invalid_persistence_record, :server_turn}} =
-               Record.build_active(c.agent, ref, 0, checkpoint, candidate)
+               Record.build_active(c.agent, ref, 0, 0, checkpoint, candidate)
     end
   end
 
@@ -301,7 +301,7 @@ defmodule Jido.Persistence.BoundaryTest do
     {:ok, checkpoint} = Jido.Persistence.snapshot(c.agent)
 
     ref = Agent.Ref.new!(namespace: "first", partition: "blue", id: c.agent.id)
-    {:ok, active} = Record.build_active(c.agent, ref, 0, checkpoint)
+    {:ok, active} = Record.build_active(c.agent, ref, 0, 0, checkpoint)
     tombstone = active |> Map.drop([:vsn, :checkpoint]) |> Map.put(:kind, :tombstone)
 
     changes = [
@@ -362,7 +362,7 @@ defmodule Jido.Persistence.BoundaryTest do
 
     record =
       %{
-        fmt: 1,
+        fmt: 2,
         namespace: namespace,
         kind: :active,
         agent_module: Basic,
@@ -370,16 +370,17 @@ defmodule Jido.Persistence.BoundaryTest do
         agent_id: c.agent.id,
         partition: "blue",
         rev: 0,
+        agent_rev: 0,
         checkpoint: checkpoint
       }
 
     created = :erlang.term_to_binary(record)
-    updated = :erlang.term_to_binary(%{record | rev: 1})
+    updated = :erlang.term_to_binary(%{record | rev: 1, agent_rev: 1})
 
     tombstone =
       record
       |> Map.drop([:vsn, :checkpoint])
-      |> Map.merge(%{kind: :tombstone, rev: 1})
+      |> Map.merge(%{kind: :tombstone, rev: 2, agent_rev: 1})
 
     deleted = :erlang.term_to_binary(tombstone)
     prefix = [:validate_options]

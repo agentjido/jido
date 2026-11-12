@@ -42,8 +42,8 @@ opts = [id: "report-agent", persistence: store]
   Keyword.put(opts, :persistence_mode, :create))
 :ok = Server.await_ready(server)
 {:ok, signal} = SavedAgent.request_signal(%{report_id: "report-42", topic: "OTP"})
-{:ok, agent, []} = Server.call(server, signal)
-# agent.state.status == :requested
+{:ok, %Server.TurnResult{status: :committed}} = Server.call(server, signal)
+# Server.snapshot(server).agent.state.status == :requested
 ```
 
 In a fresh BEAM, load the same code, start the same instance namespace, and use

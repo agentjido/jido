@@ -143,9 +143,10 @@ defmodule Jido.Agent.FlowEffectsTest do
   test "a Flow booking request runs only after the live state commit", %{jido: jido} do
     {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, BookingAgent)
 
-    assert {:ok, candidate, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(server, command_signal("flow"), context: %{observer: self()})
 
+    candidate = Server.snapshot(server).agent
     assert_receive {:submitted, "booking-1", snapshot}, 1_000
     assert snapshot == %{agent: candidate, state_version: 1}
     assert candidate.state.status == :submitting
@@ -167,7 +168,10 @@ defmodule Jido.Agent.FlowEffectsTest do
           command_signal("failed")
         ] do
       assert {:error, _} = Jido.Agent.cmd(initial.agent, command, context: %{observer: self()})
-      assert {:error, _} = Server.call(server, command, context: %{observer: self()})
+
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+               Server.call(server, command, context: %{observer: self()})
+
       assert Jido.Test.AgentServer.Assertions.committed(server) == initial
       # The call reply and snapshot are barriers after the failed Turn.
       refute_received {:submitted, _, _}
@@ -185,8 +189,10 @@ defmodule Jido.Agent.FlowEffectsTest do
     refute_received {:submitted, _, _}
     {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
 
-    assert {:ok, ^candidate, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(server, command_signal("multiple"), context: %{observer: self()})
+
+    assert Server.snapshot(server).agent == candidate
 
     assert_receive {:submitted, "first", first_snapshot}
     assert_receive {:submitted, "second", second_snapshot}

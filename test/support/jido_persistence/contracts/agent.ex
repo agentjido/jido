@@ -66,7 +66,7 @@ defmodule Jido.Test.Persistence.Contracts.Agent do
                  )
 
         assert :ok = Server.await_ready(server)
-        assert Server.snapshot(server).state_version == 0
+        assert Server.snapshot(server).agent_revision == 0
       end
 
       @tag persistence_contract: :agent

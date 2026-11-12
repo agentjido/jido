@@ -13,33 +13,36 @@ defmodule Jido.Examples.AI.RequestModesTest do
   alias Jido.Examples.AI.RequestModes
   alias Jido.Test.Examples.AIModel
 
-  test "call and submit commit replies while cast cannot commit a reply route", %{jido: jido} do
-    AIModel.expect_text("Offline answer.", 2)
+  test "call and submit return replies while cast discards its reply", %{jido: jido} do
+    AIModel.expect_text("Offline answer.", 3)
     assert {:ok, server} = RequestModes.start(jido, id: unique_id("request-modes"))
-    assert :ok = Server.await_ready(server)
+    assert :ok = Jido.AgentServer.await_ready(server)
 
-    assert {:ok, called, call_directives} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, reply: %Jido.Signal{}}} =
              Server.call(server, RequestModes.Agent.request_signal!(%{input: "call"}))
 
-    assert [%Jido.Agent.Directive.Reply{}] = call_directives
+    called = Server.snapshot(server).agent
 
     pending = Server.submit(server, RequestModes.Agent.request_signal!(%{input: "submit"}))
-    assert {:ok, submitted, submit_directives} = Server.await(pending)
-    assert [%Jido.Agent.Directive.Reply{}] = submit_directives
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, reply: %Jido.Signal{}}} =
+             Server.await(pending)
+
+    submitted = Server.snapshot(server).agent
 
     assert :ok = Server.cast(server, RequestModes.Agent.request_signal!(%{input: "cast"}))
-    assert :ok = Server.quiesce(server)
-    casted = Server.agent(server)
+    assert {:ok, _status} = Server.quiesce(server)
+    casted = Server.snapshot(server).agent
 
     assert called.state.session.thread.rev < submitted.state.session.thread.rev
-    assert submitted.state.session.thread.rev == casted.state.session.thread.rev
+    assert submitted.state.session.thread.rev < casted.state.session.thread.rev
 
     assistants =
       Enum.filter(casted.state.session.thread.entries, fn entry ->
         entry.kind == :ai_message and entry.payload["role"] == "assistant"
       end)
 
-    assert length(assistants) == 2
+    assert length(assistants) == 3
     assert :ok = Jido.stop_agent(jido, server)
   end
 end

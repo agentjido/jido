@@ -49,7 +49,7 @@ alias Jido.AgentServer, as: Server
 :ok = Server.await_ready(root)
 
 member_ids = fn root, name ->
-  root |> Server.members(name) |> Enum.map(&Server.agent(&1).id)
+  root |> Server.members(name) |> Enum.map(&Server.snapshot(&1).agent.id)
 end
 
 ["team/$topology/triage/1/initial"] = member_ids.(root, :triage)
@@ -90,7 +90,7 @@ When a member's server dies, its activation restarts it from its record. Its sib
 ```elixir
 alias Jido.AgentServer, as: Server
 
-triage_id = Server.agent(triage).id
+triage_id = Server.snapshot(triage).agent.id
 monitor = Process.monitor(triage)
 Process.exit(triage, :kill)
 
@@ -113,8 +113,8 @@ end
 
 new_triage = await_replacement.(root, :triage, triage)
 
-^triage_id = Server.agent(new_triage).id
-%{handled: 1} = Server.agent(new_triage).state
+^triage_id = Server.snapshot(new_triage).agent.id
+%{handled: 1} = Server.snapshot(new_triage).agent.state
 ```
 
 When a root's server or activation dies, the root restores first, then reconciles its members. The owned member activations restart, so member PIDs change. Each member reads its own record, so its ID, state, and any pending Flow Turn survive.
@@ -133,8 +133,8 @@ alias Jido.AgentServer, as: Server
 :ok = Server.await_ready(root)
 
 [thawed_triage] = Server.members(root, :triage)
-^triage_id = Server.agent(thawed_triage).id
-%{handled: 1} = Server.agent(thawed_triage).state
+^triage_id = Server.snapshot(thawed_triage).agent.id
+%{handled: 1} = Server.snapshot(thawed_triage).agent.state
 %{state_version: 1} = Server.snapshot(thawed_triage)
 ```
 

@@ -111,7 +111,7 @@ Read the record, hibernate the Agent, and thaw it. `Jido.thaw/4` starts a new pr
 {:ok, thawed} = Jido.thaw(AdaptersGuide.EtsJido, AdaptersGuide.Invoice, "inv-1001")
 :ok = Jido.AgentServer.await_ready(thawed)
 
-{stored.state, Jido.AgentServer.agent(thawed).state, Jido.AgentServer.snapshot(thawed).state_version}
+{stored.state, Jido.AgentServer.snapshot(thawed).agent.state, Jido.AgentServer.snapshot(thawed).agent_revision}
 ```
 
 The cell returns `{%{paid_cents: 250}, %{paid_cents: 250}, 1}`.
@@ -164,7 +164,7 @@ The instance is gone, but the record remains on disk. A new instance with the sa
 
 {:ok, restored} = Jido.thaw(AdaptersGuide.RestartedJido, AdaptersGuide.Invoice, "inv-2001")
 :ok = Jido.AgentServer.await_ready(restored)
-state = Jido.AgentServer.agent(restored).state
+state = Jido.AgentServer.snapshot(restored).agent.state
 
 :ok = Jido.stop_agent(AdaptersGuide.RestartedJido, restored)
 Supervisor.stop(AdaptersGuide.RestartedJido)

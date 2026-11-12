@@ -29,9 +29,10 @@ defmodule Jido.Examples.Persistence.RecoverableDeliveryTest do
 
     {:ok, route_signal_1} = Example.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
 
-    assert {:ok, committed, _directives} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Jido.AgentServer.call(server, route_signal_1, [])
 
+    committed = Server.snapshot(server).agent
     assert committed.state.delivery.pending == %{"effect-1" => 7}
     assert Sink.records(c.jido) == %{}
 
@@ -44,14 +45,14 @@ defmodule Jido.Examples.Persistence.RecoverableDeliveryTest do
     restored = start_example(c, id, :required)
 
     eventually(fn ->
-      Server.agent(restored).state.delivery == %{
+      Server.snapshot(restored).agent.state.delivery == %{
         pending: %{},
         completed: %{"effect-1" => 7}
       }
     end)
 
     assert Sink.records(c.jido) == %{"effect-1" => 7}
-    assert Server.snapshot(restored).state_version == 4
+    assert Server.snapshot(restored).agent_revision == 2
 
     assert :ok = Sink.deliver(c.jido, %Deliver{effect_id: "effect-1", value: 7})
     assert Sink.records(c.jido) == %{"effect-1" => 7}

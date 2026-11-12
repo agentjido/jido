@@ -88,7 +88,7 @@ alias Jido.AgentServer, as: Server
 
 :ok = Server.await_ready(server)
 
-revision = fn -> Server.snapshot(server).state_version end
+revision = fn -> Server.snapshot(server).agent_revision end
 
 0 = revision.()
 
@@ -110,7 +110,7 @@ revision = fn -> Server.snapshot(server).state_version end
 5 = revision.()
 %{status: :failed} = Server.status(server).durable_turn
 
-%{balance_cents: 750} = Server.agent(server).state
+%{balance_cents: 750} = Server.snapshot(server).agent.state
 ```
 
 A revision counts writes to the record. It does not count successful Turns, and an unchanged state can still produce a new revision. [Revisions and Conflicts](durable-revisions-and-conflicts.md) has the exact rules.
@@ -130,7 +130,7 @@ Two different things can start this path:
 - **OTP restarts within a live BEAM.** The activation supervisor restarts a killed AgentServer. The supervisor allows three restarts in five seconds and then stops the activation. The record stays intact.
 - **The application activates after BEAM loss.** Jido has no recovery scanner. Your application must know which Agents to activate, and it must call `Jido.activate_agent/4` or `Jido.thaw/4` for each one.
 
-Recovery never falls back to fresh state. A missing, deleted, or invalid record, or changed code, stops the activation with a reason. Only `Jido.activate_agent/4` and `persistence_mode: :restore_or_create` create a record, and only after a read returns `:not_found`.
+Recovery never falls back to fresh state. A missing, deleted, or invalid record, or changed code, stops the activation with a reason. `Jido.create_agent/4` is the durable creation boundary. It creates revision zero before it returns and does not start an activation.
 
 ## Who owns each responsibility
 

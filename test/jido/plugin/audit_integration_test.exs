@@ -34,16 +34,19 @@ defmodule Jido.Plugin.AuditIntegrationTest do
       Jido.Test.AgentServer.Assertions.start_agent(jido, Agent, id: unique_id("audit"))
 
     for event <- [:one, :two, :three] do
-      assert {:ok, _agent, _directives} =
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
                AgentServer.call(server, signal("audit.record", %{event: event}))
     end
 
     committed = Jido.Test.AgentServer.Assertions.committed(server)
     assert committed.agent.state.count == 3
     assert Enum.map(committed.agent.state.audit.records, & &1.event) == [:two, :three]
-    assert {:ok, committed.agent.state.audit} == AgentServer.plugin_state(server, Audit)
 
-    assert {:error, %Jido.Error.ValidationError{details: %{path: [:record, :event]}}} =
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :failed,
+              error: %Jido.Error.ValidationError{details: %{path: [:record, :event]}}
+            }} =
              AgentServer.call(server, signal("audit.record", %{event: <<5::3>>}))
 
     assert Jido.Test.AgentServer.Assertions.committed(server) == committed

@@ -34,7 +34,10 @@ defmodule Jido.Test.Agent.BasicSDKCase do
 
   def await_idle(server) do
     Jido.Test.Eventually.eventually(fn ->
-      Jido.AgentServer.status(server).phase == :idle
+      case Jido.AgentServer.status(server) do
+        %{work_state: :idle, effects: :none} -> true
+        _other -> false
+      end
     end)
   end
 end

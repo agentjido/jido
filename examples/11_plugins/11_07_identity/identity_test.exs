@@ -34,18 +34,23 @@ defmodule Jido.Examples.Plugins.IdentityTest do
     assert direct.state.accepted == 1
     assert direct.state.last_public_key == Base.encode16(peer_public, case: :lower)
 
-    assert {:ok, committed, _directives} = Server.call(agent_server, signed)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, reply: %Signal{} = reply}} =
+             Server.call(agent_server, signed)
+
+    committed = Server.snapshot(agent_server).agent
     assert committed.state.accepted == 1
     assert committed.state.last_public_key == Base.encode16(peer_public, case: :lower)
 
-    assert_receive %Signal{type: "examples.plugins.identity.accepted"} = reply
+    assert reply.type == "examples.plugins.identity.accepted"
     assert {:ok, _nonce} = Crypto.verify(reply, agent_public)
     assert SignalContext.get_trace(reply).causation_id == signed.id
 
-    assert {:error, :replayed_signal} = Server.call(agent_server, signed)
-    assert Server.agent(agent_server).state.accepted == 1
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: :replayed_signal}} =
+             Server.call(agent_server, signed)
 
-    activation = Server.activation(agent_server)
+    assert Jido.AgentServer.snapshot(agent_server).agent.state.accepted == 1
+
+    activation = Jido.Test.AgentServer.ExampleRuntime.activation(agent_server)
     old_runtime = Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Plugin)
     old_runtime_ref = Process.monitor(old_runtime)
     Process.exit(old_runtime, :kill)
@@ -60,11 +65,14 @@ defmodule Jido.Examples.Plugins.IdentityTest do
       end)
 
     agent_server = Jido.AgentServer.Supervisor.worker(activation)
-    assert :ok = Server.await_ready(agent_server)
+    assert :ok = Jido.AgentServer.await_ready(agent_server)
     assert Process.alive?(replacement_runtime)
-    assert {:ok, committed, _directives} = Server.call(agent_server, signed)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, reply: %Signal{}}} =
+             Server.call(agent_server, signed)
+
+    committed = Server.snapshot(agent_server).agent
     assert committed.state.accepted == 2
-    assert_receive %Signal{type: "examples.plugins.identity.accepted"}
 
     invalid_route =
       Signal.new!(
@@ -81,11 +89,16 @@ defmodule Jido.Examples.Plugins.IdentityTest do
                "identity-invalid-route"
              )
 
-    assert {:error, %Jido.Error.ValidationError{}} =
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :failed,
+              error: %Jido.Error.ValidationError{}
+            }} = Server.call(agent_server, admitted_then_invalid)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: :replayed_signal}} =
              Server.call(agent_server, admitted_then_invalid)
 
-    assert {:error, :replayed_signal} = Server.call(agent_server, admitted_then_invalid)
-    assert Server.agent(agent_server).state.accepted == 2
+    assert Jido.AgentServer.snapshot(agent_server).agent.state.accepted == 2
 
     assert {:ok, forged} =
              unsigned
@@ -93,7 +106,10 @@ defmodule Jido.Examples.Plugins.IdentityTest do
              |> Crypto.sign(peer_private, peer_public, "identity-forged")
 
     forged = %{forged | data: %{"challenge" => "changed-after-signing"}}
-    assert {:error, :invalid_signature} = Server.call(agent_server, forged)
-    assert Server.agent(agent_server).state.accepted == 2
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: :invalid_signature}} =
+             Server.call(agent_server, forged)
+
+    assert Jido.AgentServer.snapshot(agent_server).agent.state.accepted == 2
   end
 end

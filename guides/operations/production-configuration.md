@@ -66,7 +66,7 @@ Each limit below has a default. Decide on each one, because the right value depe
 
 Also set these per call or per Agent when the default does not fit:
 
-- `:admission_timeout` on `Jido.AgentServer.call/3` and `Jido.AgentServer.submit/3`, which defaults to 5,000 ms. See [Admission and Deadlines](../agent-servers/agent-server-admission.md).
+- `:admission_timeout` on `Jido.AgentServer.call/3` and `Jido.AgentServer.submit/3`, which defaults to 5,000 ms.
 - `:exec_opts` on an Agent, for retries and concurrency inside a Turn. See [Execution Policy](../actions/action-execution-policy.md).
 - `:error_policy` on an Agent, for its response to failed Turns. The default is `:log_only`. See [Agent Lifecycle](../agent-servers/agent-activation-control.md).
 
@@ -125,7 +125,7 @@ defmodule MyApp.AgentRecovery do
 end
 ```
 
-Activation is safe to repeat, because `Jido.activate_agent/4` returns the live process when the Agent is already running. A tombstone, an invalid record, or changed Agent code returns an error and does not create new state. See [Durable Agent Activation](../durability/durable-agent-activation.livemd).
+Activation is safe to repeat, because `Jido.activate_agent/3` returns the live process when the Agent is already running. A tombstone, an invalid record, or changed Agent code returns an error and does not create new state. See [Durable Agent Activation](../durability/durable-agent-activation.livemd).
 
 Run recovery after an instance restart as well as after a node restart. An instance that restarts comes back with no Agents. Put both children under a `:rest_for_one` supervisor so that a new instance also gets a new recovery run. [Shutdown and Recovery](shutdown-and-recovery.md#restart-agents-with-the-instance) has a full example.
 

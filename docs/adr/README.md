@@ -7,7 +7,7 @@ This directory records decisions that constrain the Jido V3 architecture. The [m
 | ADR | Status | Decision |
 |---|---|---|
 | [0001](0001-one-mix-project-and-one-otp-application.md) | Accepted | Keep one Mix project and one OTP application |
-| [0002](0002-restore-or-create-durable-agent-activation.md) | Accepted | Restore or create durable Agent activation |
+| [0002](0002-restore-or-create-durable-agent-activation.md) | Superseded | Restore or create durable Agent activation |
 | [0003](0003-atomic-inactive-agent-upgrade.md) | Accepted | Upgrade an inactive saved Agent atomically |
 
 | [0004](0004-passive-catalog-reference-resolution.md) | Accepted | Keep Catalog passive and resolve registered values for hydration |

@@ -13,7 +13,11 @@ defmodule Jido.Telemetry.PersistenceTest do
 
   defmodule UpgradeAction do
     use Jido.Action, name: "telemetry_reason_upgrade"
-    def run(%{snapshot: snapshot}, _context), do: {:ok, %{snapshot: snapshot}}
+
+    def run(%{snapshot: snapshot}, _context) do
+      agent = %{snapshot.agent | vsn: snapshot.agent.vsn + 1}
+      with {:ok, next} <- Jido.Persistence.snapshot(agent), do: {:ok, %{snapshot: next}}
+    end
   end
 
   defmodule AdapterSource do
@@ -252,7 +256,11 @@ defmodule Jido.Telemetry.PersistenceTest do
       instance = :"telemetry_reason_instance_#{System.unique_integer([:positive])}"
 
       start_supervised!(
-        {Jido, name: instance, namespace: "tests/#{instance}", persistence: {Jido.Persistence.ETS, table: table}}
+        {Jido,
+         name: instance,
+         namespace: "tests/#{instance}",
+         persistence: {Jido.Persistence.ETS, table: table},
+         activation: [idle_residency_timeout: 100]}
       )
 
       attach(self())
@@ -267,13 +275,12 @@ defmodule Jido.Telemetry.PersistenceTest do
       :ok = Jido.AgentServer.await_ready(pid)
       assert write_reason(id) == :activate
 
-      {:ok, _, _} =
+      {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
         Jido.AgentServer.call(pid, Jido.Signal.new!("runtime.record", %{event: :saved}, source: "/test"))
 
       assert write_reason(id) == :commit
       assert write_reason(id) == :commit
 
-      :ok = Jido.AgentServer.hibernate(pid)
       assert write_reason(id) == :hibernate
 
       assert {:ok, _upgraded, _revision} =

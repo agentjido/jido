@@ -32,12 +32,13 @@ repeat. Runic owns graph progress; there is no second step counter.
 | [14_05 Saved Completion](14_05_saved_completion/README.md) | Implemented | Restore completion after a lost storage reply without repeated work. |
 | [14_06 Durable Wait](14_06_durable_wait/README.md) | Implemented | Restore one suspended approval Flow with the same wait and deadline. |
 | [14_07 External Uncertainty](14_07_external_uncertainty/README.md) | Implemented | Repeat an interrupted provider call with the same operation ID. |
+| [14_08 Waterpark](14_08_waterpark/README.md) | Implemented | Many durable Agents activate, wait, wake, recover, and passivate in one Instance. |
 
-Numbers stay stable. The seven implemented lessons have runnable source and behavior tests.
+Numbers stay stable. The eight implemented lessons have runnable source and behavior tests.
 
 ## Proposed lessons
 
-Lessons 14_08–14_19 are proposal-only source documents. They are excluded from
+Lessons 14_09–14_19 are proposal-only source documents. They are excluded from
 the supported example tree and do not count as example coverage. The source
 manifest records this exclusion so the stable lesson IDs are not reused.
 
@@ -89,7 +90,7 @@ mix test.examples examples/14_durable_agents --warnings-as-errors
 ```
 
 Child BEAM tests need local sockets and `kill`. No credentials or external service
-are required. See the [durable activation decision](../../docs/adr/0002-restore-or-create-durable-agent-activation.md) and
-[Core tests](../../test/jido/agent_server/durable_turn/runtime_test.exs).
+are required. See the [durable Agent activation plan](../../docs/architecture/durable-agent-activation.md) and
+[activation contract tests](../../test/jido/agent_server/durable_activation_contract_test.exs).
 
 Previous: [Persistence](../13_persistence/README.md) | Next: [Saved Agent State](14_01_saved_agent/README.md)

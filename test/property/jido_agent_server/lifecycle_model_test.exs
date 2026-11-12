@@ -124,32 +124,32 @@ defmodule Jido.AgentServer.Property.LifecycleModelTest do
           case step do
             %{"mode" => "success", "by" => by} ->
               expected = %{count: model.count + by, history: model.history ++ [by]}
-              assert {:ok, next, []} = result
-              assert next.state == expected
+              assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} = result
+              assert Server.snapshot(server).agent.state == expected
               expected
 
             %{"mode" => mode} when mode in ~w(failure invalid_state invalid_directive) ->
-              assert {:error, error} = result
+              assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: error}} = result
               assert is_exception(error)
               model
           end
 
-        assert Server.agent(server).state == next_model
+        assert Server.snapshot(server).agent.state == next_model
         {next_model, MapSet.put(observations, step["mode"])}
       end)
 
-    assert Server.agent(server).state == expected
+    assert Server.snapshot(server).agent.state == expected
     monitor = Process.monitor(server)
-    assert :ok = Jido.hibernate(c.jido, server)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(server)
     assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 5_000
     assert Jido.whereis_agent(c.jido, id) == nil
 
     assert {:ok, restored} = Jido.thaw(c.jido, Counter, id, persistence: persistence)
     assert :ok = Server.await_ready(restored)
-    assert Server.agent(restored).state == expected
+    assert Server.snapshot(restored).agent.state == expected
     assert :ok = Jido.stop_agent(c.jido, restored)
     assert Jido.whereis_agent(c.jido, id) == nil
-    assert Jido.agent_count(c.jido) == 0
+    assert Jido.resident_agent_count(c.jido) == 0
 
     ["hibernate", "restore", "cleanup" | MapSet.to_list(observations)]
   end

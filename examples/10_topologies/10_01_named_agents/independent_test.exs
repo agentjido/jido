@@ -6,7 +6,6 @@ defmodule Jido.Examples.Topology.IndependentTest do
   @moduletag :integration
 
   import Jido.Test.AgentServer.TopologyAssertions
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.Independent
   alias Independent.Cell
 
@@ -17,22 +16,36 @@ defmodule Jido.Examples.Topology.IndependentTest do
     assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
 
     assert {:ok, decoded} =
-             Jido.Test.AgentServer.Registry.decode(Jason.decode!(Jason.encode!(document)), registry)
+             Jido.Test.AgentServer.Registry.decode(
+               Jason.decode!(Jason.encode!(document)),
+               registry
+             )
 
     assert decoded == definition
     server = start_topology(jido, decoded)
 
-    assert Enum.sort(Enum.map(members(server), &Server.agent(&1).state.label)) == [
-             "left",
-             "right"
-           ]
+    assert Enum.sort(Enum.map(members(server), &Jido.AgentServer.snapshot(&1).agent.state.label)) ==
+             [
+               "left",
+               "right"
+             ]
 
     [left] = labeled(server, "left")
-    assert {:ok, %{cron: %{}}} = Server.plugin_state(left, Jido.Plugin.Scheduler)
+
+    assert {:ok, %{cron: %{}}} =
+             Jido.Test.AgentServer.ExampleRuntime.plugin_state(left, Jido.Plugin.Scheduler)
+
     {:ok, schedule} = Cell.schedule_signal(%{value: 4})
-    assert {:ok, _, [_]} = Server.call(left, schedule)
-    eventually(fn -> Server.agent(left).state.total == 4 end)
-    assert Server.agent(left).state.received == 1
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(left, schedule)
+
+      assert turn_result.status in [:committed, :waiting]
+    )
+
+    eventually(fn -> Jido.AgentServer.snapshot(left).agent.state.total == 4 end)
+    assert Jido.AgentServer.snapshot(left).agent.state.received == 1
     stop_topology(server)
   end
 
@@ -40,12 +53,19 @@ defmodule Jido.Examples.Topology.IndependentTest do
     server = start_topology(jido, Independent)
     [left] = labeled(server, "left")
     [right] = labeled(server, "right")
-    assert Jido.agent_count(jido) == 3
-    assert Server.agent(left).id != Server.agent(right).id
-    before = Server.snapshot(right)
+    assert Jido.resident_agent_count(jido) == 3
+    assert Jido.AgentServer.snapshot(left).agent.id != Jido.AgentServer.snapshot(right).agent.id
+    before = Jido.AgentServer.snapshot(right)
 
     assert {:ok, work} = Cell.work_signal(%{value: 4})
-    assert {:ok, changed, []} = Server.call(left, work)
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(left, work)
+
+      assert turn_result.status in [:committed, :waiting]
+      changed = Jido.AgentServer.snapshot(left).agent
+    )
 
     assert Map.take(changed.state, [:label, :received, :total]) == %{
              label: "left",
@@ -53,15 +73,15 @@ defmodule Jido.Examples.Topology.IndependentTest do
              total: 4
            }
 
-    assert Server.snapshot(right) == before
+    assert Jido.AgentServer.snapshot(right) == before
     stop_topology(server)
-    assert Jido.agent_count(jido) == 0
+    assert Jido.resident_agent_count(jido) == 0
   end
 
   test "stopping the owner stops all member runtimes", %{jido: jido} do
     server = start_topology(jido, Independent)
     assert length(members(server)) == 2
     stop_topology(server)
-    assert Jido.agent_count(jido) == 0
+    assert Jido.resident_agent_count(jido) == 0
   end
 end

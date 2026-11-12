@@ -3,8 +3,6 @@ Code.require_file("prepared_input.ex", __DIR__)
 defmodule Jido.Examples.Plugins.PreparedInputTest do
   use Jido.Test.Case, async: true
   @moduletag :integration
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Plugins.PreparedInput.Agent
   alias Jido.Signal
 
@@ -23,7 +21,15 @@ defmodule Jido.Examples.Plugins.PreparedInputTest do
 
     live = Agent.instantiate!(id: unique_id("prepared-live"))
     {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, live)
-    assert {:ok, live, _directives} = Server.call(server, source)
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, source)
+
+      assert turn_result.status in [:committed, :waiting]
+      live = Jido.AgentServer.snapshot(server).agent
+    )
+
     assert live.state.tenant == "acme"
     assert live.state.last_signal_id == source.id
     assert live.state.last_subject == source.subject

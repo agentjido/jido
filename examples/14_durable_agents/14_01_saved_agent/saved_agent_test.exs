@@ -22,35 +22,44 @@ defmodule Jido.Examples.Durable.SavedAgentTest do
     {writer, writer_node} = start_beam()
     server = start_agent(writer, id, persistence, :create)
     assert {:ok, request} = Example.request_signal(%{report_id: "report-42", topic: "  OTP  "})
-    assert {:ok, accepted, []} = :peer.call(writer, Server, :call, [server, request])
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             :peer.call(writer, Server, :call, [server, request])
+
     snapshot = :peer.call(writer, Server, :snapshot, [server])
-    assert snapshot == %{agent: accepted, state_version: 2}
+    accepted = snapshot.agent
+    assert snapshot.agent_revision == 1
     assert accepted.state == %{report_id: "report-42", topic: "OTP", status: :requested}
 
     # A rejected Turn cannot replace the last confirmed request.
-    assert {:error, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
              :peer.call(writer, Server, :call, [
                server,
                %{request | data: %{report_id: "invalid", topic: "   "}}
              ])
 
     failed_snapshot = :peer.call(writer, Server, :snapshot, [server])
-    assert failed_snapshot == %{agent: accepted, state_version: 4}
+    assert failed_snapshot.agent == accepted
+    assert failed_snapshot.agent_revision == 1
 
     Peer.kill(writer)
     {reader, reader_node} = start_beam()
     assert reader_node != writer_node
     restored = start_agent(reader, id, persistence, :restore)
-    assert :peer.call(reader, Server, :snapshot, [restored]) == failed_snapshot
+    restored_snapshot = :peer.call(reader, Server, :snapshot, [restored])
+    assert restored_snapshot.agent == failed_snapshot.agent
+    assert restored_snapshot.agent_revision == failed_snapshot.agent_revision
 
     # Restore preserves the domain guard, but adds no command receipt protocol.
-    assert {:error, _} = :peer.call(reader, Server, :call, [restored, request])
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+             :peer.call(reader, Server, :call, [restored, request])
 
-    assert :peer.call(reader, Server, :snapshot, [restored]) ==
-             %{agent: accepted, state_version: 6}
+    final_snapshot = :peer.call(reader, Server, :snapshot, [restored])
+    assert final_snapshot.agent == accepted
+    assert final_snapshot.agent_revision == 1
 
     assert :ok = :peer.call(reader, Jido, :stop_agent, [@instance, restored])
-    assert :peer.call(reader, Jido, :agent_count, [@instance]) == 0
+    assert :peer.call(reader, Jido, :resident_agent_count, [@instance]) == 0
     Peer.stop(reader)
   end
 

@@ -89,7 +89,13 @@ defmodule SystemTests.Case do
     namespace = "system-tests/#{unique}"
     store = {Jido.Persistence.ETS, table: :"system_tests_store_#{unique}"}
 
-    start_supervised!({Jido, name: jido, namespace: namespace, persistence: store})
+    start_supervised!(
+      {Jido,
+       name: jido,
+       namespace: namespace,
+       persistence: store,
+       agent_server: [default_dispatch: {:noop, []}]}
+    )
     %{jido: jido, namespace: namespace, store: store}
   end
 
@@ -135,8 +141,8 @@ defmodule SystemTests.IsolationTest do
     {:ok, _agent, _directives} = Server.call(first, add_signal("sku-1"))
 
     assert first != second
-    assert Server.agent(first).state.items == ["sku-1"]
-    assert Server.agent(second).state.items == []
+    assert Server.snapshot(first).agent.state.items == ["sku-1"]
+    assert Server.snapshot(second).agent.state.items == []
     assert Jido.list_agents(other) == [{"order-1", second}]
   end
 end
@@ -222,8 +228,8 @@ defmodule SystemTests.CrashTest do
         end
       end)
 
-    assert Server.agent(restarted).state.items == ["sku-1"]
-    assert Server.status(restarted).state_version == 1
+    assert Server.snapshot(restarted).agent.state.items == ["sku-1"]
+    assert Server.status(restarted).agent_revision == 1
   end
 
   test "repeated crashes stop the activation", %{jido: jido} do
@@ -265,20 +271,27 @@ defmodule SystemTests.RestartTest do
   test "a durable Agent survives an instance restart", context do
     %{jido: jido, namespace: namespace, store: store} = context
     {:ok, ref} = Jido.agent_ref(jido, "order-1")
+    {:ok, ^ref} = Jido.create_agent(jido, ref, Order)
 
-    {:ok, server} = Jido.activate_agent(jido, ref, Order, default_dispatch: {:noop, []})
+    {:ok, server} = Jido.activate_agent(jido, ref, Order)
     :ok = Server.await_ready(server)
     {:ok, _agent, _directives} = Server.call(server, add_signal("sku-1"))
 
     stop_supervised!(jido)
     assert {:error, _reason} = Jido.agent_ref(jido, "order-1")
 
-    start_supervised!({Jido, name: jido, namespace: namespace, persistence: store})
+    start_supervised!(
+      {Jido,
+       name: jido,
+       namespace: namespace,
+       persistence: store,
+       agent_server: [default_dispatch: {:noop, []}]}
+    )
 
-    {:ok, server} = Jido.activate_agent(jido, ref, Order, default_dispatch: {:noop, []})
+    {:ok, server} = Jido.activate_agent(jido, ref, Order)
     :ok = Server.await_ready(server)
 
-    assert Server.agent(server).state.items == ["sku-1"]
+    assert Server.snapshot(server).agent.state.items == ["sku-1"]
   end
 end
 

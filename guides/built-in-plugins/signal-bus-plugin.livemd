@@ -86,9 +86,9 @@ Publish one Signal inside the path and one outside it. Only the first starts a T
     Jido.Signal.new!("invoice.sent", %{invoice_id: "inv-7"}, source: "/billing")
   ])
 
-:ok = BusGuide.Wait.until(fn -> Jido.AgentServer.agent(desk).state.order_ids == ["ord-100"] end)
+:ok = BusGuide.Wait.until(fn -> Jido.AgentServer.snapshot(desk).agent.state.order_ids == ["ord-100"] end)
 
-Jido.AgentServer.agent(desk).state.order_ids
+Jido.AgentServer.snapshot(desk).agent.state.order_ids
 # => ["ord-100"]
 ```
 
@@ -182,10 +182,10 @@ first = captured.("ord-200")
 
 :ok =
   BusGuide.Wait.until(fn ->
-    Jido.AgentServer.agent(payments).state.paid == ["ord-200", "ord-201"]
+    Jido.AgentServer.snapshot(payments).agent.state.paid == ["ord-200", "ord-201"]
   end)
 
-{:ets.lookup(:bus_guide_attempts, "ord-200"), Jido.AgentServer.agent(payments).state.paid}
+{:ets.lookup(:bus_guide_attempts, "ord-200"), Jido.AgentServer.snapshot(payments).agent.state.paid}
 # => {[{"ord-200", 2}], ["ord-200", "ord-201"]}
 ```
 
@@ -200,7 +200,7 @@ Publish the first Signal again, with the same ID. The Turn succeeds and the stat
   end)
 
 :ok = Jido.AgentServer.await_ready(payments)
-Jido.AgentServer.agent(payments).state.paid
+Jido.AgentServer.snapshot(payments).agent.state.paid
 # => ["ord-200", "ord-201"]
 ```
 
@@ -247,8 +247,8 @@ end
     Jido.Signal.new!("shipment.sent", %{tracking: "1Z-42"}, source: "/warehouse")
   ])
 
-:ok = BusGuide.Wait.until(fn -> Jido.AgentServer.agent(shipping).state.tracking == ["1Z-42"] end)
-Jido.AgentServer.agent(shipping).state.tracking
+:ok = BusGuide.Wait.until(fn -> Jido.AgentServer.snapshot(shipping).agent.state.tracking == ["1Z-42"] end)
+Jido.AgentServer.snapshot(shipping).agent.state.tracking
 # => ["1Z-42"]
 ```
 

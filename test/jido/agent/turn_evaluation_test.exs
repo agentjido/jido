@@ -69,7 +69,11 @@ defmodule Jido.Agent.PreparedEvaluationTest do
     assert direct.state == %{count: 1, history: ["route"]}
 
     assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
-    assert {:ok, live, _} = Jido.AgentServer.call(server, source)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Jido.AgentServer.call(server, source)
+
+    live = Jido.AgentServer.snapshot(server).agent
     assert live.state == direct.state
   end
 

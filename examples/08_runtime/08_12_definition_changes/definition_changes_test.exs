@@ -1,45 +1,52 @@
 Code.require_file("definition_changes.ex", __DIR__)
 
 defmodule Jido.Examples.Runtime.DefinitionChangesTest do
-  use Jido.Test.Case, async: true
+  use ExUnit.Case, async: false
   @moduletag :integration
 
-  alias Jido.AgentServer, as: Server
+  alias Jido.Agent.Ref
+  alias Jido.AgentServer.{Snapshot, TurnResult}
   alias Jido.Examples.DefinitionChanges, as: Example
-  import Jido.Test.Eventually
 
-  test "a whole-definition upgrade keeps the Ref and replaces the PID", %{jido: jido} do
-    agent = Example.V1.instantiate!(id: unique_id("definition-upgrade"), state: %{count: 2})
-    {:ok, server} = Jido.start_agent(jido, agent)
-    assert :ok = Server.await_ready(server)
-    {:ok, ref} = Jido.agent_ref(jido, agent.id)
-    {document, catalog} = Example.upgrade_input()
+  setup do
+    id = System.unique_integer([:positive])
+    instance = :"definition_upgrade_#{id}"
+    namespace = "examples/definition-upgrade/#{id}"
+    table = :"definition_upgrade_store_#{id}"
 
-    assert {:ok, upgraded, []} =
-             Server.upgrade(server, document, catalog: catalog, migrate: Example.Migrate)
+    start_supervised!(
+      {Jido, name: instance, namespace: namespace, persistence: {Jido.Persistence.ETS, table: table}},
+      id: instance
+    )
 
-    assert upgraded.module == Example.V2
-    assert upgraded.vsn == 2
-    assert upgraded.state == %{total: 12}
+    ref = Ref.new!(namespace: namespace, id: "document")
+    agent = Example.V1.instantiate!(id: ref.id, state: %{count: 2})
+    {:ok, ^ref} = Jido.create_agent(instance, ref, agent)
+    %{instance: instance, ref: ref}
+  end
 
-    replacement =
-      eventually(fn ->
-        case Jido.resolve_agent(jido, ref) do
-          {:ok, pid} when pid != server -> pid
-          _ -> nil
-        end
-      end)
+  test "an Instance-owned definition upgrade keeps the Ref and replaces the activation", c do
+    assert {:ok, first} = Jido.activate_agent(c.instance, c.ref)
 
-    refute Process.alive?(server)
-    assert :ok = Server.await_ready(replacement)
-    assert %{agent: ^upgraded, state_version: 1} = Server.snapshot(replacement)
+    assert {:ok, c.ref} ==
+             Jido.upgrade_agent(c.instance, c.ref, Example.AdvanceVersion)
 
-    assert {:ok, next, []} = Jido.call(jido, ref, Example.increment_signal())
-    assert next.state == %{total: 13}
+    assert {:ok, replacement} = Jido.activate_agent(c.instance, c.ref)
+    refute replacement == first
+
+    assert %Snapshot{
+             agent: %{module: Example.V1, vsn: 2, state: %{count: 2}},
+             agent_revision: 1
+           } = Jido.AgentServer.snapshot(replacement)
+
+    assert {:ok, %TurnResult{status: :committed, agent_revision: 2}} =
+             Jido.call(c.instance, c.ref, Example.increment_signal())
+
+    assert %{count: 3} == Jido.AgentServer.snapshot(replacement).agent.state
   end
 
   test "normal work changes state but not the definition" do
-    agent = Example.V1.instantiate!(id: unique_id("fixed-definition"))
+    agent = Example.V1.instantiate!(id: "fixed-definition")
     definition = Jido.Agent.definition(agent)
 
     assert {:ok, changed, []} = Jido.Agent.cmd(agent, Example.increment_signal())

@@ -127,10 +127,10 @@ An AgentServer delivers an `Emit` with no dispatch by looking for connections, t
 # The follow-up Turn runs after the first Turn commits, so wait for it.
 Enum.find(1..100, fn _attempt ->
   Process.sleep(10)
-  Jido.AgentServer.agent(server).state.sent == 1
+  Jido.AgentServer.snapshot(server).agent.state.sent == 1
 end)
 
-%{sent: 1, closed: ["o-2"]} = Jido.AgentServer.agent(server).state
+%{sent: 1, closed: ["o-2"]} = Jido.AgentServer.snapshot(server).agent.state
 ```
 
 ## How a batch runs

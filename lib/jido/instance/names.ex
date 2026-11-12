@@ -34,6 +34,10 @@ defmodule Jido.Instance.Names do
   def runtime_store(instance) when is_atom(instance), do: Module.concat(instance, RuntimeStore)
 
   @doc false
+  @spec wake(atom()) :: atom()
+  def wake(instance) when is_atom(instance), do: Module.concat(instance, Wake)
+
+  @doc false
   @spec partition_key(term(), term() | nil) :: term()
   def partition_key(value, nil), do: value
   def partition_key(value, partition), do: {:partition, partition, value}

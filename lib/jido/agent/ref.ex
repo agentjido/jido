@@ -124,10 +124,10 @@ defmodule Jido.Agent.Ref do
   end
 
   @doc false
-  @spec startup_options(t(), term()) ::
+  @spec operation_options(t(), term(), String.t()) ::
           {:ok, keyword()} | {:error, Error.ValidationError.t()}
-  def startup_options(%__MODULE__{} = ref, opts) do
-    with :ok <- validate_option_list(opts, "Agent Ref startup options"),
+  def operation_options(%__MODULE__{} = ref, opts, label) when is_binary(label) do
+    with :ok <- validate_option_list(opts, label),
          :ok <- matching_option(opts, :id, ref.id),
          :ok <- matching_option(opts, :partition, ref.partition) do
       {:ok,

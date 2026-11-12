@@ -12,11 +12,18 @@ defmodule Jido.Examples.Workflow.NestedFlowTest do
 
     {:ok, route_signal_1} = Example.draft_and_review_signal(%{text: "draft"})
 
-    assert {:ok, agent, _directives} =
-             Jido.AgentServer.call(server, route_signal_1, context: %{request: "shared"})
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_1, context: %{request: "shared"})
+
+      assert turn_result.status in [:committed, :waiting]
+      agent = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert agent.state.result == %{text: "draft:writer:editor", request: "shared"}
-    assert Server.snapshot(server) == %{agent: agent, state_version: before.state_version + 1}
+    snapshot = Server.snapshot(server)
+    assert snapshot.agent == agent
+    assert snapshot.agent_revision == before.agent_revision + 1
   end
 
   test "parent and child input contracts preserve prior state", %{jido: jido} do
@@ -24,21 +31,25 @@ defmodule Jido.Examples.Workflow.NestedFlowTest do
 
     {:ok, route_signal_2} = Example.draft_and_review_signal(%{text: "seed"})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(server, route_signal_2, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_2, [])
+
+      assert turn_result.status in [:committed, :waiting]
+    )
 
     before = Server.snapshot(server)
 
     {:ok, route_signal_3} = Example.draft_and_review_signal(%{text: 42})
 
-    assert {:error, parent_error} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: parent_error}} =
              Jido.AgentServer.call(server, route_signal_3, [])
 
     assert %Jido.Error.ValidationError{details: %{phase: :flow_input}} = parent_error
 
     {:ok, route_signal_4} = Example.draft_and_review_signal(%{text: ""})
 
-    assert {:error, child_error} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: child_error}} =
              Jido.AgentServer.call(server, route_signal_4, [])
 
     assert Enum.any?(errors(child_error), &(&1.type == :validation_error))
@@ -50,8 +61,13 @@ defmodule Jido.Examples.Workflow.NestedFlowTest do
 
     {:ok, route_signal_5} = Example.draft_and_review_signal(%{text: "plain"})
 
-    assert {:ok, agent, _directives} =
-             Jido.AgentServer.call(server, route_signal_5, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_5, [])
+
+      assert turn_result.status in [:committed, :waiting]
+      agent = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert agent.state.result == %{text: "plain:writer:editor", request: "none"}
   end

@@ -108,7 +108,7 @@ The cell returns `4`: the owner, the auditor, and two packers. An Agent with mem
 {:ok, pack} = TopologyGuide.Packer.pack_signal(%{items: 4})
 {:ok, _committed, []} = Jido.AgentServer.call(first_packer, pack)
 
-Enum.map([auditor | packers], &Jido.AgentServer.agent(&1).state)
+Enum.map([auditor | packers], &Jido.AgentServer.snapshot(&1).agent.state)
 ```
 
 Only the first packer changed:
@@ -150,7 +150,7 @@ end
 {:ok, conveyor} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Conveyor, id: "conveyor-1")
 :ok = Jido.AgentServer.await_ready(conveyor)
 
-Jido.AgentServer.members(conveyor, :lanes) |> Enum.map(&Jido.AgentServer.agent(&1).state.lane)
+Jido.AgentServer.members(conveyor, :lanes) |> Enum.map(&Jido.AgentServer.snapshot(&1).agent.state.lane)
 ```
 
 The cell returns `[1, 2]`.

@@ -211,9 +211,9 @@ defmodule TestingGuide.LiveTest do
     {:ok, server} = Jido.start_agent(TestingGuide.Instance, TicketAgent, id: "t-live")
     :ok = AgentServer.await_ready(server)
 
-    assert {:ok, committed, []} = AgentServer.call(server, signal)
-    assert committed.state == pure.state
-    assert %{state_version: 1} = AgentServer.snapshot(server)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} = AgentServer.call(server, signal)
+    assert AgentServer.snapshot(server).agent.state == pure.state
+    assert %{agent_revision: 1} = AgentServer.snapshot(server)
   end
 end
 ```

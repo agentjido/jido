@@ -76,9 +76,9 @@ end
 The timer starts with the Plugin, and the first tick arrives one interval later. Wait for a few beats and read the state:
 
 ```elixir
-:ok = HeartbeatGuide.Wait.until(fn -> Jido.AgentServer.agent(monitor).state.beats >= 3 end)
+:ok = HeartbeatGuide.Wait.until(fn -> Jido.AgentServer.snapshot(monitor).agent.state.beats >= 3 end)
 
-Jido.AgentServer.agent(monitor).state.last
+Jido.AgentServer.snapshot(monitor).agent.state.last
 # => %{type: "jido.agent.heartbeat", source: "/plugin/heartbeat", input: %{check: "disk"}}
 ```
 
@@ -134,9 +134,9 @@ The Heartbeat options belong to the AgentServer side of the Plugin, so you can o
   )
 
 :ok = Jido.AgentServer.await_ready(sweeper)
-:ok = HeartbeatGuide.Wait.until(fn -> length(Jido.AgentServer.agent(sweeper).state.sweeps) >= 2 end)
+:ok = HeartbeatGuide.Wait.until(fn -> length(Jido.AgentServer.snapshot(sweeper).agent.state.sweeps) >= 2 end)
 
-Jido.AgentServer.agent(sweeper).state.sweeps |> Enum.take(2)
+Jido.AgentServer.snapshot(sweeper).agent.state.sweeps |> Enum.take(2)
 # => [50, 50]
 ```
 
@@ -159,7 +159,7 @@ An invalid value fails the Agent definition with the message "Heartbeat Plugin o
 
 - The Plugin casts each tick to the Agent, so it does not wait for the Turn. A Turn longer than the interval leaves ticks queued behind it. Excess casts are dropped and logged at the postponed Turn limit.
 - The next tick is scheduled after the previous one is sent. The interval is a delay between ticks, not a wall-clock alignment. Use [Schedules](scheduler.livemd) for work that must land on a clock slot.
-- A tick with no matching route fails its Turn at every interval. Under the default `:log_only` error policy, each failure logs a warning and raises `error_count` in `Jido.AgentServer.status/2`. Under `:stop_on_error`, the first one stops the Agent.
+- A tick with no matching route fails its Turn at every interval. Under the default `:log_only` error policy, each failure logs a warning and appears in `last_outcome` from `Jido.AgentServer.status/2`. Under `:stop_on_error`, the first one stops the Agent.
 - Each tick is a fresh Signal with a new ID.
 - The timer holds nothing durable. After a restart it starts over, and ticks that fell in the gap are not sent.
 

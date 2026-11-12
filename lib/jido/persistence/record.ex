@@ -6,9 +6,9 @@ defmodule Jido.Persistence.Record do
   alias Jido.Error
   alias Jido.Codec.Term
 
-  @format_version 1
-  @key_prefix "jido:agent:v1:"
-  @common_keys [:fmt, :kind, :namespace, :agent_module, :agent_id, :partition, :rev]
+  @format_version 2
+  @key_prefix "jido:agent:v2:"
+  @common_keys [:fmt, :kind, :namespace, :agent_module, :agent_id, :partition, :rev, :agent_rev]
   @active_keys @common_keys ++ [:vsn, :checkpoint]
 
   def format_version, do: @format_version
@@ -27,11 +27,18 @@ defmodule Jido.Persistence.Record do
   end
 
   @doc false
-  @spec build_active(Agent.t(), Ref.t(), non_neg_integer(), map()) ::
+  @spec build_active(Agent.t(), Ref.t(), non_neg_integer(), non_neg_integer(), map()) ::
           {:ok, map()} | {:error, term()}
-  @spec build_active(Agent.t(), Ref.t(), non_neg_integer(), map(), map() | nil) ::
+  @spec build_active(Agent.t(), Ref.t(), non_neg_integer(), non_neg_integer(), map(), map() | nil) ::
           {:ok, map()} | {:error, term()}
-  def build_active(%Agent{} = agent, %Ref{} = ref, revision, checkpoint, server_turn \\ nil) do
+  def build_active(
+        %Agent{} = agent,
+        %Ref{} = ref,
+        revision,
+        agent_revision,
+        checkpoint,
+        server_turn \\ nil
+      ) do
     record = %{
       fmt: @format_version,
       kind: :active,
@@ -41,6 +48,7 @@ defmodule Jido.Persistence.Record do
       agent_id: agent.id,
       partition: ref.partition,
       rev: revision,
+      agent_rev: agent_revision,
       checkpoint: checkpoint
     }
 
@@ -51,8 +59,9 @@ defmodule Jido.Persistence.Record do
   end
 
   @doc false
-  @spec build_tombstone(Ref.t(), module(), non_neg_integer()) :: {:ok, map()} | {:error, term()}
-  def build_tombstone(%Ref{} = ref, agent_module, revision) do
+  @spec build_tombstone(Ref.t(), module(), non_neg_integer(), non_neg_integer()) ::
+          {:ok, map()} | {:error, term()}
+  def build_tombstone(%Ref{} = ref, agent_module, revision, agent_revision) do
     record = %{
       fmt: @format_version,
       kind: :tombstone,
@@ -60,7 +69,8 @@ defmodule Jido.Persistence.Record do
       agent_module: agent_module,
       agent_id: ref.id,
       partition: ref.partition,
-      rev: revision
+      rev: revision,
+      agent_rev: agent_revision
     }
 
     with :ok <- validate(record, ref, agent_module),
@@ -112,6 +122,10 @@ defmodule Jido.Persistence.Record do
   @doc false
   @spec revision(map()) :: term()
   def revision(record), do: Map.get(record, :rev)
+
+  @doc false
+  @spec agent_revision(map()) :: term()
+  def agent_revision(record), do: Map.get(record, :agent_rev)
 
   @doc false
   @spec checkpoint(map()) :: term()
@@ -175,10 +189,12 @@ defmodule Jido.Persistence.Record do
 
   defp validate_revision(record) do
     revision = revision(record)
+    agent_revision = agent_revision(record)
 
-    if is_integer(revision) and revision >= 0,
-      do: :ok,
-      else: invalid(:rev)
+    if is_integer(revision) and revision >= 0 and is_integer(agent_revision) and
+         agent_revision >= 0 and agent_revision <= revision,
+       do: :ok,
+       else: invalid(:rev)
   end
 
   defp validate_kind_fields(%{kind: :active} = record), do: validate_active(record)
@@ -193,7 +209,7 @@ defmodule Jido.Persistence.Record do
   defp validate_server_turn(nil), do: :ok
 
   defp validate_server_turn(turn) do
-    case Jido.AgentServer.DurableTurn.Continuation.validate(turn) do
+    case Jido.Durable.Continuation.validate(turn) do
       :ok -> :ok
       {:error, _reason} -> invalid(:server_turn)
     end

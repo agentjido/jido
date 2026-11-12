@@ -284,7 +284,7 @@ defmodule PluginTestGuide.LiveTest do
     assert status.last_outcome.status == :succeeded
     assert status.last_effect_outcome.status == :failed
     assert status.last_effect_outcome.stage == :after_commit
-    assert Server.agent(server) == saved
+    assert Server.snapshot(server).agent == saved
     refute_received {:note, _text}
   end
 
@@ -294,7 +294,7 @@ defmodule PluginTestGuide.LiveTest do
     assert_receive {:committed, 1, 1}, 1_000
     wait_for_idle(server)
 
-    agent_id = Server.agent(server).id
+    agent_id = Server.snapshot(server).agent.id
     monitor = Process.monitor(server)
     Process.exit(runtime(server), :kill)
     assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000

@@ -20,11 +20,11 @@ between `examples/` and a chapter.
 | [`11_plugins`](11_plugins/README.md) | Plugin mechanics | 8 |
 | [`12_plugin_applications`](12_plugin_applications/README.md) | Plugin applications | 5 |
 | [`13_persistence`](13_persistence/README.md) | Persistence | 8 |
-| [`14_durable_agents`](14_durable_agents/README.md) | Durable Agents | 7 |
+| [`14_durable_agents`](14_durable_agents/README.md) | Durable Agents | 8 |
 | [`15_ai_basics`](15_ai_basics/README.md) | AI basics | 9 |
 | [`16_ai_conversations`](16_ai_conversations/README.md) | AI conversations and sessions | 5 |
 
-The offline catalog has 114 lessons. The graph-first chapter also has one
+The offline catalog has 115 lessons. The graph-first chapter also has one
 opt-in live-provider lesson. Each chapter README lists its lessons in order.
 
 The machine-readable register is

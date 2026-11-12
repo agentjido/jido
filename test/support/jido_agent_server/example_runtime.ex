@@ -7,11 +7,27 @@ defmodule Jido.Test.AgentServer.ExampleRuntime do
          do: {:ok, server}
   end
 
+  @doc false
+  def activation(server) do
+    {_phase, data} = :sys.get_state(server)
+    data.activation
+  end
+
+  @doc false
+  def plugin_state(server, plugin, timeout \\ 5_000) do
+    Jido.AgentServer.Worker.plugin_state(server, plugin, timeout)
+  end
+
   # Inspect the current OTP root, not the Agent relationship map.
   def plugin(activation, module) do
-    case List.keyfind(Supervisor.which_children(activation), {:plugin, module}, 0) do
+    plugin_supervisor = Jido.AgentServer.Supervisor.plugin_supervisor(activation)
+
+    case plugin_supervisor &&
+           List.keyfind(Supervisor.which_children(plugin_supervisor), {:plugin, module}, 0) do
       {_, pid, _, _} when is_pid(pid) -> pid
       _ -> nil
     end
+  catch
+    :exit, _reason -> nil
   end
 end

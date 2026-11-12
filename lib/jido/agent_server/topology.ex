@@ -3,7 +3,7 @@ defmodule Jido.AgentServer.Topology do
   use GenServer
   alias Jido.Agent
   alias Jido.Agent.Topology, as: AgentTopology
-  alias Jido.AgentServer, as: Server
+  alias Jido.AgentServer.Worker, as: Server
   alias Jido.AgentServer.{Lifecycle, Effects}
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
   alias Jido.Signal
@@ -14,7 +14,6 @@ defmodule Jido.AgentServer.Topology do
   @self_emit_hops "jidoselfemithops"
   @max_self_emit_hops 32
   @child_options ~w(placement on_parent_exit orphan_dispatch restart server_options meta)a
-  @adoption_options ~w(placement on_parent_exit orphan_dispatch restart meta)a
 
   def start_link(args), do: GenServer.start_link(__MODULE__, args)
 
@@ -83,7 +82,7 @@ defmodule Jido.AgentServer.Topology do
     not AgentTopology.empty?(agent.topology) or buses(agent) != []
   end
 
-  def spawn_child(server, agent, tag, opts) do
+  defp spawn_child(server, agent, tag, opts) do
     token = make_ref()
 
     with {:ok, _agent} <- Agent.Validation.validate_instance(agent),
@@ -119,9 +118,9 @@ defmodule Jido.AgentServer.Topology do
     end
   end
 
-  def children(%{state: nil}), do: %{}
+  defp children(%{state: nil}), do: %{}
 
-  def children(context) do
+  defp children(context) do
     Map.new(
       for {{:child, tag}, %{root: root} = record} <- ServerSupervisor.records(context.state),
           worker = ServerSupervisor.live_worker(root),
@@ -130,10 +129,11 @@ defmodule Jido.AgentServer.Topology do
     )
   end
 
-  def stop_child(server, tag, reason) do
-    case Map.fetch(Server.children(server), tag) do
+  defp stop_child(server, tag, reason) do
+    context = :gen_statem.call(server, :child_context)
+
+    case Map.fetch(children(context), tag) do
       {:ok, %{pid: worker, activation: root, placement: placement}} ->
-        context = :gen_statem.call(server, :child_context)
         [{_, record}] = :ets.lookup(context.state, {:child, tag})
 
         result =
@@ -150,32 +150,6 @@ defmodule Jido.AgentServer.Topology do
 
       :error ->
         {:error, :child_not_found}
-    end
-  end
-
-  def adopt_child(server, child, tag, opts) do
-    valid? = unique_options?(opts) and Keyword.get(opts, :placement, :independent) == :independent
-
-    if valid? and Server.alive?(child) do
-      token = make_ref()
-      opts = Keyword.put(opts, :placement, :independent)
-
-      with {:ok, context, parent} <-
-             child_options(server, tag, opts, token, @adoption_options) do
-        lock = {{__MODULE__, :adoption, context.jido, context.partition}, self()}
-
-        case :global.trans(
-               lock,
-               fn -> attach_child(server, child, tag, token, context, parent) end,
-               [node()],
-               0
-             ) do
-          :aborted -> {:error, :adoption_busy}
-          result -> result
-        end
-      end
-    else
-      {:error, :invalid_child_options}
     end
   end
 
@@ -450,60 +424,6 @@ defmodule Jido.AgentServer.Topology do
   defp child_supervisor(context, :independent),
     do: Jido.Instance.Names.agent_supervisor(context.jido)
 
-  defp attach_child(server, child, tag, token, context, parent) do
-    with :ok <- validate_adoption(context, child),
-         :ok <- :gen_statem.call(server, {:reserve_child, tag, token}) do
-      try do
-        result = :gen_statem.call(child, {:attach_parent, parent})
-        if result != :ok, do: ServerSupervisor.release(context.state, tag, token)
-        result
-      catch
-        :exit, _ ->
-          ServerSupervisor.release(context.state, tag, token)
-          {:error, :child_unavailable}
-      end
-    end
-  end
-
-  defp validate_adoption(context, child) do
-    root = Server.activation(child)
-
-    cond do
-      is_nil(root) ->
-        {:error, :activation_required}
-
-      root == context.activation ->
-        {:error, :self_adoption}
-
-      true ->
-        case ancestor_result(context.activation, root, []) do
-          true -> {:error, :cyclic_parent}
-          false -> :ok
-          error -> error
-        end
-    end
-  catch
-    :exit, _ -> {:error, :child_unavailable}
-  end
-
-  @spec ancestor_result(pid(), pid(), [pid()]) :: boolean() | {:error, atom()}
-  defp ancestor_result(root, root, _visited), do: true
-
-  defp ancestor_result(current, root, visited) do
-    if current in visited do
-      true
-    else
-      worker = ServerSupervisor.worker(current)
-
-      case :gen_statem.call(worker, :parent) do
-        nil -> false
-        parent -> ancestor_result(parent.activation, root, [current | visited])
-      end
-    end
-  catch
-    :exit, _ -> {:error, :ancestor_unavailable}
-  end
-
   defp child_options(server, tag, opts, token, allowed) do
     if unique_options?(opts) and Keyword.keys(opts) -- allowed == [] do
       context = :gen_statem.call(server, :child_context)
@@ -517,7 +437,7 @@ defmodule Jido.AgentServer.Topology do
         is_nil(context.activation) ->
           {:error, :activation_required}
 
-        Server.Directive.AgentStart.validate_restart(Keyword.get(opts, :restart, :transient)) != :ok ->
+        Keyword.get(opts, :restart, :transient) not in [:permanent, :transient, :temporary] ->
           {:error, :invalid_restart_policy}
 
         not valid_server_options?(server_options) ->
@@ -525,9 +445,6 @@ defmodule Jido.AgentServer.Topology do
 
         not is_map(meta) or is_struct(meta) ->
           {:error, :invalid_child_options}
-
-        not (is_atom(tag) or is_binary(tag)) or is_nil(tag) ->
-          {:error, :invalid_child_tag}
 
         placement not in [:owned, :independent] ->
           {:error, :invalid_placement}

@@ -21,7 +21,11 @@ defmodule Jido.Examples.Basic.DataDefinedAgentTest do
     {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, live)
     assert :ok = Server.await_ready(server)
     assert {:ok, candidate, []} = Agent.cmd(direct, Example.signal!(3))
-    assert {:ok, committed, []} = Server.call(server, Example.signal!(3))
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Server.call(server, Example.signal!(3))
+
+    committed = Server.snapshot(server).agent
     assert candidate.state == %{count: 3, turns: 1, scheduler: %{cron: %{}}}
     assert committed.state == candidate.state
   end
@@ -42,17 +46,18 @@ defmodule Jido.Examples.Basic.DataDefinedAgentTest do
     instance = Agent.instantiate!(definition, id: unique_id("json-scheduler"))
     assert {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, instance)
     assert :ok = Server.await_ready(server)
-    assert {:ok, %{cron: %{}}} = Server.plugin_state(server, Scheduler)
+    assert Server.snapshot(server).agent.state.scheduler == %{cron: %{}}
 
-    assert {:ok, scheduled, [%Scheduler.Schedule{}]} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(server, Example.schedule_signal!(0))
 
+    scheduled = Server.snapshot(server).agent
     assert scheduled.state.count == 0
     assert scheduled.state.turns == 1
-    eventually(fn -> Server.agent(server).state.count == 1 end)
-    assert Server.agent(server).state.turns == 2
+    eventually(fn -> Server.snapshot(server).agent.state.count == 1 end)
+    assert Server.snapshot(server).agent.state.turns == 2
 
-    activation = Server.activation(server)
+    activation = Jido.Test.AgentServer.ExampleRuntime.activation(server)
     monitor = Process.monitor(activation)
     assert :ok = Jido.stop_agent(jido, server)
     assert_receive {:DOWN, ^monitor, :process, ^activation, _}

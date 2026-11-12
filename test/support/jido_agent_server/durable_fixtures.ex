@@ -244,7 +244,8 @@ defmodule Jido.Test.AgentServer.DurableFixtures do
   end
 
   def member(server, name) do
-    [pid] = Jido.AgentServer.members(server, name)
+    {_phase, data} = :sys.get_state(server)
+    [pid] = Jido.AgentServer.Topology.members(data.activation_state, name)
     pid
   end
 end

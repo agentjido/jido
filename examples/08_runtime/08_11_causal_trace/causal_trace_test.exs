@@ -1,60 +1,36 @@
 Code.require_file("../support/event_probe.ex", __DIR__)
-Code.require_file("../support/keep_state.ex", __DIR__)
-Code.require_file("worker.ex", __DIR__)
 Code.require_file("causal_trace.ex", __DIR__)
 
 defmodule Jido.Examples.Runtime.CausalTraceTest do
   use Jido.Test.Agent.Case
   @moduletag :integration
 
-  @moduletag group: :runtime
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.CausalTrace, as: Example
   alias Jido.Examples.Runtime.EventProbe
 
-  test "parent work, child work, and child results keep one causal trace", %{jido: jido} do
+  test "one Agent Turn keeps one public causal identity", %{jido: jido} do
     id = unique_id("example-causal-trace")
-    probe = EventProbe.attach([id, id <> "/left", id <> "/right"])
+    probe = EventProbe.attach([id])
 
     try do
       assert {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Example, id: id)
+      {:ok, signal} = Example.compute_signal(%{value: 7})
 
-      {:ok, route_signal_1} = Example.start_work_signal(%{request_id: "request-1", value: 7})
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, turn_id: turn_id}} =
+               Jido.AgentServer.call(server, signal)
 
-      assert {:ok, _, _directives} =
-               Jido.AgentServer.call(server, route_signal_1, [])
+      assert Jido.AgentServer.snapshot(server).agent.state.results == %{left: 14, right: 14}
 
-      eventually(fn -> Server.agent(server).state.results == %{left: 14, right: 14} end)
-
-      turns =
+      settled =
         eventually(fn ->
-          turns =
-            for %{
-                  event: [:jido, :agent_server, :turn, :settled],
-                  metadata: metadata
-                } <- EventProbe.events(probe) do
-              metadata
-            end
-
-          if length(turns) == 5 do
-            turns
-          end
+          Enum.find(EventProbe.events(probe), fn event ->
+            event.event == [:jido, :agent_server, :turn, :settled]
+          end)
         end)
 
-      [parent] = Enum.filter(turns, &(&1.signal_id == route_signal_1.id))
-      children = Enum.filter(turns, &(&1.agent_id != id))
-      results = Enum.filter(turns, &(&1.agent_id == id and &1.signal_id != route_signal_1.id))
-
-      assert length(children) == 2
-      assert length(results) == 2
-      assert Enum.all?(children ++ results, &(&1.trace_id == parent.trace_id))
-      assert Enum.all?(children, &(&1.parent_span_id == parent.span_id))
-
-      assert Enum.sort(Enum.map(results, & &1.parent_span_id)) ==
-               Enum.sort(Enum.map(children, & &1.span_id))
-
-      refute inspect(turns) =~ "private-causal-agent-state"
+      assert settled.metadata.turn_id == turn_id
+      assert settled.metadata.signal_id == signal.id
+      assert is_binary(settled.metadata.trace_id)
     after
       EventProbe.detach(probe)
     end

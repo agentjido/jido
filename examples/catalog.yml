@@ -680,6 +680,12 @@ examples:
   readme: examples/14_durable_agents/14_07_external_uncertainty/README.md
   source: examples/14_durable_agents/14_07_external_uncertainty/external_uncertainty.ex
   test: examples/14_durable_agents/14_07_external_uncertainty/external_uncertainty_test.exs
+- id: 14_08_waterpark
+  category: durable
+  component: jido.agent_server.durable
+  readme: examples/14_durable_agents/14_08_waterpark/README.md
+  source: examples/14_durable_agents/14_08_waterpark/waterpark.ex
+  test: examples/14_durable_agents/14_08_waterpark/waterpark_test.exs
 - id: 15_01_basic_agent
   category: ai
   component: jido_ai.agent_authoring

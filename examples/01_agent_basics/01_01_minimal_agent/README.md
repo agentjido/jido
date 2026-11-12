@@ -37,8 +37,8 @@ alias Jido.Examples.MinimalAgent
 {:ok, server} = Jido.start_agent(MyJido, MinimalAgent, id: "counter", state: %{count: 4})
 :ok = Server.await_ready(server)
 {:ok, signal} = MinimalAgent.increment_signal(%{amount: 3})
-{:ok, agent, []} = Server.call(server, signal)
-agent.state # %{count: 7}
+{:ok, %Server.TurnResult{status: :committed}} = Server.call(server, signal)
+Server.snapshot(server).agent.state # %{count: 7}
 ```
 
 An invalid amount does not change committed state. A later valid command can

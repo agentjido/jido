@@ -341,9 +341,9 @@ defmodule Jido.PersistenceTest do
 
     assert restored == agent
     assert {:ok, pid} = Jido.Test.AgentServer.Assertions.start_agent(jido, restored)
-    assert Map.has_key?(Server.agent(pid).state.scheduler.cron, :heartbeat)
+    assert Map.has_key?(Server.snapshot(pid).agent.state.scheduler.cron, :heartbeat)
 
-    eventually(fn -> Server.agent(pid).state.ticks > 4 end, timeout: 5_000)
+    eventually(fn -> Server.snapshot(pid).agent.state.ticks > 4 end, timeout: 5_000)
   end
 
   test "contains adapter faults and reports indeterminate writes", %{jido: jido} do
@@ -464,9 +464,10 @@ defmodule Jido.PersistenceTest do
         persistence_mode: :create
       )
 
-    assert {:ok, agent, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(pid, Signal.new!("runtime.record", %{event: :saved}, source: "/test"))
 
+    agent = Server.snapshot(pid).agent
     assert agent.state.events == [:saved]
 
     assert {:ok, restored, 2} =
@@ -475,7 +476,7 @@ defmodule Jido.PersistenceTest do
     assert restored.state.events == [:saved]
   end
 
-  test "hibernate persists and stops an idle Agent Server", %{jido: jido} do
+  test "stop persists and stops an idle Agent Server", %{jido: jido} do
     persistence = adapter(:hibernate)
     id = unique_id("hibernate")
 
@@ -486,12 +487,12 @@ defmodule Jido.PersistenceTest do
         persistence_mode: :create
       )
 
-    assert {:ok, _agent, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(pid, Signal.new!("runtime.record", %{event: :saved}, source: "/test"))
 
     monitor = Process.monitor(pid)
-    assert :ok = Server.hibernate(pid)
-    assert_receive {:DOWN, ^monitor, :process, ^pid, {:shutdown, :hibernate}}, 1_000
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(pid)
+    assert_receive {:DOWN, ^monitor, :process, ^pid, :shutdown}, 1_000
 
     assert {:ok, restored} =
              Persistence.load_agent(persistence, RuntimeAgent, id, instance: jido)
@@ -506,7 +507,6 @@ defmodule Jido.PersistenceTest do
     opts = [
       persistence: persistence,
       persistence_mode: :create,
-      error_policy: :log_only,
       default_dispatch: {:pid, target: self()}
     ]
 
@@ -530,15 +530,20 @@ defmodule Jido.PersistenceTest do
         source: "/test"
       )
 
-    assert {:error, %Jido.Error.ExecutionError{details: %{reason: :conflict}}} =
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :uncertain,
+              durability: :unknown,
+              error: :conflict,
+              effects: :none
+            }} =
              Server.call(stale, command)
 
-    assert_receive {:DOWN, ^monitor, :process, ^stale, {:shutdown, :execution_lifecycle_failed}},
-                   1_000
-
     refute_received {:signal, ^output}
-    refute Process.alive?(stale)
-    eventually(fn -> Jido.whereis_agent(jido, agent.id) == nil end)
+    assert Process.alive?(stale)
+    assert Server.status(stale).work_state == :faulted
+    assert Server.status(stale).admission == :blocked
+    refute_receive {:DOWN, ^monitor, :process, ^stale, _reason}, 20
 
     assert {:ok, ^committed, 1} =
              Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id, instance: jido)
@@ -560,10 +565,10 @@ defmodule Jido.PersistenceTest do
              Jido.thaw(jido, RuntimeAgent, id, persistence: persistence)
 
     assert :ok = Server.await_ready(pid)
-    assert Server.agent(pid).state.events == [:saved]
+    assert Server.snapshot(pid).agent.state.events == [:saved]
     assert %{state_version: 7} = Jido.Test.AgentServer.Assertions.committed(pid)
 
-    assert {:ok, _agent, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(pid, Signal.new!("runtime.record", %{event: :next}, source: "/test"))
 
     assert {:ok, _restored, 9} =
@@ -584,7 +589,7 @@ defmodule Jido.PersistenceTest do
                persistence_mode: :restore
              )
 
-    assert Server.agent(pid) == agent
+    assert Server.snapshot(pid).agent == agent
     assert %{state_version: 3} = Jido.Test.AgentServer.Assertions.committed(pid)
   end
 

@@ -55,7 +55,7 @@ These terms describe live processes.
 
 | Term | Meaning |
 | --- | --- |
-| Activation | The supervisor tree for one Agent. `Jido.AgentServer.activation/1` returns its root PID. |
+| Activation | The internal supervisor tree for one resident Agent. The public API exposes semantic status, not the root PID. |
 | Owner | The AgentServer whose activation holds a member or child. |
 | Slot | One running copy of a member, numbered from 1. |
 | Runtime child | An Agent started by `Jido.AgentServer.Directive.agent_start/3` or `Jido.AgentServer.spawn_child/4`. It does not appear in the definition. |

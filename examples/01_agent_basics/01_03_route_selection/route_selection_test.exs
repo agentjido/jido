@@ -20,7 +20,10 @@ defmodule Jido.Examples.Basic.RouteSelectionTest do
       assert {:ok, direct, []} =
                Jido.Agent.cmd(Router.instantiate!(id: unique_id("direct-route")), signal)
 
-      assert {:ok, live, []} = Jido.AgentServer.call(server, signal)
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+               Jido.AgentServer.call(server, signal)
+
+      live = Jido.AgentServer.snapshot(server).agent
       assert direct.state.handler == expected
       assert live.state.handler == direct.state.handler
     end

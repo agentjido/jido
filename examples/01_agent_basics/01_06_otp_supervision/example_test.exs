@@ -4,8 +4,6 @@ Code.require_file("application.ex", __DIR__)
 defmodule Jido.Examples.OTPSupervisionTest do
   use Jido.Test.Agent.BasicSDKCase
   @moduletag :integration
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.OTPSupervision.{Application, Counter}
   alias Jido.Examples.OTPSupervision.Jido, as: Runtime
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
@@ -26,28 +24,36 @@ defmodule Jido.Examples.OTPSupervisionTest do
              {Runtime, infrastructure, :supervisor, [Jido]}
            ] = Supervisor.which_children(application)
 
-    server = Server.worker(activation)
+    server = ServerSupervisor.worker(activation)
     assert Process.whereis(Runtime) == infrastructure
-    assert :ok = Server.await_ready(server)
+    assert :ok = Jido.AgentServer.await_ready(server)
     assert Jido.whereis_agent(Runtime, "otp-counter") == server
-    assert Jido.agent_count(Runtime) == 1
+    assert Jido.resident_agent_count(Runtime) == 1
 
-    assert Server.activation(server) == activation
+    assert Jido.Test.AgentServer.ExampleRuntime.activation(server) == activation
 
     {:ok, signal} = Counter.increment_signal(%{amount: 7})
-    assert {:ok, committed, _directives} = Server.call(server, signal)
-    assert committed.state.count == 7
-    assert Server.snapshot(server).state_version == 1
 
-    old_refs = monitor(children(activation))
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, signal)
+
+      assert turn_result.status in [:committed, :waiting]
+      committed = Jido.AgentServer.snapshot(server).agent
+    )
+
+    assert committed.state.count == 7
+    assert Jido.AgentServer.snapshot(server).agent_revision == 1
+
+    old_refs = monitor([server])
     Process.exit(server, :kill)
     await_down(old_refs)
     eventually(fn -> is_pid(Jido.whereis_agent(Runtime, "otp-counter")) end)
     replacement = Jido.whereis_agent(Runtime, "otp-counter")
     assert replacement != server
-    assert :ok = Server.await_ready(replacement)
-    assert Server.agent(replacement) == committed
-    assert Server.snapshot(replacement).state_version == 1
+    assert :ok = Jido.AgentServer.await_ready(replacement)
+    assert Jido.AgentServer.snapshot(replacement).agent == committed
+    assert Jido.AgentServer.snapshot(replacement).agent_revision == 1
     # A clean stop stays stopped under :transient, even though its child spec
     # remains in the application supervisor.
     refs = monitor([activation | children(activation)])
@@ -58,9 +64,9 @@ defmodule Jido.Examples.OTPSupervisionTest do
              List.keyfind(Supervisor.which_children(application), :counter, 0)
 
     assert {:ok, new_activation} = Supervisor.restart_child(application, :counter)
-    resumed = Server.worker(new_activation)
-    assert :ok = Server.await_ready(resumed)
-    assert Server.agent(resumed).state.count == 0
+    resumed = ServerSupervisor.worker(new_activation)
+    assert :ok = Jido.AgentServer.await_ready(resumed)
+    assert Jido.AgentServer.snapshot(resumed).agent.state.count == 0
 
     refs = monitor([new_activation, infrastructure | children(new_activation)])
     assert :ok = Supervisor.stop(application)

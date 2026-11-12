@@ -6,8 +6,6 @@ defmodule Jido.Examples.Runtime.ScheduledCounterTest do
 
   @moduletag group: :runtime
   @moduletag complexity: 2
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.ScheduledCounter
   alias Jido.Plugin.Scheduler
 
@@ -16,17 +14,22 @@ defmodule Jido.Examples.Runtime.ScheduledCounterTest do
 
     {:ok, route_signal_1} = ScheduledCounter.schedule_once_signal(%{delay_ms: 10})
 
-    assert {:ok, scheduled, _directives} =
-             Jido.AgentServer.call(counter, route_signal_1, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(counter, route_signal_1, [])
+
+      assert turn_result.status in [:committed, :waiting]
+      scheduled = Jido.AgentServer.snapshot(counter).agent
+    )
 
     assert scheduled.state.schedule_requests == 1
     assert scheduled.state.count == 0
 
-    eventually(fn -> Server.agent(counter).state.count == 1 end)
+    eventually(fn -> Jido.AgentServer.snapshot(counter).agent.state.count == 1 end)
 
     assert %{
              state: %{count: 1, schedule_requests: 1},
-             state_version: 2
+             agent_revision: 2
            } = agent_result(counter)
   end
 
@@ -39,32 +42,42 @@ defmodule Jido.Examples.Runtime.ScheduledCounterTest do
         expression: "0 0 0 1 1 * 2099"
       })
 
-    assert {:ok, enabled, _directives} =
-             Jido.AgentServer.call(counter, route_signal_2, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(counter, route_signal_2, [])
+
+      assert turn_result.status in [:committed, :waiting]
+      enabled = Jido.AgentServer.snapshot(counter).agent
+    )
 
     assert enabled.state.cron_enabled
 
-    assert {:ok, scheduler_state} = Server.plugin_state(counter, Scheduler)
+    assert {:ok, scheduler_state} = Jido.Test.AgentServer.ExampleRuntime.plugin_state(counter, Scheduler)
     assert Map.has_key?(scheduler_state.cron, :heartbeat)
 
     {:ok, route_signal_3} = ScheduledCounter.disable_cron_signal(%{job_id: :heartbeat})
 
-    assert {:ok, disabled, _directives} =
-             Jido.AgentServer.call(counter, route_signal_3, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(counter, route_signal_3, [])
+
+      assert turn_result.status in [:committed, :waiting]
+      disabled = Jido.AgentServer.snapshot(counter).agent
+    )
 
     refute disabled.state.cron_enabled
 
-    assert {:ok, scheduler_state} = Server.plugin_state(counter, Scheduler)
+    assert {:ok, scheduler_state} = Jido.Test.AgentServer.ExampleRuntime.plugin_state(counter, Scheduler)
     refute Map.has_key?(scheduler_state.cron, :heartbeat)
   end
 
   test "invalid timer and CRON requests leave Agent and Plugin state unchanged", %{jido: jido} do
-    counter = start_agent!(jido, ScheduledCounter, error_policy: :log_only)
-    before = Server.snapshot(counter)
+    counter = start_agent!(jido, ScheduledCounter)
+    before = Jido.AgentServer.snapshot(counter)
 
     {:ok, route_signal_4} = ScheduledCounter.schedule_once_signal(%{delay_ms: -1})
 
-    assert {:error, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: _}} =
              Jido.AgentServer.call(counter, route_signal_4, [])
 
     {:ok, route_signal_5} =
@@ -73,9 +86,9 @@ defmodule Jido.Examples.Runtime.ScheduledCounterTest do
         expression: "invalid cron"
       })
 
-    assert {:error, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: _}} =
              Jido.AgentServer.call(counter, route_signal_5, [])
 
-    assert Server.snapshot(counter) == before
+    assert Jido.AgentServer.snapshot(counter) == before
   end
 end

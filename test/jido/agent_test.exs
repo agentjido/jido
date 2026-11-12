@@ -91,6 +91,25 @@ defmodule Jido.AgentTest do
     @behaviour Jido.Agent
   end
 
+  defmodule StopIntent do
+    use Jido.Agent.Directive
+    defstruct [:reason]
+  end
+
+  defmodule StopPlugin do
+    use Jido.Plugin
+
+    @impl true
+    def state_spec(_opts),
+      do: {:stop_state, Jido.Joi.any() |> Jido.Joi.nullable() |> Jido.Joi.default(nil)}
+
+    @impl true
+    def directives(_opts), do: [StopIntent]
+
+    @impl true
+    def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
+  end
+
   defmodule WithStopDirective do
     @moduledoc false
 
@@ -100,7 +119,7 @@ defmodule Jido.AgentTest do
     @impl Jido.Action
     def run(%{label: label}, context) do
       state = %{context.agent_state | history: context.agent_state.history ++ [label]}
-      {:ok, state, [%Jido.Agent.Directive.ServerStop{reason: :normal}]}
+      {:ok, state, [%Jido.AgentTest.StopIntent{reason: :normal}]}
     end
   end
 
@@ -774,13 +793,23 @@ defmodule Jido.AgentTest do
     end
 
     test "returns validated Directives without dispatching them" do
-      agent = agent_with_route("counter.stop", WithStopDirective)
+      agent =
+        build!(
+          name: "counter",
+          schema: schema(),
+          routes: [{"counter.stop", WithStopDirective}],
+          plugins: [
+            %{id: StopPlugin.id(), provider: StopPlugin, vsn: StopPlugin.vsn(), data: %{}}
+          ]
+        )
+        |> instance!()
+
       signal = Signal.new!("counter.stop", %{label: "stopped"}, source: "/test")
 
-      assert {:ok, updated, [%Jido.Agent.Directive.ServerStop{reason: :normal}]} =
+      assert {:ok, updated, [%StopIntent{reason: :normal}]} =
                Agent.cmd(agent, signal)
 
-      assert updated.state == %{count: 0, history: ["stopped"]}
+      assert updated.state == %{count: 0, history: ["stopped"], stop_state: nil}
     end
 
     test "passes execution options to the executable boundary" do

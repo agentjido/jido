@@ -5,8 +5,6 @@ Code.require_file("../support/durable_step_probe.exs", __DIR__)
 defmodule Jido.Examples.Durable.SavedProgressTest do
   use Jido.Test.Case, async: false
   @moduletag :integration
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Durable.SavedProgress
   alias Jido.Test.Examples.Durable.{ObservedAgent, StepProbe}
 
@@ -22,11 +20,11 @@ defmodule Jido.Examples.Durable.SavedProgressTest do
     assert {:ok, server} =
              Jido.start_agent(c.jido, ObservedAgent.new(id), persistence: persistence)
 
-    assert :ok = Server.await_ready(server)
+    assert :ok = Jido.AgentServer.await_ready(server)
     {:ok, request} = SavedProgress.Agent.run_signal(%{value: 0})
-    pending = Server.submit(server, request)
+    pending = Jido.AgentServer.submit(server, request)
     assert_receive {:step_6_running, action, 5}, 5_000
-    turn = Server.status(server).active.turn_id
+    turn = Jido.AgentServer.status(server).active_turn_id
     assert StepProbe.records().completed == Enum.to_list(1..5)
     monitor = Process.monitor(action)
     Process.exit(server, :kill)
@@ -40,21 +38,24 @@ defmodule Jido.Examples.Durable.SavedProgressTest do
         end
       end)
 
-    assert :ok = Server.await_ready(restored)
+    assert :ok = Jido.AgentServer.await_ready(restored)
     assert_receive {:step_6_running, _, 5}, 5_000
-    assert Server.status(restored).active.turn_id == turn
-    assert Server.agent(restored).state == %{value: 0}
+    assert Jido.AgentServer.status(restored).active_turn_id == turn
+    assert Jido.AgentServer.snapshot(restored).agent.state == %{value: 0}
     assert StepProbe.records().completed == Enum.to_list(1..5)
     assert :ok = StepProbe.release()
-    eventually(fn -> Server.agent(restored).state == %{value: 10} end)
+    eventually(fn -> Jido.AgentServer.snapshot(restored).agent.state == %{value: 10} end)
 
     assert StepProbe.records().started ==
              Enum.map(1..6, &{&1, &1 - 1}) ++ Enum.map(6..10, &{&1, &1 - 1})
 
     assert StepProbe.records().completed == Enum.to_list(1..10)
-    assert Server.status(restored).durable_turn == %{id: turn, status: :completed}
-    assert {:error, _} = Server.await(pending)
-    assert :ok = Server.stop(restored)
-    assert Jido.agent_count(c.jido) == 0
+
+    assert %Jido.AgentServer.Status{work_state: :idle, active_turn_id: nil} =
+             Jido.AgentServer.status(restored)
+
+    assert {:error, _} = Jido.AgentServer.await(pending)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(restored)
+    assert Jido.resident_agent_count(c.jido) == 0
   end
 end

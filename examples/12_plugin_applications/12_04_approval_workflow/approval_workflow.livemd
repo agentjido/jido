@@ -111,7 +111,7 @@ end
 Server.snapshot(server)
 ```
 
-The initial `state_version` is zero. The Agent starts with `:idle` booking
+The initial `agent_revision` is zero. The Agent starts with `:idle` booking
 status.
 
 ## Search For Flights
@@ -156,7 +156,7 @@ offers = [
   status: searched.state.booking_status,
   search_revision: searched.state.search_revision,
   option_ids: Enum.map(searched.state.offered_options, & &1.id),
-  state_version: Server.snapshot(server).state_version
+  agent_revision: Server.snapshot(server).agent_revision
 }
 ```
 
@@ -183,7 +183,7 @@ from an older search result.
   status: selected.state.booking_status,
   approval: selected.state.approval,
   selected_offer: selected.state.selection.id,
-  state_version: Server.snapshot(server).state_version
+  agent_revision: Server.snapshot(server).agent_revision
 }
 ```
 
@@ -203,7 +203,7 @@ booking_context = %{booking_adapter: {FakeBookingAPI, booking_api}}
   Example.cmd(selected, approval_signal, context: booking_context)
 
 %{
-  live_status: Server.agent(server).state.booking_status,
+  live_status: Server.snapshot(server).agent.state.booking_status,
   candidate_status: candidate.state.booking_status,
   directive_type: directive.__struct__,
   directive: Map.from_struct(directive),
@@ -229,7 +229,7 @@ correlated result Signal back to the Agent Server.
 
 terminal_agent =
   Enum.reduce_while(1..100, nil, fn _attempt, _last_agent ->
-    current_agent = Server.agent(server)
+    current_agent = Server.snapshot(server).agent
 
     if current_agent.state.booking_status in [:booked, :failed] do
       {:halt, current_agent}
@@ -248,7 +248,7 @@ end
   terminal_status: terminal_agent.state.booking_status,
   booking_id: terminal_agent.state.booking_id,
   provider_calls: FakeBookingAPI.calls(booking_api),
-  state_version: Server.snapshot(server).state_version
+  agent_revision: Server.snapshot(server).agent_revision
 }
 ```
 
@@ -273,7 +273,7 @@ fails before it creates another provider request.
 %{
   error: Jido.Flow.Error.to_map(duplicate_error),
   provider_call_count: length(FakeBookingAPI.calls(booking_api)),
-  live_status: Server.agent(server).state.booking_status
+  live_status: Server.snapshot(server).agent.state.booking_status
 }
 ```
 

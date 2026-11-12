@@ -45,26 +45,24 @@ defmodule Jido.Examples.Runtime.AgentLiveDebuggerTest do
   end
 
   test "a snapshot uses public inspection and removes secrets", %{jido: jido} do
-    agent =
-      start_agent!(jido, AgentLiveDebugger,
-        state: %{secret_token: "secret"},
-        debug_max_events: 2
-      )
+    agent = start_agent!(jido, AgentLiveDebugger, state: %{secret_token: "secret"})
 
     {:ok, route_signal_1} = AgentLiveDebugger.record_result_signal(%{result: "done"})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(agent, route_signal_1, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(agent, route_signal_1, [])
+
+      assert turn_result.status in [:committed, :waiting]
+    )
 
     snapshot = AgentLiveDebugger.snapshot(agent)
     assert snapshot.agent_module == AgentLiveDebugger
     assert snapshot.state == %{status: "complete", result: "done"}
-    assert snapshot.state_version == 1
-    assert snapshot.runtime_status == :idle
-    assert snapshot.active == nil
-    assert snapshot.scheduler == %{cron: %{}}
-
-    assert snapshot.children == %{}
+    assert snapshot.agent_revision == 1
+    assert snapshot.work_state == :idle
+    assert snapshot.active_turn_id == nil
+    assert snapshot.effects == :none
     refute inspect(snapshot) =~ "secret"
   end
 
@@ -80,35 +78,33 @@ defmodule Jido.Examples.Runtime.AgentLiveDebuggerTest do
     assert_receive :runtime_barrier_waiting, 1_000
     snapshot = AgentLiveDebugger.snapshot(agent)
     assert snapshot.state == %{status: "idle", result: ""}
-    assert snapshot.state_version == 0
-    refute snapshot.runtime_status == :idle
+    assert snapshot.agent_revision == 0
+    assert snapshot.work_state == :running
+    assert is_binary(snapshot.active_turn_id)
     assert :ok = RuntimeBarrier.release()
-    assert {:ok, _, []} = Task.await(task)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Task.await(task)
     snapshot = AgentLiveDebugger.snapshot(agent)
     assert snapshot.state.result == "later"
-    assert snapshot.state_version == 1
+    assert snapshot.agent_revision == 1
   end
 
-  test "the debug buffer is explicit, bounded, and safe", %{jido: jido} do
-    agent =
-      start_agent!(jido, AgentLiveDebugger,
-        state: %{secret_token: "debug-secret"},
-        debug: true,
-        debug_max_events: 2
-      )
+  test "the public status is process-neutral and the application view is redacted", %{jido: jido} do
+    agent = start_agent!(jido, AgentLiveDebugger, state: %{secret_token: "debug-secret"})
 
     for result <- ["one", "two"] do
       {:ok, signal} = AgentLiveDebugger.record_result_signal(%{result: result})
-      assert {:ok, _agent, _directives} = Server.call(agent, signal)
+
+      (
+        assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+                 Jido.AgentServer.call(agent, signal)
+
+        assert turn_result.status in [:committed, :waiting]
+        _agent = Jido.AgentServer.snapshot(agent).agent
+      )
     end
 
-    events = Server.history(agent)
-    assert length(events) == 2
-    assert Enum.map(events, & &1.state_version_after) == [1, 2]
-    refute inspect(events) =~ "debug-secret"
-    refute Enum.any?(events, &Map.has_key?(&1, :server_state))
-
-    plain = start_agent!(jido, AgentLiveDebugger)
-    assert Server.history(plain) == []
+    status = Server.status(agent)
+    assert Jido.AgentServer.Status.process_neutral?(status)
+    refute inspect(AgentLiveDebugger.snapshot(agent)) =~ "debug-secret"
   end
 end

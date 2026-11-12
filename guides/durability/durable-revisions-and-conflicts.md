@@ -125,7 +125,7 @@ monitor = Process.monitor(server)
 
 # Another writer commits behind the server.
 :ok =
-  Persistence.save_agent(RevisionsGuide.Jido, Server.agent(server),
+  Persistence.save_agent(RevisionsGuide.Jido, Server.snapshot(server).agent,
     revision: 1,
     expected_revision: 0
   )

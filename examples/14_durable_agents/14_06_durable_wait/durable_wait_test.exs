@@ -1,148 +1,89 @@
 Code.require_file("durable_wait.ex", __DIR__)
 
-defmodule Jido.Test.Examples.Durable.ImmediateApproval do
-  @moduledoc false
-  use Jido.Flow,
-    name: "test_immediate_approval",
-    schema: Jido.Joi.object(%{request_id: Jido.Joi.string() |> Jido.Joi.min(1)})
-
-  alias Jido.Examples.Durable.DurableWait.Approval
-
-  flow do
-    step "request", action: Approval.step_action("request"), params: %{request: input()}
-
-    selection "decision" do
-      needs ["request"]
-
-      await("approved",
-        event: "examples.durable.wait.approve",
-        match: %{request_id: result("request", :request_id)}
-      )
-
-      await("cancelled",
-        event: "examples.durable.wait.cancel",
-        match: %{request_id: result("request", :request_id)}
-      )
-
-      timer("expired", after_ms: 0)
-    end
-
-    step "finish",
-      action: Approval.step_action("finish"),
-      params: %{values: %{request: result("request"), decision: result("decision")}}
-
-    output result("finish")
-  end
-end
-
 defmodule Jido.Examples.Durable.DurableWaitTest do
-  use Jido.Test.Case, async: false
+  use ExUnit.Case, async: false
   @moduletag :integration
-
   @moduletag :tmp_dir
 
-  alias Jido.AgentServer, as: Server
+  alias Jido.Agent.Ref
+  alias Jido.AgentServer.{Snapshot, Status, TurnResult}
   alias Jido.Examples.Durable.DurableWait, as: Example
 
-  defp start(c) do
-    id = unique_id("approval")
-    persistence = {Jido.Persistence.File, path: c.tmp_dir}
+  setup c do
+    id = System.unique_integer([:positive])
+    instance = :"durable_wait_#{id}"
+    namespace = "examples/durable-wait/#{id}"
 
-    assert {:ok, server} =
-             Jido.start_agent(c.jido, Example,
-               id: id,
-               persistence: persistence,
-               turn_timeout: :infinity
-             )
+    start_supervised!(
+      {Jido,
+       name: instance,
+       namespace: namespace,
+       persistence: {Jido.Persistence.File, path: c.tmp_dir},
+       activation: [idle_residency_timeout: 50]},
+      id: instance
+    )
 
-    assert :ok = Server.await_ready(server)
+    ref = Ref.new!(namespace: namespace, id: "approval")
+    {:ok, ^ref} = Jido.create_agent(instance, ref, Example)
+    %{instance: instance, ref: ref}
+  end
+
+  test "a matching Signal resumes one passivated approval Turn", c do
     {:ok, request} = Example.request_signal(%{request_id: "report-1"})
-    pending = Server.submit(server, request)
-    {id, server, persistence, pending}
-  end
 
-  defp waiting(server) do
-    eventually(fn ->
-      case Server.status(server) do
-        %{active: %{stage: :waiting}, waits: [wait]} = status -> {status, wait}
-        _ -> nil
-      end
-    end)
-  end
+    assert {:ok, %TurnResult{status: :waiting, turn_id: turn_id, waits: [wait | _]}} =
+             Jido.call(c.instance, c.ref, request)
 
-  test "one approval Flow survives hibernation with the same wait and deadline", c do
-    {id, server, persistence, pending} = start(c)
-    {status, wait} = waiting(server)
-    refute Map.has_key?(status.active, :worker_pid)
-    assert Server.agent(server).state == %{request_id: "", status: :idle}
-    assert :ok = Server.hibernate(server)
-    assert {:error, _} = Server.await(pending)
-
-    assert {:ok, awake} =
-             Jido.thaw(c.jido, Example, id,
-               persistence: persistence,
-               turn_timeout: :infinity
-             )
-
-    assert :ok = Server.await_ready(awake)
-    {restored, restored_wait} = waiting(awake)
-    assert restored.active.turn_id == status.active.turn_id
-    assert restored_wait == wait
+    assert is_binary(wait.id)
+    eventually(fn -> match?(%Status{residency: :passivated}, Jido.status(c.instance, c.ref)) end)
 
     {:ok, wrong} = Example.resolve_signal(%{request_id: "other", decision: :approve})
-
-    assert {:error, %{details: %{reason: :unmatched_input}}} =
-             Server.deliver_wait(awake, wait.id, wrong)
+    assert {:error, :wait_not_matched} = Jido.call(c.instance, c.ref, wrong)
 
     {:ok, approval} = Example.resolve_signal(%{request_id: "report-1", decision: :approve})
-    assert :ok = Server.deliver_wait(awake, wait.id, approval)
-    assert :ok = Server.quiesce(awake)
-    assert Server.agent(awake).state == %{request_id: "report-1", status: :approved}
-    assert Server.status(awake).durable_turn == %{id: status.active.turn_id, status: :completed}
-    assert {:error, :not_waiting} = Server.deliver_wait(awake, wait.id, approval)
-    assert :ok = Jido.stop_agent(c.jido, awake)
-    assert Jido.agent_count(c.jido) == 0
+
+    assert {:ok, %TurnResult{status: :committed, turn_id: ^turn_id}} =
+             Jido.call(c.instance, c.ref, approval)
+
+    assert %Snapshot{agent: %{state: %{request_id: "report-1", status: :approved}}} =
+             snapshot(c)
   end
 
-  test "a domain cancellation completes the same Flow and survives restore", c do
-    {id, server, persistence, pending} = start(c)
-    {_status, wait} = waiting(server)
-    {:ok, cancel} = Example.resolve_signal(%{request_id: "report-1", decision: :cancel})
-    assert :ok = Server.deliver_wait(server, wait.id, cancel)
-    assert {:ok, cancelled, []} = Server.await(pending)
-    assert cancelled.state == %{request_id: "report-1", status: :cancelled}
-    assert :ok = Server.hibernate(server)
-    assert {:ok, awake} = Jido.thaw(c.jido, Example, id, persistence: persistence)
-    assert :ok = Server.await_ready(awake)
-    assert Server.agent(awake) == cancelled
-    assert Server.status(awake).active == nil
-    assert :ok = Jido.stop_agent(c.jido, awake)
+  test "a cancellation Signal completes the same durable Turn", c do
+    {:ok, request} = Example.request_signal(%{request_id: "report-2"})
+
+    assert {:ok, %TurnResult{status: :waiting, turn_id: turn_id}} =
+             Jido.call(c.instance, c.ref, request)
+
+    {:ok, cancel} = Example.resolve_signal(%{request_id: "report-2", decision: :cancel})
+
+    assert {:ok, %TurnResult{status: :committed, turn_id: ^turn_id}} =
+             Jido.call(c.instance, c.ref, cancel)
+
+    assert %Snapshot{agent: %{state: %{request_id: "report-2", status: :cancelled}}} =
+             snapshot(c)
   end
 
-  test "timer expiry completes the approval Flow and survives thaw", c do
-    raw = Map.from_struct(Example.definition())
-    [route] = raw.routes
-    route = put_in(route.handler.target, Jido.Test.Examples.Durable.ImmediateApproval)
-    definition = Jido.Agent.define!(%{raw | routes: [route]})
-    persistence = {Jido.Persistence.File, path: c.tmp_dir}
-    id = unique_id("expired-approval")
+  defp snapshot(c) do
+    {:ok, server} = Jido.activate_agent(c.instance, c.ref)
+    Jido.AgentServer.snapshot(server)
+  end
 
-    {:ok, server} =
-      Jido.Test.AgentServer.ExampleRuntime.start_agent(c.jido, definition,
-        id: id,
-        persistence: persistence,
-        turn_timeout: :infinity
-      )
+  defp eventually(fun, attempts \\ 200)
+  defp eventually(fun, 0), do: flunk("condition did not become true: #{inspect(fun.())}")
 
-    {:ok, request} = Example.request_signal(%{request_id: "report-expired"})
-    assert {:ok, expired, []} = Server.call(server, request)
-    assert expired.state == %{request_id: "report-expired", status: :expired}
-    assert Server.status(server).durable_turn.status == :completed
-    assert :ok = Server.hibernate(server)
-    assert {:ok, awake} = Jido.thaw(c.jido, Example, id, persistence: persistence)
-    assert :ok = Server.await_ready(awake)
-    assert Server.agent(awake) == expired
-    assert Server.status(awake).waits == []
-    assert :ok = Jido.stop_agent(c.jido, awake)
+  defp eventually(fun, attempts) do
+    case fun.() do
+      nil ->
+        Process.sleep(10)
+        eventually(fun, attempts - 1)
+
+      false ->
+        Process.sleep(10)
+        eventually(fun, attempts - 1)
+
+      value ->
+        value
+    end
   end
 end

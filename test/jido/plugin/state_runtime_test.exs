@@ -77,8 +77,9 @@ defmodule Jido.Plugin.StateRuntimeTest do
 
     signal = Signal.new!("plugin.credits.spend", %{amount: 1}, source: "/test")
 
-    assert {:ok, agent, _} = Server.call(pid, signal)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Server.call(pid, signal)
+    agent = Server.snapshot(pid).agent
     assert agent.state.credits == 2
-    assert Server.children(pid) == %{}
+    assert Jido.Test.AgentServer.Assertions.plugin(pid, Credits) == nil
   end
 end

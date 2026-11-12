@@ -50,7 +50,7 @@ try do
     5_000 -> raise "No effect completion event"
   end
 
-  %{state_version: 2} = Server.status(server)
+  %{agent_revision: 2} = Server.status(server)
   :ok = Jido.stop_agent(ObservationProbe, server)
 
   outcomes =

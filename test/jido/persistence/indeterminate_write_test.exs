@@ -4,6 +4,7 @@ defmodule Jido.Persistence.IndeterminateWriteTest do
   @moduletag capability: "PERSIST-03"
 
   alias Jido.Persistence
+  alias Jido.AgentServer.TurnResult
   alias Jido.Test.Persistence.IndeterminateWriteProbe, as: Probe
   alias Jido.Test.Persistence.ProbeStore, as: Store
 
@@ -39,7 +40,7 @@ defmodule Jido.Persistence.IndeterminateWriteTest do
 
     {:ok, route_signal_1} = Probe.increment_signal(%{request_id: "first", amount: 1})
 
-    assert {:ok, agent, _} =
+    assert {:ok, %TurnResult{status: :committed, durability: :durable}} =
              Jido.AgentServer.call(pid, route_signal_1, context: c.turn_context)
 
     # The commit reply precedes asynchronous Directive dispatch.
@@ -50,7 +51,10 @@ defmodule Jido.Persistence.IndeterminateWriteTest do
                     }},
                    5_000
 
-    assert Jido.Test.AgentServer.Assertions.committed(pid) == %{agent: agent, state_version: 2}
+    snapshot = Jido.AgentServer.snapshot(pid)
+    agent = snapshot.agent
+    assert snapshot.agent_revision == 1
+    assert snapshot.persistence_revision == 2
 
     assert {:ok, ^agent, 2} =
              Persistence.load_agent_with_revision(c.store, Probe, c.id, instance: c.jido)
@@ -61,7 +65,12 @@ defmodule Jido.Persistence.IndeterminateWriteTest do
 
     {:ok, route_signal_2} = Probe.increment_signal(%{request_id: "first", amount: 1})
 
-    assert {:error, %Jido.Error.ExecutionError{details: %{reason: :indeterminate}}} =
+    assert {:ok,
+            %TurnResult{
+              status: :uncertain,
+              durability: :unknown,
+              error: :indeterminate
+            }} =
              Jido.AgentServer.call(pid, route_signal_2, context: c.turn_context)
 
     assert_stored_first(c)
@@ -73,15 +82,17 @@ defmodule Jido.Persistence.IndeterminateWriteTest do
 
     {:ok, route_signal_3} = Probe.increment_signal(%{request_id: "first", amount: 1})
 
-    assert {:error, %Jido.Error.ExecutionError{details: %{reason: :indeterminate}}} =
+    assert {:ok,
+            %TurnResult{
+              status: :uncertain,
+              durability: :unknown,
+              error: :indeterminate
+            }} =
              Jido.AgentServer.call(pid, route_signal_3, context: c.turn_context)
 
     assert_stored_first(c)
 
-    # A stopped Server or a rejected command can satisfy the admission boundary.
-    # Do not install a stopping error policy: this test requires a core guarantee.
-    result = try_next_command(pid, c.turn_context)
-    assert match?({:error, _}, result) or match?({:exit, _}, result)
+    assert try_next_command(pid, c.turn_context) == {:error, :reconciliation_required}
     refute_received {:signal, %{type: "test.persistence.indeterminate_write.applied"}}
     assert_stored_first(c)
   end
@@ -99,15 +110,16 @@ defmodule Jido.Persistence.IndeterminateWriteTest do
 
     {:ok, route_signal_4} = Probe.increment_signal(%{request_id: "first", amount: 1})
 
-    assert {:error,
-            %Jido.Error.ExecutionError{
-              details: %{reason: {:indeterminate, %Jido.Error.ExecutionError{}}}
+    assert {:ok,
+            %TurnResult{
+              status: :uncertain,
+              durability: :unknown,
+              error: {:indeterminate, %Jido.Error.ExecutionError{}}
             }} =
              Jido.AgentServer.call(pid, route_signal_4, context: c.turn_context)
 
     assert_stored_first(c)
-    result = try_next_command(pid, c.turn_context)
-    assert match?({:error, _}, result) or match?({:exit, _}, result)
+    assert try_next_command(pid, c.turn_context) == {:error, :reconciliation_required}
     refute_received {:signal, %{type: "test.persistence.indeterminate_write.applied"}}
   end
 

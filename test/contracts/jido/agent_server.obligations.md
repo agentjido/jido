@@ -27,7 +27,7 @@ authoring surface.
 - **must:** Start only with a complete Agent instance and a live named Runner with the temporary Store, including the shared instance Store. Reject invalid options, definitions, and unrelated or stale Runner names. Enforce instance Runner ownership.
 - **why:** Invalid startup must not create an activation.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I2 — Runtime defaults
 
@@ -35,7 +35,7 @@ authoring surface.
 - **must:** Use a 60000 ms built-in turn timeout and the declared built-in runtime defaults. Read valid application turn_timeout defaults at startup; do not accept other application runtime defaults. Explicit values override unused application configuration. Require unique startup, instance-default, and application-configuration keys. Reject unknown configuration keys and finite caller waits outside 0..4294967295. Accept non-negative integer Turn timeouts, including 90 days; arm bounded timer intervals without resetting the active or saved deadline. Name each invalid timeout field in its validation error.
 - **why:** Configuration errors must be detected before work starts.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I3 — Signal validation
 
@@ -43,7 +43,7 @@ authoring surface.
 - **must:** Reject malformed Signals before execution. Preserve the committed Agent and revision and keep the activation alive.
 - **why:** Bad input must not destroy live state.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I4 — Transient context
 
@@ -51,7 +51,7 @@ authoring surface.
 - **must:** Pass supported map, keyword, or nil context to the turn. Reject duplicate or unknown options and reserved keys. Keep transient values out of Agent state and Signal data.
 - **why:** Runtime input must not become domain state.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I5 — Responsive committed reads
 
@@ -59,7 +59,7 @@ authoring surface.
 - **must:** Return committed state and a typed `Jido.AgentServer.Status` while a turn or cleanup is active. Report Agent identity, active turn and Signal IDs, starting revision, stage, and queue counts. Report handoff_pending while a released successor owns the next Turn. Do not expose PIDs, ports, references, functions, monitors, tasks, timers, or ownership tokens. Separate reads are not atomic.
 - **why:** Inspection must remain available without exposing input or internal request handles.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I6 — Serial execution
 
@@ -67,7 +67,7 @@ authoring surface.
 - **must:** Run at most one turn per activation. Queued work starts from the previous committed result.
 - **why:** Turns must not overwrite each other.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I7 — One commit
 
@@ -75,7 +75,7 @@ authoring surface.
 - **must:** Commit the complete validated candidate once on success and increment the runtime revision once, including successful unchanged state.
 - **why:** Completion must have one commit boundary.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I8 — Failure isolation
 
@@ -83,13 +83,13 @@ authoring surface.
 - **must:** Action or Flow failure, routing failure, or invalid candidate preserves the complete committed Agent and revision. Ordinary failure permits later work under the default policy.
 - **why:** Rejected work must not corrupt state.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I9 — Public API boundary
 
 - **scope:** documented `Jido.AgentServer` functions and types
-- **must:** Keep one exact documented API for lifecycle, requests, control, observation, Plugin state, composition, and durability. Keep the owner-bound pending handle opaque. Keep `Status` public and typed. Keep `Lifecycle`, `Pending`, state-machine callbacks, and owner implementation modules internal. Do not add a second AgentServer DSL or expose coordinator internals.
-- **why:** Users need one stable runtime entry point while focused components retain behavior ownership.
+- **must:** Keep the documented 13-function facade exact. Keep `Pending`, `Snapshot`, `Status`, and `TurnResult` public and typed. Keep workers, supervisors, state-machine callbacks, Plugin roots, and coordinator data internal. Do not add a second AgentServer DSL.
+- **why:** Users need one stable runtime entry point without OTP implementation data.
 - **kind:** functional
 - **status:** active
 
@@ -99,7 +99,7 @@ authoring surface.
 - **must:** Return a temporary handle without waiting for turn completion. Only the submitting process can collect it. Wait timeout returns an error and permits a later wait without cancelling work.
 - **why:** Asynchronous requests need explicit reply ownership.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I11 — Caller wait
 
@@ -107,7 +107,7 @@ authoring surface.
 - **must:** Caller wait timeout exits as an OTP call does. It does not cancel accepted turn work or revoke accepted cancellation.
 - **why:** Waiting and execution have separate limits.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I12 — Reply disposal
 
@@ -115,7 +115,7 @@ authoring surface.
 - **must:** Only the submitting process can discard a pending reply. Remove its monitor, discard a queued turn result and buffered Reply Signals, and prevent late turn results and Reply Signals without cancelling the turn.
 - **why:** Unwanted replies must not retain Agent values in the caller mailbox.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I13 — Casts
 
@@ -123,7 +123,7 @@ authoring surface.
 - **must:** Accept a valid cast without a result handle. Apply the same turn validation and commit rules. Dropped or failed casts do not change committed state.
 - **why:** Best-effort requests still require state safety.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I14 — Queue capacity
 
@@ -131,7 +131,7 @@ authoring surface.
 - **must:** Bound postponed turns separately from the active turn and mailbox. Reject excess requests with limit and count; drop excess casts. Support zero and infinity.
 - **why:** Admission must have a clear capacity limit.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I15 — Admission expiry
 
@@ -139,7 +139,7 @@ authoring surface.
 - **must:** Reject expired requests before execution, including replay of queued work. Zero always expires. An admission deadline does not stop a turn that already started.
 - **why:** Queued work must retain its own admission budget.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I16 — Owned requests
 
@@ -147,7 +147,7 @@ authoring surface.
 - **must:** Reject direct and nested OTP Task requests from detected owned work with reentrant_turn, including execution startup. Allow unrelated callers even if an Action monitors them. Reads remain available. Detection follows local caller ancestry to depth eight, not arbitrary process protocols.
 - **why:** A turn must not wait for itself or cancel its own execution.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I17 — Whole-turn deadline
 
@@ -155,7 +155,7 @@ authoring surface.
 - **must:** Apply the active timeout to preparation, startup, execution, candidate validation, and cleanup. Recheck before commit. Zero cannot commit; infinity disables the active deadline. Reply with turn_timeout only after cleanup.
 - **why:** A delayed timer must not permit a late commit.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I18 — Cancellation
 
@@ -163,7 +163,7 @@ authoring surface.
 - **must:** Stop active owned work, preserve committed state and revision, and return ok only after cleanup. The turn receives cancelled. Idle cancellation and cancellation after commit during effects or after terminal cleanup during failure policy return not_running. A Handoff chain is the narrow exception: after its predecessor commits, cancellation owns the chain until the successor settles and must prevent a not-yet-started successor. Repeated cancellation shares cleanup; the first abort reason wins.
 - **why:** Cancellation must have a confirmed ownership boundary.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I19 — Targeted cancellation
 
@@ -171,7 +171,7 @@ authoring surface.
 - **must:** Cancel only the matching active turn ID. Reject a stale ID without affecting current work. Keep one active ID through the turn.
 - **why:** An old request must not cancel newer work.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I20 — Successful cleanup
 
@@ -179,7 +179,7 @@ authoring surface.
 - **must:** Confirm Worker and execution Task cleanup before success and before the next turn. Do not retain execution records in the temporary Store, including the shared instance Store.
 - **why:** Successful turns must not accumulate execution resources.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I21 — Abort cleanup
 
@@ -187,7 +187,7 @@ authoring surface.
 - **must:** Confirm cleanup after timeout or cancellation at preparation, Worker startup, execution, and validation. Fence in-flight Worker startup before admitting later work. Keep reads available during cleanup.
 - **why:** An aborted startup must not leave detached execution.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I22 — Server ownership
 
@@ -195,7 +195,7 @@ authoring surface.
 - **must:** Stop owned Worker and Action work after explicit stop or abrupt server death. Preserve standard clean shutdown reasons.
 - **why:** Execution must not outlive its owner.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I23 — Lifecycle loss
 
@@ -203,7 +203,7 @@ authoring surface.
 - **must:** Stop the activation when its Runner, Worker, or lifecycle Task is lost, or cleanup cannot be confirmed. Do not commit a candidate or start queued work after ownership becomes uncertain.
 - **why:** Unknown execution ownership cannot be treated as safe completion.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I24 — Late messages
 
@@ -211,7 +211,7 @@ authoring surface.
 - **must:** Ignore stale completion and timeout messages. A discarded result cannot commit or affect a later turn.
 - **why:** Mailbox races must not cross turn boundaries.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I25 — Safe failure logs
 
@@ -219,7 +219,7 @@ authoring surface.
 - **must:** Return Action or Flow errors to the caller without raw Runner failure warnings containing node input or error values. Failed casts retain an Agent and turn ID summary. This does not filter logs written by application code.
 - **why:** Runtime failure reporting must not expose private input.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 **Execution policy and observation**
 
@@ -229,7 +229,7 @@ authoring surface.
 - **must:** Reject duplicate or unknown execution and hook keys, invalid timeouts, attempts, backoff, concurrency, hook arities, error policies, unbounded policy waits, and invalid history limits before startup.
 - **why:** Runtime policy must be valid before execution starts.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I27 — Eligible bounded retries
 
@@ -237,7 +237,7 @@ authoring surface.
 - **must:** Use the owned Runner for per-node timeouts and retries. Run at most max_attempts attempts, retry only retryable Action errors, apply configured backoff, and let the outer deadline or cancellation stop retry work.
 - **why:** Retries must not bypass ownership, error classification, or the commit boundary.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I28 — Execution scheduling and hooks
 
@@ -245,7 +245,7 @@ authoring surface.
 - **must:** Apply max_concurrency to Flow nodes within one serial turn. Compose supported Worker hooks with ownership, trace propagation, and safe runtime failure logging.
 - **why:** Execution policy must not change turn isolation.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I29 — One terminal summary
 
@@ -253,7 +253,7 @@ authoring surface.
 - **must:** Record one terminal summary for each admitted turn: succeeded, failed, cancelled, timed_out, or indeterminate. Report stage, commit indicator, versions, IDs, directive count, and duration without raw state, input, or errors. Emit one settled event when the process can run its terminal callback; an untrappable kill cannot emit it.
 - **why:** Observers need one safe statement of the commit result.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I30 — Failure decisions
 
@@ -261,7 +261,7 @@ authoring surface.
 - **must:** Default to continuing after ordinary failure. Support stop_on_error and a consecutive max_errors threshold; success resets the count. Stop decisions preserve the original error reply.
 - **why:** Failure policy must not alter committed domain state.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I31 — Bounded custom failure policy
 
@@ -269,7 +269,7 @@ authoring surface.
 - **must:** Run custom error callbacks outside the server with a finite policy deadline after terminal cleanup. Keep reads available and reject owned reentrant turns. Serialize queued work until the decision. Stop safely on timeout, exception, invalid return, or callback failure and preserve the original turn error.
 - **why:** Policy work must not block reads or revise a terminal outcome.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I33 — Runtime observation
 
@@ -277,7 +277,7 @@ authoring surface.
 - **must:** Emit safe lifecycle start/stop, turn start/stop/settled, commit, and returned-directive events. Carry trace context through lifecycle tasks, Action context, and native Task Logger metadata. Label the server process. Reject caller-supplied trace_context.
 - **why:** Runtime observation must follow ownership without disclosing input or state.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I34 — Bounded opt-in history
 
@@ -285,7 +285,7 @@ authoring surface.
 - **must:** Return no history by default. When debug is enabled, retain at most debug_max_events terminal summaries, in completion order, dropping the oldest. Keep last_outcome available without history.
 - **why:** Debug work must have a fixed retention bound and exclude raw values.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 **Runtime control**
 
@@ -295,14 +295,14 @@ authoring surface.
 - **must:** Close admission atomically for quiesce or hibernate. Reject new and OTP-postponed turns with quiesced, drain queued requests before completion, and never replay them on resume. Keep Agent and status reads available.
 - **why:** Control must preserve Agent state, ownership, and bounded process lifetime.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 ### jido.agent_server.I85 — Quiescent boundary
 
 - **scope:** `Jido.AgentServer`
 - **must:** Finish active work by default. With active: cancel, cancel only pre-commit work and confirm execution cleanup. Accepted required writes, failure policy, commit hooks, directives, and orphan delivery must settle before quiescence. Resume only after that boundary.
 - **why:** Control must preserve Agent state, ownership, and bounded process lifetime.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I86 — Bounded control
 
@@ -310,7 +310,7 @@ authoring surface.
 - **must:** Use a finite control deadline and a finite caller wait when the server cannot respond. Reject concurrent controls. A quiesce deadline returns an explicit failure and leaves admission closed until work settles and an explicit resume succeeds. Ignore stale control and idle timers.
 - **why:** Control must preserve Agent state, ownership, and bounded process lifetime.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I87 — Control callback safety
 
@@ -318,7 +318,7 @@ authoring surface.
 - **must:** Reject synchronous quiesce, resume, hibernate, and stop requests from owned turn, bootstrap, storage, or orphan callback work that would deadlock. Keep nonblocking reads available.
 - **why:** Control must preserve Agent state, ownership, and bounded process lifetime.
 - **kind:** functional
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.I94 — Control configuration
 
@@ -326,4 +326,84 @@ authoring surface.
 - **must:** Validate unique control option keys, finite control deadlines, owner PIDs, idle timeout, and idle policy before dependent work. Keep runtime changes in one file, preserve the direct option surface, and keep unrelated runtime APIs unchanged.
 - **why:** Control must preserve Agent state, ownership, and bounded process lifetime.
 - **kind:** functional
+- **status:** retired
+
+### jido.agent_server.I95 — Stable logical Agent reference
+
+- **scope:** `Jido.Agent.Ref`, `Jido.create_agent/4`, Ref delivery through `Jido`
+- **must:** Use one stable Ref for a logical Agent across activation, worker replacement, passivation, and reactivation. Do not put a process identifier in the Ref.
+- **why:** A logical Agent can stay alive when no worker is resident.
+- **kind:** functional
+- **status:** active
+
+### jido.agent_server.I96 — One accepted Turn result
+
+- **scope:** `Jido.AgentServer.call/3`, `submit/3`, `await/2`, `cast/3`, `Jido.AgentServer.TurnResult`
+- **must:** Return accepted completion, wait, failure, cancellation, timeout, and uncertainty as a `TurnResult`. Reserve `{:error, reason}` for work that was not accepted or for transport failure. Run cast through the same Turn path and discard only its reply.
+- **why:** All request modes need one result model and one execution path.
+- **kind:** functional
+- **status:** active
+
+### jido.agent_server.I97 — Stable activation root
+
+- **scope:** `Jido.AgentServer` activation supervision
+- **must:** Keep one activation identity while the worker restarts. Keep a healthy Plugin runtime when only the worker restarts. Replace the worker before the activation accepts more work.
+- **why:** Worker recovery must not change the logical activation or restart healthy resources.
+- **kind:** ordering
+- **status:** active
+
+### jido.agent_server.I98 — Signal resume and retry
+
+- **scope:** durable Flow wait delivery through stable Ref input
+- **must:** Resume a waiting durable Flow with a `Jido.Signal`. Save accepted input before downstream work. Return the saved terminal result for an exact retry and reject a conflicting reuse.
+- **why:** External input must be safe to retry after an uncertain reply.
+- **kind:** ordering
+- **status:** active
+
+### jido.agent_server.I99 — Durable wake-up
+
+- **scope:** Instance wake store and Agent activation
+- **must:** Save a wake deadline outside the resident worker. Restore it after an Instance restart. Activate the stable Ref when the deadline is due and continue the saved Turn.
+- **why:** Timer work must survive a BEAM or Instance restart without a resident worker.
+- **kind:** ordering
+- **status:** active
+
+### jido.agent_server.I100 — Single activation under concurrency
+
+- **scope:** concurrent Ref delivery through one Jido instance
+- **must:** Join concurrent activation requests on one resident activation and serialize their Turns. Do not start two workers for the same Ref.
+- **why:** Concurrent network entry must not split one logical Agent.
+- **kind:** ordering
+- **status:** active
+
+### jido.agent_server.I101 — Uncertain write reconciliation
+
+- **scope:** durable Agent writes and Instance reconciliation
+- **must:** Stop admission after an indeterminate durable write. Reconcile storage before the Ref accepts more work. Continue from the confirmed stored revision.
+- **why:** The runtime must not guess whether an uncertain durable write committed.
+- **kind:** ordering
+- **status:** active
+
+### jido.agent_server.I102 — Definition upgrade
+
+- **scope:** `Jido.upgrade_agent/4`
+- **must:** Upgrade one idle logical Agent through its stable Ref. Save the upgraded definition and state before the replacement activation is ready.
+- **why:** Definition changes must use the same durable identity and commit boundary.
+- **kind:** persisted-format
+- **status:** active
+
+### jido.agent_server.I103 — Warm residency and passivation
+
+- **scope:** Instance activation policy and `Jido.status/2`
+- **must:** Keep an active Agent resident for the configured warm period. Passivate only when it is safe. Report logical life, work state, and residency separately.
+- **why:** Logical Agent life must not depend on continuous process residency.
+- **kind:** functional
+- **status:** active
+
+### jido.agent_server.I104 — Separate revisions
+
+- **scope:** `Jido.AgentServer.Snapshot`, `Status`, `TurnResult`, persistence records
+- **must:** Report Agent revision and persistence revision as separate fields. Never expose the old `state_version` term in the public AgentServer values.
+- **why:** One logical commit can require more than one persistence record change.
+- **kind:** persisted-format
 - **status:** active

@@ -35,7 +35,7 @@ defmodule Jido.Plugin.HeartbeatIntegrationTest do
       Jido.Test.AgentServer.Assertions.start_agent(jido, Agent, id: unique_id("heartbeat"))
 
     eventually(fn ->
-      case AgentServer.agent(server).state.heartbeats do
+      case AgentServer.snapshot(server).agent.state.heartbeats do
         [%{source: :plugin} | _rest] -> true
         _heartbeats -> false
       end

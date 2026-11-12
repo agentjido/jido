@@ -68,25 +68,25 @@ defmodule Jido.Agent.ForwardTest do
     {:ok, parent} =
       Jido.Test.AgentServer.Assertions.start_agent(jido, Parent, default_dispatch: {:pid, target: self()})
 
-    [worker] = AgentServer.members(parent, :worker)
+    [worker] = members(parent, :worker)
     signal = Signal.new!("work.request", %{}, source: "/test")
 
-    assert {:ok, _, [%Jido.Agent.Directive.AgentSend{name: :worker}]} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              AgentServer.call(parent, signal)
 
-    eventually(fn -> AgentServer.agent(worker).state.count == 1 end)
+    eventually(fn -> AgentServer.snapshot(worker).agent.state.count == 1 end)
     refute_received {:signal, _signal}
   end
 
   test "forward sends to the current parent Agent", %{jido: jido} do
     {:ok, parent} = Jido.Test.AgentServer.Assertions.start_agent(jido, Parent)
-    [worker] = AgentServer.members(parent, :worker)
+    [worker] = members(parent, :worker)
     signal = Signal.new!("work.completed", %{}, source: "/test")
 
-    assert {:ok, _, [%Jido.Agent.Directive.ParentSend{}]} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              AgentServer.call(worker, signal)
 
-    eventually(fn -> AgentServer.agent(parent).state.count == 1 end)
+    eventually(fn -> AgentServer.snapshot(parent).agent.state.count == 1 end)
   end
 
   test "forward rejects missing definition and runtime targets", %{jido: jido} do
@@ -104,7 +104,14 @@ defmodule Jido.Agent.ForwardTest do
     {:ok, worker} = Jido.Test.AgentServer.Assertions.start_agent(jido, Worker)
     signal = Signal.new!("work.completed", %{}, source: "/test")
 
-    assert {:error, :parent_not_found} = AgentServer.call(worker, signal)
-    assert AgentServer.status(worker).state_version == 0
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: :parent_not_found}} =
+             AgentServer.call(worker, signal)
+
+    assert AgentServer.status(worker).agent_revision == 0
+  end
+
+  defp members(server, name) do
+    {_phase, state} = :sys.get_state(server)
+    Jido.AgentServer.Topology.members(state.activation_state, name)
   end
 end

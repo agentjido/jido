@@ -79,7 +79,7 @@ defmodule Jido.AI.Observability.TelemetryTest do
     assert {:ok, server} = Jido.start_agent(instance, SimpleAgent, id: "telemetry-agent")
     assert :ok = AgentServer.await_ready(server)
 
-    assert {:ok, _agent, _directives} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              AgentServer.call(
                server,
                SimpleAgent.request_signal!(%{input: "Add 2 and 3."})
@@ -268,7 +268,7 @@ defmodule Jido.AI.Observability.TelemetryTest do
 
     log =
       capture_log(fn ->
-        assert {:ok, _agent, [%{signal: reply}]} =
+        assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, reply: reply}} =
                  AgentServer.call(
                    server,
                    SimpleAgent.request_signal!(%{input: "Keep going", limits: %{tool_rounds: 0}})

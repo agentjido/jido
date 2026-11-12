@@ -52,17 +52,17 @@ defmodule Jido.Plugin.ConfigRuntimeTest do
     System.put_env(name, "private-token-second")
     assert GenServer.call(runtime, :config) == [credentials: %{token: "private-token-first"}]
 
-    assert Server.agent(server) === agent
-    assert {:ok, snapshot} = Jido.Persistence.snapshot(Server.agent(server))
+    assert Server.snapshot(server).agent === agent
+    assert {:ok, snapshot} = Jido.Persistence.snapshot(Server.snapshot(server).agent)
     refute inspect(snapshot) =~ "private-token"
-    assert :ok = Server.stop(server)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(server)
 
     assert {:ok, ^agent} = Jido.Persistence.restore(snapshot)
     assert {:ok, restored} = AgentServerAssertions.start_agent(jido, agent)
     %{pid: replacement} = AgentServerAssertions.plugin(restored, Connection)
     assert replacement != runtime
     assert GenServer.call(replacement, :config) == [credentials: %{token: "private-token-second"}]
-    assert Server.agent(restored) === agent
-    assert :ok = Server.stop(restored)
+    assert Server.snapshot(restored).agent === agent
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(restored)
   end
 end

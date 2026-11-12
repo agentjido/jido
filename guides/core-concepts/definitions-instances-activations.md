@@ -82,7 +82,7 @@ true = activation != server
 
 # A value you built keeps its ID and state.
 {:ok, seeded} = Jido.start_agent(LayersGuide.Jido, second)
-%{open: ["Printer jam"]} = Jido.AgentServer.agent(seeded).state
+%{open: ["Printer jam"]} = Jido.AgentServer.snapshot(seeded).agent.state
 ```
 
 The server takes a copy of the value. Later Turns change the server's Agent, and your variable stays as it was.

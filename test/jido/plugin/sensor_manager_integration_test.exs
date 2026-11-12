@@ -12,15 +12,17 @@ defmodule Jido.Plugin.SensorManagerIntegrationTest do
 
     runtime = Jido.Test.AgentServer.Assertions.plugin(server, SensorManager).pid
 
-    assert {:ok, committed, _directives} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              AgentServer.call(server, signal("sensor.manage", %{operation: :start, value: 7}))
+
+    committed = AgentServer.snapshot(server).agent
 
     assert committed.state.sensors.desired == %{
              source: %{module: F.EmittingSensor, config: %{value: 7}}
            }
 
     first_sensor = eventually(fn -> Runtime.sensors(runtime)[:source] end)
-    eventually(fn -> AgentServer.agent(server).state.readings == [7] end)
+    eventually(fn -> AgentServer.snapshot(server).agent.state.readings == [7] end)
 
     Process.exit(first_sensor, :kill)
 
@@ -32,11 +34,12 @@ defmodule Jido.Plugin.SensorManagerIntegrationTest do
         end
       end)
 
-    eventually(fn -> AgentServer.agent(server).state.readings == [7, 7] end)
+    eventually(fn -> AgentServer.snapshot(server).agent.state.readings == [7, 7] end)
 
-    assert {:ok, stopped, _directives} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              AgentServer.call(server, signal("sensor.manage", %{operation: :stop}))
 
+    stopped = AgentServer.snapshot(server).agent
     assert stopped.state.sensors.desired == %{}
     eventually(fn -> Runtime.sensors(runtime) == %{} end)
     refute Process.alive?(second_sensor)

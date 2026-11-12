@@ -98,7 +98,7 @@ defmodule Jido.AI.Observability.OpenTelemetryTest do
     assert {:ok, server} = Jido.start_agent(instance, TracedAgent, id: "runtime-agent-1")
     assert :ok = Jido.AgentServer.await_ready(server)
 
-    assert {:ok, _agent, _directives} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Jido.AgentServer.call(server, TracedAgent.request_signal!(%{input: "Run the tool."}))
 
     events = receive_otel([])

@@ -9,7 +9,7 @@ defmodule Jido.AgentServer.Plugin do
   @doc "Reads the current state owned by one live Plugin runtime."
   @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
   def state(%Init{agent_server: agent_server, module: package}, timeout \\ 5_000) do
-    Jido.AgentServer.plugin_state(agent_server, package, timeout)
+    Jido.AgentServer.Worker.plugin_state(agent_server, package, timeout)
   catch
     :exit, reason -> {:error, {:agent_server_unavailable, reason}}
   end
@@ -50,7 +50,11 @@ defmodule Jido.AgentServer.Plugin do
   @doc false
   def init(data, spec, owner) do
     %Init{
-      agent_server: owner,
+      agent_server:
+        if(data.activation,
+          do: Jido.AgentServer.ActivationHandle.via(data.activation),
+          else: owner
+        ),
       agent_id: data.agent.id,
       module: spec.module,
       plugin_state: owned_state(data.agent, spec),
@@ -143,7 +147,9 @@ defmodule Jido.AgentServer.Plugin do
         start: {__MODULE__, :start_root, [spec, state]}
     }
 
-    case Supervisor.start_child(activation, child_spec) do
+    supervisor = Jido.AgentServer.Supervisor.plugin_supervisor(activation)
+
+    case Supervisor.start_child(supervisor, child_spec) do
       {:ok, pid} when is_pid(pid) ->
         {:ok, pid}
 
@@ -151,7 +157,7 @@ defmodule Jido.AgentServer.Plugin do
         {:ok, pid}
 
       {:error, {:already_started, pid}} = error ->
-        case List.keyfind(Supervisor.which_children(activation), child_spec.id, 0) do
+        case List.keyfind(Supervisor.which_children(supervisor), child_spec.id, 0) do
           {_, ^pid, _, _} when is_pid(pid) -> {:ok, pid}
           _ -> error
         end

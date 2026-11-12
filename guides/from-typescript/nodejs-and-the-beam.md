@@ -290,8 +290,8 @@ restarted =
     end
   end)
 
-%{handled: 1} = Jido.AgentServer.agent(restarted).state
-%{handled: 0} = Jido.AgentServer.agent(returns).state
+%{handled: 1} = Jido.AgentServer.snapshot(restarted).agent.state
+%{handled: 0} = Jido.AgentServer.snapshot(returns).agent.state
 
 :ok = Jido.stop(BeamGuide.Jido)
 ```

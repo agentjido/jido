@@ -112,40 +112,31 @@ Guides: [Instances and Tenants](../operations/configuration-and-tenant-isolation
 
 | Function | Summary |
 | --- | --- |
-| `Jido.activate_agent/4` | Restores or creates one durable Agent with an explicit stable Agent Ref. |
-| `Jido.agent/3` | Returns the committed Agent through a stable Agent Ref. |
-| `Jido.agent_count/2` | Counts live Agents with options in the selected Jido instance. |
+| `Jido.activate_agent/3` | Activates one existing durable Agent with an explicit stable Agent Ref. |
 | `Jido.agent_ref/3` | Builds one stable Agent Ref in the selected instance namespace. |
-| `Jido.attach/4` | Attaches an owner process through a stable Agent Ref. |
-| `Jido.await_ready/3` | Waits for runtime readiness through a stable Agent Ref. |
 | `Jido.call/4` | Sends one synchronous Signal through a stable Agent Ref. |
-| `Jido.cancel/3` | Cancels current pre-commit work for one stable Agent Ref. |
 | `Jido.cancel_turn/4` | Cancels one matching Turn for a stable Agent Ref. |
 | `Jido.cast/3` | Sends one best-effort asynchronous Signal through a stable Agent Ref. |
-| `Jido.children/3` | Returns child runtime status through a stable Agent Ref. |
-| `Jido.delete_agent/4` | Writes a durable tombstone for one inactive stable Agent Ref. |
-| `Jido.detach/4` | Detaches an owner process through a stable Agent Ref. |
-| `Jido.hibernate/3` | Hibernates an Agent with options in the selected Jido instance. |
-| `Jido.hibernate_ref/3` | Persists and stops the local Agent resolved by a stable Agent Ref. |
+| `Jido.create_agent/4` | Creates one durable Agent with an explicit stable Agent Ref. |
+| `Jido.delete_agent/3` | Writes a durable tombstone for one inactive stable Agent Ref. |
 | `Jido.list_agents/2` | Lists Agents with options in the selected Jido instance. |
-| `Jido.plugin_state/4` | Returns one Plugin-owned field from the complete Agent state through a stable Ref. |
+| `Jido.reconcile_agent/3` | Replaces one faulted activation from its authoritative durable record. |
+| `Jido.resident_agent_count/2` | Counts resident Agent activations. |
 | `Jido.resolve_agent/2` | Resolves the current local worker for one stable Agent Ref. |
 | `Jido.start/1` | Start the default Jido instance for scripts and Livebook. |
 | `Jido.start_agent/3` | Starts one Agent under the selected Jido instance supervisor. |
-| `Jido.start_agent_ref/4` | Starts one Agent with an explicit stable Agent Ref. |
 | `Jido.start_link/1` | Starts a Jido instance supervisor. |
 | `Jido.status/3` | Returns Turn status through a stable Agent Ref. |
 | `Jido.stop/1` | Stop a Jido instance. |
 | `Jido.stop_agent/3` | Stops an Agent with options in the selected Jido instance. |
-| `Jido.stop_agent_ref/4` | Stops the local Agent resolved by a stable Agent Ref. |
 | `Jido.submit/4` | Submits one AgentServer turn through a stable Agent Ref. |
 | `Jido.thaw/4` | Thaws an Agent with options in the selected Jido instance. |
-| `Jido.touch/2` | Resets the idle timer through a stable Agent Ref. |
+| `Jido.upgrade_agent/4` | Applies one trusted upgrade Action to an inactive durable Agent. |
 | `Jido.whereis_agent/3` | Looks up an Agent with options in the selected Jido instance. |
 
 ## Live Agents
 
-Guides: [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd), [Call, Cast, and Await](../agent-servers/send-signals-to-live-agents.livemd).
+Guides: [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd), [Status and Snapshots](../agent-servers/status-and-history.md).
 
 ### `Jido.AgentServer`
 
@@ -153,52 +144,19 @@ Runs one serialized Agent Turn at a time.
 
 | Function | Summary |
 | --- | --- |
-| `Jido.AgentServer.abandon/1` | Discards a pending reply and releases its OTP request monitor. |
-| `Jido.AgentServer.activation/1` | Returns the activation supervisor PID, or nil for a bare worker. |
-| `Jido.AgentServer.adopt_child/4` | Attaches an independent orphan to a new logical parent in the same instance and partition. |
-| `Jido.AgentServer.agent/2` | Returns the saved Agent instance. |
-| `Jido.AgentServer.alive?/1` | Returns true for a live local AgentServer PID or OTP name. |
-| `Jido.AgentServer.attach/3` | Attaches one owner. |
-| `Jido.AgentServer.await/2` | Waits for a submitted turn and returns the same turn result as `call/3`. |
+| `Jido.AgentServer.abandon/1` | Stops local waiting for one pending Turn without cancelling it. |
+| `Jido.AgentServer.await/2` | Waits for a submitted Turn and returns its `TurnResult`. |
 | `Jido.AgentServer.await_ready/2` | Waits for Plugin startup and readiness. |
-| `Jido.AgentServer.call/3` | Runs one Signal. |
-| `Jido.AgentServer.cancel/2` | Cancels the active turn and waits for owned work to stop. |
-| `Jido.AgentServer.cancel_turn/3` | Cancels only the active turn with this ID. |
-| `Jido.AgentServer.cast/3` | Sends one Signal without a reply, with optional `context:`. |
-| `Jido.AgentServer.child_spec/1` | Returns a child specification for OTP supervision. |
-| `Jido.AgentServer.children/2` | Returns live tagged children with separate worker and activation PIDs. |
-| `Jido.AgentServer.deliver_wait/4` | Saves a Signal as input to an open durable Flow wait. |
-| `Jido.AgentServer.detach/3` | Detaches one owner. |
-| `Jido.AgentServer.hibernate/2` | Saves the settled Agent at its current revision, then stops the activation. |
-| `Jido.AgentServer.history/1` | Returns terminal summaries in chronological order when debug is enabled. |
-| `Jido.AgentServer.members/3` | Returns live topology members in slot order. |
-| `Jido.AgentServer.plugin_state/3` | Returns one committed Plugin-owned state field. |
-| `Jido.AgentServer.quiesce/2` | Closes admission and rejects queued turns with `:quiesced`. |
-| `Jido.AgentServer.resume/2` | Opens admission after quiescence. |
-| `Jido.AgentServer.snapshot/2` | Returns one committed Agent and revision from the same server event. |
-| `Jido.AgentServer.spawn_child/4` | Starts a tagged local child Agent. |
-| `Jido.AgentServer.start/1` | Starts a registered AgentServer under the selected Jido instance supervisor. |
-| `Jido.AgentServer.start_link/1` | Starts a bare worker with one validated Agent instance and a running `runner:`. |
-| `Jido.AgentServer.status/2` | Returns phase, identity, revision, queue counts, and a bounded active turn view. |
-| `Jido.AgentServer.stop/3` | Stops the server and its active turn through OTP termination. |
-| `Jido.AgentServer.stop_child/3` | Stops the complete tagged child activation and confirms its shutdown. |
-| `Jido.AgentServer.submit/3` | Submits one turn with optional `context:` and `admission_timeout:` and returns a pending result handle. |
-| `Jido.AgentServer.touch/1` | Restarts the idle budget. |
-| `Jido.AgentServer.upgrade/3` | Replaces one idle activation from a complete trusted Agent document and optional state migration. |
-| `Jido.AgentServer.whereis/3` | Looks up an AgentServer in one instance and partition. |
-| `Jido.AgentServer.worker/1` | Returns the live request worker for an activation root, or nil when unavailable. |
-
-### `Jido.AgentServer.Directive`
-
-Runtime requests.
-
-| Function | Summary |
-| --- | --- |
-| `Jido.AgentServer.Directive.agent_start/3` | Builds a Directive that starts and tracks one local Agent. |
-| `Jido.AgentServer.Directive.agent_stop/2` | Builds a Directive that stops and untracks one child Agent. |
-| `Jido.AgentServer.Directive.error_report/2` | Builds a Directive that applies the AgentServer error policy after commit. |
-| `Jido.AgentServer.Directive.process_start/1` | Builds a Directive that starts one independent OTP child under the Jido instance. |
-| `Jido.AgentServer.Directive.signal_send/3` | Builds an Emit Directive that sends one Signal to a local process. |
+| `Jido.AgentServer.call/3` | Runs one Signal and waits for its accepted `TurnResult`. |
+| `Jido.AgentServer.cancel_turn/3` | Cancels one exact queued, running, or waiting Turn. |
+| `Jido.AgentServer.cast/3` | Sends one Signal through the same Turn path and discards its reply. |
+| `Jido.AgentServer.child_spec/1` | Returns a child specification for one complete activation. |
+| `Jido.AgentServer.quiesce/2` | Closes admission and returns a stable `Status`. |
+| `Jido.AgentServer.resume/2` | Reopens admission when the activation is safe. |
+| `Jido.AgentServer.snapshot/2` | Returns the complete committed `Snapshot`. |
+| `Jido.AgentServer.status/2` | Returns the process-neutral semantic `Status`. |
+| `Jido.AgentServer.stop/3` | Stops one resident activation and returns its final `Snapshot`. |
+| `Jido.AgentServer.submit/3` | Submits one Signal and returns an owner-bound `Pending` value. |
 
 ### `Jido.AgentServer.Plugin`
 
@@ -219,7 +177,7 @@ The live AgentServer admission envelope.
 
 ## Agent definitions and commands
 
-Guides: [Define an Agent](../agents/define-and-instantiate-an-agent.livemd), [State and Directives](../agents/agent-results-and-directives.md).
+Guides: [Define an Agent](../agents/define-and-instantiate-an-agent.livemd).
 
 ### `Jido.Agent`
 
@@ -246,11 +204,8 @@ Changes and runtime work returned by an Agent executable turn.
 
 | Function | Summary |
 | --- | --- |
-| `Jido.Agent.Directive.agent_send/2` | Creates a request to send one Signal to a tracked child Agent after commit. |
 | `Jido.Agent.Directive.emit/2` | Creates an emission request. |
-| `Jido.Agent.Directive.parent_send/1` | Creates a request to send one Signal to the parent Agent after commit. |
 | `Jido.Agent.Directive.reply/1` | Creates one correlated response request. |
-| `Jido.Agent.Directive.server_stop/1` | Creates a terminal request to stop the AgentServer after commit. |
 | `Jido.Agent.Directive.validate/1` | Validates one built-in or custom Agent Directive. |
 
 ### `Jido.Agent.Ref`

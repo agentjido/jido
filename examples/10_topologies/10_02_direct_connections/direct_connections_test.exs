@@ -7,7 +7,6 @@ defmodule Jido.Examples.Topology.DirectConnectionsTest do
   @moduletag :integration
 
   import Jido.Test.AgentServer.TopologyAssertions
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.DirectConnections, as: Example
 
   test "outputs travel root to worker to sink to root in separate commits", %{jido: jido} do
@@ -18,18 +17,29 @@ defmodule Jido.Examples.Topology.DirectConnectionsTest do
         source: "/examples/topology/direct_connections"
       )
 
-    assert {:ok, unchanged, [_]} = Server.call(server, signal)
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, signal)
+
+      assert turn_result.status in [:committed, :waiting]
+      unchanged = Jido.AgentServer.snapshot(server).agent
+    )
+
     assert unchanged.state.completed == 0
-    eventually(fn -> Server.agent(server).state.completed == 6 end)
-    assert Server.snapshot(server).state_version == 2
-    assert Enum.all?(members(server), &(Server.snapshot(&1).state_version == 1))
+    eventually(fn -> Jido.AgentServer.snapshot(server).agent.state.completed == 6 end)
+    assert Jido.AgentServer.snapshot(server).agent_revision == 2
+    assert Enum.all?(members(server), &(Jido.AgentServer.snapshot(&1).agent_revision == 1))
 
     assert {:ok, checks} =
-             Jido.Agent.Topology.checks(Example.definition(), [], &Jido.Agent.Validation.resolve/2)
+             Jido.Agent.Topology.checks(
+               Example.definition(),
+               [],
+               &Jido.Agent.Validation.resolve/2
+             )
 
     assert Enum.all?(checks, &(&1.status == :unchecked))
     stop_topology(server)
-    assert Jido.agent_count(jido) == 0
+    assert Jido.resident_agent_count(jido) == 0
   end
 
   test "connections are validated as part of the complete definition" do

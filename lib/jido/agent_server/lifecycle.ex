@@ -5,14 +5,9 @@ defmodule Jido.AgentServer.Lifecycle do
   @runtime_defaults [
     turn_timeout: 60_000,
     exec_opts: [],
-    error_policy: :log_only,
-    error_policy_timeout: 5_000,
-    debug: false,
-    debug_max_events: 100,
     max_postponed_signals: 1_000,
     max_directives_per_turn: 1_000,
     directive_timeout: 5_000,
-    directive_handler: nil,
     default_dispatch: nil,
     readiness_timeout: 5_000,
     commit_timeout: 5_000,
@@ -42,7 +37,6 @@ defmodule Jido.AgentServer.Lifecycle do
     on_persistence_error: 3,
     transform_runnables: 2
   ]
-  @error_signal "jido.agent_server.error"
   @start_failure_table Jido.AgentServer.StartFailures
   @start_failure_slots 1_024
 
@@ -50,7 +44,7 @@ defmodule Jido.AgentServer.Lifecycle do
 
   alias Jido.Agent.Validation
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
-  alias Jido.AgentServer.DurableTurn.Continuation
+  alias Jido.Durable.Continuation
   alias Jido.Durable.Runtime, as: DurableRuntime
   alias Jido.Persistence.ETS, as: ETSStore
   alias Jido.Trace.Context, as: TraceContext
@@ -100,21 +94,13 @@ defmodule Jido.AgentServer.Lifecycle do
              :turn_timeout
            ),
          :ok <- validate_exec(opts[:exec_opts]),
-         :ok <- validate_error_policy(opts[:error_policy]),
-         :ok <- validate_timeout(opts, :error_policy_timeout),
          :ok <- validate_limit(opts, :max_postponed_signals),
-         :ok <- validate_setting(is_boolean(opts[:debug]), :debug),
          :ok <-
            Jido.Plugin.Normalizer.validate_runtime_options(opts[:plugin_runtime_options]),
-         :ok <-
-           validate_setting(
-             is_integer(opts[:debug_max_events]) and opts[:debug_max_events] in 1..10_000,
-             :debug_max_events
-           ),
          :ok <- validate_timeout(opts, :persistence_timeout),
          :ok <-
            validate_setting(
-             opts[:persistence_mode] in [:create, :restore, :restore_or_create],
+             opts[:persistence_mode] in [:create, :restore],
              :persistence_mode
            ),
          :ok <-
@@ -281,9 +267,6 @@ defmodule Jido.AgentServer.Lifecycle do
   def outcome_status(:turn_timeout), do: :timed_out
   def outcome_status(_reason), do: :failed
 
-  def next_error_count(:failed, count), do: count + 1
-  def next_error_count(_status, count), do: count
-
   def outcome(active, state_version, status, stage, committed, count) do
     outcome = %{
       turn_id: active.turn_id,
@@ -317,28 +300,6 @@ defmodule Jido.AgentServer.Lifecycle do
       outcome
     end
   end
-
-  def retain_history(history, _outcome, false, _limit), do: history
-
-  def retain_history(history, outcome, true, limit) do
-    queue = :queue.in(outcome, history)
-    if :queue.len(queue) > limit, do: elem(:queue.out(queue), 1), else: queue
-  end
-
-  def failure_decision(:log_only, _count, _signal_type), do: {:complete, :continue}
-
-  def failure_decision(:stop_on_error, _count, _signal_type),
-    do: {:complete, {:stop, :agent_error}}
-
-  def failure_decision({:max_errors, max}, count, _signal_type) do
-    decision = if count >= max, do: {:stop, :max_agent_errors}, else: :continue
-    {:complete, decision}
-  end
-
-  def failure_decision({:emit_signal, _target}, _count, @error_signal),
-    do: {:complete, :continue}
-
-  def failure_decision(_policy, _count, _signal_type), do: :run
 
   def start(data, mode) do
     data |> open_activation(mode) |> remember_start_failure(data)
@@ -397,7 +358,7 @@ defmodule Jido.AgentServer.Lifecycle do
   defp open_activation(data, mode) do
     with :ok <- ServerSupervisor.close_execution(data.activation_state),
          {:ok, config} <- Jido.Persistence.resolve_config(data.persistence, data.jido),
-         {:ok, agent, revision, turn} <-
+         {:ok, agent, revision, agent_revision, turn} <-
            Jido.Persistence.open_agent(
              config,
              data.agent,
@@ -407,7 +368,7 @@ defmodule Jido.AgentServer.Lifecycle do
          {:ok, agent} <- Validation.validate_instance(agent),
          {:ok, revision, turn} <- settle_unreleased_handoff(data, config, agent, revision, turn),
          :ok <- validate_continuation(agent, turn) do
-      {:ok, agent, revision, config, turn}
+      {:ok, agent, revision, agent_revision, config, turn}
     end
   end
 
@@ -415,6 +376,7 @@ defmodule Jido.AgentServer.Lifecycle do
     persistence_opts =
       persistence_options(data) ++
         [
+          agent_revision: Keyword.get(opts, :agent_revision, data.agent_revision),
           revision: revision,
           expected_revision: expected_revision,
           server_turn: server_turn,
@@ -422,13 +384,7 @@ defmodule Jido.AgentServer.Lifecycle do
           reason: if(revision == expected_revision, do: :hibernate, else: :commit)
         ]
 
-    case Keyword.fetch(opts, :previous_agent_module) do
-      {:ok, module} ->
-        Jido.Persistence.replace_agent(data.persistence, agent, module, persistence_opts)
-
-      :error ->
-        Jido.Persistence.save_agent(data.persistence, agent, persistence_opts)
-    end
+    Jido.Persistence.save_agent(data.persistence, agent, persistence_opts)
   end
 
   def write_result(result, deadline) do
@@ -444,45 +400,6 @@ defmodule Jido.AgentServer.Lifecycle do
 
   def snapshot(agent, revision), do: %{agent: agent, state_version: revision}
 
-  def upgrade_definition(agent, definition, migration, context) do
-    with {:ok, definition} <- Validation.resolve(definition),
-         {:ok, state} <- migrate_state(agent.state, migration, context),
-         candidate = %{definition | id: agent.id, state: state},
-         {:ok, candidate} <- Validation.validate_instance(candidate) do
-      {:ok, candidate}
-    end
-  end
-
-  defp migrate_state(state, nil, _context), do: {:ok, state}
-
-  defp migrate_state(state, migration, context) do
-    case Jido.Exec.run(migration, %{state: state}, context, []) do
-      {:ok, next} when is_map(next) and not is_struct(next) ->
-        {:ok, next}
-
-      {:ok, next, []} when is_map(next) and not is_struct(next) ->
-        {:ok, next}
-
-      {:ok, _next, [_ | _]} ->
-        Jido.Error.validation_result(
-          :invalid_definition_migration,
-          [:migrate],
-          "Agent definition migration cannot return Directives"
-        )
-
-      {:error, _reason} = error ->
-        error
-
-      result ->
-        Jido.Error.validation_result(
-          :invalid_definition_migration,
-          [:migrate],
-          "Agent definition migration must return a complete state Map",
-          %{result: result}
-        )
-    end
-  end
-
   @doc false
   def persistence_mode(state, requested) do
     lifetime = :ets.lookup_element(state, :durable_lifetime, 2)
@@ -493,12 +410,12 @@ defmodule Jido.AgentServer.Lifecycle do
   end
 
   @doc false
-  def restore(state, agent, revision) do
+  def restore(state, agent, revision, agent_revision) do
     # The parent child specification retains this reference across root loss.
     # A separate start has a new reference and still enforces strict :create.
     lifetime = :ets.lookup_element(state, :durable_lifetime, 2)
     :atomics.put(lifetime, 1, 1)
-    :ets.insert(state, {:checkpoint, agent, revision})
+    :ets.insert(state, [{:checkpoint, agent, revision}, {:agent_revision, agent_revision}])
   end
 
   def durable_instruction(%{instruction: %Jido.Instruction{} = instruction}),
@@ -719,19 +636,6 @@ defmodule Jido.AgentServer.Lifecycle do
         end
       end)
   end
-
-  defp validate_error_policy(policy) when policy in [:log_only, :stop_on_error], do: :ok
-  defp validate_error_policy({:max_errors, count}) when is_integer(count) and count > 0, do: :ok
-  defp validate_error_policy(fun) when is_function(fun, 2), do: :ok
-
-  defp validate_error_policy({:emit_signal, target}) do
-    case Jido.Signal.Dispatch.validate_opts(target) do
-      {:ok, _} -> :ok
-      {:error, _} -> invalid_options("invalid error_policy Signal destination")
-    end
-  end
-
-  defp validate_error_policy(_), do: invalid_options("invalid error_policy")
 
   defp safe_hook(:transform_runnables, fun),
     do: fn runnables, state -> invoke_hook(fun, [runnables, state], runnables) end

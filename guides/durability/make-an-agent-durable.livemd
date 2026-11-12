@@ -89,7 +89,7 @@ alias MakeDurableGuide.Invoice
 {:ok, signal} = Invoice.record_payment_signal(%{cents: 1_500})
 {:ok, agent, []} = Server.call(server, signal)
 
-{agent.state, Server.snapshot(server).state_version}
+{agent.state, Server.snapshot(server).agent_revision}
 ```
 
 The cell returns `{%{paid_cents: 1500}, 1}`.
@@ -123,7 +123,7 @@ replacement =
 
 :ok = Server.await_ready(replacement)
 
-{replacement != server, Server.agent(replacement).state, Server.snapshot(replacement).state_version}
+{replacement != server, Server.snapshot(replacement).agent.state, Server.snapshot(replacement).agent_revision}
 ```
 
 The cell returns `{true, %{paid_cents: 1500}, 1}`.
@@ -145,7 +145,7 @@ nil = Process.whereis(MakeDurableGuide.Jido)
 {:ok, restored} = Jido.thaw(MakeDurableGuide.Jido, Invoice, "invoice-42")
 :ok = Server.await_ready(restored)
 
-{Server.agent(restored).state, Server.snapshot(restored).state_version}
+{Server.snapshot(restored).agent.state, Server.snapshot(restored).agent_revision}
 ```
 
 The cell returns `{%{paid_cents: 1500}, 1}`. A new BEAM follows the same steps. It needs the same namespace, the same store, and compatible code. Loading the record does not rebuild the definition from source, so changed code needs an explicit upgrade. [Checkpoints and Upgrades](checkpoints-and-data-upgrades.md) shows how.
@@ -161,7 +161,7 @@ alias MakeDurableGuide.Invoice
 {:ok, signal} = Invoice.record_payment_signal(%{cents: 500})
 {:ok, agent, []} = Server.call(restored, signal)
 
-{agent.state, Server.snapshot(restored).state_version}
+{agent.state, Server.snapshot(restored).agent_revision}
 ```
 
 The cell returns `{%{paid_cents: 2000}, 2}`.

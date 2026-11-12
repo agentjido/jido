@@ -20,15 +20,23 @@ defmodule Jido.Examples.Workflow.FlowDirectivesTest do
   test "live dispatch starts after the single Agent commit", %{jido: jido} do
     server = start_agent!(jido, Example)
     {:ok, signal} = Example.run_signal(%{})
-    assert {:ok, committed, _directives} = Jido.AgentServer.call(server, signal)
 
-    eventually(fn -> length(Effects.records(server)) == 3 end)
-    records = Effects.records(server)
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, signal)
+
+      assert turn_result.status in [:committed, :waiting]
+      committed = Jido.AgentServer.snapshot(server).agent
+    )
+
+    eventually(fn -> length(Effects.records(jido, server)) == 3 end)
+    records = Effects.records(jido, server)
     assert Enum.map(records, & &1.label) == ["first", "side", "final"]
     assert Enum.uniq_by(records, & &1.turn_id) |> length() == 1
 
     for record <- records do
-      assert record.snapshot == %{agent: committed, state_version: 1}
+      assert record.snapshot.agent == committed
+      assert record.snapshot.agent_revision == 1
     end
   end
 
@@ -38,9 +46,12 @@ defmodule Jido.Examples.Workflow.FlowDirectivesTest do
     {:ok, signal} = Example.fail_signal(%{})
 
     assert {:error, _reason} = Jido.Agent.cmd(before.agent, signal)
-    assert {:error, _reason} = Jido.AgentServer.call(server, signal)
-    eventually(fn -> Jido.AgentServer.status(server).phase == :idle end)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: _reason}} =
+             Jido.AgentServer.call(server, signal)
+
+    eventually(fn -> Jido.AgentServer.status(server).work_state == :idle end)
     assert Jido.AgentServer.snapshot(server) == before
-    assert Effects.records(server) == []
+    assert Effects.records(jido, server) == []
   end
 end

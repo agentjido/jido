@@ -6,7 +6,6 @@ defmodule Jido.Examples.Plugins.DSLTest do
   @moduletag :integration
 
   alias Jido.Agent, as: CoreAgent
-  alias Jido.AgentServer, as: Server
   alias Jido.Catalog
   alias Jido.Examples.Plugins.DSL.{Agent, Thresholds}
 
@@ -26,8 +25,23 @@ defmodule Jido.Examples.Plugins.DSLTest do
     assert {:ok, direct, []} = Agent.cmd(agent, signal)
     assert direct.state == %{count: 3, reached: [:first, :third]}
     {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, agent)
-    assert {:ok, ^direct, []} = Server.call(server, signal)
-    assert {:ok, again, []} = Server.call(server, signal)
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, signal)
+
+      assert turn_result.status in [:committed, :waiting]
+      assert direct == Jido.AgentServer.snapshot(server).agent
+    )
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, signal)
+
+      assert turn_result.status in [:committed, :waiting]
+      again = Jido.AgentServer.snapshot(server).agent
+    )
+
     assert again.state == %{count: 6, reached: [:first, :third]}
   end
 
@@ -35,11 +49,24 @@ defmodule Jido.Examples.Plugins.DSLTest do
     definition = Agent.definition()
     registry = Agent.registry()
     assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
-    assert {:ok, imported} = Jido.Test.AgentServer.Registry.decode_json(Jason.encode!(document), registry)
+
+    assert {:ok, imported} =
+             Jido.Test.AgentServer.Registry.decode_json(Jason.encode!(document), registry)
+
     assert imported == definition
-    {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, imported, id: unique_id())
+
+    {:ok, server} =
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, imported, id: unique_id())
+
     {:ok, signal} = Agent.add_signal(%{amount: 1})
-    assert {:ok, %{state: %{count: 1, reached: [:first]}}, []} = Server.call(server, signal)
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, signal)
+
+      assert turn_result.status in [:committed, :waiting]
+      %{state: %{count: 1, reached: [:first]}} = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert {:error, _} =
              Jido.Test.AgentServer.Registry.decode_json(Jason.encode!(document), Catalog.new!([]))

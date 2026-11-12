@@ -90,16 +90,15 @@ defmodule Jido.Agent.StatelessDirectiveTest do
 
   test "a handler without a Plugin process sends its result through another Turn", %{jido: jido} do
     {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, Agent)
-    refute Map.has_key?(Server.children(server), {:plugin, Effects})
 
-    assert {:ok, committed, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(server, signal("effect.submit", %{kind: :reply}), context: %{observer: self()})
 
-    assert committed.state == %{value: 7}
+    assert Server.snapshot(server).agent.state == %{value: 7}
     assert_receive {:effect_started, :reply, worker}
     refute worker == server
     assert_receive {:effect_started, :last, _}
-    eventually(fn -> Server.status(server).state_version == 2 end)
-    assert Server.agent(server).state == %{value: 8}
+    eventually(fn -> Server.status(server).agent_revision == 2 end)
+    assert Server.snapshot(server).agent.state == %{value: 8}
   end
 end

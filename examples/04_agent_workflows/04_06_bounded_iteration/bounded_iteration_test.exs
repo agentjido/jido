@@ -11,11 +11,16 @@ defmodule Jido.Examples.Workflow.BoundedIterationTest do
 
     {:ok, command_signal_1} = Example.repair_signal(%{missing: 0})
 
-    assert {:ok, complete, _directives} =
-             Server.call(
-               server,
-               command_signal_1
-             )
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Server.call(
+                 server,
+                 command_signal_1
+               )
+
+      assert turn_result.status in [:committed, :waiting]
+      complete = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert complete.state.result == %{
              kind: :jido_flow_iterate_result,
@@ -26,11 +31,16 @@ defmodule Jido.Examples.Workflow.BoundedIterationTest do
 
     {:ok, command_signal_2} = Example.repair_signal(%{missing: 3})
 
-    assert {:ok, repaired, _directives} =
-             Server.call(
-               server,
-               command_signal_2
-             )
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Server.call(
+                 server,
+                 command_signal_2
+               )
+
+      assert turn_result.status in [:committed, :waiting]
+      repaired = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert repaired.state.result == %{
              kind: :jido_flow_iterate_result,
@@ -39,7 +49,9 @@ defmodule Jido.Examples.Workflow.BoundedIterationTest do
              state: %{missing: 0, repairs: 3}
            }
 
-    assert Server.snapshot(server) == %{agent: repaired, state_version: 2}
+    snapshot = Server.snapshot(server)
+    assert snapshot.agent == repaired
+    assert snapshot.agent_revision == 2
   end
 
   test "iteration exhaustion preserves the prior result", %{jido: jido} do
@@ -47,17 +59,21 @@ defmodule Jido.Examples.Workflow.BoundedIterationTest do
 
     {:ok, command_signal_3} = Example.repair_signal(%{missing: 1})
 
-    assert {:ok, _, _directives} =
-             Server.call(
-               server,
-               command_signal_3
-             )
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Server.call(
+                 server,
+                 command_signal_3
+               )
+
+      assert turn_result.status in [:committed, :waiting]
+    )
 
     before = Server.snapshot(server)
 
     {:ok, command_signal_4} = Example.repair_signal(%{missing: 4})
 
-    assert {:error, error} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: error}} =
              Server.call(
                server,
                command_signal_4
@@ -73,7 +89,11 @@ defmodule Jido.Examples.Workflow.BoundedIterationTest do
 
     {:ok, command_signal_5} = Example.repair_signal(%{missing: -1})
 
-    assert {:error, %Jido.Error.ValidationError{details: %{phase: :flow_input}}} =
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :failed,
+              error: %Jido.Error.ValidationError{details: %{phase: :flow_input}}
+            }} =
              Server.call(
                server,
                command_signal_5
@@ -81,7 +101,11 @@ defmodule Jido.Examples.Workflow.BoundedIterationTest do
 
     {:ok, command_signal_6} = Example.repair_signal(%{missing: 1, repair_size: 2})
 
-    assert {:error, %Jido.Error.ValidationError{details: %{phase: :iterate_state_update}}} =
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :failed,
+              error: %Jido.Error.ValidationError{details: %{phase: :iterate_state_update}}
+            }} =
              Server.call(
                server,
                command_signal_6

@@ -111,10 +111,10 @@ To keep the Agent running, start a Jido instance and start the Agent inside it. 
 
 :ok = Jido.AgentServer.await_ready(server)
 
-{:ok, _agent, []} = Jido.AgentServer.call(server, payment)
-{:ok, _agent, []} = Jido.AgentServer.call(server, payment)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.call(server, payment)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.call(server, payment)
 
-Jido.AgentServer.agent(server).state
+Jido.AgentServer.snapshot(server).agent.state
 ```
 
 The cell returns `%{paid_cents: 3000, total_cents: 5000}`. The server kept the state between the two calls.
@@ -124,9 +124,10 @@ A failed Turn leaves the committed state alone, and the server keeps running.
 ```elixir
 bad_payment = GettingStarted.InvoiceAgent.apply_payment_signal!(%{amount_cents: -1})
 
-{:error, %Jido.Error.ValidationError{}} = Jido.AgentServer.call(server, bad_payment)
+{:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+  Jido.AgentServer.call(server, bad_payment)
 
-Jido.AgentServer.agent(server).state.paid_cents
+Jido.AgentServer.snapshot(server).agent.state.paid_cents
 ```
 
 The cell returns `3000`.

@@ -66,7 +66,7 @@ defmodule Jido.MalformedPublicInputsTest do
     for opts <- [[1], [{:partition, nil}, 1], [{:partition, nil} | :invalid]] do
       assert {:error, %{__exception__: true}} = Jido.whereis_agent(jido, "missing", opts)
       assert {:error, %{__exception__: true}} = Jido.list_agents(jido, opts)
-      assert {:error, %{__exception__: true}} = Jido.agent_count(jido, opts)
+      assert {:error, %{__exception__: true}} = Jido.resident_agent_count(jido, opts)
       assert {:error, %{__exception__: true}} = Jido.stop_agent(jido, "missing", opts)
     end
 

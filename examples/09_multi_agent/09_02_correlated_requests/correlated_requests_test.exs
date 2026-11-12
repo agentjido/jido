@@ -1,90 +1,53 @@
-Code.require_file("../../08_runtime/support/keep_state.ex", __DIR__)
 Code.require_file("../support/worker.ex", __DIR__)
 Code.require_file("correlated_requests.ex", __DIR__)
 
 defmodule Jido.Examples.MultiAgent.CorrelatedRequestsTest do
-  use Jido.Test.Agent.FeatureSDKCase
+  use ExUnit.Case, async: false
   @moduletag :integration
 
-  @moduletag group: :multi_agent
+  alias Jido.Agent.Ref
+  alias Jido.AgentServer.TurnResult
+  alias Jido.Examples.{CorrelatedRequests, Worker}
 
-  alias Jido.Examples.CorrelatedRequests
+  setup do
+    id = System.unique_integer([:positive])
+    instance = :"correlated_requests_#{id}"
+    namespace = "examples/correlated-requests/#{id}"
+    table = :"correlated_requests_store_#{id}"
 
-  test "child work and its correlated result use separate parent commits", %{jido: jido} do
-    parent = start_agent!(jido, CorrelatedRequests)
+    start_supervised!(
+      {Jido, name: instance, namespace: namespace, persistence: {Jido.Persistence.ETS, table: table}},
+      id: instance
+    )
 
-    {:ok, route_signal_1} =
-      CorrelatedRequests.request_signal(%{request_id: "request-1", value: 7})
+    coordinator = Ref.new!(namespace: namespace, id: "coordinator")
+    worker = Ref.new!(namespace: namespace, id: "worker")
+    {:ok, ^coordinator} = Jido.create_agent(instance, coordinator, CorrelatedRequests)
+    {:ok, ^worker} = Jido.create_agent(instance, worker, Worker)
 
-    assert {:ok, pending, _directives} =
-             Jido.AgentServer.call(parent, route_signal_1, [])
-
-    assert pending.state.status == :waiting
-    pending_version = Server.snapshot(parent).state_version
-    assert pending_version == 1
-
-    eventually(fn -> state(parent).status == :completed end)
-    assert state(parent).result == 14
-    assert Server.snapshot(parent).state_version > pending_version
-    eventually(fn -> Server.children(parent) == %{} end)
+    %{instance: instance, coordinator: coordinator, worker: worker}
   end
 
-  test "wrong correlation and duplicate request IDs preserve the candidate" do
-    agent = CorrelatedRequests.instantiate!(id: unique_id("correlated"))
+  test "explicit coordination preserves request correlation", c do
+    assert {:ok, %TurnResult{status: :committed}} =
+             CorrelatedRequests.run(c.instance, c.coordinator, c.worker, "request-1", 7)
 
-    {:ok, command_signal_1} =
-      CorrelatedRequests.request_signal(%{request_id: "request-1", value: 7})
+    assert {:ok, coordinator} = Jido.activate_agent(c.instance, c.coordinator)
 
-    assert {:ok, pending, [_spawn, _send]} =
-             CorrelatedRequests.cmd(
-               agent,
-               command_signal_1
-             )
-
-    for overrides <- [%{request_id: "old"}, %{tag: "wrong"}, %{job_id: "wrong"}] do
-      data =
-        Map.merge(
-          %{request_id: "request-1", job_id: "request-1", tag: "request-1", value: 14},
-          overrides
-        )
-
-      signal =
-        Jido.Signal.new!("examples.multi_agent.worker.result", data, source: "/test/correlated_requests")
-
-      assert {:error, _} = CorrelatedRequests.cmd(pending, signal)
-    end
-
-    {:ok, command_signal_2} =
-      CorrelatedRequests.request_signal(%{request_id: "request-1", value: 8})
-
-    assert {:error, _} =
-             CorrelatedRequests.cmd(
-               pending,
-               command_signal_2
-             )
+    assert %{request_id: "request-1", status: :completed, result: 14} =
+             Jido.AgentServer.snapshot(coordinator).agent.state
   end
 
-  test "cancellation returns explicit child-stop intent" do
-    agent = CorrelatedRequests.instantiate!(id: unique_id("correlated"))
+  test "an unrelated result does not change the committed coordinator", c do
+    {:ok, request} = CorrelatedRequests.request_signal(%{request_id: "request-1"})
+    assert {:ok, %TurnResult{status: :committed}} = Jido.call(c.instance, c.coordinator, request)
 
-    {:ok, command_signal_3} =
-      CorrelatedRequests.request_signal(%{request_id: "request-1", value: 7})
+    {:ok, stale} = CorrelatedRequests.complete_signal(%{request_id: "old", value: 10})
+    assert {:ok, %TurnResult{status: :failed}} = Jido.call(c.instance, c.coordinator, stale)
 
-    assert {:ok, pending, _directives} =
-             CorrelatedRequests.cmd(
-               agent,
-               command_signal_3
-             )
+    assert {:ok, coordinator} = Jido.activate_agent(c.instance, c.coordinator)
 
-    {:ok, command_signal_4} = CorrelatedRequests.cancel_signal(%{request_id: "request-1"})
-
-    assert {:ok, cancelled, [%Jido.AgentServer.Directive.AgentStop{name: "request-1"}]} =
-             CorrelatedRequests.cmd(
-               pending,
-               command_signal_4
-             )
-
-    assert cancelled.state.status == :cancelled
-    assert cancelled.state.result == nil
+    assert %{status: :waiting, result: nil} =
+             Jido.AgentServer.snapshot(coordinator).agent.state
   end
 end

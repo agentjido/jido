@@ -29,20 +29,18 @@ defmodule Jido.Examples.AgentLiveDebugger do
   alias Jido.AgentServer, as: Server
 
   def snapshot(server) do
-    agent = Server.agent(server)
-    %{state_version: version} = Server.snapshot(server)
+    committed = Server.snapshot(server)
+    agent = committed.agent
     status = Server.status(server)
-    {:ok, scheduler} = Server.plugin_state(server, Jido.Plugin.Scheduler)
 
     %{
       agent_id: agent.id,
       agent_module: agent.module,
       state: Map.take(agent.state, [:status, :result]),
-      state_version: version,
-      runtime_status: status.phase,
-      active: status.active,
-      scheduler: scheduler,
-      children: Server.children(server)
+      agent_revision: committed.agent_revision,
+      work_state: status.work_state,
+      active_turn_id: status.active_turn_id,
+      effects: status.effects
     }
   end
 end

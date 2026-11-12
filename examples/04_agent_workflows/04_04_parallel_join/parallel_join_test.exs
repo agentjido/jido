@@ -16,8 +16,13 @@ defmodule Jido.Examples.Workflow.ParallelJoinTest do
 
     {:ok, route_signal_1} = Example.fetch_pair_signal(%{value: 3})
 
-    assert {:ok, agent, _directives} =
-             Jido.AgentServer.call(server, route_signal_1, context: %{request: "generated"})
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_1, context: %{request: "generated"})
+
+      assert turn_result.status in [:committed, :waiting]
+      agent = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert agent.state.result.left == %{side: :left, value: 3, request: "generated"}
     assert agent.state.result.right == %{side: :right, value: 3, request: "generated"}
@@ -25,11 +30,13 @@ defmodule Jido.Examples.Workflow.ParallelJoinTest do
 
     {:ok, route_signal_2} = Example.fetch_pair_signal(%{value: 3, fail: :invalid})
 
-    assert {:error,
-            %Jido.Error.ValidationError{
-              details: %{phase: :flow_input, errors: [%{path: [:fail]}]}
-            }} =
-             Jido.AgentServer.call(server, route_signal_2, [])
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :failed,
+              error: %Jido.Error.ValidationError{
+                details: %{phase: :flow_input, errors: [%{path: [:fail]}]}
+              }
+            }} = Jido.AgentServer.call(server, route_signal_2, [])
 
     assert Server.snapshot(server) == before
   end
@@ -40,15 +47,22 @@ defmodule Jido.Examples.Workflow.ParallelJoinTest do
 
     {:ok, route_signal_3} = Example.fetch_pair_signal(%{value: 2})
 
-    assert {:ok, agent, _directives} =
-             Jido.AgentServer.call(server, route_signal_3, context: %{request: "shared"})
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_3, context: %{request: "shared"})
+
+      assert turn_result.status in [:committed, :waiting]
+      agent = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert agent.state.result == %{
              left: %{side: :left, value: 2, request: "shared"},
              right: %{side: :right, value: 2, request: "shared"}
            }
 
-    assert Server.snapshot(server) == %{agent: agent, state_version: before.state_version + 1}
+    snapshot = Server.snapshot(server)
+    assert snapshot.agent == agent
+    assert snapshot.agent_revision == before.agent_revision + 1
   end
 
   test "a branch failure prevents the join and preserves committed state", %{jido: jido} do
@@ -56,14 +70,18 @@ defmodule Jido.Examples.Workflow.ParallelJoinTest do
 
     {:ok, route_signal_4} = Example.fetch_pair_signal(%{value: 1})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(server, route_signal_4, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_4, [])
+
+      assert turn_result.status in [:committed, :waiting]
+    )
 
     before = Server.snapshot(server)
 
     {:ok, route_signal_5} = Example.fetch_pair_signal(%{value: 2, fail: :left})
 
-    assert {:error, error} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: error}} =
              Jido.AgentServer.call(server, route_signal_5, [])
 
     assert Enum.any?(

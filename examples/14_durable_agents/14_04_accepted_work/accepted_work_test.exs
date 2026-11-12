@@ -8,6 +8,7 @@ defmodule Jido.Examples.Durable.AcceptedWorkTest do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Durable.AcceptedWork, as: Example
+  alias Jido.Test.AgentServer.TopologyAssertions
 
   test "a topology member commits its Flow and restores completion without another Turn", c do
     id = unique_id("accepted-report")
@@ -19,15 +20,17 @@ defmodule Jido.Examples.Durable.AcceptedWorkTest do
                persistence: persistence
              )
 
-    assert :ok = Server.await_ready(root)
-    assert [server] = Server.members(root, :reports)
+    assert :ok = Jido.AgentServer.await_ready(root)
+    assert [server] = TopologyAssertions.members(root)
     assert {:ok, request} = Example.request_signal(%{topic: "  OTP  "})
-    assert {:ok, agent, []} = Server.call(server, request)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed} = receipt} =
+             Server.call(server, request)
+
+    agent = Server.snapshot(server).agent
     assert agent.state == %{report: "Report: OTP"}
-    receipt = Server.status(server).durable_turn
-    assert receipt.status == :completed
     member_id = agent.id
-    activation = Server.activation(root)
+    activation = Jido.Test.AgentServer.ExampleRuntime.activation(root)
     monitor = Process.monitor(activation)
     Process.exit(activation, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^activation, :killed}, 5_000
@@ -40,14 +43,17 @@ defmodule Jido.Examples.Durable.AcceptedWorkTest do
         end
       end)
 
-    assert :ok = Server.await_ready(awake)
-    assert [restored] = Server.members(awake, :reports)
-    assert Server.agent(restored) == agent
-    assert Server.agent(restored).id == member_id
-    assert Server.status(restored).durable_turn == receipt
-    assert {:error, _} = Server.call(restored, %{request | data: %{topic: 42}})
-    assert Server.agent(restored) == agent
+    assert :ok = Jido.AgentServer.await_ready(awake)
+    assert [restored] = TopologyAssertions.members(awake)
+    assert Jido.AgentServer.snapshot(restored).agent == agent
+    assert Jido.AgentServer.snapshot(restored).agent.id == member_id
+    assert receipt.agent_ref.id == member_id
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+             Server.call(restored, %{request | data: %{topic: 42}})
+
+    assert Jido.AgentServer.snapshot(restored).agent == agent
     assert :ok = Jido.stop_agent(c.jido, awake)
-    assert Jido.agent_count(c.jido) == 0
+    assert Jido.resident_agent_count(c.jido) == 0
   end
 end

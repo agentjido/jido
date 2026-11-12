@@ -60,9 +60,9 @@ invoice = PureLiveGuide.Invoice.instantiate!(id: "inv-1")
 {:ok, server} = Jido.start_agent(PureLiveGuide.Jido, PureLiveGuide.Invoice, id: "inv-live")
 :ok = Jido.AgentServer.await_ready(server)
 
-{:ok, committed, [%Jido.Agent.Directive.Emit{}]} = Jido.AgentServer.call(server, signal)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.call(server, signal)
 
-true = committed.state == candidate.state
+true = Jido.AgentServer.snapshot(server).agent.state == candidate.state
 ```
 
 On the pure path, `invoice` still holds the old state, and `candidate` is yours to keep or drop. The emitted Signal went nowhere. On the live path, the server committed the state and then delivered the Signal.
@@ -78,12 +78,12 @@ On the pure path, `invoice` still holds the old state, and `candidate` is yours 
 | Plugin `prepare/2`, `select_route/2`, `reduce/2` | Yes | Yes |
 | Plugin `admit/3`, `after_commit/3`, `dispatch/4`, `prepare_outbound/4` | No | Yes |
 | Plugin runtime process | No. `plugin_inputs[plugin].runtime` is `nil` | Yes |
-| Directives | Returned to you | Returned to you, then run after commit |
-| Keeps the result | No | Yes, with a new `state_version` |
+| Directives | Returned to you | Applied after commit |
+| Keeps the result | No | Yes, with a new Agent revision |
 | Saves to a store | No | With persistence |
 | Serializes concurrent work | No | One Turn at a time, with a queue |
 | Limit on total time | None | `:turn_timeout`, 60,000 ms by default |
-| Reply Directive | Validated and returned | Delivered to the caller as a message |
+| Reply Directive | Validated and returned | Reported in `TurnResult.reply` and delivered to the caller |
 | Flow with a wait | Fails with `:unsupported_host` | Runs with persistence. Otherwise fails with `:unsupported_host` |
 | Flow ending in a Handoff | Returns `{:handoff, candidate, instruction, directives}` | Commits and runs the successor as a new Turn |
 

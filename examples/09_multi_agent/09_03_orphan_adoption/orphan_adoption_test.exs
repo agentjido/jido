@@ -1,61 +1,66 @@
 Code.require_file("../support/worker.ex", __DIR__)
 Code.require_file("orphan_adoption.ex", __DIR__)
 
-defmodule Jido.Examples.MultiAgent.OrphanAdoptionTest do
-  use Jido.Test.Case, async: false
+defmodule Jido.Examples.MultiAgent.StableReplacementTest do
+  use ExUnit.Case, async: false
   @moduletag :integration
 
-  alias Jido.AgentServer, as: Server
-  alias Jido.Examples.OrphanAdoption.Parent
+  alias Jido.Agent.Ref
+  alias Jido.AgentServer.{Snapshot, TurnResult}
+  alias Jido.Examples.{StableReplacement, Worker}
 
-  test "the continue policy leaves a live unattached worker", %{jido: jido} do
-    {:ok, parent} =
-      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Parent, id: unique_id("continue-parent"))
+  setup do
+    id = System.unique_integer([:positive])
+    instance = :"stable_replacement_#{id}"
+    namespace = "examples/stable-replacement/#{id}"
+    table = :"stable_replacement_store_#{id}"
 
-    assert {:ok, worker} = Parent.start_worker(parent, :continue)
-    monitor = Process.monitor(worker)
-    assert :ok = Jido.stop_agent(jido, parent)
-    eventually(fn -> Server.status(worker).parent == nil end)
-    assert Server.agent(worker).state.total == 0
-    assert :ok = Jido.stop_agent(jido, worker)
-    assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 1_000
+    start_supervised!(
+      {Jido, name: instance, namespace: namespace, persistence: {Jido.Persistence.ETS, table: table}},
+      id: instance
+    )
+
+    ref = Ref.new!(namespace: namespace, id: "worker")
+    {:ok, ^ref} = Jido.create_agent(instance, ref, Worker)
+    %{instance: instance, ref: ref}
   end
 
-  test "an orphan notification precedes adoption by a new owner", %{jido: jido} do
-    {:ok, parent} =
-      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Parent, id: unique_id("former-parent"))
+  test "the Ref resolves a replacement worker and retains committed state", c do
+    assert {:ok, %TurnResult{agent_activation_id: activation_id}} =
+             StableReplacement.calculate(c.instance, c.ref, "first", 3)
 
-    parent_id = Server.agent(parent).id
+    {:ok, first} = Jido.resolve_agent(c.instance, c.ref)
+    Process.exit(first, :kill)
 
-    assert {:ok, worker} =
-             Parent.start_worker(parent, :emit_orphan, orphan_dispatch: {:pid, target: self()})
+    second =
+      eventually(fn ->
+        case Jido.resolve_agent(c.instance, c.ref) do
+          {:ok, pid} when pid != first -> pid
+          _other -> nil
+        end
+      end)
 
-    worker_id = Server.agent(worker).id
-    assert :ok = Jido.stop_agent(jido, parent)
+    assert %Snapshot{agent: %{state: %{completed: [%{value: 6}]}}} =
+             Jido.AgentServer.snapshot(second)
 
-    assert_receive {:signal,
-                    %{
-                      type: "jido.agent_server.orphaned",
-                      data: %{parent_id: ^parent_id, tag: :worker}
-                    }},
-                   1_000
+    assert activation_id == Jido.AgentServer.status(second).agent_activation_id
+  end
 
-    eventually(fn -> Server.status(worker).parent == nil end)
+  defp eventually(fun, attempts \\ 200)
+  defp eventually(fun, 0), do: flunk("condition did not become true: #{inspect(fun.())}")
 
-    {:ok, adopter} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Parent, id: unique_id("adopter"))
-    assert :ok = Server.adopt_child(adopter, worker, :adopted)
-    assert %{pid: ^worker, placement: :independent} = Server.children(adopter).adopted
-    assert Server.status(worker).parent.agent_id == Server.agent(adopter).id
-    assert {:error, _} = Server.adopt_child(adopter, worker, :adopted)
-    assert {:error, _} = Server.adopt_child(adopter, "missing-worker", :missing)
+  defp eventually(fun, attempts) do
+    case fun.() do
+      nil ->
+        Process.sleep(10)
+        eventually(fun, attempts - 1)
 
-    {:ok, signal} = Parent.forward_signal(%{value: 7})
-    assert {:ok, %{state: %{forwarded: 1}}, [_]} = Server.call(adopter, signal)
-    eventually(fn -> Server.agent(worker).state.total == 7 end)
-    monitor = Process.monitor(worker)
-    assert :ok = Server.stop_child(adopter, :adopted)
-    assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 1_000
-    assert Jido.whereis_agent(jido, worker_id) == nil
-    assert :ok = Jido.stop_agent(jido, adopter)
+      false ->
+        Process.sleep(10)
+        eventually(fun, attempts - 1)
+
+      value ->
+        value
+    end
   end
 end

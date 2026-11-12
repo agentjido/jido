@@ -164,11 +164,8 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | --- | --- |
 | `Jido.Agent` | Author Agent definitions as Maps or with the Spark DSL. |
 | `Jido.Agent.Directive` | Runtime work returned by an Agent executable command. |
-| `Jido.Agent.Directive.AgentSend` | Sends one Signal to a tracked Agent activation after commit. |
 | `Jido.Agent.Directive.Emit` | Dispatches one Signal after the Agent state commit. |
-| `Jido.Agent.Directive.ParentSend` | Sends one Signal to the current parent Agent after commit. |
 | `Jido.Agent.Directive.Reply` | Represents one correlated Signal response to the current request. |
-| `Jido.Agent.Directive.ServerStop` | Stops the AgentServer after the Agent state commit. |
 | `Jido.Agent.Plugin` | Executes the Agent callbacks of `Jido.Plugin`. |
 | `Jido.Agent.Plugin.FSM` | Adds deterministic finite-state route control to one Agent. |
 | `Jido.Agent.Plugin.Preparation` | Read-only input for one pure Agent Plugin preparation callback. |
@@ -185,11 +182,6 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | --- | --- |
 | `Jido.AgentServer` | Runs one serialized Agent Turn at a time. |
 | `Jido.AgentServer.Command` | The live AgentServer admission envelope. |
-| `Jido.AgentServer.Directive` | Runtime requests. |
-| `Jido.AgentServer.Directive.AgentStart` | Starts and tracks one local Agent under its owner's OTP supervisor. |
-| `Jido.AgentServer.Directive.AgentStop` | Stops and untracks one Agent activation. |
-| `Jido.AgentServer.Directive.ErrorReport` | Reports a structured turn or runtime error to the Server policy. |
-| `Jido.AgentServer.Directive.ProcessStart` | Starts one untracked process under the Jido instance supervisor. |
 | `Jido.AgentServer.Plugin` | Live Plugin state access and lifecycle policy for one AgentServer. |
 | `Jido.AgentServer.Status` | A process-neutral view of one AgentServer runtime. |
 

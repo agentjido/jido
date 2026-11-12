@@ -1,114 +1,41 @@
-Code.require_file("../../08_runtime/support/keep_state.ex", __DIR__)
-Code.require_file("../support/worker.ex", __DIR__)
 Code.require_file("child_lifecycle.ex", __DIR__)
 
 defmodule Jido.Examples.MultiAgent.ChildLifecycleTest do
-  use Jido.Test.Agent.FeatureSDKCase
+  use ExUnit.Case, async: false
   @moduletag :integration
 
-  @moduletag group: :multi_agent
-  alias Jido.Examples.{ChildLifecycle, Worker}
+  alias Jido.Agent.Ref
+  alias Jido.AgentServer.{Snapshot, TurnResult}
+  alias Jido.Examples.ChildLifecycle
 
-  test "pure evaluation plans a child; only live dispatch starts it", %{jido: jido} do
-    parent = start_agent!(jido, ChildLifecycle)
-    before = Server.snapshot(parent)
+  setup do
+    id = System.unique_integer([:positive])
+    instance = :"child_lifecycle_#{id}"
+    namespace = "examples/child-lifecycle/#{id}"
+    table = :"child_lifecycle_store_#{id}"
 
-    {:ok, command_signal_1} = ChildLifecycle.start_worker_signal(%{tag: "worker"})
+    start_supervised!(
+      {Jido, name: instance, namespace: namespace, persistence: {Jido.Persistence.ETS, table: table}},
+      id: instance
+    )
 
-    assert {:ok, candidate, [%Jido.AgentServer.Directive.AgentStart{name: "worker"}]} =
-             ChildLifecycle.cmd(
-               before.agent,
-               command_signal_1
-             )
-
-    assert candidate.state.desired == ["worker"]
-    assert Server.children(parent) == %{}
-    assert Server.snapshot(parent) == before
-
-    {:ok, route_signal_1} = ChildLifecycle.start_worker_signal(%{tag: "worker"})
-
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(parent, route_signal_1, [])
-
-    child = eventually(fn -> Server.children(parent)["worker"] end)
-    assert Server.agent(child.pid).id == "#{before.agent.id}/worker"
-    assert Jido.whereis_agent(jido, Server.agent(child.pid).id) == child.pid
-    assert Server.status(child.pid).parent.agent_id == Server.agent(parent).id
-    assert state(parent) == %{desired: ["worker"]}
-
-    {:ok, route_signal_2} = ChildLifecycle.start_worker_signal(%{tag: "worker"})
-
-    assert {:error, _} =
-             Jido.AgentServer.call(parent, route_signal_2, [])
-
-    assert Server.children(parent)["worker"].pid == child.pid
+    %{instance: instance, ref: Ref.new!(namespace: namespace, id: "worker")}
   end
 
-  test "abnormal restart keeps committed child state and updates the tracked PID", %{jido: jido} do
-    parent = start_agent!(jido, ChildLifecycle)
+  test "the Instance owns one logical Agent across activations", c do
+    assert {:ok, c.ref} == Jido.create_agent(c.instance, c.ref, ChildLifecycle)
+    assert {:ok, first} = Jido.activate_agent(c.instance, c.ref)
 
-    {:ok, route_signal_3} = ChildLifecycle.start_worker_signal(%{tag: "worker"})
+    assert {:ok, signal} = ChildLifecycle.increment_signal(%{})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(parent, route_signal_3, [])
+    assert {:ok, %TurnResult{status: :committed, agent_revision: 1}} =
+             Jido.call(c.instance, c.ref, signal)
 
-    first = eventually(fn -> Server.children(parent)["worker"] end)
+    assert %Snapshot{agent: %{state: %{count: 1}}} = Jido.AgentServer.snapshot(first)
+    assert {:ok, %Snapshot{agent: %{state: %{count: 1}}}} = Jido.AgentServer.stop(first)
 
-    {:ok, route_signal_4} =
-      Worker.calculate_signal(%{
-        request_id: "r",
-        job_id: "j",
-        tag: "worker",
-        value: 3
-      })
-
-    assert {:ok, committed, _directives} =
-             Jido.AgentServer.call(first.pid, route_signal_4, [])
-
-    Process.exit(first.pid, :kill)
-
-    next =
-      eventually(fn ->
-        case Server.children(parent)["worker"] do
-          %{pid: pid} = child when pid != first.pid -> child
-          _ -> nil
-        end
-      end)
-
-    assert Server.agent(next.pid).id == committed.id
-    assert Server.snapshot(next.pid).agent.state == committed.state
-    assert Server.snapshot(next.pid).state_version == 1
-  end
-
-  test "explicit child stop and parent stop remove owned processes", %{jido: jido} do
-    parent = start_agent!(jido, ChildLifecycle)
-
-    {:ok, route_signal_5} = ChildLifecycle.start_worker_signal(%{tag: "first"})
-
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(parent, route_signal_5, [])
-
-    first = eventually(fn -> Server.children(parent)["first"] end)
-    ref = Process.monitor(first.pid)
-
-    {:ok, route_signal_6} = ChildLifecycle.stop_worker_signal(%{tag: "first"})
-
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(parent, route_signal_6, [])
-
-    assert_receive {:DOWN, ^ref, :process, _, _}, 1000
-    eventually(fn -> Server.children(parent) == %{} end)
-
-    {:ok, route_signal_7} = ChildLifecycle.start_worker_signal(%{tag: "second"})
-
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(parent, route_signal_7, [])
-
-    second = eventually(fn -> Server.children(parent)["second"] end)
-    second_id = Server.agent(second.pid).id
-    ref = Process.monitor(second.pid)
-    assert :ok = Jido.stop_agent(jido, parent)
-    assert_receive {:DOWN, ^ref, :process, _, _}, 1000
-    eventually(fn -> Jido.whereis_agent(jido, second_id) == nil end)
+    assert {:ok, second} = Jido.activate_agent(c.instance, c.ref)
+    refute second == first
+    assert %Snapshot{agent: %{state: %{count: 1}}} = Jido.AgentServer.snapshot(second)
   end
 end

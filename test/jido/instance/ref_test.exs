@@ -59,6 +59,16 @@ defmodule Jido.Instance.RefTest do
     end
   end
 
+  defmodule ReadyAgent do
+    use Jido.Agent,
+      name: "instance_ref_ready",
+      plugins: [{ReadyPlugin, %{observer: Jido.Instance.RefTest.Observer}}]
+  end
+
+  defmodule StateAgent do
+    use Jido.Agent, name: "instance_ref_state", plugins: [StatePlugin]
+  end
+
   defmodule RenamedCounter do
     use Jido.Agent, name: "instance_ref_renamed_counter"
 
@@ -89,7 +99,7 @@ defmodule Jido.Instance.RefTest do
     agent_count: [0, 1],
     agent_ref: [1, 2],
     resolve_agent: [1],
-    start_agent_ref: [2, 3],
+    create_agent: [2, 3],
     activate_agent: [2, 3],
     call: [2, 3],
     cast: [2],
@@ -156,18 +166,18 @@ defmodule Jido.Instance.RefTest do
   test "a process label identifies each live server for one Agent Ref" do
     namespace = unique_namespace("process-label")
     instance = unique_instance("process-label")
-    start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
+    start_durable_instance!(instance, namespace)
 
     ref = Ref.new!(namespace: namespace, partition: "west", id: "labelled-agent")
-    assert {:ok, first} = Jido.start_agent_ref(instance, ref, Counter)
+    first = create_and_activate(instance, ref, Counter)
     label = {Jido.AgentServer, ref.id}
     assert :proc_lib.get_label(first) == label
 
     monitor = Process.monitor(first)
-    assert :ok = Jido.stop_agent_ref(instance, ref)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(first)
     assert_receive {:DOWN, ^monitor, :process, ^first, _reason}
 
-    assert {:ok, second} = Jido.start_agent_ref(instance, ref, Counter)
+    assert {:ok, second} = Jido.activate_agent(instance, ref)
     assert second != first
     assert :proc_lib.get_label(second) == label
   end
@@ -262,42 +272,48 @@ defmodule Jido.Instance.RefTest do
 
   @tag obligation: "jido.instance.I8"
   test "the Ref API accepts a generated instance identity" do
-    start_supervised!(NamespacedInstance)
+    start_supervised!({NamespacedInstance, persistence: persistence("generated")})
 
     assert Jido.Instance.NamespaceRegistry.namespace(NamespacedInstance) ==
              "jido/test/generated-instance"
 
     assert {:ok, ref} = Jido.agent_ref(NamespacedInstance, "counter")
-    assert {:ok, server} = Jido.start_agent_ref(NamespacedInstance, ref, Counter)
+    server = create_and_activate(NamespacedInstance, ref, Counter)
     assert Jido.resolve_agent(NamespacedInstance, ref) == {:ok, server}
-    assert {:ok, agent, _} = Jido.call(NamespacedInstance, ref, signal(2))
-    assert agent.state.count == 2
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Jido.call(NamespacedInstance, ref, signal(2))
+
+    assert Jido.AgentServer.snapshot(server).agent.state.count == 2
   end
 
   @tag obligation: ["jido.instance.I6", "jido.instance.I7", "jido.instance.I8"]
   test "the Ref API resolves each operation and preserves direct Server results" do
     namespace = unique_namespace("routing")
     instance = unique_instance("routing")
-    start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
+    start_durable_instance!(instance, namespace)
 
     assert {:ok, %Ref{} = ref} = Jido.agent_ref(instance, "counter", partition: "west")
     assert ref == Ref.new!(namespace: namespace, partition: "west", id: "counter")
-    assert {:ok, server} = Jido.start_agent_ref(instance, ref, Counter)
+    server = create_and_activate(instance, ref, Counter)
     assert Jido.resolve_agent(instance, ref) == {:ok, server}
-    assert Jido.await_ready(instance, ref) == :ok
+    assert Jido.AgentServer.await_ready(server) == :ok
 
-    assert {:ok, committed, _} = Jido.call(instance, ref, signal(2))
-    assert committed.state.count == 2
-    assert Jido.agent(instance, ref) == committed
-    assert %{phase: :idle, state_version: 1} = Jido.status(instance, ref)
-    assert is_map(Jido.children(instance, ref))
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Jido.call(instance, ref, signal(2))
+
+    assert Jido.AgentServer.snapshot(server).agent.state.count == 2
+    assert %{work_state: :idle, residency: :active} = Jido.status(instance, ref)
 
     assert :ok = Jido.cast(instance, ref, signal(3))
-    eventually(fn -> Jido.agent(instance, ref).state.count == 5 end)
+    eventually(fn -> Jido.AgentServer.snapshot(server).agent.state.count == 5 end)
 
     pending = Jido.submit(instance, ref, signal(4))
-    assert {:ok, requested, _} = Jido.AgentServer.await(pending)
-    assert requested.state.count == 9
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Jido.AgentServer.await(pending)
+
+    assert Jido.AgentServer.snapshot(server).agent.state.count == 9
 
     missing = %{ref | id: "missing"}
     assert {:error, :not_found} = Jido.resolve_agent(instance, missing)
@@ -314,7 +330,7 @@ defmodule Jido.Instance.RefTest do
     assert {:ok, _} = Registry.register(Jido.Instance.Names.registry(instance), key, :ready)
     assert {:error, :not_found} = Jido.resolve_agent(instance, foreign)
 
-    assert :ok = Jido.stop_agent_ref(instance, ref)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(server)
     eventually(fn -> Jido.resolve_agent(instance, ref) == {:error, :not_found} end)
   end
 
@@ -322,29 +338,16 @@ defmodule Jido.Instance.RefTest do
   test "Ref resolution distinguishes recovery and Registry loss" do
     namespace = unique_namespace("resolution")
     instance = unique_instance("resolution")
-    instance_pid = start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
+    instance_pid = start_durable_instance!(instance, namespace)
     ref = Ref.new!(namespace: namespace, id: "recovering")
-    observer = unique_instance("resolution_observer")
-    Process.register(self(), observer)
+    Process.register(self(), Jido.Instance.RefTest.Observer)
 
-    agent =
-      Jido.Agent.define!(%{
-        name: "instance_ref_recovering",
-        plugins: [
-          %{
-            id: ReadyPlugin.id(),
-            provider: ReadyPlugin,
-            vsn: ReadyPlugin.vsn(),
-            data: %{observer: observer}
-          }
-        ]
-      })
-      |> Jido.Agent.instantiate!(id: ref.id)
-
-    assert {:ok, server} = Jido.start_agent_ref(instance, ref, agent)
+    assert {:ok, ^ref} = Jido.create_agent(instance, ref, ReadyAgent)
+    task = Task.async(fn -> Jido.activate_agent(instance, ref) end)
     assert_receive {:ready_gate, gate, _root}, 1_000
     assert Jido.resolve_agent(instance, ref) == {:error, :recovering}
     send(gate, :release)
+    assert {:ok, server} = Task.await(task)
     assert Jido.AgentServer.await_ready(server) == :ok
     assert Jido.resolve_agent(instance, ref) == {:ok, server}
 
@@ -365,9 +368,11 @@ defmodule Jido.Instance.RefTest do
   test "Ref routing forwards context and explicit caller waits" do
     namespace = unique_namespace("routing")
     instance = unique_instance("routing")
-    start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
+    start_durable_instance!(instance, namespace)
     {:ok, ref} = Jido.agent_ref(instance, "counter")
-    {:ok, server} = Jido.start_agent_ref(instance, ref, Counter)
+    server = create_and_activate(instance, ref, Counter)
+    observer = unique_instance("routing-observer")
+    Process.register(self(), observer)
 
     assert {:error, %Error.ValidationError{}} =
              Jido.call(instance, ref, signal(1), timeout: -1)
@@ -376,50 +381,33 @@ defmodule Jido.Instance.RefTest do
              Jido.submit(instance, ref, signal(1), unknown: true)
 
     pending =
-      Jido.submit(instance, ref, signal(1), context: %{observer: self(), gate: true})
+      Jido.submit(instance, ref, signal(1), context: %{observer: observer, gate: true})
 
     assert_receive {:add_started, action, context}, 1_000
-    assert context.observer == self()
+    assert context.observer == observer
     on_exit(fn -> if Process.alive?(action), do: send(action, :release) end)
 
     assert catch_exit(Jido.call(instance, ref, signal(1), timeout: 0))
 
-    for read <- [
-          &Jido.agent(instance, ref, &1),
-          &Jido.status(instance, ref, &1),
-          &Jido.plugin_state(instance, ref, StatePlugin, &1),
-          &Jido.children(instance, ref, &1),
-          &Jido.await_ready(instance, ref, &1)
-        ] do
-      assert {:error, %Error.ValidationError{}} = read.(-1)
-    end
+    assert {:error, %Error.ValidationError{}} = Jido.status(instance, ref, -1)
 
     send(action, :release)
-    assert {:ok, committed, []} = Jido.AgentServer.await(pending)
-    assert committed.state.count == 1
-    assert Jido.AgentServer.agent(server) == committed
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Jido.AgentServer.await(pending)
+
+    assert Jido.AgentServer.snapshot(server).agent.state.count == 1
   end
 
   @tag obligation: "jido.instance.I8"
   test "Ref Plugin reads keep the selected Plugin" do
     namespace = unique_namespace("plugin-state")
     instance = unique_instance("plugin-state")
-    start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
+    start_durable_instance!(instance, namespace)
     ref = Ref.new!(namespace: namespace, id: "plugin-agent")
 
-    agent =
-      Jido.Agent.define!(%{
-        name: "instance_ref_plugin_state",
-        plugins: [
-          %{id: StatePlugin.id(), provider: StatePlugin, vsn: StatePlugin.vsn(), data: %{}}
-        ]
-      })
-      |> Jido.Agent.instantiate!(id: ref.id)
-
-    assert {:ok, _server} = Jido.start_agent_ref(instance, ref, agent)
-    assert Jido.await_ready(instance, ref) == :ok
-    assert Jido.plugin_state(instance, ref, StatePlugin) == {:ok, 9}
-    assert Jido.plugin_state(instance, ref, ReadyPlugin) == {:error, :plugin_not_found}
+    server = create_and_activate(instance, ref, StateAgent)
+    assert Jido.AgentServer.snapshot(server).agent.state.owned == 9
   end
 
   @tag obligation: ["jido.instance.I3", "jido.instance.I6", "jido.instance.I8"]
@@ -435,17 +423,16 @@ defmodule Jido.Instance.RefTest do
       id: first
     )
 
-    assert {:ok, server} =
-             Jido.start_agent_ref(first, ref, Counter,
-               persistence: :inherit,
-               persistence_mode: :create
-             )
+    assert {:ok, ^ref} = Jido.create_agent(first, ref, Counter)
+    assert {:ok, server} = Jido.activate_agent(first, ref)
 
     assert :ok = Jido.AgentServer.await_ready(server)
 
-    assert {:ok, agent, _} = Jido.call(first, ref, signal(7))
-    assert agent.state.count == 7
-    assert :ok = Jido.hibernate_ref(first, ref)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Jido.call(first, ref, signal(7))
+
+    assert Jido.AgentServer.snapshot(server).agent.state.count == 7
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(server)
     assert :ok = stop_supervised(first)
 
     start_supervised!(
@@ -453,13 +440,16 @@ defmodule Jido.Instance.RefTest do
       id: second
     )
 
-    assert {:ok, server} = Jido.activate_agent(second, ref, Counter)
+    assert {:ok, server} = Jido.activate_agent(second, ref)
     assert :ok = Jido.AgentServer.await_ready(server)
-    assert Jido.agent(second, ref).state.count == 7
-    assert {:ok, restored, _} = Jido.call(second, ref, signal(1))
-    assert restored.state.count == 8
-    assert :ok = Jido.hibernate_ref(second, ref)
-    assert :ok = Jido.delete_agent(second, ref, Counter)
+    assert Jido.AgentServer.snapshot(server).agent.state.count == 7
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Jido.call(second, ref, signal(1))
+
+    assert Jido.AgentServer.snapshot(server).agent.state.count == 8
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(server)
+    assert :ok = Jido.delete_agent(second, ref)
 
     assert {:error, :deleted} =
              Jido.Persistence.load_agent(store, Counter, ref.id,
@@ -467,7 +457,7 @@ defmodule Jido.Instance.RefTest do
                partition: ref.partition
              )
 
-    case Jido.activate_agent(second, ref, Counter) do
+    case Jido.activate_agent(second, ref) do
       {:ok, deleted} ->
         assert Jido.AgentServer.await_ready(deleted) == {:error, :deleted}
 
@@ -477,7 +467,7 @@ defmodule Jido.Instance.RefTest do
   end
 
   @tag obligation: ["jido.instance.I6", "jido.instance.I9"]
-  test "durable Ref activation creates, restores, and resolves concurrent starts" do
+  test "durable Ref creation is synchronous and activation is strict and single-flight" do
     namespace = unique_namespace("activation")
     instance = unique_instance("activation")
     store = persistence("activation")
@@ -488,10 +478,14 @@ defmodule Jido.Instance.RefTest do
       id: instance
     )
 
+    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Counter)
+    assert {:error, :not_found} = Jido.resolve_agent(instance, ref)
+    assert {:error, :conflict} = Jido.create_agent(instance, ref, Counter)
+
     results =
       1..4
       |> Task.async_stream(
-        fn _index -> Jido.activate_agent(instance, ref, Counter) end,
+        fn _index -> Jido.activate_agent(instance, ref) end,
         ordered: false,
         timeout: 5_000
       )
@@ -501,26 +495,61 @@ defmodule Jido.Instance.RefTest do
     assert length(Enum.uniq(servers)) == 1
     server = hd(servers)
     assert :ok = Jido.AgentServer.await_ready(server)
-    assert Jido.agent(instance, ref).state.count == 0
+    assert Jido.AgentServer.snapshot(server).agent.state.count == 0
 
-    assert {:ok, agent, _} = Jido.call(instance, ref, signal(7))
-    assert agent.state.count == 7
-    assert :ok = Jido.hibernate_ref(instance, ref)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Jido.call(instance, ref, signal(7))
 
-    assert {:ok, restored} = Jido.activate_agent(instance, ref, Counter)
+    assert Jido.AgentServer.snapshot(server).agent.state.count == 7
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(server)
+
+    assert {:ok, restored} = Jido.activate_agent(instance, ref)
     assert :ok = Jido.AgentServer.await_ready(restored)
-    assert Jido.agent(instance, ref).state.count == 7
+    assert Jido.AgentServer.snapshot(restored).agent.state.count == 7
+  end
+
+  @tag obligation: "jido.instance.I9"
+  test "durable creation requires Instance persistence" do
+    namespace = unique_namespace("create-persistence")
+    instance = unique_instance("create-persistence")
+    start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
+    ref = Ref.new!(namespace: namespace, id: "counter")
+
+    assert {:error, :persistence_not_configured} =
+             Jido.create_agent(instance, ref, Counter)
+
+    assert {:error, :not_found} = Jido.resolve_agent(instance, ref)
+  end
+
+  @tag obligation: "jido.instance.I9"
+  test "strict activation does not create a missing durable Agent" do
+    namespace = unique_namespace("strict-activation")
+    instance = unique_instance("strict-activation")
+    store = persistence("strict_activation")
+    start_durable_instance!(instance, namespace, persistence: store)
+    ref = Ref.new!(namespace: namespace, id: "missing")
+
+    outcome =
+      case Jido.activate_agent(instance, ref) do
+        {:ok, server} -> Jido.AgentServer.await_ready(server)
+        {:error, reason} -> {:error, reason}
+      end
+
+    assert outcome == {:error, :not_found}
+
+    assert {:error, :not_found} =
+             Jido.Persistence.load_agent(store, Counter, ref.id, namespace: namespace)
   end
 
   @tag obligation: "jido.instance.I6"
-  test "Ref startup rejects conflicting identity options before starting an Agent" do
+  test "Ref creation rejects conflicting identity options before writing an Agent" do
     instance = unique_instance("ref-options")
-    start_supervised!({Jido, name: instance, namespace: unique_namespace("ref-options")})
+    start_durable_instance!(instance, unique_namespace("ref-options"))
     {:ok, ref} = Jido.agent_ref(instance, "counter", partition: "west")
 
     for {key, value} <- [id: "other", partition: "east"] do
       assert {:error, %{details: %{key: ^key, value: ^value}}} =
-               Jido.start_agent_ref(instance, ref, Counter, [{key, value}])
+               Jido.create_agent(instance, ref, Counter, [{key, value}])
     end
 
     for {operation, opts, duplicate} <- [
@@ -530,7 +559,7 @@ defmodule Jido.Instance.RefTest do
       result =
         case operation do
           :build -> Jido.agent_ref(instance, "counter", opts)
-          :start -> Jido.start_agent_ref(instance, ref, Counter, opts)
+          :start -> Jido.create_agent(instance, ref, Counter, opts)
         end
 
       assert {:error, %Error.ValidationError{} = error} = result
@@ -542,104 +571,78 @@ defmodule Jido.Instance.RefTest do
       assert {:error, %{message: "Agent Ref options must be a keyword list"}} =
                Jido.agent_ref(instance, "counter", opts)
 
-      assert {:error, %{message: "Agent Ref startup options must be a keyword list"}} =
-               Jido.start_agent_ref(instance, ref, Counter, opts)
+      assert {:error, %{message: "Agent Ref create options must be a keyword list"}} =
+               Jido.create_agent(instance, ref, Counter, opts)
 
       assert {:error, %{message: "Agent Ref delete options must be a unique keyword list"}} =
-               Jido.delete_agent(instance, ref, Counter, opts)
+               Jido.delete_agent(instance, ref, opts)
     end
 
-    assert Jido.agent_count(instance) == 0
+    assert Jido.resident_agent_count(instance) == 0
 
-    assert {:ok, server} =
-             Jido.start_agent_ref(instance, ref, Counter, id: ref.id, partition: ref.partition)
+    assert {:ok, ^ref} =
+             Jido.create_agent(instance, ref, Counter, id: ref.id, partition: ref.partition)
+
+    assert {:ok, server} = Jido.activate_agent(instance, ref)
+    assert :ok = Jido.AgentServer.await_ready(server)
 
     assert Jido.resolve_agent(instance, ref) == {:ok, server}
-    assert {:error, :agent_running} = Jido.delete_agent(instance, ref, Counter)
-    assert Jido.agent(instance, ref).state == %{count: 0}
+    assert {:error, :agent_running} = Jido.delete_agent(instance, ref)
+    assert Jido.AgentServer.snapshot(server).agent.state == %{count: 0}
   end
 
   @tag obligation: "jido.instance.I8"
-  test "Ref runtime controls preserve their Server results and reject a missing activation" do
+  test "Ref controls preserve AgentServer results across passivation" do
     instance = unique_instance("ref-controls")
-    start_supervised!({Jido, name: instance, namespace: unique_namespace("ref-controls")})
+    start_durable_instance!(instance, unique_namespace("ref-controls"))
     {:ok, ref} = Jido.agent_ref(instance, "counter")
-    {:ok, server} = Jido.start_agent_ref(instance, ref, Counter)
-
-    assert Jido.cancel(instance, ref) == Jido.AgentServer.cancel(server)
+    server = create_and_activate(instance, ref, Counter)
 
     assert Jido.cancel_turn(instance, ref, "absent") ==
              Jido.AgentServer.cancel_turn(server, "absent")
 
-    assert :ok = Jido.attach(instance, ref)
-    assert Jido.AgentServer.status(server).owner_count == 1
-    assert :ok = Jido.touch(instance, ref)
-    assert :ok = Jido.detach(instance, ref)
-    assert Jido.AgentServer.status(server).owner_count == 0
+    assert Jido.status(instance, ref) == Jido.AgentServer.status(server)
+    assert {:error, %Error.ValidationError{}} = Jido.cancel_turn(instance, ref, "absent", -1)
 
-    assert Jido.plugin_state(instance, ref, __MODULE__) ==
-             Jido.AgentServer.plugin_state(server, __MODULE__)
-
-    assert {:error, %Error.ValidationError{}} = Jido.hibernate_ref(instance, ref, unknown: true)
-
-    for control <- [
-          &Jido.cancel(instance, ref, &1),
-          &Jido.cancel_turn(instance, ref, "absent", &1),
-          &Jido.attach(instance, ref, self(), &1),
-          &Jido.detach(instance, ref, self(), &1)
-        ] do
-      assert {:error, %Error.ValidationError{}} = control.(-1)
-    end
-
-    assert :ok = Jido.stop_agent_ref(instance, ref)
-
-    for operation <- [
-          &Jido.cancel(instance, &1),
-          &Jido.cancel_turn(instance, &1, "absent"),
-          &Jido.attach(instance, &1),
-          &Jido.detach(instance, &1),
-          &Jido.touch(instance, &1),
-          &Jido.plugin_state(instance, &1, __MODULE__)
-        ] do
-      assert {:error, :not_found} = operation.(ref)
-    end
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(server)
+    eventually(fn -> Jido.status(instance, ref).residency == :passivated end)
+    assert Jido.cancel_turn(instance, ref, "absent") == {:error, :not_running}
   end
 
   @tag obligation: "jido.instance.I8"
-  test "Ref stop forwards the reason and caller timeout" do
+  test "activation stop forwards the reason" do
     instance = unique_instance("ref-stop")
-    start_supervised!({Jido, name: instance, namespace: unique_namespace("ref-stop")})
+    start_durable_instance!(instance, unique_namespace("ref-stop"))
 
     {:ok, reason_ref} = Jido.agent_ref(instance, "reason")
-    {:ok, reason_server} = Jido.start_agent_ref(instance, reason_ref, Counter)
+    reason_server = create_and_activate(instance, reason_ref, Counter)
     reason_monitor = Process.monitor(reason_server)
 
-    assert :ok = Jido.stop_agent_ref(instance, reason_ref, :contract_stop)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} =
+             Jido.AgentServer.stop(reason_server, :contract_stop)
 
     assert_receive {:DOWN, ^reason_monitor, :process, ^reason_server, {:shutdown, :contract_stop}}
-
-    {:ok, timeout_ref} = Jido.agent_ref(instance, "timeout")
-    {:ok, timeout_server} = Jido.start_agent_ref(instance, timeout_ref, Counter)
-    :ok = :sys.suspend(timeout_server)
-
-    task =
-      Task.async(fn ->
-        catch_exit(Jido.stop_agent_ref(instance, timeout_ref, :shutdown, 0))
-      end)
-
-    try do
-      assert {:ok, {:timeout, _}} = Task.yield(task, 500)
-    after
-      :ok = :sys.resume(timeout_server)
-
-      if Task.yield(task, 100) == nil do
-        Task.shutdown(task, :brutal_kill)
-      end
-    end
   end
 
   defp signal(by) do
     Signal.new!("counter.add", %{by: by}, source: "/instance-ref-test")
+  end
+
+  defp start_durable_instance!(instance, namespace, opts \\ []) do
+    config =
+      Keyword.merge(
+        [name: instance, namespace: namespace, persistence: persistence("instance")],
+        opts
+      )
+
+    start_supervised!({Jido, config}, id: instance)
+  end
+
+  defp create_and_activate(instance, ref, agent, opts \\ []) do
+    assert {:ok, ^ref} = Jido.create_agent(instance, ref, agent, opts)
+    assert {:ok, server} = Jido.activate_agent(instance, ref)
+    assert :ok = Jido.AgentServer.await_ready(server)
+    server
   end
 
   defp persistence(label) do

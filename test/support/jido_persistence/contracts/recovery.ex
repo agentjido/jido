@@ -27,8 +27,8 @@ defmodule Jido.Test.Persistence.Contracts.Recovery do
                  Persistence.load_agent_with_revision(c.store, PersistentProbe, id, instance: c.jido)
 
         restored = Jido.Test.Persistence.Contracts.Recovery.restore!(c, id)
-        assert Server.snapshot(restored).state_version == 0
-        assert Server.agent(restored).state.value == 0
+        assert Server.snapshot(restored).agent_revision == 0
+        assert Server.snapshot(restored).agent.state.value == 0
       end
 
       @tag persistence_contract: :recovery
@@ -55,8 +55,8 @@ defmodule Jido.Test.Persistence.Contracts.Recovery do
                  Persistence.load_agent_with_revision(c.store, PersistentProbe, id, instance: c.jido)
 
         restored = Jido.Test.Persistence.Contracts.Recovery.restore!(c, id)
-        assert Server.snapshot(restored).state_version == 1
-        assert Server.agent(restored).state.value == 13
+        assert Server.snapshot(restored).agent_revision == 1
+        assert Server.snapshot(restored).agent.state.value == 13
       end
     end
   end

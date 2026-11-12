@@ -170,7 +170,7 @@ caller_handle = Server.submit(server, build)
 Poll.until(fn -> 3 in Gate.started() end)
 status = Server.status(server)
 
-{status.phase, status.state_version, status.durable_turn.status, Server.agent(server).state}
+{status.phase, status.state_version, status.durable_turn.status, Server.snapshot(server).agent.state}
 ```
 
 The cell returns `{:running, 1, :running, %{status: "empty", lines: 0}}`. The acceptance write produced revision 1. Agent state stays unchanged until the Turn commits, so a read never sees partial Flow output.
@@ -217,7 +217,7 @@ final = Server.status(restored)
 
 %{id: ^turn_id} = final.durable_turn
 
-{Gate.started(), Server.agent(restored).state, final.state_version}
+{Gate.started(), Server.snapshot(restored).agent.state, final.state_version}
 ```
 
 The cell returns `{[1, 2, 3, 3, 4], %{status: "built", lines: 4}, 2}`. Step 3 started twice, the receipt kept the same Turn ID, and completion produced revision 2.
@@ -232,7 +232,7 @@ alias Jido.AgentServer, as: Server
 {:error, %Jido.Error.ExecutionError{}} = Server.await(caller_handle, 100)
 {:error, %Jido.Error.ExecutionError{}} = Server.await(queued_handle, 100)
 
-Server.agent(restored).state.lines
+Server.snapshot(restored).agent.state.lines
 ```
 
 The cell returns `4`. After a crash, read status and Agent state to learn the result. Sending the same Signal again starts a new Turn, because Jido does not deduplicate requests. Put a domain guard in the Flow if a repeat must be refused.
@@ -259,7 +259,7 @@ Poll.until(fn -> 2 in Gate.started() end)
 
 Poll.until(fn -> Server.status(resumed).durable_turn.status == :completed end)
 
-{Gate.started(), Server.agent(resumed).state}
+{Gate.started(), Server.snapshot(resumed).agent.state}
 ```
 
 The cell returns `{[1, 2, 2, 3, 4], %{status: "built", lines: 4}}`.
@@ -272,7 +272,7 @@ The cell returns `{[1, 2, 2, 3, 4], %{status: "built", lines: 4}}`.
 alias DurableTurnsGuide.{Gate, Poll, Report}
 alias Jido.AgentServer, as: Server
 
-before = Server.agent(resumed).state
+before = Server.snapshot(resumed).agent.state
 
 :ok = Gate.hold(2)
 {:ok, build} = Report.build_signal(%{lines: 500})
@@ -282,7 +282,7 @@ Poll.until(fn -> 2 in Gate.started() end)
 :ok = Server.cancel(resumed)
 {:error, :cancelled} = Server.await(handle, 1_000)
 
-{Server.status(resumed).durable_turn.status, Server.agent(resumed).state == before}
+{Server.status(resumed).durable_turn.status, Server.snapshot(resumed).agent.state == before}
 ```
 
 The cell returns `{:cancelled, true}`. Cancellation cannot undo external work that an Action already finished. See [Cancel Turns](../agent-servers/cancel-turns.livemd) for the options.
@@ -347,7 +347,7 @@ approval =
 
 Poll.until(fn -> Server.status(awake).durable_turn.status == :completed end)
 
-{Server.agent(awake).state.status, Server.deliver_wait(awake, restored_wait.id, approval)}
+{Server.snapshot(awake).agent.state.status, Server.deliver_wait(awake, restored_wait.id, approval)}
 ```
 
 The cell returns `{"approved", {:error, :not_waiting}}`. [Flow Waits](../flow-runtime/flow-waits.md) covers selection rules, retries, and timer behavior.

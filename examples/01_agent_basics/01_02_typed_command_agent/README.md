@@ -30,10 +30,10 @@ produce the same profile, and an out-of-range candidate does not commit.
 Invalid Action input and invalid candidate state leave committed state
 unchanged. A later valid command can still commit.
 
-Successful Server calls return `{:ok, agent, directives}`. These commands
-return no directives, so the last element is `[]`. Invalid Action input
-returns `Jido.Error.ValidationError`. An invalid complete state
-returns `%Jido.Error.ValidationError{code: :invalid_state, path: [:state]}`.
+Accepted Server calls return `{:ok, %Jido.AgentServer.TurnResult{}}`. A commit
+has the status `:committed`. Invalid Action input and invalid complete state
+return a Turn result with `status: :failed` and a `Jido.Error.ValidationError`
+in `error`. An invalid complete state uses the code `:invalid_state`.
 The tests wait for `Server.await_ready/1` before reading the initial snapshot.
 
 ## Limits

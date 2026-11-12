@@ -28,10 +28,9 @@ defmodule Jido.Agent.Directive do
   it needs another validation rule.
   """
 
-  alias __MODULE__.{AgentSend, Emit, ParentSend, Reply, ServerStop}
+  alias __MODULE__.{Emit, Reply}
 
   alias Jido.Agent.Schema
-  alias Jido.Agent.Directive.Kind
   alias Jido.Error
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext
@@ -73,12 +72,10 @@ defmodule Jido.Agent.Directive do
 
   @type t :: struct()
 
-  @core_modules Kind.core_modules()
-
   @doc "Validates one built-in or custom Agent Directive."
   @spec validate(struct()) :: {:ok, struct()} | {:error, term()}
   def validate(%{__struct__: module, signal: %Signal{} = signal} = directive)
-      when module in [Emit, Reply, ParentSend, AgentSend] do
+      when module in [Emit, Reply] do
     with {:ok, signal} <- parse(Signal.schema(), signal),
          {:ok, extensions} <- normalize_context(signal.extensions),
          {:ok, directive} <-
@@ -92,15 +89,11 @@ defmodule Jido.Agent.Directive do
   end
 
   def validate(%{__struct__: module} = directive)
-      when module in [Emit, Reply, ParentSend, AgentSend] do
+      when module in [Emit, Reply] do
     {:error,
      Jido.Error.validation_error("Agent Signal Directive requires a Jido.Signal",
        details: %{directive: directive}
      )}
-  end
-
-  def validate(%{__struct__: module} = directive) when module in @core_modules do
-    parse(module.schema(), Map.from_struct(directive))
   end
 
   def validate(%{__struct__: module} = directive), do: validate_custom(module, directive)
@@ -196,18 +189,6 @@ defmodule Jido.Agent.Directive do
   @doc "Creates one correlated response request. It does not dispatch the Signal."
   @spec reply(Signal.t()) :: Reply.t()
   def reply(%Signal{} = signal), do: %Reply{signal: signal}
-
-  @doc "Creates a request to send one Signal to the parent Agent after commit."
-  @spec parent_send(Signal.t()) :: ParentSend.t()
-  def parent_send(%Signal{} = signal), do: %ParentSend{signal: signal}
-
-  @doc "Creates a request to send one Signal to a tracked child Agent after commit."
-  @spec agent_send(atom() | String.t(), Signal.t()) :: AgentSend.t()
-  def agent_send(name, %Signal{} = signal), do: %AgentSend{name: name, signal: signal}
-
-  @doc "Creates a terminal request to stop the AgentServer after commit."
-  @spec server_stop(term()) :: ServerStop.t()
-  def server_stop(reason \\ :normal), do: %ServerStop{reason: reason}
 
   @doc false
   def directives(definition, directives) do

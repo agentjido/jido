@@ -220,7 +220,8 @@ end
 {:ok, _pid} = Jido.start_link(name: TelemetryRef.Jido)
 {:ok, ticket} = Jido.start_agent(TelemetryRef.Jido, TelemetryRef.Ticket, id: "ticket-1")
 
-{:ok, _agent, []} = Jido.AgentServer.call(ticket, TelemetryRef.Ticket.update_signal!(%{subject: "private"}))
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+  Jido.AgentServer.call(ticket, TelemetryRef.Ticket.update_signal!(%{subject: "private"}))
 
 {measurements, metadata} =
   receive do

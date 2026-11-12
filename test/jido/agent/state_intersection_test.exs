@@ -123,14 +123,21 @@ defmodule Jido.Agent.StateIntersectionTest do
     for owned <- [%{}, %{nested: %{}}, %{nested: %{a: 3}}, %{nested: %{b: 4}}] do
       input = signal("intersection.reduce", %{owned: owned})
       assert {:error, _} = Agent.cmd(agent, input)
-      assert {:error, _} = AgentServer.call(server, input)
+
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+               AgentServer.call(server, input)
+
       assert Jido.Test.AgentServer.Assertions.committed(server) === before
     end
 
     owned = %{nested: %{a: nil, b: 7}}
     input = signal("intersection.reduce", %{owned: owned})
     assert {:ok, direct, []} = Agent.cmd(agent, input)
-    assert {:ok, live, _} = AgentServer.call(server, input)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             AgentServer.call(server, input)
+
+    live = AgentServer.snapshot(server).agent
     assert direct.state.owned === owned
     assert live.state === direct.state
     assert Agent.validate(live) === {:ok, live}

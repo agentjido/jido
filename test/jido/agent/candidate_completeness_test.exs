@@ -50,12 +50,14 @@ defmodule Jido.Agent.CandidateCompletenessTest do
     assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, initial)
     before = Jido.Test.AgentServer.Assertions.committed(server)
 
-    assert {:error,
-            %Jido.Error.ValidationError{
-              code: :incomplete_state,
-              details: %{issues: [%{path: [:history]}]}
-            }} =
-             Server.call(server, signal)
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :failed,
+              error: %Jido.Error.ValidationError{
+                code: :incomplete_state,
+                details: %{issues: [%{path: [:history]}]}
+              }
+            }} = Server.call(server, signal)
 
     assert Jido.Test.AgentServer.Assertions.committed(server) == before
   end
@@ -68,7 +70,8 @@ defmodule Jido.Agent.CandidateCompletenessTest do
     assert direct.state == %{count: 1, history: []}
 
     assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, initial)
-    assert {:ok, live, _} = Server.call(server, signal)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Server.call(server, signal)
+    live = Server.snapshot(server).agent
     assert live.state == direct.state
   end
 end

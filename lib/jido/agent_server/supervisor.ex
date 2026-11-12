@@ -1,7 +1,7 @@
 defmodule Jido.AgentServer.Supervisor do
   @moduledoc false
   use Supervisor
-  alias Jido.AgentServer, as: Server
+  alias Jido.AgentServer.Worker, as: Server
   alias Runic.Runner
 
   @doc false
@@ -30,31 +30,63 @@ defmodule Jido.AgentServer.Supervisor do
   @impl true
   def init({opts, parent, lifetime}) do
     state = :ets.new(__MODULE__, [:public])
+    activation_id = Jido.Id.uuid7()
 
     :ets.insert(state, [
       {:parent, parent},
       {:checkpoint, opts[:agent], 0},
-      {:durable_lifetime, lifetime}
+      {:agent_revision, 0},
+      {:durable_lifetime, lifetime},
+      {:activation_id, activation_id}
     ])
 
-    opts = Keyword.put(opts, :activation_state, state)
+    opts = opts |> Keyword.put(:activation_state, state) |> Keyword.put(:activation_id, activation_id)
 
-    children = [
-      %{
-        id: Server,
-        start: {__MODULE__, :start_worker, [opts, self()]},
-        restart: :transient,
-        significant: true,
-        shutdown: 10_000
-      }
-    ]
+    with :ok <- register_activation(opts, activation_id) do
+      children = [
+        %{
+          id: Jido.AgentServer.PluginSupervisor,
+          start: {Jido.AgentServer.PluginSupervisor, :start_link, [[]]},
+          restart: :permanent,
+          type: :supervisor,
+          shutdown: :infinity
+        },
+        %{
+          id: Server,
+          start: {__MODULE__, :start_worker, [opts, self()]},
+          restart: :transient,
+          significant: true,
+          shutdown: 10_000
+        }
+      ]
 
-    Supervisor.init(children,
-      strategy: :one_for_all,
-      auto_shutdown: :any_significant,
-      max_restarts: 3,
-      max_seconds: 5
-    )
+      Supervisor.init(children,
+        strategy: :rest_for_one,
+        auto_shutdown: :any_significant,
+        max_restarts: 3,
+        max_seconds: 5
+      )
+    else
+      {:error, reason} -> {:stop, reason}
+    end
+  end
+
+  defp register_activation(opts, activation_id) do
+    case opts[:jido] do
+      nil ->
+        :ok
+
+      jido ->
+        key = Jido.AgentServer.RegistrationGuard.registry_key(opts[:agent].id, opts[:partition])
+        registry = Jido.Instance.Names.registry(jido)
+
+        with :ok <- Jido.AgentServer.RegistrationGuard.claim(jido, key, self(), self()),
+             {:ok, _owner} <- Registry.register(registry, key, {:activation, activation_id}) do
+          :ok
+        end
+    end
+  catch
+    :exit, _reason -> {:error, :instance_unavailable}
   end
 
   # The checkpoint is the canonical Agent and revision, not a serialized
@@ -75,7 +107,13 @@ defmodule Jido.AgentServer.Supervisor do
       end
 
     with {:ok, agent, revision} <- checkpoint,
-         opts = Keyword.merge(opts, agent: agent, state_version: revision),
+         agent_revision = runtime_agent_revision(state),
+         opts =
+           Keyword.merge(opts,
+             agent: agent,
+             state_version: revision,
+             agent_revision: agent_revision
+           ),
          {:ok, pid} <- Server.start_worker(opts, activation) do
       :ets.insert(state, {:worker, pid})
       {:ok, pid}
@@ -94,25 +132,43 @@ defmodule Jido.AgentServer.Supervisor do
   end
 
   @doc false
-  def publish_checkpoint(nil, _agent, _revision), do: :ok
+  def publish_checkpoint(nil, _agent, _revision, _agent_revision), do: :ok
 
-  def publish_checkpoint(state, agent, revision) do
+  def publish_checkpoint(state, agent, revision, agent_revision) do
     match_spec = [
       {{:checkpoint, :_, revision - 1}, [], [{:const, {:checkpoint, agent, revision}}]}
     ]
 
     case :ets.select_replace(state, match_spec) do
-      1 -> :ok
-      0 -> {:error, :checkpoint_conflict}
+      1 ->
+        :ets.insert(state, {:agent_revision, agent_revision})
+        :ok
+
+      0 ->
+        {:error, :checkpoint_conflict}
     end
   rescue
     ArgumentError -> {:error, :checkpoint_unavailable}
+  end
+
+  defp runtime_agent_revision(state) do
+    case :ets.lookup(state, :agent_revision) do
+      [{:agent_revision, revision}] when is_integer(revision) and revision >= 0 -> revision
+      _ -> 0
+    end
   end
 
   def worker(activation) do
     case List.keyfind(Supervisor.which_children(activation), Server, 0) do
       {Server, pid, :worker, _} when is_pid(pid) -> pid
       _ -> nil
+    end
+  end
+
+  def plugin_supervisor(activation) do
+    case List.keyfind(Supervisor.which_children(activation), Jido.AgentServer.PluginSupervisor, 0) do
+      {Jido.AgentServer.PluginSupervisor, pid, :supervisor, _modules} when is_pid(pid) -> pid
+      _other -> nil
     end
   end
 

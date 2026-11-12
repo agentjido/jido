@@ -29,6 +29,16 @@ defmodule Jido.Examples.DefinitionChanges do
     def run(%{state: %{count: count}}, _context), do: {:ok, %{total: count + 10}}
   end
 
+  defmodule AdvanceVersion do
+    @moduledoc false
+    use Jido.Action, name: "runtime_definition_advance_version"
+
+    @impl true
+    def run(%{snapshot: snapshot}, _context) do
+      {:ok, %{snapshot: %{snapshot | agent: %{snapshot.agent | vsn: 2}}}}
+    end
+  end
+
   defmodule V1 do
     @moduledoc "The active version before the upgrade."
     use Jido.Agent, name: "runtime_definition_v1", vsn: 1

@@ -3,8 +3,6 @@ Code.require_file("state_middleware.ex", __DIR__)
 defmodule Jido.Examples.Plugins.StateMiddlewareTest do
   use Jido.Test.Case, async: true
   @moduletag :integration
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Plugins.StateMiddleware.Agent
   alias Jido.Signal
 
@@ -23,10 +21,23 @@ defmodule Jido.Examples.Plugins.StateMiddlewareTest do
     {:ok, server} =
       Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent, id: unique_id("state-middleware-live"))
 
-    assert {:ok, committed, _directives} = Server.call(server, first)
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, first)
+
+      assert turn_result.status in [:committed, :waiting]
+      committed = Jido.AgentServer.snapshot(server).agent
+    )
+
     assert committed.state == candidate.state
 
-    assert {:ok, committed, _directives} = Server.call(server, input_signal(3, "second"))
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, input_signal(3, "second"))
+
+      assert turn_result.status in [:committed, :waiting]
+      committed = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert committed.state == %{
              count: 5,

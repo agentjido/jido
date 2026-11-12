@@ -32,9 +32,10 @@ alias Jido.Examples.OTPSupervision.Jido, as: Runtime
 server = Runtime.whereis_agent("otp-counter")
 :ok = Jido.AgentServer.await_ready(server)
 {:ok, signal} = Counter.increment_signal(%{amount: 7})
-{:ok, agent, []} = Jido.AgentServer.call(server, signal)
-agent.state # %{count: 7}
-Supervisor.which_children(Jido.AgentServer.activation(server))
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+  Jido.AgentServer.call(server, signal)
+
+Jido.AgentServer.snapshot(server).agent.state # %{count: 7}
 :ok = Supervisor.stop(app)
 ```
 

@@ -79,7 +79,7 @@ true = action != packer and action != self()
 
 # The server answers reads during the Turn.
 %{phase: :running, active: %{stage: :running}} = Jido.AgentServer.status(packer)
-%{packed: []} = Jido.AgentServer.agent(packer).state
+%{packed: []} = Jido.AgentServer.snapshot(packer).agent.state
 
 # A second request waits in the queue.
 queued = Jido.AgentServer.submit(packer, pack.("o-2"), context: %{notify: self()})

@@ -106,7 +106,7 @@ Return `Jido.AgentServer.Directive.agent_start/3` from an Action when the decisi
 %{"ana" => %{pid: ana, activation: _activation, placement: :owned}} =
   Jido.AgentServer.children(dispatch)
 
-%{id: "dispatch-1/ana"} = Jido.AgentServer.agent(ana)
+%{id: "dispatch-1/ana"} = Jido.AgentServer.snapshot(ana).agent
 ```
 
 The name is the child's tag in its parent, and it must be an atom or a string. The default child ID is `<parent id>/<tag>`. `agent_start/3` accepts these options:
@@ -167,7 +167,7 @@ A parent sends to a tag with `Jido.Agent.Directive.agent_send/2`. A child sends 
 {:ok, _agent, _directives} =
   Jido.AgentServer.call(dispatch, ChildGuide.Dispatch.assign_signal!(%{name: "ana", count: 3}))
 
-wait_until.(fn -> Jido.AgentServer.agent(dispatch).state.last_total == 3 end)
+wait_until.(fn -> Jido.AgentServer.snapshot(dispatch).agent.state.last_total == 3 end)
 ```
 
 The receiving Agent needs a route for the Signal. `parent_send/1` fails before commit with `{:error, :parent_not_found}` in an Agent that has no parent. An `agent_send/2` to an unknown tag commits, then fails as an effect with the outcome in `last_effect_outcome`.

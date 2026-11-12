@@ -35,7 +35,6 @@ defmodule Jido.Examples.Runtime.RequestModesTest do
   use Jido.Test.Case, async: false
   @moduletag :integration
 
-  alias Jido.AgentServer
   alias Jido.Examples.RequestModes
   alias Jido.Test.Examples.Runtime.RequestModesBlockingAgent
   alias Jido.Test.AgentServer.RuntimeBarrier
@@ -50,16 +49,27 @@ defmodule Jido.Examples.Runtime.RequestModesTest do
       Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, RequestModes, id: unique_id("request-modes"))
 
     {:ok, call_signal} = RequestModes.record_signal(%{label: "call"})
-    assert {:ok, called, _directives} = AgentServer.call(server, call_signal)
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, call_signal)
+
+      assert turn_result.status in [:committed, :waiting]
+      called = Jido.AgentServer.snapshot(server).agent
+    )
+
     assert called.state.history == ["call"]
 
     {:ok, cast_signal} = RequestModes.record_signal(%{label: "cast"})
-    assert :ok = AgentServer.cast(server, cast_signal)
+    assert :ok = Jido.AgentServer.cast(server, cast_signal)
 
     {:ok, request_signal} = RequestModes.record_signal(%{label: "request"})
-    request_id = AgentServer.submit(server, request_signal)
-    assert {:ok, requested, []} = AgentServer.await(request_id)
-    assert requested.state.history == ["call", "cast", "request"]
+    pending = Jido.AgentServer.submit(server, request_signal)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, agent_revision: 3}} =
+             Jido.AgentServer.await(pending)
+
+    assert Jido.AgentServer.snapshot(server).agent.state.history == ["call", "cast", "request"]
   end
 
   test "several admitted asynchronous requests commit in serial order", %{jido: jido} do
@@ -69,16 +79,15 @@ defmodule Jido.Examples.Runtime.RequestModesTest do
     requests =
       for label <- ~w[first second third] do
         {:ok, signal} = RequestModes.record_signal(%{label: label})
-        AgentServer.submit(server, signal)
+        Jido.AgentServer.submit(server, signal)
       end
 
-    replies = Enum.map(requests, &AgentServer.await/1)
+    results = Enum.map(requests, &Jido.AgentServer.await/1)
 
-    assert [
-             {:ok, %{state: %{history: ["first"]}}, []},
-             {:ok, %{state: %{history: ["first", "second"]}}, []},
-             {:ok, %{state: %{history: ["first", "second", "third"]}}, []}
-           ] = replies
+    assert Enum.map(results, fn {:ok, result} -> {result.status, result.agent_revision} end) ==
+             [{:committed, 1}, {:committed, 2}, {:committed, 3}]
+
+    assert Jido.AgentServer.snapshot(server).agent.state.history == ["first", "second", "third"]
   end
 
   test "a caller timeout does not cancel work that already started", %{jido: jido} do
@@ -99,7 +108,7 @@ defmodule Jido.Examples.Runtime.RequestModesTest do
           )
 
         try do
-          AgentServer.call(server, signal, 25)
+          Jido.AgentServer.call(server, signal, 25)
         catch
           :exit, reason -> {:caller_exit, reason}
         end
@@ -109,7 +118,7 @@ defmodule Jido.Examples.Runtime.RequestModesTest do
     assert {:caller_exit, _reason} = Task.await(caller)
     assert :ok = RuntimeBarrier.release()
 
-    eventually(fn -> AgentServer.agent(server).state.history == ["completed"] end)
+    eventually(fn -> Jido.AgentServer.snapshot(server).agent.state.history == ["completed"] end)
   end
 
   defp blocked(jido, opts \\ []) do
@@ -121,7 +130,7 @@ defmodule Jido.Examples.Runtime.RequestModesTest do
       )
 
     :ok = RuntimeBarrier.arm(self())
-    pending = AgentServer.submit(server, record("active"))
+    pending = Jido.AgentServer.submit(server, record("active"))
     assert_receive :runtime_barrier_waiting, 1_000
     {server, pending}
   end
@@ -138,34 +147,44 @@ defmodule Jido.Examples.Runtime.RequestModesTest do
     {server, active} = blocked(jido, max_postponed_signals: 1)
 
     assert {:error, :admission_timeout} =
-             AgentServer.call(server, record("expired"), admission_timeout: 0)
+             Jido.AgentServer.call(server, record("expired"), admission_timeout: 0)
 
-    queued = AgentServer.submit(server, record("queued"))
-    assert AgentServer.status(server).admission.postponed == 1
+    queued = Jido.AgentServer.submit(server, record("queued"))
+    assert Jido.AgentServer.status(server).queue_depth == 1
 
     assert {:error, {:overloaded, %{limit: 1, postponed: 1}}} =
-             AgentServer.call(server, record("excess"))
+             Jido.AgentServer.call(server, record("excess"))
 
-    assert :ok = AgentServer.cast(server, record("dropped"))
-    assert AgentServer.status(server).admission.postponed == 1
+    assert :ok = Jido.AgentServer.cast(server, record("dropped"))
+    assert Jido.AgentServer.status(server).queue_depth == 1
     assert :ok = RuntimeBarrier.release()
-    assert {:ok, _, []} = AgentServer.await(active)
-    assert {:ok, %{state: %{history: ["active", "queued"]}}, []} = AgentServer.await(queued)
-    assert AgentServer.status(server).state_version == 2
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, agent_revision: 1}} =
+             Jido.AgentServer.await(active)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, agent_revision: 2}} =
+             Jido.AgentServer.await(queued)
+
+    assert Jido.AgentServer.status(server).agent_revision == 2
   end
 
   test "await can be repeated after timeout and abandon does not cancel a Turn", %{jido: jido} do
     {server, active} = blocked(jido)
-    assert {:error, :timeout} = AgentServer.await(active, 0)
+    assert {:error, :timeout} = Jido.AgentServer.await(active, 0)
     assert :ok = RuntimeBarrier.release()
-    assert {:ok, _, []} = AgentServer.await(active)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Jido.AgentServer.await(active)
 
     :ok = RuntimeBarrier.arm(self())
-    abandoned = AgentServer.submit(server, record("abandoned"))
+    abandoned = Jido.AgentServer.submit(server, record("abandoned"))
     assert_receive :runtime_barrier_waiting, 1_000
-    assert :ok = AgentServer.abandon(abandoned)
+    assert :ok = Jido.AgentServer.abandon(abandoned)
     assert :ok = RuntimeBarrier.release()
-    assert :ok = AgentServer.quiesce(server)
-    assert AgentServer.agent(server).state.history == ["active", "abandoned"]
+
+    assert {:ok, %Jido.AgentServer.Status{admission: :quiesced}} =
+             Jido.AgentServer.quiesce(server)
+
+    assert Jido.AgentServer.snapshot(server).agent.state.history == ["active", "abandoned"]
   end
 end

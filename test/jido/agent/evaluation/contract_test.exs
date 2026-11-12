@@ -292,8 +292,8 @@ defmodule Jido.Agent.EvaluationContractTest do
       Directive.emit("effect.allowed", %{value: 1}),
       %{kind: :emit, signal: signal},
       Directive.emit(signal),
-      Jido.Agent.Directive.parent_send(signal),
-      Jido.Agent.Directive.agent_send(:child, signal)
+      %Directive.Emit{signal: signal, dispatch: :parent},
+      %Directive.Emit{signal: signal, dispatch: {:agent, :child}}
     ]
 
     for request <- requests do
@@ -404,7 +404,7 @@ defmodule Jido.Agent.EvaluationContractTest do
         ]
       )
 
-    assert {:ok, ^parent, [%Jido.Agent.Directive.ParentSend{signal: ^signal}]} =
+    assert {:ok, ^parent, [%Directive.Emit{signal: ^signal, dispatch: :parent}]} =
              Agent.cmd(parent, signal)
 
     child =
@@ -418,7 +418,7 @@ defmodule Jido.Agent.EvaluationContractTest do
         topology: %{agents: [%{name: :worker, definition: ForwardChild}]}
       )
 
-    assert {:ok, ^child, [%Jido.Agent.Directive.AgentSend{name: :worker, signal: ^signal}]} =
+    assert {:ok, ^child, [%Directive.Emit{signal: ^signal, dispatch: {:agent, :worker}}]} =
              Agent.cmd(child, signal)
   end
 

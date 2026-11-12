@@ -7,8 +7,6 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
 
   @moduletag group: :persistence
   @moduletag complexity: 3
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Persistence.PersistentAgent
   alias Jido.Persistence
   alias Jido.Persistence.ETS
@@ -18,10 +16,16 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
     id = unique_id("persistent-counter")
 
     counter = start_counter(jido, id, persistence)
-    assert {:ok, _agent, _directives} = PersistentAgent.increment(counter, "command-1", 2)
-    assert {:ok, committed, _directives} = PersistentAgent.increment(counter, "command-2", 3)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             PersistentAgent.increment(counter, "command-1", 2)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             PersistentAgent.increment(counter, "command-2", 3)
+
+    committed = Jido.AgentServer.snapshot(counter).agent
     assert committed.state.count == 5
-    assert agent_result(counter).state_version == 4
+    assert agent_result(counter).agent_revision == 2
 
     stop_server(jido, counter)
 
@@ -34,14 +38,15 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
                handled_signal_ids: ["command-1", "command-2"],
                last_command: %{signal_id: "command-2", amount: 3}
              },
-             state_version: 4
+             agent_revision: 2
            } = agent_result(restored)
 
-    assert {:ok, continued, _directives} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              PersistentAgent.increment(restored, "command-3", 4)
 
+    continued = Jido.AgentServer.snapshot(restored).agent
     assert continued.state.count == 9
-    assert agent_result(restored).state_version == 6
+    assert agent_result(restored).agent_revision == 3
   end
 
   test "an identical-state commit stores a new revision and restores it", %{jido: jido} do
@@ -50,46 +55,78 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
     duplicate = PersistentAgent.increment_signal!("command-1", 7)
 
     counter = start_counter(jido, id, persistence)
-    assert {:ok, first, _directives} = Server.call(counter, duplicate)
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(counter, duplicate)
+
+      assert turn_result.status in [:committed, :waiting]
+      first = Jido.AgentServer.snapshot(counter).agent
+    )
+
     assert first.state.count == 7
     stop_server(jido, counter)
 
-    assert {:ok, restored} =
-             PersistentAgent.restore(jido, id, persistence, error_policy: fn _, _ -> :continue end)
+    assert {:ok, restored} = PersistentAgent.restore(jido, id, persistence)
 
-    assert :ok = Server.await_ready(restored)
-    assert Server.snapshot(restored) == %{agent: first, state_version: 2}
-    assert {:ok, ^first, _directives} = Server.call(restored, duplicate)
-    assert Server.snapshot(restored) == %{agent: first, state_version: 4}
+    assert :ok = Jido.AgentServer.await_ready(restored)
+    snapshot = Jido.AgentServer.snapshot(restored)
+    assert snapshot.agent == first
+    assert snapshot.agent_revision == 1
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(restored, duplicate)
+
+      assert turn_result.status in [:committed, :waiting]
+      assert first == Jido.AgentServer.snapshot(restored).agent
+    )
+
+    snapshot = Jido.AgentServer.snapshot(restored)
+    assert snapshot.agent == first
+    assert snapshot.agent_revision == 2
 
     # Read before hibernation so a stop-time write cannot hide a missed commit.
-    assert {:ok, ^first, 4} =
+    assert {:ok, ^first, stored_revision} =
              Persistence.load_agent_with_revision(persistence, PersistentAgent, id, instance: jido)
+
+    assert stored_revision >= 3
 
     invalid = %{duplicate | id: "invalid-command", data: %{amount: "invalid"}}
-    assert {:error, _reason} = Server.call(restored, invalid)
-    assert Server.snapshot(restored) == %{agent: first, state_version: 6}
 
-    assert {:ok, ^first, 6} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: _reason}} =
+             Jido.AgentServer.call(restored, invalid)
+
+    snapshot = Jido.AgentServer.snapshot(restored)
+    assert snapshot.agent == first
+    assert snapshot.agent_revision == 2
+
+    assert {:ok, ^first, failed_revision} =
              Persistence.load_agent_with_revision(persistence, PersistentAgent, id, instance: jido)
+
+    assert failed_revision > stored_revision
 
     stop_server(jido, restored)
     assert {:ok, restored_again} = PersistentAgent.restore(jido, id, persistence)
     assert :ok = Jido.AgentServer.await_ready(restored_again)
-    assert Server.snapshot(restored_again) == %{agent: first, state_version: 6}
+    snapshot = Jido.AgentServer.snapshot(restored_again)
+    assert snapshot.agent == first
+    assert snapshot.agent_revision == 2
   end
 
   test "a corrupt record prevents restore", %{jido: jido} do
     {ETS, opts} = persistence = persistence(:corrupt)
     id = unique_id("corrupt-counter")
-    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(jido), id: id))
+
+    key =
+      Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(jido), id: id))
 
     assert :ok = ETS.put(key, <<0, 1, 2>>, opts)
 
     assert {:error, _reason} =
              with(
                {:ok, server} <- PersistentAgent.restore(jido, id, persistence),
-               do: Server.await_ready(server)
+               do: Jido.AgentServer.await_ready(server)
              )
   end
 

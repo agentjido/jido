@@ -344,7 +344,7 @@ _action = await_action.()
 :ok = Jido.AgentServer.cancel(reports)
 {:error, :cancelled} = Jido.AgentServer.await(q2)
 
-%{reports: ["q1"]} = Jido.AgentServer.agent(reports).state
+%{reports: ["q1"]} = Jido.AgentServer.snapshot(reports).agent.state
 
 :ok = Jido.stop(AsyncGuide.Jido)
 ```

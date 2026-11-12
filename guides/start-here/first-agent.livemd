@@ -172,9 +172,9 @@ Start a Jido instance, then start the Agent inside it. The AgentServer holds the
 {:ok, server} = Jido.start_agent(FirstAgent.Jido, FirstAgent.InvoiceAgent, id: "inv-2001")
 :ok = Jido.AgentServer.await_ready(server)
 
-{:ok, committed, [%Jido.Agent.Directive.Reply{}]} = Jido.AgentServer.call(server, price)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.call(server, price)
 
-committed.state.total_cents
+Jido.AgentServer.snapshot(server).agent.state.total_cents
 ```
 
 The cell returns `1650`, the same total as the pure Turn.
@@ -197,20 +197,20 @@ The state stays in the server, so each call builds on the last one.
 deposit = FirstAgent.InvoiceAgent.apply_payment_signal!(%{amount_cents: 650})
 balance = FirstAgent.InvoiceAgent.apply_payment_signal!(%{amount_cents: 1_000})
 
-{:ok, _agent, []} = Jido.AgentServer.call(server, deposit)
-{:ok, _agent, []} = Jido.AgentServer.call(server, balance)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.call(server, deposit)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.call(server, balance)
 
-Map.take(Jido.AgentServer.agent(server).state, [:paid_cents, :status])
+Map.take(Jido.AgentServer.snapshot(server).agent.state, [:paid_cents, :status])
 ```
 
 The cell returns `%{status: "paid", paid_cents: 1650}`.
 
-`Jido.AgentServer.status/2` reports the Agent's identity and its `state_version`. Each committed Turn moved that version forward by one.
+`Jido.AgentServer.status/2` reports the Agent's stable reference and its Agent revision. Each committed Turn moved that revision forward by one.
 
 ```elixir
 status = Jido.AgentServer.status(server)
 
-{status.agent_id, status.state_version}
+{status.agent_ref.id, status.agent_revision}
 ```
 
 The cell returns `{"inv-2001", 3}`.
@@ -218,9 +218,10 @@ The cell returns `{"inv-2001", 3}`.
 A failed live Turn leaves the committed state and the server in place.
 
 ```elixir
-{:error, %Jido.Error.ValidationError{}} = Jido.AgentServer.call(server, bad_payment)
+{:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+  Jido.AgentServer.call(server, bad_payment)
 
-{Jido.AgentServer.agent(server).state.paid_cents, Jido.AgentServer.status(server).state_version}
+{Jido.AgentServer.snapshot(server).agent.state.paid_cents, Jido.AgentServer.status(server).agent_revision}
 ```
 
 The cell returns `{1650, 3}`.
@@ -239,4 +240,4 @@ The cell returns `nil`.
 
 - [Test Jido Code](testing-jido-code.livemd) tests this Agent at each level.
 - [Define an Agent](../agents/define-and-instantiate-an-agent.livemd) lists the definition options and generated functions.
-- [Call, Cast, and Await](../agent-servers/send-signals-to-live-agents.livemd) covers each way to send a Signal, including `Jido.AgentServer.cast/3`.
+- [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd) covers live Signal delivery and stable Agent references.

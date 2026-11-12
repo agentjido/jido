@@ -463,7 +463,7 @@ defmodule Jido.Plugin.Scheduler.RuntimeContractTest do
 
     cron = Scheduler.cron(:heartbeat, "* * * * * * *", tick("cron.tick"))
 
-    assert {:ok, _, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(
                server,
                signal("runtime.directive", %{event: :scheduled, directive: cron})
@@ -489,7 +489,7 @@ defmodule Jido.Plugin.Scheduler.RuntimeContractTest do
     assert Process.alive?(new_job)
 
     monitor = Process.monitor(scheduler.pid)
-    root = Server.activation(server)
+    root = Jido.Test.AgentServer.Assertions.activation(server)
     Process.exit(scheduler.pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, _pid, :killed}
     server = Jido.Test.AgentServer.Assertions.replacement(root, server)
@@ -520,17 +520,17 @@ defmodule Jido.Plugin.Scheduler.RuntimeContractTest do
       )
 
     {:ok, arm} = TimedAgent.arm_schedule_signal(%{job_id: "job-1", cron: "* * * * * *"})
-    assert {:ok, _, _} = Server.call(server, arm)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Server.call(server, arm)
 
     first =
       eventually(fn ->
-        case Server.agent(server).state.ticks do
+        case Server.snapshot(server).agent.state.ticks do
           [tick | _] -> tick
           [] -> nil
         end
       end)
 
-    assert :ok = Server.stop(server)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(server)
 
     {:ok, restored} =
       Jido.Test.AgentServer.Assertions.start_agent(jido, TimedAgent,

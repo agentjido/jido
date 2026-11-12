@@ -31,11 +31,11 @@ defmodule Jido.Examples.RecoverableDelivery.Probe do
       down(agent_ref)
       :ok = Sink.available(jido, true)
       {:ok, restored} = Jido.start_agent(jido, Agent, opts ++ [persistence_mode: :restore])
-      await(fn -> Server.agent(restored).state.delivery.completed == %{"effect-1" => 7} end)
+      await(fn -> Server.snapshot(restored).agent.state.delivery.completed == %{"effect-1" => 7} end)
 
       snapshot = Server.snapshot(restored)
 
-      IO.inspect(%{state: snapshot.agent.state, revision: snapshot.state_version},
+      IO.inspect(%{state: snapshot.agent.state, revision: snapshot.agent_revision},
         label: "Restored; worker retried and committed confirmation"
       )
 

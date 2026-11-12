@@ -108,7 +108,7 @@ defmodule Jido.Plugin.Bus.ContractTest do
   @tag obligation: "jido.plugin.bus.I2"
   test "Manager applies ownership defaults and stops its Bus with the Agent", %{jido: jido} do
     {:ok, agent} = start_agent(jido, F.ManagerAgent, "managed-bus")
-    agent_id = Server.agent(agent).id
+    agent_id = Server.snapshot(agent).agent.id
 
     assert {:ok, bus} = Bus.whereis(agent_id, jido: jido)
     assert Jido.Test.AgentServer.Assertions.plugin(agent, Manager).pid == bus
@@ -370,7 +370,7 @@ defmodule Jido.Plugin.Bus.ContractTest do
 
     assert {:ok, ^bus} = Bus.whereis(:owned_plugin_bus, jido: jido)
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.input", %{value: 11})])
-    eventually(fn -> Server.agent(agent).state.values == [11] end)
+    eventually(fn -> Server.snapshot(agent).agent.state.values == [11] end)
   end
 
   @tag obligation: "jido.plugin.bus.I5"
@@ -379,7 +379,7 @@ defmodule Jido.Plugin.Bus.ContractTest do
     {:ok, agent} = start_agent(jido, F.ClientAgent, "bus-client")
 
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.input", %{value: 1})])
-    eventually(fn -> Server.agent(agent).state.values == [1] end)
+    eventually(fn -> Server.snapshot(agent).agent.state.values == [1] end)
   end
 
   @tag obligation: "jido.plugin.bus.I6"
@@ -397,14 +397,14 @@ defmodule Jido.Plugin.Bus.ContractTest do
 
     assert_receive {:bus_turn_blocked, 1, first_action}, 2_000
     refute_receive {:bus_turn_blocked, 2, _action}, 50
-    assert Server.agent(agent).state.values == []
+    assert Server.snapshot(agent).agent.state.values == []
 
     send(first_action, {:release, first_gate})
     assert_receive {:bus_turn_blocked, 2, second_action}, 2_000
-    assert Server.agent(agent).state.values == [1]
+    assert Server.snapshot(agent).agent.state.values == [1]
 
     send(second_action, {:release, second_gate})
-    eventually(fn -> Server.agent(agent).state.values == [1, 2] end)
+    eventually(fn -> Server.snapshot(agent).agent.state.values == [1, 2] end)
   end
 
   @tag obligation: "jido.plugin.bus.I7"
@@ -420,7 +420,7 @@ defmodule Jido.Plugin.Bus.ContractTest do
     {:ok, agent} = start_agent(jido, F.DurableAgent, "durable-retry")
 
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.retry", %{value: 9})])
-    eventually(fn -> Server.agent(agent).state.values == [9] end)
+    eventually(fn -> Server.snapshot(agent).agent.state.values == [9] end)
     assert :ets.lookup_element(table, :attempt, 2) == 2
   end
 
@@ -433,6 +433,17 @@ defmodule Jido.Plugin.Bus.ContractTest do
     worker_ref = Process.monitor(worker)
     on_exit(fn -> if Process.alive?(worker), do: Process.exit(worker, :kill) end)
     token = make_ref()
+
+    committed =
+      %Jido.AgentServer.TurnResult{
+        turn_id: "turn-1",
+        agent_ref: Jido.Agent.Ref.new!(namespace: "bus-contract", id: "agent-1"),
+        agent_activation_id: "activation-1",
+        status: :committed,
+        durability: :memory,
+        agent_revision: 1,
+        persistence_revision: nil
+      }
 
     state = %{
       config: %{retry_delay_ms: 60_000},
@@ -447,12 +458,12 @@ defmodule Jido.Plugin.Bus.ContractTest do
       retry_timer: nil
     }
 
-    stale_delivery = {:delivery_result, make_ref(), {:ok, %{}, []}}
+    stale_delivery = {:delivery_result, make_ref(), {:ok, committed}}
     assert {:noreply, ^state} = Runtime.handle_info(stale_delivery, state)
     refute_received {:bus_ack, _durable_id, _cursor, _reply}
 
     assert {:noreply, retrying} =
-             Runtime.handle_info({:delivery_result, token, {:ok, %{}, []}}, state)
+             Runtime.handle_info({:delivery_result, token, {:ok, committed}}, state)
 
     assert_receive {:bus_ack, "durable-client", 1, {:error, :store_down}}
     assert %{stage: :ack, record: ^record, token: retry_token} = retrying.pending
@@ -460,7 +471,7 @@ defmodule Jido.Plugin.Bus.ContractTest do
 
     assert {:noreply, ^retrying} =
              Runtime.handle_info(
-               {:delivery_result, retry_token, {:ok, %{}, []}},
+               {:delivery_result, retry_token, {:ok, committed}},
                retrying
              )
 
@@ -483,10 +494,10 @@ defmodule Jido.Plugin.Bus.ContractTest do
     bus = start_supervised!({Bus, name: :plugin_bus, jido: jido})
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.input", %{value: 3})])
     {:ok, agent} = start_agent(jido, F.DurableAgent, "durable-reattach")
-    eventually(fn -> Server.agent(agent).state.values == [3] end, timeout: 2_000)
+    eventually(fn -> Server.snapshot(agent).agent.state.values == [3] end, timeout: 2_000)
 
     runtime = client_runtime(agent)
-    root = Server.activation(agent)
+    root = Jido.Test.AgentServer.Assertions.activation(agent)
     Process.exit(runtime, :kill)
     agent = Jido.Test.AgentServer.Assertions.replacement(root, agent, timeout: 2_000)
 
@@ -503,7 +514,7 @@ defmodule Jido.Plugin.Bus.ContractTest do
 
     assert Process.alive?(replacement)
     assert {:ok, [_record]} = Bus.publish(bus, [signal("bus.input", %{value: 4})])
-    eventually(fn -> Server.agent(agent).state.values == [3, 4] end, timeout: 2_000)
+    eventually(fn -> Server.snapshot(agent).agent.state.values == [3, 4] end, timeout: 2_000)
   end
 
   @tag obligation: "jido.plugin.bus.I8"
@@ -529,8 +540,12 @@ defmodule Jido.Plugin.Bus.ContractTest do
     end)
 
     action_ref = Process.monitor(action)
-    assert :ok = Jido.stop_agent(jido, agent)
+
+    assert {:ok, %Jido.AgentServer.Status{admission: :quiesced}} =
+             Server.quiesce(agent, active: :cancel)
+
     assert_receive {:DOWN, ^action_ref, :process, ^action, _reason}, 2_000
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(agent)
   end
 
   @tag obligation: "jido.plugin.bus.I8"
@@ -558,8 +573,12 @@ defmodule Jido.Plugin.Bus.ContractTest do
 
     assert :ok = Client.Server.await_ready(runtime, [])
     action_ref = Process.monitor(action)
-    assert :ok = Jido.stop_agent(jido, agent)
+
+    assert {:ok, %Jido.AgentServer.Status{admission: :quiesced}} =
+             Server.quiesce(agent, active: :cancel)
+
     assert_receive {:DOWN, ^action_ref, :process, ^action, _reason}, 2_000
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(agent)
   end
 
   @tag obligation: "jido.plugin.bus.I8"
@@ -577,14 +596,18 @@ defmodule Jido.Plugin.Bus.ContractTest do
     delivery_ref = Process.monitor(delivery)
     runtime_ref = Process.monitor(runtime)
 
-    root = Server.activation(agent)
+    root = Jido.Test.AgentServer.Assertions.activation(agent)
     Process.exit(runtime, :kill)
     assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, :killed}, 2_000
     assert_receive {:DOWN, ^delivery_ref, :process, ^delivery, _reason}, 2_000
 
     agent = Jido.Test.AgentServer.Assertions.replacement(root, agent)
     action_ref = Process.monitor(action)
-    assert :ok = Jido.stop_agent(jido, agent)
+
+    assert {:ok, %Jido.AgentServer.Status{admission: :quiesced}} =
+             Server.quiesce(agent, active: :cancel)
+
     assert_receive {:DOWN, ^action_ref, :process, ^action, _reason}, 2_000
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(agent)
   end
 end

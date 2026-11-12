@@ -27,3 +27,9 @@
   decision: Remove the unused generated `__otp_app__/0` and `__jido_namespace__/0` functions. Keep `__jido_persistence__/0` as a hidden interoperability hook. Use `config/1`, `namespace/0`, and the typed lifecycle and Ref functions as the public generated API.
   driver: The removed functions had no internal or sibling-package consumers and exposed declaration details that the supported runtime API already represents.
   approved_by: Component hardening pass
+
+- id: instance-durable-agent-creation
+  date: 2026-11-12
+  decision: Separate durable Agent creation from activation. Jido.create_agent/4 synchronously creates revision zero through the Instance persistence adapter and does not start a process. Jido.activate_agent/4 strictly restores an existing record and never creates one.
+  driver: A logical Agent must exist durably before it is activated. Restore-or-create made process startup decide Agent identity and lifetime.
+  approved_by: Durable Agent activation design review

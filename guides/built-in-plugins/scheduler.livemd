@@ -85,7 +85,7 @@ end
 {:ok, _agent, _directives} =
   Jido.AgentServer.call(reminders, request.(Jido.Plugin.Scheduler.schedule(10, due.("inv-1"))))
 
-:ok = ScheduleGuide.Wait.until(fn -> Jido.AgentServer.agent(reminders).state.sent == ["inv-1"] end)
+:ok = ScheduleGuide.Wait.until(fn -> Jido.AgentServer.snapshot(reminders).agent.state.sent == ["inv-1"] end)
 
 Jido.AgentServer.plugin_state(reminders, Jido.Plugin.Scheduler)
 # => {:ok, %{cron: %{}}}
@@ -112,7 +112,7 @@ Map.take(cron["overdue-sweep"], [:cron_expression, :timezone])
 Wait for a delivery, then remove the job with `Jido.Plugin.Scheduler.cancel/1`:
 
 ```elixir
-:ok = ScheduleGuide.Wait.until(fn -> "inv-2" in Jido.AgentServer.agent(reminders).state.sent end)
+:ok = ScheduleGuide.Wait.until(fn -> "inv-2" in Jido.AgentServer.snapshot(reminders).agent.state.sent end)
 
 {:ok, _agent, _directives} =
   Jido.AgentServer.call(reminders, request.(Jido.Plugin.Scheduler.cancel("overdue-sweep")))
@@ -229,9 +229,9 @@ arm = Jido.Signal.new!("statement.schedule", %{directive: directive}, source: "/
 ScheduleGuide.FastClock.reset()
 {:ok, _agent, _directives} = Jido.AgentServer.call(statements, arm)
 
-:ok = ScheduleGuide.Wait.until(fn -> length(Jido.AgentServer.agent(statements).state.slots) >= 2 end)
+:ok = ScheduleGuide.Wait.until(fn -> length(Jido.AgentServer.snapshot(statements).agent.state.slots) >= 2 end)
 
-Jido.AgentServer.agent(statements).state.slots |> Enum.take(2)
+Jido.AgentServer.snapshot(statements).agent.state.slots |> Enum.take(2)
 # => ["2030-01-01T00:01:00.000000Z", "2030-01-01T00:02:00.000000Z"]
 ```
 

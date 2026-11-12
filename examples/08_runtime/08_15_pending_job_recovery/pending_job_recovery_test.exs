@@ -24,16 +24,25 @@ defmodule Jido.Examples.Runtime.PendingJobRecoveryTest do
 
     {:ok, route_signal_1} = Example.request_job_signal(%{job_id: "job-1", value: 3})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(server, route_signal_1, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_1, [])
+
+      assert turn_result.status in [:committed, :waiting]
+    )
 
     {:ok, route_signal_2} =
       Example.approve_job_signal(%{job_id: "job-1", attempt_id: "attempt-1"})
 
-    assert {:ok, approved, _directives} =
-             Jido.AgentServer.call(server, route_signal_2,
-               context: Jido.Test.Examples.JobRunner.portable_context(self())
-             )
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_2,
+                 context: Jido.Test.Examples.JobRunner.portable_context(self())
+               )
+
+      assert turn_result.status in [:committed, :waiting]
+      approved = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert approved.state.status == :running
     assert_receive {:job_work, first_task, 3}, 1000
@@ -46,21 +55,32 @@ defmodule Jido.Examples.Runtime.PendingJobRecoveryTest do
     eventually(fn -> Jido.whereis_agent(c.jido, id) == nil end)
 
     restored = start_example(c, id, :required)
-    assert Server.agent(restored).state.status == :running
-    assert Server.agent(restored).state.approved?
-    assert JobServer.jobs(Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(restored), Jobs)) == []
+    assert Jido.AgentServer.snapshot(restored).agent.state.status == :running
+    assert Jido.AgentServer.snapshot(restored).agent.state.approved?
+
+    assert JobServer.jobs(
+             Jido.Test.AgentServer.ExampleRuntime.plugin(
+               Jido.Test.AgentServer.ExampleRuntime.activation(restored),
+               Jobs
+             )
+           ) == []
 
     {:ok, route_signal_3} = Example.retry_job_signal(%{job_id: "job-1", attempt_id: "attempt-2"})
 
-    assert {:ok, retrying, _directives} =
-             Jido.AgentServer.call(restored, route_signal_3,
-               context: Jido.Test.Examples.JobRunner.portable_context(self())
-             )
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(restored, route_signal_3,
+                 context: Jido.Test.Examples.JobRunner.portable_context(self())
+               )
+
+      assert turn_result.status in [:committed, :waiting]
+      retrying = Jido.AgentServer.snapshot(restored).agent
+    )
 
     assert retrying.state.attempts == ["attempt-1", "attempt-2"]
     assert_receive {:job_work, second_task, 3}, 1000
 
-    before_stale = Server.snapshot(restored)
+    before_stale = Jido.AgentServer.snapshot(restored)
 
     {:ok, route_signal_4} =
       Example.settle_attempt_signal(%{
@@ -69,15 +89,15 @@ defmodule Jido.Examples.Runtime.PendingJobRecoveryTest do
         result: "stale"
       })
 
-    assert {:error, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: _}} =
              Jido.AgentServer.call(restored, route_signal_4, [])
 
-    after_stale = Server.snapshot(restored)
+    after_stale = Jido.AgentServer.snapshot(restored)
     assert after_stale.agent == before_stale.agent
-    assert after_stale.state_version == before_stale.state_version + 2
+    assert after_stale.agent_revision == before_stale.agent_revision
     send(second_task, {:finish, {:ok, "artifact:6"}})
-    eventually(fn -> Server.agent(restored).state.status == :completed end)
-    assert Server.agent(restored).state.result == "artifact:6"
+    eventually(fn -> Jido.AgentServer.snapshot(restored).agent.state.status == :completed end)
+    assert Jido.AgentServer.snapshot(restored).agent.state.result == "artifact:6"
   end
 
   defp start_example(c, id, restore) do

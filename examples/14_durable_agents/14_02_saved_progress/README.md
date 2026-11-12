@@ -17,8 +17,10 @@ Read [the Flow and Agent](saved_progress.ex), then [Advance](advance.ex).
   id: "ten-steps", persistence: Jido.Persistence.ETS)
 :ok = Jido.AgentServer.await_ready(server)
 {:ok, signal} = Jido.Examples.Durable.SavedProgress.Agent.run_signal(%{value: 0})
-{:ok, agent, []} = Jido.AgentServer.call(server, signal)
-agent.state # %{value: 10}
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+  Jido.AgentServer.call(server, signal)
+
+Jido.AgentServer.snapshot(server).agent.state # %{value: 10}
 ```
 
 ## Run it

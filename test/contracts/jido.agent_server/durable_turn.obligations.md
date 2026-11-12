@@ -52,7 +52,7 @@ adds no DSL.
 - **must:** Validate portable Flow facts and confirm the current workflow checkpoint before dispatching the next node. Stop durable authority on rejection, conflict, invalid data, task loss, or uncertain write. Recovery can repeat unconfirmed work but must not repeat work before the last confirmed checkpoint.
 - **why:** A downstream Action must never start from progress that storage did not confirm.
 - **kind:** ordering
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.durable_turn.I5 — Execution recovery and ownership
 
@@ -60,7 +60,7 @@ adds no DSL.
 - **must:** Resume the same execution identity and Turn after owned runtime loss. Rebuild or resume one owned Runic Worker from the confirmed checkpoint, keep the committed Agent unchanged until Flow completion, and clean the Worker before later Turn work. Do not reconstruct a lost caller reply.
 - **why:** Runtime replacement must not create a second execution or a second commit.
 - **kind:** ordering
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.durable_turn.I6 — Saved wait suspension
 
@@ -68,7 +68,7 @@ adds no DSL.
 - **must:** Save pending waits, their stable IDs, and their absolute deadline before suspending and releasing the Runic Worker. Keep the Turn active, committed reads available, and later Turns queued. Restore the same waits after hibernation or runtime loss without rerunning confirmed Actions.
 - **why:** Waiting must consume no Worker while retaining exact durable progress.
 - **kind:** ordering
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.durable_turn.I7 — Durable wait input
 
@@ -100,7 +100,7 @@ adds no DSL.
 - **must:** Stop owned startup or Worker work, confirm cleanup, and save a terminal receipt before opening later admission. Reject late wait input. Preserve the first abort result. On restore, apply the saved absolute Turn expiry and do not grant a new timeout budget.
 - **why:** Aborted durable work must not continue or revive with more time.
 - **kind:** ordering
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.durable_turn.I11 — Durable capability and public boundary
 

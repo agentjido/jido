@@ -32,12 +32,15 @@ defmodule Jido.Examples.Plugins.SecureSignalTest do
     encrypted = %{unsigned | data: Map.put(unsigned.data, "secure", envelope)}
     assert {:ok, signed} = Crypto.sign(encrypted, peer_private, peer_public, "secure-once")
 
-    assert {:ok, committed, _directives} = Server.call(agent_server, signed)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, reply: %Signal{} = reply}} =
+             Server.call(agent_server, signed)
+
+    committed = Server.snapshot(agent_server).agent
     assert committed.state.accepted == 1
     assert committed.state.peer == Base.encode16(peer_public, case: :lower)
     refute Map.has_key?(committed.state, :secure)
 
-    assert_receive %Signal{type: "examples.plugins.secure_signal.accepted"} = reply
+    assert reply.type == "examples.plugins.secure_signal.accepted"
 
     assert {:ok, _nonce} = Crypto.verify(reply, agent_public)
     assert SignalContext.get_trace(reply).causation_id == signed.id

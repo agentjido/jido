@@ -26,7 +26,8 @@ defmodule Jido.Examples.StableReference do
     end
   end
 
-  @spec append(Ref.t(), atom(), String.t()) :: Jido.AgentServer.signal_result() | {:error, term()}
+  @spec append(Ref.t(), atom(), String.t()) ::
+          {:ok, Jido.AgentServer.TurnResult.t()} | {:error, term()}
   def append(%Ref{} = ref, instance, text) when is_atom(instance) and is_binary(text) do
     signal =
       Signal.new!(

@@ -124,7 +124,8 @@ defmodule Jido.Plugin.PreparationTest do
     source = signal("prepare.run", %{value: 8})
     {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
 
-    assert {:ok, next, _} = Server.call(server, source)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Server.call(server, source)
+    next = Server.snapshot(server).agent
     assert next.state.value == 8
     assert next.state.action_signal_id == source.id
     assert next.state.prepared_signal_id == source.id

@@ -3,8 +3,6 @@ Code.require_file("runtime_admission.ex", __DIR__)
 defmodule Jido.Examples.Plugins.RuntimeAdmissionTest do
   use Jido.Test.Case, async: true
   @moduletag :integration
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Plugins.RuntimeAdmission.{Agent, Plugin}
   alias Jido.Signal
 
@@ -14,13 +12,22 @@ defmodule Jido.Examples.Plugins.RuntimeAdmissionTest do
     {:ok, server} =
       Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent, id: unique_id("runtime-admission"))
 
-    assert :ok = Server.await_ready(server)
+    assert :ok = Jido.AgentServer.await_ready(server)
 
-    assert {:ok, committed, _directives} = Server.call(server, source)
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, source)
+
+      assert turn_result.status in [:committed, :waiting]
+      committed = Jido.AgentServer.snapshot(server).agent
+    )
+
     assert committed.state == %{accepted: 1, principal: "operator"}
 
-    assert {:error, :invalid_token} = Server.call(server, authorization_signal("deny"))
-    assert Server.agent(server).state == committed.state
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: :invalid_token}} =
+             Jido.AgentServer.call(server, authorization_signal("deny"))
+
+    assert Jido.AgentServer.snapshot(server).agent.state == committed.state
   end
 
   test "direct cmd does not run live admission" do

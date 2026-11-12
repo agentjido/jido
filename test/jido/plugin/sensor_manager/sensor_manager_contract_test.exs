@@ -281,7 +281,7 @@ defmodule Jido.Plugin.SensorManager.ContractTest do
   test "sensor and internal supervisor failure restore the desired set", %{jido: jido} do
     {server, runtime} = start_agent(jido)
 
-    assert {:ok, _agent, _directives} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              AgentServer.call(server, signal("sensor.manage", %{operation: :start, value: 5}))
 
     first_sensor = eventually(fn -> Runtime.sensors(runtime)[:source] end)

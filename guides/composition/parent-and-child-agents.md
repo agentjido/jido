@@ -103,12 +103,12 @@ end
 {:ok, opened} = ChildGuide.Triage.open_signal(%{request_id: "ticket-42", words: 300})
 
 {:ok, _planned, [%Jido.AgentServer.Directive.AgentStart{name: "ticket-42"}, _send]} =
-  ChildGuide.Triage.cmd(Jido.AgentServer.agent(triage), opened)
+  ChildGuide.Triage.cmd(Jido.AgentServer.snapshot(triage).agent, opened)
 
 true = Jido.AgentServer.children(triage) == %{}
 
 {:ok, _committed, _directives} = Jido.AgentServer.call(triage, opened)
-true = wait_until.(fn -> Jido.AgentServer.agent(triage).state.summary_words == 150 end)
+true = wait_until.(fn -> Jido.AgentServer.snapshot(triage).agent.state.summary_words == 150 end)
 true = wait_until.(fn -> Jido.AgentServer.children(triage) == %{} end)
 ```
 
@@ -213,7 +213,7 @@ true = wait_until.(fn ->
 end)
 
 %{steady: %{pid: restarted}} = Jido.AgentServer.children(triage)
-1 = Jido.AgentServer.agent(restarted).state.handled
+1 = Jido.AgentServer.snapshot(restarted).agent.state.handled
 ```
 
 An owned child depends on its parent's activation. When the parent's worker crashes, the activation restarts as a group, the owned children stop, and they do not come back. Only your Agent state remembers them, so start them again from a Signal if you still need them. Static declared members return with the activation.

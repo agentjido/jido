@@ -58,8 +58,8 @@ downstream operation results stay with their owning components.
 
 ### jido.instance.I6 — Stable Ref construction
 
-- **scope:** `Jido.agent_ref/3`, `Jido.start_agent_ref/4`, `Jido.activate_agent/4`
-- **must:** Build a Ref only from a live stable namespace, exact Agent ID, and optional partition. Keep process and storage data out of the Ref. Reject malformed Refs, duplicate or unknown options, namespace mismatch, and startup identity conflicts before starting work. Preserve the same Ref identity when its namespace later binds to another local instance.
+- **scope:** `Jido.agent_ref/3`, `Jido.create_agent/4`, `Jido.activate_agent/4`
+- **must:** Build a Ref only from a live stable namespace, exact Agent ID, and optional partition. Keep process and storage data out of the Ref. Reject malformed Refs, duplicate or unknown options, namespace mismatch, and operation identity conflicts before writing or starting work. Preserve the same Ref identity when its namespace later binds to another local instance.
 - **why:** Stable identity must not depend on one process or local instance name.
 - **kind:** functional
 - **status:** active
@@ -80,10 +80,10 @@ downstream operation results stay with their owning components.
 - **kind:** functional
 - **status:** active
 
-### jido.instance.I9 — Durable Ref activation
+### jido.instance.I9 — Durable Agent creation and activation
 
-- **scope:** `Jido.activate_agent/4`
-- **must:** Return the current live local activation when one exists. Otherwise restore one active durable record, or create revision zero only when no record exists. After a create conflict, restore the winning record. Do not replace a tombstone or an invalid record.
-- **why:** One activation API must safely implement the common restore-or-create lifecycle.
+- **scope:** `Jido.create_agent/4`, `Jido.activate_agent/4`
+- **must:** Require Instance persistence for durable creation. Create revision zero synchronously and return the exact Agent Ref only after that write succeeds. Do not start an activation during creation. Return the current local activation when one exists. Otherwise activation must strictly restore one active durable record. It must not create a missing record or replace a tombstone or invalid record.
+- **why:** Logical Agent creation must be durable before activation, and activation must not create a new Agent lifetime by accident.
 - **kind:** ordering
 - **status:** active

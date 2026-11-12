@@ -210,9 +210,12 @@ defmodule Jido.Agent.RouteProjectionTest do
     assert before.state == %{count: 0}
 
     assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
-    assert {:error, ^expected_error} = AgentServer.call(server, source)
-    assert AgentServer.agent(server) === before
-    assert AgentServer.status(server).state_version == 0
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: ^expected_error}} =
+             AgentServer.call(server, source)
+
+    assert AgentServer.snapshot(server).agent === before
+    assert AgentServer.status(server).agent_revision == 0
     refute_received %Signal{type: "project.done"}
   end
 
@@ -284,46 +287,42 @@ defmodule Jido.Agent.RouteProjectionTest do
 
     assert {:ok, direct, [%Reply{signal: direct_reply}]} = Agent.cmd(before, source)
     assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
-    assert {:ok, live, [%Reply{signal: live_reply}]} = AgentServer.call(server, source)
-    assert_receive %Signal{} = delivered_reply
+
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :committed,
+              reply: %Signal{} = live_reply
+            }} = AgentServer.call(server, source)
+
+    live = AgentServer.snapshot(server).agent
 
     assert live === direct
+    assert Signal.get_context(live_reply, "jidocausationid") == source.id
 
-    assert Map.drop(Map.from_struct(delivered_reply), [:extensions]) ==
-             Map.drop(Map.from_struct(live_reply), [:extensions])
+    normalize = fn signal ->
+      signal
+      |> Map.from_struct()
+      |> Map.drop([:id])
+      |> Map.update!(:extensions, &Map.delete(&1, "traceparent"))
+    end
 
-    assert Signal.get_context(delivered_reply, "jidocausationid") == source.id
-
-    assert Map.drop(Map.from_struct(live_reply), [:id]) ==
-             Map.drop(Map.from_struct(direct_reply), [:id])
+    assert normalize.(live_reply) == normalize.(direct_reply)
   end
 
-  test "a generated Reply runs before a terminal ServerStop", %{jido: jido} do
-    before = agent([project_route()])
-    stop = Jido.Agent.Directive.server_stop()
-    {source, _trace} = request(%{reply: %{value: 1}, directives: [stop]})
-    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
-    monitor = Process.monitor(server)
-
-    assert {:ok, committed, [%Reply{signal: reply}, ^stop]} = AgentServer.call(server, source)
-    assert committed.state == %{count: 1}
-    assert reply.data == %{value: 1}
-    assert_receive %Signal{id: reply_id, type: "project.done", data: %{value: 1}}
-    assert reply_id == reply.id
-    assert_receive {:DOWN, ^monitor, :process, ^server, :normal}
-  end
-
-  test "a cast with a generated reply fails before commit", %{jido: jido} do
+  test "a cast commits generated state and discards its reply", %{jido: jido} do
     before = agent([project_route(), barrier_route()])
     {source, _trace} = request(%{reply: %{value: 1}})
     {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, before)
 
     assert :ok = AgentServer.cast(server, source)
     barrier = Signal.new!("barrier", %{}, source: "/test")
-    assert {:ok, barrier_result, []} = AgentServer.call(server, barrier)
 
-    assert barrier_result.state == before.state
-    assert AgentServer.status(server).state_version == 1
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             AgentServer.call(server, barrier)
+
+    barrier_result = AgentServer.snapshot(server).agent
+    assert barrier_result.state == %{count: 1}
+    assert AgentServer.status(server).agent_revision == 2
   end
 
   test "cancellation stops output before route projection", %{jido: jido} do
@@ -338,11 +337,12 @@ defmodule Jido.Agent.RouteProjectionTest do
     caller = Task.async(fn -> AgentServer.call(server, source) end)
 
     assert_receive {:route_projection_started, worker}, 1_000
-    assert :ok = AgentServer.cancel(server)
-    assert {:error, :cancelled} = Task.await(caller)
+    turn_id = AgentServer.status(server).active_turn_id
+    assert :ok = AgentServer.cancel_turn(server, turn_id)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :cancelled}} = Task.await(caller)
     refute Process.alive?(worker)
-    assert AgentServer.agent(server) === before
-    assert AgentServer.status(server).state_version == 0
+    assert AgentServer.snapshot(server).agent === before
+    assert AgentServer.status(server).agent_revision == 0
   end
 
   test "an Action Output envelope remains invalid route output" do

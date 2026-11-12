@@ -16,7 +16,6 @@ defmodule Jido.Test.Agent.WorkflowSDKCase do
 
   def start_agent!(jido, agent, opts \\ []) do
     opts = Keyword.put_new_lazy(opts, :id, &Jido.Test.Case.unique_id/0)
-    opts = Keyword.put_new(opts, :error_policy, fn _, _ -> :continue end)
     {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, agent, opts)
     server
   end

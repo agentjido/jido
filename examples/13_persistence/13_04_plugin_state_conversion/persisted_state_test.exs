@@ -79,7 +79,7 @@ defmodule Jido.Examples.Persistence.PluginStateConversionTest do
       {:error, _reason} -> :ok
     end
 
-    eventually(fn -> Jido.whereis_agent(jido, id) == nil and Jido.agent_count(jido) == 0 end)
+    eventually(fn -> Jido.whereis_agent(jido, id) == nil and Jido.resident_agent_count(jido) == 0 end)
   end
 
   defp persistence do

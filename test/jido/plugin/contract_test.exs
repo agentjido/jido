@@ -45,14 +45,33 @@ defmodule Jido.Plugin.ContractTest do
     def run(_params, _context), do: {:ok, %{trace: [:invalid]}}
   end
 
+  defmodule StopIntent do
+    use Jido.Agent.Directive
+    defstruct reason: :normal
+  end
+
   defmodule ReturnStop do
     use Jido.Action,
       name: "agent_plugin_stop_directive"
 
     @impl Jido.Action
     def run(_params, context) do
-      {:ok, context.agent_state, [%Jido.Agent.Directive.ServerStop{}]}
+      {:ok, context.agent_state, [%Jido.Plugin.ContractTest.StopIntent{}]}
     end
+  end
+
+  defmodule StopPlugin do
+    use Jido.Plugin
+
+    @impl true
+    def state_spec(_opts),
+      do: {:stop_state, Jido.Joi.any() |> Jido.Joi.nullable() |> Jido.Joi.default(nil)}
+
+    @impl true
+    def directives(_opts), do: [StopIntent]
+
+    @impl true
+    def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
   end
 
   defmodule FailingAction do
@@ -121,7 +140,7 @@ defmodule Jido.Plugin.ContractTest do
 
   defmodule OwnedDirective do
     defstruct value: nil
-    def validate(%__MODULE__{}), do: {:ok, %Jido.Agent.Directive.ServerStop{}}
+    def validate(%__MODULE__{}), do: {:ok, %Jido.Plugin.ContractTest.StopIntent{}}
   end
 
   defmodule ReturnOwnedDirective do
@@ -402,7 +421,7 @@ defmodule Jido.Plugin.ContractTest do
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state}
 
     @impl true
-    def directives(_opts), do: [Jido.Agent.Directive.ServerStop]
+    def directives(_opts), do: [Jido.Agent.Directive.Emit]
   end
 
   defmodule InvalidStateAgent do
@@ -418,7 +437,7 @@ defmodule Jido.Plugin.ContractTest do
   end
 
   defmodule DirectiveAgent do
-    use Jido.Agent, name: "directive_agent"
+    use Jido.Agent, name: "directive_agent", plugins: [StopPlugin]
 
     routes do
       route "directive.stop", ReturnStop
@@ -589,7 +608,7 @@ defmodule Jido.Plugin.ContractTest do
     agent = DirectiveAgent.instantiate!(id: Jido.Id.uuid7())
     signal = Signal.new!("directive.stop", %{}, source: "/test")
 
-    assert {:ok, _next_agent, [%Jido.Agent.Directive.ServerStop{reason: :normal}]} =
+    assert {:ok, _next_agent, [%StopIntent{reason: :normal}]} =
              DirectiveAgent.cmd(agent, signal)
   end
 

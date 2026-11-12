@@ -63,7 +63,7 @@ defmodule Jido.AgentServer.Perf.LoadTest do
                   context: %{observer: observer, run_ref: run_ref}
                 )
 
-              {index, result}
+              {index, server, result}
             end)
           end)
 
@@ -78,13 +78,15 @@ defmodule Jido.AgentServer.Perf.LoadTest do
         Enum.each(actions, &send(&1, {run_ref, :release}))
 
         for call <- calls do
-          assert {index, {:ok, %{state: %{count: count}}, []}} = Task.await(call, 60_000)
-          assert count == index
+          assert {index, server, {:ok, %Jido.AgentServer.TurnResult{status: :committed}}} =
+                   Task.await(call, 60_000)
+
+          assert Server.snapshot(server).agent.state.count == index
         end
 
         monitored =
           servers
-          |> Enum.flat_map(&[&1, Server.activation(&1)])
+          |> Enum.flat_map(&[&1, Jido.Test.AgentServer.ExampleRuntime.activation(&1)])
           |> Enum.uniq()
           |> Enum.map(&{&1, Process.monitor(&1)})
 
@@ -99,7 +101,7 @@ defmodule Jido.AgentServer.Perf.LoadTest do
           assert_receive {:DOWN, ^monitor, :process, ^pid, _reason}, 10_000
         end)
 
-        assert Jido.agent_count(c.jido) == 0
+        assert Jido.resident_agent_count(c.jido) == 0
         assert Jido.list_agents(c.jido) == []
         assert DynamicSupervisor.which_children(test_agent_supervisor(c)) == []
 

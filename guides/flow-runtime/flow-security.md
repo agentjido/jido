@@ -160,7 +160,7 @@ A Handoff target cannot carry bound context or metadata. A context bound in an I
 
 ## Control who can resolve a wait
 
-`Jido.AgentServer.deliver_wait/4` checks that the Signal matches the wait's event and `match` fields. That is correlation, not authorization. Anyone who can reach the function with the right ID and fields can resolve the wait. Authenticate the sender before you call it, and put the identity of the expected approver in `match` where you can. See [Flow Waits](flow-waits.md).
+When `Jido.call/4` delivers a Signal to a waiting durable Agent, Jido checks that the Signal matches the wait's event and `match` fields. That is correlation, not authorization. Authenticate the sender before you deliver it, and put the expected approver identity in `match` where you can.
 
 ## Bound resource use
 
@@ -201,7 +201,7 @@ An Action module that changes after a graph is built fails with `details.reason:
 ## Check your setup
 
 - Each Flow from outside your code decodes through a Catalog limited to what its author may call.
-- Your code authorizes the caller before `Jido.Exec.run/4`, `Jido.Durable.start/4`, and `Jido.AgentServer.deliver_wait/4`.
+- Your code authorizes the caller before `Jido.Exec.run/4`, `Jido.Durable.start/4`, and `Jido.call/4`.
 - Each Flow has an input schema, and it bounds list lengths for untrusted collections.
 - Invoke and Handoff targets come from a fixed table.
 - Each external call has a `:timeout`, and non-idempotent Actions return `retry: false` or use an application idempotency key.

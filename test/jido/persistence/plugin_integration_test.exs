@@ -139,7 +139,7 @@ defmodule Jido.Persistence.PluginIntegrationTest do
     assert_receive {:dump, 12, dump_context}
     assert dump_context.plugin == Package
     assert dump_context.plugin_vsn == 4
-    assert dump_context.record_format == 1
+    assert dump_context.record_format == 2
     assert dump_context.direction == :dump
     assert dump_context.reason == :test
 

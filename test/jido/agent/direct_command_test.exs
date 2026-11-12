@@ -184,7 +184,7 @@ defmodule Jido.Agent.DirectCommandTest do
           %{mode: :invalid},
           %{mode: :partial},
           %{directives: :bad},
-          %{directives: [Jido.Agent.Directive.server_stop() | :bad]},
+          %{directives: [%Directive.Emit{signal: signal("work.done")} | :bad]},
           %{directives: [%UnknownDirective{}]},
           %{directives: [%{unknown: true}]},
           %{directives: [%Directive.Emit{signal: :bad}]},
@@ -244,7 +244,7 @@ defmodule Jido.Agent.DirectCommandTest do
 
   test "outbound directives are returned without dispatch" do
     output = signal("work.done")
-    directive = Jido.AgentServer.Directive.signal_send(output, self())
+    directive = Directive.emit(output, {:pid, target: self()})
 
     assert {:ok, _, [^directive]} =
              Agent.cmd(instance(), signal("work", %{directives: [directive]}))
@@ -308,12 +308,15 @@ defmodule Jido.Agent.ReplyDirectiveRuntimeTest do
     reply = Directive.reply(output)
     request = %{request | data: %{directives: [reply]}}
 
-    assert {:ok, committed, [^reply]} = AgentServer.call(server, request)
-    assert_receive %Signal{id: output_id, type: "work.reply", data: %{}} = delivered
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :committed,
+              reply: %Signal{id: output_id, type: "work.reply", data: %{}} = delivered
+            }} = AgentServer.call(server, request)
+
     assert output_id == output.id
     assert Signal.get_context(delivered, "jidocausationid") == request.id
-    assert Signal.Context.get_trace(delivered) != nil
-    assert AgentServer.status(server).state_version == 1
-    assert AgentServer.agent(server) == committed
+    assert AgentServer.status(server).agent_revision == 1
+    assert AgentServer.snapshot(server).agent.state.count == 1
   end
 end

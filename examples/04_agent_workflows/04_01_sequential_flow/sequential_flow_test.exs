@@ -56,15 +56,24 @@ defmodule Jido.Examples.Workflow.SequentialFlowTest do
 
   test "result and control dependencies produce one complete commit", %{jido: jido} do
     server = start_agent!(jido, Example)
-    before = Server.snapshot(server)
+    before = Jido.AgentServer.snapshot(server)
     {:ok, command} = Example.double_value_signal(%{value: 4})
 
     assert {:ok, candidate, []} = Example.cmd(before.agent, command)
     assert candidate.state == %{value: 8, label: "kept"}
-    assert Server.snapshot(server) == before
+    assert Jido.AgentServer.snapshot(server) == before
 
-    assert {:ok, ^candidate, _directives} = Server.call(server, command)
-    assert Server.snapshot(server) == %{agent: candidate, state_version: 1}
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, command)
+
+      assert turn_result.status in [:committed, :waiting]
+      assert candidate == Jido.AgentServer.snapshot(server).agent
+    )
+
+    snapshot = Jido.AgentServer.snapshot(server)
+    assert snapshot.agent == candidate
+    assert snapshot.agent_revision == 1
   end
 
   test "an intermediate failure preserves the prior commit", %{jido: jido} do
@@ -72,14 +81,18 @@ defmodule Jido.Examples.Workflow.SequentialFlowTest do
 
     {:ok, route_signal_1} = Example.double_value_signal(%{value: 3})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(server, route_signal_1, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_1, [])
 
-    before = Server.snapshot(server)
+      assert turn_result.status in [:committed, :waiting]
+    )
+
+    before = Jido.AgentServer.snapshot(server)
 
     {:ok, route_signal_2} = Example.double_value_signal(%{value: 4, failure: :middle})
 
-    assert {:error, error} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: error}} =
              Jido.AgentServer.call(server, route_signal_2, [])
 
     assert Enum.any?(
@@ -87,15 +100,20 @@ defmodule Jido.Examples.Workflow.SequentialFlowTest do
              &(&1.message == "gate rejected" and &1.details.stage == :gate)
            )
 
-    assert Server.snapshot(server) == before
+    assert Jido.AgentServer.snapshot(server) == before
 
     {:ok, route_signal_3} = Example.double_value_signal(%{value: 5})
 
-    assert {:ok, recovered, _directives} =
-             Jido.AgentServer.call(server, route_signal_3, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_3, [])
+
+      assert turn_result.status in [:committed, :waiting]
+      recovered = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert recovered.state.value == 10
-    assert Server.snapshot(server).state_version == 2
+    assert Jido.AgentServer.snapshot(server).agent_revision == 2
   end
 
   test "Flow input, Flow output, and Agent state fail at distinct boundaries", %{jido: jido} do
@@ -103,26 +121,39 @@ defmodule Jido.Examples.Workflow.SequentialFlowTest do
 
     {:ok, route_signal_4} = Example.double_value_signal(%{value: 3})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(server, route_signal_4, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_4, [])
 
-    before = Server.snapshot(server)
+      assert turn_result.status in [:committed, :waiting]
+    )
+
+    before = Jido.AgentServer.snapshot(server)
 
     {:ok, route_signal_5} = Example.double_value_signal(%{value: -1})
 
-    assert {:error, %Jido.Error.ValidationError{details: %{phase: :flow_input}}} =
-             Jido.AgentServer.call(server, route_signal_5, [])
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :failed,
+              error: %Jido.Error.ValidationError{details: %{phase: :flow_input}}
+            }} = Jido.AgentServer.call(server, route_signal_5, [])
 
     {:ok, route_signal_6} = Example.double_value_signal(%{value: 4, failure: :output})
 
-    assert {:error, %Jido.Error.ValidationError{details: %{phase: :flow_output}}} =
-             Jido.AgentServer.call(server, route_signal_6, [])
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :failed,
+              error: %Jido.Error.ValidationError{details: %{phase: :flow_output}}
+            }} = Jido.AgentServer.call(server, route_signal_6, [])
 
     {:ok, route_signal_7} = Example.double_value_signal(%{value: 4, failure: :candidate})
 
-    assert {:error, %Jido.Error.ValidationError{code: :invalid_state, path: [:state]}} =
-             Jido.AgentServer.call(server, route_signal_7, [])
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :failed,
+              error: %Jido.Error.ValidationError{code: :invalid_state, path: [:state]}
+            }} = Jido.AgentServer.call(server, route_signal_7, [])
 
-    assert Server.snapshot(server) == before
+    assert Jido.AgentServer.snapshot(server) == before
   end
 end

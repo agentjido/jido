@@ -102,7 +102,8 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
     state = %{state | pending: nil}
 
     case result do
-      {:ok, _agent, _directives} -> acknowledge(record, state)
+      {:ok, %Jido.AgentServer.TurnResult{status: :committed}} -> acknowledge(record, state)
+      {:ok, %Jido.AgentServer.TurnResult{}} -> retry(record, :deliver, state)
       {:error, _reason} -> retry(record, :deliver, state)
     end
   end

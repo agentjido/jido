@@ -105,7 +105,11 @@ defmodule Jido.Agent.SelectionTest do
       assert direct.state == %{input: input, calls: 1}
 
       assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
-      assert {:ok, live, _} = Server.call(server, source, context: %{observer: self()})
+
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+               Server.call(server, source, context: %{observer: self()})
+
+      live = Server.snapshot(server).agent
       assert_receive {:executed, ^input, execution_signal}
       assert execution_signal.data == source.data
       assert live.state == direct.state
@@ -135,7 +139,11 @@ defmodule Jido.Agent.SelectionTest do
       source = signal("selection.empty", data)
       assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
       assert {:ok, direct, []} = Agent.cmd(agent, source)
-      assert {:ok, live, _} = Server.call(server, source)
+
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+               Server.call(server, source)
+
+      live = Server.snapshot(server).agent
       assert direct.state == %{input: %{}, calls: 1}
       assert live.state == direct.state
     end
@@ -151,8 +159,7 @@ defmodule Jido.Agent.SelectionTest do
 
         for result <- [
               Runner.prepare(agent, source, []),
-              Agent.cmd(agent, source, context: %{observer: self()}),
-              Server.call(server, source, context: %{observer: self()})
+              Agent.cmd(agent, source, context: %{observer: self()})
             ] do
           assert {:error,
                   %Jido.Error.ValidationError{
@@ -163,7 +170,18 @@ defmodule Jido.Agent.SelectionTest do
           assert id == source.id
         end
 
-        assert Server.agent(server).state == agent.state
+        assert {:ok,
+                %Jido.AgentServer.TurnResult{
+                  status: :failed,
+                  error: %Jido.Error.ValidationError{
+                    subject: :data,
+                    details: %{signal_id: id, data: ^data}
+                  }
+                }} = Server.call(server, source, context: %{observer: self()})
+
+        assert id == source.id
+
+        assert Server.snapshot(server).agent.state == agent.state
         refute_received {:executed, _, _}
       end
     end
@@ -190,8 +208,11 @@ defmodule Jido.Agent.SelectionTest do
     source = signal("selection.validated", value: "invalid")
     assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, agent)
     assert {:error, _error} = Agent.cmd(agent, source, context: %{observer: self()})
-    assert {:error, _error} = Server.call(server, source, context: %{observer: self()})
-    assert Server.agent(server).state == agent.state
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+             Server.call(server, source, context: %{observer: self()})
+
+    assert Server.snapshot(server).agent.state == agent.state
     refute_received {:executed, _, _}
   end
 

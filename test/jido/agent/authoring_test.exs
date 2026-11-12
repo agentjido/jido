@@ -730,8 +730,10 @@ defmodule Jido.Agent.AuthoringRuntimeTest do
 
     route_signal_1 = Counter.add_signal!(%{amount: 3})
 
-    assert {:ok, ^expected, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Jido.AgentServer.call(server, route_signal_1, [])
+
+    assert Jido.AgentServer.snapshot(server).agent == expected
 
     assert expected.state == %{count: 3, turns: 1}
 
@@ -745,11 +747,13 @@ defmodule Jido.Agent.AuthoringRuntimeTest do
 
     {:ok, route_signal_2} = Counter.flow_add_signal(%{amount: 2})
 
-    assert {:ok, ^flow_candidate, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Jido.AgentServer.call(server, route_signal_2, [])
 
+    assert Jido.AgentServer.snapshot(server).agent == flow_candidate
+
     assert flow_candidate.state == %{count: 5, turns: 2}
-    assert Server.status(server).state_version == 2
+    assert Server.status(server).agent_revision == 2
   end
 
   test "generated inline helpers apply route defaults", %{jido: jido} do
@@ -757,9 +761,10 @@ defmodule Jido.Agent.AuthoringRuntimeTest do
 
     {:ok, route_signal_3} = InlineCounter.add_inline_signal(%{amount: 4})
 
-    assert {:ok, committed, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Jido.AgentServer.call(server, route_signal_3, [])
 
+    committed = Server.snapshot(server).agent
     assert committed.state == %{count: 4}
   end
 
@@ -776,9 +781,10 @@ defmodule Jido.Agent.AuthoringRuntimeTest do
 
     {:ok, route_signal_5} = Counter.add_signal(%{amount: 0})
 
-    assert {:ok, committed, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Jido.AgentServer.call(server, route_signal_5, context: %{})
 
+    committed = Server.snapshot(server).agent
     assert committed.state.count == 0
   end
 
@@ -793,9 +799,10 @@ defmodule Jido.Agent.AuthoringRuntimeTest do
 
     {:ok, route_signal_6} = PreparedCounter.add_signal(%{amount: 2})
 
-    assert {:ok, ^candidate, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Jido.AgentServer.call(server, route_signal_6, [])
 
-    assert Server.status(server).state_version == 1
+    assert Server.snapshot(server).agent == candidate
+    assert Server.status(server).agent_revision == 1
   end
 end

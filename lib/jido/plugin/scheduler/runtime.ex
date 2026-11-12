@@ -173,7 +173,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   end
 
   defp current_plugin_state(runtime) do
-    case Server.plugin_state(runtime.agent_server, runtime.plugin, 5_000) do
+    case Jido.AgentServer.Worker.plugin_state(runtime.agent_server, runtime.plugin, 5_000) do
       {:ok, state} -> {:ok, state || %{cron: %{}}}
       {:error, reason} -> {:error, reason}
     end

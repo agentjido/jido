@@ -96,7 +96,7 @@ defmodule Jido.Persistence.RecordIdentityTest do
                persistence: c.store
              )
 
-    assert Jido.agent_count(instance) == 0
+    assert Jido.resident_agent_count(instance) == 0
   end
 
   test "a File store keeps one record across instance names", c do

@@ -140,7 +140,7 @@ A Turn fails with `{:error, :too_many_directives}` when its batch exceeds `:max_
     Jido.Agent.Directive.emit(outbound.("after stop"), {:pid, target: self()})
   ])
 
-%{state: %{placed: 1}} = Jido.AgentServer.agent(orders)
+%{state: %{placed: 1}} = Jido.AgentServer.snapshot(orders).agent
 ```
 
 `process_start/1` does not track what it starts. Your code owns stopping that process, and the process outlives the Agent.
@@ -185,7 +185,7 @@ failing = start_orders.("orders-2", [])
 failed_outcome = settle.(failing)
 
 %{status: :succeeded, committed?: true} = Jido.AgentServer.status(failing).last_outcome
-%{state: %{placed: 2}} = Jido.AgentServer.agent(failing)
+%{state: %{placed: 2}} = Jido.AgentServer.snapshot(failing).agent
 ```
 
 `last_effect_outcome` keeps a batch's result until another batch replaces it.
@@ -303,7 +303,7 @@ effect =
 %{active: %{stage: :effects, committed_version: 1}, effects: %{total: 1, completed: 0}} =
   Jido.AgentServer.status(noticing)
 
-^committed = Jido.AgentServer.agent(noticing)
+^committed = Jido.AgentServer.snapshot(noticing).agent
 {:error, :not_running} = Jido.AgentServer.cancel(noticing)
 
 send(effect, :finish)

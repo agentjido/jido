@@ -125,17 +125,7 @@ defmodule Jido.MixProject do
        [
          {"Node.js and the BEAM", "guides/from-typescript/nodejs-and-the-beam.md"},
          {"TypeScript Concept Map", "guides/from-typescript/typescript-concept-map.md"},
-         {"Types and Validation", "guides/from-typescript/types-and-validation.md"},
-         {"Errors and Async", "guides/from-typescript/errors-and-async.md"},
-         {"Effects as Data", "guides/from-typescript/effects-as-data.md"}
-       ]},
-      {:"Core Concepts",
-       [
-         {"OTP Concepts for Jido", "guides/core-concepts/otp-concepts-for-jido.md"},
-         {"Life of a Signal", "guides/core-concepts/signal-to-effects.md"},
-         {"Pure or Live Execution", "guides/core-concepts/pure-or-live-execution.md"},
-         {"Definitions and Runtime", "guides/core-concepts/definitions-instances-activations.md"},
-         {"Turns and Effects", "guides/core-concepts/turns-commits-and-effects.md"}
+         {"Types and Validation", "guides/from-typescript/types-and-validation.md"}
        ]},
       {:Actions,
        [
@@ -177,7 +167,6 @@ defmodule Jido.MixProject do
          {"Execution", "guides/flow-runtime/execution.md"},
          {"Execute Flows", "guides/flow-runtime/flow-execution.livemd"},
          {"Managed Execution", "guides/flow-runtime/managed-execution.md"},
-         {"Flow Waits", "guides/flow-runtime/flow-waits.md"},
          {"Flow Errors", "guides/flow-runtime/flow-errors.md"},
          {"Debug Flows", "guides/flow-runtime/debugging-flows.md"},
          {"Test Flows", "guides/flow-runtime/testing-flows.livemd"},
@@ -188,19 +177,9 @@ defmodule Jido.MixProject do
          {"Define an Agent", "guides/agents/define-and-instantiate-an-agent.livemd"},
          {"Agent State and Schemas", "guides/agents/agent-state-and-schemas.md"},
          {"Routes and Handlers", "guides/agents/build-agent-routes.livemd"},
-         {"Transforms and Forwards", "guides/agents/route-transforms-and-forwards.md"},
-         {"Agent Turns and Replies", "guides/agents/turns-state-and-replies.md"},
-         {"State and Directives", "guides/agents/agent-results-and-directives.md"},
          {"Documents and Views", "guides/agents/agent-documents-and-views.md"},
          {"Agent Callbacks", "guides/agents/agent-callbacks.md"},
          {"Test Agent Definitions", "guides/agents/testing-agent-definitions.livemd"}
-       ]},
-      {:"Compose Agents",
-       [
-         {"Composition Vocabulary", "guides/composition/composition-vocabulary.md"},
-         {"Declare Agent Topology", "guides/composition/declare-agent-topology.livemd"},
-         {"Connect Agent Outputs", "guides/composition/connect-agent-outputs.livemd"},
-         {"Parent and Child Agents", "guides/composition/parent-and-child-agents.md"}
        ]},
       {:Signals,
        [
@@ -216,60 +195,30 @@ defmodule Jido.MixProject do
        ]},
       {:"Build Plugins",
        [
-         {"Plugin Design", "guides/plugins/plugin-design.md"},
-         {"Write a Stateful Plugin", "guides/plugins/write-a-stateful-plugin.livemd"},
-         {"Plugin Routing", "guides/plugins/plugin-input-and-routes.md"},
-         {"Plugin State", "guides/plugins/plugin-state-and-directives.md"},
-         {"Custom Directives", "guides/plugins/plugin-custom-directives.livemd"},
-         {"Supervised Resources", "guides/plugins/plugin-supervised-resources.livemd"},
-         {"Post-Commit Work", "guides/plugins/plugin-post-commit-work.md"},
-         {"Plugin Persistence", "guides/plugins/plugin-persistence.md"},
-         {"Test Plugins", "guides/plugins/testing-plugins.livemd"}
+         {"Plugin Design", "guides/plugins/plugin-design.md"}
        ]},
       {:"Built-In Plugins",
        [
-         {"Audit Records", "guides/built-in-plugins/audit-records.md"},
          {"Signal Bus Plugin", "guides/built-in-plugins/signal-bus-plugin.livemd"},
-         {"Agent Heartbeats", "guides/built-in-plugins/heartbeats.livemd"},
-         {"Schedules", "guides/built-in-plugins/scheduler.livemd"},
-         {"Managed Sensors", "guides/built-in-plugins/managed-sensors.livemd"}
+         {"Agent Heartbeats", "guides/built-in-plugins/heartbeats.livemd"}
        ]},
       {:"Run Agent Servers",
        [
          {"Start and Address Agents", "guides/agent-servers/start-and-address-live-agents.livemd"},
-         {"Call, Cast, and Await", "guides/agent-servers/send-signals-to-live-agents.livemd"},
-         {"Admission and Deadlines", "guides/agent-servers/agent-server-admission.md"},
-         {"Status and Turn History", "guides/agent-servers/status-and-history.md"},
-         {"Cancel Turns", "guides/agent-servers/cancel-turns.livemd"},
-         {"Control Activations", "guides/agent-servers/inspect-and-control-activations.livemd"},
-         {"Agent Lifecycle", "guides/agent-servers/agent-activation-control.md"},
-         {"Hibernate and Thaw", "guides/agent-servers/hibernate-thaw-and-activate.md"},
-         {"Child Agent Adoption", "guides/agent-servers/child-agents-and-adoption.md"},
-         {"Runtime Effects", "guides/agent-servers/runtime-directives-and-effects.md"},
-         {"Upgrade Live Agents", "guides/agent-servers/upgrade-live-agents.md"}
+         {"Status and Snapshots", "guides/agent-servers/status-and-history.md"}
        ]},
       {:Durability,
        [
-         {"Durability Model", "guides/durability/durability-model.md"},
-         {"Make an Agent Durable", "guides/durability/make-an-agent-durable.livemd"},
          {"Durable Agent Activation", "guides/durability/durable-agent-activation.livemd"},
-         {"Durable Turns and Flows", "guides/durability/durable-turns-and-flows.livemd"},
-         {"Revisions and Conflicts", "guides/durability/durable-revisions-and-conflicts.md"},
-         {"Checkpoints and Upgrades", "guides/durability/checkpoints-and-data-upgrades.md"},
-         {"Durable Topology", "guides/durability/durable-topology.md"},
-         {"Recovery Limits", "guides/durability/recovery-and-effect-limits.md"},
          {"Deletion and Tombstones", "guides/durability/deletion-and-tombstones.md"}
        ]},
       {:Storage,
        [
          {"Storage Model", "guides/storage/persistence-storage-model.md"},
-         {"Persistence Adapters", "guides/storage/persistence-adapters.livemd"},
-         {"Custom Adapters", "guides/storage/custom-persistence-adapter.md"},
          {"Local Stores", "guides/storage/local-persistence-adapters.md"},
          {"Ecto Storage", "guides/storage/ecto-persistence.md"},
          {"Redis and S3 Stores", "guides/storage/redis-and-s3-persistence.md"},
-         {"Bedrock and Raft Storage", "guides/storage/bedrock-persistence.md"},
-         {"Continuation Storage", "guides/storage/flow-continuations.md"}
+         {"Bedrock and Raft Storage", "guides/storage/bedrock-persistence.md"}
        ]},
       {:"AI Agents",
        [
@@ -285,7 +234,6 @@ defmodule Jido.MixProject do
          {"Tool Calls and Results", "guides/ai/tool-calls-and-results.md"},
          {"Model Budgets and Usage", "guides/ai/budgets-and-usage.md"},
          {"ReAct Reasoning", "guides/ai/react-reasoning.livemd"},
-         {"Tool Review", "guides/ai/tool-review.md"},
          {"Reasoning Strategies", "guides/ai/reasoning-strategies.md"},
          {"Custom Reasoning Flows", "guides/ai/custom-reasoning-flows.livemd"},
          {"Test AI Agents", "guides/ai/testing-ai-agents.livemd"}
@@ -305,26 +253,16 @@ defmodule Jido.MixProject do
        [
          {"Instances and Tenants", "guides/operations/configuration-and-tenant-isolation.md"},
          {"Production Setup", "guides/operations/production-configuration.md"},
-         {"Observe Agent Turns", "guides/operations/observe-agent-turns.livemd"},
-         {"Telemetry and Tracing", "guides/operations/telemetry-tracing-and-logs.md"},
-         {"Metrics and OTel", "guides/operations/metrics-and-open-telemetry.md"},
-         {"Runtime Debugging", "guides/operations/runtime-state-and-debugging.md"},
-         {"Test Jido Systems", "guides/operations/test-jido-systems.livemd"},
          {"Deployment and Sizing", "guides/operations/deployment-and-performance.md"},
-         {"Load Testing", "guides/operations/load-and-performance-testing.md"},
-         {"Shutdown and Recovery", "guides/operations/shutdown-and-recovery.md"},
          {"Security Model", "guides/operations/security.md"}
        ]},
       {:Reference,
        [
          {"Public API Guide", "guides/reference/public-api-reference.md"},
          {"Module and Namespace Map", "guides/reference/module-and-namespace-map.md"},
-         {"Configuration Reference", "guides/reference/configuration-reference.md"},
          {"Telemetry Events", "guides/reference/telemetry-event-reference.md"},
          {"Persistence Matrix", "guides/reference/persistence-adapter-matrix.md"},
-         {"Reasoning Matrix", "guides/reference/reasoning-strategy-matrix.md"},
-         {"V2 to V3 Migration", "guides/reference/v2-to-v3-migration.md"},
-         {"Package Consolidation", "guides/reference/consolidated-package-migration.md"}
+         {"Reasoning Matrix", "guides/reference/reasoning-strategy-matrix.md"}
        ]}
     ]
   end

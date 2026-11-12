@@ -91,8 +91,8 @@ An AgentServer runs the same evaluation and adds what a long-lived Agent needs: 
 {:ok, server} = Jido.start_agent(MentalModel.Jido, MentalModel.InvoiceAgent, id: "inv-1001")
 :ok = Jido.AgentServer.await_ready(server)
 
-{:ok, committed, [%Jido.Agent.Directive.Reply{}]} = Jido.AgentServer.call(server, signal)
-true = committed.state == paid.state
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.call(server, signal)
+true = Jido.AgentServer.snapshot(server).agent.state == paid.state
 
 %Jido.Signal{type: "invoice.payment.applied"} =
   receive do

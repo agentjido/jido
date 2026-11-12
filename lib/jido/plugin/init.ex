@@ -18,7 +18,7 @@ defmodule Jido.Plugin.Init do
   @schema Joi.struct(
             __MODULE__,
             %{
-              agent_server: Joi.pid(description: "Owning Agent Server process"),
+              agent_server: Joi.any(description: "Activation-local Agent Server handle"),
               agent_id: Joi.string(description: "Owning Agent identifier"),
               module: Joi.module(description: "Plugin module"),
               plugin_state:

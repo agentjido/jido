@@ -1059,10 +1059,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
       {:ok, response(model, llm_context, "Committed answer", "before-block")}
     end)
 
-    assert {:ok, committed, _directives} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(server, SimpleAgent.request_signal!(%{input: "Commit this request."}))
 
-    assert {:ok, agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+    committed = Server.snapshot(server).agent
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, reply: reply}} =
              Server.call(
                server,
                SimpleAgent.request_signal!(%{
@@ -1070,9 +1072,10 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
                })
              )
 
+    agent = Server.snapshot(server).agent
     assert reply.data.status == :blocked
     assert agent.state.session.rev == committed.state.session.rev + 2
-    assert Server.agent(server).state == agent.state
+    assert Server.snapshot(server).agent.state == agent.state
 
     assert {:ok, messages} = Projection.messages(agent.state.session)
 
@@ -1099,19 +1102,19 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     request = SimpleAgent.request_signal!(%{input: "Add 2 and 3", review_tools: true})
     pending = Server.submit(server, request)
     wait = waiting(server)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :waiting}} = Server.await(pending)
 
     denial =
       Jido.Signal.new!("jido.ai.review.denied", review_match(wait, "denied"), source: "/tests")
 
-    assert :ok = Server.deliver_wait(server, wait.id, denial)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, reply: reply}} =
+             Server.call(server, denial)
 
-    assert {:ok, agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
-             Server.await(pending)
-
+    agent = Server.snapshot(server).agent
     assert reply.data.status == :blocked
     assert reply.data.reason_code == :review
     assert %Jido.Session{} = agent.state.session
-    assert Server.agent(server).state == agent.state
+    assert Server.snapshot(server).agent.state == agent.state
     assert {:ok, []} = Projection.messages(agent.state.session)
 
     reviews = Jido.Thread.filter_by_kind(agent.state.session.thread, :ai_review)
@@ -1126,7 +1129,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
   @tag :tmp_dir
   test "AgentServer persists conversation state and restores it for the next request", context do
-    {instance, server, persistence, id} = start_persisted_agent(context.tmp_dir, "history")
+    {instance, server, _persistence, ref} = start_persisted_agent(context.tmp_dir, "history")
 
     expect(ReqLLM, :generate_text, 2, fn model, llm_context, _options ->
       roles = Enum.map(ReqLLM.Context.to_list(llm_context), & &1.role)
@@ -1140,23 +1143,25 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
       end
     end)
 
-    assert {:ok, first_agent, _directives} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(server, SimpleAgent.request_signal!(%{input: "Before"}))
 
+    first_agent = Server.snapshot(server).agent
     assert first_agent.state.session.rev == 4
-    assert :ok = Server.hibernate(server)
-    assert {:ok, restored} = Jido.thaw(instance, SimpleAgent, id, persistence: persistence)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(server)
+    assert {:ok, restored} = Jido.activate_agent(instance, ref)
     assert :ok = Server.await_ready(restored)
 
-    assert {:ok, second_agent, _directives} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(restored, SimpleAgent.request_signal!(%{input: "After"}))
 
+    second_agent = Server.snapshot(restored).agent
     assert second_agent.state.session.rev == 8
   end
 
   @tag :tmp_dir
   test "a tool review wait survives restart and resumes the same graph", context do
-    {instance, server, persistence, id} = start_persisted_agent(context.tmp_dir, "review")
+    {instance, server, _persistence, ref} = start_persisted_agent(context.tmp_dir, "review")
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
     expect(ReqLLM, :generate_text, 2, fn model, llm_context, _options ->
@@ -1187,10 +1192,11 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
     pending = Server.submit(server, request)
     wait = waiting(server)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :waiting}} = Server.await(pending)
 
-    assert :ok = Server.hibernate(server)
-    assert {:error, _reason} = Server.await(pending)
-    assert {:ok, restored} = Jido.thaw(instance, SimpleAgent, id, persistence: persistence)
+    root = Jido.Test.AgentServer.Assertions.activation(server)
+    assert :ok = DynamicSupervisor.terminate_child(Jido.Instance.Names.agent_supervisor(instance), root)
+    assert {:ok, restored} = Jido.activate_agent(instance, ref)
     assert :ok = Server.await_ready(restored)
 
     restored_wait = waiting(restored)
@@ -1199,10 +1205,13 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     approval =
       Jido.Signal.new!("jido.ai.review.approved", review_match(restored_wait, "approved"), source: "/tests")
 
-    assert :ok = Server.deliver_wait(restored, restored_wait.id, approval)
-    assert :ok = Server.quiesce(restored, timeout: 30_000)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Server.call(restored, approval)
 
-    session = Server.agent(restored).state.session
+    assert {:ok, %Jido.AgentServer.Status{admission: :quiesced}} =
+             Server.quiesce(restored, timeout: 30_000)
+
+    session = Server.snapshot(restored).agent.state.session
     reviews = Jido.Thread.filter_by_kind(session.thread, :ai_review)
     assert Enum.map(reviews, & &1.payload["status"]) == ["requested", "approved"]
 
@@ -1290,19 +1299,21 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     suffix = System.unique_integer([:positive])
     instance = String.to_atom("jido_ai_runtime_#{label}_#{suffix}")
     namespace = "jido/ai/runtime/#{label}/#{suffix}"
-    start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
     persistence = {Jido.Persistence.File, path: path}
     id = "#{label}-agent"
 
-    assert {:ok, server} =
-             Jido.start_agent(instance, SimpleAgent,
-               id: id,
-               persistence: persistence,
-               turn_timeout: :infinity
-             )
+    start_supervised!(
+      {Jido, name: instance, namespace: namespace, persistence: persistence, agent_server: [turn_timeout: :infinity]},
+      id: instance
+    )
+
+    ref = Jido.Agent.Ref.new!(namespace: namespace, id: id)
+
+    assert {:ok, ^ref} = Jido.create_agent(instance, ref, SimpleAgent)
+    assert {:ok, server} = Jido.activate_agent(instance, ref)
 
     assert :ok = Server.await_ready(server)
-    {instance, server, persistence, id}
+    {instance, server, persistence, ref}
   end
 
   defp waiting(server, attempts \\ 500)
@@ -1311,7 +1322,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
   defp waiting(server, attempts) do
     case Server.status(server) do
-      %{active: %{stage: :waiting}, waits: [wait]} ->
+      %Jido.AgentServer.Status{work_state: :waiting, waits: [wait]} ->
         wait
 
       _status ->

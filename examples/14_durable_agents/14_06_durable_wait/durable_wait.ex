@@ -16,7 +16,7 @@ defmodule Jido.Examples.Durable.DurableWait do
     end
   end
 
-  @doc "Builds a decision Signal. Deliver it with AgentServer.deliver_wait/4."
+  @doc "Builds a decision Signal for normal delivery through an Agent Ref."
   def resolve_signal(%{request_id: id, decision: decision})
       when decision in [:approve, :cancel] do
     Jido.Signal.new("examples.durable.wait.#{decision}", %{request_id: id}, source: "/examples/durable/wait")

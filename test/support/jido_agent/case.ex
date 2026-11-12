@@ -25,7 +25,7 @@ defmodule Jido.Test.Agent.Case do
           agent: Jido.Agent.t(),
           server: GenServer.server(),
           state: map(),
-          state_version: non_neg_integer()
+          agent_revision: non_neg_integer()
         }
 
   @doc "Starts an example Elixir.Agent with a unique local ID."
@@ -43,13 +43,13 @@ defmodule Jido.Test.Agent.Case do
   @doc "Returns the committed Agent state and runtime version for assertions."
   @spec agent_result(GenServer.server()) :: result()
   def agent_result(server) do
-    %{agent: agent, state_version: state_version} = Server.snapshot(server)
+    %{agent: agent, agent_revision: agent_revision} = Server.snapshot(server)
 
     %{
       agent: agent,
       server: server,
       state: agent.state,
-      state_version: state_version
+      agent_revision: agent_revision
     }
   end
 

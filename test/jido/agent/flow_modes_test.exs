@@ -46,7 +46,11 @@ defmodule Jido.Agent.FlowModesTest do
              Jido.start_agent(jido, Worker, id: unique_id("managed"), persistence: false)
 
     assert :ok = AgentServer.await_ready(managed_server)
-    assert {:ok, managed, managed_directives} = AgentServer.call(managed_server, signal)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             AgentServer.call(managed_server, signal)
+
+    managed = AgentServer.snapshot(managed_server).agent
 
     assert {:ok, durable_server} =
              Jido.start_agent(jido, Worker,
@@ -55,12 +59,15 @@ defmodule Jido.Agent.FlowModesTest do
              )
 
     assert :ok = AgentServer.await_ready(durable_server)
-    assert {:ok, durable, durable_directives} = AgentServer.call(durable_server, signal)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             AgentServer.call(durable_server, signal)
+
+    durable = AgentServer.snapshot(durable_server).agent
 
     assert direct.state == managed.state
     assert managed.state == durable.state
-    assert direct_directives == managed_directives
-    assert managed_directives == durable_directives
+    assert direct_directives == []
     assert direct.state == %{count: 4}
   end
 end

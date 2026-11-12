@@ -1,7 +1,5 @@
 defmodule Jido.Examples.FailureOutcome do
-  @moduledoc """
-  Shows precommit failure and postcommit error reporting in one Agent.
-  """
+  @moduledoc "Shows failed and committed AgentServer Turn results."
   use Jido.Agent, name: "runtime_failure_outcome"
 
   state do
@@ -11,7 +9,7 @@ defmodule Jido.Examples.FailureOutcome do
   routes do
     signal_source "/examples/runtime/failure_outcome"
     route "examples.runtime.failure_outcome.reject", __MODULE__.Reject, as: :reject
-    route "examples.runtime.failure_outcome.report", __MODULE__.Report, as: :report
+    route "examples.runtime.failure_outcome.accept", __MODULE__.Accept, as: :accept
   end
 
   defmodule Reject do
@@ -25,18 +23,14 @@ defmodule Jido.Examples.FailureOutcome do
     end
   end
 
-  defmodule Report do
+  defmodule Accept do
     @moduledoc false
     use Jido.Action,
-      name: "runtime_failure_outcome_report",
+      name: "runtime_failure_outcome_accept",
       schema: Jido.Joi.object(%{name: Jido.Joi.string() |> Jido.Joi.min(1)})
 
-    alias Jido.AgentServer.Directive
-
     def run(%{name: name}, context) do
-      state = %{context.agent_state | accepted: context.agent_state.accepted ++ [name]}
-      error = Jido.Error.execution_error("Postcommit notification failed", details: %{name: name})
-      {:ok, state, [Directive.error_report(error, :notification)]}
+      {:ok, %{context.agent_state | accepted: context.agent_state.accepted ++ [name]}}
     end
   end
 end

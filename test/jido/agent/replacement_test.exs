@@ -36,8 +36,9 @@ defmodule Jido.Agent.ReplacementTest do
     assert initial.state.config == %{a: 1}
 
     assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, initial)
-    assert {:ok, live, _} = Server.call(server, signal)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Server.call(server, signal)
+    live = Server.snapshot(server).agent
     assert live.state == direct.state
-    assert Server.status(server).state_version == 1
+    assert Server.status(server).agent_revision == 1
   end
 end

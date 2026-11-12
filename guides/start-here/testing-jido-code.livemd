@@ -197,7 +197,7 @@ The cell returns `%{total: 2, failures: 0}`.
 
 ## Test a live Agent
 
-Add a small number of live tests for what only a server does: commit, state version, and delivery. Start the instance with `start_supervised!/1`, so it stops with the test. A unique name for each test keeps `async: true` safe. `Jido.AgentServer.call/3` returns at the commit and the server performs Directives afterward, so wait for the reply with `assert_receive`.
+Add a small number of live tests for what only a server does: commit, Agent revision, and delivery. Start the instance with `start_supervised!/1`, so it stops with the test. A unique name for each test keeps `async: true` safe. `Jido.AgentServer.call/3` returns at the commit and the server performs Directives afterward, so wait for the reply with `assert_receive`.
 
 ```elixir
 defmodule TestingJido.InvoiceServerTest do
@@ -217,19 +217,20 @@ defmodule TestingJido.InvoiceServerTest do
   end
 
   test "commits the payment and delivers the reply", %{server: server, signal: signal} do
-    assert {:ok, committed, [_reply]} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              AgentServer.call(server, signal, context: %{gateway: ApprovingGateway})
 
-    assert committed.state.paid_cents == 500
-    assert AgentServer.status(server).state_version == 1
+    assert AgentServer.snapshot(server).agent.state.paid_cents == 500
+    assert AgentServer.status(server).agent_revision == 1
     assert_receive %Jido.Signal{type: "invoice.paid", data: 500}
   end
 
   test "keeps the committed state after a failed Turn", %{server: server, signal: signal} do
-    assert {:error, _reason} = AgentServer.call(server, signal, context: %{gateway: DecliningGateway})
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+             AgentServer.call(server, signal, context: %{gateway: DecliningGateway})
 
-    assert AgentServer.agent(server).state.paid_cents == 0
-    assert AgentServer.status(server).state_version == 0
+    assert AgentServer.snapshot(server).agent.state.paid_cents == 0
+    assert AgentServer.status(server).agent_revision == 0
     assert Process.alive?(server)
   end
 end
@@ -246,7 +247,7 @@ The cell returns `%{total: 2, failures: 0}`.
 | A body, a schema, or a failure in one unit of work | `Jido.Exec.run/4` on the Action |
 | Components connect, and a failure stops in the right place | `Jido.Exec.run/4` on the Flow |
 | A route, a state change, or a Directive | `cmd/3` on an Agent instance |
-| Commit, state version, or delivery | `Jido.AgentServer.call/3` under a test instance |
+| Commit, Agent revision, or delivery | `Jido.AgentServer.call/3` under a test instance |
 
 ## Next steps
 

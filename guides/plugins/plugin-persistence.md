@@ -113,7 +113,7 @@ store = {Jido.Persistence.ETS, table: :plugin_persistence_guide}
   Jido.thaw(PluginPersistenceGuide.Jido, PluginPersistenceGuide.Customer, "c-live", persistence: store)
 
 :ok = Jido.AgentServer.await_ready(thawed)
-%{orders: 1, recent_orders: ["o-9"]} = Jido.AgentServer.agent(thawed).state
+%{orders: 1, recent_orders: ["o-9"]} = Jido.AgentServer.snapshot(thawed).agent.state
 :ok = Jido.stop_agent(PluginPersistenceGuide.Jido, thawed)
 ```
 

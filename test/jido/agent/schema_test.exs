@@ -181,7 +181,9 @@ defmodule Jido.Agent.SchemaTest do
       before = Jido.Test.AgentServer.Assertions.committed(server)
       command = signal("counter.add", %{by: 2, label: "invalid"})
 
-      assert {:error, %{__exception__: true}} = Server.call(server, command)
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+               Server.call(server, command)
+
       assert Jido.Test.AgentServer.Assertions.committed(server) == before
     end
 
@@ -193,12 +195,13 @@ defmodule Jido.Agent.SchemaTest do
       {:ok, server} =
         Jido.Test.AgentServer.Assertions.start_agent(jido, agent_module, id: unique_id())
 
-      initial = Server.agent(server).state
+      initial = Server.snapshot(server).agent.state
       expected = %{initial | count: 1, history: ["valid"]}
 
-      assert {:ok, agent, _} =
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
                Server.call(server, signal("counter.add", %{by: 1, label: "valid"}))
 
+      agent = Server.snapshot(server).agent
       assert agent.state == expected
       assert %{agent: ^agent, state_version: 1} = Jido.Test.AgentServer.Assertions.committed(server)
     end

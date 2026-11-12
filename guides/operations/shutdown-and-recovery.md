@@ -213,8 +213,8 @@ end
 Process.exit(crashing, :kill)
 restarted = await_worker.(await_worker, crashing, 200)
 
-%{shipped: ["first"]} = Jido.AgentServer.agent(restarted).state
-1 = Jido.AgentServer.status(restarted).state_version
+%{shipped: ["first"]} = Jido.AgentServer.snapshot(restarted).agent.state
+1 = Jido.AgentServer.status(restarted).agent_revision
 
 Enum.reduce_while(1..10, restarted, fn _attempt, worker ->
   Process.exit(worker, :kill)
@@ -263,6 +263,12 @@ defmodule ShutdownGuide.Recovery do
   end
 end
 
+{:ok, _bootstrap} = ShutdownGuide.Instance.start_link()
+{:ok, dock_ref} = Jido.agent_ref(ShutdownGuide.Instance, "dock-1")
+{:ok, ^dock_ref} =
+  Jido.create_agent(ShutdownGuide.Instance, dock_ref, ShutdownGuide.Dock)
+:ok = Jido.stop(ShutdownGuide.Instance)
+
 {:ok, runtime} =
   Supervisor.start_link(
     [ShutdownGuide.Instance, {ShutdownGuide.Recovery, ["dock-1"]}],
@@ -287,7 +293,7 @@ Process.exit(Process.whereis(ShutdownGuide.Instance), :kill)
 
 recovered = await_agent.(await_agent, durable, 500)
 :ok = Jido.AgentServer.await_ready(recovered)
-%{shipped: ["kept"]} = Jido.AgentServer.agent(recovered).state
+%{shipped: ["kept"]} = Jido.AgentServer.snapshot(recovered).agent.state
 
 Supervisor.stop(runtime)
 ```

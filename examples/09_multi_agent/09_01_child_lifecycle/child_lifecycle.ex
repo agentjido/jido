@@ -1,50 +1,19 @@
 defmodule Jido.Examples.ChildLifecycle do
-  @moduledoc "Starts, tracks, restarts, and stops child Agents without storing PIDs."
+  @moduledoc "A durable worker whose logical identity is separate from its activation."
 
   use Jido.Agent, name: "example_child_lifecycle"
 
   state do
-    schema Jido.Joi.object(%{desired: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
   end
 
   routes do
     signal_source "/examples/multi_agent/child_lifecycle"
 
-    route "examples.multi_agent.children.start", as: :start_worker do
-      action input,
-        schema:
-          Jido.Joi.object(%{
-            tag: Jido.Joi.string() |> Jido.Joi.min(1),
-            restart: Jido.Joi.enum([:temporary, :transient]) |> Jido.Joi.default(:transient)
-          }),
-        context: context do
-        if input.tag in context.agent_state.desired do
-          {:error, Jido.Error.validation_error("child tag is already in use")}
-        else
-          candidate = %{context.agent_state | desired: context.agent_state.desired ++ [input.tag]}
-
-          directive =
-            Jido.AgentServer.Directive.agent_start(Jido.Examples.Worker, input.tag, restart: input.restart)
-
-          {:ok, candidate, [directive]}
-        end
+    route "examples.multi_agent.children.increment", as: :increment do
+      action _input, context: context do
+        {:ok, %{context.agent_state | count: context.agent_state.count + 1}}
       end
     end
-
-    route "examples.multi_agent.children.stop", as: :stop_worker do
-      action %{tag: tag},
-        schema: Jido.Joi.object(%{tag: Jido.Joi.string() |> Jido.Joi.min(1)}),
-        context: context do
-        candidate = %{
-          context.agent_state
-          | desired: List.delete(context.agent_state.desired, tag)
-        }
-
-        {:ok, candidate, [Jido.AgentServer.Directive.agent_stop(tag)]}
-      end
-    end
-
-    route "jido.agent.child.*", Jido.Examples.Support.KeepState
-    route "examples.multi_agent.worker.result", Jido.Examples.Support.KeepState
   end
 end

@@ -207,7 +207,7 @@ alias RequestsGuide.TicketAgent
 :ok = Jido.AgentServer.cast(server, TicketAgent.request_signal!(%{input: "Third"}))
 :ok = Jido.AgentServer.quiesce(server)
 
-after_cast = Jido.AgentServer.agent(server)
+after_cast = Jido.AgentServer.snapshot(server).agent
 :ok = Jido.stop_agent(RequestsGuide.Jido, server)
 Application.delete_env(:jido, :ai_inference_client)
 

@@ -90,13 +90,14 @@ end
 
 | Function | Mode | No save exists | A save exists |
 | --- | --- | --- | --- |
+| `Jido.create_agent/4` | strict create | Creates the Agent record. | Returns `{:error, :conflict}`. |
 | `Jido.start_agent/3` with `:persistence` | `:create` | Creates the Agent. | The worker stops with `{:shutdown, :conflict}`. |
 | `Jido.thaw/4` | `:restore` | The worker stops with `{:shutdown, :not_found}`. | Restores the save. |
-| `Jido.activate_agent/4` | `:restore_or_create` | Creates the Agent. | Restores the save. |
+| `Jido.activate_agent/4` | `:restore` | The worker stops with `{:shutdown, :not_found}`. | Restores the save. |
 
 ## Activate on demand
 
-`Jido.activate_agent/4` is the call to make when a request arrives for an Agent that may or may not be in memory. It takes a Ref and returns the running PID when the Agent is already live.
+`Jido.activate_agent/4` is the call to make when a request arrives for an existing durable Agent that may not be in memory. It takes a Ref and returns the running PID when the Agent is already live.
 
 ```elixir
 :ok = Jido.stop_agent(HibernateGuide.Jido, thawed)
@@ -111,6 +112,7 @@ end
   Jido.call(HibernateGuide.Jido, ref, HibernateGuide.Cart.add_signal!(%{sku: "scone"}))
 
 {:ok, new_ref} = Jido.agent_ref(HibernateGuide.Jido, "cart-2")
+{:ok, ^new_ref} = Jido.create_agent(HibernateGuide.Jido, new_ref, HibernateGuide.Cart)
 {:ok, created} = Jido.activate_agent(HibernateGuide.Jido, new_ref, HibernateGuide.Cart)
 :ok = Jido.AgentServer.await_ready(created)
 

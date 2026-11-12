@@ -254,7 +254,7 @@ A bare worker has no restart group and no local checkpoint. It cannot own childr
 | `:commit_timeout` | 5,000 ms | The bound on Plugin `after_commit/3` callbacks in one Turn. |
 | `:readiness_timeout` | 5,000 ms | The bound on Plugin startup and composition changes. |
 | `:persistence` | `false` | A store, `{store, options}`, `:inherit`, `nil`, or `false`. |
-| `:persistence_mode` | `:create` | `:create`, `:restore`, or `:restore_or_create`. |
+| `:persistence_mode` | `:create` | `:create` or `:restore`. |
 | `:persistence_timeout` | 5,000 ms | The bound on one durable save or restore. |
 | `:idle_timeout` | `:infinity` | The idle budget in milliseconds. |
 | `:idle_policy` | `:stop` | `:stop`, or `:hibernate` with persistence. |

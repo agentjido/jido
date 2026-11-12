@@ -45,6 +45,13 @@ defmodule Jido.Telemetry.Persistence do
   defp result_measurements({:ok, _agent, revision, _server_turn}, :load, _opts),
     do: %{revision_after: revision}
 
+  defp result_measurements(
+         {:ok, _agent, revision, _agent_revision, _server_turn},
+         :load,
+         _opts
+       ),
+       do: %{revision_after: revision}
+
   defp result_measurements(:ok, :compare_and_swap, opts) do
     opts = safe_options(opts)
     %{revision_after: Keyword.get(opts, :revision, 0)}

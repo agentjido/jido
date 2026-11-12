@@ -33,7 +33,7 @@ This component has no DSL or forwarding facade.
 - **must:** Start all declared roots before readiness checks. Check readiness in declaration order with the live root reference. Keep reads available, reject Turns as not ready, and publish instance lookup only after all checks pass. A caller wait timeout does not cancel startup. A readiness callback cannot wait for its own activation.
 - **why:** Admission must not open while a required Plugin is not ready.
 - **kind:** ordering
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.plugin_runtime.I3 — Finite readiness budget
 
@@ -41,7 +41,7 @@ This component has no DSL or forwarding facade.
 - **must:** Use one finite readiness timeout, with 5000 ms as the default, for root startup and ordered readiness. Reject invalid values before startup. Reject results at or after the deadline even before timer delivery. Close admission immediately on expiry and confirm provisional task and root cleanup, including bounded starts and roots that trap exits.
 - **why:** Plugin startup must not leave an activation indefinitely unavailable or partly owned.
 - **kind:** ordering
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.plugin_runtime.I4 — Ordered live admission
 
@@ -57,7 +57,7 @@ This component has no DSL or forwarding facade.
 - **must:** Keep prepared input, caller context, Signal, Agent state, and each Plugin's owned state separate. Run admission as owned Turn work so reads, the Turn deadline, cancellation, cleanup, and reentrant request rejection remain effective.
 - **why:** A live callback must not weaken Turn isolation or move transient values into Agent state.
 - **kind:** ordering
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.plugin_runtime.I6 — Ordered commit notification
 
@@ -73,7 +73,7 @@ This component has no DSL or forwarding facade.
 - **must:** Use one finite commit timeout, with 5000 ms as the default, for the complete commit-callback batch. Accept validated instance defaults and explicit overrides. Check the deadline before accepting results. On error, exception, invalid result, or timeout, stop later callbacks and effects, confirm callback cleanup, and keep the successful committed Agent, revision, and Turn result.
 - **why:** A Plugin notification failure must not undo a commit or leave owned work active.
 - **kind:** ordering
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.plugin_runtime.I8 — Outbound Signal preparation
 
@@ -97,7 +97,7 @@ This component has no DSL or forwarding facade.
 - **must:** Treat a returned error, exception, invalid result, or deadline expiry as an effect failure. Stop later effects, terminate owned callback work, and preserve the successful committed Agent, revision, and Turn result.
 - **why:** External Plugin work must fail after, not through, the commit boundary.
 - **kind:** ordering
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.plugin_runtime.I11 — Callback ownership boundary
 
@@ -105,7 +105,7 @@ This component has no DSL or forwarding facade.
 - **must:** Do not run commit or Directive callbacks for a rejected batch or failed Turn. Keep inspection available while callbacks run. Reject synchronous Turn requests from owned callback work. Keep callback child work linked until the callback returns. Stop owned callback work on activation stop or callback timeout. Resources that must survive callback return belong in the supervised runtime root.
 - **why:** Callback lifetime must be explicit and must not create detached work or a reentrant deadlock.
 - **kind:** ordering
-- **status:** active
+- **status:** retired
 
 ### jido.agent_server.plugin_runtime.I13 — Public live Plugin API
 

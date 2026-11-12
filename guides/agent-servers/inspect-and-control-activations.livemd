@@ -120,7 +120,7 @@ send(action, :finish)
 {:ok, _agent, []} = Jido.AgentServer.await(active)
 :ok = Task.await(control)
 
-{Jido.AgentServer.status(warehouse).admission.mode, Jido.AgentServer.agent(warehouse).state.counted}
+{Jido.AgentServer.status(warehouse).admission.mode, Jido.AgentServer.snapshot(warehouse).agent.state.counted}
 # The cell returns {:quiesced, ["a1"]}
 ```
 

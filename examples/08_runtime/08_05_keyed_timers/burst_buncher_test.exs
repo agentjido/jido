@@ -7,8 +7,6 @@ defmodule Jido.Examples.Runtime.BurstBuncherTest do
 
   @moduletag group: :runtime
   @moduletag complexity: 2
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.BurstBuncher
 
   test "maximum size flushes one ordered batch after commit", %{jido: jido} do
@@ -16,15 +14,25 @@ defmodule Jido.Examples.Runtime.BurstBuncherTest do
 
     {:ok, route_signal_1} = BurstBuncher.add_item_signal(%{item_id: "item-1", item: %{value: 1}})
 
-    assert {:ok, first, _directives} =
-             Jido.AgentServer.call(buncher, route_signal_1, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(buncher, route_signal_1, [])
+
+      assert turn_result.status in [:committed, :waiting]
+      first = Jido.AgentServer.snapshot(buncher).agent
+    )
 
     assert first.state.buffer == [%{id: "item-1", value: %{value: 1}}]
 
     {:ok, route_signal_2} = BurstBuncher.add_item_signal(%{item_id: "item-2", item: %{value: 2}})
 
-    assert {:ok, second, _directives} =
-             Jido.AgentServer.call(buncher, route_signal_2, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(buncher, route_signal_2, [])
+
+      assert turn_result.status in [:committed, :waiting]
+      second = Jido.AgentServer.snapshot(buncher).agent
+    )
 
     assert second.state.buffer == []
     assert second.state.last_flush_reason == :size
@@ -43,7 +51,7 @@ defmodule Jido.Examples.Runtime.BurstBuncherTest do
                     }},
                    500
 
-    assert agent_result(buncher).state_version == 2
+    assert agent_result(buncher).agent_revision == 2
   end
 
   test "stale timer generations cannot drain a newer batch", %{jido: jido} do
@@ -51,24 +59,46 @@ defmodule Jido.Examples.Runtime.BurstBuncherTest do
 
     {:ok, route_signal_3} = BurstBuncher.add_item_signal(%{item_id: "item-1", item: :first})
 
-    assert {:ok, first, _directives} =
-             Jido.AgentServer.call(buncher, route_signal_3, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(buncher, route_signal_3, [])
+
+      assert turn_result.status in [:committed, :waiting]
+      first = Jido.AgentServer.snapshot(buncher).agent
+    )
 
     assert first.state.timer_generation == 1
 
     {:ok, route_signal_4} = BurstBuncher.add_item_signal(%{item_id: "item-2", item: :second})
 
-    assert {:ok, second, _directives} =
-             Jido.AgentServer.call(buncher, route_signal_4, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(buncher, route_signal_4, [])
+
+      assert turn_result.status in [:committed, :waiting]
+      second = Jido.AgentServer.snapshot(buncher).agent
+    )
 
     assert second.state.timer_generation == 2
 
-    assert {:ok, unchanged, _directives} =
-             Server.call(buncher, BurstBuncher.timer_flush_signal!(1))
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(buncher, BurstBuncher.timer_flush_signal!(1))
+
+      assert turn_result.status in [:committed, :waiting]
+      unchanged = Jido.AgentServer.snapshot(buncher).agent
+    )
 
     assert Enum.map(unchanged.state.buffer, & &1.id) == ["item-1", "item-2"]
 
-    assert {:ok, flushed, _directives} = Server.call(buncher, BurstBuncher.timer_flush_signal!(2))
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(buncher, BurstBuncher.timer_flush_signal!(2))
+
+      assert turn_result.status in [:committed, :waiting]
+      flushed = Jido.AgentServer.snapshot(buncher).agent
+    )
+
     assert flushed.state.buffer == []
 
     assert_receive {:signal,
@@ -85,14 +115,33 @@ defmodule Jido.Examples.Runtime.BurstBuncherTest do
     {:ok, duplicate} =
       BurstBuncher.add_item_signal(%{item_id: "item-1", item: :first})
 
-    assert {:ok, _agent, _directives} = Server.call(buncher, duplicate)
-    assert {:ok, unchanged, _directives} = Server.call(buncher, duplicate)
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(buncher, duplicate)
+
+      assert turn_result.status in [:committed, :waiting]
+      _agent = Jido.AgentServer.snapshot(buncher).agent
+    )
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(buncher, duplicate)
+
+      assert turn_result.status in [:committed, :waiting]
+      unchanged = Jido.AgentServer.snapshot(buncher).agent
+    )
+
     assert Enum.map(unchanged.state.buffer, & &1.id) == ["item-1"]
 
     {:ok, route_signal_5} = BurstBuncher.add_item_signal(%{item_id: "item-2", item: :second})
 
-    assert {:ok, _agent, _directives} =
-             Jido.AgentServer.call(buncher, route_signal_5, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(buncher, route_signal_5, [])
+
+      assert turn_result.status in [:committed, :waiting]
+      _agent = Jido.AgentServer.snapshot(buncher).agent
+    )
 
     assert_receive {:signal,
                     %Jido.Signal{
@@ -116,8 +165,12 @@ defmodule Jido.Examples.Runtime.BurstBuncherTest do
 
     {:ok, route_signal_6} = BurstBuncher.add_item_signal(%{item_id: "item", item: :value})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(buncher, route_signal_6, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(buncher, route_signal_6, [])
+
+      assert turn_result.status in [:committed, :waiting]
+    )
 
     assert_receive {:signal,
                     %Jido.Signal{
@@ -126,6 +179,6 @@ defmodule Jido.Examples.Runtime.BurstBuncherTest do
                     }},
                    1000
 
-    assert Server.agent(buncher).state.buffer == []
+    assert Jido.AgentServer.snapshot(buncher).agent.state.buffer == []
   end
 end

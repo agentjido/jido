@@ -153,7 +153,7 @@ Jido checks routes in declaration order and runs the first match. See [Routes an
 {:ok, %{state: %{count: 2}}, []} =
   Jido.AgentServer.call(pid, MigrationGuide.Counter.increment_signal!(%{amount: 2}))
 
-%{state: %{count: 2}} = Jido.AgentServer.agent(pid)
+%{state: %{count: 2}} = Jido.AgentServer.snapshot(pid).agent
 
 pending = Jido.AgentServer.submit(pid, MigrationGuide.Counter.increment_signal!(%{amount: 1}))
 {:ok, %{state: %{count: 3}}, []} = Jido.AgentServer.await(pending)
@@ -284,7 +284,7 @@ V2 configured storage on the instance. V3 needs a stable namespace and an adapte
 
 {:ok, thawed} = Jido.thaw(MigrationGuide.Jido, MigrationGuide.Counter, "counter-3")
 :ok = Jido.AgentServer.await_ready(thawed)
-%{state: %{count: 5}} = Jido.AgentServer.agent(thawed)
+%{state: %{count: 5}} = Jido.AgentServer.snapshot(thawed).agent
 ```
 
 | V2 | V3 |

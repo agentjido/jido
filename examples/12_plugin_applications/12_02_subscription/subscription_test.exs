@@ -4,8 +4,6 @@ Code.require_file("subscription.ex", __DIR__)
 defmodule Jido.Examples.Applications.SubscriptionTest do
   use Jido.Test.Case, async: true
   @moduletag :integration
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Applications.Subscription.{Agent, Plugin, Runtime}
 
   test "committed state and version rebuild resources after replacement", %{jido: jido} do
@@ -21,7 +19,14 @@ defmodule Jido.Examples.Applications.SubscriptionTest do
                config: %{status: "new"}
              })
 
-    assert {:ok, committed, _directives} = Server.call(agent_server, route_signal_1)
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(agent_server, route_signal_1)
+
+      assert turn_result.status in [:committed, :waiting]
+      committed = Jido.AgentServer.snapshot(agent_server).agent
+    )
+
     desired = %{"orders" => %{status: "new"}}
     assert committed.state.subscriptions.desired == desired
 
@@ -42,7 +47,15 @@ defmodule Jido.Examples.Applications.SubscriptionTest do
 
     first_pid = first.pid
     first_ref = Process.monitor(first_pid)
-    assert {:ok, _committed, _directives} = Server.call(agent_server, route_signal_2)
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(agent_server, route_signal_2)
+
+      assert turn_result.status in [:committed, :waiting]
+      _committed = Jido.AgentServer.snapshot(agent_server).agent
+    )
+
     assert_receive {:DOWN, ^first_ref, :process, ^first_pid, :normal}, 1_000
 
     second = eventually(fn -> Runtime.info(runtime).resources["orders"] end)
@@ -52,12 +65,14 @@ defmodule Jido.Examples.Applications.SubscriptionTest do
     assert :ok = Runtime.input(runtime, second, "new")
 
     eventually(fn ->
-      Server.agent(agent_server).state.events == [%{topic: "orders", text: "new"}]
+      Jido.AgentServer.snapshot(agent_server).agent.state.events == [
+        %{topic: "orders", text: "new"}
+      ]
     end)
 
     second_pid = second.pid
     second_ref = Process.monitor(second_pid)
-    activation = Server.activation(agent_server)
+    activation = Jido.Test.AgentServer.ExampleRuntime.activation(agent_server)
     Process.exit(runtime, :kill)
     assert_receive {:DOWN, ^second_ref, :process, ^second_pid, _reason}, 1_000
 
@@ -78,7 +93,7 @@ defmodule Jido.Examples.Applications.SubscriptionTest do
       end)
 
     agent_server = Jido.AgentServer.Supervisor.worker(activation)
-    assert :ok = Server.await_ready(agent_server)
+    assert :ok = Jido.AgentServer.await_ready(agent_server)
     replacement_pid = replacement.pid
     replacement_ref = Process.monitor(replacement_pid)
     owner_ref = Process.monitor(agent_server)
@@ -89,6 +104,6 @@ defmodule Jido.Examples.Applications.SubscriptionTest do
   end
 
   defp plugin_runtime(agent_server) do
-    Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(agent_server), Plugin)
+    Jido.Test.AgentServer.ExampleRuntime.plugin(Jido.Test.AgentServer.ExampleRuntime.activation(agent_server), Plugin)
   end
 end

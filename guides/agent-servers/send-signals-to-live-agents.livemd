@@ -86,7 +86,7 @@ A failed Turn returns `{:error, reason}` and leaves the committed state as it wa
 unknown = Jido.Signal.new!("order.teleport", %{}, source: "/orders/api")
 {:error, %Jido.Error.ValidationError{code: :unmatched_input}} = Jido.AgentServer.call(desk, unknown)
 
-Jido.AgentServer.agent(desk).state
+Jido.AgentServer.snapshot(desk).agent.state
 # The cell returns %{packed: ["o-1"]}
 ```
 
@@ -144,7 +144,7 @@ Use `Jido.AgentServer.cancel/2` to stop a Turn. See [Cancel Turns](cancel-turns.
 {:ok, agent, []} =
   Jido.AgentServer.call(desk, CallGuide.OrderDesk.pack_signal!(%{order_id: "o-5"}))
 
-{agent.state.packed, Jido.AgentServer.status(desk).state_version}
+{agent.state.packed, Jido.AgentServer.status(desk).agent_revision}
 # The cell returns {["o-1", "o-2", "o-3", "o-4", "o-5"], 5}
 ```
 

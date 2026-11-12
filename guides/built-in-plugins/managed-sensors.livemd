@@ -176,8 +176,8 @@ for message_id <- ["msg-1", "msg-2", "msg-2"] do
   SensorGuide.MailboxSensor.push(sensor, %{message_id: message_id})
 end
 
-SensorGuide.Wait.until(fn -> length(Jido.AgentServer.agent(inbox).state.message_ids) == 2 end)
-Jido.AgentServer.agent(inbox).state.message_ids
+SensorGuide.Wait.until(fn -> length(Jido.AgentServer.snapshot(inbox).agent.state.message_ids) == 2 end)
+Jido.AgentServer.snapshot(inbox).agent.state.message_ids
 # => ["msg-1", "msg-2"]
 ```
 
@@ -198,8 +198,8 @@ replacement =
 
 SensorGuide.MailboxSensor.push(replacement, %{message_id: "msg-3"})
 
-SensorGuide.Wait.until(fn -> "msg-3" in Jido.AgentServer.agent(inbox).state.message_ids end)
-Jido.AgentServer.agent(inbox).state.message_ids
+SensorGuide.Wait.until(fn -> "msg-3" in Jido.AgentServer.snapshot(inbox).agent.state.message_ids end)
+Jido.AgentServer.snapshot(inbox).agent.state.message_ids
 # => ["msg-1", "msg-2", "msg-3"]
 ```
 
@@ -233,7 +233,7 @@ outcome =
   end)
 
 %{status: :failed, stage: :directive} = outcome
-Map.keys(Jido.AgentServer.agent(inbox).state.sensors.desired)
+Map.keys(Jido.AgentServer.snapshot(inbox).agent.state.sensors.desired)
 # => ["billing", "support"]
 ```
 

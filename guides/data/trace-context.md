@@ -128,7 +128,8 @@ alias Jido.Signal.Context
   |> TraceGuide.OrderDesk.confirm_signal!()
   |> Context.put_trace(incoming)
 
-{:ok, _agent, _directives} = Jido.AgentServer.call(desk, request, context: %{observer: self()})
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+  Jido.AgentServer.call(desk, request, context: %{observer: self()})
 
 turn_trace =
   receive do

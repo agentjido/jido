@@ -57,7 +57,13 @@ defmodule Jido.Test.Agent.EvolutionFixtures do
       name: "evolution_upgrade"
 
     def run(%{snapshot: snapshot}, _) do
-      agent = %{snapshot.agent | routes: [], state: %{count: 7}}
+      agent = %{
+        snapshot.agent
+        | vsn: snapshot.agent.vsn + 1,
+          routes: [],
+          state: %{count: 7}
+      }
+
       with {:ok, next} <- Jido.Persistence.snapshot(agent), do: {:ok, %{snapshot: next}}
     end
   end
@@ -83,14 +89,29 @@ defmodule Jido.Test.Agent.EvolutionFixtures do
 
     def run(%{snapshot: snapshot}, context) do
       case context.mode do
-        :identity -> {:ok, %{snapshot: put_in(snapshot.agent.id, "other")}}
-        :origin -> {:ok, %{snapshot: put_in(snapshot.agent.module, OtherOrigin)}}
-        :state -> {:ok, %{snapshot: put_in(snapshot.agent.state.count, "wrong")}}
-        :directive -> {:ok, %{snapshot: snapshot}, [Jido.Agent.Directive.server_stop()]}
-        :result -> {:ok, %{wrong: true}}
-        :extra -> {:ok, %{snapshot: snapshot, ignored: true}}
-        :nonportable -> {:ok, %{snapshot: Map.put(snapshot, :pid, self())}}
-        :raise -> raise "upgrade failed"
+        :identity ->
+          {:ok, %{snapshot: put_in(snapshot.agent.id, "other")}}
+
+        :origin ->
+          {:ok, %{snapshot: put_in(snapshot.agent.module, OtherOrigin)}}
+
+        :state ->
+          {:ok, %{snapshot: put_in(snapshot.agent.state.count, "wrong")}}
+
+        :directive ->
+          {:ok, %{snapshot: snapshot}, [%Jido.Agent.Directive.Emit{signal: :invalid}]}
+
+        :result ->
+          {:ok, %{wrong: true}}
+
+        :extra ->
+          {:ok, %{snapshot: snapshot, ignored: true}}
+
+        :nonportable ->
+          {:ok, %{snapshot: Map.put(snapshot, :pid, self())}}
+
+        :raise ->
+          raise "upgrade failed"
       end
     end
   end

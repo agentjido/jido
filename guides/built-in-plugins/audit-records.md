@@ -99,7 +99,7 @@ end
 Domain state is not bounded by the Plugin. `approved` still holds all three invoices. The bound applies only to `audit.records`.
 
 ```elixir
-["inv-1", "inv-2", "inv-3"] = Jido.AgentServer.agent(ledger).state.approved
+["inv-1", "inv-2", "inv-3"] = Jido.AgentServer.snapshot(ledger).agent.state.approved
 ```
 
 ## Audit a failed Turn

@@ -253,7 +253,7 @@ defmodule Jido.Instance.ContractTest do
              Jido.start_agent(TestInstance, agent, persistence: :inherit, persistence_mode: :create)
 
     assert :ok = Server.await_ready(server)
-    assert :ok = Jido.hibernate(TestInstance, server)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(server)
 
     assert {:ok, ^agent} =
              Jido.Persistence.load_agent(runtime_persistence, RedisTestAgent, agent.id, instance: TestInstance)
@@ -267,7 +267,7 @@ defmodule Jido.Instance.ContractTest do
   end
 
   @tag obligation: ["jido.instance.I4", "jido.instance.I5"]
-  test "hibernate and thaw use the selected instance" do
+  test "stop and thaw use the selected instance" do
     module = compile_inline_redis_instance("inline-persist")
     on_exit(fn -> unload_module(module) end)
     start_supervised!(module)
@@ -280,10 +280,10 @@ defmodule Jido.Instance.ContractTest do
              Jido.start_agent(module, agent, persistence: :inherit, persistence_mode: :create)
 
     assert :ok = Server.await_ready(pid)
-    assert :ok = Jido.hibernate(module, pid)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(pid)
     assert {:ok, thawed_pid} = Jido.thaw(module, RedisTestAgent, agent.id)
     assert :ok = Server.await_ready(thawed_pid)
-    assert Server.agent(thawed_pid).state.counter == 42
+    assert Server.snapshot(thawed_pid).agent.state.counter == 42
   end
 
   @tag obligation: "jido.instance.I5"
@@ -309,9 +309,9 @@ defmodule Jido.Instance.ContractTest do
              )
 
     assert :ok = Server.await_ready(pid)
-    assert :ok = Jido.hibernate(module, pid)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(pid)
     assert :ok = Server.await_ready(partitioned_pid)
-    assert :ok = Jido.hibernate(module, partitioned_pid)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(partitioned_pid)
 
     assert {:ok, restored_pid} = Jido.thaw(module, RedisTestAgent, agent.id)
 
@@ -320,8 +320,8 @@ defmodule Jido.Instance.ContractTest do
 
     assert :ok = Server.await_ready(restored_pid)
     assert :ok = Server.await_ready(restored_partitioned_pid)
-    assert Server.agent(restored_pid).state.counter == 10
-    assert Server.agent(restored_partitioned_pid).state.counter == 20
+    assert Server.snapshot(restored_pid).agent.state.counter == 10
+    assert Server.snapshot(restored_partitioned_pid).agent.state.counter == 20
   end
 
   @tag obligation: "jido.instance.I2"
@@ -348,7 +348,7 @@ defmodule Jido.Instance.ContractTest do
     assert Enum.sort(Jido.list_agents(TestInstance)) ==
              Enum.sort([{"agent-1", first}, {"agent-2", second}])
 
-    assert Jido.agent_count(TestInstance) == 2
+    assert Jido.resident_agent_count(TestInstance) == 2
 
     monitor = Process.monitor(first)
     assert :ok = Jido.stop_agent(TestInstance, "agent-1")
@@ -356,7 +356,7 @@ defmodule Jido.Instance.ContractTest do
     eventually(fn -> Jido.whereis_agent(TestInstance, "agent-1") == nil end)
 
     assert :ok = Jido.stop_agent(TestInstance, second)
-    assert Jido.agent_count(TestInstance) == 0
+    assert Jido.resident_agent_count(TestInstance) == 0
   end
 
   @tag obligation: "jido.instance.I5"
@@ -373,7 +373,7 @@ defmodule Jido.Instance.ContractTest do
   end
 
   @tag obligation: "jido.instance.I5"
-  test "PID stop and hibernate require the exact explicit partition" do
+  test "PID stop requires the exact explicit partition" do
     start_supervised!(TestInstance)
     {:ok, server} = Jido.start_agent(TestInstance, RedisTestAgent, id: "numeric", partition: "1")
     before = Jido.Test.AgentServer.Assertions.committed(server)
@@ -381,7 +381,6 @@ defmodule Jido.Instance.ContractTest do
     assert Jido.whereis_agent(TestInstance, "numeric", partition: "1") == server
     assert Jido.whereis_agent(TestInstance, "numeric", partition: "1.0") == nil
     assert {:error, :not_found} = Jido.stop_agent(TestInstance, server, partition: "1.0")
-    assert {:error, :not_found} = Jido.hibernate(TestInstance, server, partition: "1.0")
     assert Jido.Test.AgentServer.Assertions.committed(server) === before
     assert Jido.whereis_agent(TestInstance, "numeric", partition: "1") == server
 

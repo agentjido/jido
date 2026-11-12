@@ -4,6 +4,7 @@ defmodule Jido.Instance.Options do
   alias Jido.Error
 
   @allowed_keys [
+    :activation,
     :agent_server,
     :debug,
     :max_tasks,
@@ -14,6 +15,7 @@ defmodule Jido.Instance.Options do
   ]
   @definition_keys [:namespace, :otp_app, :persistence]
   @default_max_tasks 1_000
+  @default_activation [idle_residency_timeout: :timer.minutes(5)]
 
   @doc false
   @spec merge_definition(term(), term()) :: term()
@@ -70,13 +72,15 @@ defmodule Jido.Instance.Options do
          :ok <- validate_otp_app(opts),
          :ok <- validate_namespace(Keyword.get(opts, :namespace)),
          :ok <- validate_debug(Keyword.get(opts, :debug)),
-         :ok <- Jido.AgentServer.validate_defaults(agent_server),
+         {:ok, activation} <- validate_activation(Keyword.get(opts, :activation, @default_activation)),
+         :ok <- Jido.AgentServer.Worker.validate_defaults(agent_server),
          :ok <- validate_max_tasks(Keyword.get(opts, :max_tasks, @default_max_tasks)),
          {:ok, persistence} <- validate_persistence(Keyword.get(opts, :persistence)),
          :ok <- validate_inherited_persistence(agent_server, persistence) do
       validated =
         opts
         |> Keyword.put_new(:max_tasks, @default_max_tasks)
+        |> Keyword.put(:activation, activation)
         |> Keyword.put(:persistence, persistence)
 
       {:ok, validated}
@@ -159,6 +163,24 @@ defmodule Jido.Instance.Options do
 
   defp validate_max_tasks(max_tasks),
     do: invalid("max_tasks must be :infinity or a nonnegative integer", %{max_tasks: max_tasks})
+
+  defp validate_activation(activation) do
+    if Keyword.keyword?(activation) and
+         Keyword.keys(activation) == Enum.uniq(Keyword.keys(activation)) and
+         Keyword.keys(activation) -- [:idle_residency_timeout] == [] do
+      timeout = Keyword.get(activation, :idle_residency_timeout, :timer.minutes(5))
+
+      if is_integer(timeout) and timeout >= 0 do
+        {:ok, [idle_residency_timeout: timeout]}
+      else
+        invalid("activation idle_residency_timeout must be a nonnegative integer", %{
+          idle_residency_timeout: timeout
+        })
+      end
+    else
+      invalid("activation must be a unique keyword list", %{activation: activation})
+    end
+  end
 
   defp validate_persistence(persistence) do
     case Jido.Persistence.resolve_config(persistence, nil) do

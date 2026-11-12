@@ -5,10 +5,7 @@ defmodule Jido.Agent.Directive.Kind do
 
   @core_modules [
     Directive.Emit,
-    Directive.Reply,
-    Directive.AgentSend,
-    Directive.ParentSend,
-    Directive.ServerStop
+    Directive.Reply
   ]
 
   @doc false

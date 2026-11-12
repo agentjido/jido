@@ -172,7 +172,7 @@ approval =
 :ok = Jido.AgentServer.deliver_wait(thawed, wait.id, approval)
 :ok = Jido.AgentServer.quiesce(thawed)
 
-%{approved_by: "ana"} = Jido.AgentServer.agent(thawed).state
+%{approved_by: "ana"} = Jido.AgentServer.snapshot(thawed).agent.state
 %{status: :completed} = Jido.AgentServer.status(thawed).durable_turn
 
 ContinuationGuide.Poll.until(fn -> ContinuationGuide.ObservedStore.families() == %{agent: 1} end)

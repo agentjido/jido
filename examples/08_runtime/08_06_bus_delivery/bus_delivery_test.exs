@@ -78,21 +78,20 @@ defmodule Jido.Examples.Runtime.BusDeliveryTest do
 
     assert_receive {:feature_work, first, %{value: 1}}, 1000
     assert state(agent).values == []
-    assert Server.snapshot(agent).state_version == 0
+    assert Jido.AgentServer.snapshot(agent).agent_revision == 0
     refute_received {:feature_work, _, %{value: 2}}
     send(first, :release)
     assert_receive {:feature_work, second, %{value: 2}}, 1000
     assert state(agent).values == [1]
     send(second, :release)
     eventually(fn -> state(agent).values == [1, 2] end)
-    assert Server.snapshot(agent).state_version == 2
+    assert Jido.AgentServer.snapshot(agent).agent_revision == 2
   end
 
   test "a failed Turn retries the same record before later input", %{jido: jido} do
     {:ok, agent} =
       Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, observed(BusDeliveryFixture, :on_delivery),
-        id: unique_id("bus-observer"),
-        error_policy: :log_only
+        id: unique_id("bus-observer")
       )
 
     bus = owned_bus(jido, agent)
@@ -107,7 +106,7 @@ defmodule Jido.Examples.Runtime.BusDeliveryTest do
     send(first, :fail)
     assert_receive {:feature_work, retry, %{value: 3}}, 1000
     assert state(agent).values == []
-    assert Server.snapshot(agent).state_version == 0
+    assert Jido.AgentServer.snapshot(agent).agent_revision == 0
     send(retry, :release)
     assert_receive {:feature_work, next, %{value: 4}}, 1000
     send(next, :release)
@@ -122,8 +121,8 @@ defmodule Jido.Examples.Runtime.BusDeliveryTest do
     {:ok, event} = BusDelivery.record_signal(%{value: 7})
     assert {:ok, [_]} = Bus.publish(bus, [event])
     eventually(fn -> state(agent).values == ~c"\a" end)
-    activation = Server.activation(agent)
-    old = Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(agent), Client)
+    activation = Jido.Test.AgentServer.ExampleRuntime.activation(agent)
+    old = Jido.Test.AgentServer.ExampleRuntime.plugin(Jido.Test.AgentServer.ExampleRuntime.activation(agent), Client)
     Process.exit(old, :kill)
 
     eventually(fn ->
@@ -132,7 +131,7 @@ defmodule Jido.Examples.Runtime.BusDeliveryTest do
     end)
 
     agent = Jido.AgentServer.Supervisor.worker(activation)
-    assert :ok = Server.await_ready(agent)
+    assert :ok = Jido.AgentServer.await_ready(agent)
     bus = owned_bus(jido, agent)
 
     {:ok, command_signal_5} = BusDelivery.record_signal(%{value: 9})
@@ -143,7 +142,7 @@ defmodule Jido.Examples.Runtime.BusDeliveryTest do
     eventually(fn -> state(agent).values == ~c"\a\t" end)
     assert length(state(agent).seen) == 2
     # Duplicate acknowledgement is a successful unchanged-state Turn.
-    assert Server.snapshot(agent).state_version >= 3
+    assert Jido.AgentServer.snapshot(agent).agent_revision >= 3
   end
 
   test "normal input outside the subscription path does not enter the Agent", %{jido: jido} do
@@ -156,8 +155,8 @@ defmodule Jido.Examples.Runtime.BusDeliveryTest do
              Bus.publish(bus, [signal("unrelated.record", %{value: 100}), command_signal_6])
 
     eventually(fn -> state(agent).values == [5] end)
-    assert Server.snapshot(agent).state_version == 1
-    activation = Server.activation(agent)
+    assert Jido.AgentServer.snapshot(agent).agent_revision == 1
+    activation = Jido.Test.AgentServer.ExampleRuntime.activation(agent)
     client = Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Client)
     manager = Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Manager)
     client_ref = Process.monitor(client)
@@ -169,11 +168,10 @@ defmodule Jido.Examples.Runtime.BusDeliveryTest do
   end
 
   defp owned_bus(jido, agent) do
-    assert :ok = Server.await_ready(agent)
+    assert :ok = Jido.AgentServer.await_ready(agent)
     assert {:ok, bus} = Bus.whereis(:example_commands, jido: jido)
 
-    activation = Server.activation(agent)
-    assert Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Manager) == bus
+    activation = Jido.Test.AgentServer.ExampleRuntime.activation(agent)
     client = Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Client)
     assert is_pid(client)
     bus

@@ -12,12 +12,17 @@ defmodule Jido.Examples.Runtime.ManagedJobsTest do
   alias Jido.Examples.ManagedJobs.JobRuntime.Server, as: JobServer
 
   defp start_job(jido) do
-    agent = start_agent!(jido, ManagedJobs, error_policy: :log_only)
+    agent = start_agent!(jido, ManagedJobs)
 
     {:ok, route_signal_1} = ManagedJobs.start_job_signal(%{job_id: "job", value: 3})
 
-    assert {:ok, pending, _directives} =
-             Jido.AgentServer.call(agent, route_signal_1, context: Jido.Test.Examples.JobRunner.context(self()))
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(agent, route_signal_1, context: Jido.Test.Examples.JobRunner.context(self()))
+
+      assert turn_result.status in [:committed, :waiting]
+      pending = Jido.AgentServer.snapshot(agent).agent
+    )
 
     assert pending.state.status == :running
     assert_receive {:job_work, worker, 3}, 1000
@@ -28,7 +33,7 @@ defmodule Jido.Examples.Runtime.ManagedJobsTest do
     jido: jido
   } do
     agent = start_agent!(jido, ManagedJobs)
-    before = Server.snapshot(agent)
+    before = Jido.AgentServer.snapshot(agent)
 
     {:ok, command_signal_1} = ManagedJobs.start_job_signal(%{job_id: "job", value: 3})
 
@@ -41,22 +46,29 @@ defmodule Jido.Examples.Runtime.ManagedJobsTest do
 
     assert candidate.state.status == :running
     assert Map.from_struct(intent) == %{job_id: "job", value: 3}
-    assert Server.snapshot(agent) == before
+    assert Jido.AgentServer.snapshot(agent) == before
     refute_received {:job_work, _, _}
 
     {:ok, route_signal_2} = ManagedJobs.start_job_signal(%{job_id: "job", value: 3})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(agent, route_signal_2, context: Jido.Test.Examples.JobRunner.context(self()))
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(agent, route_signal_2, context: Jido.Test.Examples.JobRunner.context(self()))
+
+      assert turn_result.status in [:committed, :waiting]
+    )
 
     assert_receive {:job_work, worker, 3}, 1000
     assert state(agent).status == :running
-    assert Server.snapshot(agent).state_version == 1
+    assert Jido.AgentServer.snapshot(agent).agent_revision == 1
     send(worker, {:finish, {:ok, "artifact:6"}})
     eventually(fn -> state(agent).status == :completed end)
     assert state(agent).result == "artifact:6"
-    assert Server.snapshot(agent).state_version == 2
-    assert JobServer.jobs(Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(agent), Jobs)) == []
+    assert Jido.AgentServer.snapshot(agent).agent_revision == 2
+
+    assert JobServer.jobs(
+             Jido.Test.AgentServer.ExampleRuntime.plugin(Jido.Test.AgentServer.ExampleRuntime.activation(agent), Jobs)
+           ) == []
   end
 
   test "cancellation stops work and rejects its later result", %{jido: jido} do
@@ -65,11 +77,15 @@ defmodule Jido.Examples.Runtime.ManagedJobsTest do
 
     {:ok, route_signal_3} = ManagedJobs.cancel_job_signal(%{job_id: "job"})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(agent, route_signal_3, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(agent, route_signal_3, [])
+
+      assert turn_result.status in [:committed, :waiting]
+    )
 
     assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1000
-    before = Server.snapshot(agent)
+    before = Jido.AgentServer.snapshot(agent)
 
     {:ok, route_signal_4} =
       ManagedJobs.settle_signal(%{
@@ -78,18 +94,18 @@ defmodule Jido.Examples.Runtime.ManagedJobsTest do
         result: "late"
       })
 
-    assert {:error, _} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: _}} =
              Jido.AgentServer.call(agent, route_signal_4, [])
 
-    assert Server.snapshot(agent) == before
+    assert Jido.AgentServer.snapshot(agent) == before
     assert state(agent).status == :cancelled
   end
 
   test "capability loss kills its work but requires explicit pending-job recovery", %{jido: jido} do
     {agent, worker} = start_job(jido)
     ref = Process.monitor(worker)
-    activation = Server.activation(agent)
-    old = Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(agent), Jobs)
+    activation = Jido.Test.AgentServer.ExampleRuntime.activation(agent)
+    old = Jido.Test.AgentServer.ExampleRuntime.plugin(Jido.Test.AgentServer.ExampleRuntime.activation(agent), Jobs)
     Process.exit(old, :kill)
     assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1000
 
@@ -102,19 +118,27 @@ defmodule Jido.Examples.Runtime.ManagedJobsTest do
       end)
 
     agent = Jido.AgentServer.Supervisor.worker(activation)
-    assert :ok = Server.await_ready(agent)
+    assert :ok = Jido.AgentServer.await_ready(agent)
     assert JobServer.jobs(runtime) == []
     assert state(agent).status == :running
 
     {:ok, route_signal_5} = ManagedJobs.cancel_job_signal(%{job_id: "job"})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(agent, route_signal_5, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(agent, route_signal_5, [])
+
+      assert turn_result.status in [:committed, :waiting]
+    )
 
     {:ok, route_signal_6} = ManagedJobs.start_job_signal(%{job_id: "retry-with-new-id", value: 5})
 
-    assert {:ok, _, _directives} =
-             Jido.AgentServer.call(agent, route_signal_6, [])
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(agent, route_signal_6, [])
+
+      assert turn_result.status in [:committed, :waiting]
+    )
 
     eventually(fn -> state(agent).status == :completed end)
     assert state(agent).result == "10"

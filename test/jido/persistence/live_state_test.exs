@@ -237,20 +237,28 @@ defmodule Jido.Persistence.LiveStateTest do
       input = %{payload: value, owned: %{bits: value}}
       assert {:ok, candidate, [_effect]} = Agent.cmd(initial, signal("local.update", input))
       assert candidate.state.owned.bits === value
-      assert {:ok, committed, _} = Server.call(server, signal("local.update", input))
+
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+               Server.call(server, signal("local.update", input))
+
+      committed = Server.snapshot(server).agent
       assert committed.state.payload === value
       assert committed.state.owned.bits === value
       assert_receive {:signal, %{type: "local.updated"}}, 1_000
-      assert Server.agent(server) == committed
+      assert Server.snapshot(server).agent == committed
     end
 
-    assert {:error, _reason} =
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :failed,
+              error: %Jido.Error.ExecutionError{}
+            }} =
              Server.call(
                server,
                signal("local.update", %{payload: :valid, owned: :invalid})
              )
 
-    assert Server.agent(server).state.count == 6
+    assert Server.snapshot(server).agent.state.count == 6
   end
 
   test "persistent custom and Plugin checkpoints convert before storage and dispatch", c do
@@ -264,10 +272,12 @@ defmodule Jido.Persistence.LiveStateTest do
                  default_dispatch: {:pid, target: self()}
                )
 
-      assert {:ok, committed, _} =
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
                Server.call(server, signal("local.update", input))
 
       assert_receive {:signal, %{type: "local.updated"}}, 1_000
+
+      committed = Server.snapshot(server).agent
 
       assert {:ok, ^committed, 2} =
                Persistence.load_agent_with_revision(c.persistence, module, committed.id, instance: c.jido)

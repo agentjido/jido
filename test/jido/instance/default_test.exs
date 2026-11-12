@@ -111,10 +111,10 @@ defmodule Jido.Instance.DefaultTest do
     agent = DefaultAgent.instantiate!(id: unique_id("default-agent"))
     agent_id = agent.id
     assert {:ok, server} = Jido.start_agent(Jido.Default, agent)
-    assert %Jido.Agent{id: ^agent_id} = AgentServer.agent(server)
+    assert %Jido.Agent{id: ^agent_id} = AgentServer.snapshot(server).agent
     assert Jido.whereis_agent(Jido.Default, agent_id) == server
     assert Jido.list_agents(Jido.Default) == [{agent_id, server}]
-    assert Jido.agent_count(Jido.Default) == 1
+    assert Jido.resident_agent_count(Jido.Default) == 1
     assert :ok = Jido.stop_agent(Jido.Default, agent_id)
     assert Jido.whereis_agent(Jido.Default, agent_id) == nil
   end
@@ -125,7 +125,7 @@ defmodule Jido.Instance.DefaultTest do
 
     id = unique_id("default-agent-options")
     assert {:ok, server} = Jido.start_agent(Jido.Default, DefaultAgent, id: id)
-    assert %Jido.Agent{id: ^id} = AgentServer.agent(server)
+    assert %Jido.Agent{id: ^id} = AgentServer.snapshot(server).agent
   end
 
   @tag obligation: "jido.instance.I2"
@@ -140,7 +140,7 @@ defmodule Jido.Instance.DefaultTest do
   end
 
   @tag obligation: "jido.instance.I5"
-  test "hibernate and thaw use the explicit default instance identity" do
+  test "stop and thaw use the explicit default instance identity" do
     assert {:ok, _jido} = Jido.start(namespace: "default-persistence-test")
 
     table = :"default_lifecycle_#{System.unique_integer([:positive])}"
@@ -155,11 +155,11 @@ defmodule Jido.Instance.DefaultTest do
 
     assert {:ok, server} = Jido.start_agent(Jido.Default, agent, persistence: persistence)
     assert :ok = AgentServer.await_ready(server)
-    assert :ok = Jido.hibernate(Jido.Default, server)
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = AgentServer.stop(server)
     assert Jido.whereis_agent(Jido.Default, id) == nil
 
     assert {:ok, restored_server} = Jido.thaw(Jido.Default, DefaultAgent, id, persistence: persistence)
     assert :ok = AgentServer.await_ready(restored_server)
-    assert %Jido.Agent{id: ^id} = AgentServer.agent(restored_server)
+    assert %Jido.Agent{id: ^id} = AgentServer.snapshot(restored_server).agent
   end
 end

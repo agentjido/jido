@@ -8,8 +8,10 @@ defmodule Jido.Agent.StateBoundaryTest do
     use Jido.Action,
       name: "state_boundary_replace"
 
-    def run(%{candidate: candidate}, _context),
-      do: {:ok, candidate, [Jido.Agent.Directive.server_stop(:invalid_state_committed)]}
+    def run(%{candidate: candidate}, _context) do
+      signal = Jido.Signal.new!("state.invalid", %{}, source: "/test")
+      {:ok, candidate, [Jido.Agent.Directive.emit(signal)]}
+    end
   end
 
   test "invalid complete state cannot commit or run its effects", %{jido: jido} do
@@ -44,7 +46,10 @@ defmodule Jido.Agent.StateBoundaryTest do
         ] do
       input = signal("state.replace", %{candidate: candidate})
       assert {:error, %{__exception__: true}} = Agent.cmd(agent, input)
-      assert {:error, %{__exception__: true}} = AgentServer.call(server, input)
+
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+               AgentServer.call(server, input)
+
       assert Jido.Test.AgentServer.Assertions.committed(server) === before
       assert Agent.validate(agent) === {:ok, agent}
     end
@@ -93,13 +98,20 @@ defmodule Jido.Agent.StateBoundaryTest do
     for owned <- [%{}, nil, %{count: "bad"}] do
       input = signal("owned.reduce", %{owned: owned})
       assert {:error, _} = Agent.cmd(agent, input)
-      assert {:error, _} = AgentServer.call(server, input)
+
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+               AgentServer.call(server, input)
+
       assert Jido.Test.AgentServer.Assertions.committed(server) === before
     end
 
     input = signal("owned.reduce", %{owned: %{count: nil}})
     assert {:ok, direct, []} = Agent.cmd(agent, input)
-    assert {:ok, live, _} = AgentServer.call(server, input)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             AgentServer.call(server, input)
+
+    live = AgentServer.snapshot(server).agent
     assert direct.state.owned === %{count: nil}
     assert live.state === direct.state
     assert Agent.validate(live) === {:ok, live}

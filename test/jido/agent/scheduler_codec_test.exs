@@ -48,14 +48,14 @@ defmodule Jido.Agent.SchedulerCodecTest do
       assert instance.state == %{count: 0, scheduler: %{cron: %{}}}
 
       assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, instance)
-      assert {:ok, %{cron: %{}}} = Server.plugin_state(server, Scheduler)
+      assert Server.snapshot(server).agent.state.scheduler == %{cron: %{}}
 
-      assert {:ok, committed, [%Scheduler.Schedule{}]} =
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, effects: :pending}} =
                Server.call(server, signal("codec.queue"))
 
-      assert committed.state.count == 0
-      eventually(fn -> Server.agent(server).state.count == 1 end)
-      assert Server.snapshot(server).state_version == 2
+      assert Server.snapshot(server).agent.state.count == 0
+      eventually(fn -> Server.snapshot(server).agent.state.count == 1 end)
+      assert Server.snapshot(server).agent_revision == 2
 
       scheduler = Jido.Test.AgentServer.Assertions.plugin(server, Scheduler).pid
       scheduler_monitor = Process.monitor(scheduler)

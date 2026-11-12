@@ -11,16 +11,23 @@ defmodule Jido.Test.AgentServer.TopologyAssertions do
 
   # Child tags are opaque. Tests select these example workers by domain labels.
   def members(server) do
-    for {_, %{pid: pid}} <- Server.children(server), do: pid
+    {_phase, data} = :sys.get_state(server)
+
+    for {{:child, _tag}, %{root: root}} <-
+          Jido.AgentServer.Supervisor.records(data.activation_state),
+        pid = Jido.AgentServer.Supervisor.live_worker(root),
+        is_pid(pid),
+        do: pid
   end
 
   def labeled(server, label) do
-    Enum.filter(members(server), &(Server.agent(&1).state.label == label))
+    Enum.filter(members(server), &(Jido.AgentServer.snapshot(&1).agent.state.label == label))
   end
 
   def stop_topology(server) do
-    monitors = monitor_runtime(Server.activation(server))
-    assert :ok = Server.stop(server)
+    {_phase, data} = :sys.get_state(server)
+    monitors = monitor_runtime(data.activation)
+    assert {:ok, _snapshot} = Server.stop(server)
     assert_down(monitors)
   end
 

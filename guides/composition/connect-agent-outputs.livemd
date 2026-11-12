@@ -104,10 +104,10 @@ end
 {:ok, request} = ConnectGuide.Desk.request_signal(%{amount: 7})
 {:ok, at_reply, [_forward]} = Jido.AgentServer.call(desk, request)
 
-true = wait_until.(fn -> Jido.AgentServer.agent(desk).state.receipted == 7 end)
+true = wait_until.(fn -> Jido.AgentServer.snapshot(desk).agent.state.receipted == 7 end)
 
 [packer] = Jido.AgentServer.members(desk, :packer)
-{at_reply.state.receipted, Jido.AgentServer.agent(desk).state.receipted, Jido.AgentServer.agent(packer).state.total}
+{at_reply.state.receipted, Jido.AgentServer.snapshot(desk).agent.state.receipted, Jido.AgentServer.snapshot(packer).agent.state.total}
 ```
 
 The cell returns `{0, 7, 7}`.
@@ -206,7 +206,7 @@ end
 {:ok, _accepted, [_emit]} = Jido.AgentServer.call(dispatch, ship)
 
 notifiers = Jido.AgentServer.members(dispatch, :notifiers)
-true = wait_until.(fn -> Enum.all?(notifiers, &(Jido.AgentServer.agent(&1).state.sent == 1)) end)
+true = wait_until.(fn -> Enum.all?(notifiers, &(Jido.AgentServer.snapshot(&1).agent.state.sent == 1)) end)
 
 length(notifiers)
 ```

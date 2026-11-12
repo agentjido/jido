@@ -1,98 +1,95 @@
 Code.require_file("hibernate_and_thaw.ex", __DIR__)
 
 defmodule Jido.Examples.Persistence.HibernateAndThawTest do
-  use Jido.Test.Agent.Case
+  use ExUnit.Case, async: false
   @moduletag :integration
-
   @moduletag group: :persistence
 
-  alias Jido.AgentServer, as: Server
+  alias Jido.Agent.Ref
+  alias Jido.AgentServer.{Snapshot, Status, TurnResult}
   alias Jido.Examples.Persistence.HibernateAndThaw, as: Example
-  alias Jido.Persistence.ETS
 
-  test "hibernate stops the old process and thaw restores the saved revision", %{jido: jido} do
-    persistence = persistence()
-    id = unique_id("hibernate-and-thaw")
+  setup do
+    id = System.unique_integer([:positive])
+    instance = :"passivation_#{id}"
+    namespace = "examples/passivation/#{id}"
+    table = :"passivation_store_#{id}"
 
-    server =
-      start_agent!(jido, Example, id: id, persistence: persistence, persistence_mode: :create)
+    start_supervised!(
+      {Jido,
+       name: instance,
+       namespace: namespace,
+       persistence: {Jido.Persistence.ETS, table: table},
+       activation: [idle_residency_timeout: 50]},
+      id: instance
+    )
+
+    %{instance: instance, namespace: namespace}
+  end
+
+  test "a stopped activation restores the same durable Agent", c do
+    ref = create(c, "counter")
+    assert {:ok, first} = Jido.activate_agent(c.instance, ref)
+    first_id = Jido.AgentServer.status(first).agent_activation_id
 
     {:ok, signal} = Example.increment_signal(%{amount: 4})
-    assert {:ok, %{state: %{count: 4}}, []} = Server.call(server, signal)
-    assert Server.snapshot(server).state_version == 2
 
-    monitor = Process.monitor(server)
-    assert :ok = Jido.hibernate(jido, server)
-    assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, :hibernate}}, 1_000
+    assert {:ok,
+            %TurnResult{
+              status: :committed,
+              agent_revision: 1,
+              persistence_revision: 2
+            }} = Jido.call(c.instance, ref, signal)
 
-    assert {:ok, restored} = Example.thaw(jido, id, persistence)
-    assert :ok = Jido.AgentServer.await_ready(restored)
-    assert Server.snapshot(restored) == %{agent: Server.agent(restored), state_version: 2}
-    assert Server.agent(restored).state.count == 4
+    assert {:ok, %Snapshot{agent: %{state: %{count: 4}}}} = Jido.AgentServer.stop(first)
+    assert {:ok, restored} = Jido.activate_agent(c.instance, ref)
+    refute Jido.AgentServer.status(restored).agent_activation_id == first_id
+
+    assert %Snapshot{agent: %{state: %{count: 4}}, agent_revision: 1} =
+             Jido.AgentServer.snapshot(restored)
   end
 
-  test "hibernate without persistence fails and keeps the Agent live", %{jido: jido} do
-    server = start_agent!(jido, Example)
-    before = Server.snapshot(server)
+  test "idle passivation keeps the Ref alive and later delivery reactivates it", c do
+    ref = create(c, "idle-counter")
+    assert {:ok, first} = Jido.activate_agent(c.instance, ref)
+    first_id = Jido.AgentServer.status(first).agent_activation_id
 
-    assert {:error, %{reason: :persistence_not_configured, resumable?: true}} =
-             Jido.hibernate(jido, server)
+    eventually(fn -> match?(%Status{residency: :passivated}, Jido.status(c.instance, ref)) end)
+    assert {:error, :not_found} = Jido.resolve_agent(c.instance, ref)
 
-    assert Process.alive?(server)
-    assert Server.snapshot(server) == before
+    {:ok, signal} = Example.increment_signal(%{amount: 1})
+    assert {:ok, %TurnResult{status: :committed}} = Jido.call(c.instance, ref, signal)
+    assert {:ok, second} = Jido.resolve_agent(c.instance, ref)
+    refute Jido.AgentServer.status(second).agent_activation_id == first_id
+    assert Jido.AgentServer.snapshot(second).agent.state.count == 1
   end
 
-  test "thaw rejects a missing required record", %{jido: jido} do
-    id = unique_id("missing-thaw")
-
-    # A fast failure can return its reason from the start call itself.
-    assert {:error, :not_found} =
-             with({:ok, server} <- Example.thaw(jido, id, persistence()), do: Server.await_ready(server))
-
-    assert Jido.whereis_agent(jido, id) == nil
+  test "activation rejects a missing durable record", c do
+    missing = Ref.new!(namespace: c.namespace, id: "missing")
+    assert {:error, :not_found} = Jido.activate_agent(c.instance, missing)
   end
 
-  test "Ref lifetime controls gate idle hibernation and thaw restores it", %{jido: jido} do
-    persistence = persistence()
-    id = unique_id("idle-hibernate")
-
-    server =
-      start_agent!(jido, Example,
-        id: id,
-        persistence: persistence,
-        persistence_mode: :create,
-        idle_timeout: 500
-      )
-
-    assert {:ok, ref} = Jido.agent_ref(jido, id)
-    assert :ok = Jido.attach(jido, ref)
-
-    assert Server.status(server).owner_count == 1
-
-    assert :ok = Jido.touch(jido, ref)
-    assert :ok = Jido.detach(jido, ref)
-
-    assert Server.status(server).owner_count == 0
-
-    assert :ok = Jido.touch(jido, ref)
-    monitor = Process.monitor(server)
-
-    assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, :idle_timeout}}, 2_000
-    assert Jido.whereis_agent(jido, id) == nil
-
-    assert {:ok, restored} = Example.thaw(jido, id, persistence)
-    assert :ok = Jido.AgentServer.await_ready(restored)
-    assert Server.snapshot(restored).state_version == 0
-    assert Server.agent(restored).state.count == 0
-
-    restored_monitor = Process.monitor(restored)
-    assert :ok = Server.stop(restored)
-    assert_receive {:DOWN, ^restored_monitor, :process, ^restored, _reason}, 1_000
-    assert Jido.agent_count(jido) == 0
+  defp create(c, id) do
+    ref = Ref.new!(namespace: c.namespace, id: id)
+    {:ok, ^ref} = Jido.create_agent(c.instance, ref, Example)
+    ref
   end
 
-  defp persistence do
-    table = :"example_hibernate_#{System.unique_integer([:positive])}"
-    {ETS, table: table}
+  defp eventually(fun, attempts \\ 200)
+  defp eventually(fun, 0), do: flunk("condition did not become true: #{inspect(fun.())}")
+
+  defp eventually(fun, attempts) do
+    case fun.() do
+      nil ->
+        Process.sleep(10)
+        eventually(fun, attempts - 1)
+
+      false ->
+        Process.sleep(10)
+        eventually(fun, attempts - 1)
+
+      value ->
+        value
+    end
   end
 end

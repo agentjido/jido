@@ -35,7 +35,6 @@ defmodule Jido.Examples.Runtime.TurnControlTest do
   use Jido.Test.Case, async: false
   @moduletag :integration
 
-  alias Jido.AgentServer
   alias Jido.Test.Examples.Runtime.TurnControlBlockingAgent
   alias Jido.Test.AgentServer.RuntimeBarrier
 
@@ -59,24 +58,25 @@ defmodule Jido.Examples.Runtime.TurnControlTest do
             source: "/test/examples/runtime/turn_control"
           )
 
-        AgentServer.call(server, signal)
+        Jido.AgentServer.call(server, signal)
       end)
 
     assert_receive :runtime_barrier_waiting, 1_000
 
-    assert %{
-             phase: phase,
-             state_version: 0,
-             active: %{turn_id: turn_id, signal_id: signal_id, start_version: 0}
-           } = AgentServer.status(server)
+    assert %Jido.AgentServer.Status{
+             work_state: :running,
+             agent_revision: 0,
+             active_turn_id: turn_id
+           } = Jido.AgentServer.status(server)
 
-    assert phase == :running
-    assert is_binary(signal_id)
-    assert {:error, :stale_turn} = AgentServer.cancel_turn(server, "stale-turn-id")
-    assert :ok = AgentServer.cancel_turn(server, turn_id)
-    assert {:error, :cancelled} = Task.await(caller)
-    assert %{state_version: 0, agent: %{state: %{completed: []}}} = AgentServer.snapshot(server)
-    assert %{phase: :idle, active: nil} = AgentServer.status(server)
+    assert {:error, :stale_turn} = Jido.AgentServer.cancel_turn(server, "stale-turn-id")
+    assert :ok = Jido.AgentServer.cancel_turn(server, turn_id)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :cancelled}} = Task.await(caller)
+
+    assert %{agent_revision: 0, agent: %{state: %{completed: []}}} =
+             Jido.AgentServer.snapshot(server)
+
+    assert %{work_state: :idle, active_turn_id: nil} = Jido.AgentServer.status(server)
   end
 
   defp blocked(jido) do
@@ -84,7 +84,7 @@ defmodule Jido.Examples.Runtime.TurnControlTest do
       Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, TurnControlBlockingAgent, id: unique_id())
 
     :ok = RuntimeBarrier.arm(self())
-    pending = AgentServer.submit(server, complete("active"))
+    pending = Jido.AgentServer.submit(server, complete("active"))
     assert_receive :runtime_barrier_waiting, 1_000
     {server, pending}
   end
@@ -99,30 +99,45 @@ defmodule Jido.Examples.Runtime.TurnControlTest do
 
   test "quiesce closes admission, drains active work, and resume accepts new work", %{jido: jido} do
     {server, active} = blocked(jido)
-    queued = AgentServer.submit(server, complete("queued"))
-    assert AgentServer.status(server).admission.postponed == 1
-    control = Task.async(fn -> AgentServer.quiesce(server) end)
-    eventually(fn -> AgentServer.status(server).admission.mode != :open end)
-    assert {:error, :quiesced} = AgentServer.await(queued)
-    assert {:error, :quiesced} = AgentServer.call(server, complete("closed"))
-    assert AgentServer.agent(server).state.completed == []
-    assert AgentServer.snapshot(server).state_version == 0
-    assert :ok = RuntimeBarrier.release()
-    assert {:ok, _, []} = AgentServer.await(active)
-    assert :ok = Task.await(control)
-    assert AgentServer.status(server).admission.mode == :quiesced
-    assert :ok = AgentServer.resume(server)
+    queued = Jido.AgentServer.submit(server, complete("queued"))
+    assert Jido.AgentServer.status(server).queue_depth == 1
+    control = Task.async(fn -> Jido.AgentServer.quiesce(server) end)
+    eventually(fn -> Jido.AgentServer.status(server).admission != :open end)
+    assert {:error, :quiesced} = Jido.AgentServer.await(queued)
 
-    assert {:ok, %{state: %{completed: ["active", "resumed"]}}, []} =
-             AgentServer.call(server, complete("resumed"))
+    assert {:error, :quiesced} = Jido.AgentServer.call(server, complete("closed"))
+
+    assert Jido.AgentServer.snapshot(server).agent.state.completed == []
+    assert Jido.AgentServer.snapshot(server).agent_revision == 0
+    assert :ok = RuntimeBarrier.release()
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Jido.AgentServer.await(active)
+
+    assert {:ok, %Jido.AgentServer.Status{admission: :quiesced}} = Task.await(control)
+    assert Jido.AgentServer.status(server).admission == :quiesced
+    assert {:ok, %Jido.AgentServer.Status{admission: :open}} = Jido.AgentServer.resume(server)
+
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, complete("resumed"))
+
+      assert turn_result.status in [:committed, :waiting]
+      %{state: %{completed: ["active", "resumed"]}} = Jido.AgentServer.snapshot(server).agent
+    )
   end
 
   test "quiesce can cancel active work before commit", %{jido: jido} do
     {server, pending} = blocked(jido)
-    assert :ok = AgentServer.quiesce(server, active: :cancel)
-    assert {:error, :cancelled} = AgentServer.await(pending)
-    assert AgentServer.agent(server).state.completed == []
-    assert AgentServer.status(server).admission.mode == :quiesced
-    assert :ok = AgentServer.resume(server)
+
+    assert {:ok, %Jido.AgentServer.Status{admission: :quiesced}} =
+             Jido.AgentServer.quiesce(server, active: :cancel)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :cancelled}} =
+             Jido.AgentServer.await(pending)
+
+    assert Jido.AgentServer.snapshot(server).agent.state.completed == []
+    assert Jido.AgentServer.status(server).admission == :quiesced
+    assert {:ok, %Jido.AgentServer.Status{admission: :open}} = Jido.AgentServer.resume(server)
   end
 end

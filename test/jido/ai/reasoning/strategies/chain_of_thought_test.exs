@@ -138,7 +138,7 @@ defmodule Jido.AI.Reasoning.Strategies.ChainOfThoughtTest do
     assert {:ok, server} = Jido.start_agent(instance, ChainOfThoughtAgent, id: "cot-agent")
     assert :ok = AgentServer.await_ready(server)
 
-    assert {:ok, agent, [%Reply{signal: reply}]} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, reply: reply}} =
              AgentServer.call(
                server,
                ChainOfThoughtAgent.request_signal!(%{
@@ -146,6 +146,8 @@ defmodule Jido.AI.Reasoning.Strategies.ChainOfThoughtTest do
                    "A shop has 12 boxes with 8 markers in each box. It gives away 17 markers. How many markers remain?"
                })
              )
+
+    agent = AgentServer.snapshot(server).agent
 
     assert reply.data.status == :completed
     assert reply.data.output == "79 markers remain."

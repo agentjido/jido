@@ -145,10 +145,11 @@ defmodule Jido.Agent.FlowExpressionTest do
 
       {:ok, route_signal_1} = Counter.add_signal(%{amount: 9})
 
-      assert {:ok, %{state: %{count: 15}}, _} =
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
                Jido.AgentServer.call(server, route_signal_1, [])
 
-      assert Jido.AgentServer.status(server).state_version == 1
+      assert Jido.AgentServer.snapshot(server).agent.state == %{count: 15}
+      assert Jido.AgentServer.status(server).agent_revision == 1
     end
   end
 
@@ -182,7 +183,10 @@ defmodule Jido.Agent.FlowExpressionTest do
     {:ok, input} = Counter.add_signal(%{})
     assert {:error, error} = Agent.cmd(instance, input)
     assert is_exception(error)
-    assert {:error, _} = Jido.AgentServer.call(server, input)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+             Jido.AgentServer.call(server, input)
+
     assert Jido.Test.AgentServer.Assertions.committed(server) == before
     assert instance.state == %{count: 10}
 

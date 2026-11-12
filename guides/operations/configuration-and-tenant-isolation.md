@@ -141,7 +141,7 @@ nil = Jido.whereis_agent(TenantGuide.Billing, "ticket-1")
 {:ok, ^acme} = Jido.resolve_agent(TenantGuide.Billing, ref)
 ```
 
-`Jido.list_agents/2` and `Jido.agent_count/2` read one partition at a time. Without `:partition`, they count only Agents with no partition. Jido has no function that lists partitions, so your application keeps that list.
+`Jido.list_agents/2` and `Jido.resident_agent_count/2` read one partition at a time. Without `:partition`, they count only Agents with no partition. Jido has no function that lists partitions, so your application keeps that list.
 
 ## Choose a tenant model
 

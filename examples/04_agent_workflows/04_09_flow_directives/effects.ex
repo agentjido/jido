@@ -30,9 +30,8 @@ defmodule Jido.Examples.FlowDirectives.Effects do
     do: GenServer.call(runtime, {:record, directive, context})
 
   @doc "Reads recorded labels and the public snapshots seen during dispatch."
-  def records(server) do
-    id = Jido.AgentServer.agent(server).id
-    instance = Jido.AgentServer.status(server).jido
+  def records(instance, server) do
+    id = Jido.AgentServer.snapshot(server).agent.id
 
     [{runtime, _}] =
       Registry.lookup(Jido.Instance.Names.registry(instance), {__MODULE__, id})

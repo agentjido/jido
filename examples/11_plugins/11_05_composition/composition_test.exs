@@ -4,8 +4,6 @@ Code.require_file("composition.ex", __DIR__)
 defmodule Jido.Examples.Plugins.CompositionTest do
   use Jido.Test.Case, async: true
   @moduletag :integration
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Plugins.Composition.Agent
   alias Jido.Signal
 
@@ -19,11 +17,21 @@ defmodule Jido.Examples.Plugins.CompositionTest do
         subject: "tenant/ACME"
       )
 
-    assert {:ok, committed, _directives} = Server.call(server, source)
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, source)
+
+      assert turn_result.status in [:committed, :waiting]
+      committed = Jido.AgentServer.snapshot(server).agent
+    )
+
     assert committed.state == %{accepted: 1, owner: "acme:operator"}
 
     rejected = %{source | id: unique_id("rejected"), subject: nil}
-    assert {:error, :tenant_subject_required} = Server.call(server, rejected)
-    assert Server.agent(server).state == committed.state
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: :tenant_subject_required}} =
+             Jido.AgentServer.call(server, rejected)
+
+    assert Jido.AgentServer.snapshot(server).agent.state == committed.state
   end
 end

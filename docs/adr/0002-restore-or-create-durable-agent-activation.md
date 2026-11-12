@@ -1,7 +1,8 @@
 # ADR 0002: Restore or create durable Agent activation
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-11-03
+- Superseded by: [Jido durable Agent activation plan](../architecture/durable-agent-activation.md)
 
 ## Context
 

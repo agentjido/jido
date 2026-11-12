@@ -13,12 +13,19 @@ defmodule Jido.Examples.Workflow.ConditionalRoutesTest do
 
     {:ok, route_signal_1} = Example.fetch_signal(%{})
 
-    assert {:ok, agent, _directives} =
-             Jido.AgentServer.call(server, route_signal_1, context: %{service: {Service, client}})
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_1, context: %{service: {Service, client}})
+
+      assert turn_result.status in [:committed, :waiting]
+      agent = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert agent.state == %{route: :primary, result: %{answer: "primary"}}
     assert Service.calls(client) == [primary: %{}]
-    assert Server.snapshot(server) == %{agent: agent, state_version: 1}
+    snapshot = Server.snapshot(server)
+    assert snapshot.agent == agent
+    assert snapshot.agent_revision == 1
   end
 
   test "explicit provider policy selects fallback or rejection", %{jido: jido} do
@@ -29,8 +36,13 @@ defmodule Jido.Examples.Workflow.ConditionalRoutesTest do
 
     {:ok, route_signal_2} = Example.fetch_signal(%{})
 
-    assert {:ok, fallback, _directives} =
-             Jido.AgentServer.call(server, route_signal_2, context: %{service: {Service, unavailable}})
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(server, route_signal_2, context: %{service: {Service, unavailable}})
+
+      assert turn_result.status in [:committed, :waiting]
+      fallback = Jido.AgentServer.snapshot(server).agent
+    )
 
     assert fallback.state == %{route: :fallback, result: %{answer: "cache"}}
     assert Service.calls(unavailable) == [primary: %{}, fallback: %{}]
@@ -40,7 +52,7 @@ defmodule Jido.Examples.Workflow.ConditionalRoutesTest do
 
     {:ok, route_signal_3} = Example.fetch_signal(%{})
 
-    assert {:error, error} =
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: error}} =
              Jido.AgentServer.call(server, route_signal_3, context: %{service: {Service, forbidden}})
 
     assert Enum.any?(errors(error), &(&1.message == "primary rejected"))

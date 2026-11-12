@@ -285,7 +285,7 @@ defmodule TestingAIGuide.ServerTest do
              )
 
     assert reply.data.output == "Hello from the server."
-    assert Jido.AgentServer.agent(server).state.session == agent.state.session
+    assert Jido.AgentServer.snapshot(server).agent.state.session == agent.state.session
   end
 end
 

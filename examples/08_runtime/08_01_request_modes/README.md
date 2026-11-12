@@ -4,7 +4,7 @@ Agent Server request modes provide different reply and delivery contracts.
 
 ## What you will learn
 
-- How `call/3` waits for one commit and returns `{:ok, agent, directives}`.
+- How `call/3` waits for one accepted Turn and returns a `TurnResult`.
 - How `cast/2` returns `:ok` before best-effort delivery completes.
 - How `submit/3` separates sending from `await/2`.
 - Why a caller timeout does not cancel work that already started.
@@ -25,9 +25,9 @@ stop waiting while the active work still commits.
 
 ## Important behavior
 
-One Agent Server accepts Turns in serial order. `call/3` returns a direct
-success or error. `submit/3` returns a Pending handle.
-The same caller uses `await/2` to collect the success tuple or error.
+One Agent Server accepts Turns in serial order. `call/3` returns a `TurnResult`
+for accepted work. `submit/3` returns a Pending handle. The same caller uses
+`await/2` to collect that result.
 
 The default postponed-Signal limit is 1,000. Calls and asynchronous requests
 return an overload error when Jido can reject admission. A cast always returns
@@ -45,14 +45,17 @@ explicit cancellation when a caller timeout must stop eligible active work.
 - [Tests](request_modes_test.exs)
 
 ```elixir
-{:ok, agent, directives} = Jido.AgentServer.call(server, signal)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+  Jido.AgentServer.call(server, signal)
 :ok = Jido.AgentServer.cast(server, signal)
 pending = Jido.AgentServer.submit(server, signal)
-{:ok, agent, directives} = Jido.AgentServer.await(pending)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+  Jido.AgentServer.await(pending)
 ```
 
-Errors return `{:error, reason}`. A caller wait timeout does not cancel an
-accepted or queued Turn. Cast returns before the work commits.
+Accepted failures are `TurnResult` values with `status: :failed`. Admission and
+transport errors return `{:error, reason}`. A caller wait timeout does not
+cancel accepted or queued work. Cast returns before the work commits.
 
 Previous: [Flow Distribution](../../07_flow_distribution/README.md) |
 Next: [Turn Control](../08_02_turn_control/README.md)

@@ -53,27 +53,35 @@ defmodule Jido.Agent.Plugin.FSMDurableTest do
 
   test "a durable Flow wait keeps the source FSM state until completion", c do
     id = unique_id("fsm-wait")
-    persistence = {Jido.Persistence.File, path: c.tmp_dir}
+    instance = String.to_atom("fsm_durable_#{System.unique_integer([:positive])}")
+    namespace = "jido/test/fsm-durable/#{System.unique_integer([:positive])}"
 
-    assert {:ok, server} =
-             Jido.start_agent(c.jido, Agent, id: id, persistence: persistence)
+    start_supervised!(
+      {Jido,
+       name: instance,
+       namespace: namespace,
+       persistence: {Jido.Persistence.File, path: c.tmp_dir},
+       activation: [idle_residency_timeout: 5_000]},
+      id: instance
+    )
 
-    assert :ok = Server.await_ready(server)
+    ref = Jido.Agent.Ref.new!(namespace: namespace, id: id)
+    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Agent)
 
     request =
       Jido.Signal.new!("request", %{request_id: "one"}, source: "/plugin/fsm/durable")
 
-    pending = Server.submit(server, request)
+    pending = Jido.submit(instance, ref, request)
 
-    wait =
-      eventually(fn ->
-        case Server.status(server) do
-          %{active: %{stage: :waiting}, waits: [wait]} -> wait
-          _status -> nil
-        end
-      end)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :waiting, waits: [wait]}} =
+             Server.await(pending)
 
-    assert Server.agent(server).state == %{
+    assert %Jido.AgentServer.Status{work_state: :waiting, waits: [^wait]} =
+             Jido.status(instance, ref)
+
+    assert {:ok, server} = Jido.resolve_agent(instance, ref)
+
+    assert Server.snapshot(server).agent.state == %{
              status: :idle,
              fsm: %{definition_vsn: 1, current: :idle}
            }
@@ -81,9 +89,11 @@ defmodule Jido.Agent.Plugin.FSMDurableTest do
     approval =
       Jido.Signal.new!("approved", %{request_id: "one"}, source: "/plugin/fsm/durable")
 
-    assert :ok = Server.deliver_wait(server, wait.id, approval)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Jido.call(instance, ref, approval)
 
-    assert {:ok, completed, []} = Server.await(pending)
+    assert {:ok, server} = Jido.resolve_agent(instance, ref)
+    completed = Server.snapshot(server).agent
     assert completed.state.status == :approved
     assert completed.state.fsm == %{definition_vsn: 1, current: :ready}
   end

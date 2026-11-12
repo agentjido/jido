@@ -4,19 +4,26 @@ Code.require_file("inbox.ex", __DIR__)
 defmodule Jido.Examples.Applications.InboxTest do
   use Jido.Test.Case, async: false
   @moduletag :integration
-
-  alias Jido.AgentServer, as: Server
   alias Jido.Examples.Applications.Inbox.{Agent, Sensor}
   alias Jido.Plugin.SensorManager
   alias Jido.Plugin.SensorManager.Runtime
 
   test "managed input survives duplicate events, failures, and runtime replacement", %{jido: jido} do
-    {:ok, agent_server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent, id: unique_id("inbox"))
-    agent_id = Server.agent(agent_server).id
+    {:ok, agent_server} =
+      Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent, id: unique_id("inbox"))
+
+    agent_id = Jido.AgentServer.snapshot(agent_server).agent.id
     manager = manager(agent_server)
 
-    assert {:ok, started, _directives} = Server.call(agent_server, sensor_signal(:start))
-    start_version = Server.snapshot(agent_server).state_version
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(agent_server, sensor_signal(:start))
+
+      assert turn_result.status in [:committed, :waiting]
+      started = Jido.AgentServer.snapshot(agent_server).agent
+    )
+
+    start_version = Jido.AgentServer.snapshot(agent_server).agent_revision
 
     desired = %{
       "mailbox" => %{
@@ -26,13 +33,19 @@ defmodule Jido.Examples.Applications.InboxTest do
     }
 
     assert started.state.sensors.desired == desired
-    assert {:ok, %{desired: ^desired}} = Server.plugin_state(agent_server, SensorManager)
+
+    assert {:ok, %{desired: ^desired}} =
+             Jido.Test.AgentServer.ExampleRuntime.plugin_state(agent_server, SensorManager)
 
     sensor = eventually(fn -> Sensor.whereis(agent_id, "mailbox") end)
     push(sensor, ["first", "duplicate", "duplicate"])
 
-    eventually(fn -> Server.agent(agent_server).state.accepted == 2 end)
-    assert Enum.count(Server.agent(agent_server).state.seen, &(&1 == "duplicate")) == 1
+    eventually(fn -> Jido.AgentServer.snapshot(agent_server).agent.state.accepted == 2 end)
+
+    assert Enum.count(
+             Jido.AgentServer.snapshot(agent_server).agent.state.seen,
+             &(&1 == "duplicate")
+           ) == 1
 
     sensor_monitor = Process.monitor(sensor)
     Process.exit(sensor, :kill)
@@ -47,9 +60,9 @@ defmodule Jido.Examples.Applications.InboxTest do
       end)
 
     Sensor.push(replacement, %{event_id: "after-sensor-restart"})
-    eventually(fn -> Server.agent(agent_server).state.accepted == 3 end)
+    eventually(fn -> Jido.AgentServer.snapshot(agent_server).agent.state.accepted == 3 end)
 
-    activation = Server.activation(agent_server)
+    activation = Jido.Test.AgentServer.ExampleRuntime.activation(agent_server)
     manager_monitor = Process.monitor(manager)
     Process.exit(manager, :kill)
     assert_receive {:DOWN, ^manager_monitor, :process, ^manager, :killed}, 1_000
@@ -63,7 +76,7 @@ defmodule Jido.Examples.Applications.InboxTest do
       end)
 
     agent_server = Jido.AgentServer.Supervisor.worker(activation)
-    assert :ok = Server.await_ready(agent_server)
+    assert :ok = Jido.AgentServer.await_ready(agent_server)
 
     restored_sensor =
       eventually(fn ->
@@ -74,9 +87,16 @@ defmodule Jido.Examples.Applications.InboxTest do
       end)
 
     Sensor.push(restored_sensor, %{event_id: "after-manager-restart"})
-    eventually(fn -> Server.agent(agent_server).state.accepted == 4 end)
+    eventually(fn -> Jido.AgentServer.snapshot(agent_server).agent.state.accepted == 4 end)
 
-    assert {:ok, stopped, _directives} = Server.call(agent_server, sensor_signal(:stop))
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(agent_server, sensor_signal(:stop))
+
+      assert turn_result.status in [:committed, :waiting]
+      stopped = Jido.AgentServer.snapshot(agent_server).agent
+    )
+
     assert stopped.state.sensors.desired == %{}
     eventually(fn -> Sensor.whereis(agent_id, "mailbox") == nil end)
 
@@ -84,7 +104,14 @@ defmodule Jido.Examples.Applications.InboxTest do
     assert Runtime.sensors(next_manager) == %{}
     assert Sensor.whereis(agent_id, "mailbox") == nil
 
-    assert {:ok, _started_again, _directives} = Server.call(agent_server, sensor_signal(:start))
+    (
+      assert {:ok, %Jido.AgentServer.TurnResult{} = turn_result} =
+               Jido.AgentServer.call(agent_server, sensor_signal(:start))
+
+      assert turn_result.status in [:committed, :waiting]
+      _started_again = Jido.AgentServer.snapshot(agent_server).agent
+    )
+
     final_sensor = eventually(fn -> Sensor.whereis(agent_id, "mailbox") end)
     final_sensor_monitor = Process.monitor(final_sensor)
     final_manager = manager(agent_server)
@@ -108,6 +135,9 @@ defmodule Jido.Examples.Applications.InboxTest do
   end
 
   defp manager(agent_server) do
-    Jido.Test.AgentServer.ExampleRuntime.plugin(Server.activation(agent_server), SensorManager)
+    Jido.Test.AgentServer.ExampleRuntime.plugin(
+      Jido.Test.AgentServer.ExampleRuntime.activation(agent_server),
+      SensorManager
+    )
   end
 end

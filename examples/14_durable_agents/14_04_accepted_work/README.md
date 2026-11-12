@@ -1,27 +1,31 @@
 # 14_04 Accepted Work
 
-A topology member runs a report Flow as its current durable Turn.
+A member in a declared static topology runs one Flow as a durable Agent Turn.
 
 ## What you will learn
 
-- Route directly to a Flow without a durability Plugin.
-- Save acceptance before execution and commit output before returning success.
-- Restore a member identity, Agent state, and terminal Turn receipt.
+- A Flow Signal is accepted before its first Action runs.
+- A successful call returns a committed `TurnResult`.
+- Agent state is read from `Jido.AgentServer.snapshot/2`.
+- Worker recovery restores the saved member state without another Turn.
 
-## Read the code
-
-Read [the Agent, report Flow, and team](accepted_work.ex).
+## Core result
 
 ```elixir
-{:ok, root} = Jido.start_agent(MyJido, Jido.Examples.Durable.AcceptedWork.Team,
-  id: "reports", persistence: :inherit)
-:ok = Jido.AgentServer.await_ready(root)
-[reports] = Jido.AgentServer.members(root, :reports)
-{:ok, request} = Jido.Examples.Durable.AcceptedWork.request_signal(%{topic: "OTP"})
-{:ok, agent, []} = Jido.AgentServer.call(reports, request)
-agent.state # %{report: "Report: OTP"}
-Jido.AgentServer.status(reports).durable_turn # %{id: turn_id, status: :completed}
+{:ok, request} =
+  Jido.Examples.Durable.AcceptedWork.request_signal(%{topic: "OTP"})
+
+{:ok, %Jido.AgentServer.TurnResult{status: :committed} = result} =
+  Jido.AgentServer.call(member_server, request)
+
+snapshot = Jido.AgentServer.snapshot(member_server)
+snapshot.agent.state # %{report: "Report: OTP"}
+result.agent_ref.id == snapshot.agent.id
 ```
+
+The topology member handle in the behavior test comes from test-only OTP
+inspection. It is not a public AgentServer member API. Application code should
+address independent durable Agents with stable `Jido.Agent.Ref` values.
 
 ## Run it
 
@@ -29,29 +33,12 @@ Jido.AgentServer.status(reports).durable_turn # %{id: turn_id, status: :complete
 mix test.examples examples/14_durable_agents/14_04_accepted_work
 ```
 
-Expected result: the report commits, the team activation is killed, and its
-replacement restores the same member ID, report, and completed Turn.
-
-## Important behavior
-
-The call returns after the Flow Turn commits. It does not return an early
-background-work acknowledgement. Further state-changing commands wait. Cancellation
-uses `AgentServer.cancel/2` or `cancel_turn/3`, not a domain cancellation route.
-Core [topology tests](../../../test/jido/agent_server/durable_topology_test.exs)
-and [BEAM tests](../../../test/jido/agent_server/durable_topology_peer_test.exs)
-cover active member work across wider failures.
-
 ## Limits
 
-Repeated Signals start new Turns. There is no request-ID deduplication contract.
-The Server retains the latest durable Turn receipt, not a receipt ledger.
-Topology members have independent records; the root is not an atomic family save.
-External effects and post-commit directives do not gain exactly-once delivery.
+Repeated Signals start new Turns. Static topology does not create an atomic
+family save. External effects still need idempotency.
 
 ## Files
 
 - [Source](accepted_work.ex)
 - [Tests](accepted_work_test.exs)
-- [Core execution](../../../lib/jido/agent_server.ex)
-
-Previous: [VM Recovery](../14_03_vm_recovery/README.md) | Next: [Saved Completion](../14_05_saved_completion/README.md)

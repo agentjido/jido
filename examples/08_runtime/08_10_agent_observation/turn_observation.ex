@@ -29,14 +29,8 @@ defmodule Jido.Examples.TurnObservation do
     route "examples.runtime.observation.missing_child", as: :send_to_missing_child do
       action %{value: value},
         schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
-        context: context do
-        signal =
-          Jido.Signal.new!("examples.runtime.observation.deliver", %{value: value},
-            source: "/examples/runtime/observation"
-          )
-
-        directive = Jido.Agent.Directive.agent_send(:missing, signal)
-        {:ok, %{context.agent_state | value: value}, [directive]}
+        context: _context do
+        {:error, Jido.Error.validation_error("delivery target is not available", %{value: value})}
       end
     end
   end

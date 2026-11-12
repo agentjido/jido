@@ -2,7 +2,6 @@ defmodule Jido.Agent.DirectiveContractTest do
   use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent.Directive
   alias Jido.Agent.Directive.Kind
-  alias Jido.AgentServer.Directive, as: Runtime
   alias Jido.Signal
 
   defmodule PlainDirective do
@@ -89,14 +88,7 @@ defmodule Jido.Agent.DirectiveContractTest do
 
     directives = [
       Directive.emit(signal),
-      Directive.reply(reply),
-      Directive.parent_send(signal),
-      Directive.agent_send(:child, signal),
-      Runtime.agent_start(Jido.Test.AgentServer.Fixtures.CounterAgent, :child),
-      Runtime.agent_stop(:child),
-      Runtime.error_report(:failed, :action),
-      Runtime.process_start({Elixir.Agent, fn -> 0 end}),
-      Directive.server_stop()
+      Directive.reply(reply)
     ]
 
     for directive <- directives do
@@ -129,18 +121,12 @@ defmodule Jido.Agent.DirectiveContractTest do
           %{signal | extensions: %{"invalid" => self()}}
         ],
         directive <- [
-          Directive.emit(malformed),
-          Directive.parent_send(malformed),
-          Directive.agent_send(:child, malformed)
+          Directive.emit(malformed)
         ] do
       assert {:error, _reason} = Directive.validate(directive)
     end
 
-    for directive <- [
-          Directive.emit(signal),
-          Directive.parent_send(signal),
-          Directive.agent_send(:child, signal)
-        ] do
+    for directive <- [Directive.emit(signal)] do
       assert {:ok, ^directive} = Directive.validate(directive)
     end
 
@@ -152,9 +138,7 @@ defmodule Jido.Agent.DirectiveContractTest do
 
     for directive <- [
           %Directive.Emit{signal: %{}},
-          %Directive.Reply{signal: %{}},
-          %{Directive.parent_send(signal) | signal: %{}},
-          %{Directive.agent_send(:child, signal) | signal: %{}}
+          %Directive.Reply{signal: %{}}
         ] do
       assert {:error, %Jido.Error.ValidationError{details: %{directive: ^directive}}} =
                Directive.validate(directive)
@@ -162,7 +146,7 @@ defmodule Jido.Agent.DirectiveContractTest do
   end
 
   @tag obligation: "jido.agent.I27"
-  test "AgentServer validates Reply against the current requester" do
+  test "AgentServer validates Reply independently of the current requester" do
     signal = Signal.new!("response", %{}, source: "/test")
     {:ok, signal} = Signal.put_context(signal, "jidocausationid", "request-id")
 
@@ -171,8 +155,7 @@ defmodule Jido.Agent.DirectiveContractTest do
       max_directives_per_turn: 10
     }
 
-    assert {:error, :requester_not_found} =
-             Jido.AgentServer.Effects.validate_batch([Directive.reply(signal)], config)
+    assert :ok = Jido.AgentServer.Effects.validate_batch([Directive.reply(signal)], config)
 
     assert :ok =
              Jido.AgentServer.Effects.validate_batch(
@@ -228,77 +211,5 @@ defmodule Jido.Agent.DirectiveContractTest do
 
     assert {:error, _} = Directive.emit("event.*", %{})
     assert {:error, _} = Directive.emit("event", [])
-  end
-end
-
-defmodule Jido.AgentServer.DirectiveTest do
-  use ExUnit.Case, async: true
-
-  alias Jido.Agent.Directive
-
-  test "child start validation rejects unsupported lifecycle options and malformed targets" do
-    assert :ok = Jido.AgentServer.Directive.AgentStart.validate_restart(:temporary)
-    assert {:error, message} = Jido.AgentServer.Directive.AgentStart.validate_restart(:invalid)
-    assert message =~ "restart must be one of"
-    assert :ok = Jido.AgentServer.Directive.AgentStart.validate_options(%{id: "child"})
-
-    assert {:error, "AgentStart does not support initialization input"} =
-             Jido.AgentServer.Directive.AgentStart.validate_options(%{input: %{}})
-
-    assert {:error, message} =
-             Jido.AgentServer.Directive.AgentStart.validate_options(%{
-               restore: :required,
-               persistence: :invalid
-             })
-
-    assert message =~ "does not support lifecycle options"
-    assert {:error, message} = Jido.AgentServer.Directive.AgentStart.validate_options([])
-    assert message =~ "opts must be a map"
-    assert {:error, {:invalid_agent, 42}} = Jido.AgentServer.Directive.AgentStart.validate_target(42)
-    agent = Jido.Test.AgentServer.Fixtures.CounterAgent.instantiate!(id: "invalid-target")
-    invalid = %{agent | state: %{count: :invalid, history: []}}
-    assert {:error, _} = Jido.AgentServer.Directive.AgentStart.validate_target(invalid)
-
-    assert {:error, _} =
-             Directive.validate(Jido.AgentServer.Directive.agent_start(invalid, :child))
-  end
-
-  test "child helpers reject option typos and ambiguous or malformed containers" do
-    for opts <- [
-          [restat: :permanent],
-          [restart: :permanent, restart: :temporary],
-          [opts: [id: "first", id: "second"]],
-          [meta: [role: :first, role: :second]],
-          [opts: %URI{}],
-          [meta: :invalid],
-          [{"restart", :permanent}],
-          [:invalid],
-          %{restart: :permanent}
-        ] do
-      assert_raise ArgumentError, fn ->
-        Jido.AgentServer.Directive.agent_start(Jido.Test.AgentServer.Fixtures.CounterAgent, :child, opts)
-      end
-    end
-  end
-
-  test "child helpers retain supported options with maps or keyword lists" do
-    for {opts, meta} <- [
-          {%{id: "child"}, %{role: :worker}},
-          {[id: "child"], [role: :worker]}
-        ] do
-      directive =
-        Jido.AgentServer.Directive.agent_start(Jido.Test.AgentServer.Fixtures.CounterAgent, :child,
-          node: node(),
-          opts: opts,
-          meta: meta,
-          restart: :temporary
-        )
-
-      assert directive.opts == %{id: "child"}
-      assert directive.meta == %{role: :worker}
-      assert directive.node == node()
-      assert directive.restart == :temporary
-      assert {:ok, ^directive} = Directive.validate(directive)
-    end
   end
 end

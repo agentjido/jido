@@ -48,12 +48,19 @@ defmodule Jido.Agent.AuthoringPortTest do
     assert {:ok, server} = Jido.start_agent(jido, instance)
     assert :ok = AgentServer.await_ready(server)
     assert {:ok, signal} = Leaf.increment_signal(%{amount: 3})
-    assert {:ok, updated, []} = AgentServer.call(server, signal)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             AgentServer.call(server, signal)
+
+    updated = AgentServer.snapshot(server).agent
     assert updated.state == %{count: 3}
     assert Agent.definition(updated) === Leaf.definition()
     invalid = Jido.Signal.new!("counter.invalid", %{}, source: "/test")
-    assert {:error, _} = AgentServer.call(server, invalid)
-    assert AgentServer.agent(server) === updated
-    assert AgentServer.status(server).state_version == 1
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+             AgentServer.call(server, invalid)
+
+    assert AgentServer.snapshot(server).agent === updated
+    assert AgentServer.status(server).agent_revision == 1
   end
 end
