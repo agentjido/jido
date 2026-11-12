@@ -1,7 +1,7 @@
 - id: durable-turn-boundary
   date: 2026-10-20
-  decision: Use Jido.Durable.Continuation for portable accepted Flow and Handoff receipts. Use Jido.Durable.Runtime for Flow checkpoint and wait recovery policy. Use AgentServer as the Agent commit, wait-timer, cron delivery, and OTP lifecycle host. Use Jido.Persistence.ContinuationStore for Runic workflow checkpoints and saved wait input receipts.
-  driver: Exec owns portable suspension data. AgentServer owns live execution and Persistence owns its durable record.
+  decision: Keep accepted Flow and Handoff receipts private to AgentServer. Use Jido.Durable.Runtime for Flow checkpoint and wait recovery policy. Use AgentServer as the Agent commit, wait-timer, cron delivery, and OTP lifecycle host. Use Jido.Persistence.ContinuationStore for Runic workflow checkpoints and saved wait input receipts.
+  driver: Exec owns portable wait data. AgentServer owns its Turn receipt and live execution. Persistence owns its durable record.
   approved_by: User-approved Jido V3 component map
 
 - id: durable-turn-code-seam

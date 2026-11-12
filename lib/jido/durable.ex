@@ -252,9 +252,15 @@ defmodule Jido.Durable do
 
   defp durable_instruction(target, params, context) do
     with {:ok, instruction} <- Jido.Instruction.resolve(target, params, context),
-         {:ok, instruction} <- ExecRuntime.flow_instruction(instruction),
+         %Jido.Instruction{kind: :flow} = instruction <- instruction,
          :ok <- ExecRuntime.portable(instruction) do
       {:ok, instruction}
+    else
+      %Jido.Instruction{} ->
+        invalid("durable execution requires a Flow", %{target: target})
+
+      error ->
+        error
     end
   end
 

@@ -413,16 +413,6 @@ uses the persistence adapter of the named Jido instance.
 | `Jido.Durable.status/2` | Reads the last committed state, waits, and next wake time. |
 | `Jido.Durable.result/2` | Reads the normal Exec result from the last committed state. |
 
-### `Jido.Durable.Continuation`
-
-Portable data for one suspended or terminal durable execution.
-
-| Function | Summary |
-| --- | --- |
-| `Jido.Durable.Continuation.fingerprint/1` | Returns a stable fingerprint for one Flow definition and its loaded code. |
-| `Jido.Durable.Continuation.portable/1` | Checks that a continuation contains only storage-safe terms. |
-| `Jido.Durable.Continuation.validate/1` | Checks the exact shape of one continuation. |
-
 ## Flows and expressions
 
 Guides: [Flows](../flows/flows.md), [Flow Data Definitions](../flow-data/flow-data.md).

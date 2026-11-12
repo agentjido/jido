@@ -1,7 +1,7 @@
 defmodule Jido.Flow.Identity do
   @moduledoc false
 
-  alias Jido.Flow.Graph
+  alias Jido.Flow.{Component, Graph}
 
   @identity_version 1
 
@@ -26,6 +26,17 @@ defmodule Jido.Flow.Identity do
     flow
     |> identity_data(Graph.canonical_components(components))
     |> identity()
+  end
+
+  @doc false
+  @spec executable_digest(module() | Jido.Flow.t()) :: String.t()
+  def executable_digest(target) do
+    flow = if is_atom(target), do: target.flow(), else: target
+    versions = executable_versions({:flow, target}, %{}) |> Enum.sort()
+
+    :sha256
+    |> :crypto.hash(:erlang.term_to_binary({flow, versions}, [:deterministic]))
+    |> Base.encode16(case: :lower)
   end
 
   defp identity_data(flow, ordered_components) do
@@ -72,6 +83,24 @@ defmodule Jido.Flow.Identity do
   end
 
   defp identity_hash(data), do: hash_term({:jido_flow_identity, @identity_version, data})
+
+  defp executable_versions({kind, module}, acc)
+       when kind in [:action, :flow] and is_atom(module) do
+    if Map.has_key?(acc, module) do
+      acc
+    else
+      acc = Map.put(acc, module, module.module_info(:md5))
+      if kind == :flow, do: executable_versions({:flow, module.flow()}, acc), else: acc
+    end
+  end
+
+  defp executable_versions({:flow, %Jido.Flow{} = flow}, acc) do
+    for {_name, node} <- flow.components,
+        {_role, instruction, _params} <- Component.calls(node),
+        reduce: acc do
+      acc -> executable_versions({instruction.kind, instruction.target}, acc)
+    end
+  end
 
   defp hash_term(term) do
     case :erlang.term_to_iovec(term, [:deterministic]) do

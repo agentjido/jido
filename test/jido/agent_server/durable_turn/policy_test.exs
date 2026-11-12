@@ -3,7 +3,7 @@ defmodule Jido.AgentServer.DurableTurn.PolicyTest do
   use Covenant.Case, component: "jido.agent_server.durable_turn", async: false
 
   alias Jido.AgentServer.Lifecycle
-  alias Jido.Durable.Continuation
+  alias Jido.Flow.Identity
   alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   defp prepared(agent, type, data) do
@@ -83,7 +83,7 @@ defmodule Jido.AgentServer.DurableTurn.PolicyTest do
     assert receipt.admitted_signal == signal
     assert receipt.context == %{custom: %{portable: true}}
     assert receipt.plugin_inputs == %{}
-    assert receipt.fingerprint == Continuation.fingerprint(F.Flow)
+    assert receipt.fingerprint == Identity.executable_digest(F.Flow)
     assert receipt.status == :running
     assert receipt.expires_at in (before + 900)..(after_accept + 1_100)
   end
@@ -115,7 +115,7 @@ defmodule Jido.AgentServer.DurableTurn.PolicyTest do
 
   @tag obligation: "jido.agent_server.durable_turn.I3"
   test "a data Flow has a fingerprint without a module callback" do
-    fingerprint = Continuation.fingerprint(F.Flow.flow())
+    fingerprint = Identity.executable_digest(F.Flow.flow())
     assert is_binary(fingerprint)
     assert byte_size(fingerprint) == 64
   end
@@ -129,16 +129,16 @@ defmodule Jido.AgentServer.DurableTurn.PolicyTest do
 
     compile_action(action, 1)
     compile_flow(flow, action, 1)
-    initial = Continuation.fingerprint(flow)
+    initial = Identity.executable_digest(flow)
 
     unload(action)
     compile_action(action, 2)
-    action_changed = Continuation.fingerprint(flow)
+    action_changed = Identity.executable_digest(flow)
     refute action_changed == initial
 
     unload(flow)
     compile_flow(flow, action, 2)
-    refute Continuation.fingerprint(flow) == action_changed
+    refute Identity.executable_digest(flow) == action_changed
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I3"

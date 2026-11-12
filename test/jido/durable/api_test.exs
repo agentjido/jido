@@ -74,15 +74,11 @@ defmodule Jido.Durable.ApiTest do
     refute Runic.Runner.lookup(Jido.Instance.Names.exec_runner(c.jido), Durable.Ref.execution_id(ref))
   end
 
-  test "lowers one Action to the same durable Flow path", c do
+  test "accepts Flow targets and rejects Action targets", c do
     input = signal("durable.action", %{value: 8})
-    signal_id = input.id
 
-    assert {:ok, %Status{state: :completed, ref: ref}} =
+    assert {:error, %Jido.Error.ValidationError{message: "durable execution requires a Flow"}} =
              Durable.start(c.jido, ReadSignal, input)
-
-    assert {:ok, %{value: 9, signal_id: ^signal_id}} =
-             Durable.result(c.jido, ref)
   end
 
   test "a wait Signal resumes the Flow and equal retries are inert", c do

@@ -1,21 +1,11 @@
-defmodule Jido.Durable.Continuation do
-  @moduledoc """
-  Portable data for one suspended or terminal durable execution.
+defmodule Jido.AgentServer.DurableTurn.Continuation do
+  @moduledoc false
 
-  A continuation keeps a stable Turn identity, accepted Signals, safe context,
-  an executable fingerprint, an absolute expiry, and optional Handoff chain
-  data. It has no process, timer, storage adapter, or AgentServer state.
-  """
+  alias Jido.Flow.Identity
 
-  alias Jido.Flow.Component
-
-  @typedoc "A stable Turn identity."
   @type id :: String.t()
-
-  @typedoc "A saved execution state."
   @type status :: :running | :accepted | :released | :completed | :failed | :cancelled
 
-  @typedoc "A direct durable Flow continuation."
   @type direct :: %{
           id: id(),
           signal: Jido.Signal.t(),
@@ -27,7 +17,6 @@ defmodule Jido.Durable.Continuation do
           expires_at: non_neg_integer() | :infinity
         }
 
-  @typedoc "An accepted Handoff before successor release."
   @type accepted_handoff :: %{
           id: id(),
           signal: Jido.Signal.t(),
@@ -40,7 +29,6 @@ defmodule Jido.Durable.Continuation do
           predecessor_id: id()
         }
 
-  @typedoc "A released Handoff continuation."
   @type released_handoff :: %{
           id: id(),
           signal: Jido.Signal.t(),
@@ -56,7 +44,6 @@ defmodule Jido.Durable.Continuation do
           predecessor_id: id()
         }
 
-  @typedoc "Any portable continuation form."
   @type t :: direct() | accepted_handoff() | released_handoff()
 
   @doc false
@@ -76,7 +63,7 @@ defmodule Jido.Durable.Continuation do
       admitted_signal: admitted_signal,
       context: context,
       plugin_inputs: plugin_inputs,
-      fingerprint: fingerprint(target),
+      fingerprint: Identity.executable_digest(target),
       status: :running,
       expires_at: expires_at
     }
@@ -145,7 +132,7 @@ defmodule Jido.Durable.Continuation do
     updated
   end
 
-  @doc "Checks the exact shape of one continuation."
+  @doc false
   @spec validate(term()) :: :ok | {:error, term()}
   def validate(
         %{
@@ -210,7 +197,7 @@ defmodule Jido.Durable.Continuation do
 
   def validate(_continuation), do: invalid()
 
-  @doc "Checks that a continuation contains only storage-safe terms."
+  @doc false
   @spec portable(t()) :: :ok | {:error, Jido.Error.ValidationError.t()}
   def portable(continuation) do
     with {:error, path} <- Jido.Codec.Term.validate(continuation, :continuation) do
@@ -223,11 +210,6 @@ defmodule Jido.Durable.Continuation do
     end
   end
 
-  defp non_portable_subject([:continuation, :context, key | _path]),
-    do: "context key #{inspect(key)}"
-
-  defp non_portable_subject(path), do: "value at #{inspect(path)}"
-
   @doc false
   @spec compatible(t(), Jido.Instruction.t()) :: :ok | {:error, :execution_definition_changed}
   def compatible(%{fingerprint: fingerprint}, %Jido.Instruction{} = instruction) do
@@ -236,41 +218,18 @@ defmodule Jido.Durable.Continuation do
       else: {:error, :execution_definition_changed}
   end
 
-  @doc "Returns a stable fingerprint for one Flow definition and its loaded code."
-  @spec fingerprint(module() | Jido.Flow.t()) :: String.t()
-  def fingerprint(target) do
-    flow = if is_atom(target), do: target.flow(), else: target
-    versions = versions({:flow, target}, %{}) |> Enum.sort()
+  defp non_portable_subject([:continuation, :context, key | _path]),
+    do: "context key #{inspect(key)}"
 
-    :sha256
-    |> :crypto.hash(:erlang.term_to_binary({flow, versions}, [:deterministic]))
-    |> Base.encode16(case: :lower)
-  end
+  defp non_portable_subject(path), do: "value at #{inspect(path)}"
 
   defp instruction_fingerprint(%Jido.Instruction{kind: :flow, target: target}),
-    do: fingerprint(target)
+    do: Identity.executable_digest(target)
 
   defp instruction_fingerprint(%Jido.Instruction{kind: :action, target: target}) do
     :sha256
     |> :crypto.hash(:erlang.term_to_binary({:action, target, target.module_info(:md5)}, [:deterministic]))
     |> Base.encode16(case: :lower)
-  end
-
-  defp versions({kind, module}, acc) when kind in [:action, :flow] and is_atom(module) do
-    if Map.has_key?(acc, module) do
-      acc
-    else
-      acc = Map.put(acc, module, module.module_info(:md5))
-      if kind == :flow, do: versions({:flow, module.flow()}, acc), else: acc
-    end
-  end
-
-  defp versions({:flow, %Jido.Flow{} = flow}, acc) do
-    for {_name, node} <- flow.components,
-        {_role, instruction, _params} <- Component.calls(node),
-        reduce: acc do
-      acc -> versions({instruction.kind, instruction.target}, acc)
-    end
   end
 
   defp valid_id?(id), do: is_binary(id) and byte_size(id) > 0

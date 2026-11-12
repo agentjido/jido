@@ -50,7 +50,7 @@ defmodule Jido.AgentServer.Lifecycle do
 
   alias Jido.Agent.Validation
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
-  alias Jido.Durable.Continuation
+  alias Jido.AgentServer.DurableTurn.Continuation
   alias Jido.Durable.Runtime, as: DurableRuntime
   alias Jido.Persistence.ETS, as: ETSStore
   alias Jido.Trace.Context, as: TraceContext

@@ -402,7 +402,7 @@ defmodule Jido.Persistence.SnapshotTest do
     signal = F.signal([])
 
     assert {:ok, turn} =
-             Jido.Durable.Continuation.running(%{
+             Jido.AgentServer.DurableTurn.Continuation.running(%{
                id: "turn-1",
                signal: signal,
                admitted_signal: signal,

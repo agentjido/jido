@@ -15,7 +15,9 @@ A persistent Agent's Flow Turn uses the same adapter for two kinds of record:
 
 An ordinary Action Turn writes only the Agent record. No persistence means no durable Flow: a Flow with a [wait](../flow-runtime/flow-waits.md) fails with `:unsupported_host`, and a plain Flow is not restored after an interruption.
 
-The Turn receipt has the portable shape of `Jido.Durable.Continuation`. Jido reads and writes execution records through the Store contract. Use `Jido.Durable` for host-neutral Flow execution or `Jido.AgentServer` for an Agent Turn.
+The Turn receipt is private AgentServer data. Jido reads and writes execution
+records through the Store contract. Use `Jido.Durable` for host-neutral Flow
+execution or `Jido.AgentServer` for an Agent Turn.
 
 ## See the records
 

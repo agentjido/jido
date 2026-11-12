@@ -193,7 +193,7 @@ defmodule Jido.Persistence.Record do
   defp validate_server_turn(nil), do: :ok
 
   defp validate_server_turn(turn) do
-    case Jido.Durable.Continuation.validate(turn) do
+    case Jido.AgentServer.DurableTurn.Continuation.validate(turn) do
       :ok -> :ok
       {:error, _reason} -> invalid(:server_turn)
     end

@@ -258,7 +258,6 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | --- | --- |
 | `Jido.Exec` | Compiles and runs Jido Actions and Flows with Runic. |
 | `Jido.Durable` | Host-neutral persisted Flow execution from Signals. |
-| `Jido.Durable.Continuation` | Portable data for one suspended or terminal durable execution. |
 | `Jido.Exec.Wait` | Portable data for one suspended Flow wait. |
 
 ### Jido.Expr

@@ -1,9 +1,10 @@
-defmodule Jido.Durable.ContinuationTest do
+defmodule Jido.AgentServer.DurableTurn.ContinuationTest do
   use ExUnit.Case, async: true
 
   @moduletag :durable
 
-  alias Jido.Durable.Continuation
+  alias Jido.AgentServer.DurableTurn.Continuation
+  alias Jido.Flow.Identity
   alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   defp signal, do: Jido.Signal.new!("continuation.test", %{value: 1}, source: "/test")
@@ -22,7 +23,7 @@ defmodule Jido.Durable.ContinuationTest do
 
     assert continuation.id == "turn-1"
     assert continuation.status == :running
-    assert continuation.fingerprint == Continuation.fingerprint(F.Flow)
+    assert continuation.fingerprint == Identity.executable_digest(F.Flow)
     assert :ok = Continuation.validate(continuation)
     assert :ok = Continuation.portable(continuation)
 

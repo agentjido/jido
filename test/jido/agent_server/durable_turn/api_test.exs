@@ -4,8 +4,8 @@ defmodule Jido.AgentServer.DurableTurn.ApiTest do
   import Jido.Test.PublicAPI
 
   alias Jido.AgentServer, as: Server
+  alias Jido.AgentServer.DurableTurn.Continuation
   alias Jido.AgentServer.Lifecycle
-  alias Jido.Durable.Continuation
   alias Jido.Exec.Wait
   alias Jido.Persistence.ContinuationStore
   alias Jido.Persistence.ContinuationStore.JoinCompletedRef
@@ -15,11 +15,9 @@ defmodule Jido.AgentServer.DurableTurn.ApiTest do
   test "wait delivery stays on the typed AgentServer facade" do
     assert {:function, :deliver_wait, 4} in documented_api(Server)
     assert {:type, :id, 0} in documented_types(Wait)
-    assert {:type, :t, 0} in documented_types(Continuation)
     refute {:type, :wait_id, 0} in documented_types(Server)
-    assert public_module?(Continuation)
 
-    for module <- [Lifecycle, ContinuationStore, JoinCompletedRef] do
+    for module <- [Continuation, Lifecycle, ContinuationStore, JoinCompletedRef] do
       refute public_module?(module)
     end
   end
