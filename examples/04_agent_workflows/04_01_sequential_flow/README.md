@@ -12,12 +12,12 @@ candidate.
 ## Read the code
 
 Read [the Agent and Flow](sequential_flow.ex) first. Then read
-[the behavior tests](../../../test/examples/04_agent_workflows/04_01_sequential_flow/sequential_flow_test.exs).
+[the behavior tests](sequential_flow_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/04_agent_workflows/04_01_sequential_flow --include example --seed 0
+mix test.examples examples/04_agent_workflows/04_01_sequential_flow
 ```
 
 Expected result: the value is doubled, failures do not commit, and schema
@@ -42,7 +42,7 @@ This example does not teach parallel execution, collections, or external I/O.
 ## Files
 
 - [Source](sequential_flow.ex)
-- [Tests](../../../test/examples/04_agent_workflows/04_01_sequential_flow/sequential_flow_test.exs)
+- [Tests](sequential_flow_test.exs)
 
 Previous: [Dynamic Invoke](../../03_flow_execution/03_15_dynamic_invoke/README.md) |
 Next: [Effectful Steps](../04_02_effectful_steps/README.md)

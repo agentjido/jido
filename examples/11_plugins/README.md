@@ -23,7 +23,7 @@ remain in [shared support](support/crypto.ex).
 ## Run the section
 
 ```sh
-mix test test/examples/11_plugins --include example --seed 0
+mix test.examples examples/11_plugins
 ```
 
 ## Core Plugins and related lessons

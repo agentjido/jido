@@ -10,13 +10,13 @@ An Action redirects an output while both destination Agents keep their processes
 
 ## Read the code
 
-Read [the Agent](connection_changes.ex), then [the behavior tests](../../../test/examples/10_topologies/10_06_connection_changes/connection_changes_test.exs).
+Read [the Agent](connection_changes.ex), then [the behavior tests](connection_changes_test.exs).
 The destinations use the shared [Cell Agent](../support/cell.ex). Tests use the [shared runtime assertions](../../../test/support/agent_topology_assertions.ex).
 
 ## Run it
 
 ```sh
-mix test test/examples/10_topologies/10_06_connection_changes --include example --seed 0
+mix test.examples examples/10_topologies/10_06_connection_changes
 ```
 
 Expected result: work first reaches the left Agent, then a redirect Turn sends work to the right Agent. A later fan-out reaches both. PIDs remain unchanged during edits. Repeated redirection fails without a commit. After hibernate and thaw, new output still reaches the saved right destination.

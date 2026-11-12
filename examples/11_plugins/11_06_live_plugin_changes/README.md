@@ -10,13 +10,13 @@ An Agent installs, reconfigures, and removes a state-owning runtime Plugin.
 
 ## Read the code
 
-Read [the Agent](live_plugin_changes.ex), then [the behavior tests](../../../test/examples/11_plugins/11_06_live_plugin_changes/live_plugin_changes_test.exs).
+Read [the Agent](live_plugin_changes.ex), then [the behavior tests](live_plugin_changes_test.exs).
 Read [the Plugin and its revision cache](cache.ex) next. Tests inspect the owned runtime through [OTP test assertions](../../../test/support/agent_server_assertions.ex).
 
 ## Run it
 
 ```sh
-mix test test/examples/11_plugins/11_06_live_plugin_changes --include example --seed 0
+mix test.examples examples/11_plugins/11_06_live_plugin_changes
 ```
 
 Expected result: installation starts the Plugin from revision one. Configuration replaces the runtime while retaining its owned value. Invalid capacity and removal without a state decision preserve the accepted Agent. Explicit removal stops the runtime and discards its owned field.

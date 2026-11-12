@@ -12,12 +12,12 @@ result.
 ## Read the code
 
 Read [the Agent, child Flow, and parent Flow](nested_flow.ex) first. Then read
-[the behavior tests](../../../test/examples/04_agent_workflows/04_07_nested_flow/nested_flow_test.exs).
+[the behavior tests](nested_flow_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/04_agent_workflows/04_07_nested_flow --include example --seed 0
+mix test.examples examples/04_agent_workflows/04_07_nested_flow
 ```
 
 Expected result: writer and editor results stay separate, context is shared,
@@ -37,6 +37,6 @@ trace or persistence contract.
 ## Files
 
 - [Source](nested_flow.ex)
-- [Tests](../../../test/examples/04_agent_workflows/04_07_nested_flow/nested_flow_test.exs)
+- [Tests](nested_flow_test.exs)
 
 Previous: [Bounded Iteration](../04_06_bounded_iteration/README.md) | Next: [Executable Continuation](../04_08_executable_continuation/README.md)

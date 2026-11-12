@@ -17,5 +17,5 @@ canonical Flow data and a shallow dependency graph.
 Run the group with:
 
 ```sh
-mix test.examples test/examples/02_flow_authoring
+mix test.examples examples/02_flow_authoring
 ```

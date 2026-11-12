@@ -6,3 +6,5 @@ continues the saved Flow.
 
 This example uses `Jido.Plugin.Scheduler.occurrence_signal/5`. An AgentServer
 can use the same function and delivery path.
+
+See [the ExUnit proof](signal_resume_test.exs).

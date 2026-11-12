@@ -15,7 +15,7 @@ Read the owner definition first, then the local Cell Agent and tests.
 ## Run it
 
 ```sh
-mix test test/examples/10_topologies/10_01_named_agents --include example --seed 0
+mix test.examples examples/10_topologies/10_01_named_agents
 ```
 
 Expected result: The root and two members start. A command changes only the selected member.
@@ -40,7 +40,7 @@ coordinated snapshot of running member states.
 
 - [Source](independent.ex)
 - [Cell Agent](cell.ex)
-- [Tests](../../../test/examples/10_topologies/10_01_named_agents/independent_test.exs)
+- [Tests](independent_test.exs)
 - [Test runtime assertions](../../../test/support/agent_topology_assertions.ex)
 
 ```elixir

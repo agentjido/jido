@@ -12,12 +12,12 @@ fixed limit.
 ## Read the code
 
 Read [the Agent and Flow](bounded_iteration.ex) first. Then read
-[the behavior tests](../../../test/examples/04_agent_workflows/04_06_bounded_iteration/bounded_iteration_test.exs).
+[the behavior tests](bounded_iteration_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/04_agent_workflows/04_06_bounded_iteration --include example --seed 0
+mix test.examples examples/04_agent_workflows/04_06_bounded_iteration
 ```
 
 Expected result: complete input runs no repair, three repairs succeed,
@@ -40,6 +40,6 @@ or multi-Turn work.
 ## Files
 
 - [Source](bounded_iteration.ex)
-- [Tests](../../../test/examples/04_agent_workflows/04_06_bounded_iteration/bounded_iteration_test.exs)
+- [Tests](bounded_iteration_test.exs)
 
 Previous: [Ordered Batch](../04_05_ordered_batch/README.md) | Next: [Nested Flow](../04_07_nested_flow/README.md)

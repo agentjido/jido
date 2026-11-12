@@ -18,11 +18,11 @@ Numbers are stable IDs; the table gives the reading order.
 Run the section from the `jido` repository root:
 
 ```sh
-mix test.examples test/examples/01_agent_basics
+mix test.examples examples/01_agent_basics
 ```
 
 The examples use deterministic local processes. They need no credentials or
 network access. Durable recovery, external services, and multi-agent systems
 belong to later sections.
 
-See [all examples](../README.md) and the [matching test guide](../../test/examples/01_agent_basics/README.md).
+See [all examples](../README.md). Each lesson keeps its ExUnit test beside its source.

@@ -16,7 +16,7 @@ Read [the Bus delivery Agent](bus_delivery.ex), then read its behavior test.
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_06_bus_delivery --include example --seed 0
+mix test.examples examples/08_runtime/08_06_bus_delivery
 ```
 
 Expected result: matching records commit in order, a failed Turn retries before
@@ -40,6 +40,6 @@ The example Bus and cursor use local memory. This does not prove disk durability
 ## Files
 
 - [Source](bus_delivery.ex)
-- [Tests](../../../test/examples/08_runtime/08_06_bus_delivery/bus_delivery_test.exs)
+- [Tests](bus_delivery_test.exs)
 
 Previous: [Keyed Timers](../08_05_keyed_timers/README.md) | Next: [Managed Jobs](../08_07_managed_jobs/README.md)

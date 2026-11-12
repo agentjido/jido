@@ -10,13 +10,13 @@ Explicit outputs form a local root → worker → sink → root pipeline.
 
 ## Read the code
 
-Read [the Agent](direct_connections.ex), then [the behavior tests](../../../test/examples/10_topologies/10_02_direct_connections/direct_connections_test.exs).
+Read [the Agent](direct_connections.ex), then [the behavior tests](direct_connections_test.exs).
 The [worker](worker.ex) commits work and emits completion. The [sink](sink.ex) transforms completion into a receipt. Tests use the [shared runtime assertions](../../../test/support/agent_topology_assertions.ex).
 
 ## Run it
 
 ```sh
-mix test test/examples/10_topologies/10_02_direct_connections --include example --seed 0
+mix test.examples examples/10_topologies/10_02_direct_connections
 ```
 
 Expected result: the request commits at the root, the worker doubles its value, the sink transforms completion into a receipt, and the root commits the receipt. An incompatible destination is rejected. Owner shutdown stops all runtimes.

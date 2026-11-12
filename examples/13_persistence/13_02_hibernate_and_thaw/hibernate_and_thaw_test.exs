@@ -1,0 +1,98 @@
+Code.require_file("hibernate_and_thaw.ex", __DIR__)
+
+defmodule Jido.Examples.Persistence.HibernateAndThawTest do
+  use Jido.Test.Agent.Case
+  @moduletag :integration
+
+  @moduletag group: :persistence
+
+  alias Jido.AgentServer, as: Server
+  alias Jido.Examples.Persistence.HibernateAndThaw, as: Example
+  alias Jido.Persistence.ETS
+
+  test "hibernate stops the old process and thaw restores the saved revision", %{jido: jido} do
+    persistence = persistence()
+    id = unique_id("hibernate-and-thaw")
+
+    server =
+      start_agent!(jido, Example, id: id, persistence: persistence, persistence_mode: :create)
+
+    {:ok, signal} = Example.increment_signal(%{amount: 4})
+    assert {:ok, %{state: %{count: 4}}, []} = Server.call(server, signal)
+    assert Server.snapshot(server).state_version == 1
+
+    monitor = Process.monitor(server)
+    assert :ok = Jido.hibernate(jido, server)
+    assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, :hibernate}}, 1_000
+
+    assert {:ok, restored} = Example.thaw(jido, id, persistence)
+    assert :ok = Jido.AgentServer.await_ready(restored)
+    assert Server.snapshot(restored) == %{agent: Server.agent(restored), state_version: 1}
+    assert Server.agent(restored).state.count == 4
+  end
+
+  test "hibernate without persistence fails and keeps the Agent live", %{jido: jido} do
+    server = start_agent!(jido, Example)
+    before = Server.snapshot(server)
+
+    assert {:error, %{reason: :persistence_not_configured, resumable?: true}} =
+             Jido.hibernate(jido, server)
+
+    assert Process.alive?(server)
+    assert Server.snapshot(server) == before
+  end
+
+  test "thaw rejects a missing required record", %{jido: jido} do
+    id = unique_id("missing-thaw")
+
+    # A fast failure can return its reason from the start call itself.
+    assert {:error, :not_found} =
+             with({:ok, server} <- Example.thaw(jido, id, persistence()), do: Server.await_ready(server))
+
+    assert Jido.whereis_agent(jido, id) == nil
+  end
+
+  test "Ref lifetime controls gate idle hibernation and thaw restores it", %{jido: jido} do
+    persistence = persistence()
+    id = unique_id("idle-hibernate")
+
+    server =
+      start_agent!(jido, Example,
+        id: id,
+        persistence: persistence,
+        persistence_mode: :create,
+        idle_timeout: 500
+      )
+
+    assert {:ok, ref} = Jido.agent_ref(jido, id)
+    assert :ok = Jido.attach(jido, ref)
+
+    assert Server.status(server).owner_count == 1
+
+    assert :ok = Jido.touch(jido, ref)
+    assert :ok = Jido.detach(jido, ref)
+
+    assert Server.status(server).owner_count == 0
+
+    assert :ok = Jido.touch(jido, ref)
+    monitor = Process.monitor(server)
+
+    assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, :idle_timeout}}, 2_000
+    assert Jido.whereis_agent(jido, id) == nil
+
+    assert {:ok, restored} = Example.thaw(jido, id, persistence)
+    assert :ok = Jido.AgentServer.await_ready(restored)
+    assert Server.snapshot(restored).state_version == 0
+    assert Server.agent(restored).state.count == 0
+
+    restored_monitor = Process.monitor(restored)
+    assert :ok = Server.stop(restored)
+    assert_receive {:DOWN, ^restored_monitor, :process, ^restored, _reason}, 1_000
+    assert Jido.agent_count(jido) == 0
+  end
+
+  defp persistence do
+    table = :"example_hibernate_#{System.unique_integer([:positive])}"
+    {ETS, table: table}
+  end
+end

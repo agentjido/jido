@@ -73,7 +73,7 @@ inert at that limit. This bound does not provide graph compaction or a byte limi
 Map and Iterate Flow bodies remain unsupported. The Turn deadline also remains
 in force; this lesson uses `turn_timeout: :infinity` so the Flow timer owns expiry.
 
-The [tests](../../../test/examples/14_durable_agents/14_06_durable_wait/durable_wait_test.exs)
+The [tests](durable_wait_test.exs)
 prove approval and cancellation, hibernation, unchanged wait identity and deadline,
 timer expiry, completed expiry after thaw, and process cleanup. The expiry
 test reuses the same request and finish Actions with a zero-duration Selection.
@@ -83,7 +83,7 @@ example does not prove power-loss or storage-loss recovery.
 ## Run it
 
 ```sh
-mix test test/examples/14_durable_agents/14_06_durable_wait --include example --seed 0 --warnings-as-errors
+mix test.examples examples/14_durable_agents/14_06_durable_wait --warnings-as-errors
 ```
 
 Expected result: all behavior tests pass. No external service is required.
@@ -91,6 +91,6 @@ Expected result: all behavior tests pass. No external service is required.
 ## Files
 
 - [Source](durable_wait.ex)
-- [Tests](../../../test/examples/14_durable_agents/14_06_durable_wait/durable_wait_test.exs)
+- [Tests](durable_wait_test.exs)
 
 Previous: [Saved Completion](../14_05_saved_completion/README.md) | Next: [External Uncertainty](../14_07_external_uncertainty/README.md)

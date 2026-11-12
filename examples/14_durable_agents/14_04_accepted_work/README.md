@@ -26,7 +26,7 @@ Jido.AgentServer.status(reports).durable_turn # %{id: turn_id, status: :complete
 ## Run it
 
 ```sh
-mix test test/examples/14_durable_agents/14_04_accepted_work --include example --seed 0
+mix test.examples examples/14_durable_agents/14_04_accepted_work
 ```
 
 Expected result: the report commits, the team activation is killed, and its
@@ -51,7 +51,7 @@ External effects and post-commit directives do not gain exactly-once delivery.
 ## Files
 
 - [Source](accepted_work.ex)
-- [Tests](../../../test/examples/14_durable_agents/14_04_accepted_work/accepted_work_test.exs)
+- [Tests](accepted_work_test.exs)
 - [Core execution](../../../lib/jido/agent_server.ex)
 
 Previous: [VM Recovery](../14_03_vm_recovery/README.md) | Next: [Saved Completion](../14_05_saved_completion/README.md)

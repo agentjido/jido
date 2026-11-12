@@ -6,3 +6,5 @@ no synthetic vertices.
 
 Read [`compiled_program.ex`](compiled_program.ex) and run its paired offline
 test.
+
+See [the ExUnit proof](compiled_program_test.exs).

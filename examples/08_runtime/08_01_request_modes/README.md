@@ -17,7 +17,7 @@ the request results, serial commit order, and timeout boundary.
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_01_request_modes --include example --seed 0
+mix test.examples examples/08_runtime/08_01_request_modes
 ```
 
 Expected result: the three request modes commit in arrival order. A caller can
@@ -42,7 +42,7 @@ explicit cancellation when a caller timeout must stop eligible active work.
 ## Files
 
 - [Source](request_modes.ex)
-- [Tests](../../../test/examples/08_runtime/08_01_request_modes/request_modes_test.exs)
+- [Tests](request_modes_test.exs)
 
 ```elixir
 {:ok, agent, directives} = Jido.AgentServer.call(server, signal)

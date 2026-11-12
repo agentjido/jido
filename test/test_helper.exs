@@ -16,7 +16,6 @@ special_suite_tags = [
   :fuzz,
   :peer,
   :bench,
-  :example,
   :live,
   :service
 ]

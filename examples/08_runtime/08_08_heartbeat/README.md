@@ -18,7 +18,7 @@ behavior test can trigger each tick through an explicit synchronization point.
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_08_heartbeat --include example --seed 0
+mix test.examples examples/08_runtime/08_08_heartbeat
 ```
 
 Expected result: explicit ticks produce the configured Signals. An invalid
@@ -43,7 +43,7 @@ scheduling and persistence lessons when a missed occurrence must be recovered.
 ## Files
 
 - [Source](heartbeat.ex)
-- [Tests](../../../test/examples/08_runtime/08_08_heartbeat/heartbeat_test.exs)
+- [Tests](heartbeat_test.exs)
 
 Previous: [Managed Jobs](../08_07_managed_jobs/README.md) |
 Next: [Runtime Inspection](../08_09_runtime_inspection/README.md)

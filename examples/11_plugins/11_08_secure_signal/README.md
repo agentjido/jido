@@ -16,7 +16,7 @@ then [the identity Plugin](identity_plugin.ex).
 ## Run it
 
 ```sh
-mix test test/examples/11_plugins/11_08_secure_signal --include example --seed 0
+mix test.examples examples/11_plugins/11_08_secure_signal
 ```
 
 Expected result: the Agent accepts a signed encrypted request and returns a
@@ -43,7 +43,7 @@ key exchange, rotation, or secure hardware storage.
 - [Secure Plugin](secure_signal_plugin.ex)
 - [Identity Plugin](identity_plugin.ex)
 - [Shared cryptographic helpers](../support/crypto.ex)
-- [Tests](../../../test/examples/11_plugins/11_08_secure_signal/secure_signal_test.exs)
+- [Tests](secure_signal_test.exs)
 
 Previous: [Identity](../11_07_identity/README.md) |
 Next: [Plugin Applications](../../12_plugin_applications/README.md)

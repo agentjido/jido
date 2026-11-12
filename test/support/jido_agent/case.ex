@@ -3,8 +3,8 @@ defmodule Jido.Test.Agent.Case do
   Shared test case for opt-in agent examples.
 
   Each test gets an isolated Jido instance from `Jido.Test.Case`. The
-  `:example` tag keeps the suite out of the default test run. Use
-  `mix test --only example` or `mix test.examples` to run the suite.
+  `:integration` tag keeps the suite out of the default test run. Use
+  `mix test --only integration` or `mix test.examples` to run the suite.
   """
 
   use ExUnit.CaseTemplate
@@ -17,7 +17,7 @@ defmodule Jido.Test.Agent.Case do
 
       import Jido.Test.Agent.Case
 
-      @moduletag :example
+      @moduletag :integration
     end
   end
 

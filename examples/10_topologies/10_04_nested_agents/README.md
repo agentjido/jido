@@ -15,7 +15,7 @@ Read the root Agent, then `Hierarchy.Team` in the same file, then the Cell Agent
 ## Run it
 
 ```sh
-mix test test/examples/10_topologies/10_04_nested_agents --include example --seed 0
+mix test.examples examples/10_topologies/10_04_nested_agents
 ```
 
 Expected result: The root, team, and two workers start. Workers keep separate state.
@@ -37,7 +37,7 @@ does not define remote placement, orphan adoption, or member-state recovery.
 
 - [Source](hierarchy.ex)
 - [Cell Agent](../support/cell.ex)
-- [Tests](../../../test/examples/10_topologies/10_04_nested_agents/hierarchy_test.exs)
+- [Tests](hierarchy_test.exs)
 - [Test runtime assertions](../../../test/support/agent_topology_assertions.ex)
 
 This is also the Agent hierarchy lesson. Nested definitions replace the old

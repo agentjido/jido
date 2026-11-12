@@ -33,7 +33,7 @@ stable. Each lesson uses public Jido APIs and deterministic local services.
 ## Run the section
 
 ```sh
-mix test test/examples/08_runtime --include example --seed 0
+mix test.examples examples/08_runtime
 ```
 
 Expected result: runtime tests pass without network access or credentials.

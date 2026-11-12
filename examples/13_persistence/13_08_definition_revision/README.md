@@ -6,7 +6,7 @@ from an unintended change to executable behavior.
 Read [the Agent and upgrade Action](definition_revision.ex), then the tests.
 
 ```sh
-mix test test/examples/13_persistence/13_08_definition_revision --include example --seed 0
+mix test.examples examples/13_persistence/13_08_definition_revision
 ```
 
 Expected result: restore retains the saved version even when it differs from
@@ -19,7 +19,7 @@ it does not store that code. Keep the required release available, or provide
 an upgrade Action. Restore does not select a new definition automatically.
 
 - [Source](definition_revision.ex)
-- [Tests](../../../test/examples/13_persistence/13_08_definition_revision/definition_revision_test.exs)
+- [Tests](definition_revision_test.exs)
 - [Schema and state upgrade](../../08_runtime/08_14_state_migration/README.md)
 
 A nested definition is captured as data rather than reselected from current

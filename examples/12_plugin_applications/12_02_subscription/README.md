@@ -16,7 +16,7 @@ Read [the Agent](subscription.ex), then [the Plugin and runtime](subscription_pl
 ## Run it
 
 ```sh
-mix test test/examples/12_plugin_applications/12_02_subscription --include example --seed 0
+mix test.examples examples/12_plugin_applications/12_02_subscription
 ```
 
 Expected result: a subscription commits, resource replacement rejects the old
@@ -40,6 +40,6 @@ this example.
 
 - [Agent](subscription.ex)
 - [Plugin and runtime](subscription_plugin.ex)
-- [Tests](../../../test/examples/12_plugin_applications/12_02_subscription/subscription_test.exs)
+- [Tests](subscription_test.exs)
 
 Previous: [Audit](../12_01_audit/README.md) | Next: [Inbox](../12_03_inbox/README.md)

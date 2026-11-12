@@ -6,3 +6,5 @@ before Action work starts.
 
 Read [`inputs_and_output.ex`](inputs_and_output.ex) and run its paired offline
 test.
+
+See [the ExUnit proof](inputs_and_output_test.exs).

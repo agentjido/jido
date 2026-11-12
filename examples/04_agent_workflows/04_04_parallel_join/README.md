@@ -12,12 +12,12 @@ Agent state candidate.
 ## Read the code
 
 Read [the Agent and Flow](parallel_join.ex) first. Then read
-[the behavior tests](../../../test/examples/04_agent_workflows/04_04_parallel_join/parallel_join_test.exs).
+[the behavior tests](parallel_join_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/04_agent_workflows/04_04_parallel_join --include example --seed 0
+mix test.examples examples/04_agent_workflows/04_04_parallel_join
 ```
 
 Expected result: both branch results reach the join, shared context reaches
@@ -37,6 +37,6 @@ and cancellation belong to Jido Flow and Agent Server core tests.
 ## Files
 
 - [Source](parallel_join.ex)
-- [Tests](../../../test/examples/04_agent_workflows/04_04_parallel_join/parallel_join_test.exs)
+- [Tests](parallel_join_test.exs)
 
 Previous: [Choice and Fallback](../04_03_conditional_routes/README.md) | Next: [Ordered Batch](../04_05_ordered_batch/README.md)

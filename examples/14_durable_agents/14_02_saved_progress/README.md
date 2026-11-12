@@ -24,7 +24,7 @@ agent.state # %{value: 10}
 ## Run it
 
 ```sh
-mix test test/examples/14_durable_agents/14_02_saved_progress --include example --seed 0
+mix test.examples examples/14_durable_agents/14_02_saved_progress
 ```
 
 Expected result: steps 1–5 run once; step 6 starts twice after the crash; final
@@ -33,7 +33,7 @@ Agent state is `%{value: 10}`. The saved Turn ID remains the same.
 ## Important behavior
 
 AgentServer confirms graph checkpoints before dispatching more work. The test
-uses a [barrier Action](../../../test/examples/support/durable_step_probe.exs)
+uses a [barrier Action](../support/durable_step_probe.exs)
 in a test copy of the Flow. Production Actions contain no crash controls.
 The Server owns recovery; callers do not start, resume, or step a separate Runner.
 Process monitors confirm that interrupted work stops.
@@ -48,7 +48,7 @@ Caller Pending handles do not survive the Server crash.
 
 - [Source](saved_progress.ex)
 - [Action](advance.ex)
-- [Tests](../../../test/examples/14_durable_agents/14_02_saved_progress/saved_progress_test.exs)
-- [Test support](../../../test/examples/support/durable_step_probe.exs)
+- [Tests](saved_progress_test.exs)
+- [Test support](../support/durable_step_probe.exs)
 
 Previous: [Saved Agent State](../14_01_saved_agent/README.md) | Next: [VM Recovery](../14_03_vm_recovery/README.md)

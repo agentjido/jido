@@ -18,7 +18,7 @@ Identity and encrypted Signal handling now belong to the focused
 ## Run the section
 
 ```sh
-mix test test/examples/12_plugin_applications --include example --seed 0
+mix test.examples examples/12_plugin_applications
 ```
 
 Expected result: each application commits its state, handles its documented

@@ -13,7 +13,7 @@ Read [the persistent Agent](persistent_agent.ex), then the [identity probe](chec
 
 ## Run it
 
-`mix test test/examples/13_persistence/13_01_persistent_agent --include example --seed 0`
+`mix test.examples examples/13_persistence/13_01_persistent_agent`
 
 Expected result: each successful Turn advances the saved revision. Restore returns the exact state. A checkpoint with another Agent ID is rejected.
 
@@ -29,8 +29,8 @@ The example uses local ETS storage. ETS data does not survive a BEAM restart.
 
 - [Persistent Agent](persistent_agent.ex)
 - [Identity probe](checkpoint_identity_probe.ex)
-- [Agent tests](../../../test/examples/13_persistence/13_01_persistent_agent/persistent_agent_test.exs)
-- [Identity test](../../../test/examples/13_persistence/13_01_persistent_agent/checkpoint_identity_test.exs)
+- [Agent tests](persistent_agent_test.exs)
+- [Identity test](checkpoint_identity_test.exs)
 
 ```elixir
 opts = [id: "counter", persistence: {Jido.Persistence.File, path: "tmp/counters"}]

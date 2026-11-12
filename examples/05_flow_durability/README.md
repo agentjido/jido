@@ -19,5 +19,5 @@ scheduler.
 Run the supported group with:
 
 ```sh
-mix test.examples test/examples/05_flow_durability
+mix test.examples examples/05_flow_durability
 ```

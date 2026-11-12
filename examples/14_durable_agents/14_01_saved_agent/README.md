@@ -13,7 +13,7 @@ Persistence also enables Flow recovery; the next example interrupts a running Fl
 
 ## Read the code
 
-Read [the Agent](saved_agent.ex), then [its Flow](request_report.ex), then [the test](../../../test/examples/14_durable_agents/14_01_saved_agent/saved_agent_test.exs).
+Read [the Agent](saved_agent.ex), then [its Flow](request_report.ex), then [the test](saved_agent_test.exs).
 The Flow normalizes the topic, rejects an empty topic, and accepts one report
 request. The test owns BEAM startup, crash control, and cleanup; those operations
 are not part of the Agent.
@@ -21,7 +21,7 @@ are not part of the Agent.
 ## Run it
 
 ```sh
-mix test test/examples/14_durable_agents/14_01_saved_agent --include example --seed 0 --warnings-as-errors
+mix test.examples examples/14_durable_agents/14_01_saved_agent --warnings-as-errors
 ```
 
 Expected result: the last confirmed Agent and revision survive `SIGKILL`

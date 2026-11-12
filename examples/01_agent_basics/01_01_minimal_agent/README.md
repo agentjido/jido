@@ -11,14 +11,14 @@ A small Agent keeps a counter and changes it through one typed Signal route.
 ## Read the code
 
 Read [the Agent](minimal_agent.ex) first. Then read
-[the behavior tests](../../../test/examples/01_agent_basics/01_01_minimal_agent/minimal_agent_test.exs).
+[the behavior tests](minimal_agent_test.exs).
 
 ## Run it
 
 Run this command from the `jido` repository root:
 
 ```sh
-mix test test/examples/01_agent_basics/01_01_minimal_agent/minimal_agent_test.exs --include example --seed 0
+mix test.examples examples/01_agent_basics/01_01_minimal_agent/minimal_agent_test.exs
 ```
 
 Expected result: the tests complete without failures. They show default and
@@ -52,6 +52,6 @@ Turns.
 ## Files
 
 - [Agent source](minimal_agent.ex)
-- [Behavior tests](../../../test/examples/01_agent_basics/01_01_minimal_agent/minimal_agent_test.exs)
+- [Behavior tests](minimal_agent_test.exs)
 
 Previous: [Basic overview](../README.md) | Next: [Typed Command Agent](../01_02_typed_command_agent/README.md)

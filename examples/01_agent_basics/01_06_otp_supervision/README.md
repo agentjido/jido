@@ -13,12 +13,12 @@ group. A failed worker is replaced from the instance's accepted checkpoint.
 ## Read the code
 
 Read [the counter](example.ex), [the Application](application.ex), then
-[the integration test](../../../test/examples/01_agent_basics/01_06_otp_supervision/example_test.exs).
+[the integration test](example_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/01_agent_basics/01_06_otp_supervision --include example --seed 0
+mix test.examples examples/01_agent_basics/01_06_otp_supervision
 ```
 
 Expected result: a worker restart retains count seven and revision one. Its old

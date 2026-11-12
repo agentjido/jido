@@ -15,7 +15,7 @@ Read [the observed Agent](turn_observation.ex), then the shared
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_10_agent_observation --include example --seed 0
+mix test.examples examples/08_runtime/08_10_agent_observation
 ```
 
 Expected result: both Turn events report successful commits. A separate
@@ -43,7 +43,7 @@ backpressure contract.
 - [Agent](turn_observation.ex)
 - [Shared EventProbe](../support/event_probe.ex)
 - [Demo](demo.exs)
-- [Tests](../../../test/examples/08_runtime/08_10_agent_observation/agent_observation_test.exs)
+- [Tests](agent_observation_test.exs)
 
 Turn commit and effect dispatch have separate results. Inspect the Turn event
 for the commit and `[:jido, :agent_server, :effects, :stop]` for delivery failure.

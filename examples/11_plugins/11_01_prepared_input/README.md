@@ -13,12 +13,12 @@ its package key.
 ## Read the code
 
 Read [the Plugin and Agent](prepared_input.ex), then read the
-[behavior tests](../../../test/examples/11_plugins/11_01_prepared_input/prepared_input_test.exs).
+[behavior tests](prepared_input_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/11_plugins/11_01_prepared_input --include example --seed 0
+mix test.examples examples/11_plugins/11_01_prepared_input
 ```
 
 Expected result: direct and live commands select the same tenant. They preserve
@@ -39,7 +39,7 @@ runtime state or grant external authority.
 ## Files
 
 - [Plugin and Agent](prepared_input.ex)
-- [Tests](../../../test/examples/11_plugins/11_01_prepared_input/prepared_input_test.exs)
+- [Tests](prepared_input_test.exs)
 
 Previous: [Topologies](../../10_topologies/README.md) |
 Next: [Runtime Admission](../11_02_runtime_admission/README.md)

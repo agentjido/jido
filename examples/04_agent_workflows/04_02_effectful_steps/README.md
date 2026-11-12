@@ -13,13 +13,13 @@ portable result.
 ## Read the code
 
 Read [the Agent and Flow](effectful_steps.ex) first. Then read
-[the behavior tests](../../../test/examples/04_agent_workflows/04_02_effectful_steps/effectful_steps_test.exs)
+[the behavior tests](effectful_steps_test.exs)
 and [the local service adapter](read_service.ex).
 
 ## Run it
 
 ```sh
-mix test test/examples/04_agent_workflows/04_02_effectful_steps --include example --seed 0
+mix test.examples examples/04_agent_workflows/04_02_effectful_steps
 ```
 
 Expected result: guarded work makes no service call, selected data persists,
@@ -54,7 +54,7 @@ across a crash. External writes still need application idempotency.
 ## Files
 
 - [Source](effectful_steps.ex)
-- [Tests](../../../test/examples/04_agent_workflows/04_02_effectful_steps/effectful_steps_test.exs)
+- [Tests](effectful_steps_test.exs)
 - [Local service adapter](read_service.ex)
 
 Previous: [Sequential Flow](../04_01_sequential_flow/README.md) | Next: [Choice and Fallback](../04_03_conditional_routes/README.md)

@@ -5,3 +5,5 @@ The expected dependency data is `%{"echo" => %{needs: [], references: [], effect
 Validation rejects the same definition without an explicit output.
 
 Read [`single_step.ex`](single_step.ex) and run its paired offline test.
+
+See [the ExUnit proof](single_step_test.exs).

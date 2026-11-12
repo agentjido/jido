@@ -18,7 +18,7 @@ Each folder has a short guide, runnable source, and integration tests.
 Run all Workflow examples from the `jido` repository root:
 
 ```shell
-mix test.examples test/examples/04_agent_workflows
+mix test.examples examples/04_agent_workflows
 ```
 
 The examples need no network access or credentials. They use small local

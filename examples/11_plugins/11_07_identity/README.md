@@ -19,7 +19,7 @@ Read [the Agent](identity.ex), [the identity Plugin](identity_plugin.ex), then
 ## Run it
 
 ```sh
-mix test test/examples/11_plugins/11_07_identity --include example --seed 0
+mix test.examples examples/11_plugins/11_07_identity
 ```
 
 Expected result: one valid request commits and receives a signed reply. A
@@ -52,6 +52,6 @@ are not included.
 - [Agent](identity.ex)
 - [Plugin](identity_plugin.ex)
 - [Shared cryptographic helpers](../support/crypto.ex)
-- [Tests](../../../test/examples/11_plugins/11_07_identity/identity_test.exs)
+- [Tests](identity_test.exs)
 
 Previous: [Live Plugin Changes](../11_06_live_plugin_changes/README.md) | Next: [Secure Signal](../11_08_secure_signal/README.md)

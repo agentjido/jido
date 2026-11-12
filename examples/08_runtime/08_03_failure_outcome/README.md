@@ -19,7 +19,7 @@ Directive for postcommit policy handling.
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_03_failure_outcome --include example --seed 0
+mix test.examples examples/08_runtime/08_03_failure_outcome
 ```
 
 Expected result: the precommit Outcome has stage `:running` and no new state
@@ -44,7 +44,7 @@ prior commit or undo external work.
 ## Files
 
 - [Source](failure_outcome.ex)
-- [Tests](../../../test/examples/08_runtime/08_03_failure_outcome/failure_outcome_test.exs)
+- [Tests](failure_outcome_test.exs)
 
 Read `Server.status/1` for `last_outcome` and `last_effect_outcome`.
 `Server.history/1` retains bounded Turn summaries when debug history is enabled.

@@ -13,7 +13,7 @@ Read [the Agent](indeterminate_write_probe.ex), then read its behavior test and 
 
 ## Run it
 
-`mix test test/examples/13_persistence/13_06_indeterminate_write --include example --seed 0`
+`mix test.examples examples/13_persistence/13_06_indeterminate_write`
 
 Expected result: storage contains the candidate revision, no output Signal is
 sent, and the old process stops, releases its registration, and cannot run
@@ -30,7 +30,7 @@ The example does not prescribe automatic restart, a shutdown reason, or cross-no
 ## Files
 
 - [Source](indeterminate_write_probe.ex)
-- [Tests](../../../test/examples/13_persistence/13_06_indeterminate_write/indeterminate_write_test.exs)
+- [Tests](indeterminate_write_test.exs)
 - [Fault adapter](../../../test/support/persistence/fixtures/probe_store.ex)
 
 Previous: [Durable Delete](../13_05_durable_delete/README.md) | Next: [Recoverable Delivery](../13_07_recoverable_delivery/README.md)

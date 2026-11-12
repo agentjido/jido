@@ -18,7 +18,7 @@ The IDs follow the recommended reading order.
 ## Run the section
 
 ```sh
-mix test test/examples/10_topologies --include example --seed 0
+mix test.examples examples/10_topologies
 ```
 
 The [Cell Agent](support/cell.ex) supports member and Bus lessons. The

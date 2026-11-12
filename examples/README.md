@@ -28,21 +28,43 @@ The offline catalog has 114 lessons. The graph-first chapter also has one
 opt-in live-provider lesson. Each chapter README lists its lessons in order.
 
 The machine-readable register is
-[`test/examples/catalog.yml`](../test/examples/catalog.yml). It is the source
+[`catalog.yml`](catalog.yml). It is the source
 of truth for example IDs, categories, source files, README files, and paired
 tests.
 
 Each supported offline example has one catalog entry, one README, one primary
-source file, and one paired test. Auxiliary source files are in the same
-entry. The catalog rejects unregistered files, nested domain folders, invalid
-chapter or lesson numbers, and entries that are not sorted by ID. Each entry
-also names the component whose canonical behavior the lesson supplements.
+source file, and one paired ExUnit test in the same lesson folder:
+
+```text
+examples/03_flow_execution/03_03_choice/
+├── README.md
+├── choice.ex
+└── choice_test.exs
+```
+
+The test loads its sibling source with `Code.require_file/2`. Example source
+stays outside the package compiler paths, so a normal `mix test` does not
+compile the complete catalog. Auxiliary source files are in the same catalog
+entry. The catalog rejects unregistered files, separated tests, missing test
+links, nested domain folders, invalid chapter or lesson numbers, and entries
+that are not sorted by ID. Each entry also names the component whose canonical
+behavior the lesson supplements.
 
 Run all offline examples with:
 
 ```sh
 mix test.examples
 ```
+
+Run one chapter or lesson with an explicit path:
+
+```sh
+mix test.examples examples/03_flow_execution
+mix test.examples examples/03_flow_execution/03_03_choice/choice_test.exs
+```
+
+`mix test.integration` runs the complete offline integration suite, including
+these examples. Both commands use the standard Mix test task and ExUnit.
 
 Provider and external-service examples are not part of the offline catalog.
 They must have an explicit exclusion or use the opt-in live or service suite.

@@ -15,7 +15,7 @@ Read [the counter](hibernate_and_thaw.ex), then read its behavior test.
 
 ## Run it
 
-`mix test test/examples/13_persistence/13_02_hibernate_and_thaw --include example --seed 0`
+`mix test.examples examples/13_persistence/13_02_hibernate_and_thaw`
 
 Expected result: the old process stops, the new process has the saved count and
 revision, and a missing required record does not start an Agent. An attachment
@@ -35,6 +35,6 @@ Hibernate and thaw do not provide cluster ownership or a writer lease.
 ## Files
 
 - [Source](hibernate_and_thaw.ex)
-- [Tests](../../../test/examples/13_persistence/13_02_hibernate_and_thaw/hibernate_and_thaw_test.exs)
+- [Tests](hibernate_and_thaw_test.exs)
 
 Previous: [Persistent Agent](../13_01_persistent_agent/README.md) | Next: [Portable Checkpoint](../13_03_portable_checkpoint/README.md)

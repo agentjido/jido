@@ -3,7 +3,7 @@
 An independent Agent can survive its owner's supervisor and later accept a new owner.
 
 Read [the Agents and startup helper](orphan_adoption.ex) and
-[the tests](../../../test/examples/09_multi_agent/09_03_orphan_adoption/orphan_adoption_test.exs).
+[the tests](orphan_adoption_test.exs).
 
 ```elixir
 Parent.start_worker(server, :continue)
@@ -19,7 +19,7 @@ It sends `jido.agent_server.orphaned` there after the old owner stops.
 The new owner sends work with `agent_send/2`.
 
 ```sh
-mix test test/examples/09_multi_agent/09_03_orphan_adoption --include example --seed 0
+mix test.examples examples/09_multi_agent/09_03_orphan_adoption
 ```
 
 Adoption is local. It does not provide a distributed lease.

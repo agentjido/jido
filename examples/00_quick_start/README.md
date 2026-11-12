@@ -10,7 +10,7 @@ two lessons run offline. The last lesson is an opt-in live-provider example.
 Run this chapter:
 
 ```sh
-mix test.examples test/examples/00_quick_start --warnings-as-errors
+mix test.examples examples/00_quick_start --warnings-as-errors
 ```
 
 Run the live lesson only when you intend to make a paid provider call:

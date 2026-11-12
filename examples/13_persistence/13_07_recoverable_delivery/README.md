@@ -13,7 +13,7 @@ Read [the Agent](recoverable_delivery.ex), then the [Plugin](delivery_plugin.ex)
 
 ## Run it
 
-`mix test test/examples/13_persistence/13_07_recoverable_delivery --include example --seed 0`
+`mix test.examples examples/13_persistence/13_07_recoverable_delivery`
 
 Expected result: intent saved while the sink is unavailable resumes after restore and creates one idempotent external record.
 
@@ -33,6 +33,6 @@ The memory sink is not durable. Completed IDs need an application retention poli
 - [Sink](sink.ex)
 - [Memory sink](support/memory_sink.ex)
 - [Demo](demo.exs)
-- [Tests](../../../test/examples/13_persistence/13_07_recoverable_delivery/recoverable_delivery_test.exs)
+- [Tests](recoverable_delivery_test.exs)
 
 Previous: [Indeterminate Write](../13_06_indeterminate_write/README.md) | Next: [Definition Revision](../13_08_definition_revision/README.md)

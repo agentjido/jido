@@ -32,13 +32,13 @@ route. `state_spec/1` and `reduce/2` add the behavior. One Plugin supplies all
 of these parts; no Agent compiler change is required.
 
 The Agent's `registry/0` gives installed code and known atoms stable names for
-JSON. The [tests](../../../test/examples/11_plugins/11_04_plugin_dsl/plugin_dsl_test.exs)
+JSON. The [tests](plugin_dsl_test.exs)
 show the DSL data, direct and live commands, Map validation, and JSON import.
 
 ## Run it
 
 ```sh
-mix test test/examples/11_plugins/11_04_plugin_dsl --include example --seed 0
+mix test.examples examples/11_plugins/11_04_plugin_dsl
 ```
 
 Expected result: adding three reaches `:first` and `:third` once. Direct and
@@ -66,7 +66,7 @@ new atoms.
 
 - [Agent and trusted Registry](plugin_dsl.ex)
 - [Plugin, section, and entity](thresholds.ex)
-- [Tests](../../../test/examples/11_plugins/11_04_plugin_dsl/plugin_dsl_test.exs)
+- [Tests](plugin_dsl_test.exs)
 
 Previous: [State Middleware](../11_03_state_middleware/README.md) |
 Next: [Composition](../11_05_composition/README.md)

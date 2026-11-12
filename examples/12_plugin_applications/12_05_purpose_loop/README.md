@@ -15,7 +15,7 @@ Read [the Agent and state rules](purpose_loop.ex), then [the clock and Signal bu
 ## Run it
 
 ```sh
-mix test test/examples/12_plugin_applications/12_05_purpose_loop --include example --seed 0
+mix test.examples examples/12_plugin_applications/12_05_purpose_loop
 ```
 
 Expected result: scheduled work reaches idle, a restored paused Agent resumes,
@@ -35,7 +35,7 @@ or an endless Action loop.
 
 - [Agent and state rules](purpose_loop.ex)
 - [Clock and Signals](clock.ex)
-- [Tests](../../../test/examples/12_plugin_applications/12_05_purpose_loop/purpose_loop_test.exs)
+- [Tests](purpose_loop_test.exs)
 
 Previous: [Approval Workflow](../12_04_approval_workflow/README.md) |
 Next: [Persistence](../../13_persistence/README.md)

@@ -16,7 +16,7 @@ Read [the live debugger](agent_live_debugger.ex), then read its behavior test.
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_09_runtime_inspection --include example --seed 0
+mix test.examples examples/08_runtime/08_09_runtime_inspection
 ```
 
 Expected result: the debugger returns committed public state, Plugin state,
@@ -41,7 +41,7 @@ which domain fields are secret. Semantic Telemetry remains in the next lesson.
 ## Files
 
 - [Source](agent_live_debugger.ex)
-- [Tests](../../../test/examples/08_runtime/08_09_runtime_inspection/agent_live_debugger_test.exs)
+- [Tests](agent_live_debugger_test.exs)
 
 `children/1` lists owned Agents, not Plugin runtimes. `Server.snapshot/1` is a
 live Agent value with a runtime revision. `Persistence.snapshot/1` produces a

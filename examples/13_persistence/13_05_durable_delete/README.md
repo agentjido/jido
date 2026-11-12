@@ -14,7 +14,7 @@ Read [the order Agent](durable_delete.ex), then read its behavior test.
 
 ## Run it
 
-`mix test test/examples/13_persistence/13_05_durable_delete --include example --seed 0`
+`mix test.examples examples/13_persistence/13_05_durable_delete`
 
 Expected result: load returns `:deleted`, and an old initial writer cannot
 replace the tombstone. A byte comparison rejects a condition that is only a
@@ -32,6 +32,6 @@ Tombstone retention and physical purge are application policy. A tombstone is no
 ## Files
 
 - [Source](durable_delete.ex)
-- [Tests](../../../test/examples/13_persistence/13_05_durable_delete/durable_delete_test.exs)
+- [Tests](durable_delete_test.exs)
 
 Previous: [Plugin State Conversion](../13_04_plugin_state_conversion/README.md) | Next: [Indeterminate Write](../13_06_indeterminate_write/README.md)

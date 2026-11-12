@@ -8,7 +8,7 @@ defmodule Jido.Test.Agent.BasicSDKCase do
       use Jido.Test.Case, async: false
       import Jido.Test.Agent.BasicSDKCase
 
-      @moduletag :example
+      @moduletag :integration
 
       @moduletag group: :basic
       @moduletag complexity: 1

@@ -23,7 +23,7 @@ request = Jido.Examples.DataDefinedAgent.schedule_signal!(0)
 before the Scheduler delivers the count command in a second Turn.
 
 ```sh
-mix test test/examples/01_agent_basics/01_07_data_defined_agent --include example --seed 0
+mix test.examples examples/01_agent_basics/01_07_data_defined_agent
 ```
 
 Expected result: JSON round trips preserve the definition; direct and live
@@ -45,7 +45,7 @@ round trip that starts a composed Agent. The core authoring tests cover the
 full DSL, data, and JSON format matrix.
 
 - [Source](data_defined_agent.ex)
-- [Tests](../../../test/examples/01_agent_basics/01_07_data_defined_agent/data_defined_agent_test.exs)
+- [Tests](data_defined_agent_test.exs)
 - [Authoring tests](../../../test/authoring/agents/json_test.exs)
 - [Scheduler import tests](../../../test/jido/agent/scheduler_codec_test.exs)
 

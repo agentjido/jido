@@ -18,7 +18,7 @@ Read [the Agent](inbox.ex), then [the input sensor](inbox_sensor.ex).
 ## Run it
 
 ```sh
-mix test test/examples/12_plugin_applications/12_03_inbox --include example --seed 0
+mix test.examples examples/12_plugin_applications/12_03_inbox
 ```
 
 Expected result: repeated IDs commit once. Sensor and Manager replacement keep
@@ -43,6 +43,6 @@ acknowledgement.
 
 - [Agent](inbox.ex)
 - [Sensor](inbox_sensor.ex)
-- [Tests](../../../test/examples/12_plugin_applications/12_03_inbox/inbox_test.exs)
+- [Tests](inbox_test.exs)
 
 Previous: [Subscription](../12_02_subscription/README.md) | Next: [Approval Workflow](../12_04_approval_workflow/README.md)

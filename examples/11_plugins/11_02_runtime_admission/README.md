@@ -15,12 +15,12 @@ authorization input.
 ## Read the code
 
 Read [the Plugin, runtime, and Agent](runtime_admission.ex), then read the
-[behavior tests](../../../test/examples/11_plugins/11_02_runtime_admission/runtime_admission_test.exs).
+[behavior tests](runtime_admission_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/11_plugins/11_02_runtime_admission --include example --seed 0
+mix test.examples examples/11_plugins/11_02_runtime_admission
 ```
 
 Expected result: the authorization contains a transient lease reference. The Action consumes
@@ -43,6 +43,6 @@ not provide distributed authorization, token rotation, or durable leases.
 ## Files
 
 - [Plugin, runtime, and Agent](runtime_admission.ex)
-- [Tests](../../../test/examples/11_plugins/11_02_runtime_admission/runtime_admission_test.exs)
+- [Tests](runtime_admission_test.exs)
 
 Previous: [Prepared Input](../11_01_prepared_input/README.md) | Next: [State Middleware](../11_03_state_middleware/README.md)

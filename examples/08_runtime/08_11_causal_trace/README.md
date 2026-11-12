@@ -15,7 +15,7 @@ shared [EventProbe](../support/event_probe.ex), and the behavior test.
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_11_causal_trace --include example --seed 0
+mix test.examples examples/08_runtime/08_11_causal_trace
 ```
 
 Expected result: the parent, child, and result Turns share one trace ID with the
@@ -36,7 +36,7 @@ Agent placement or cross-node lifecycle guarantees.
 - [Parent Agent](causal_trace.ex)
 - [Worker Agent](worker.ex)
 - [Shared EventProbe](../support/event_probe.ex)
-- [Tests](../../../test/examples/08_runtime/08_11_causal_trace/causal_trace_test.exs)
+- [Tests](causal_trace_test.exs)
 
 Previous: [Agent Observation](../08_10_agent_observation/README.md) |
 Next: [Definition Changes and Diff](../08_12_definition_changes/README.md)

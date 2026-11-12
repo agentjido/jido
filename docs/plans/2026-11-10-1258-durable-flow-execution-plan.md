@@ -243,7 +243,7 @@ Jido.AgentServer
 - **Affected surfaces:** `examples/05_flow_durability`, paired example tests, examples index, component/docs index if needed.
 - **Implementation direction:** Add small examples that use the public Durable API. Use ETS or temporary File persistence and deterministic clocks. State that cron calculation and delivery belong to the host.
 - **Test scenarios:** Every example runs through its paired test and produces the documented result.
-- **Verification:** `mix test.examples test/examples/05_flow_durability`.
+- **Verification:** `mix test.examples examples/05_flow_durability`.
 - **Completion signal:** Examples pass and explain the host boundary without introducing a scheduler.
 
 ### Work Graph
@@ -269,7 +269,7 @@ Working directory: repository root.
 mix test test/jido/durable
 mix test test/jido/agent_server/durable test/jido/agent_server/durable_turn
 mix test test/jido/exec test/jido/persistence
-mix test.examples test/examples/05_flow_durability
+mix test.examples examples/05_flow_durability
 mix format --check-formatted
 mix compile --warnings-as-errors
 mix test

@@ -15,5 +15,5 @@ These lessons add one feature at a time to the graph-first Agent contract.
 All tests are offline. They replace only the inference client result.
 
 ```sh
-mix test.examples test/examples/15_ai_basics --warnings-as-errors
+mix test.examples examples/15_ai_basics --warnings-as-errors
 ```

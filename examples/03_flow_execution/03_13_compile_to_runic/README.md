@@ -9,3 +9,5 @@ Run it from the `jido` package:
 ```sh
 mix run examples/03_flow_execution/03_13_compile_to_runic/run.exs
 ```
+
+See [the ExUnit proof](compile_to_runic_test.exs).

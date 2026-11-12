@@ -10,12 +10,12 @@ An Action installs an exact route ahead of a wildcard without changing the runni
 
 ## Read the code
 
-Read [the Agent](definition_changes.ex), then [the behavior tests](../../../test/examples/08_runtime/08_12_definition_changes/definition_changes_test.exs).
+Read [the Agent](definition_changes.ex), then [the behavior tests](definition_changes_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_12_definition_changes --include example --seed 0
+mix test.examples examples/08_runtime/08_12_definition_changes
 ```
 
 Expected result: pure evaluation leaves the live snapshot unchanged. Live installation selects the exact handler; removal selects the wildcard again. Duplicate installation fails. Adding and removing the same temporary route produces an empty Diff.

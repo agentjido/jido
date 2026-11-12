@@ -11,7 +11,7 @@ ownership is covered by [10_04 Nested Agents](../10_topologies/10_04_nested_agen
 Remote placement and node-loss behavior are outside this supported example suite.
 
 ```sh
-mix test test/examples/09_multi_agent --include example --seed 0
+mix test.examples examples/09_multi_agent
 ```
 
 The [Worker](support/worker.ex) supports local lifecycle and correlation.

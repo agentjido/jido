@@ -18,7 +18,7 @@ not enter Signal data, Action input, or Turn context.
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_02_turn_control --include example --seed 0
+mix test.examples examples/08_runtime/08_02_turn_control
 ```
 
 Expected result: status reports the active Turn. A stale ID is rejected. The
@@ -41,7 +41,7 @@ make external operations idempotent when a retry is possible.
 ## Files
 
 - [Source](turn_control.ex)
-- [Tests](../../../test/examples/08_runtime/08_02_turn_control/turn_control_test.exs)
+- [Tests](turn_control_test.exs)
 
 `cancel/2` targets whichever eligible Turn is active when the Server handles
 the request. `cancel_turn/3` also checks the supplied ID, so a delayed request

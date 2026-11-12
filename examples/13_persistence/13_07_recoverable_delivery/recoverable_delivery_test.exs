@@ -1,0 +1,70 @@
+Code.require_file("sink.ex", __DIR__)
+Code.require_file("support/memory_sink.ex", __DIR__)
+Code.require_file("delivery_plugin.ex", __DIR__)
+Code.require_file("delivery_worker.ex", __DIR__)
+Code.require_file("recoverable_delivery.ex", __DIR__)
+
+defmodule Jido.Examples.Persistence.RecoverableDeliveryTest do
+  use Jido.Test.Agent.Case
+  @moduletag :integration
+
+  @moduletag group: :persistence
+
+  alias Jido.AgentServer, as: Server
+  alias Jido.Test.Persistence.ProbeStore
+  alias Jido.Examples.RecoverableDelivery, as: Example
+  alias Jido.Examples.RecoverableDelivery.Deliver
+  alias Jido.Examples.RecoverableDelivery.MemorySink, as: Sink
+
+  setup %{jido: jido} do
+    start_supervised!({Sink, jido: jido})
+    store = {ProbeStore, store: start_supervised!(ProbeStore)}
+    {:ok, store: store}
+  end
+
+  test "saved delivery intent resumes after loss without duplicating the external record", c do
+    id = unique_id("example-recoverable-delivery")
+    assert :ok = Sink.available(c.jido, false)
+    server = start_example(c, id, false)
+
+    {:ok, route_signal_1} = Example.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
+
+    assert {:ok, committed, _directives} =
+             Jido.AgentServer.call(server, route_signal_1, [])
+
+    assert committed.state.delivery.pending == %{"effect-1" => 7}
+    assert Sink.records(c.jido) == %{}
+
+    server_ref = Process.monitor(server)
+    assert :ok = Jido.stop_agent(c.jido, server)
+    assert_receive {:DOWN, ^server_ref, :process, ^server, _reason}, 1000
+    eventually(fn -> Jido.whereis_agent(c.jido, id) == nil end)
+
+    assert :ok = Sink.available(c.jido, true)
+    restored = start_example(c, id, :required)
+
+    eventually(fn ->
+      Server.agent(restored).state.delivery == %{
+        pending: %{},
+        completed: %{"effect-1" => 7}
+      }
+    end)
+
+    assert Sink.records(c.jido) == %{"effect-1" => 7}
+    assert Server.snapshot(restored).state_version == 2
+
+    assert :ok = Sink.deliver(c.jido, %Deliver{effect_id: "effect-1", value: 7})
+    assert Sink.records(c.jido) == %{"effect-1" => 7}
+  end
+
+  defp start_example(c, id, restore) do
+    assert {:ok, server} =
+             Jido.Test.AgentServer.ExampleRuntime.start_agent(c.jido, Example,
+               id: id,
+               persistence: c.store,
+               persistence_mode: if(restore == false, do: :create, else: :restore)
+             )
+
+    server
+  end
+end

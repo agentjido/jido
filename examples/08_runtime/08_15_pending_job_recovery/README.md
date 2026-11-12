@@ -15,7 +15,7 @@ Read [the pending-job Agent](pending_job_recovery.ex), then the local
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_15_pending_job_recovery --include example --seed 0
+mix test.examples examples/08_runtime/08_15_pending_job_recovery
 ```
 
 Expected result: saved approval survives Agent loss, no Task appears on restore,
@@ -35,7 +35,7 @@ runtime service must be supplied again when a retry needs a non-default client.
 
 - [Agent](pending_job_recovery.ex)
 - [Local job runtime](job_runtime.ex)
-- [Tests](../../../test/examples/08_runtime/08_15_pending_job_recovery/pending_job_recovery_test.exs)
+- [Tests](pending_job_recovery_test.exs)
 
 Previous: [State Migration](../08_14_state_migration/README.md) |
 Next: [Multi-Agent](../../09_multi_agent/README.md)

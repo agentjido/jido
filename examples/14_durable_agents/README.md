@@ -85,7 +85,7 @@ Flows need separate recovery evidence before wider claims.
 ## Run it
 
 ```sh
-mix test test/examples/14_durable_agents --include example --seed 0 --warnings-as-errors
+mix test.examples examples/14_durable_agents --warnings-as-errors
 ```
 
 Child BEAM tests need local sockets and `kill`. No credentials or external service

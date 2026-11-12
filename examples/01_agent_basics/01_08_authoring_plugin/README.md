@@ -12,14 +12,14 @@ One authoring-only Plugin adds a validated owner label to an Agent definition.
 ## Read the code
 
 Read [the Plugin and Agent](authoring_plugin.ex), then read
-[the tests](../../../test/examples/01_agent_basics/01_08_authoring_plugin/authoring_plugin_test.exs).
+[the tests](authoring_plugin_test.exs).
 `Labels` owns the `labels` section. The Agent registers it with
 `plugins: [Labels]` and declares `owner("examples")` in that section.
 
 ## Run it
 
 ```sh
-mix test test/examples/01_agent_basics/01_08_authoring_plugin --include example --seed 0
+mix test.examples examples/01_agent_basics/01_08_authoring_plugin
 ```
 
 Expected result: DSL and Map authoring produce the same contribution. Invalid
@@ -53,7 +53,7 @@ version identifies its contract; it does not perform an automatic upgrade.
 ## Files
 
 - [Source](authoring_plugin.ex)
-- [Tests](../../../test/examples/01_agent_basics/01_08_authoring_plugin/authoring_plugin_test.exs)
+- [Tests](authoring_plugin_test.exs)
 
 An authoring-only Plugin needs no runtime adapter and can be part of an
 AgentServer definition. Pure authoring does not start runtime work.

@@ -14,7 +14,7 @@ Read [the scheduled counter](scheduled_counter.ex), then read its behavior test.
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_04_scheduled_signals --include example --seed 0
+mix test.examples examples/08_runtime/08_04_scheduled_signals
 ```
 
 Expected result: a one-shot schedule increments the counter in a second Turn,
@@ -34,7 +34,7 @@ application state or a durable Signal Bus when that work must survive loss.
 ## Files
 
 - [Source](scheduled_counter.ex)
-- [Tests](../../../test/examples/08_runtime/08_04_scheduled_signals/scheduled_counter_test.exs)
+- [Tests](scheduled_counter_test.exs)
 
 Previous: [Failure Outcome](../08_03_failure_outcome/README.md) |
 Next: [Keyed Timers](../08_05_keyed_timers/README.md)

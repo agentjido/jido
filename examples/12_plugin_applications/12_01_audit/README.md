@@ -15,7 +15,7 @@ Read [the Agent and Flow](audit.ex), then read the behavior test.
 ## Run it
 
 ```sh
-mix test test/examples/12_plugin_applications/12_01_audit --include example --seed 0
+mix test.examples examples/12_plugin_applications/12_01_audit
 ```
 
 Expected result: three selected events commit with domain state, the oldest
@@ -39,7 +39,7 @@ example does not provide an external compliance archive.
 ## Files
 
 - [Agent and Flow](audit.ex)
-- [Tests](../../../test/examples/12_plugin_applications/12_01_audit/audit_test.exs)
+- [Tests](audit_test.exs)
 
 Previous: [Secure Signal](../../11_plugins/11_08_secure_signal/README.md) |
 Next: [Subscription](../12_02_subscription/README.md)

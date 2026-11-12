@@ -15,7 +15,7 @@ These examples move from one durable Agent record to recovery after uncertain wr
 
 ## Run the section
 
-`mix test test/examples/13_persistence --include example --seed 0`
+`mix test.examples examples/13_persistence`
 
 Expected result: all examples pass without network access or credentials.
 

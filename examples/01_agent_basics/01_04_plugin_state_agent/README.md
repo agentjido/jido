@@ -11,14 +11,14 @@ An Agent and a Plugin update their separate state fields in one atomic commit.
 ## Read the code
 
 Read [the Agent](plugin_state_agent.ex), then its [CountTurns Plugin](count_turns.ex). Then
-read [the behavior tests](../../../test/examples/01_agent_basics/01_04_plugin_state_agent/plugin_state_agent_test.exs).
+read [the behavior tests](plugin_state_agent_test.exs).
 
 ## Run it
 
 Run this command from the `jido` repository root:
 
 ```sh
-mix test test/examples/01_agent_basics/01_04_plugin_state_agent/plugin_state_agent_test.exs --include example --seed 0
+mix test.examples examples/01_agent_basics/01_04_plugin_state_agent/plugin_state_agent_test.exs
 ```
 
 Expected result: the tests complete without failures. A valid Turn commits both
@@ -38,7 +38,7 @@ Plugin processes or Directive dispatch.
 ## Files
 
 - [Agent and Plugin source](plugin_state_agent.ex)
-- [Behavior tests](../../../test/examples/01_agent_basics/01_04_plugin_state_agent/plugin_state_agent_test.exs)
+- [Behavior tests](plugin_state_agent_test.exs)
 - [Shared test setup](../../../test/support/basic_sdk_case.ex)
 
 Previous: [Route Selection](../01_03_route_selection/README.md) | Next: [Directive Agent](../01_05_directive_agent/README.md)

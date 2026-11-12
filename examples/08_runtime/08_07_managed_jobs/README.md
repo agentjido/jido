@@ -15,7 +15,7 @@ Read [the managed-jobs Agent](managed_jobs.ex) first. Then read the local
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_07_managed_jobs --include example --seed 0
+mix test.examples examples/08_runtime/08_07_managed_jobs
 ```
 
 Expected result: job intent commits before work starts, completion arrives in a
@@ -36,7 +36,7 @@ application must choose an explicit retry after loss.
 
 - [Agent](managed_jobs.ex)
 - [Local job runtime](job_runtime.ex)
-- [Tests](../../../test/examples/08_runtime/08_07_managed_jobs/managed_jobs_test.exs)
+- [Tests](managed_jobs_test.exs)
 
 Previous: [Bus Delivery](../08_06_bus_delivery/README.md) |
 Next: [Heartbeat](../08_08_heartbeat/README.md)

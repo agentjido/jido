@@ -12,12 +12,12 @@ final Agent state candidate.
 ## Read the code
 
 Read [the Agent and selected targets](executable_continuation.ex) first. Then
-read [the behavior tests](../../../test/examples/04_agent_workflows/04_08_executable_continuation/executable_continuation_test.exs).
+read [the behavior tests](executable_continuation_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/04_agent_workflows/04_08_executable_continuation --include example --seed 0
+mix test.examples examples/04_agent_workflows/04_08_executable_continuation
 ```
 
 Expected result: Invoke selects `Finish` when no additions remain. Otherwise,
@@ -39,6 +39,6 @@ cancellation.
 ## Files
 
 - [Source](executable_continuation.ex)
-- [Tests](../../../test/examples/04_agent_workflows/04_08_executable_continuation/executable_continuation_test.exs)
+- [Tests](executable_continuation_test.exs)
 
 Previous: [Nested Flow](../04_07_nested_flow/README.md) | Next: [Flow Directives](../04_09_flow_directives/README.md)

@@ -12,14 +12,14 @@ rules inside each Action.
 ## Read the code
 
 Read [the Agent and its state contract](typed_command_agent.ex) first. Then read
-[the behavior tests](../../../test/examples/01_agent_basics/01_02_typed_command_agent/typed_command_agent_test.exs).
+[the behavior tests](typed_command_agent_test.exs).
 
 ## Run it
 
 Run this command from the `jido` repository root:
 
 ```sh
-mix test test/examples/01_agent_basics/01_02_typed_command_agent/typed_command_agent_test.exs --include example --seed 0
+mix test.examples examples/01_agent_basics/01_02_typed_command_agent/typed_command_agent_test.exs
 ```
 
 Expected result: the tests complete without failures. Direct and live execution
@@ -44,6 +44,6 @@ effects. The profile merge is shallow, not recursive.
 ## Files
 
 - [Agent and state contract](typed_command_agent.ex)
-- [Behavior tests](../../../test/examples/01_agent_basics/01_02_typed_command_agent/typed_command_agent_test.exs)
+- [Behavior tests](typed_command_agent_test.exs)
 
 Previous: [Minimal Agent](../01_01_minimal_agent/README.md) | Next: [Route Selection](../01_03_route_selection/README.md)

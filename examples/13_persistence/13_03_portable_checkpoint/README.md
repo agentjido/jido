@@ -13,7 +13,7 @@ Read [the payload Agent](checkpoint_portability_probe.ex), then read its behavio
 
 ## Run it
 
-`mix test test/examples/13_persistence/13_03_portable_checkpoint --include example --seed 0`
+`mix test.examples examples/13_persistence/13_03_portable_checkpoint`
 
 Expected result: portable nested data saves and loads. A stored PID is rejected with its value path.
 
@@ -28,6 +28,6 @@ This example does not test a VM restart. The core suite tests all prohibited ter
 ## Files
 
 - [Source](checkpoint_portability_probe.ex)
-- [Tests](../../../test/examples/13_persistence/13_03_portable_checkpoint/checkpoint_portability_test.exs)
+- [Tests](checkpoint_portability_test.exs)
 
 Previous: [Hibernate And Thaw](../13_02_hibernate_and_thaw/README.md) | Next: [Plugin State Conversion](../13_04_plugin_state_conversion/README.md)

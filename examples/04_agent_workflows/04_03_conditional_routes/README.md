@@ -12,12 +12,12 @@ matching Choice option.
 ## Read the code
 
 Read [the Agent and Flow](conditional_routes.ex) first. Then read
-[the behavior tests](../../../test/examples/04_agent_workflows/04_03_conditional_routes/conditional_routes_test.exs).
+[the behavior tests](conditional_routes_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/04_agent_workflows/04_03_conditional_routes --include example --seed 0
+mix test.examples examples/04_agent_workflows/04_03_conditional_routes
 ```
 
 Expected result: a successful primary response wins, an unavailable primary
@@ -40,7 +40,7 @@ circuit-breaker feature.
 ## Files
 
 - [Source](conditional_routes.ex)
-- [Tests](../../../test/examples/04_agent_workflows/04_03_conditional_routes/conditional_routes_test.exs)
+- [Tests](conditional_routes_test.exs)
 - [Shared test adapter](../../../test/support/workflow_sdk_case.ex)
 
 Previous: [Effectful Steps](../04_02_effectful_steps/README.md) | Next: [Parallel Join](../04_04_parallel_join/README.md)

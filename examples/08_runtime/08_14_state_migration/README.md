@@ -12,7 +12,7 @@ Action, `WalletV1ToV2`. The Action receives `%{snapshot: snapshot}` and returns
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_14_state_migration --include example --seed 0
+mix test.examples examples/08_runtime/08_14_state_migration
 ```
 
 ```elixir
@@ -49,7 +49,7 @@ runtime revision. This example does not coordinate upgrades across Agents.
 ## Files
 
 - [Source](state_migration.ex)
-- [Tests](../../../test/examples/08_runtime/08_14_state_migration/state_migration_test.exs)
+- [Tests](state_migration_test.exs)
 
 Previous: [Stable Reference](../08_13_stable_reference/README.md) |
 Next: [Pending Job Recovery](../08_15_pending_job_recovery/README.md)

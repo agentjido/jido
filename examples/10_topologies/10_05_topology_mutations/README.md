@@ -15,7 +15,7 @@ Read the mutation routes and initial observer declaration, then the Cell Agent a
 ## Run it
 
 ```sh
-mix test test/examples/10_topologies/10_05_topology_mutations --include example --seed 0
+mix test.examples examples/10_topologies/10_05_topology_mutations
 ```
 
 Expected result: Workers grow from two to three, shrink to one, and are removed. Unchanged
@@ -41,7 +41,7 @@ coordinated snapshot of all member states.
 
 - [Source](mutations.ex)
 - [Cell Agent](../support/cell.ex)
-- [Tests](../../../test/examples/10_topologies/10_05_topology_mutations/mutations_test.exs)
+- [Tests](mutations_test.exs)
 - [Test runtime assertions](../../../test/support/agent_topology_assertions.ex)
 
 The add Action declares `count: state(:worker_count)`. A state-only command

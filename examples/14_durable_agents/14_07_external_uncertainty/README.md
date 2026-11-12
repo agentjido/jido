@@ -34,7 +34,7 @@ fails. Cancellation stops local work; it cannot undo provider acceptance.
 `policy: :manual` saves `:needs_attention` and does not call the provider.
 
 Crash barriers remain in
-[test support](../../../test/examples/support/durable_publication_probe.exs).
+[test support](../support/durable_publication_probe.exs).
 The provider lives outside the killed Agent tree.
 
 ## Limits
@@ -48,7 +48,7 @@ unsafe provider. Reconciliation and later authorization belong to the applicatio
 ## Run it
 
 ```sh
-mix test test/examples/14_durable_agents/14_07_external_uncertainty --include example --seed 0 --warnings-as-errors
+mix test.examples examples/14_durable_agents/14_07_external_uncertainty --warnings-as-errors
 ```
 
 Expected result: the success, recovery, and rejection assertions pass. Tests stop
@@ -57,7 +57,7 @@ the Agents and release all held test calls. No external service is required.
 ## Files
 
 - [Source](external_uncertainty.ex)
-- [Tests](../../../test/examples/14_durable_agents/14_07_external_uncertainty/external_uncertainty_test.exs)
+- [Tests](external_uncertainty_test.exs)
 
 Previous: [Durable Wait](../14_06_durable_wait/README.md) |
 Next: [AI Basics](../../15_ai_basics/README.md)

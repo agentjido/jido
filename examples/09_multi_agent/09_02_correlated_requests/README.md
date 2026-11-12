@@ -17,7 +17,7 @@ Read [the parent Agent](correlated_requests.ex), then read the shared
 ## Run it
 
 ```sh
-mix test test/examples/09_multi_agent/09_02_correlated_requests --include example --seed 0
+mix test.examples examples/09_multi_agent/09_02_correlated_requests
 ```
 
 Expected result: the request commits as waiting, the child returns twice the
@@ -36,7 +36,7 @@ policy, or durable request ledger.
 ## Files
 
 - [Source](correlated_requests.ex)
-- [Tests](../../../test/examples/09_multi_agent/09_02_correlated_requests/correlated_requests_test.exs)
+- [Tests](correlated_requests_test.exs)
 - [Worker Agent](../support/worker.ex)
 - [Keep State Action](../../08_runtime/support/keep_state.ex)
 

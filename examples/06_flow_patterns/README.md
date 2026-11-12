@@ -12,5 +12,5 @@ audit contract.
 Run the supported group with:
 
 ```sh
-mix test.examples test/examples/06_flow_patterns
+mix test.examples examples/06_flow_patterns
 ```

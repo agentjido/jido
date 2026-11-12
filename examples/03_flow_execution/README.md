@@ -27,5 +27,5 @@ The last two lessons are advanced escape hatches. Normal application code uses
 Run the chapter with:
 
 ```sh
-mix test.examples test/examples/03_flow_execution
+mix test.examples examples/03_flow_execution
 ```

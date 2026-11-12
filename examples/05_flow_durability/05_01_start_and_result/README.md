@@ -8,3 +8,5 @@ cannot select or replace that adapter.
 The completed status contains a portable reference. Pass this reference to
 `Jido.Durable.status/2` or `Jido.Durable.result/2`. The result has the same
 shape as `Jido.Exec.run/4`.
+
+See [the ExUnit proof](start_and_result_test.exs).

@@ -16,7 +16,7 @@ Read [the Agent](approval_workflow.ex), then [the search Flow](search_flow.ex),
 [the booking Actions](booking_actions.ex), and
 [the booking Plugin](booking_plugin.ex). Read [the ports](ports.ex) before the
 [local adapters](support/adapters.ex). Finish with
-[the behavior tests](../../../test/examples/12_plugin_applications/12_04_approval_workflow/approval_workflow_test.exs).
+[the behavior tests](approval_workflow_test.exs).
 
 For a guided run, open [the Livebook](approval_workflow.livemd). It includes a
 Mermaid sequence diagram and uses the same source modules and local adapters.
@@ -24,7 +24,7 @@ Mermaid sequence diagram and uses the same source modules and local adapters.
 ## Run it
 
 ```sh
-mix test test/examples/12_plugin_applications/12_04_approval_workflow --include example --seed 0
+mix test.examples examples/12_plugin_applications/12_04_approval_workflow
 ```
 
 Expected result: a booking succeeds or fails in a later Turn, stale selection
@@ -55,6 +55,6 @@ provide durable delivery, provider retry, or recovery after process loss.
 - [Ports](ports.ex)
 - [Local support adapters](support/adapters.ex)
 - [Guided Livebook](approval_workflow.livemd)
-- [Tests](../../../test/examples/12_plugin_applications/12_04_approval_workflow/approval_workflow_test.exs)
+- [Tests](approval_workflow_test.exs)
 
 Previous: [Inbox](../12_03_inbox/README.md) | Next: [Purpose Loop](../12_05_purpose_loop/README.md)

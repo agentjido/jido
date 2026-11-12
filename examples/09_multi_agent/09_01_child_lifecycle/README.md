@@ -17,7 +17,7 @@ Read [the parent Agent](child_lifecycle.ex), then read the shared
 ## Run it
 
 ```sh
-mix test test/examples/09_multi_agent/09_01_child_lifecycle --include example --seed 0
+mix test.examples examples/09_multi_agent/09_01_child_lifecycle
 ```
 
 Expected result: the parent creates one child per tag, preserves committed child
@@ -35,7 +35,7 @@ This example does not implement a worker queue or capacity policy.
 ## Files
 
 - [Source](child_lifecycle.ex)
-- [Tests](../../../test/examples/09_multi_agent/09_01_child_lifecycle/child_lifecycle_test.exs)
+- [Tests](child_lifecycle_test.exs)
 - [Worker Agent](../support/worker.ex)
 - [Keep State Action](../../08_runtime/support/keep_state.ex)
 

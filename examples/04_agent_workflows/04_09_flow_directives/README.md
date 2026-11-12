@@ -18,7 +18,7 @@ Plugin](effects.ex), and finish with the behavior test.
 ## Run it
 
 ```sh
-mix test test/examples/04_agent_workflows/04_09_flow_directives --include example --seed 0
+mix test.examples examples/04_agent_workflows/04_09_flow_directives
 ```
 
 Expected result: direct execution returns `first`, `side`, and `final` in order.
@@ -40,7 +40,7 @@ dependency, and executor mechanics belong to `jido_action` tests.
 
 - [Agent and Flows](flow_directives.ex)
 - [Recording Plugin](effects.ex)
-- [Tests](../../../test/examples/04_agent_workflows/04_09_flow_directives/flow_directives_test.exs)
+- [Tests](flow_directives_test.exs)
 
 Previous: [Executable Continuation](../04_08_executable_continuation/README.md) |
 Next: [Flow Durability](../../05_flow_durability/README.md)

@@ -15,7 +15,7 @@ Read [the router Agent](route_selection.ex), then read its behavior test.
 ## Run it
 
 ```sh
-mix test test/examples/01_agent_basics/01_03_route_selection --include example --seed 0
+mix test.examples examples/01_agent_basics/01_03_route_selection
 ```
 
 Expected result: `order.create` uses the first, exact route. Another order
@@ -43,7 +43,7 @@ route table as the command boundary.
 ## Files
 
 - [Source](route_selection.ex)
-- [Tests](../../../test/examples/01_agent_basics/01_03_route_selection/route_selection_test.exs)
+- [Tests](route_selection_test.exs)
 
 Forward and transform routes are shown in
 [Direct Connections](../../10_topologies/10_02_direct_connections/README.md).

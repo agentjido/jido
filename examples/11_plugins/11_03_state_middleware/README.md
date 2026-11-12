@@ -14,12 +14,12 @@ reduces only its owned audit field.
 ## Read the code
 
 Read [the Directive, Plugin, and Agent](state_middleware.ex), then read the
-[behavior tests](../../../test/examples/11_plugins/11_03_state_middleware/state_middleware_test.exs).
+[behavior tests](state_middleware_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/11_plugins/11_03_state_middleware --include example --seed 0
+mix test.examples examples/11_plugins/11_03_state_middleware
 ```
 
 Expected result: the Action changes `count`. The Plugin records the count before and after the
@@ -40,6 +40,6 @@ does not export or persist an audit history.
 ## Files
 
 - [Directive, Plugin, and Agent](state_middleware.ex)
-- [Tests](../../../test/examples/11_plugins/11_03_state_middleware/state_middleware_test.exs)
+- [Tests](state_middleware_test.exs)
 
 Previous: [Runtime Admission](../11_02_runtime_admission/README.md) | Next: [Plugin DSL](../11_04_plugin_dsl/README.md)

@@ -52,6 +52,7 @@ defmodule Jido.MixProject do
         "test.contracts": :test,
         "test.examples": :test,
         "test.fuzz": :test,
+        "test.integration": :test,
         "test.live": :test,
         "test.load": :test,
         "test.peer": :test,
@@ -418,11 +419,12 @@ defmodule Jido.MixProject do
       "test.bench": test_alias("test/perf", :bench),
       "test.ci": &run_test_ci/1,
       "test.contracts": "covenant.check",
-      "test.examples": test_alias("test/examples", :example),
+      "test.examples": test_alias("examples", :integration),
       "test.fuzz": fn args ->
         run_tagged_tests("test/property", :fuzz, args)
         check_property_report!(args, :fuzz)
       end,
+      "test.integration": test_alias(["test", "examples"], :integration),
       "test.live": test_alias("test/external/jido_ai", :live),
       "test.load": test_alias("test/perf", :load),
       "test.peer": test_alias("test", :peer),
@@ -434,19 +436,19 @@ defmodule Jido.MixProject do
     ]
   end
 
-  defp test_alias(default_path, tag) do
-    fn args -> run_tagged_tests(default_path, tag, args) end
+  defp test_alias(default_paths, tag) do
+    fn args -> run_tagged_tests(default_paths, tag, args) end
   end
 
-  defp run_tagged_tests(default_path, tag, args) do
+  defp run_tagged_tests(default_paths, tag, args) do
     explicit_path? = Enum.any?(args, &test_path?/1)
-    default_path? = File.exists?(default_path)
+    existing_paths = default_paths |> List.wrap() |> Enum.filter(&File.exists?/1)
 
-    if default_path? or explicit_path? do
-      paths = if default_path? and not explicit_path?, do: [default_path], else: []
+    if existing_paths != [] or explicit_path? do
+      paths = if explicit_path?, do: [], else: existing_paths
       Mix.Task.run("test", ["--only", Atom.to_string(tag), "--seed", "0"] ++ paths ++ args)
     else
-      Mix.shell().info("No #{tag} tests found under #{default_path}")
+      Mix.shell().info("No #{tag} tests found under #{Enum.join(List.wrap(default_paths), ", ")}")
     end
   end
 
@@ -455,7 +457,7 @@ defmodule Jido.MixProject do
       ["test", "--seed", "0"],
       ["test.authoring"],
       ["test.contracts"],
-      ["test.examples"],
+      ["test.integration"],
       ["test.property"],
       ["test.fuzz"],
       ["test.load"],
@@ -494,7 +496,9 @@ defmodule Jido.MixProject do
       ~r/^test\/consumers\//,
       ~r/^test\/contracts\//,
       ~r/^test\/authoring\/support\//,
-      ~r/^test\/examples\/support\//,
+      fn path ->
+        String.starts_with?(path, "examples/") and not String.ends_with?(path, "_test.exs")
+      end,
       ~r{^test/perf/(?:jido_ai/(?:react_fresh_workflow|react_memory|react_state_growth|react_stress|react_support)|jido_exec/flow_run|jido_flow/(?:dsl_compile|flow_compile)|jido_signal/run)\.exs$},
       ~r{^test/perf/(?:jido_signal/support|support)/},
       ~r{^test/property/(?:support|[^/]+/support)/},

@@ -7,3 +7,5 @@ and continues the Flow.
 
 Confirmed authored component boundaries do not repeat. Work inside one
 unfinished composite component can repeat after recovery.
+
+See [the ExUnit proof](restart_recovery_test.exs).

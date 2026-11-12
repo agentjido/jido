@@ -11,12 +11,12 @@ Map processes a collection while Reduce builds one ordered Agent result.
 ## Read the code
 
 Read [the Agent and two Flows](ordered_batch.ex) first. Then read
-[the behavior tests](../../../test/examples/04_agent_workflows/04_05_ordered_batch/ordered_batch_test.exs).
+[the behavior tests](ordered_batch_test.exs).
 
 ## Run it
 
 ```sh
-mix test test/examples/04_agent_workflows/04_05_ordered_batch --include example --seed 0
+mix test.examples examples/04_agent_workflows/04_05_ordered_batch
 ```
 
 Expected result: results keep source order, collected errors keep their
@@ -36,6 +36,6 @@ belong to Jido Flow core tests.
 ## Files
 
 - [Source](ordered_batch.ex)
-- [Tests](../../../test/examples/04_agent_workflows/04_05_ordered_batch/ordered_batch_test.exs)
+- [Tests](ordered_batch_test.exs)
 
 Previous: [Parallel Join](../04_04_parallel_join/README.md) | Next: [Bounded Iteration](../04_06_bounded_iteration/README.md)

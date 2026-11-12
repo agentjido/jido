@@ -17,7 +17,7 @@ behavior tests.
 ## Run it
 
 ```sh
-mix test test/examples/08_runtime/08_13_stable_reference --include example --seed 0
+mix test.examples examples/08_runtime/08_13_stable_reference
 ```
 
 Expected result: calls reach the correct conversation before and after process
@@ -43,7 +43,7 @@ ownership, routing, or fencing.
 ## Files
 
 - [Source](stable_reference.ex)
-- [Tests](../../../test/examples/08_runtime/08_13_stable_reference/stable_reference_test.exs)
+- [Tests](stable_reference_test.exs)
 
 Previous: [Definition Changes and Diff](../08_12_definition_changes/README.md) |
 Next: [State Migration](../08_14_state_migration/README.md)

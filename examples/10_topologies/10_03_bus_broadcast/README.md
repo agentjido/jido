@@ -15,7 +15,7 @@ Read the root Agent and its connections, then the Cell Agent and tests.
 ## Run it
 
 ```sh
-mix test test/examples/10_topologies/10_03_bus_broadcast --include example --seed 0
+mix test.examples examples/10_topologies/10_03_bus_broadcast
 ```
 
 Expected result: One root command commits and emits a work Signal. Each of the three members
@@ -41,7 +41,7 @@ small behavior example, not a 1,000-worker capacity test.
 
 - [Source](swarm.ex)
 - [Cell Agent](../support/cell.ex)
-- [Tests](../../../test/examples/10_topologies/10_03_bus_broadcast/bus_swarm_test.exs)
+- [Tests](bus_swarm_test.exs)
 - [Test runtime assertions](../../../test/support/agent_topology_assertions.ex)
 
 This is also the fixed-group lesson: the Agent declares stable worker roles

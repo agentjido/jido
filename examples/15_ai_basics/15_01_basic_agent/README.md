@@ -3,12 +3,12 @@
 Select ReAct, a direct model name, and instructions in the `ai` block. The
 Agent definition stores these values as typed reasoning defaults.
 
-The [tests](../../../test/examples/15_ai_basics/15_01_basic_agent/basic_agent_test.exs)
+The [tests](basic_agent_test.exs)
 inspect the definition and run one complete offline request. They check the
 correlated reply and committed Session state.
 
 ```sh
-mix test.examples test/examples/15_ai_basics/15_01_basic_agent --warnings-as-errors
+mix test.examples examples/15_ai_basics/15_01_basic_agent --warnings-as-errors
 ```
 
 Previous: [Durable Agents](../../14_durable_agents/README.md) |

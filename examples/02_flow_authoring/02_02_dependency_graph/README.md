@@ -6,3 +6,5 @@ dependency. The expected graph has independent `load` and `audit` roots,
 
 Read [`dependency_graph.ex`](dependency_graph.ex) and run its paired offline
 test.
+
+See [the ExUnit proof](dependency_graph_test.exs).

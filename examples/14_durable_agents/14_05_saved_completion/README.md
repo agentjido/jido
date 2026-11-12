@@ -21,7 +21,7 @@ with a count of one. Execution hooks confirm that completed work did not repeat.
 A later request starts a new Turn and increases the count to two.
 
 The barrier adapter and execution counter are
-[test support](../../../test/examples/support/durable_completion_probe.exs), not
+[test support](../support/durable_completion_probe.exs), not
 application code. Storage uses the existing File adapter.
 
 ## Limits
@@ -32,7 +32,7 @@ request deduplication, caller reply replay, or replay of post-commit effects.
 ## Run it
 
 ```sh
-mix test test/examples/14_durable_agents/14_05_saved_completion --include example --seed 0 --warnings-as-errors
+mix test.examples examples/14_durable_agents/14_05_saved_completion --warnings-as-errors
 ```
 
 Expected result: the success, recovery, and rejection assertions pass. Tests stop
@@ -41,6 +41,6 @@ the Agents and release all held test calls. No external service is required.
 ## Files
 
 - [Source](saved_completion.ex)
-- [Tests](../../../test/examples/14_durable_agents/14_05_saved_completion/saved_completion_test.exs)
+- [Tests](saved_completion_test.exs)
 
 Previous: [Accepted Work](../14_04_accepted_work/README.md) | Next: [Durable Wait](../14_06_durable_wait/README.md)

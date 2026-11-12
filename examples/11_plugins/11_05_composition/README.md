@@ -12,14 +12,14 @@ One Agent combines a pure tenant input with a live authorization input.
 ## Read the code
 
 Read [the composed Agent](composition.ex), then read the
-[behavior tests](../../../test/examples/11_plugins/11_05_composition/composition_test.exs).
+[behavior tests](composition_test.exs).
 Read [the local input Plugins](inputs.ex) next. These small local copies keep
 both inputs visible in this lesson. Their contracts match the earlier lessons.
 
 ## Run it
 
 ```sh
-mix test test/examples/11_plugins/11_05_composition --include example --seed 0
+mix test.examples examples/11_plugins/11_05_composition
 ```
 
 Expected result: a valid tenant and live token commit one owner value. A
@@ -39,6 +39,6 @@ language or allow one Plugin to change another Plugin's input.
 ## Files
 
 - [Composed Agent](composition.ex)
-- [Tests](../../../test/examples/11_plugins/11_05_composition/composition_test.exs)
+- [Tests](composition_test.exs)
 
 Previous: [Plugin DSL](../11_04_plugin_dsl/README.md) | Next: [Live Plugin Changes](../11_06_live_plugin_changes/README.md)

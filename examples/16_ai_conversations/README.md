@@ -9,5 +9,5 @@ These lessons use the portable `Jido.Session` and its one `Jido.Thread`.
 5. [Request modes](16_05_request_modes/README.md)
 
 ```sh
-mix test.examples test/examples/16_ai_conversations --warnings-as-errors
+mix test.examples examples/16_ai_conversations --warnings-as-errors
 ```
