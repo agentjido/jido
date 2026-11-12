@@ -87,7 +87,7 @@ defmodule Jido.Codec.Issue do
     case json_key_names(Map.keys(value)) do
       {:ok, names} ->
         length(names) == MapSet.size(MapSet.new(names)) and
-          Enum.all?(Map.values(value), &unique_json_keys?/1)
+          Enum.all?(value, fn {_key, item} -> unique_json_keys?(item) end)
 
       :error ->
         false

@@ -266,7 +266,7 @@ defmodule Jido.Codec.Value do
     do: error(:map_key, "codec data contains an unsupported map key", path)
 
   defp validate_keys(value, path) do
-    if Enum.all?(Map.keys(value), &valid_key?/1),
+    if Enum.all?(value, fn {key, _value} -> valid_key?(key) end),
       do: :ok,
       else: error(:map_key, "codec data contains an unsupported map key", path)
   end

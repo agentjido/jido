@@ -368,6 +368,7 @@ defmodule Jido.MixProject do
 
       # Development and test tools
       {:covenant, "~> 0.2.0", only: [:dev, :test], runtime: false},
+      {:credence, "~> 0.8.1", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_dna, "~> 1.5", only: [:dev, :test], runtime: false},

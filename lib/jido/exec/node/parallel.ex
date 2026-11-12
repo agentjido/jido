@@ -116,7 +116,7 @@ defmodule Jido.Exec.Node.Parallel do
   defp concurrent_map(items, runtime, fun) do
     max_concurrency = Map.get(runtime, :__jido_exec_max_concurrency__, 1)
 
-    if max_concurrency > 1 and length(items) > 1 do
+    if max_concurrency > 1 and match?([_, _ | _], items) do
       items
       |> Task.async_stream(fun,
         ordered: true,

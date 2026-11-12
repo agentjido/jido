@@ -139,10 +139,10 @@ defmodule Jido.Agent.DSL.RouteMacros do
     states = for {:state, _, _} = state <- mappings, do: state
     replies = for {:reply, _, _} = reply <- mappings, do: reply
 
-    if length(states) > 1,
+    if match?([_, _ | _], states),
       do: error!(caller, "An Action or Flow route accepts at most one state declaration")
 
-    if length(replies) > 1,
+    if match?([_, _ | _], replies),
       do: error!(caller, "An Action or Flow route accepts at most one reply declaration")
 
     state = if states == [], do: default_state(), else: parse_state(hd(states), caller)

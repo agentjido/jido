@@ -476,7 +476,7 @@ defmodule Jido.AgentServer.Topology do
         {:error, :self_adoption}
 
       true ->
-        case ancestor?(context.activation, root, []) do
+        case ancestor_result(context.activation, root, []) do
           true -> {:error, :cyclic_parent}
           false -> :ok
           error -> error
@@ -486,10 +486,10 @@ defmodule Jido.AgentServer.Topology do
     :exit, _ -> {:error, :child_unavailable}
   end
 
-  @spec ancestor?(pid(), pid(), [pid()]) :: boolean() | {:error, atom()}
-  defp ancestor?(root, root, _visited), do: true
+  @spec ancestor_result(pid(), pid(), [pid()]) :: boolean() | {:error, atom()}
+  defp ancestor_result(root, root, _visited), do: true
 
-  defp ancestor?(current, root, visited) do
+  defp ancestor_result(current, root, visited) do
     if current in visited do
       true
     else
@@ -497,7 +497,7 @@ defmodule Jido.AgentServer.Topology do
 
       case :gen_statem.call(worker, :parent) do
         nil -> false
-        parent -> ancestor?(parent.activation, root, [current | visited])
+        parent -> ancestor_result(parent.activation, root, [current | visited])
       end
     end
   catch

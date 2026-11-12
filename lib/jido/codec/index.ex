@@ -79,7 +79,9 @@ defmodule Jido.Codec.Index do
     duplicate =
       values
       |> Enum.group_by(key)
-      |> Enum.find_value(fn {entry_key, grouped} -> if length(grouped) > 1, do: entry_key end)
+      |> Enum.find_value(fn {entry_key, grouped} ->
+        if match?([_, _ | _], grouped), do: entry_key
+      end)
 
     if duplicate, do: {:error, {tag, duplicate}}, else: :ok
   end

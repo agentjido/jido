@@ -1075,17 +1075,15 @@ defmodule Jido.AgentServer do
   defp monitor_children(nil), do: %{}
 
   defp monitor_children(state) do
-    Map.new(
-      Enum.map(ServerSupervisor.records(state), fn {{:child, tag}, record} ->
-        {kind, pid} =
-          case record do
-            %{root: root} -> {:root, root}
-            %{caller: caller} -> {:reservation, caller}
-          end
+    Map.new(ServerSupervisor.records(state), fn {{:child, tag}, record} ->
+      {kind, pid} =
+        case record do
+          %{root: root} -> {:root, root}
+          %{caller: caller} -> {:reservation, caller}
+        end
 
-        {Process.monitor(pid), {kind, tag, record.token}}
-      end)
-    )
+      {Process.monitor(pid), {kind, tag, record.token}}
+    end)
   end
 
   @impl true

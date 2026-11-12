@@ -47,7 +47,11 @@ defmodule Jido.Exec.Node.Output do
   @spec run(t(), term(), Context.t()) :: Result.t()
   def run(%__MODULE__{} = node, input, %Context{} = context) do
     bindings = Fact.unwrap(input)
-    handoff? = bindings |> Map.get(:controls, %{}) |> Map.values() |> Enum.any?(&(&1 == :handoff))
+
+    handoff? =
+      bindings
+      |> Map.get(:controls, %{})
+      |> Enum.any?(fn {_key, control} -> control == :handoff end)
 
     with {:ok, output} <-
            ValueResolver.resolve(

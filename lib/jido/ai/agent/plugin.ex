@@ -69,11 +69,11 @@ defmodule Jido.AI.Agent.Plugin do
       compile_error!(caller, caller.line, "An Agent can define only one ai block")
     end
 
-    if length(reasoning) != 1 do
+    if not match?([_], reasoning) do
       compile_error!(caller, caller.line, "ai requires exactly one reasoning declaration")
     end
 
-    if length(tools) > 1 do
+    if match?([_, _ | _], tools) do
       compile_error!(caller, caller.line, "An Agent can define at most one tools block")
     end
 
@@ -120,7 +120,7 @@ defmodule Jido.AI.Agent.Plugin do
       config != %{} ->
         normalize(config)
 
-      length(reasonings) != 1 ->
+      not match?([_], reasonings) ->
         Error.validation_result(:reasoning_count, [:ai], "AI Agent requires exactly one reasoning Flow")
 
       true ->

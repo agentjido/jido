@@ -59,7 +59,7 @@ defmodule Jido.Expr.Limits do
 
   @doc false
   @spec type(term()) :: atom()
-  def type(value) when is_nil(value), do: nil
+  def type(nil), do: nil
   def type(value) when is_boolean(value), do: :boolean
   def type(value) when is_integer(value), do: :integer
   def type(value) when is_float(value), do: :float

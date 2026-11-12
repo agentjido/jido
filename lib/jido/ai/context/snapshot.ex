@@ -296,8 +296,11 @@ defmodule Jido.AI.Context.Snapshot do
     %{
       message_count: length(context.messages),
       tool_count: length(context.tools),
-      content_part_count: Enum.sum(Enum.map(context.messages, &length(&1.content || []))),
-      content_bytes: Enum.sum(Enum.map(context.messages, &content_bytes/1)),
+      content_part_count:
+        Enum.reduce(context.messages, 0, fn message, total ->
+          total + length(message.content || [])
+        end),
+      content_bytes: Enum.reduce(context.messages, 0, fn message, total -> total + content_bytes(message) end),
       roles: context.messages |> Enum.map(& &1.role) |> Enum.frequencies(),
       reasoning_message_count: Enum.count(context.messages, fn message -> (message.reasoning_details || []) != [] end)
     }
