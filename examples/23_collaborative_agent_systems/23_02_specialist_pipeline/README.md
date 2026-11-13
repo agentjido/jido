@@ -36,8 +36,10 @@ serialization, or post-commit effects.
 ## Core Fit and Gaps
 
 Pure Agent execution and correlated reply Signals compose cleanly for a local
-specialist pipeline. The example does not need a role or task orchestration
-API.
+specialist pipeline. A reply selector does not disable default state mapping,
+so each route selects both its complete candidate state and its reply. The
+[route guide](../../../guides/agents/build-agent-routes.livemd#select-state-and-a-reply)
+states this rule. The example does not need a role or task orchestration API.
 
 ## Files
 

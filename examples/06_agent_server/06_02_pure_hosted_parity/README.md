@@ -37,7 +37,8 @@ The route, state selector, reply selector, validation, and Agent evaluation
 contracts are identical in both modes. Hosted execution adds commit and effect
 work without changing the domain result. A route that selects nested output
 must declare those fields in the target Action output schema so the Agent
-compiler can validate each path.
+compiler can validate each path. The [route guide](../../../guides/agents/build-agent-routes.livemd#select-state-and-a-reply)
+shows the compile-time rule beside the first selectors.
 
 - Logical owner: the Agent value in pure mode and the stable Agent identity in
   hosted mode.

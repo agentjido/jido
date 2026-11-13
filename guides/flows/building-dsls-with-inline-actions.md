@@ -21,6 +21,13 @@ Each declaration has a typed path that identifies it within the owner. The path 
 
 In callback mode, the body receives the Action's validated parameters directly, with no source mapping. This host declares invoice rules:
 
+Define and import both declaration arities. A declaration with only a pattern
+and a `do` block calls `rule/3`; its third argument contains `do:`. A
+declaration with explicit keyword options before the `do` block calls
+`rule/4`. The four-argument macro must join `options` and `body` before it calls
+`parse_callback!/3`. If the host defines only `rule/3`, the form with options
+fails compilation with `undefined function rule/4`.
+
 ```elixir
 defmodule InvoiceRules do
   alias Jido.Action.Inline

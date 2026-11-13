@@ -35,7 +35,8 @@ declaration identity, not a code version.
 The generated target uses normal Action validation and execution. A host must
 still define both the three-argument declaration macro and the four-argument
 form used by a declaration with a `do` block. This is public extension code,
-but the required macro shape is easy to miss.
+not a core gap. The [inline host guide](../../../guides/flows/building-dsls-with-inline-actions.md#build-a-callback-host)
+shows both arities and explains how Elixir selects them.
 
 ## Files
 

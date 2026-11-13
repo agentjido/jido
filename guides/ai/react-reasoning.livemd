@@ -305,7 +305,13 @@ signals = collect.(collect, [])
 
 The output is `"Shipping costs 900 cents."`. The Signals in order are `jido.ai.model.stream.started` with sequence 0, `jido.ai.model.stream.chunk` with sequence 1, and `jido.ai.model.stream.completed` with sequence 2. A failed stream ends with `jido.ai.model.stream.failed`. Each Signal also has the Session, Thread, request, run, model, and stream IDs.
 
-Without a `:jido_ai_dispatch` value, the Flow still streams and emits no Signals. A dispatch value with a PID is not portable, so a durable Turn ends with a `Jido.Error.ValidationError` that names the context key. Use a named process or another portable target there.
+Without a `:jido_ai_dispatch` value, the Flow still streams and emits no
+Signals. A dispatch value with a PID is not portable, so a durable Turn ends
+with a `Jido.Error.ValidationError` that names the context key. For a hosted
+web client, subscribe the client to a topic and use the portable `:pubsub`
+dispatch target. Use PID dispatch only for pure or transient local runs. See
+[Dispatch Adapters](../signals/dispatch-adapters.md#phoenix-pubsub) and the
+[Phoenix LiveView chat example](../../examples/24_application_patterns/24_06_phoenix_liveview_chat/README.md).
 
 ## Next steps
 

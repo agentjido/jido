@@ -162,10 +162,17 @@ A failure returns `{:error, %{reason: reason, resumable?: boolean}}`. The Agent 
 | `:activation_required` | `true` | Unchanged. The server is a bare worker. | Start the Agent through an instance. |
 | `:quiesce_timeout` | `true` | Admission stays closed until the server settles. | Call `Jido.AgentServer.resume/2` after that, or hibernate again. |
 | A known store rejection | `true` | Admission returns to its earlier mode. | Fix the store and retry. |
-| `:conflict` | `false` | Admission is `:blocked`. | Stop the Agent and thaw it. |
-| `:indeterminate` or `{:indeterminate, detail}` | `false` | Admission is `:blocked`. | Stop the Agent and thaw it. |
+| `:conflict` | `false` | Admission is `:blocked`. | Reconcile the stable Address from the authoritative record. |
+| `:indeterminate` or `{:indeterminate, detail}` | `false` | Admission is `:blocked`. | Reconcile the stable Address from the authoritative record. |
 
-`:blocked` protects you from a split outcome. After an uncertain save, the store may hold a newer value than the live Agent, or the same value. New Turns get `:quiesced`, `Jido.AgentServer.resume/2` returns `{:error, :unsafe_resume}`, and a worker restart keeps the block. Reads still work. `Jido.AgentServer.stop/3` and a new `thaw` load whatever the store holds.
+`:blocked` protects you from a split outcome. After an uncertain save, the
+store may hold a newer value than the live Agent, or the same value. New Turns
+get `:quiesced`, `Jido.AgentServer.resume/2` and a direct stop return
+`{:error, :unsafe_resume}`, and a worker restart keeps the block. Reads still
+work. Resolve the stable Address, call `Jido.reconcile_agent/3`, verify the
+replacement activation, and then stop it if cleanup is required.
+Reconciliation terminates the faulted activation and restores a replacement
+from the authoritative record.
 
 Control problems keep the plain form: `{:error, :reentrant_turn}`, `{:error, :not_ready}`, `{:error, :control_in_progress}`, and `{:error, :unsafe_resume}`.
 

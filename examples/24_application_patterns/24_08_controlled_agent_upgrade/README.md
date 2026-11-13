@@ -48,7 +48,9 @@ Public quiesce, stable Addresses, persistence snapshots, migration Actions,
 and `Jido.upgrade_agent/4` provide the complete control path. Upgrade failure
 and rollback are explicit and tested. The first implementation attempt changed
 the origin module. Jido rejected it with `:upgrade_identity`; the working path
-keeps the origin and replaces the saved definition data.
+keeps the origin and replaces the saved definition data. The
+[upgrade guide](../../../guides/durability/checkpoints-and-data-upgrades.md#write-an-upgrade-action)
+now states the stable-origin rule and the forward-rollback version rule.
 
 - Logical owner: stable account Agent Address.
 - Process owner: current AgentServer activation.

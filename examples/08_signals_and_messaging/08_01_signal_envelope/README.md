@@ -32,8 +32,10 @@ Serialization does not deliver the Signal or authorize its source.
 
 The custom Signal and codec compose when the data schema returns JSON values.
 An atom-keyed Joi object returns an Elixir map that the JSON codec rejects.
-The public catalog guide states the string-key rule, but it is easy to miss
-when a developer moves from normal Action schemas to wire Signal schemas.
+The [Signal data schema guide](../../../guides/signals/signal-data-schemas.md#use-string-keys-for-json-data)
+shows the failing atom-key form beside the correct string-key form. Action
+schemas commonly use atom keys, but a Signal that crosses a JSON boundary must
+use string keys and JSON values.
 
 ## Files
 

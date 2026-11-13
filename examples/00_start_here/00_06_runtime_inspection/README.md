@@ -58,7 +58,8 @@ The first implementation used an in-memory AgentServer and returned
 stable namespace. Configuring both public contracts fixes the behavior. This
 is a documentation and learning-order friction point: the first-hour path
 needs namespace and persistence concepts before their later chapters. It is
-not a missing SDK operation.
+not a missing SDK operation. The [Flow Waits guide](../../../guides/flow-runtime/flow-waits.md#know-where-waits-can-run)
+now states both setup requirements at the first wait boundary.
 
 ## Files
 

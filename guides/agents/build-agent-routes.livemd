@@ -173,6 +173,16 @@ By default, the complete output of an Action or Flow becomes the next state. Two
 
 `output()` selects the whole output. `output(:field)` or `output([:field, :nested])` selects a path.
 
+Every selected path must exist in the Action or Flow `output_schema`. The
+default broad output schema does not declare named fields. If a route selects
+an undeclared field, Agent compilation fails with `:unsupported_output_path`
+and reports the missing path.
+
+A `reply` declaration does not change the default state mapping. Without a
+`state` declaration, Jido still treats the complete handler output as the next
+Agent state. A reply-only route must also use `state :unchanged` or select a
+complete candidate state with `state from: output(...)`.
+
 ```elixir
 {:ok, priced, [%Jido.Agent.Directive.Reply{signal: reply}]} =
   RoutesGuide.OrderAgent.cmd(order, RoutesGuide.OrderAgent.price_signal!(%{quantity: 4}))

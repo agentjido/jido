@@ -15,6 +15,11 @@ A durable Agent Turn or `Jido.Durable` run can host a wait. Both need a persiste
 | `Jido.AgentServer` without persistence | `{:error, error}` with `details.reason: :unsupported_host` |
 | `Jido.Exec.run/4`, direct `Runic.Runner` | No wait host; execution returns an unsupported-host error |
 
+Persistence also requires a stable Jido instance namespace. Configure both
+`namespace:` and `persistence:` on the instance before you start an Agent that
+can wait. Adding only a persistence adapter fails startup with `persistence
+requires a Jido instance with a stable namespace`.
+
 An Action can check for this support with `Jido.Exec.supports?/2`. Callers cannot claim it by passing it in context, because Jido drops the reserved keys.
 
 ## Declare a wait

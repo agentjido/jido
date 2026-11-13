@@ -50,7 +50,9 @@ The public AI Agent, ReAct, tool, and Session contracts compose without a
 private runtime API. The old runner called `ExpandNext.run/2` directly and
 failed after its input contract changed. The replacement uses Agent preflight
 and leaves the full tool round to `Agent.cmd/3`. This is application-code and
-documentation friction, not a missing SDK operation.
+documentation friction, not a missing SDK operation. The
+[graph-first AI guide](../../../guides/ai/graph-first-ai-agents.livemd)
+now states which inspection and execution paths are public.
 
 ## Files
 

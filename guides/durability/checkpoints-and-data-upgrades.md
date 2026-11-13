@@ -142,6 +142,12 @@ An upgrade Action is an ordinary Action with a fixed contract. It receives `%{sn
 - A target that is a Flow.
 - A next snapshot that fails restore, for example state that does not match the new schema.
 
+The origin module is a stable identity and callback boundary. A newer compiled
+Agent module can supply the trusted definition template, but the upgrade
+Action must copy that definition data onto the saved Agent and preserve the
+saved `module` field. Jido rejects a replacement origin with
+`:upgrade_identity`.
+
 Build the next snapshot from the saved Agent and the current definition. Calling `Jido.Persistence.snapshot/2` on the new Agent records the fingerprints of the new code.
 
 ```elixir
@@ -191,6 +197,15 @@ alias UpgradesGuide.{AddCurrency, Invoice}
 The restored Agent ran the new Action, which added 100 cents and a 10-cent tax line.
 
 A failed read, Action, or validation does not change the stored bytes. A concurrent writer causes `{:error, :conflict}`. The Action context holds your `:context` option plus `:instance`, `:namespace`, `:partition`, `:revision`, and `reason: :stored_upgrade`, so one Action can log or branch on the record it changes.
+
+## Roll back with a forward version
+
+Definition versions are monotonic. Jido rejects an upgrade whose replacement
+version is not greater than the saved version with
+`:definition_version_not_advanced`. To restore earlier behavior after version
+2, publish version 3 with the earlier routes and state shape, then migrate the
+version 2 state into that shape. This is a forward rollback: behavior goes
+back, but the definition history continues from version 2 to version 3.
 
 ## Settle Turns before you deploy
 

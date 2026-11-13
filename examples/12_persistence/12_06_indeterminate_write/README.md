@@ -39,7 +39,9 @@ The example does not prescribe automatic restart, a shutdown reason, or cross-no
 The public store behavior, uncertain `TurnResult`, operational status, and
 stable Address recovery operations expose the boundary without private runtime
 access. An application must reconcile before it can stop this activation
-safely. Jido does not guess whether an indeterminate remote write won.
+safely. Jido does not guess whether an indeterminate remote write won. The
+[hibernate and activation guide](../../../guides/agent-servers/hibernate-thaw-and-activate.md#handle-a-failed-hibernation)
+now gives reconcile-before-stop as the standard operator response.
 
 ## Files
 

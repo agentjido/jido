@@ -68,7 +68,10 @@ Stable Agent Addresses, durable Session state, normal `jido.ai.request`
 Signals, portable dispatch targets, and public Session projection compose into
 a Phoenix application without a Phoenix-specific Jido API. The first attempt
 used PID dispatch and produced a clear `:non_portable_term` failure. The public
-`:pubsub` adapter is the correct durable boundary.
+`:pubsub` adapter is the correct durable boundary. The
+[ReAct streaming guide](../../../guides/ai/react-reasoning.livemd#stream-the-answer)
+now recommends PubSub for hosted web clients and limits PID dispatch to pure or
+transient local runs.
 
 - Logical owner: conversation Agent Address.
 - Process owner: current AgentServer activation; LiveView owns only its socket.
