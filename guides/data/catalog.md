@@ -82,9 +82,21 @@ catalog = Jido.Catalog.from_targets!(MyApp.Values, :my_app, %{
 Jido.Codec.decode(document, catalog: catalog, codec: MyApp.DocumentCodec)
 ```
 
-An explicit codec also avoids the published routing index. An explicit Catalog
-alone does not replace that index when automatic document routing needs it.
-Tests do not need to replace global application state.
+An explicit codec also avoids the published routing index. For a bundled Agent
+or Flow document, select that codec by its exact stored type and version:
+
+```elixir
+{:ok, codec} =
+  Jido.Catalog.Discovery.bundled_codec(document["type"], document["vsn"])
+
+Jido.Codec.decode(document, catalog: catalog, codec: codec)
+```
+
+The bundled selector reads no published state. It returns a structured Codec
+Issue for an unknown type or unsupported version. It does not authorize a
+Catalog entry. The caller owns the explicit Catalog and its trust policy.
+Application codecs still use an explicit codec module or the published codec
+index.
 
 `new/1` and `new!/1` accept Entries and Manifests. `get/3`, `get_by_target/2`,
 and `list/1` expose registrations for inspection and explicit construction.

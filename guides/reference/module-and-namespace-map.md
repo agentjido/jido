@@ -190,7 +190,7 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | Module | Purpose |
 | --- | --- |
 | `Jido.Catalog` | A passive registry of explicitly registered values. |
-| `Jido.Catalog.Discovery` | Builds and atomically publishes the application-wide Catalog. |
+| `Jido.Catalog.Discovery` | Builds and publishes the application Catalog, and selects bundled document codecs. |
 | `Jido.Catalog.Entry` | One stable definition in a Jido Catalog. |
 | `Jido.Catalog.Error` | An invalid Catalog reference or construction input. |
 | `Jido.Catalog.Manifest` | A validated static Catalog contribution from one OTP application. |

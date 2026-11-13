@@ -201,6 +201,26 @@ invoice = struct!(CodecGuide.Invoice, number: "INV-7", total_cents: 500)
 
 An unknown option raises `ArgumentError`. Without an explicit `:catalog`, the call reads the Catalog that Discovery publishes, and raises `Jido.Codec.Error.InternalError` until the first scan finishes. See [Catalog and Discovery](catalog.md).
 
+### Select a bundled reader without Discovery publication
+
+Jido ships exact readers for its Agent and Flow documents. An offline importer
+can select one by the stored type and version. It does not need the published
+Catalog or codec index.
+
+```elixir
+catalog = MyApp.trusted_catalog()
+
+{:ok, codec} =
+  Jido.Catalog.Discovery.bundled_codec(document["type"], document["vsn"])
+
+{:ok, value} = Jido.Codec.decode(document, catalog: catalog, codec: codec)
+```
+
+The selector returns `:unsupported_document` for an unknown type or an
+unsupported version. It does not select application codecs. It also does not
+authorize any reference in the document. The caller must supply a trusted
+Catalog that contains only the targets allowed for that document source.
+
 ## Read an older version
 
 A historical reader returns `nil` from `target/0` and implements only `decode/2`. It reads the old document into the current struct. The next write then produces the current version.

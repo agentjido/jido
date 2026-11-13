@@ -725,10 +725,12 @@ A passive registry of explicitly registered values.
 
 ### `Jido.Catalog.Discovery`
 
-Builds and atomically publishes the application-wide Catalog.
+Builds and atomically publishes the application-wide Catalog. It also selects
+bundled document codecs without published state.
 
 | Function | Summary |
 | --- | --- |
+| `Jido.Catalog.Discovery.bundled_codec/2` | Returns the bundled codec for one exact document type and version. |
 | `Jido.Catalog.Discovery.catalog/0` | Returns the current immutable application-wide Catalog. |
 | `Jido.Catalog.Discovery.get/2` | Returns a discovered entry for a stable identifier and `vsn`. |
 | `Jido.Catalog.Discovery.get_by_target/1` | Returns a discovered registration for a value. |

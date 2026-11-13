@@ -16,9 +16,9 @@
       "covered": 34
     },
     "jido_action": {
-      "active": 52,
+      "active": 53,
       "coverage": 1.0,
-      "covered": 52
+      "covered": 53
     },
     "jido_ai": {
       "active": 44,
@@ -3277,10 +3277,10 @@
       }
     },
     "jido_action.authoring": {
-      "active": 3,
+      "active": 4,
       "app": "jido_action",
       "coverage": 1.0,
-      "covered": 3,
+      "covered": 4,
       "form": "light",
       "obligations": {
         "jido_action.authoring.I1": {
@@ -3328,6 +3328,17 @@
             "test bounds terms without owning their value semantics",
             "test checks exact JSON size and JSON compatibility",
             "test parses bounded JSON without losing duplicate keys or retaining the input binary"
+          ]
+        },
+        "jido_action.authoring.I4": {
+          "failing": 0,
+          "kind": "security",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test decodes bundled documents with an explicit Catalog and no publication",
+            "test selects only exact bundled document types and versions"
           ]
         }
       }
@@ -5662,8 +5673,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 235,
+    "active": 236,
     "coverage": 1.0,
-    "covered": 235
+    "covered": 236
   }
 }

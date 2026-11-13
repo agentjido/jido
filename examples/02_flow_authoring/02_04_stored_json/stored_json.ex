@@ -9,8 +9,12 @@ defmodule Jido.Examples.Compilation.StoredJSON.Echo do
 end
 
 defmodule Jido.Examples.Compilation.StoredJSON do
+  alias Jido.Catalog.Discovery
   alias Jido.Examples.Compilation.StoredJSON.Echo
   alias Jido.Flow.Ref
+
+  @document_type "jido.flow"
+  @document_vsn 2
 
   def flow do
     Jido.Flow.new!(%{
@@ -34,7 +38,7 @@ defmodule Jido.Examples.Compilation.StoredJSON do
   end
 
   def decode(json \\ document()) do
-    {:ok, codec} = Jido.Codec.Encoder.codec(flow())
-    Jido.Codec.decode_json(json, catalog: catalog(), codec: codec)
+    with {:ok, codec} <- Discovery.bundled_codec(@document_type, @document_vsn),
+         do: Jido.Codec.decode_json(json, catalog: catalog(), codec: codec)
   end
 end

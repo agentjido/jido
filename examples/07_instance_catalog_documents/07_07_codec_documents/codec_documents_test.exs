@@ -1,15 +1,28 @@
 Code.require_file("codec_documents.ex", __DIR__)
 
 defmodule Jido.Examples.CodecDocumentsTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   @moduletag :integration
 
   alias Jido.Agent.Address
-  alias Jido.Codec.Document
+  alias Jido.Codec.{Document, Issue}
   alias Jido.Examples.CodecDocuments
   alias Jido.Examples.CodecDocuments.AddressableAgent
 
-  test "definition and stable address remain separate portable documents" do
+  setup do
+    publication = :persistent_term.get({:jido, :catalog}, :not_ready)
+    :persistent_term.erase({:jido, :catalog})
+
+    on_exit(fn ->
+      if publication == :not_ready,
+        do: :persistent_term.erase({:jido, :catalog}),
+        else: :persistent_term.put({:jido, :catalog}, publication)
+    end)
+
+    :ok
+  end
+
+  test "definition and stable address remain separate offline documents" do
     address = Address.new!(namespace: "examples/codec", partition: "tenant-a", id: "agent-7")
     assert {:ok, definition_document} = CodecDocuments.encode_definition()
     envelope = CodecDocuments.envelope(address, definition_document)
@@ -18,6 +31,27 @@ defmodule Jido.Examples.CodecDocumentsTest do
     assert {:ok, definition} = CodecDocuments.decode_definition(envelope["definition"])
     assert definition == AddressableAgent.definition()
     assert {:ok, ^address} = Address.from_map(envelope["address"])
+  end
+
+  test "unknown bundled types and versions fail before decode" do
+    assert {:ok, definition_document} = CodecDocuments.encode_definition()
+
+    assert {:error, [%Issue{code: :unsupported_document, path: ["type"]}]} =
+             definition_document
+             |> Map.put("type", "unknown.agent.definition")
+             |> CodecDocuments.decode_definition()
+
+    assert {:error,
+            [
+              %Issue{
+                code: :unsupported_document,
+                path: ["vsn"],
+                details: %{supported_vsns: [1]}
+              }
+            ]} =
+             definition_document
+             |> Map.put("vsn", 2)
+             |> CodecDocuments.decode_definition()
   end
 
   test "the complete JSON byte limit is checked before storage" do

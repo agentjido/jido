@@ -37,12 +37,10 @@ limits compose through public APIs. The application must still define which
 Catalog entries are allowed for each stored-document source. This is an
 authorization policy, not a Codec responsibility.
 
-Decode with an explicit Catalog still needs the global codec index or an
-explicit codec module. The bundled Agent and Flow codec modules are hidden
-from generated documentation. This example obtains the current writer as an
-opaque value through `Jido.Codec.Encoder.codec/1`. An importer with only a
-stored document has no equivalent public selector. This is `EX-013` in the
-[gap register](../../core_gaps.md).
+`Jido.Catalog.Discovery.bundled_codec/2` selects the exact Agent or Flow reader
+from the stored document type and version. It reads no published state. The
+selector does not authorize Catalog entries. The application still supplies
+the explicit trusted Catalog for decode.
 
 ## Files
 
