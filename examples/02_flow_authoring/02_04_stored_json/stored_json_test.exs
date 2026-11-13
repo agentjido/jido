@@ -1,10 +1,23 @@
 Code.require_file("stored_json.ex", __DIR__)
 
 defmodule Jido.Examples.Compilation.StoredJSONTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   @moduletag :integration
 
-  test "decodes trusted JSON to the exact canonical Flow" do
+  setup do
+    publication = :persistent_term.get({:jido, :catalog}, :not_ready)
+    :persistent_term.erase({:jido, :catalog})
+
+    on_exit(fn ->
+      if publication == :not_ready,
+        do: :persistent_term.erase({:jido, :catalog}),
+        else: :persistent_term.put({:jido, :catalog}, publication)
+    end)
+
+    :ok
+  end
+
+  test "decodes trusted JSON to the exact canonical Flow without publication" do
     module = Jido.Examples.Compilation.StoredJSON
     assert {:ok, flow} = apply(module, :decode, [])
     assert flow == apply(module, :flow, [])

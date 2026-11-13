@@ -15,6 +15,10 @@ defmodule Jido.Catalog.Discovery do
   users. Discovery is an inventory service. It does not grant permission to
   execute a discovered module.
 
+  Use `bundled_codec/2` to select an Agent or Flow document codec without a
+  published Catalog or codec index. The caller still supplies and authorizes
+  the explicit Catalog used for decode.
+
   Use `get/2` and `get_by_target/1` for registered values.
 
   Inline Actions remain implementation details of their owner modules.
@@ -29,7 +33,7 @@ defmodule Jido.Catalog.Discovery do
 
   alias Jido.Catalog
   alias Jido.Catalog.{Entry, Manifest}
-  alias Jido.Codec.{Contract, Index}
+  alias Jido.Codec.{Contract, Index, Issue}
 
   @publication_key {:jido, :catalog}
   @default_applications :loaded
@@ -43,6 +47,10 @@ defmodule Jido.Catalog.Discovery do
     Jido.Plugin.Heartbeat,
     Jido.Plugin.Audit
   ]
+  @bundled_codecs %{
+    {"jido.agent.definition", 1} => Jido.Agent.Codec,
+    {"jido.flow", 2} => Jido.Flow.Codec
+  }
   @base_entry %{
     id: "jido/schemas/map",
     vsn: 1,
@@ -69,6 +77,36 @@ defmodule Jido.Catalog.Discovery do
   @doc "Lists the first-party Plugin modules included in this Jido release."
   @spec included_plugins() :: [module()]
   def included_plugins, do: @included_plugins
+
+  @doc """
+  Returns the bundled codec for one exact document type and version.
+
+  This function reads no published state. It selects only codecs that ship
+  with Jido. It does not authorize a stored reference or a Catalog target.
+  Pass the returned module to `Jido.Codec.decode/2` or
+  `Jido.Codec.decode_json/2` with an explicit trusted Catalog.
+  """
+  @spec bundled_codec(term(), term()) :: {:ok, module()} | {:error, [Issue.t()]}
+  def bundled_codec(type, vsn) do
+    cond do
+      not is_binary(type) or byte_size(type) not in 1..255 or not String.valid?(type) ->
+        codec_issue(
+          :invalid_document_type,
+          ["type"],
+          "codec document type must be a string of 1 to 255 bytes"
+        )
+
+      not is_integer(vsn) or vsn <= 0 ->
+        codec_issue(
+          :invalid_document_vsn,
+          ["vsn"],
+          "codec document vsn must be a positive integer"
+        )
+
+      true ->
+        select_bundled_codec(type, vsn)
+    end
+  end
 
   @doc "Returns the current immutable application-wide Catalog."
   @spec catalog() :: Catalog.t()
@@ -359,6 +397,31 @@ defmodule Jido.Catalog.Discovery do
     |> List.flatten()
     |> Enum.member?(Jido.Codec.Contract)
   end
+
+  defp select_bundled_codec(type, vsn) do
+    case Map.fetch(@bundled_codecs, {type, vsn}) do
+      {:ok, codec} ->
+        {:ok, codec}
+
+      :error ->
+        supported_vsns =
+          for {{entry_type, entry_vsn}, _codec} <- @bundled_codecs,
+              entry_type == type,
+              do: entry_vsn
+
+        path = if supported_vsns == [], do: ["type"], else: ["vsn"]
+
+        codec_issue(
+          :unsupported_document,
+          path,
+          "bundled codec document type or vsn is not supported",
+          %{type: type, vsn: vsn, supported_vsns: Enum.sort(supported_vsns)}
+        )
+    end
+  end
+
+  defp codec_issue(code, path, message, details \\ %{}),
+    do: {:error, [Issue.new(code, path, message, details: details)]}
 
   defp published, do: :persistent_term.get(@publication_key, :not_ready)
 

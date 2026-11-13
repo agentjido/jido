@@ -8,6 +8,7 @@ defmodule Jido.Examples.CodecDocuments do
 
   alias Jido.Agent.Address
   alias Jido.Catalog
+  alias Jido.Catalog.Discovery
   alias Jido.Codec.Document
   alias Jido.Examples.CodecDocuments.AddressableAgent
 
@@ -27,8 +28,11 @@ defmodule Jido.Examples.CodecDocuments do
   end
 
   def decode_definition(document) do
-    {:ok, codec} = Jido.Codec.Encoder.codec(AddressableAgent.definition())
-    Jido.Codec.decode(document, catalog: catalog(), codec: codec)
+    type = if is_map(document), do: document["type"]
+    vsn = if is_map(document), do: document["vsn"]
+
+    with {:ok, codec} <- Discovery.bundled_codec(type, vsn),
+         do: Jido.Codec.decode(document, catalog: catalog(), codec: codec)
   end
 
   def envelope(%Address{} = address, definition_document) do

@@ -198,21 +198,20 @@ that makes the problem clear.
 - Follow-up question: Should the persistence guide show reconcile-before-stop
   as the standard operator response to an indeterminate write?
 
-### EX-013: Explicit-Catalog document decode still needs codec selection
+### EX-013: Explicit-Catalog document decode has a bundled codec selector (resolved)
 
 - Examples: [02_04 Stored JSON](02_flow_authoring/02_04_stored_json/README.md)
   and [07_07 Codec documents](07_instance_catalog_documents/07_07_codec_documents/README.md).
-- Classification: Candidate public API or documentation change.
+- Classification: Resolved public API and documentation gap.
 - Attempted contract: Decode a stored Flow or Agent document through
   `Jido.Codec.decode/2` or `decode_json/2` with an explicit trusted Catalog.
-- Result: Decode returned a `:catalog_not_ready` issue because document routing
-  also needs the globally published codec index. Naming `Jido.Flow.Codec` or
-  `Jido.Agent.Codec` works, but both modules have hidden documentation.
-- Public solution: Obtain the current writer as an opaque module through the
-  documented `Jido.Codec.Encoder.codec/1` protocol and pass it in the public
-  `:codec` option.
-- Core change: Decide whether explicit-Catalog decode should route bundled
-  document types without global publication, or expose a public codec selector
-  by document type and version.
-- Follow-up question: How should an offline importer select a codec when it has
-  only the stored document and no current runtime value of that type?
+- Result: `Jido.Catalog.Discovery.bundled_codec/2` now selects the bundled Agent
+  or Flow codec by exact document type and version without reading published
+  state. Unknown types and unsupported versions return structured Codec Issues.
+- Public solution: Select the bundled codec, then pass it through the public
+  `:codec` option with the explicit trusted Catalog. The selector does not
+  authorize Catalog targets.
+- Core change: Complete. The public bundled selector removes the offline
+  importer gap without adding higher-layer Agent or Flow dependencies to
+  `Jido.Codec`.
+- Follow-up question: None.

@@ -1,6 +1,7 @@
 ---
 modules:
   - Jido.Catalog
+  - Jido.Catalog.Discovery
   - Jido.Codec.Document
   - Jido.Codec.Reference
   - Jido.Codec.Value
@@ -28,5 +29,11 @@ envelope, version, fields, resolved value roles, and semantic validation.
 ### jido_action.authoring.I3 — Complete document limits stay owner-neutral
 - **scope:** `Jido.Codec.Document.check/1, Jido.Codec.Reference, Jido.Codec.Value`
 - **must:** Bound complete documents by nesting depth, collection size, total nodes, and proper-list shape before owner-specific decoding. Report the active maximum in structured limit error details. Do not treat this resource check as envelope, value, target, or semantic validation. Permit a downstream owner to compose the public APIs and share one Catalog with other document owners.
+- **kind:** security
+- **status:** active
+
+### jido_action.authoring.I4 — Bundled codec selection is exact and offline
+- **scope:** `Jido.Catalog.Discovery.bundled_codec/2`
+- **must:** Select bundled Agent and Flow codecs only for an exact document type and version. Do not read or change the published Catalog and codec index. Do not authorize Catalog targets. Reject invalid, unknown, and unsupported selectors with structured Codec Issues. The caller supplies the trusted Catalog for decode.
 - **kind:** security
 - **status:** active
