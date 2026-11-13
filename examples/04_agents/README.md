@@ -10,15 +10,20 @@ pure Turns to Flow behavior.
    input, and the complete candidate state.
 3. [Route Selection](04_03_route_selection/README.md) compares exact,
    wildcard, and fallback routes.
-4. Pure execution with `Agent.cmd/3` is present in the first three lessons. A
-   focused parity lesson remains to be added.
+4. [Pure Execution](04_04_pure_execution/README.md) returns a candidate Agent
+   value without a process or commit.
 5. [Replies and Directives](04_05_replies_and_directives/README.md) separates
    candidate state from work that runs after commit.
-6. Agent callbacks remain to be added.
-7. A safe `Jido.Agent.View` projection remains to be added.
+6. [Agent Callbacks](04_06_agent_callbacks/README.md) customizes initialization
+   and portable checkpoint conversion.
+7. [Agent Views](04_07_agent_views/README.md) builds safe framework-neutral UI
+   metadata.
 8. [Data-defined Agent](04_08_data_defined_agent/README.md) loads one trusted
    portable definition through the Catalog and Agent codec.
-9. Controlled definition upgrades remain to be added.
+9. Definition replacement begins with
+   [Definition Changes](../06_agent_server/06_10_definition_changes/README.md)
+   and completes with the
+   [Controlled Agent Upgrade](../24_application_patterns/24_08_controlled_agent_upgrade/README.md).
 
 Run the current chapter with:
 
