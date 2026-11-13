@@ -17,10 +17,10 @@ that makes the problem clear.
 
 ## Findings
 
-### EX-001: A first-hour wait requires persistence setup
+### EX-001: A first-hour wait requires persistence setup (resolved)
 
 - Example: [00_06 Runtime inspection](00_start_here/00_06_runtime_inspection/README.md).
-- Classification: Documentation and learning-order friction.
+- Classification: Resolved documentation and learning-order friction.
 - Attempted contract: Run an AgentServer Flow wait in the first-hour path.
 - First result: The in-memory host returned `unsupported_host` for the `waits`
   capability.
@@ -29,13 +29,13 @@ that makes the problem clear.
 - Public solution: Configure a stable Jido namespace and a public persistence
   adapter, then start the Agent with `persistence: :inherit`.
 - Core change: None proposed. The public operations are sufficient.
-- Follow-up question: Should the first-hour path introduce namespace and
-  persistence, or should its final lesson avoid a real wait?
+- Resolution: Keep the real wait. The example and Flow Waits guide now state
+  that a wait needs both persistence and a stable instance namespace.
 
-### EX-002: A runner called an Action callback directly
+### EX-002: A runner called an Action callback directly (resolved)
 
 - Example: [17_01 ReAct tool loop](17_ai_reasoning_flows/17_01_react_tool_loop/README.md).
-- Classification: Application code and documentation friction.
+- Classification: Resolved application-code and documentation friction.
 - Attempted contract: Expand the next ReAct tool Flow by calling
   `ExpandNext.run/2` from a runner.
 - Result: The stale call returned `{:error, :invalid_tool_calls}` after the
@@ -43,13 +43,14 @@ that makes the problem clear.
 - Public solution: Use Agent preflight for graph inspection and run behavior
   through `Agent.cmd/3` or `Jido.Exec`, not an Action callback.
 - Core change: None proposed. The example bypassed the public execution path.
-- Follow-up question: Should public ReAct graph inspection expose a supported
-  expansion view without executing a model round?
+- Resolution: `explain/0` and `preflight/1` are the supported inspection
+  boundary. The graph-first guide now states that callers must use
+  `Agent.cmd/3` or `Jido.Exec` for execution.
 
-### EX-003: An inline Action host needs two declaration macro arities
+### EX-003: An inline Action host needs two declaration macro arities (resolved)
 
 - Example: [01_05 Inline Actions](01_actions/01_05_inline_actions/README.md).
-- Classification: Documentation and authoring friction.
+- Classification: Resolved documentation and authoring friction.
 - Attempted contract: Import one three-argument host macro for an inline Action
   declaration with a `do` block.
 - Result: Compilation failed with `undefined function inline_action/4`.
@@ -57,27 +58,27 @@ that makes the problem clear.
   the option list and `do` block before it calls `parse_callback!/3`.
 - Core change: None proposed. The public compiler API works after the host
   follows Elixir macro call shape.
-- Follow-up question: Should the inline Action guide include a minimal host
-  that shows both arities before it shows bound input?
+- Resolution: The inline Action host guide now shows both arities before the
+  owner example and explains how Elixir selects each form.
 
-### EX-004: JSON Signal schemas need string keys
+### EX-004: JSON Signal schemas need string keys (resolved)
 
 - Example: [08_01 Signal Envelope](08_signals_and_messaging/08_01_signal_envelope/README.md).
-- Classification: Documentation and boundary friction.
+- Classification: Resolved documentation and boundary friction.
 - Attempted contract: Serialize a custom Signal created from a Joi object with
   atom keys.
 - Result: `Jido.Signal.Codec.serialize/2` returned
   `{:json_encode_failed, "Signal data must contain JSON values or binary data"}`.
 - Public solution: Use a string-key Joi schema for JSON-bound Signal data.
-- Core change: None proposed. The Signal catalog guide already states the wire
-  data rule.
-- Follow-up question: Should custom Signal compilation or JSON serialization
-  identify the first non-JSON data path in its error details?
+- Core change: None proposed. Atom-key Signal data remains valid inside one
+  BEAM application.
+- Resolution: The Signal data schema guide now puts the failing atom-key form
+  beside the correct string-key JSON form, and the example links to it.
 
-### EX-005: Agent output selectors require a declared output shape
+### EX-005: Agent output selectors require a declared output shape (resolved)
 
 - Example: [06_02 Pure and Hosted Execution Parity](06_agent_server/06_02_pure_hosted_parity/README.md).
-- Classification: Documentation and authoring friction.
+- Classification: Resolved documentation and authoring friction.
 - Attempted contract: Select `output(:state)` and `output(:reply)` from an
   inline route Action that used the default broad output schema.
 - Result: Agent compilation failed with `:unsupported_output_path` and named
@@ -86,13 +87,13 @@ that makes the problem clear.
   fields.
 - Core change: None proposed. Compile-time path validation prevented an unsafe
   route definition and gave a specific correction.
-- Follow-up question: Should the Agent route guide place an output-schema
-  example beside its first state or reply selector?
+- Resolution: The route guide now states the `output_schema` rule beside its
+  first state and reply selectors and names the compile error.
 
-### EX-006: A reply-only route still needs explicit state projection
+### EX-006: A reply-only route still needs explicit state projection (resolved)
 
 - Example: [23_02 Specialist pipeline](23_collaborative_agent_systems/23_02_specialist_pipeline/README.md).
-- Classification: Documentation and authoring friction.
+- Classification: Resolved documentation and authoring friction.
 - Attempted contract: Return `%{reply: value}` from a stateless Agent route and
   select that field with `reply/2`.
 - Result: Agent validation treated the complete Action output as candidate
@@ -100,8 +101,8 @@ that makes the problem clear.
 - Public solution: Return both `state` and `reply`, declare both output fields,
   and select each with `state/1` and `reply/2`.
 - Core change: None proposed. Explicit projection is safe and supported.
-- Follow-up question: Should the first reply-selector example state that reply
-  selection does not disable the default state projection?
+- Resolution: The route guide now states that reply selection does not disable
+  default state mapping and gives both supported state choices.
 
 ### EX-007: Controlled declared-subtree removal (resolved)
 
@@ -121,10 +122,10 @@ that makes the problem clear.
   persistence is enabled.
 - Follow-up question: None.
 
-### EX-008: Definition upgrade cannot replace the Agent origin module
+### EX-008: Definition upgrade cannot replace the Agent origin module (resolved)
 
 - Example: [24_08 Controlled Agent Upgrade](24_application_patterns/24_08_controlled_agent_upgrade/README.md).
-- Classification: Documentation and authoring friction.
+- Classification: Resolved documentation and authoring friction.
 - Attempted contract: Migrate an Account V1 Agent snapshot into an instance
   created directly from the compiled Account V2 module.
 - Result: `Jido.upgrade_agent/4` rejected the candidate with
@@ -134,13 +135,13 @@ that makes the problem clear.
   result.
 - Core change: None proposed. Stable origin is an intentional persistence and
   callback boundary.
-- Follow-up question: Should the upgrade guide include one complete schema and
-  route replacement example that states this origin rule?
+- Resolution: The upgrade guide now states that the saved origin module is a
+  stable identity and callback boundary and names `:upgrade_identity`.
 
-### EX-009: Definition rollback is a new forward version
+### EX-009: Definition rollback is a new forward version (resolved)
 
 - Example: [24_08 Controlled Agent Upgrade](24_application_patterns/24_08_controlled_agent_upgrade/README.md).
-- Classification: Documentation and operational-model friction.
+- Classification: Resolved documentation and operational-model friction.
 - Attempted contract: Upgrade V1 to V2, then restore the V1 definition with
   version 1.
 - Result: `Jido.upgrade_agent/4` rejected the reverse migration with
@@ -148,13 +149,13 @@ that makes the problem clear.
 - Public solution: Publish version 3 with the earlier behavior and migrate V2
   state into the version 1 state shape.
 - Core change: None proposed. Monotonic versions make upgrade history clear.
-- Follow-up question: Should Jido call this a forward rollback in its operator
-  guide and include a version timeline?
+- Resolution: The upgrade guide now calls this a forward rollback and shows
+  the version 2 to version 3 sequence.
 
-### EX-010: Durable AI stream dispatch must be portable
+### EX-010: Durable AI stream dispatch must be portable (resolved)
 
 - Example: [24_06 Phoenix LiveView Chat](24_application_patterns/24_06_phoenix_liveview_chat/README.md).
-- Classification: Documentation and integration friction.
+- Classification: Resolved documentation and integration friction.
 - Attempted contract: Send model stream Signals directly to the LiveView PID
   through `jido_ai_dispatch` during a durable Agent Turn.
 - Result: AgentServer rejected the Turn because the PID in durable context was
@@ -162,8 +163,8 @@ that makes the problem clear.
 - Public solution: Subscribe the LiveView to a conversation topic and use the
   portable `:pubsub` dispatch target in Turn context.
 - Core change: None proposed. Durable context must stay portable.
-- Follow-up question: Should the AI streaming guide use PubSub as its first
-  hosted Agent example and reserve PID dispatch for pure or transient runs?
+- Resolution: The ReAct streaming guide now recommends PubSub for hosted web
+  clients and limits PID dispatch to pure or transient local runs.
 
 ### EX-011: Dynamic runtime adoption and ownership transfer — resolved
 
@@ -186,10 +187,10 @@ that makes the problem clear.
 - Follow-up question: None for EX-011. Durable or distributed ownership needs a
   separate lease and failover contract.
 
-### EX-012: An indeterminate activation rejects direct stop
+### EX-012: An indeterminate activation rejects direct stop (resolved)
 
 - Example: [12_06 Indeterminate Write](12_persistence/12_06_indeterminate_write/README.md).
-- Classification: Documentation and operational-model friction.
+- Classification: Resolved documentation and operational-model friction.
 - Attempted contract: Stop an activation after its persistence adapter saved a
   candidate revision but returned an indeterminate result.
 - Result: `Jido.stop_agent/3` returned `{:error, :unsafe_resume}` because a
@@ -199,8 +200,9 @@ that makes the problem clear.
   authoritative record, and then stop the replacement.
 - Core change: None proposed. The safety boundary and recovery operation are
   public and testable.
-- Follow-up question: Should the persistence guide show reconcile-before-stop
-  as the standard operator response to an indeterminate write?
+- Resolution: The hibernate and activation guide now gives
+  reconcile-before-stop as the standard operator response and no longer tells
+  the reader to stop the blocked activation directly.
 
 ### EX-013: Explicit-Catalog document decode has a bundled codec selector (resolved)
 
