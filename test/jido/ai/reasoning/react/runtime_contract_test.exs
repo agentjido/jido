@@ -1129,7 +1129,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
   @tag :tmp_dir
   test "AgentServer persists conversation state and restores it for the next request", context do
-    {instance, server, _persistence, ref} = start_persisted_agent(context.tmp_dir, "history")
+    {instance, server, _persistence, address} = start_persisted_agent(context.tmp_dir, "history")
 
     expect(ReqLLM, :generate_text, 2, fn model, llm_context, _options ->
       roles = Enum.map(ReqLLM.Context.to_list(llm_context), & &1.role)
@@ -1149,7 +1149,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     first_agent = Server.snapshot(server).agent
     assert first_agent.state.session.rev == 4
     assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(server)
-    assert {:ok, restored} = Jido.activate_agent(instance, ref)
+    assert {:ok, restored} = Jido.activate_agent(instance, address)
     assert :ok = Server.await_ready(restored)
 
     assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
@@ -1161,7 +1161,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
   @tag :tmp_dir
   test "a tool review wait survives restart and resumes the same graph", context do
-    {instance, server, _persistence, ref} = start_persisted_agent(context.tmp_dir, "review")
+    {instance, server, _persistence, address} = start_persisted_agent(context.tmp_dir, "review")
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
     expect(ReqLLM, :generate_text, 2, fn model, llm_context, _options ->
@@ -1196,7 +1196,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
     root = Jido.Test.AgentServer.Assertions.activation(server)
     assert :ok = DynamicSupervisor.terminate_child(Jido.Instance.Names.agent_supervisor(instance), root)
-    assert {:ok, restored} = Jido.activate_agent(instance, ref)
+    assert {:ok, restored} = Jido.activate_agent(instance, address)
     assert :ok = Server.await_ready(restored)
 
     restored_wait = waiting(restored)
@@ -1307,13 +1307,13 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
       id: instance
     )
 
-    ref = Jido.Agent.Ref.new!(namespace: namespace, id: id)
+    address = Jido.Agent.Address.new!(namespace: namespace, id: id)
 
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, SimpleAgent)
-    assert {:ok, server} = Jido.activate_agent(instance, ref)
+    assert {:ok, ^address} = Jido.create_agent(instance, address, SimpleAgent)
+    assert {:ok, server} = Jido.activate_agent(instance, address)
 
     assert :ok = Server.await_ready(server)
-    {instance, server, persistence, ref}
+    {instance, server, persistence, address}
   end
 
   defp waiting(server, attempts \\ 500)

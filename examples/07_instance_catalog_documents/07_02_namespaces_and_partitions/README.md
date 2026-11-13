@@ -5,7 +5,7 @@ Use the same Agent ID safely in separate application and tenant scopes.
 ## What you will learn
 
 - A stable identity is the exact `{namespace, partition, id}` tuple.
-- One instance accepts only references from its bound namespace.
+- One instance accepts only Addresses from its bound namespace.
 - Separate partitions keep state and processes independent.
 
 ## Read the code
@@ -33,4 +33,4 @@ tenant authorization.
 - [Source](isolation.ex)
 - [Tests](isolation_test.exs)
 
-Previous: [Instance configuration](../07_01_instance_configuration/README.md) | Next: [Stable references](../07_03_stable_references/README.md)
+Previous: [Instance configuration](../07_01_instance_configuration/README.md) | Next: [Stable Addresses](../07_03_stable_addresses/README.md)

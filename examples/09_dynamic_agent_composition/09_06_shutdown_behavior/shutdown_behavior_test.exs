@@ -5,7 +5,7 @@ defmodule Jido.Examples.AgentShutdownTest do
   use ExUnit.Case, async: false
   @moduletag :integration
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.AgentServer
   alias Jido.Examples.{AgentShutdown, Worker}
 
@@ -18,23 +18,23 @@ defmodule Jido.Examples.AgentShutdownTest do
 
     start_supervised!({Jido, name: instance, namespace: namespace, persistence: persistence}, id: instance)
 
-    first_ref = Ref.new!(namespace: namespace, id: "first")
-    second_ref = Ref.new!(namespace: namespace, id: "second")
+    first_address = Address.new!(namespace: namespace, id: "first")
+    second_address = Address.new!(namespace: namespace, id: "second")
 
-    for ref <- [first_ref, second_ref] do
-      assert {:ok, ^ref} = Jido.create_agent(instance, ref, Worker)
-      assert {:ok, server} = Jido.activate_agent(instance, ref)
+    for address <- [first_address, second_address] do
+      assert {:ok, ^address} = Jido.create_agent(instance, address, Worker)
+      assert {:ok, server} = Jido.activate_agent(instance, address)
       assert :ok = AgentServer.await_ready(server)
     end
 
-    {:ok, first_pid} = Jido.resolve_agent(instance, first_ref)
-    {:ok, second_pid} = Jido.resolve_agent(instance, second_ref)
+    {:ok, first_pid} = Jido.resolve_agent(instance, first_address)
+    {:ok, second_pid} = Jido.resolve_agent(instance, second_address)
 
-    assert {:ok, %{agent: %{id: "first"}}} = AgentShutdown.stop_activation(instance, first_ref)
+    assert {:ok, %{agent: %{id: "first"}}} = AgentShutdown.stop_activation(instance, first_address)
     refute Process.alive?(first_pid)
     assert Process.alive?(second_pid)
 
-    assert {:ok, first_reactivated} = AgentShutdown.reactivate(instance, first_ref)
+    assert {:ok, first_reactivated} = AgentShutdown.reactivate(instance, first_address)
     refute first_reactivated == first_pid
 
     first_monitor = Process.monitor(first_reactivated)
@@ -48,10 +48,10 @@ defmodule Jido.Examples.AgentShutdownTest do
       id: rebound
     )
 
-    for ref <- [first_ref, second_ref] do
-      assert {:ok, server} = AgentShutdown.reactivate(rebound, ref)
+    for address <- [first_address, second_address] do
+      assert {:ok, server} = AgentShutdown.reactivate(rebound, address)
       assert :ok = AgentServer.await_ready(server)
-      assert AgentServer.snapshot(server).agent.id == ref.id
+      assert AgentServer.snapshot(server).agent.id == address.id
     end
   end
 end

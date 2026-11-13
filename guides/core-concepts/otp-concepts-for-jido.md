@@ -199,7 +199,7 @@ The Action stopped because Runic ties a Worker's execution to its owner. A step 
 
 The worker's PID changes at each restart, as the example above shows. Look up an Agent by ID when you need it. Each instance has its own `Registry`, keyed by Agent ID and partition, so an ID is unique within an instance and partition. `Jido.whereis_agent/3` returns `nil` until the Agent is ready.
 
-Use a `Jido.Agent.Ref` for a name you can store, and let `Jido.call/4` find the current process. See [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd).
+Use a `Jido.Agent.Address` for a name you can store, and let `Jido.call/4` find the current process. See [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd).
 
 ## Monitors tie the parts together
 

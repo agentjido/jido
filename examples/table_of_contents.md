@@ -195,7 +195,7 @@ Purpose: Add identity, state, routes, and pure Turns to Flow behavior.
 
 Proposed lessons:
 
-1. Agent definition, instance, identity, and stable reference.
+1. Agent definition, instance, identity, and stable Address.
 2. State schemas and defaults.
 3. Exact routes, wildcard routes, and precedence.
 4. Pure execution with `Agent.cmd/3`.
@@ -215,7 +215,7 @@ Primary coverage:
 
 - `Jido.Agent`
 - `Jido.Agent.Route`
-- `Jido.Agent.Ref`
+- `Jido.Agent.Address`
 - `Jido.Agent.View`
 - `Jido.Agent.Codec`
 - `Jido.Id`
@@ -308,17 +308,17 @@ Proposed lessons:
 
 1. Start and configure a Jido instance.
 2. Namespaces and partitions.
-3. Stable Agent references.
+3. Stable Agent Addresses.
 4. Logical Agent identity and current process identity.
 5. Catalog discovery and package contributions.
 6. Portable values and forbidden runtime values.
 7. Codec documents, stable references, and term limits.
 8. Installed definitions and application supervision.
 
-A stable Agent reference identifies the logical Agent. A PID identifies only
+A stable Agent Address identifies the logical Agent. A PID identifies only
 the process for the current activation. For a durable Agent, the logical
 identity can remain after that process stops and can resolve to a later
-activation. A stable reference is an address. It is not an authorization
+activation. An Agent Address is not an authorization
 credential.
 
 Primary coverage:
@@ -847,7 +847,7 @@ script. It runs offline and stays outside Jido core. The example must:
 
 - Start Phoenix LiveView and one Jido instance from the script.
 - Create or resolve one Session-backed AI Agent for a conversation ID.
-- Keep a stable `Jido.Agent.Ref` instead of a process identifier in LiveView
+- Keep a stable `Jido.Agent.Address` instead of a process identifier in LiveView
   socket assigns.
 - Send user messages as normal `jido.ai.request` Signals.
 - Accept an optional media attachment as a multimodal content part.

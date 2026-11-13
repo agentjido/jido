@@ -25,14 +25,14 @@ Read [the Agent and Flow](accepted_work.ex), then
 
 snapshot = Jido.AgentServer.snapshot(member_server)
 snapshot.agent.state # %{report: "Report: OTP"}
-result.agent_ref.id == snapshot.agent.id
+result.agent_address.id == snapshot.agent.id
 ```
 
 ## Important behavior
 
 The topology member handle in the behavior test comes from test-only OTP
 inspection. It is not a public AgentServer member API. Application code should
-address independent durable Agents with stable `Jido.Agent.Ref` values.
+address independent durable Agents with stable `Jido.Agent.Address` values.
 
 ## Run it
 

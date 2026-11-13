@@ -6,15 +6,15 @@ defmodule Jido.Examples.Patterns.LiveChat do
 
   @doc "Creates or activates the durable conversation Agent."
   def ensure_conversation(instance, conversation_id) do
-    with {:ok, ref} <- Jido.agent_ref(instance, conversation_id) do
-      case Jido.activate_agent(instance, ref) do
+    with {:ok, address} <- Jido.agent_address(instance, conversation_id) do
+      case Jido.activate_agent(instance, address) do
         {:ok, _server} ->
-          {:ok, ref}
+          {:ok, address}
 
         {:error, :not_found} ->
-          with {:ok, ^ref} <- Jido.create_agent(instance, ref, Agent),
-               {:ok, _server} <- Jido.activate_agent(instance, ref),
-               do: {:ok, ref}
+          with {:ok, ^address} <- Jido.create_agent(instance, address, Agent),
+               {:ok, _server} <- Jido.activate_agent(instance, address),
+               do: {:ok, address}
 
         {:error, reason} ->
           {:error, reason}
@@ -23,7 +23,7 @@ defmodule Jido.Examples.Patterns.LiveChat do
   end
 
   @doc "Runs one offline model Turn and dispatches stream Signals to the caller."
-  def ask(instance, ref, text, opts \\ []) do
+  def ask(instance, address, text, opts \\ []) do
     input = multimodal_input(text, Keyword.get(opts, :attachment))
 
     options =
@@ -48,12 +48,12 @@ defmodule Jido.Examples.Patterns.LiveChat do
         Keyword.get(opts, :stream_dispatch)
       )
 
-    Jido.call(instance, ref, signal, context: context, timeout: 6_000)
+    Jido.call(instance, address, signal, context: context, timeout: 6_000)
   end
 
   @doc "Returns a small public projection of the committed conversation."
-  def history(instance, ref) do
-    with {:ok, server} <- Jido.activate_agent(instance, ref),
+  def history(instance, address) do
+    with {:ok, server} <- Jido.activate_agent(instance, address),
          %{agent: %{state: %{session: session}}} <- AgentServer.snapshot(server) do
       project_session(session)
     else

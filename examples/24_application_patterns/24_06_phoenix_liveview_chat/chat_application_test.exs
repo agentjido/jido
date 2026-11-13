@@ -9,7 +9,7 @@ defmodule Jido.Examples.Patterns.LiveChatTest do
 
   test "streamed multimodal chat survives client and Agent process replacement" do
     jido = start_persistent_jido()
-    {:ok, ref} = LiveChat.ensure_conversation(jido, "conversation-1")
+    {:ok, address} = LiveChat.ensure_conversation(jido, "conversation-1")
     dispatch = start_stream_dispatch("conversation-1")
 
     attachment = %{
@@ -18,7 +18,7 @@ defmodule Jido.Examples.Patterns.LiveChatTest do
     }
 
     result =
-      LiveChat.ask(jido, ref, "Describe the attachment",
+      LiveChat.ask(jido, address, "Describe the attachment",
         attachment: attachment,
         response: "A small offline image.",
         stream_dispatch: dispatch
@@ -43,27 +43,27 @@ defmodule Jido.Examples.Patterns.LiveChatTest do
             [
               %{role: :user, text: "Describe the attachment", attachments: [attachment_view]},
               %{role: :assistant, text: "A small offline image.", attachments: []}
-            ]} = LiveChat.history(jido, ref)
+            ]} = LiveChat.history(jido, address)
 
     assert attachment_view.attached?
 
-    {:ok, first_server} = Jido.resolve_agent(jido, ref)
+    {:ok, first_server} = Jido.resolve_agent(jido, address)
     assert :ok = Jido.stop_agent(jido, first_server)
 
-    {:ok, ^ref} = LiveChat.ensure_conversation(jido, "conversation-1")
-    {:ok, second_server} = Jido.resolve_agent(jido, ref)
+    {:ok, ^address} = LiveChat.ensure_conversation(jido, "conversation-1")
+    {:ok, second_server} = Jido.resolve_agent(jido, address)
     refute second_server == first_server
 
-    assert {:ok, [_user, %{text: "A small offline image."}]} = LiveChat.history(jido, ref)
+    assert {:ok, [_user, %{text: "A small offline image."}]} = LiveChat.history(jido, address)
   end
 
   test "a model failure is visible and does not enter public chat history" do
     jido = start_persistent_jido()
-    {:ok, ref} = LiveChat.ensure_conversation(jido, "conversation-failure")
+    {:ok, address} = LiveChat.ensure_conversation(jido, "conversation-failure")
     dispatch = start_stream_dispatch("conversation-failure")
 
     result =
-      LiveChat.ask(jido, ref, "Fail safely",
+      LiveChat.ask(jido, address, "Fail safely",
         fail: true,
         stream_dispatch: dispatch
       )
@@ -75,7 +75,7 @@ defmodule Jido.Examples.Patterns.LiveChatTest do
              "jido.ai.model.stream.failed"
            ]
 
-    assert {:ok, []} = LiveChat.history(jido, ref)
+    assert {:ok, []} = LiveChat.history(jido, address)
   end
 
   test "the browser state vocabulary covers terminal and nonterminal outcomes" do
@@ -144,7 +144,7 @@ defmodule Jido.Examples.Patterns.LiveChatTest do
   defp turn_result(status) do
     %Jido.AgentServer.TurnResult{
       turn_id: "turn-1",
-      agent_ref: Jido.Agent.Ref.new!(namespace: "examples/live-chat", id: "conversation"),
+      agent_address: Jido.Agent.Address.new!(namespace: "examples/live-chat", id: "conversation"),
       agent_activation_id: "activation-1",
       status: status,
       durability: :durable,

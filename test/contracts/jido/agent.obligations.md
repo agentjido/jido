@@ -24,7 +24,7 @@ failures use `Jido.Error.ValidationError` with a code and field path.
 The component follows behavior ownership. It does not claim shared Codec,
 Registry, Document, Value, or Discovery behavior from `jido_action`. It also
 does not claim pure Agent evaluation, AgentServer commands and lifecycle,
-Agent references and process addressing, Directive dispatch, persistence, or
+Agent Addresses and process addressing, Directive dispatch, persistence, or
 bundled Plugin runtime behavior.
 
 Public functions use their documented input types. Wrong top-level Elixir types

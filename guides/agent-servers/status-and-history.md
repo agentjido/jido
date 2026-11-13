@@ -19,7 +19,7 @@ its revisions from the same server event.
 
 It also reports:
 
-- `agent_ref` and `agent_activation_id`
+- `agent_address` and `agent_activation_id`
 - `ready?` and `durability`
 - `agent_revision` and `persistence_revision`
 - `admission` and `queue_depth`
@@ -55,7 +55,7 @@ two fields are intentionally separate.
 
 ## Read a durable logical Agent
 
-Use `Jido.status/3` with a stable `Jido.Agent.Ref`. The Instance can return a
+Use `Jido.status/3` with a stable `Jido.Agent.Address`. The Instance can return a
 passivated status even when no AgentServer process is resident.
 
 ```elixir
@@ -64,10 +64,10 @@ passivated status even when no AgentServer process is resident.
   work_state: :idle,
   residency: :passivated,
   ready?: false
-} = Jido.status(MyApp.Jido, agent_ref)
+} = Jido.status(MyApp.Jido, agent_address)
 ```
 
-Use `Jido.activate_agent/3` when you need a direct AgentServer handle. Ref
+Use `Jido.activate_agent/3` when you need a direct AgentServer handle. Address
 Signal operations activate the Agent when required.
 
 ## Inspect one accepted Turn

@@ -56,8 +56,8 @@ defmodule Jido.Persistence.CodecConfigTest do
     assert :ok = Persistence.save_agent(profile, agent, namespace: "json-profile")
     assert {:ok, ^agent} = Persistence.load_agent(profile, CounterAgent, agent.id, namespace: "json-profile")
 
-    ref = Jido.Agent.Ref.new!(namespace: "json-profile", id: agent.id)
-    assert {:ok, raw, _condition} = Store.read(store, Persistence.agent_key(ref))
+    address = Jido.Agent.Address.new!(namespace: "json-profile", id: agent.id)
+    assert {:ok, raw, _condition} = Store.read(store, Persistence.agent_key(address))
     assert {:ok, %{"codec" => "jido.json", "codec_version" => 1}} = JSON.decode(raw)
   end
 
@@ -82,9 +82,9 @@ defmodule Jido.Persistence.CodecConfigTest do
   test "inspection redacts state and export emits paged JSONL", %{store: store} do
     {:ok, config} = Config.open(store)
     agent = CounterAgent.instantiate!(id: "inspected-agent", state: %{count: 7})
-    ref = Jido.Agent.Ref.new!(namespace: "inspection", id: agent.id)
-    key = Persistence.agent_key(ref)
-    assert :ok = Persistence.save_agent(config, agent, namespace: ref.namespace)
+    address = Jido.Agent.Address.new!(namespace: "inspection", id: agent.id)
+    key = Persistence.agent_key(address)
+    assert :ok = Persistence.save_agent(config, agent, namespace: address.namespace)
 
     assert {:ok, redacted} = Inspector.read(config, key)
     assert redacted.checkpoint.agent.state == "[REDACTED]"

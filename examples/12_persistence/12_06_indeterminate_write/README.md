@@ -27,7 +27,7 @@ authoritative record, after which normal stop succeeds.
 
 Stored bytes do not prove that the live command committed. Recovery must read
 the authoritative record before work continues. A direct stop is rejected as
-`unsafe_resume`. The test reconciles through the stable Agent Ref, then stops
+`unsafe_resume`. The test reconciles through the stable Agent Address, then stops
 the replacement and proves process cleanup.
 
 ## Limits
@@ -37,7 +37,7 @@ The example does not prescribe automatic restart, a shutdown reason, or cross-no
 ## Core Fit and Gaps
 
 The public store behavior, uncertain `TurnResult`, operational status, and
-stable Ref recovery operations expose the boundary without private runtime
+stable Address recovery operations expose the boundary without private runtime
 access. An application must reconcile before it can stop this activation
 safely. Jido does not guess whether an indeterminate remote write won.
 

@@ -50,13 +50,13 @@ defmodule Jido.MalformedPublicInputsTest do
     end
   end
 
-  test "Ref creation rejects wrong ID and unknown options" do
-    instance = :"malformed_ref_#{System.unique_integer([:positive])}"
-    start_supervised!({Jido, name: instance, namespace: "malformed/ref"}, id: instance)
+  test "Address creation rejects wrong ID and unknown options" do
+    instance = :"malformed_address_#{System.unique_integer([:positive])}"
+    start_supervised!({Jido, name: instance, namespace: "malformed/address"}, id: instance)
 
-    assert {:ok, _ref} = Jido.agent_ref(instance, "agent-1", partition: nil)
-    assert {:error, %{__exception__: true}} = Jido.agent_ref(instance, 123)
-    assert {:error, %{__exception__: true}} = Jido.agent_ref(instance, "agent-1", extra: true)
+    assert {:ok, _address} = Jido.agent_address(instance, "agent-1", partition: nil)
+    assert {:error, %{__exception__: true}} = Jido.agent_address(instance, 123)
+    assert {:error, %{__exception__: true}} = Jido.agent_address(instance, "agent-1", extra: true)
   end
 
   test "compatibility lookup, list, count, and stop report malformed options", %{jido: jido} do

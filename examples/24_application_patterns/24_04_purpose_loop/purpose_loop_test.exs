@@ -155,11 +155,11 @@ defmodule Jido.Examples.Applications.PurposeLoopTest do
 
     assert Jido.AgentServer.snapshot(agent_server).agent.state.completed == ["one"]
     old_scheduler = scheduler_runtime(agent_server)
-    old_agent_ref = Process.monitor(agent_server)
+    old_agent_monitor = Process.monitor(agent_server)
     old_scheduler_ref = Process.monitor(old_scheduler)
 
     assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(agent_server)
-    assert_receive {:DOWN, ^old_agent_ref, :process, ^agent_server, _reason}, 1_000
+    assert_receive {:DOWN, ^old_agent_monitor, :process, ^agent_server, _reason}, 1_000
     assert_receive {:DOWN, ^old_scheduler_ref, :process, ^old_scheduler, _reason}, 1_000
 
     assert {:ok, restored} =
@@ -233,11 +233,11 @@ defmodule Jido.Examples.Applications.PurposeLoopTest do
     assert rejected.state.completed == ["one", "two", "three", "four"]
 
     scheduler = scheduler_runtime(restarted_server)
-    agent_ref = Process.monitor(restarted_server)
+    agent_monitor = Process.monitor(restarted_server)
     scheduler_ref = Process.monitor(scheduler)
 
     assert :ok = Jido.stop_agent(jido, restarted_server)
-    assert_receive {:DOWN, ^agent_ref, :process, ^restarted_server, _reason}, 1_000
+    assert_receive {:DOWN, ^agent_monitor, :process, ^restarted_server, _reason}, 1_000
     assert_receive {:DOWN, ^scheduler_ref, :process, ^scheduler, _reason}, 1_000
 
     eventually(fn -> Jido.whereis_agent(jido, id) == nil end)

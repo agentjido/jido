@@ -40,17 +40,17 @@ The current Agent layer exposes a Turn value, authored managed or durable policy
 - **R6:** Remove `Jido.Agent.Turn`; the private Runner prepared value holds the selected route, source Signal, and one bound Flow instruction.
 - **R7:** AgentServer selects managed or durable execution from persistence capability, not authored handler kind.
 - **R8:** A permanent definition change accepts one complete Agent Codec document with an explicit trusted Catalog.
-- **R9:** AgentServer definition upgrade requires an idle supervised activation, validates the new definition, optionally migrates state through one Action, validates and persists the candidate with revision control, publishes the local checkpoint, and restarts the AgentServer under the same stable Agent Ref.
+- **R9:** AgentServer definition upgrade requires an idle supervised activation, validates the new definition, optionally migrates state through one Action, validates and persists the candidate with revision control, publishes the local checkpoint, and restarts the AgentServer under the same stable Agent Address.
 - **R10:** A running or waiting durable Flow is active. Definition upgrade must return `:agent_busy`; it must not migrate that Flow.
 - **R11:** Move compiler-only option and input-Signal helpers off the `Jido.Agent` facade. Move raw state transition validation to `Jido.Agent.Validation`.
-- **R12:** Examples and tests must show pure Agent state work, one-step Action lowering, explicit runtime children, complete definition upgrade, stable Ref and changed PID, and busy-upgrade rejection.
+- **R12:** Examples and tests must show pure Agent state work, one-step Action lowering, explicit runtime children, complete definition upgrade, stable Address and changed PID, and busy-upgrade rejection.
 
 ### Acceptance Examples
 
 - An Action route prepared by Runner contains `%Jido.Instruction{kind: :flow}` and no execution mode.
 - Direct `Jido.Agent.cmd/3` and AgentServer without persistence produce the same state and Directives.
 - AgentServer with persistence runs an Action route through the durable Flow path.
-- A complete Agent document decodes through `Jido.Codec` with an explicit `Jido.Catalog`, upgrades an idle activation, retains its stable Agent Ref, and runs in a new AgentServer PID.
+- A complete Agent document decodes through `Jido.Codec` with an explicit `Jido.Catalog`, upgrades an idle activation, retains its stable Agent Address, and runs in a new AgentServer PID.
 - An upgrade request during a running or waiting Flow returns `{:error, :agent_busy}` and changes no state or definition.
 
 ### Success Criteria
@@ -82,7 +82,7 @@ Out of scope:
 - `Jido.Instruction` is the only prepared execution value.
 - Persistence capability selects durable execution.
 - Definition upgrade accepts a complete Codec document and explicit Catalog, never a patch.
-- Upgrade restarts the AgentServer. Its PID can change. `Jido.Agent.Ref` stays stable.
+- Upgrade restarts the AgentServer. Its PID can change. `Jido.Agent.Address` stays stable.
 - The first version rejects upgrade while any Turn or durable wait is active.
 
 ### Rejected Alternatives
@@ -94,7 +94,7 @@ Out of scope:
 
 ### Dependencies
 
-- Existing Agent Codec, Catalog, Validation, Ref, Persistence compare-and-swap, activation checkpoint, and OTP supervisor behavior.
+- Existing Agent Codec, Catalog, Validation, Address, Persistence compare-and-swap, activation checkpoint, and OTP supervisor behavior.
 - Existing Exec Action-to-Flow lowering and Durable runtime.
 
 ### Outstanding Questions
@@ -135,7 +135,7 @@ Complete Agent Codec document + trusted Catalog
     -> require idle supervised activation
     -> migrate and validate state
     -> compare-and-swap persistence and local checkpoint
-    -> restart AgentServer under the same Agent Ref
+    -> restart AgentServer under the same Agent Address
 ```
 
 ### Key Technical Decisions
@@ -158,7 +158,7 @@ Complete Agent Codec document + trusted Catalog
 
 - Decision: `Jido.AgentServer.upgrade/3` accepts a complete Agent Codec document plus `catalog:`, optional `migrate:`, context, and timeout. It rejects non-idle work. After a successful revision-controlled save, it publishes the candidate checkpoint and exits so its supervisor starts a new worker.
 - Reason: This creates one atomic administration boundary and lets OTP rebuild all runtime resources.
-- Consequence: Callers resolve the stable Ref again after upgrade. PID identity is not stable.
+- Consequence: Callers resolve the stable Address again after upgrade. PID identity is not stable.
 - Governs: R8-R10.
 
 #### KTD4: Keep runtime children operational
@@ -190,9 +190,9 @@ Complete Agent Codec document + trusted Catalog
 
 #### U3: Add whole-definition AgentServer upgrade
 
-- Outcome: Complete trusted definition input, optional state migration, idle gate, revision-controlled save, local checkpoint, OTP restart, stable Ref, and busy rejection.
+- Outcome: Complete trusted definition input, optional state migration, idle gate, revision-controlled save, local checkpoint, OTP restart, stable Address, and busy rejection.
 - Requirements: R8-R10.
-- Verification: Local and persistent upgrade tests, stable Ref tests, PID replacement, invalid document, migration failure, persistence failure, and active Flow rejection.
+- Verification: Local and persistent upgrade tests, stable Address tests, PID replacement, invalid document, migration failure, persistence failure, and active Flow rejection.
 
 #### U4: Align facade, examples, guides, and contracts
 
@@ -234,8 +234,8 @@ This is an unreleased V3 breaking cleanup. Stored Agent documents remain complet
 ### Risks and Assumptions
 
 - Risk: Removing reconciliation can expose a hidden mutation producer. Repository-wide searches and the full suite must find it.
-- Risk: Upgrade can save successfully but fail to restart. The stable Ref will report recovery or not found; persistence keeps the accepted revision for a later restore.
-- Risk: A caller can hold the old PID after upgrade. Documentation and examples must use the stable Ref for later operations.
+- Risk: Upgrade can save successfully but fail to restart. The stable Address will report recovery or not found; persistence keeps the accepted revision for a later restore.
+- Risk: A caller can hold the old PID after upgrade. Documentation and examples must use the stable Address for later operations.
 - Assumption: Runtime child effects already provide the required temporary-child capability.
 - Assumption: A new definition can accept old state directly or use one explicit migration Action.
 
@@ -245,7 +245,7 @@ This is an unreleased V3 breaking cleanup. Stored Agent documents remain complet
 - Ordinary work has one state commit path.
 - Agent prepares one bound Flow instruction.
 - AgentServer uses persistence capability for durable execution.
-- Complete definition upgrade validates, persists, restarts, and retains stable Ref.
+- Complete definition upgrade validates, persists, restarts, and retains stable Address.
 - Active or waiting Flow upgrade is rejected.
 - Examples, focused tests, format, compile, and full tests pass.
 

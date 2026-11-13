@@ -1,5 +1,5 @@
 defmodule Jido.Examples.CorrelatedRequests do
-  @moduledoc "Coordinates two durable Agents with explicit stable references."
+  @moduledoc "Coordinates two durable Agents with explicit stable Addresses."
 
   use Jido.Agent, name: "example_correlated_requests"
 
@@ -45,17 +45,17 @@ defmodule Jido.Examples.CorrelatedRequests do
     end
   end
 
-  @doc "Runs one request through the coordinator and worker stable references."
-  def run(instance, coordinator_ref, worker_ref, request_id, value) do
+  @doc "Runs one request through the coordinator and worker stable Addresses."
+  def run(instance, coordinator_address, worker_address, request_id, value) do
     with {:ok, request} <- request_signal(%{request_id: request_id}),
-         {:ok, _turn} <- Jido.call(instance, coordinator_ref, request),
+         {:ok, _turn} <- Jido.call(instance, coordinator_address, request),
          {:ok, calculation} <-
            Jido.Examples.Worker.calculate_signal(%{request_id: request_id, value: value}),
-         {:ok, _worker_turn} <- Jido.call(instance, worker_ref, calculation),
-         {:ok, worker} <- Jido.activate_agent(instance, worker_ref),
+         {:ok, _worker_turn} <- Jido.call(instance, worker_address, calculation),
+         {:ok, worker} <- Jido.activate_agent(instance, worker_address),
          result <- List.last(Jido.AgentServer.snapshot(worker).agent.state.completed),
          {:ok, completion} <- complete_signal(result),
-         {:ok, coordinator_turn} <- Jido.call(instance, coordinator_ref, completion) do
+         {:ok, coordinator_turn} <- Jido.call(instance, coordinator_address, completion) do
       {:ok, coordinator_turn}
     end
   end

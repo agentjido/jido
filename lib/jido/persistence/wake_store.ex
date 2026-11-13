@@ -1,7 +1,7 @@
 defmodule Jido.Persistence.WakeStore do
   @moduledoc false
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Persistence.{Config, Store}
 
   @format 3
@@ -44,10 +44,10 @@ defmodule Jido.Persistence.WakeStore do
     end
   end
 
-  def delete_turn(instance, %Ref{} = ref, turn_id) do
+  def delete_turn(instance, %Address{} = address, turn_id) do
     with {:ok, entries} <- list(instance) do
       entries
-      |> Enum.filter(&(&1.agent_ref == ref and &1.turn_id == turn_id))
+      |> Enum.filter(&(&1.agent_address == address and &1.turn_id == turn_id))
       |> Enum.reduce_while(:ok, fn entry, :ok ->
         case delete(instance, entry) do
           :ok -> {:cont, :ok}
@@ -225,10 +225,10 @@ defmodule Jido.Persistence.WakeStore do
     end)
   end
 
-  defp location(%{agent_ref: %Ref{} = ref, turn_id: turn_id, wait_id: wait_id, deadline: deadline})
+  defp location(%{agent_address: %Address{} = address, turn_id: turn_id, wait_id: wait_id, deadline: deadline})
        when is_binary(turn_id) and is_binary(wait_id) and is_integer(deadline) do
     bucket = div(deadline, @bucket_ms)
-    shard = :erlang.phash2({Ref.to_map!(ref), turn_id, wait_id}, @shard_count)
+    shard = :erlang.phash2({Address.to_map!(address), turn_id, wait_id}, @shard_count)
     {:ok, bucket, shard}
   end
 
@@ -236,12 +236,18 @@ defmodule Jido.Persistence.WakeStore do
 
   defp merge(current, entries) do
     (current ++ entries)
-    |> Enum.uniq_by(&{&1.agent_ref, &1.turn_id, &1.wait_id, &1.deadline})
+    |> Enum.uniq_by(&{&1.agent_address, &1.turn_id, &1.wait_id, &1.deadline})
     |> Enum.sort_by(&{&1.deadline, &1.turn_id, &1.wait_id})
   end
 
   defp encode(config, bucket, shard, generation, entries) do
-    encoded = Enum.map(entries, &Map.update!(&1, :agent_ref, fn ref -> Ref.to_map!(ref) end))
+    # Keep the version-3 storage key so existing durable wake records remain readable.
+    encoded =
+      Enum.map(entries, fn entry ->
+        entry
+        |> Map.put(:agent_ref, Address.to_map!(entry.agent_address))
+        |> Map.delete(:agent_address)
+      end)
 
     Config.encode(config, %{
       format: @format,
@@ -273,10 +279,10 @@ defmodule Jido.Persistence.WakeStore do
   defp decode_entries(entries) do
     entries
     |> Enum.reduce_while({:ok, []}, fn entry, {:ok, acc} ->
-      with %{agent_ref: ref_map, turn_id: turn_id, wait_id: wait_id, deadline: deadline} <- entry,
-           {:ok, ref} <- Ref.from_map(ref_map),
+      with %{agent_ref: address_map, turn_id: turn_id, wait_id: wait_id, deadline: deadline} <- entry,
+           {:ok, address} <- Address.from_map(address_map),
            true <- is_binary(turn_id) and is_binary(wait_id) and is_integer(deadline) do
-        {:cont, {:ok, [%{agent_ref: ref, turn_id: turn_id, wait_id: wait_id, deadline: deadline} | acc]}}
+        {:cont, {:ok, [%{agent_address: address, turn_id: turn_id, wait_id: wait_id, deadline: deadline} | acc]}}
       else
         _ -> {:halt, {:error, :invalid_wake_entry}}
       end

@@ -6,7 +6,7 @@ This lesson authorizes one allowlisted operation before a simulated effect.
 
 - Authentication and tenant authorization belong before sensitive work.
 - A strict input schema can limit selectable operations.
-- Jido does not sandbox arbitrary Action code or make an Agent Ref a credential.
+- Jido does not sandbox arbitrary Action code or make an Agent Address a credential.
 
 ## Read the code
 

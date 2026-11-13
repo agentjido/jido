@@ -21,29 +21,29 @@ end
 defmodule Jido.Examples.Observability.ActivationMeasurements do
   @moduledoc "Measures a bounded passive Agent fleet through public APIs."
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Examples.Observability.ActivationMeasurements.Agent
 
   @doc "Creates logical Agents without keeping an activation process resident."
   def create(instance, namespace, count) when is_integer(count) and count > 0 do
     Enum.map(1..count, fn number ->
-      ref = Ref.new!(namespace: namespace, id: "measured-agent-#{number}")
-      {:ok, ^ref} = Jido.create_agent(instance, ref, Agent)
-      ref
+      address = Address.new!(namespace: namespace, id: "measured-agent-#{number}")
+      {:ok, ^address} = Jido.create_agent(instance, address, Agent)
+      address
     end)
   end
 
   @doc "Activates each Agent once and returns measured call samples."
   def activate(instance, refs) do
-    Enum.map(refs, fn ref ->
+    Enum.map(refs, fn address ->
       {:ok, signal} = Agent.ping_signal(%{})
       started_at = System.monotonic_time()
-      {:ok, result} = Jido.call(instance, ref, signal)
+      {:ok, result} = Jido.call(instance, address, signal)
 
       %{
         activation_id: result.agent_activation_id,
         elapsed_us: elapsed_us(started_at),
-        ref: ref,
+        address: address,
         status: result.status
       }
     end)

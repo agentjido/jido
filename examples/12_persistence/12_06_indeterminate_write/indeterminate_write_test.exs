@@ -63,8 +63,8 @@ defmodule Jido.Examples.Persistence.IndeterminateWriteTest do
     assert {:error, :unsafe_resume} = Jido.stop_agent(jido, server)
 
     old_monitor = Process.monitor(server)
-    assert {:ok, ref} = Jido.agent_ref(jido, id)
-    assert {:ok, replacement} = Jido.reconcile_agent(jido, ref)
+    assert {:ok, address} = Jido.agent_address(jido, id)
+    assert {:ok, replacement} = Jido.reconcile_agent(jido, address)
     assert_receive {:DOWN, ^old_monitor, :process, ^server, _reason}, 1_000
     assert replacement != server
     assert :ok = Jido.AgentServer.await_ready(replacement)

@@ -10,7 +10,7 @@ Purpose: Host one resident Agent activation and run every accepted Signal
 through one serialized Turn path.
 
 Review result: The component boundary and public facade are confirmed. The
-Jido Instance owns logical Agent life, stable Ref routing, persistence choice,
+Jido Instance owns logical Agent life, stable Address routing, persistence choice,
 activation, passivation, durable wake records, reconciliation, deletion, and
 definition upgrade. AgentServer owns only the current resident activation.
 
@@ -25,7 +25,7 @@ The facade has 13 functions:
 - `snapshot/2`, `status/2`, and `await_ready/2`
 
 The public values are `Pending`, `TurnResult`, `Snapshot`, and `Status`.
-`Jido.Agent.Ref` is the normal logical address. An AgentServer PID or OTP name
+`Jido.Agent.Address` is the normal logical address. An AgentServer PID or OTP name
 addresses only one current activation.
 
 All request modes use one Turn path. Accepted terminal states are data in a
@@ -38,7 +38,7 @@ reply.
 One activation root owns the AgentServer worker and Plugin supervisor. A
 worker restart keeps the activation ID and healthy Plugin runtime. Passivation
 stops the activation. Reactivation creates a new activation ID but keeps the
-stable Agent Ref.
+stable Agent Address.
 
 The worker, activation supervisor, Plugin roots, execution workers, internal
 state-machine phases, effect detail, and composition records are not public
@@ -48,7 +48,7 @@ inspection data.
 
 AgentServer can host a durable Flow Turn, but it does not own durable workflow
 authoring. `Jido.Durable` accepts only `Jido.Flow` and reuses `Jido.Exec`.
-Signals resume saved waits through the stable Ref delivery path. The Instance
+Signals resume saved waits through the stable Address delivery path. The Instance
 stores wake deadlines so a timer can reactivate a passivated Agent after a
 restart.
 
@@ -57,7 +57,7 @@ operation can change the persistence revision without changing Agent state.
 
 ## Proof
 
-The focused contract suite covers stable Ref delivery, warm residency,
+The focused contract suite covers stable Address delivery, warm residency,
 passivation, worker recovery, accepted failure values, durable Signal retry,
 timer wake-up after Instance restart, concurrent activation, uncertain-write
 reconciliation, definition upgrade, and stable Plugin runtime.

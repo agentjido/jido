@@ -1,17 +1,17 @@
-# 07_04 Stable Reference
+# 07_04 Stable Address
 
-A stable Agent Ref resolves the current conversation process after replacement.
+A stable Agent Address resolves the current conversation process after replacement.
 
 ## What you will learn
 
-- How a Ref keeps namespace, partition, and Agent identity without keeping a PID.
-- How the same Ref reaches restored state after process or instance replacement.
+- How an Address keeps namespace, partition, and Agent identity without keeping a PID.
+- How the same Address reaches restored state after process or instance replacement.
 - How partitions isolate equal namespace and Agent ID pairs.
-- How `Ref.to_map/1` and `Ref.from_map/1` transport exact versioned identity.
+- How `Address.to_map/1` and `Address.from_map/1` transport exact versioned identity.
 
 ## Read the code
 
-Read [the conversation Agent and Ref client](stable_reference.ex), then read the
+Read [the conversation Agent and Address client](stable_address.ex), then read the
 behavior tests.
 
 ## Run it
@@ -25,25 +25,25 @@ replacement, persistence restore, and instance rebinding.
 
 ## Important behavior
 
-Resolve the Ref for each operation. Equal Agent IDs in different namespaces are
+Resolve the Address for each operation. Equal Agent IDs in different namespaces are
 different identities. Equal namespace and ID values in different partitions
 are also different identities. Rebinding a namespace to a new local Jido
 instance keeps the durable identity when both instances use the same
 persistence record.
 
 The public map has exact string keys for version, namespace, partition, and ID.
-Decode it with `Ref.from_map/1` before use. A Ref is an identifier, not a
+Decode it with `Address.from_map/1` before use. A Address is an identifier, not a
 credential.
 
 ## Limits
 
-The test store is local and in memory. A Ref does not provide cluster-wide
+The test store is local and in memory. A Address does not provide cluster-wide
 ownership, routing, or fencing.
 
 ## Files
 
-- [Source](stable_reference.ex)
-- [Tests](stable_reference_test.exs)
+- [Source](stable_address.ex)
+- [Tests](stable_address_test.exs)
 
-Previous: [Stable references](../07_03_stable_references/README.md) |
+Previous: [Stable Addresses](../07_03_stable_addresses/README.md) |
 Next: [Catalog discovery](../07_05_catalog_discovery/README.md)

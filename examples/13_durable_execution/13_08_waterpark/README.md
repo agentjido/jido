@@ -1,7 +1,7 @@
 # 13_08 Waterpark
 
 This example proves the durable Agent activation model in one Jido Instance.
-It creates 20 long-lived Agents. Normal delivery uses `Jido.Agent.Ref`, not a
+It creates 20 long-lived Agents. Normal delivery uses `Jido.Agent.Address`, not a
 process identifier. Active Agents stay warm for a short time. Idle Agents
 passivate and restore from the same durable state.
 
@@ -31,7 +31,7 @@ mix test.examples examples/13_durable_execution/13_08_waterpark --warnings-as-er
 ## Important behavior
 
 The example does not start another Instance or BEAM node. It has no mesh,
-placement, or remote routing code. A later mesh can route the same Agent Ref to
+placement, or remote routing code. A later mesh can route the same Agent Address to
 the owning Instance without a change to AgentServer.
 
 `Jido.Examples.Durable.Waterpark.load/3` is an optional local load helper. Its

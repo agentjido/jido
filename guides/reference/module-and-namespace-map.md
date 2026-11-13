@@ -171,7 +171,7 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | `Jido.Agent.Plugin.Preparation` | Read-only input for one pure Agent Plugin preparation callback. |
 | `Jido.Agent.Plugin.Reduction` | Read-only input for one pure Agent Plugin state reduction. |
 | `Jido.Agent.Plugin.RouteSelection` | Read-only input for one pure Agent Plugin route selection callback. |
-| `Jido.Agent.Ref` | Stable identity for one logical Agent. |
+| `Jido.Agent.Address` | Stable identity for one logical Agent. |
 | `Jido.Agent.Route` | Pure route normalization and selection. |
 | `Jido.Agent.Topology` | Logical members and output connections. |
 | `Jido.Agent.View` | Builds a safe, framework-neutral view of one Agent. |

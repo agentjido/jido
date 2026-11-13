@@ -127,9 +127,9 @@ defmodule Jido.Persistence.Inspector do
          %{agent_module: module, namespace: namespace, agent_id: id, partition: partition} = value
        )
        when is_atom(module) and is_binary(namespace) and is_binary(id) do
-    with {:ok, ref} <- Jido.Agent.Ref.new(namespace: namespace, id: id, partition: partition),
-         true <- Jido.Persistence.agent_key(ref) == key,
-         :ok <- Jido.Persistence.Record.validate(value, ref, module) do
+    with {:ok, address} <- Jido.Agent.Address.new(namespace: namespace, id: id, partition: partition),
+         true <- Jido.Persistence.agent_key(address) == key,
+         :ok <- Jido.Persistence.Record.validate(value, address, module) do
       :ok
     else
       _ -> {:error, :invalid_persistence_record}

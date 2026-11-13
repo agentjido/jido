@@ -72,7 +72,7 @@ defmodule Jido.Test.Persistence.ProbeStore do
 
   @doc "Changes one stored record to test validation at the load boundary."
   def rewrite_record({__MODULE__, opts}, id, update) do
-    key = Jido.Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-probe", id: id))
+    key = Jido.Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-probe", id: id))
 
     with {:ok, bytes} <- get(key, opts),
          {:ok, record} <- Jido.Persistence.Codec.Term.decode(bytes, []),

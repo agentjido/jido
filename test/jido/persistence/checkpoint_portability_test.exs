@@ -35,7 +35,7 @@ defmodule Jido.Persistence.CheckpointPortabilityTest do
               path: [:snapshot, :agent, :state, :payload, :job, :worker]
             }} = Persistence.save_agent(c.store, agent, namespace: "persistence-probe")
 
-    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-probe", id: c.id))
+    key = Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-probe", id: c.id))
     assert {:error, :not_found} = Store.get(key, elem(c.store, 1))
   end
 
@@ -49,7 +49,7 @@ defmodule Jido.Persistence.CheckpointPortabilityTest do
               path: [:snapshot, :agent, :state, :payload, :job, :values, 1]
             }} = Persistence.save_agent(c.store, agent, namespace: "persistence-probe")
 
-    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-probe", id: c.id))
+    key = Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-probe", id: c.id))
     assert {:error, :not_found} = Store.get(key, elem(c.store, 1))
   end
 

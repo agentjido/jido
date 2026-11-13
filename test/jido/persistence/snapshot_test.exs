@@ -387,8 +387,8 @@ defmodule Jido.Persistence.SnapshotTest do
     agent = %{F.agent() | id: "stored-upgrade-#{System.unique_integer([:positive])}"}
     assert :ok = Persistence.create_agent(store, agent, opts)
 
-    ref = Agent.Ref.new!(namespace: namespace, id: agent.id)
-    key = Persistence.agent_key(ref)
+    address = Agent.Address.new!(namespace: namespace, id: agent.id)
+    key = Persistence.agent_key(address)
     assert {:ok, bytes, condition} = Store.read(store, key)
     assert {:ok, record} = Record.decode(bytes)
     snapshot = Record.checkpoint(record)
@@ -442,8 +442,8 @@ defmodule Jido.Persistence.SnapshotTest do
                expires_at: :infinity
              })
 
-    ref = Agent.Ref.new!(namespace: namespace, id: agent.id)
-    key = Persistence.agent_key(ref)
+    address = Agent.Address.new!(namespace: namespace, id: agent.id)
+    key = Persistence.agent_key(address)
     assert {:ok, bytes, condition} = Store.read(store, key)
     assert {:ok, record} = Record.decode(bytes)
     assert {:ok, turn_bytes} = Record.encode(Map.put(record, :server_turn, turn))
@@ -475,8 +475,8 @@ defmodule Jido.Persistence.SnapshotTest do
     assert {:ok, ^next, 1} =
              Persistence.load_agent_with_revision(store, agent.module, agent.id, opts)
 
-    ref = Agent.Ref.new!(namespace: "evolution", id: agent.id)
-    key = Persistence.agent_key(ref)
+    address = Agent.Address.new!(namespace: "evolution", id: agent.id)
+    key = Persistence.agent_key(address)
     assert {:ok, bytes} = Persistence.ETS.get(key, elem(store, 1))
 
     assert {:error, :conflict} =

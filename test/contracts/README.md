@@ -19,7 +19,7 @@ tests with its obligation tags.
 
 | Component | Purpose | Contract area |
 | --- | --- | --- |
-| `jido.instance` | Jido instance supervision, namespace, options, and Ref routing | `test/contracts/jido/instance.*` |
+| `jido.instance` | Jido instance supervision, namespace, options, and Address routing | `test/contracts/jido/instance.*` |
 | `jido.agent` | Agent model, authoring, validation, logical topology, and edits | `test/contracts/jido/agent.*` |
 | `jido.agent_evaluation` | Pure Agent evaluation and candidate production | `test/contracts/jido/agent_evaluation.*` |
 | `jido.agent_server` | Transient serialized Turn lifecycle | `test/contracts/jido/agent_server.*` |
@@ -125,7 +125,7 @@ durable business delivery or acknowledgement.
 DSL, static logical topology, fixed extension contributions, the Agent document
 codec adapter, and safe Agent views. It uses shared
 Codec, Registry, Document, Value, and Discovery behavior from
-`jido_action`. It does not own pure evaluation, Agent references, AgentServer
+`jido_action`. It does not own pure evaluation, Agent Addresses, AgentServer
 lifecycle, Directive dispatch, persistence, or bundled Plugin runtime behavior.
 
 `jido.agent_evaluation` owns pure route selection, executable evaluation,

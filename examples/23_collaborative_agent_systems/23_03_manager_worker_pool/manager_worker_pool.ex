@@ -96,36 +96,36 @@ end
 defmodule Jido.Examples.Collaboration.ManagerPool do
   alias Jido.Examples.Collaboration.ManagerPool.{Manager, Worker}
 
-  def run(jido, manager_ref, worker_refs, mission_id, tasks) do
+  def run(jido, manager_address, worker_addresses, mission_id, tasks) do
     task_ids = Enum.map(tasks, & &1.task_id)
 
     with {:ok, _turn} <-
-           Jido.call(jido, manager_ref, Manager.start_signal!(%{mission_id: mission_id, task_ids: task_ids})) do
+           Jido.call(jido, manager_address, Manager.start_signal!(%{mission_id: mission_id, task_ids: task_ids})) do
       results =
-        worker_refs
+        worker_addresses
         |> Enum.zip(tasks)
         |> Task.async_stream(
-          fn {worker_ref, task} -> run_worker(jido, worker_ref, task) end,
+          fn {worker_address, task} -> run_worker(jido, worker_address, task) end,
           ordered: true,
-          max_concurrency: length(worker_refs),
+          max_concurrency: length(worker_addresses),
           timeout: 1_000
         )
         |> Enum.map(fn {:ok, result} -> result end)
 
       Enum.each(results, fn result ->
         signal = Manager.collect_signal!(Map.put(result, :mission_id, mission_id))
-        {:ok, _turn} = Jido.call(jido, manager_ref, signal)
+        {:ok, _turn} = Jido.call(jido, manager_address, signal)
       end)
 
-      {:ok, manager} = Jido.activate_agent(jido, manager_ref)
+      {:ok, manager} = Jido.activate_agent(jido, manager_address)
       {:ok, Jido.AgentServer.snapshot(manager).agent.state}
     end
   end
 
-  defp run_worker(jido, worker_ref, task) do
+  defp run_worker(jido, worker_address, task) do
     signal = Worker.execute_signal!(task)
 
-    case Jido.call(jido, worker_ref, signal) do
+    case Jido.call(jido, worker_address, signal) do
       {:ok, %Jido.AgentServer.TurnResult{status: :committed, reply: reply}}
       when not is_nil(reply) ->
         reply.data

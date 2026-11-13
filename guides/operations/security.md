@@ -21,7 +21,7 @@ Treat the BEAM node as one trust zone. Anything inside can reach anything else, 
 
 A partition, a namespace, and an instance organize Agents. None of them is an access control.
 
-A `Jido.Agent.Ref` is an identifier and not a credential. Anyone holding one can address that Agent through the instance. Check authorization in your application before you build a Ref or look up an Agent, and take the tenant from your authenticated session rather than from the request's data. All tenants in one BEAM also share memory and schedulers, and a tenant that must not affect another needs a separate node. See [Instances and Tenants](configuration-and-tenant-isolation.md#what-a-partition-does-not-do).
+A `Jido.Agent.Address` is an identifier and not a credential. Anyone holding one can address that Agent through the instance. Check authorization in your application before you build an Address or look up an Agent, and take the tenant from your authenticated session rather than from the request's data. All tenants in one BEAM also share memory and schedulers, and a tenant that must not affect another needs a separate node. See [Instances and Tenants](configuration-and-tenant-isolation.md#what-a-partition-does-not-do).
 
 ## Inbound Signals
 

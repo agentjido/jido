@@ -4,7 +4,7 @@ defmodule Jido.Instance.Wake do
   use GenServer
   require Logger
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Instance.Names
   alias Jido.Persistence.WakeStore
 
@@ -22,12 +22,12 @@ defmodule Jido.Instance.Wake do
     :exit, _reason -> {:error, :wake_capability_unavailable}
   end
 
-  def register(instance, %Ref{} = ref, turn_id, waits) do
+  def register(instance, %Address{} = address, turn_id, waits) do
     entries =
       for wait <- waits,
           option <- wait.options,
           is_integer(option.deadline),
-          do: %{agent_ref: ref, turn_id: turn_id, wait_id: wait.id, deadline: option.deadline}
+          do: %{agent_address: address, turn_id: turn_id, wait_id: wait.id, deadline: option.deadline}
 
     if entries == [] do
       :ok
@@ -38,10 +38,10 @@ defmodule Jido.Instance.Wake do
     :exit, _reason -> {:error, :wake_capability_unavailable}
   end
 
-  def complete(nil, _ref, _turn_id), do: :ok
+  def complete(nil, _address, _turn_id), do: :ok
 
-  def complete(instance, %Ref{} = ref, turn_id) do
-    GenServer.cast(Names.wake(instance), {:complete, ref, turn_id})
+  def complete(instance, %Address{} = address, turn_id) do
+    GenServer.cast(Names.wake(instance), {:complete, address, turn_id})
   end
 
   @impl true
@@ -76,13 +76,13 @@ defmodule Jido.Instance.Wake do
   end
 
   @impl true
-  def handle_cast({:complete, ref, turn_id}, state) do
-    complete_turn(state, ref, turn_id)
+  def handle_cast({:complete, address, turn_id}, state) do
+    complete_turn(state, address, turn_id)
   end
 
   @impl true
-  def handle_info({:complete_turn, ref, turn_id}, state) do
-    complete_turn(state, ref, turn_id)
+  def handle_info({:complete_turn, address, turn_id}, state) do
+    complete_turn(state, address, turn_id)
   end
 
   def handle_info({:cleanup_wake, entry}, state) do
@@ -121,10 +121,10 @@ defmodule Jido.Instance.Wake do
     end
   end
 
-  defp complete_turn(state, ref, turn_id) do
-    case WakeStore.delete_turn(state.instance, ref, turn_id) do
+  defp complete_turn(state, address, turn_id) do
+    case WakeStore.delete_turn(state.instance, address, turn_id) do
       :ok ->
-        {:noreply, cancel_turn_timers(state, ref, turn_id)}
+        {:noreply, cancel_turn_timers(state, address, turn_id)}
 
       {:error, reason} ->
         Logger.warning("Jido wake cleanup failed; retrying",
@@ -133,16 +133,16 @@ defmodule Jido.Instance.Wake do
           reason: inspect(reason)
         )
 
-        Process.send_after(self(), {:complete_turn, ref, turn_id}, @retry_ms)
+        Process.send_after(self(), {:complete_turn, address, turn_id}, @retry_ms)
         {:noreply, state}
     end
   end
 
-  defp cancel_turn_timers(state, ref, turn_id) do
+  defp cancel_turn_timers(state, address, turn_id) do
     timers =
       Enum.reduce(state.timers, state.timers, fn {key, timer}, timers ->
         case key do
-          {^ref, ^turn_id, _wait_id, _deadline} ->
+          {^address, ^turn_id, _wait_id, _deadline} ->
             Process.cancel_timer(timer)
             Map.delete(timers, key)
 
@@ -229,7 +229,7 @@ defmodule Jido.Instance.Wake do
         source: "/jido/instance/wake"
       )
 
-    case Jido.call(instance, entry.agent_ref, signal) do
+    case Jido.call(instance, entry.agent_address, signal) do
       {:ok, %Jido.AgentServer.TurnResult{}} -> :ok
       {:error, reason} when reason in [:stale_wait, :wait_not_matched, :deleted, :not_found] -> :stale
       {:error, _reason} = error -> error
@@ -245,5 +245,5 @@ defmodule Jido.Instance.Wake do
   end
 
   defp entry_key(entry),
-    do: {entry.agent_ref, entry.turn_id, entry.wait_id, entry.deadline}
+    do: {entry.agent_address, entry.turn_id, entry.wait_id, entry.deadline}
 end

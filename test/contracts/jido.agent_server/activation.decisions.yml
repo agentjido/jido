@@ -6,7 +6,7 @@
 
 - id: activation-instance-handoff
   date: 2026-10-19
-  decision: Keep Ref construction and routing in jido.instance. Move selected-instance activation ownership, fixed-default consumption, and activation uniqueness from old AgentServer obligations I36, I38, and I69 to this component.
+  decision: Keep Address construction and routing in jido.instance. Move selected-instance activation ownership, fixed-default consumption, and activation uniqueness from old AgentServer obligations I36, I38, and I69 to this component.
   driver: The instance selects and resolves an activation. The activation owns the selected local process lifetime.
   approved_by: Component hardening pass
 

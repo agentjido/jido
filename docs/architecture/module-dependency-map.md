@@ -676,7 +676,7 @@ Disposition terms:
 | `Jido.Agent.Mutation` | Removed | Definition mutation is not part of Agent evaluation; AgentServer upgrade replaces a complete trusted definition |
 | `Jido.Agent.Options` | Removed | Agent macro option preparation now belongs to the public `Jido.Agent` authoring boundary |
 | `Jido.Agent.Plugin` | Keep | Pure Agent-owned Plugin callback execution |
-| `Jido.Agent.Ref` | Keep | Stable logical Agent identity |
+| `Jido.Agent.Address` | Keep | Stable logical Agent identity |
 | `Jido.Agent.Route` | Keep | Pure Flow-route normalization and selection; direct Action authoring lowers to a one-step Flow |
 | `Jido.Agent.Runner` | Keep internal | Pure route selection, Flow-instruction preparation, result projection, and state validation; no AgentServer dependency |
 | `Jido.Agent.Schema` | Keep | Canonical generic Agent authoring checks, struct schema, defaults, and schema traversal |
@@ -725,7 +725,7 @@ Disposition terms:
 | `Jido.Persistence.Ecto` | Keep | Ecto adapter |
 | `Jido.Persistence.ETS` | Keep | ETS adapter |
 | `Jido.Persistence.File` | Keep | File adapter |
-| `Jido.Persistence.Identity` | Removed | The Persistence facade resolves Agent Refs and Record owns stable key construction |
+| `Jido.Persistence.Identity` | Removed | The Persistence facade resolves Agent Addresses and Record owns stable key construction |
 | `Jido.Persistence.Inspector` | Added | Redacted exact read and optional paged JSONL export above Store bytes |
 | `Jido.Persistence.Mnesia` | Keep | Mnesia adapter |
 | `Jido.Persistence.NamespaceManifest` | Added internal | Pins codec and V3 record layouts before durable readiness |
@@ -765,7 +765,7 @@ Disposition terms:
 | `Jido.Instance.Names` | Keep internal | Canonical per-instance runtime naming and partition-key policy |
 | `Jido.Instance.NamespaceRegistry` | Keep | Instance namespace ownership process |
 | `Jido.Instance.Options` | Keep | Instance option materialization and validation |
-| `Jido.Instance.RefFacade` | Removed | Public calls are in `Jido`; Ref-specific validation is in `Jido.Agent.Ref` |
+| `Jido.Instance.RefFacade` | Removed | Public calls are in `Jido`; Address-specific validation is in `Jido.Agent.Address` |
 | `Jido.Instance.RuntimeStore` | Keep internal | Per-instance runtime infrastructure and live settings; replaces `Jido.RuntimeStore` and root setting delegates |
 
 ### AI

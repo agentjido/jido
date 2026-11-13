@@ -257,16 +257,16 @@ defmodule ShutdownGuide.Recovery do
 
   def run(ids) do
     for id <- ids do
-      {:ok, ref} = Jido.agent_ref(ShutdownGuide.Instance, id)
-      {:ok, _server} = Jido.activate_agent(ShutdownGuide.Instance, ref, ShutdownGuide.Dock)
+      {:ok, address} = Jido.agent_address(ShutdownGuide.Instance, id)
+      {:ok, _server} = Jido.activate_agent(ShutdownGuide.Instance, address, ShutdownGuide.Dock)
     end
   end
 end
 
 {:ok, _bootstrap} = ShutdownGuide.Instance.start_link()
-{:ok, dock_ref} = Jido.agent_ref(ShutdownGuide.Instance, "dock-1")
-{:ok, ^dock_ref} =
-  Jido.create_agent(ShutdownGuide.Instance, dock_ref, ShutdownGuide.Dock)
+{:ok, dock_address} = Jido.agent_address(ShutdownGuide.Instance, "dock-1")
+{:ok, ^dock_address} =
+  Jido.create_agent(ShutdownGuide.Instance, dock_address, ShutdownGuide.Dock)
 :ok = Jido.stop(ShutdownGuide.Instance)
 
 {:ok, runtime} =

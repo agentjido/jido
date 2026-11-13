@@ -4,26 +4,26 @@ defmodule Jido.Examples.CodecDocumentsTest do
   use ExUnit.Case, async: true
   @moduletag :integration
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Codec.Document
   alias Jido.Examples.CodecDocuments
   alias Jido.Examples.CodecDocuments.AddressableAgent
 
   test "definition and stable address remain separate portable documents" do
-    ref = Ref.new!(namespace: "examples/codec", partition: "tenant-a", id: "agent-7")
+    address = Address.new!(namespace: "examples/codec", partition: "tenant-a", id: "agent-7")
     assert {:ok, definition_document} = CodecDocuments.encode_definition()
-    envelope = CodecDocuments.envelope(ref, definition_document)
+    envelope = CodecDocuments.envelope(address, definition_document)
 
     assert :ok = CodecDocuments.validate_json(envelope, 64_000)
     assert {:ok, definition} = CodecDocuments.decode_definition(envelope["definition"])
     assert definition == AddressableAgent.definition()
-    assert {:ok, ^ref} = Ref.from_map(envelope["address"])
+    assert {:ok, ^address} = Address.from_map(envelope["address"])
   end
 
   test "the complete JSON byte limit is checked before storage" do
-    ref = Ref.new!(namespace: "examples/codec", id: "agent-7")
+    address = Address.new!(namespace: "examples/codec", id: "agent-7")
     assert {:ok, definition_document} = CodecDocuments.encode_definition()
-    envelope = CodecDocuments.envelope(ref, definition_document)
+    envelope = CodecDocuments.envelope(address, definition_document)
 
     assert {:error, %Document.Error{reason: :bytes}} =
              CodecDocuments.validate_json(envelope, 32)

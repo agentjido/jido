@@ -2,7 +2,7 @@ defmodule Jido.Persistence do
   @moduledoc """
   Saves and restores portable Agent checkpoints through a persistence adapter.
 
-  This module owns durable Agent operations and Ref resolution.
+  This module owns durable Agent operations and Address resolution.
   `Jido.Persistence.Record` owns record keys, encoding, and validation.
   `Jido.Persistence.Store` contains byte-adapter faults and write outcomes.
   Adapters only store binary keys and values.
@@ -39,7 +39,7 @@ defmodule Jido.Persistence do
   the default checkpoint path. Complete custom Agent checkpoints bypass this
   conversion and keep their opaque callback contract.
 
-  Each durable Agent uses one exact `{namespace, partition, id}` Ref key and
+  Each durable Agent uses one exact `{namespace, partition, id}` Address key and
   record format 3. Supply `:namespace`, or use the namespace of a live Jido
   `:instance`. The Agent module is checked in the record, but is not part of
   its key. `:instance` also supplies checkpoint callback context.
@@ -54,7 +54,7 @@ defmodule Jido.Persistence do
   """
 
   alias Jido.Agent
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Error
   alias Jido.Persistence.{Checkpoint, Config, Record, Store}
   alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
@@ -246,16 +246,16 @@ defmodule Jido.Persistence do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
       Store.protect(:compare_and_swap, fn ->
         with {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
-             {:ok, ref} <- resolve_ref(instance, agent.id, opts),
-             {:ok, record} <- build_record(agent, instance, opts, ref),
+             {:ok, address} <- resolve_address(instance, agent.id, opts),
+             {:ok, record} <- build_record(agent, instance, opts, address),
              {:ok, expected_revision} <- expected_revision(opts),
              {:ok, expected_value} <-
-               current_value(config, record, ref, expected_revision, previous_module),
+               current_value(config, record, address, expected_revision, previous_module),
              {:ok, value} <- Record.encode(record, config),
              :ok <-
                Store.compare_and_swap(
                  config.store,
-                 Record.agent_key(ref),
+                 Record.agent_key(address),
                  expected_value,
                  value
                ) do
@@ -274,14 +274,14 @@ defmodule Jido.Persistence do
         with :ok <- validate_operation_options(opts, @create_options),
              {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
              :ok <- validate_initial_revision(opts),
-             {:ok, ref} <- resolve_ref(instance, agent.id, opts),
+             {:ok, address} <- resolve_address(instance, agent.id, opts),
              {:ok, record} <-
-               build_record(agent, instance, Keyword.put(opts, :revision, 0), ref),
+               build_record(agent, instance, Keyword.put(opts, :revision, 0), address),
              {:ok, value} <- Record.encode(record, config),
              :ok <-
                Store.compare_and_swap(
                  config.store,
-                 Record.agent_key(ref),
+                 Record.agent_key(address),
                  :not_found,
                  value
                ) do
@@ -340,30 +340,30 @@ defmodule Jido.Persistence do
       })
 
   @doc false
-  @spec load_agent_ref(adapter_config() | atom(), Ref.t(), keyword()) ::
+  @spec load_agent_address(adapter_config() | atom(), Address.t(), keyword()) ::
           {:ok, Agent.t(), non_neg_integer(), non_neg_integer(), map() | nil}
           | {:error, term()}
-  def load_agent_ref(source, ref, opts \\ [])
+  def load_agent_address(source, address, opts \\ [])
 
-  def load_agent_ref(source, %Ref{} = ref, opts) do
+  def load_agent_address(source, %Address{} = address, opts) do
     Store.protect(:get, fn ->
       with :ok <- validate_operation_options(opts, [:instance]),
            {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
-           :ok <- validate_ref_instance(ref, instance),
+           :ok <- validate_address_instance(address, instance),
            {:ok, value, _condition} <-
-             Store.read(config.store, Record.agent_key(ref)),
+             Store.read(config.store, Record.agent_key(address)),
            {:ok, record} <- Record.decode(value, config),
            {:ok, agent_module} <- record_agent_module(record),
-           :ok <- Record.validate(record, ref, agent_module),
+           :ok <- Record.validate(record, address, agent_module),
            :ok <- Record.require_active(record),
-           {:ok, agent} <- Checkpoint.restore_agent(record, agent_module, ref.id, instance) do
+           {:ok, agent} <- Checkpoint.restore_agent(record, agent_module, address.id, instance) do
         {:ok, agent, Record.revision(record), Record.agent_revision(record), Map.get(record, :server_turn)}
       end
     end)
   end
 
-  def load_agent_ref(_source, ref, _opts),
-    do: invalid_public_input(:load_agent_ref, %{agent_ref: ref})
+  def load_agent_address(_source, address, _opts),
+    do: invalid_public_input(:load_agent_address, %{agent_address: address})
 
   @doc """
   Atomically upgrades one inactive saved Agent.
@@ -397,15 +397,15 @@ defmodule Jido.Persistence do
                context = Keyword.get(opts, :context, %{}),
                :ok <- Jido.Agent.Schema.plain_map(context),
                {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
-               {:ok, ref} <- resolve_ref(instance, agent_id, opts),
-               key = Record.agent_key(ref),
+               {:ok, address} <- resolve_address(instance, agent_id, opts),
+               key = Record.agent_key(address),
                {:ok, value, condition} <- Store.read(config.store, key),
                {:ok, record} <- decode_record(value, agent_module, config),
-               :ok <- Record.validate(record, ref, agent_module),
+               :ok <- Record.validate(record, address, agent_module),
                :ok <- Record.require_active(record),
                :ok <- require_inactive_turn(record),
                revision = Record.revision(record),
-               action_context = stored_upgrade_context(context, instance, ref, revision),
+               action_context = stored_upgrade_context(context, instance, address, revision),
                {:ok, upgraded} <-
                  upgrade(Record.checkpoint(record), action, context: action_context),
                :ok <- validate_definition_upgrade(record, upgraded),
@@ -416,13 +416,13 @@ defmodule Jido.Persistence do
                    upgraded,
                    instance,
                    [
-                     partition: ref.partition,
+                     partition: address.partition,
                      revision: next_revision,
                      agent_revision: next_agent_revision,
                      reason: :stored_upgrade,
                      server_turn: Map.get(record, :server_turn)
                    ],
-                   ref
+                   address
                  ),
                {:ok, next_value} <- Record.encode(next_record, config),
                :ok <-
@@ -468,8 +468,8 @@ defmodule Jido.Persistence do
       Store.protect(:delete, fn ->
         with :ok <- validate_operation_options(opts, @identity_options),
              {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
-             {:ok, ref} <- resolve_ref(instance, agent_id, opts) do
-          delete_current(config, ref, agent_module)
+             {:ok, address} <- resolve_address(instance, agent_id, opts) do
+          delete_current(config, address, agent_module)
         end
       end)
     end)
@@ -479,24 +479,24 @@ defmodule Jido.Persistence do
     do: invalid_public_input(:delete_agent, %{agent_module: agent_module, agent_id: agent_id})
 
   @doc false
-  @spec delete_agent_ref(adapter_config() | atom(), Ref.t(), keyword()) :: :ok | {:error, term()}
-  def delete_agent_ref(source, ref, opts \\ [])
+  @spec delete_agent_address(adapter_config() | atom(), Address.t(), keyword()) :: :ok | {:error, term()}
+  def delete_agent_address(source, address, opts \\ [])
 
-  def delete_agent_ref(source, %Ref{} = ref, opts) do
+  def delete_agent_address(source, %Address{} = address, opts) do
     Store.protect(:compare_and_swap, fn ->
       with :ok <- validate_operation_options(opts, [:instance]),
            {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
-           :ok <- validate_ref_instance(ref, instance),
-           {:ok, value, _condition} <- Store.read(config.store, Record.agent_key(ref)),
+           :ok <- validate_address_instance(address, instance),
+           {:ok, value, _condition} <- Store.read(config.store, Record.agent_key(address)),
            {:ok, record} <- Record.decode(value, config),
            {:ok, agent_module} <- record_agent_module(record) do
-        delete_current(config, ref, agent_module)
+        delete_current(config, address, agent_module)
       end
     end)
   end
 
-  def delete_agent_ref(_source, ref, _opts),
-    do: invalid_public_input(:delete_agent_ref, %{agent_ref: ref})
+  def delete_agent_address(_source, address, _opts),
+    do: invalid_public_input(:delete_agent_address, %{agent_address: address})
 
   defp invalid_public_input(operation, details) do
     {:error,
@@ -508,10 +508,10 @@ defmodule Jido.Persistence do
   end
 
   @doc false
-  @spec agent_key(Ref.t()) :: binary()
-  def agent_key(%Ref{} = ref), do: Record.agent_key(ref)
+  @spec agent_key(Address.t()) :: binary()
+  def agent_key(%Address{} = address), do: Record.agent_key(address)
 
-  defp resolve_ref(instance, agent_id, opts) do
+  defp resolve_address(instance, agent_id, opts) do
     case Keyword.get_lazy(opts, :namespace, fn ->
            Jido.Instance.NamespaceRegistry.namespace(instance)
          end) do
@@ -519,17 +519,17 @@ defmodule Jido.Persistence do
         {:error, :stable_namespace_required}
 
       namespace ->
-        Ref.new(namespace: namespace, partition: Keyword.get(opts, :partition), id: agent_id)
+        Address.new(namespace: namespace, partition: Keyword.get(opts, :partition), id: agent_id)
     end
   end
 
-  defp validate_ref_instance(_ref, nil), do: :ok
+  defp validate_address_instance(_address, nil), do: :ok
 
-  defp validate_ref_instance(ref, instance) do
+  defp validate_address_instance(address, instance) do
     case Jido.Instance.NamespaceRegistry.namespace(instance) do
       namespace when is_binary(namespace) ->
-        case Ref.validate_namespace(ref, namespace) do
-          {:ok, _ref} -> :ok
+        case Address.validate_namespace(address, namespace) do
+          {:ok, _address} -> :ok
           {:error, _reason} = error -> error
         end
 
@@ -561,11 +561,11 @@ defmodule Jido.Persistence do
       Store.protect(:get, fn ->
         with :ok <- validate_operation_options(opts, @identity_options),
              {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
-             {:ok, ref} <- resolve_ref(instance, agent_id, opts),
+             {:ok, address} <- resolve_address(instance, agent_id, opts),
              {:ok, value, _condition} <-
-               Store.read(config.store, Record.agent_key(ref)),
+               Store.read(config.store, Record.agent_key(address)),
              {:ok, record} <- decode_record(value, agent_module, config),
-             :ok <- Record.validate(record, ref, agent_module),
+             :ok <- Record.validate(record, address, agent_module),
              :ok <- Record.require_active(record),
              {:ok, agent} <- Checkpoint.restore_agent(record, agent_module, agent_id, instance) do
           {:ok, agent, Record.revision(record), Record.agent_revision(record), Map.get(record, :server_turn)}
@@ -595,11 +595,11 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp stored_upgrade_context(context, instance, ref, revision) do
+  defp stored_upgrade_context(context, instance, address, revision) do
     Map.merge(context, %{
       instance: instance,
-      namespace: ref.namespace,
-      partition: ref.partition,
+      namespace: address.namespace,
+      partition: address.partition,
       revision: revision,
       reason: :stored_upgrade
     })
@@ -620,8 +620,8 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp current_value(%Config{} = config, record, ref, expected_revision, current_module) do
-    case Store.read(config.store, Record.agent_key(ref)) do
+  defp current_value(%Config{} = config, record, address, expected_revision, current_module) do
+    case Store.read(config.store, Record.agent_key(address)) do
       {:error, :not_found} when expected_revision in [:any, 0] ->
         {:ok, :not_found}
 
@@ -630,7 +630,7 @@ defmodule Jido.Persistence do
 
       {:ok, value, condition} ->
         with {:ok, current} <- decode_record(value, current_module, config),
-             :ok <- Record.validate(current, ref, current_module),
+             :ok <- Record.validate(current, address, current_module),
              :ok <- Record.require_active_for_write(current),
              :ok <- check_revision(current, record, expected_revision) do
           {:ok, condition}
@@ -707,7 +707,7 @@ defmodule Jido.Persistence do
   defp require_adapter(nil), do: {:error, :persistence_not_configured}
   defp require_adapter(config), do: {:ok, config}
 
-  defp build_record(agent, instance, opts, ref) do
+  defp build_record(agent, instance, opts, address) do
     partition = Keyword.get(opts, :partition)
     revision = Keyword.get(opts, :revision, 0)
     agent_revision = Keyword.get(opts, :agent_revision, revision)
@@ -726,7 +726,7 @@ defmodule Jido.Persistence do
          {:ok, record} <-
            Record.build_active(
              agent,
-             ref,
+             address,
              revision,
              agent_revision,
              checkpoint,
@@ -739,14 +739,14 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp delete_current(%Config{} = config, ref, agent_module) do
-    case read_for_delete(config.store, Record.agent_key(ref)) do
+  defp delete_current(%Config{} = config, address, agent_module) do
+    case read_for_delete(config.store, Record.agent_key(address)) do
       {:error, :not_found} ->
-        with {:ok, tombstone} <- Record.build_tombstone(ref, agent_module, 0, 0),
+        with {:ok, tombstone} <- Record.build_tombstone(address, agent_module, 0, 0),
              {:ok, value} <- Record.encode(tombstone, config) do
           Store.compare_and_swap(
             config.store,
-            Record.agent_key(ref),
+            Record.agent_key(address),
             :not_found,
             value
           )
@@ -754,7 +754,7 @@ defmodule Jido.Persistence do
 
       {:ok, expected_value, condition} ->
         with {:ok, current} <- decode_record(expected_value, agent_module, config),
-             :ok <- Record.validate(current, ref, agent_module) do
+             :ok <- Record.validate(current, address, agent_module) do
           case Record.kind(current) do
             :tombstone ->
               :ok
@@ -762,7 +762,7 @@ defmodule Jido.Persistence do
             :active ->
               with {:ok, tombstone} <-
                      Record.build_tombstone(
-                       ref,
+                       address,
                        agent_module,
                        Record.revision(current) + 1,
                        Record.agent_revision(current)
@@ -770,7 +770,7 @@ defmodule Jido.Persistence do
                    {:ok, value} <- Record.encode(tombstone, config) do
                 Store.compare_and_swap(
                   config.store,
-                  Record.agent_key(ref),
+                  Record.agent_key(address),
                   condition,
                   value
                 )

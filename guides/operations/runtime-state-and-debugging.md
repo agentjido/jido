@@ -80,14 +80,14 @@ nil = Jido.whereis_agent(DebugGuide.Jido, "depot-1")
 | --- | --- | --- |
 | `{:ok, pid}` | The Agent is ready. | Read its status. |
 | `{:error, :recovering}` | It is registered and still starting, often while it restores from storage. | Wait, or call `Jido.await_ready/3`. |
-| `{:error, :not_found}` | No live process has this Ref. | See [The Agent is gone](#the-agent-is-gone). |
+| `{:error, :not_found}` | No live process has this Address. | See [The Agent is gone](#the-agent-is-gone). |
 | `{:error, :unavailable}` | The instance Registry cannot be read. | See [The Agent is gone](#the-agent-is-gone). |
 
 ```elixir
-{:ok, ref} = Jido.agent_ref(DebugGuide.Jido, "depot-1", partition: "north")
-{:ok, ^dispatch} = Jido.resolve_agent(DebugGuide.Jido, ref)
+{:ok, address} = Jido.agent_address(DebugGuide.Jido, "depot-1", partition: "north")
+{:ok, ^dispatch} = Jido.resolve_agent(DebugGuide.Jido, address)
 
-{:ok, missing} = Jido.agent_ref(DebugGuide.Jido, "depot-9", partition: "north")
+{:ok, missing} = Jido.agent_address(DebugGuide.Jido, "depot-9", partition: "north")
 {:error, :not_found} = Jido.resolve_agent(DebugGuide.Jido, missing)
 ```
 

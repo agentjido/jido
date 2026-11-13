@@ -1,6 +1,6 @@
 # 09_03 Process replacement
 
-A stable Agent Ref resolves a replacement process after abnormal process loss.
+A stable Agent Address resolves a replacement process after abnormal process loss.
 
 ## What you will learn
 
@@ -14,7 +14,7 @@ Read [the stable replacement client](orphan_adoption.ex) and
 [the tests](orphan_adoption_test.exs).
 
 The Jido instance restarts the activation from its durable record. The logical
-Agent Ref and activation ID stay stable while the worker PID changes.
+Agent Address and activation ID stay stable while the worker PID changes.
 
 ## Run it
 

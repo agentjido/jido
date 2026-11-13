@@ -114,9 +114,9 @@ defmodule MyApp.AgentRecovery do
 
   def run do
     for id <- MyApp.Orders.open_order_ids() do
-      {:ok, ref} = Jido.agent_ref(MyApp.Jido, id)
+      {:ok, address} = Jido.agent_address(MyApp.Jido, id)
 
-      case Jido.activate_agent(MyApp.Jido, ref, MyApp.OrderAgent) do
+      case Jido.activate_agent(MyApp.Jido, address, MyApp.OrderAgent) do
         {:ok, _server} -> :ok
         {:error, reason} -> MyApp.Alerts.activation_failed(id, reason)
       end

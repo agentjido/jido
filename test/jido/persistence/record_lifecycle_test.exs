@@ -58,7 +58,7 @@ defmodule Jido.Persistence.RecordLifecycleTest do
 
     key =
       Persistence.agent_key(
-        Jido.Agent.Ref.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(jido), id: active.id)
+        Jido.Agent.Address.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(jido), id: active.id)
       )
 
     assert {:ok, bytes} = ETS.get(key, opts)
@@ -87,7 +87,7 @@ defmodule Jido.Persistence.RecordLifecycleTest do
 
     missing_key =
       Persistence.agent_key(
-        Jido.Agent.Ref.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(jido), id: missing_id)
+        Jido.Agent.Address.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(jido), id: missing_id)
       )
 
     assert {:ok, missing_bytes} = ETS.get(missing_key, opts)
@@ -132,7 +132,7 @@ defmodule Jido.Persistence.RecordLifecycleTest do
     {ETS, opts} = persistence = persistence(:old_formats)
     agent = RuntimeAgent.instantiate!(id: unique_id("old-formats"))
     assert {:ok, checkpoint} = Jido.Persistence.snapshot(agent)
-    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
+    key = Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: agent.id))
 
     for format <- [1, 2, 3, 4] do
       record = %{
@@ -169,7 +169,7 @@ defmodule Jido.Persistence.RecordLifecycleTest do
   test "outer definition and record changes fail closed without a replacement write" do
     {ETS, opts} = persistence = persistence(:fail_closed)
     agent = RuntimeAgent.instantiate!(id: unique_id("fail-closed"))
-    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
+    key = Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: agent.id))
     assert :ok = Persistence.save_agent(persistence, agent, namespace: "persistence-test")
     assert {:ok, original} = ETS.get(key, opts)
     assert {:ok, record} = Jido.Persistence.Codec.Term.decode(original, [])

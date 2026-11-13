@@ -110,7 +110,7 @@ every AgentServer; this component has no DSL.
 ### jido.agent_server.durable.I12 — Whole definition upgrade
 
 - **scope:** `Jido.AgentServer.upgrade/3`
-- **must:** Accept one complete Agent Codec document through an explicit trusted Catalog. Require an idle supervised activation. Reject busy work without queueing. Optionally run one Action or Flow that maps the old state to the complete new state and returns no Directives. Validate the full definition and state, save with revision control, replace the activation under the same stable Ref, and allow the AgentServer PID to change. Do not migrate an active durable Flow.
+- **must:** Accept one complete Agent Codec document through an explicit trusted Catalog. Require an idle supervised activation. Reject busy work without queueing. Optionally run one Action or Flow that maps the old state to the complete new state and returns no Directives. Validate the full definition and state, save with revision control, replace the activation under the same stable Address, and allow the AgentServer PID to change. Do not migrate an active durable Flow.
 - **why:** A definition replacement must be explicit, complete, trusted, and separate from normal Agent work.
 - **kind:** ordering
 - **status:** retired

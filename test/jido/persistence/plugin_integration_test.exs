@@ -144,7 +144,7 @@ defmodule Jido.Persistence.PluginIntegrationTest do
     assert dump_context.reason == :test
 
     {ETS, opts} = c.persistence
-    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
+    key = Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: agent.id))
     assert {:ok, bytes} = ETS.get(key, opts)
     assert {:ok, record} = Jido.Persistence.Codec.Term.decode(bytes, [])
     assert record.checkpoint.agent.state.visible == 8
@@ -238,7 +238,7 @@ defmodule Jido.Persistence.PluginIntegrationTest do
              )
 
     {ETS, opts} = c.persistence
-    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
+    key = Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: agent.id))
     assert {:ok, bytes} = ETS.get(key, opts)
     assert {:ok, stored_record} = Jido.Persistence.Codec.Term.decode(bytes, [])
 
@@ -261,7 +261,7 @@ defmodule Jido.Persistence.PluginIntegrationTest do
       agent = owned_agent("dump-#{fault}")
 
       key =
-        Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
+        Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: agent.id))
 
       {ETS, opts} = c.persistence
       Process.put({PersistenceFacet, :dump_fault}, fault)
@@ -310,7 +310,7 @@ defmodule Jido.Persistence.PluginIntegrationTest do
   test "a missing Plugin-owned field cannot write a record", c do
     agent = owned_agent("missing-owned")
     incomplete = %{agent | state: Map.delete(agent.state, :owned)}
-    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
+    key = Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: agent.id))
     {ETS, opts} = c.persistence
 
     assert {:error, %Jido.Error.ValidationError{code: :incomplete_state, path: [:state]}} =

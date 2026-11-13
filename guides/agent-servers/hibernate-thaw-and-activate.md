@@ -56,7 +56,7 @@ instance's one Store and codec, and each commit saves.
 - `:active` is `:finish` by default. `:cancel` cancels pre-commit work.
 - `:timeout` is the finite drain budget, with a default of 5,000 ms. Cleanup has a further wait of the same length. `:persistence_timeout` bounds the save itself.
 
-Use `Jido.AgentServer.hibernate/2` with a PID or name, and `Jido.hibernate_ref/3` with a `Jido.Agent.Ref`. With `Jido.hibernate/3`, pass `:partition` for an Agent in a partition. A wrong partition returns `{:error, :not_found}`.
+Use `Jido.AgentServer.hibernate/2` with a PID or name. To use an Address, first resolve it with `Jido.resolve_agent/2`, and then hibernate the returned PID. A wrong Address returns `{:error, :not_found}` from resolution.
 
 A durable Flow Turn suspended on a wait can hibernate with its progress saved. See [Durable Turns and Flows](../durability/durable-turns-and-flows.livemd).
 
@@ -99,23 +99,23 @@ end
 
 ## Activate on demand
 
-`Jido.activate_agent/4` is the call to make when a request arrives for an existing durable Agent that may not be in memory. It takes a Ref and returns the running PID when the Agent is already live.
+`Jido.activate_agent/4` is the call to make when a request arrives for an existing durable Agent that may not be in memory. It takes an Address and returns the running PID when the Agent is already live.
 
 ```elixir
 :ok = Jido.stop_agent(HibernateGuide.Jido, thawed)
 
-{:ok, ref} = Jido.agent_ref(HibernateGuide.Jido, "cart-1")
-{:ok, activated} = Jido.activate_agent(HibernateGuide.Jido, ref, HibernateGuide.Cart)
+{:ok, address} = Jido.agent_address(HibernateGuide.Jido, "cart-1")
+{:ok, activated} = Jido.activate_agent(HibernateGuide.Jido, address, HibernateGuide.Cart)
 :ok = Jido.AgentServer.await_ready(activated)
 
-{:ok, ^activated} = Jido.activate_agent(HibernateGuide.Jido, ref, HibernateGuide.Cart)
+{:ok, ^activated} = Jido.activate_agent(HibernateGuide.Jido, address, HibernateGuide.Cart)
 
 {:ok, %{state: %{items: ["tea", "scone"]}}, []} =
-  Jido.call(HibernateGuide.Jido, ref, HibernateGuide.Cart.add_signal!(%{sku: "scone"}))
+  Jido.call(HibernateGuide.Jido, address, HibernateGuide.Cart.add_signal!(%{sku: "scone"}))
 
-{:ok, new_ref} = Jido.agent_ref(HibernateGuide.Jido, "cart-2")
-{:ok, ^new_ref} = Jido.create_agent(HibernateGuide.Jido, new_ref, HibernateGuide.Cart)
-{:ok, created} = Jido.activate_agent(HibernateGuide.Jido, new_ref, HibernateGuide.Cart)
+{:ok, new_address} = Jido.agent_address(HibernateGuide.Jido, "cart-2")
+{:ok, ^new_address} = Jido.create_agent(HibernateGuide.Jido, new_address, HibernateGuide.Cart)
+{:ok, created} = Jido.activate_agent(HibernateGuide.Jido, new_address, HibernateGuide.Cart)
 :ok = Jido.AgentServer.await_ready(created)
 
 %{agent: %{state: %{items: []}}, state_version: 0} = Jido.AgentServer.snapshot(created)

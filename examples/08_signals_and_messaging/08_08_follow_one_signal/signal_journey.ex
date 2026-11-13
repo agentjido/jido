@@ -167,16 +167,16 @@ end
 defmodule Jido.Examples.Signals.SignalJourney do
   @moduledoc "Runs one correlated request through coordinator and child Turns."
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Examples.Signals.SignalJourney.FailOnceDelivery
   alias Jido.Signal.Context
   alias Jido.Trace
 
-  def run(instance, %Ref{} = coordinator, %Ref{} = worker, adapter, request_id, value) do
+  def run(instance, %Address{} = coordinator, %Address{} = worker, adapter, request_id, value) do
     request =
       Jido.Signal.new!(
         "examples.signals.journey.request",
-        %{request_id: request_id, value: value, reply_to: Ref.to_map!(coordinator)},
+        %{request_id: request_id, value: value, reply_to: Address.to_map!(coordinator)},
         source: "/examples/signals/journey/client"
       )
 

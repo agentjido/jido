@@ -251,7 +251,7 @@ is_integer(version)
 | The result later, from the same process | `Jido.AgentServer.submit/3`, then `Jido.AgentServer.await/2` | The same result. A timeout returns `{:error, :timeout}`. |
 | No result | `Jido.AgentServer.cast/3` | `:ok` when the Signal is sent. Delivery is best effort. |
 
-`Jido.call/4`, `Jido.submit/4`, and `Jido.cast/3` do the same through a `Jido.Agent.Ref`. `Jido.cast/3` has no `:context` option.
+`Jido.call/4`, `Jido.submit/4`, and `Jido.cast/3` do the same through a `Jido.Agent.Address`. `Jido.cast/3` has no `:context` option.
 
 ## Next steps
 

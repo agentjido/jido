@@ -5,7 +5,7 @@ defmodule Jido.Examples.MultiAgent.StableReplacementTest do
   use ExUnit.Case, async: false
   @moduletag :integration
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.AgentServer.{Snapshot, TurnResult}
   alias Jido.Examples.{StableReplacement, Worker}
 
@@ -20,21 +20,21 @@ defmodule Jido.Examples.MultiAgent.StableReplacementTest do
       id: instance
     )
 
-    ref = Ref.new!(namespace: namespace, id: "worker")
-    {:ok, ^ref} = Jido.create_agent(instance, ref, Worker)
-    %{instance: instance, ref: ref}
+    address = Address.new!(namespace: namespace, id: "worker")
+    {:ok, ^address} = Jido.create_agent(instance, address, Worker)
+    %{instance: instance, address: address}
   end
 
-  test "the Ref resolves a replacement worker and retains committed state", c do
+  test "the Address resolves a replacement worker and retains committed state", c do
     assert {:ok, %TurnResult{agent_activation_id: activation_id}} =
-             StableReplacement.calculate(c.instance, c.ref, "first", 3)
+             StableReplacement.calculate(c.instance, c.address, "first", 3)
 
-    {:ok, first} = Jido.resolve_agent(c.instance, c.ref)
+    {:ok, first} = Jido.resolve_agent(c.instance, c.address)
     Process.exit(first, :kill)
 
     second =
       eventually(fn ->
-        case Jido.resolve_agent(c.instance, c.ref) do
+        case Jido.resolve_agent(c.instance, c.address) do
           {:ok, pid} when pid != first -> pid
           _other -> nil
         end

@@ -1,7 +1,7 @@
 defmodule Jido do
   use Supervisor
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.AgentServer
   alias Jido.Instance.{Names, NamespaceRegistry, Options, RuntimeStore}
 
@@ -90,7 +90,7 @@ defmodule Jido do
   ## Options
 
     - `:otp_app` - Required. Your application name (e.g., `:my_app`).
-    - `:namespace` - Nonempty binary for stable Agent Ref operations.
+    - `:namespace` - Nonempty binary for stable Agent Address operations.
       Required for persistent Agents.
       One exact namespace can be bound to one live local instance per node.
     - `:persistence` - Optional persistence profile. A Store declaration uses
@@ -243,7 +243,7 @@ defmodule Jido do
 
   ## Options
     - `:name` - Required. The name of this Jido instance (e.g., `MyApp.Jido`)
-    - `:namespace` - Nonempty stable namespace for Ref-first functions.
+    - `:namespace` - Nonempty stable namespace for Address-first functions.
       Required for persistent Agents.
     - `:max_tasks` - Task Supervisor child limit; defaults to `1_000`
     - `:persistence` - Optional instance persistence profile. All Agents in the
@@ -311,17 +311,17 @@ defmodule Jido do
       deadline = System.monotonic_time(:millisecond) + @shutdown_timeout_ms
 
       result =
-        Enum.reduce_while(monitors, :ok, fn {pid, ref}, :ok ->
+        Enum.reduce_while(monitors, :ok, fn {pid, monitor_ref}, :ok ->
           remaining = max(deadline - System.monotonic_time(:millisecond), 0)
 
           receive do
-            {:DOWN, ^ref, :process, ^pid, _reason} -> {:cont, :ok}
+            {:DOWN, ^monitor_ref, :process, ^pid, _reason} -> {:cont, :ok}
           after
             remaining -> {:halt, {:error, {:previous_instance_still_stopping, pid}}}
           end
         end)
 
-      for {_pid, ref} <- monitors, do: Process.demonitor(ref, [:flush])
+      for {_pid, monitor_ref} <- monitors, do: Process.demonitor(monitor_ref, [:flush])
       result
     end
   end
@@ -396,72 +396,72 @@ defmodule Jido do
   end
 
   # ---------------------------------------------------------------------------
-  # Stable Agent Ref API
+  # Stable Agent Address API
   # ---------------------------------------------------------------------------
 
-  @doc "Builds one stable Agent Ref in the selected instance namespace."
-  @spec agent_ref(atom(), String.t(), keyword()) ::
-          {:ok, Ref.t()} | {:error, Jido.Error.ValidationError.t()}
-  def agent_ref(instance, id, opts \\ []) do
+  @doc "Builds one stable Agent Address in the selected instance namespace."
+  @spec agent_address(atom(), String.t(), keyword()) ::
+          {:ok, Address.t()} | {:error, Jido.Error.ValidationError.t()}
+  def agent_address(instance, id, opts \\ []) do
     with {:ok, namespace} <- require_instance_namespace(instance) do
-      Ref.new_scoped(namespace, id, opts)
+      Address.new_scoped(namespace, id, opts)
     end
   end
 
   @doc """
-  Resolves the current local worker for one stable Agent Ref. Each operation
-  resolves the Ref again; it does not retry or replay an accepted turn.
+  Resolves the current local worker for one stable Agent Address. Each operation
+  resolves the Address again; it does not retry or replay an accepted turn.
 
   Returns `{:error, :not_found}` when there is no live registration,
   `{:error, :recovering}` while AgentServer is registered but not ready, or
   `{:error, :unavailable}` when the Registry cannot be read. A worker can still
   stop after resolution. Caller timeout does not cancel an accepted turn.
   """
-  @spec resolve_agent(atom(), Ref.t()) :: {:ok, pid()} | {:error, term()}
-  def resolve_agent(instance, %Ref{} = ref) do
-    with :ok <- ensure_reconciled(instance, ref), do: resolve_ref_target(instance, ref)
+  @spec resolve_agent(atom(), Address.t()) :: {:ok, pid()} | {:error, term()}
+  def resolve_agent(instance, %Address{} = address) do
+    with :ok <- ensure_reconciled(instance, address), do: resolve_address_target(instance, address)
   end
 
-  @doc "Creates one durable Agent with an explicit stable Agent Ref."
-  @spec create_agent(atom(), Ref.t(), module() | Jido.Agent.t(), keyword()) ::
-          {:ok, Ref.t()} | {:error, term()}
-  def create_agent(instance, %Ref{} = ref, agent, opts \\ []) do
-    with {:ok, ref} <- validate_instance_ref(instance, ref),
-         {:ok, opts} <- Ref.operation_options(ref, opts, "Agent Ref create options"),
+  @doc "Creates one durable Agent with an explicit stable Agent Address."
+  @spec create_agent(atom(), Address.t(), module() | Jido.Agent.t(), keyword()) ::
+          {:ok, Address.t()} | {:error, term()}
+  def create_agent(instance, %Address{} = address, agent, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         {:ok, opts} <- Address.operation_options(address, opts, "Agent Address create options"),
          :ok <- validate_create_agent_options(opts),
          {instance_opts, _runtime_opts} = Keyword.split(opts, [:id, :state]),
          {:ok, agent} <- startup_agent(agent, instance_opts, []),
          {:ok, _agent, 0, 0, nil} <-
            Jido.Persistence.open_agent(instance, agent, :create,
              instance: instance,
-             namespace: ref.namespace,
-             partition: ref.partition,
+             namespace: address.namespace,
+             partition: address.partition,
              reason: :create
            ) do
-      {:ok, ref}
+      {:ok, address}
     end
   end
 
-  @doc "Activates one existing durable Agent from its stable Agent Ref."
-  @spec activate_agent(atom(), Ref.t(), keyword()) ::
+  @doc "Activates one existing durable Agent from its stable Agent Address."
+  @spec activate_agent(atom(), Address.t(), keyword()) ::
           DynamicSupervisor.on_start_child()
-  def activate_agent(instance, %Ref{} = ref, opts \\ []) do
-    with {:ok, ref} <- validate_instance_ref(instance, ref),
-         {:ok, opts} <- Ref.operation_options(ref, opts, "Agent Ref activation options"),
+  def activate_agent(instance, %Address{} = address, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         {:ok, opts} <- Address.operation_options(address, opts, "Agent Address activation options"),
          :ok <- validate_activate_agent_options(opts),
-         :ok <- ensure_reconciled(instance, ref) do
-      case resolve_ref_target(instance, ref) do
+         :ok <- ensure_reconciled(instance, address) do
+      case resolve_address_target(instance, address) do
         {:ok, pid} ->
           {:ok, pid}
 
         {:error, :not_found} ->
-          restore_activation(instance, ref, opts)
+          restore_activation(instance, address, opts)
 
         {:error, :recovering} ->
-          await_ref_activation(instance, ref)
+          await_address_activation(instance, address)
 
         {:error, :passivating} ->
-          await_ref_passivation(instance, ref)
+          await_address_passivation(instance, address)
 
         {:error, _reason} = error ->
           error
@@ -470,22 +470,22 @@ defmodule Jido do
   end
 
   @doc "Replaces one faulted activation from its authoritative durable record."
-  @spec reconcile_agent(atom(), Ref.t(), keyword()) ::
+  @spec reconcile_agent(atom(), Address.t(), keyword()) ::
           DynamicSupervisor.on_start_child() | {:error, term()}
-  def reconcile_agent(instance, %Ref{} = ref, opts \\ []) do
-    with {:ok, ref} <- validate_instance_ref(instance, ref),
+  def reconcile_agent(instance, %Address{} = address, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
          :ok <- validate_reconcile_options(opts),
-         {:ok, reason} <- reconciliation_reason(instance, ref),
-         :ok <- terminate_registered_activation(instance, ref),
+         {:ok, reason} <- reconciliation_reason(instance, address),
+         :ok <- terminate_registered_activation(instance, address),
          {:ok, _agent, _persistence_revision, _agent_revision, _turn} <-
-           Jido.Persistence.load_agent_ref(instance, ref, instance: instance),
-         :ok <- RuntimeStore.delete(instance, :agent_reconciliation, ref) do
-      case restore_activation(instance, ref, []) do
+           Jido.Persistence.load_agent_address(instance, address, instance: instance),
+         :ok <- RuntimeStore.delete(instance, :agent_reconciliation, address) do
+      case restore_activation(instance, address, []) do
         {:ok, _pid} = ok ->
           ok
 
         {:error, activation_reason} = error ->
-          _ = RuntimeStore.put(instance, :agent_reconciliation, ref, {reason, activation_reason})
+          _ = RuntimeStore.put(instance, :agent_reconciliation, address, {reason, activation_reason})
           error
       end
     else
@@ -495,34 +495,34 @@ defmodule Jido do
   end
 
   @doc "Upgrades one inactive durable Agent and replaces its active activation."
-  @spec upgrade_agent(atom(), Ref.t(), term(), keyword()) :: {:ok, Ref.t()} | {:error, term()}
-  def upgrade_agent(instance, %Ref{} = ref, action, opts \\ []) do
-    with {:ok, ref} <- validate_instance_ref(instance, ref),
+  @spec upgrade_agent(atom(), Address.t(), term(), keyword()) :: {:ok, Address.t()} | {:error, term()}
+  def upgrade_agent(instance, %Address{} = address, action, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
          :ok <- validate_upgrade_options(opts),
-         :ok <- ensure_reconciled(instance, ref),
-         {:ok, agent, reactivate?} <- prepare_definition_upgrade(instance, ref),
+         :ok <- ensure_reconciled(instance, address),
+         {:ok, agent, reactivate?} <- prepare_definition_upgrade(instance, address),
          {:ok, _upgraded, _persistence_revision} <-
-           Jido.Persistence.upgrade_agent(instance, agent.module, ref.id, action,
+           Jido.Persistence.upgrade_agent(instance, agent.module, address.id, action,
              instance: instance,
-             partition: ref.partition,
+             partition: address.partition,
              context: Keyword.get(opts, :context, %{})
            ),
-         :ok <- restore_after_upgrade(instance, ref, reactivate?) do
-      {:ok, ref}
+         :ok <- restore_after_upgrade(instance, address, reactivate?) do
+      {:ok, address}
     end
   end
 
-  defp restore_activation(instance, ref, opts) do
+  defp restore_activation(instance, address, opts) do
     with {:ok, agent, _revision, _agent_revision, _turn} <-
-           Jido.Persistence.load_agent_ref(instance, ref, instance: instance) do
+           Jido.Persistence.load_agent_address(instance, address, instance: instance) do
       opts =
         opts
-        |> Keyword.put(:id, ref.id)
+        |> Keyword.put(:id, address.id)
         |> Keyword.put(:persistence, :inherit)
         |> Keyword.put(:persistence_mode, :restore)
 
       case start_agent(instance, agent, opts) do
-        {:error, {:already_started, _root}} -> await_ref_activation(instance, ref)
+        {:error, {:already_started, _root}} -> await_address_activation(instance, address)
         {:ok, pid} when is_pid(pid) -> await_activated(pid)
         result -> result
       end
@@ -536,33 +536,33 @@ defmodule Jido do
     end
   end
 
-  @doc "Sends one synchronous Signal through a stable Agent Ref."
-  @spec call(atom(), Ref.t(), Jido.Signal.t(), timeout() | keyword()) ::
+  @doc "Sends one synchronous Signal through a stable Agent Address."
+  @spec call(atom(), Address.t(), Jido.Signal.t(), timeout() | keyword()) ::
           {:ok, Jido.AgentServer.TurnResult.t()} | {:error, term()}
-  def call(instance, %Ref{} = ref, signal, timeout_or_opts \\ 5_000) do
-    with_ref_server(instance, ref, &AgentServer.call(&1, signal, timeout_or_opts))
+  def call(instance, %Address{} = address, signal, timeout_or_opts \\ 5_000) do
+    with_address_server(instance, address, &AgentServer.call(&1, signal, timeout_or_opts))
   end
 
-  @doc "Sends one best-effort asynchronous Signal through a stable Agent Ref."
-  @spec cast(atom(), Ref.t(), Jido.Signal.t()) :: :ok | {:error, term()}
-  def cast(instance, %Ref{} = ref, signal) do
-    with_ref_server(instance, ref, &AgentServer.cast(&1, signal))
+  @doc "Sends one best-effort asynchronous Signal through a stable Agent Address."
+  @spec cast(atom(), Address.t(), Jido.Signal.t()) :: :ok | {:error, term()}
+  def cast(instance, %Address{} = address, signal) do
+    with_address_server(instance, address, &AgentServer.cast(&1, signal))
   end
 
-  @doc "Submits one AgentServer turn through a stable Agent Ref."
-  @spec submit(atom(), Ref.t(), Jido.Signal.t(), keyword()) ::
+  @doc "Submits one AgentServer turn through a stable Agent Address."
+  @spec submit(atom(), Address.t(), Jido.Signal.t(), keyword()) ::
           Jido.AgentServer.Pending.t() | {:error, term()}
-  def submit(instance, %Ref{} = ref, signal, opts \\ []) do
-    with_ref_server(instance, ref, &AgentServer.submit(&1, signal, opts))
+  def submit(instance, %Address{} = address, signal, opts \\ []) do
+    with_address_server(instance, address, &AgentServer.submit(&1, signal, opts))
   end
 
-  @doc "Writes a durable tombstone for one inactive stable Agent Ref."
-  @spec delete_agent(atom(), Ref.t(), keyword()) :: :ok | {:error, term()}
-  def delete_agent(instance, %Ref{} = ref, opts \\ []) do
-    with {:ok, ref} <- validate_instance_ref(instance, ref),
-         {:ok, _opts} <- validate_ref_delete_options(opts),
-         {:error, :not_found} <- resolve_ref_target(instance, ref) do
-      Jido.Persistence.delete_agent_ref(instance, ref, instance: instance)
+  @doc "Writes a durable tombstone for one inactive stable Agent Address."
+  @spec delete_agent(atom(), Address.t(), keyword()) :: :ok | {:error, term()}
+  def delete_agent(instance, %Address{} = address, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         {:ok, _opts} <- validate_address_delete_options(opts),
+         {:error, :not_found} <- resolve_address_target(instance, address) do
+      Jido.Persistence.delete_agent_address(instance, address, instance: instance)
     else
       {:ok, _pid} -> {:error, :agent_running}
       {:error, state} when state in [:recovering, :passivating] -> {:error, :agent_running}
@@ -570,28 +570,28 @@ defmodule Jido do
     end
   end
 
-  @doc "Cancels one matching Turn for a stable Agent Ref."
-  @spec cancel_turn(atom(), Ref.t(), String.t(), timeout()) :: :ok | {:error, term()}
-  def cancel_turn(instance, %Ref{} = ref, turn_id, timeout \\ 5_000) do
-    with_ref_server(instance, ref, &AgentServer.cancel_turn(&1, turn_id, timeout))
+  @doc "Cancels one matching Turn for a stable Agent Address."
+  @spec cancel_turn(atom(), Address.t(), String.t(), timeout()) :: :ok | {:error, term()}
+  def cancel_turn(instance, %Address{} = address, turn_id, timeout \\ 5_000) do
+    with_address_server(instance, address, &AgentServer.cancel_turn(&1, turn_id, timeout))
   end
 
-  @doc "Returns Turn status through a stable Agent Ref."
-  @spec status(atom(), Ref.t(), timeout()) :: Jido.AgentServer.Status.t() | {:error, term()}
-  def status(instance, %Ref{} = ref, timeout \\ 5_000) do
-    with {:ok, ref} <- validate_instance_ref(instance, ref) do
-      case resolve_ref_target(instance, ref) do
+  @doc "Returns Turn status through a stable Agent Address."
+  @spec status(atom(), Address.t(), timeout()) :: Jido.AgentServer.Status.t() | {:error, term()}
+  def status(instance, %Address{} = address, timeout \\ 5_000) do
+    with {:ok, address} <- validate_instance_address(instance, address) do
+      case resolve_address_target(instance, address) do
         {:ok, pid} ->
           AgentServer.status(pid, timeout)
 
         {:error, state} when state in [:recovering, :passivating] ->
-          status_for_registered(instance, ref, timeout)
+          status_for_registered(instance, address, timeout)
 
         {:error, :reconciliation_required} ->
-          status_for_registered(instance, ref, timeout)
+          status_for_registered(instance, address, timeout)
 
         {:error, :not_found} ->
-          passivated_status(instance, ref)
+          passivated_status(instance, address)
 
         {:error, _reason} = error ->
           error
@@ -599,8 +599,8 @@ defmodule Jido do
     end
   end
 
-  defp status_for_registered(instance, ref, timeout) do
-    key = AgentServer.RegistrationGuard.registry_key(ref.id, ref.partition)
+  defp status_for_registered(instance, address, timeout) do
+    key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
 
     case Registry.lookup(Names.registry(instance), key) do
       [{root, {:activation, _activation_id}}] ->
@@ -611,19 +611,19 @@ defmodule Jido do
           nil ->
             if Process.alive?(root),
               do: {:error, :recovering},
-              else: passivated_status(instance, ref)
+              else: passivated_status(instance, address)
         end
 
       _ ->
-        passivated_status(instance, ref)
+        passivated_status(instance, address)
     end
   end
 
-  defp passivated_status(instance, ref) do
-    case Jido.Persistence.load_agent_ref(instance, ref, instance: instance) do
+  defp passivated_status(instance, address) do
+    case Jido.Persistence.load_agent_address(instance, address, instance: instance) do
       {:ok, _agent, persistence_revision, agent_revision, turn} ->
         Jido.AgentServer.Status.passivated(
-          ref,
+          address,
           agent_revision,
           persistence_revision,
           turn
@@ -634,8 +634,8 @@ defmodule Jido do
     end
   end
 
-  defp with_ref_server(instance, ref, operation) do
-    with {:ok, pid} <- resolve_or_activate(instance, ref) do
+  defp with_address_server(instance, address, operation) do
+    with {:ok, pid} <- resolve_or_activate(instance, address) do
       try do
         operation.(pid)
       catch
@@ -647,23 +647,23 @@ defmodule Jido do
     end
   end
 
-  defp resolve_or_activate(instance, ref) do
-    with :ok <- ensure_reconciled(instance, ref) do
-      case resolve_ref_target(instance, ref) do
+  defp resolve_or_activate(instance, address) do
+    with :ok <- ensure_reconciled(instance, address) do
+      case resolve_address_target(instance, address) do
         {:ok, pid} -> {:ok, pid}
-        {:error, :not_found} -> activate_agent(instance, ref)
-        {:error, :recovering} -> await_ref_activation(instance, ref)
-        {:error, :passivating} -> await_ref_passivation(instance, ref)
+        {:error, :not_found} -> activate_agent(instance, address)
+        {:error, :recovering} -> await_address_activation(instance, address)
+        {:error, :passivating} -> await_address_passivation(instance, address)
         {:error, _reason} = error -> error
       end
     end
   end
 
-  defp await_ref_activation(instance, ref),
-    do: await_ref_activation(instance, ref, System.monotonic_time(:millisecond) + 5_000)
+  defp await_address_activation(instance, address),
+    do: await_address_activation(instance, address, System.monotonic_time(:millisecond) + 5_000)
 
-  defp await_ref_activation(instance, ref, deadline) do
-    key = AgentServer.RegistrationGuard.registry_key(ref.id, ref.partition)
+  defp await_address_activation(instance, address, deadline) do
+    key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
 
     case Registry.lookup(Names.registry(instance), key) do
       [{root, {:activation, _activation_id}}] ->
@@ -677,7 +677,7 @@ defmodule Jido do
           nil ->
             if System.monotonic_time(:millisecond) < deadline do
               Process.sleep(5)
-              await_ref_activation(instance, ref, deadline)
+              await_address_activation(instance, address, deadline)
             else
               {:error, :activation_timeout}
             end
@@ -685,22 +685,22 @@ defmodule Jido do
 
       _ ->
         if System.monotonic_time(:millisecond) < deadline do
-          resolve_or_activate(instance, ref)
+          resolve_or_activate(instance, address)
         else
           {:error, :activation_timeout}
         end
     end
   end
 
-  defp await_ref_passivation(instance, ref) do
-    key = AgentServer.RegistrationGuard.registry_key(ref.id, ref.partition)
+  defp await_address_passivation(instance, address) do
+    key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
 
     case Registry.lookup(Names.registry(instance), key) do
       [{root, {:activation, _activation_id}}] ->
         monitor = Process.monitor(root)
 
         receive do
-          {:DOWN, ^monitor, :process, ^root, _reason} -> activate_agent(instance, ref)
+          {:DOWN, ^monitor, :process, ^root, _reason} -> activate_agent(instance, address)
         after
           5_000 ->
             Process.demonitor(monitor, [:flush])
@@ -708,13 +708,13 @@ defmodule Jido do
         end
 
       _ ->
-        resolve_or_activate(instance, ref)
+        resolve_or_activate(instance, address)
     end
   end
 
-  defp resolve_ref_target(instance, ref) do
-    with {:ok, _ref} <- validate_instance_ref(instance, ref) do
-      key = AgentServer.RegistrationGuard.registry_key(ref.id, ref.partition)
+  defp resolve_address_target(instance, address) do
+    with {:ok, _address} <- validate_instance_address(instance, address) do
+      key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
 
       case Registry.lookup(Names.registry(instance), key) do
         [{root, {:activation, _activation_id}}] -> resolve_registered_agent(root)
@@ -743,9 +743,9 @@ defmodule Jido do
     :exit, _reason -> {:error, :recovering}
   end
 
-  defp validate_instance_ref(instance, ref) do
+  defp validate_instance_address(instance, address) do
     with {:ok, namespace} <- require_instance_namespace(instance) do
-      Ref.validate_namespace(ref, namespace)
+      Address.validate_namespace(address, namespace)
     end
   end
 
@@ -758,7 +758,7 @@ defmodule Jido do
         {:error,
          Jido.Error.validation_error("Jido instance does not have a stable namespace",
            kind: :input,
-           subject: Jido.Agent.Ref,
+           subject: Jido.Agent.Address,
            details: %{
              code: :jido_namespace_required,
              instance: instance
@@ -767,33 +767,33 @@ defmodule Jido do
     end
   end
 
-  defp validate_ref_delete_options(opts) do
+  defp validate_address_delete_options(opts) do
     if Keyword.keyword?(opts) and length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts))) do
       {:ok, opts}
     else
       {:error,
-       Jido.Error.validation_error("Agent Ref delete options must be a unique keyword list",
+       Jido.Error.validation_error("Agent Address delete options must be a unique keyword list",
          kind: :input,
-         subject: Jido.Agent.Ref,
+         subject: Jido.Agent.Address,
          details: %{code: :jido_instance_invalid_config, value: opts}
        )}
     end
   end
 
   defp validate_create_agent_options(opts),
-    do: validate_ref_operation_options(:create_agent, opts, [:id, :partition, :state])
+    do: validate_address_operation_options(:create_agent, opts, [:id, :partition, :state])
 
   defp validate_activate_agent_options(opts),
-    do: validate_ref_operation_options(:activate_agent, opts, [:id, :partition])
+    do: validate_address_operation_options(:activate_agent, opts, [:id, :partition])
 
   defp validate_reconcile_options(opts),
-    do: validate_ref_operation_options(:reconcile_agent, opts, [])
+    do: validate_address_operation_options(:reconcile_agent, opts, [])
 
   defp validate_upgrade_options(opts),
-    do: validate_ref_operation_options(:upgrade_agent, opts, [:context])
+    do: validate_address_operation_options(:upgrade_agent, opts, [:context])
 
-  defp prepare_definition_upgrade(instance, ref) do
-    case resolve_ref_target(instance, ref) do
+  defp prepare_definition_upgrade(instance, address) do
+    case resolve_address_target(instance, address) do
       {:ok, pid} ->
         case AgentServer.status(pid) do
           %{work_state: :idle, queue_depth: 0, effects: :none} ->
@@ -809,7 +809,7 @@ defmodule Jido do
 
       {:error, :not_found} ->
         with {:ok, agent, _persistence_revision, _agent_revision, _turn} <-
-               Jido.Persistence.load_agent_ref(instance, ref, instance: instance),
+               Jido.Persistence.load_agent_address(instance, address, instance: instance),
              do: {:ok, agent, false}
 
       {:error, state} when state in [:recovering, :passivating] ->
@@ -820,28 +820,28 @@ defmodule Jido do
     end
   end
 
-  defp restore_after_upgrade(_instance, _ref, false), do: :ok
+  defp restore_after_upgrade(_instance, _address, false), do: :ok
 
-  defp restore_after_upgrade(instance, ref, true) do
-    case activate_agent(instance, ref) do
+  defp restore_after_upgrade(instance, address, true) do
+    case activate_agent(instance, address) do
       {:ok, _pid} -> :ok
       {:error, _reason} = error -> error
     end
   end
 
-  defp ensure_reconciled(instance, ref) do
-    case reconciliation_reason(instance, ref) do
+  defp ensure_reconciled(instance, address) do
+    case reconciliation_reason(instance, address) do
       {:ok, _reason} -> {:error, :reconciliation_required}
       :error -> :ok
       {:error, _reason} = error -> error
     end
   end
 
-  defp reconciliation_reason(instance, ref),
-    do: RuntimeStore.fetch(instance, :agent_reconciliation, ref)
+  defp reconciliation_reason(instance, address),
+    do: RuntimeStore.fetch(instance, :agent_reconciliation, address)
 
-  defp terminate_registered_activation(instance, ref) do
-    key = AgentServer.RegistrationGuard.registry_key(ref.id, ref.partition)
+  defp terminate_registered_activation(instance, address) do
+    key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
 
     case Registry.lookup(Names.registry(instance), key) do
       [{root, {:activation, _activation_id}}] ->
@@ -857,16 +857,16 @@ defmodule Jido do
     :exit, _reason -> {:error, :unavailable}
   end
 
-  defp validate_ref_operation_options(operation, opts, allowed) do
+  defp validate_address_operation_options(operation, opts, allowed) do
     case Keyword.keys(opts) -- allowed do
       [] ->
         :ok
 
       keys ->
         {:error,
-         Jido.Error.validation_error("Agent Ref operation options contain unknown keys",
+         Jido.Error.validation_error("Agent Address operation options contain unknown keys",
            kind: :input,
-           subject: Jido.Agent.Ref,
+           subject: Jido.Agent.Address,
            details: %{
              code: :jido_instance_invalid_config,
              operation: operation,
@@ -1117,7 +1117,7 @@ defmodule Jido do
     with true <- not is_nil(instance),
          true <- Keyword.keyword?(opts),
          pid when is_pid(pid) <- safe_whereis(server),
-         %{agent_ref: %{id: agent_id, partition: partition}} <-
+         %{agent_address: %{id: agent_id, partition: partition}} <-
            Jido.AgentServer.status(pid),
          true <- partition_matches?(opts, partition),
          ^pid <- owned_registry_pid(instance, agent_id, partition, pid) do

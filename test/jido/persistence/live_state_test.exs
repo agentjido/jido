@@ -349,5 +349,8 @@ defmodule Jido.Persistence.LiveStateTest do
   end
 
   defp key(c, id),
-    do: Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(c.jido), id: id))
+    do:
+      Persistence.agent_key(
+        Jido.Agent.Address.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(c.jido), id: id)
+      )
 end

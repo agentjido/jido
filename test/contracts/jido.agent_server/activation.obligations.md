@@ -11,7 +11,7 @@ its memory-only recovery boundary. The activation owns the OTP root and the
 runtime records that must survive worker replacement.
 
 This component does not own Turn evaluation, Plugin callback rules, durable
-storage, Ref routing, or child-composition behavior.
+storage, Address routing, or child-composition behavior.
 
 Activation has no separate DSL. Its public operations stay on
 `Jido.AgentServer`; the OTP root and registration processes are internal.

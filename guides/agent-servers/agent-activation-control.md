@@ -162,7 +162,7 @@ end
 | Function | Effect |
 | --- | --- |
 | `Jido.stop_agent/3` | Stops an Agent in the named instance by PID or ID. It returns `{:error, :not_found}` when the Agent is absent or belongs to another instance. |
-| `Jido.stop_agent_ref/4` | The same, through a `Jido.Agent.Ref`. |
+| `Jido.resolve_agent/2`, then `Jido.stop_agent/3` | Resolves an Address and stops its current local activation. |
 | `Jido.AgentServer.stop/3` | Stops any server. The default reason is `:shutdown` and the default wait is 5,000 ms. A reason other than `:normal`, `:shutdown`, or `{:shutdown, term}` becomes `{:shutdown, reason}`. |
 | `Jido.Agent.Directive.server_stop/1` | Stops the server from a Turn, after commit. |
 | `Jido.AgentServer.hibernate/2` | Saves, then stops. See [Hibernate and Thaw](hibernate-thaw-and-activate.md). |

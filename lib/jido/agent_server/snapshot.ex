@@ -2,11 +2,11 @@ defmodule Jido.AgentServer.Snapshot do
   @moduledoc "The complete committed Agent view for one resident activation."
 
   alias Jido.Agent
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
 
   @enforce_keys [
     :agent,
-    :agent_ref,
+    :agent_address,
     :agent_activation_id,
     :agent_revision,
     :persistence_revision,
@@ -16,7 +16,7 @@ defmodule Jido.AgentServer.Snapshot do
 
   @type t :: %__MODULE__{
           agent: Agent.t(),
-          agent_ref: Ref.t(),
+          agent_address: Address.t(),
           agent_activation_id: String.t(),
           agent_revision: non_neg_integer(),
           persistence_revision: non_neg_integer() | nil,
@@ -27,7 +27,7 @@ defmodule Jido.AgentServer.Snapshot do
   def new(data) do
     %__MODULE__{
       agent: data.agent,
-      agent_ref: data.agent_ref,
+      agent_address: data.agent_address,
       agent_activation_id: data.agent_activation_id,
       agent_revision: data.agent_revision,
       persistence_revision: data.persistence_revision,

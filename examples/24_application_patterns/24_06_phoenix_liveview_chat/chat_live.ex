@@ -26,8 +26,8 @@ defmodule Jido.Examples.Patterns.LiveChat.Live do
   @impl true
   def mount(params, _session, socket) do
     conversation_id = Map.get(params, "conversation_id", "demo-conversation")
-    {:ok, ref} = LiveChat.ensure_conversation(@instance, conversation_id)
-    {:ok, history} = LiveChat.history(@instance, ref)
+    {:ok, address} = LiveChat.ensure_conversation(@instance, conversation_id)
+    {:ok, history} = LiveChat.history(@instance, address)
     topic = "examples:live-chat:#{conversation_id}"
 
     if connected?(socket), do: Phoenix.PubSub.subscribe(@pubsub, topic)
@@ -37,7 +37,7 @@ defmodule Jido.Examples.Patterns.LiveChat.Live do
       |> assign(
         page_title: "Offline Jido Chat",
         conversation_id: conversation_id,
-        agent_ref: ref,
+        agent_address: address,
         topic: topic,
         history: history,
         operation: :committed,
@@ -69,7 +69,7 @@ defmodule Jido.Examples.Patterns.LiveChat.Live do
     ]
 
     case Task.Supervisor.start_child(@task_supervisor, fn ->
-           result = LiveChat.ask(@instance, socket.assigns.agent_ref, text, options)
+           result = LiveChat.ask(@instance, socket.assigns.agent_address, text, options)
            send(live_view, {:chat_turn_result, result})
          end) do
       {:ok, _task} ->
@@ -87,9 +87,9 @@ defmodule Jido.Examples.Patterns.LiveChat.Live do
   end
 
   def handle_event("cancel", _params, socket) do
-    case Jido.status(@instance, socket.assigns.agent_ref) do
+    case Jido.status(@instance, socket.assigns.agent_address) do
       %Status{active_turn_id: turn_id} when is_binary(turn_id) ->
-        result = Jido.cancel_turn(@instance, socket.assigns.agent_ref, turn_id)
+        result = Jido.cancel_turn(@instance, socket.assigns.agent_address, turn_id)
 
         operation =
           case result do
@@ -133,7 +133,7 @@ defmodule Jido.Examples.Patterns.LiveChat.Live do
     operation = LiveChat.operation_state(result)
 
     history =
-      case LiveChat.history(@instance, socket.assigns.agent_ref) do
+      case LiveChat.history(@instance, socket.assigns.agent_address) do
         {:ok, messages} -> messages
         {:error, _reason} -> socket.assigns.history
       end
@@ -149,8 +149,8 @@ defmodule Jido.Examples.Patterns.LiveChat.Live do
         <p class="eyebrow">Phoenix Playground · deterministic offline model</p>
         <h1>Jido LiveView chat</h1>
         <p>
-          Conversation <code>{@conversation_id}</code> uses stable Agent reference
-          <code>{@agent_ref.id}</code>.
+          Conversation <code>{@conversation_id}</code> uses stable Agent Address
+          <code>{@agent_address.id}</code>.
         </p>
       </header>
 

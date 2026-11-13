@@ -24,7 +24,7 @@ Use these major components and target Covenant IDs:
 | `value_model` | Signals (`jido.signal`), Catalog (`jido.catalog`), Session and Thread values (`jido.conversation`), and portable values and references (`jido.codec`) |
 | `definitions` | Actions (`jido.action`, `jido.action.inline`, `jido.action.output`, `jido.action.validation`), Flows (`jido.flow`, `jido.flow.inline`), Instructions (`jido.instruction`), Plugin definitions (`jido.plugin.definition`), and Signal routing (`jido.signal.routing`) |
 | `execution` | Flow execution (`jido.execution`) and the Action execution boundary (`jido.execution.action_boundary`) |
-| `agent_domain` | Agent data and authoring (`jido.agent`), pure evaluation (`jido.agent_evaluation`), references (`jido.agent_reference`), and the generic Plugin SDK (`jido.plugin`) |
+| `agent_domain` | Agent data and authoring (`jido.agent`), pure evaluation (`jido.agent_evaluation`), addresses (`jido.agent_reference`), and the generic Plugin SDK (`jido.plugin`) |
 | `live_runtime` | AgentServer (`jido.agent_server.*`), Instance (`jido.instance`), Persistence (`jido.persistence`), Signal delivery (`jido.signal.delivery`), and Telemetry (`jido.telemetry`) |
 | `capabilities` | AI (`jido.ai.*`) and the bundled Audit, Bus, Heartbeat, Scheduler, and Sensor Manager components (`jido.plugin.*`) |
 | `composition` | The OTP application (`jido.application`) and Catalog discovery (`jido.catalog.discovery`) |

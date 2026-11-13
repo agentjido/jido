@@ -6,14 +6,14 @@
 
 - id: agent-server-future-split
   date: 2026-10-19
-  decision: Keep the remaining obligations together during the name cleanup. Stable Ref identity and routing moved from I70 and I71 to jido.instance. Activation obligations later moved through the reviewed component refactor plan, leaving 85 transitional obligations. Move durable, Plugin runtime, effect, and composition obligations only through the same plan.
+  decision: Keep the remaining obligations together during the name cleanup. Stable Address identity and routing moved from I70 and I71 to jido.instance. Activation obligations later moved through the reviewed component refactor plan, leaving 85 transitional obligations. Move durable, Plugin runtime, effect, and composition obligations only through the same plan.
   driver: A name cleanup must not silently change runtime ownership or public behavior.
   approved_by: User request to refine the component before the boundary split
 
 - id: agent-server-activation-ownership
   date: 2026-10-19
   decision: Move I36, I38, and I69 to jido.agent_server.activation. Keep only I70 and I71 in jido.instance.
-  driver: Instance owns Ref construction, selection, and routing. The activation owns the selected instance registration, consumption of fixed instance defaults, and one live activation identity.
+  driver: Instance owns Address construction, selection, and routing. The activation owns the selected instance registration, consumption of fixed instance defaults, and one live activation identity.
   approved_by: Component hardening pass
 
 - id: agent-server-durable-migration

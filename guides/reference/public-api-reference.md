@@ -102,7 +102,7 @@ Implement these to extend Jido. An optional callback can be left out.
 
 `Jido.Joi` has 93 public functions, one for each schema type and refinement, so this guide does not list them. See [Jido.Joi Validation](../data/joi-validation.md) and the `Jido.Joi` module page.
 
-## Instances and stable Agent Refs
+## Instances and stable Agent Addresses
 
 Guides: [Instances and Tenants](../operations/configuration-and-tenant-isolation.md).
 
@@ -112,24 +112,24 @@ Guides: [Instances and Tenants](../operations/configuration-and-tenant-isolation
 
 | Function | Summary |
 | --- | --- |
-| `Jido.activate_agent/3` | Activates one existing durable Agent with an explicit stable Agent Ref. |
-| `Jido.agent_ref/3` | Builds one stable Agent Ref in the selected instance namespace. |
-| `Jido.call/4` | Sends one synchronous Signal through a stable Agent Ref. |
-| `Jido.cancel_turn/4` | Cancels one matching Turn for a stable Agent Ref. |
-| `Jido.cast/3` | Sends one best-effort asynchronous Signal through a stable Agent Ref. |
-| `Jido.create_agent/4` | Creates one durable Agent with an explicit stable Agent Ref. |
-| `Jido.delete_agent/3` | Writes a durable tombstone for one inactive stable Agent Ref. |
+| `Jido.activate_agent/3` | Activates one existing durable Agent with an explicit stable Agent Address. |
+| `Jido.agent_address/3` | Builds one stable Agent Address in the selected instance namespace. |
+| `Jido.call/4` | Sends one synchronous Signal through a stable Agent Address. |
+| `Jido.cancel_turn/4` | Cancels one matching Turn for a stable Agent Address. |
+| `Jido.cast/3` | Sends one best-effort asynchronous Signal through a stable Agent Address. |
+| `Jido.create_agent/4` | Creates one durable Agent with an explicit stable Agent Address. |
+| `Jido.delete_agent/3` | Writes a durable tombstone for one inactive stable Agent Address. |
 | `Jido.list_agents/2` | Lists Agents with options in the selected Jido instance. |
 | `Jido.reconcile_agent/3` | Replaces one faulted activation from its authoritative durable record. |
 | `Jido.resident_agent_count/2` | Counts resident Agent activations. |
-| `Jido.resolve_agent/2` | Resolves the current local worker for one stable Agent Ref. |
+| `Jido.resolve_agent/2` | Resolves the current local worker for one stable Agent Address. |
 | `Jido.start/1` | Start the default Jido instance for scripts and Livebook. |
 | `Jido.start_agent/3` | Starts one Agent under the selected Jido instance supervisor. |
 | `Jido.start_link/1` | Starts a Jido instance supervisor. |
-| `Jido.status/3` | Returns Turn status through a stable Agent Ref. |
+| `Jido.status/3` | Returns Turn status through a stable Agent Address. |
 | `Jido.stop/1` | Stop a Jido instance. |
 | `Jido.stop_agent/3` | Stops an Agent with options in the selected Jido instance. |
-| `Jido.submit/4` | Submits one AgentServer turn through a stable Agent Ref. |
+| `Jido.submit/4` | Submits one AgentServer turn through a stable Agent Address. |
 | `Jido.thaw/4` | Thaws an Agent with options in the selected Jido instance. |
 | `Jido.upgrade_agent/4` | Applies one trusted upgrade Action to an inactive durable Agent. |
 | `Jido.whereis_agent/3` | Looks up an Agent with options in the selected Jido instance. |
@@ -208,20 +208,20 @@ Changes and runtime work returned by an Agent executable turn.
 | `Jido.Agent.Directive.reply/1` | Creates one correlated response request. |
 | `Jido.Agent.Directive.validate/1` | Validates one built-in or custom Agent Directive. |
 
-### `Jido.Agent.Ref`
+### `Jido.Agent.Address`
 
 Stable identity for one logical Agent.
 
 | Function | Summary |
 | --- | --- |
-| `Jido.Agent.Ref.from_map/1` | Decodes and validates one exact version-1 Agent Ref map. |
-| `Jido.Agent.Ref.from_map!/1` | Decodes one exact version-1 Agent Ref map or raises its validation error. |
-| `Jido.Agent.Ref.new/1` | Creates and validates one Agent Ref. |
-| `Jido.Agent.Ref.new!/1` | Creates one Agent Ref or raises its validation error. |
-| `Jido.Agent.Ref.schema/0` | Returns the static schema for an Agent Ref. |
-| `Jido.Agent.Ref.to_map/1` | Returns the exact version-1 public map for one Agent Ref. |
-| `Jido.Agent.Ref.to_map!/1` | Returns the exact version-1 public map or raises its validation error. |
-| `Jido.Agent.Ref.validate/1` | Validates one Agent Ref without changing its identity fields. |
+| `Jido.Agent.Address.from_map/1` | Decodes and validates one exact version-1 Agent Address map. |
+| `Jido.Agent.Address.from_map!/1` | Decodes one exact version-1 Agent Address map or raises its validation error. |
+| `Jido.Agent.Address.new/1` | Creates and validates one Agent Address. |
+| `Jido.Agent.Address.new!/1` | Creates one Agent Address or raises its validation error. |
+| `Jido.Agent.Address.schema/0` | Returns the static schema for an Agent Address. |
+| `Jido.Agent.Address.to_map/1` | Returns the exact version-1 public map for one Agent Address. |
+| `Jido.Agent.Address.to_map!/1` | Returns the exact version-1 public map or raises its validation error. |
+| `Jido.Agent.Address.validate/1` | Validates one Agent Address without changing its identity fields. |
 
 ### `Jido.Agent.Route`
 

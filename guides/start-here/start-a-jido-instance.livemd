@@ -84,7 +84,7 @@ defmodule StartInstance.Jido do
 end
 ```
 
-The `:namespace` option is a nonempty string that gives this instance a stable identity. You need it for stable Agent Refs and for persistent Agents. One namespace can bind to one live instance per node.
+The `:namespace` option is a nonempty string that gives this instance a stable identity. You need it for stable Agent Addresses and for persistent Agents. One namespace can bind to one live instance per node.
 
 ## Add the instance to a supervision tree
 
@@ -127,7 +127,7 @@ The cell returns `[max_tasks: 2000]`. Jido reads this config when the instance s
 | Option | Meaning | Default |
 | --- | --- | --- |
 | `:name` | The instance name, a non-nil atom. Required by `Jido.start_link/1`. A `use Jido` module uses its own name. | The default instance under `Jido.start/1` |
-| `:namespace` | Stable identity for Refs and persistent Agents. | `nil` |
+| `:namespace` | Stable identity for Addresses and persistent Agents. | `nil` |
 | `:max_tasks` | Child limit for the instance's Task supervisor, a nonnegative integer or `:infinity`. | `1_000` |
 | `:persistence` | One instance profile with a Store and codec. Every Agent in a persistent instance uses this profile. | `nil` |
 | `:agent_server` | Default AgentServer runtime options for this instance. | `[]` |
@@ -173,5 +173,5 @@ The cell returns `nil`.
 ## Next steps
 
 - [Build Your First Action](first-action.livemd) writes the work that an Agent runs.
-- [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd) covers partitions, Refs, and OTP names.
+- [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd) covers partitions, Addresses, and OTP names.
 - [Instances and Tenants](../operations/configuration-and-tenant-isolation.md) covers tenant isolation.

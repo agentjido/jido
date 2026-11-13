@@ -27,7 +27,7 @@ application with `Jido.Application` as the package composition root.
 ## Limits
 
 This lesson starts one required resident Agent. Passive durable Agents should
-activate from stable references when work arrives.
+activate from stable Addresses when work arrives.
 
 ## Core Fit and Gaps
 

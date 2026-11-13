@@ -280,7 +280,7 @@ Jido does not describe an ordinary BEAM process as a sandbox.
 | `Jido.Session` | Agent Session identity, revision, lifecycle, and Thread | AI model calls and storage |
 | `Jido.Thread` | Append-only Agent interaction entries | AI projection, process lifecycle, and storage |
 | `Jido.AI` | AI Plugin authoring, reasoning Flows, tools, model boundary, budget, and usage | Agent core, Session ownership, and Thread ownership |
-| `Jido.Instance` | Per-instance supervision, names, configuration, and Agent Ref resolution | Package-global application startup |
+| `Jido.Instance` | Per-instance supervision, names, configuration, and Agent Address resolution | Package-global application startup |
 | `Jido.Application` | The single package application composition root | Per-Agent business rules |
 
 ## Catalog working design

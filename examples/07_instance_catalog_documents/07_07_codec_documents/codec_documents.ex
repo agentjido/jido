@@ -6,7 +6,7 @@ end
 defmodule Jido.Examples.CodecDocuments do
   @moduledoc "Encodes a trusted Agent definition and its separate stable address."
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Catalog
   alias Jido.Codec.Document
   alias Jido.Examples.CodecDocuments.AddressableAgent
@@ -31,11 +31,11 @@ defmodule Jido.Examples.CodecDocuments do
     Jido.Codec.decode(document, catalog: catalog(), codec: codec)
   end
 
-  def envelope(%Ref{} = ref, definition_document) do
+  def envelope(%Address{} = address, definition_document) do
     %{
       "type" => "examples.addressed-agent",
       "vsn" => 1,
-      "address" => Ref.to_map!(ref),
+      "address" => Address.to_map!(address),
       "definition" => definition_document
     }
   end

@@ -45,7 +45,7 @@ defmodule Jido.Examples.Durable.AcceptedWorkTest do
     assert [restored] = TopologyAssertions.members(awake)
     assert Jido.AgentServer.snapshot(restored).agent == agent
     assert Jido.AgentServer.snapshot(restored).agent.id == member_id
-    assert receipt.agent_ref.id == member_id
+    assert receipt.agent_address.id == member_id
 
     assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
              Server.call(restored, %{request | data: %{topic: 42}})

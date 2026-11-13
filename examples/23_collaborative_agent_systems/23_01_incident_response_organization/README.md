@@ -2,7 +2,7 @@
 
 This declared Agent organization triages one incident, contains it, waits for
 human approval, isolates one failed audit team, removes its full subtree, and
-restores the coordinator under the same logical Agent reference.
+restores the coordinator under the same logical Agent Address.
 
 ## What you will learn
 
@@ -48,7 +48,7 @@ references compose into a real organization. The missing automatic child
 failure notification is an application policy choice; a Plugin or supervisor
 observer can turn it into a domain Signal when required.
 
-- Logical owner: `incident-coordinator` stable Agent reference.
+- Logical owner: `incident-coordinator` stable Agent Address.
 - Process owner: the current coordinator AgentServer activation.
 - Canonical state owner: persisted coordinator Agent state.
 - Commit point: each AgentServer Turn commits independently.

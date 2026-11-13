@@ -2,7 +2,7 @@ defmodule Jido.Persistence.Record do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Error
   alias Jido.Codec.Term
   alias Jido.Persistence.Config
@@ -15,12 +15,12 @@ defmodule Jido.Persistence.Record do
   def format_version, do: @format_version
 
   @doc false
-  @spec agent_key(Ref.t()) :: binary()
-  def agent_key(%Ref{} = ref) do
-    ref = Ref.new!(ref)
+  @spec agent_key(Address.t()) :: binary()
+  def agent_key(%Address{} = address) do
+    address = Address.new!(address)
 
     encoded =
-      {ref.namespace, ref.partition, ref.id}
+      {address.namespace, address.partition, address.id}
       |> :erlang.term_to_binary()
       |> Base.url_encode64(padding: false)
 
@@ -28,13 +28,13 @@ defmodule Jido.Persistence.Record do
   end
 
   @doc false
-  @spec build_active(Agent.t(), Ref.t(), non_neg_integer(), non_neg_integer(), map()) ::
+  @spec build_active(Agent.t(), Address.t(), non_neg_integer(), non_neg_integer(), map()) ::
           {:ok, map()} | {:error, term()}
-  @spec build_active(Agent.t(), Ref.t(), non_neg_integer(), non_neg_integer(), map(), map() | nil) ::
+  @spec build_active(Agent.t(), Address.t(), non_neg_integer(), non_neg_integer(), map(), map() | nil) ::
           {:ok, map()} | {:error, term()}
   def build_active(
         %Agent{} = agent,
-        %Ref{} = ref,
+        %Address{} = address,
         revision,
         agent_revision,
         checkpoint,
@@ -43,11 +43,11 @@ defmodule Jido.Persistence.Record do
     record = %{
       fmt: @format_version,
       kind: :active,
-      namespace: ref.namespace,
+      namespace: address.namespace,
       agent_module: agent.module,
       vsn: agent.vsn,
       agent_id: agent.id,
-      partition: ref.partition,
+      partition: address.partition,
       rev: revision,
       agent_rev: agent_revision,
       checkpoint: checkpoint
@@ -55,26 +55,26 @@ defmodule Jido.Persistence.Record do
 
     record = if is_nil(server_turn), do: record, else: Map.put(record, :server_turn, server_turn)
 
-    with :ok <- validate(record, ref, agent.module),
+    with :ok <- validate(record, address, agent.module),
          do: {:ok, record}
   end
 
   @doc false
-  @spec build_tombstone(Ref.t(), module(), non_neg_integer(), non_neg_integer()) ::
+  @spec build_tombstone(Address.t(), module(), non_neg_integer(), non_neg_integer()) ::
           {:ok, map()} | {:error, term()}
-  def build_tombstone(%Ref{} = ref, agent_module, revision, agent_revision) do
+  def build_tombstone(%Address{} = address, agent_module, revision, agent_revision) do
     record = %{
       fmt: @format_version,
       kind: :tombstone,
-      namespace: ref.namespace,
+      namespace: address.namespace,
       agent_module: agent_module,
-      agent_id: ref.id,
-      partition: ref.partition,
+      agent_id: address.id,
+      partition: address.partition,
       rev: revision,
       agent_rev: agent_revision
     }
 
-    with :ok <- validate(record, ref, agent_module),
+    with :ok <- validate(record, address, agent_module),
          do: {:ok, record}
   end
 
@@ -112,18 +112,18 @@ defmodule Jido.Persistence.Record do
   end
 
   @doc false
-  @spec validate(term(), Ref.t(), module()) :: :ok | {:error, term()}
-  def validate(record, %Ref{} = ref, agent_module) when is_map(record) do
+  @spec validate(term(), Address.t(), module()) :: :ok | {:error, term()}
+  def validate(record, %Address{} = address, agent_module) when is_map(record) do
     with :ok <- validate_format_and_kind(record),
          :ok <- validate_exact_shape(record),
-         :ok <- validate_identity(record, ref, agent_module),
+         :ok <- validate_identity(record, address, agent_module),
          :ok <- validate_revision(record),
          :ok <- validate_kind_fields(record) do
       validate_portable(record)
     end
   end
 
-  def validate(_record, _ref, _agent_module), do: invalid(:shape)
+  def validate(_record, _address, _agent_module), do: invalid(:shape)
 
   @doc false
   @spec kind(map()) :: :active | :tombstone | :unknown
@@ -192,12 +192,12 @@ defmodule Jido.Persistence.Record do
       else: invalid(:shape)
   end
 
-  defp validate_identity(record, ref, agent_module) do
+  defp validate_identity(record, address, agent_module) do
     cond do
-      Map.get(record, :namespace) != ref.namespace -> invalid(:namespace)
+      Map.get(record, :namespace) != address.namespace -> invalid(:namespace)
       Map.get(record, :agent_module) != agent_module -> invalid(:agent_module)
-      Map.get(record, :agent_id) != ref.id -> invalid(:agent_id)
-      Map.get(record, :partition) != ref.partition -> invalid(:partition)
+      Map.get(record, :agent_id) != address.id -> invalid(:agent_id)
+      Map.get(record, :partition) != address.partition -> invalid(:partition)
       true -> :ok
     end
   end

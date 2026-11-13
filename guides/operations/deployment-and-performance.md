@@ -105,12 +105,12 @@ Each node runs its own instance, Registry, and Agent processes. Jido has no clus
 
 To run several nodes:
 
-1. Give each Agent one active node. Route by a stable hash of its Ref, or use a placement layer that you choose.
+1. Give each Agent one active node. Route by a stable hash of its Address, or use a placement layer that you choose.
 2. Share a store that supports your node count. See the [Persistence Matrix](../reference/persistence-adapter-matrix.md). `Jido.Persistence.File` and `Jido.Persistence.ETS` belong to one BEAM.
 3. Use the same namespace for the same logical Agents on each node.
 4. Move an Agent by hibernating it on its old node and activating it on its new one.
 
-If two nodes activate one Ref, compare-and-swap rejects the stale write, and the losing activation stops at that point. It can run Actions before then. See Revisions and Conflicts.
+If two nodes activate one Address, compare-and-swap rejects the stale write, and the losing activation stops at that point. It can run Actions before then. See Revisions and Conflicts.
 
 ## Roll out new code
 

@@ -65,21 +65,21 @@ defmodule Jido.Agent.Plugin.FSMDurableTest do
       id: instance
     )
 
-    ref = Jido.Agent.Ref.new!(namespace: namespace, id: id)
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Agent)
+    address = Jido.Agent.Address.new!(namespace: namespace, id: id)
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Agent)
 
     request =
       Jido.Signal.new!("request", %{request_id: "one"}, source: "/plugin/fsm/durable")
 
-    pending = Jido.submit(instance, ref, request)
+    pending = Jido.submit(instance, address, request)
 
     assert {:ok, %Jido.AgentServer.TurnResult{status: :waiting, waits: [wait]}} =
              Server.await(pending)
 
     assert %Jido.AgentServer.Status{work_state: :waiting, waits: [^wait]} =
-             Jido.status(instance, ref)
+             Jido.status(instance, address)
 
-    assert {:ok, server} = Jido.resolve_agent(instance, ref)
+    assert {:ok, server} = Jido.resolve_agent(instance, address)
 
     assert Server.snapshot(server).agent.state == %{
              status: :idle,
@@ -90,9 +90,9 @@ defmodule Jido.Agent.Plugin.FSMDurableTest do
       Jido.Signal.new!("approved", %{request_id: "one"}, source: "/plugin/fsm/durable")
 
     assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
-             Jido.call(instance, ref, approval)
+             Jido.call(instance, address, approval)
 
-    assert {:ok, server} = Jido.resolve_agent(instance, ref)
+    assert {:ok, server} = Jido.resolve_agent(instance, address)
     completed = Server.snapshot(server).agent
     assert completed.state.status == :approved
     assert completed.state.fsm == %{definition_vsn: 1, current: :ready}

@@ -7,9 +7,9 @@ resumes the same Turn.
 ## What you will learn
 
 - Use `selection`, `await`, and `timer` inside one Flow.
-- Address a durable Agent with `Jido.Agent.Ref`.
+- Address a durable Agent with `Jido.Agent.Address`.
 - Receive `status: :waiting` and portable waits in a `TurnResult`.
-- Resume the Flow by sending a matching Signal through the same Ref.
+- Resume the Flow by sending a matching Signal through the same Address.
 
 ## Read the code
 
@@ -21,13 +21,13 @@ Read [the Agent and Flow](durable_wait.ex), then
 `mix test.examples examples/13_durable_execution/13_06_durable_wait --warnings-as-errors`
 
 Expected result: the Agent passivates while waiting, reactivates through its
-stable Ref, and completes once after the same approval Signal is sent twice.
+stable Address, and completes once after the same approval Signal is sent twice.
 
 ## Core shape
 
 ```elixir
-ref = Jido.Agent.Ref.new!(namespace: "my-app", id: "approval")
-{:ok, ^ref} = Jido.create_agent(MyJido, ref, DurableWait)
+address = Jido.Agent.Address.new!(namespace: "my-app", id: "approval")
+{:ok, ^address} = Jido.create_agent(MyJido, address, DurableWait)
 
 {:ok, request} = DurableWait.request_signal(%{request_id: "report-1"})
 
@@ -35,17 +35,17 @@ ref = Jido.Agent.Ref.new!(namespace: "my-app", id: "approval")
   status: :waiting,
   turn_id: turn_id,
   waits: [wait | _]
-}} = Jido.call(MyJido, ref, request)
+}} = Jido.call(MyJido, address, request)
 
 {:ok, approval} =
   DurableWait.resolve_signal(%{request_id: "report-1", decision: :approve})
 
 {:ok, %Jido.AgentServer.TurnResult{status: :committed, turn_id: ^turn_id}} =
-  Jido.call(MyJido, ref, approval)
+  Jido.call(MyJido, address, approval)
 ```
 
 The caller does not use a separate wait-delivery API. Normal Signal delivery
-through the stable Ref matches the saved wait. A wrong request ID returns
+through the stable Address matches the saved wait. A wrong request ID returns
 `{:error, :wait_not_matched}`.
 
 ## Important behavior
@@ -65,15 +65,15 @@ External Action side effects still need their own idempotency policy.
 
 ## Core Fit and Gaps
 
-The public Agent Ref, durable wait, passivation, activation, and Signal retry
+The public Agent Address, durable wait, passivation, activation, and Signal retry
 contracts compose without a private runtime operation.
 
-- Logical owner: the stable approval Agent reference.
+- Logical owner: the stable approval Agent Address.
 - Process owner: the current AgentServer activation.
 - Canonical state owner: the persisted approval Agent record.
 - Commit point: the final Agent state and Flow completion commit together.
 - Persisted data: Agent state, Turn ID, Flow progress, wait, and deadline.
-- Retry boundary: normal Signal delivery through the stable Agent Ref.
+- Retry boundary: normal Signal delivery through the stable Agent Address.
 - Idempotency rule: an exact Signal ID retry returns the saved result; a
   conflicting reuse is rejected.
 - Injected failure: idle passivation removes the process while the Flow waits.

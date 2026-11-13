@@ -1,5 +1,5 @@
 defmodule Jido.Examples.Durable.Waterpark.Guest do
-  @moduledoc "A durable park guest that is addressed only by Agent Ref."
+  @moduledoc "A durable park guest that is addressed only by Agent Address."
 
   use Jido.Agent, name: "waterpark_guest"
 
@@ -65,37 +65,37 @@ end
 defmodule Jido.Examples.Durable.Waterpark do
   @moduledoc "Public helpers for the single-Instance Waterpark example."
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Examples.Durable.Waterpark.Guest
 
   def create_guests(instance, namespace, count) when is_integer(count) and count > 0 do
     Enum.map(1..count, fn number ->
-      ref = Ref.new!(namespace: namespace, id: "guest-#{number}")
-      {:ok, ^ref} = Jido.create_agent(instance, ref, Guest)
-      ref
+      address = Address.new!(namespace: namespace, id: "guest-#{number}")
+      {:ok, ^address} = Jido.create_agent(instance, address, Guest)
+      address
     end)
   end
 
-  def visit(instance, ref),
-    do: Jido.call(instance, ref, signal("waterpark.visit", %{}))
+  def visit(instance, address),
+    do: Jido.call(instance, address, signal("waterpark.visit", %{}))
 
-  def reserve(instance, ref, request_id),
-    do: Jido.call(instance, ref, signal("waterpark.reserve", %{request_id: request_id}))
+  def reserve(instance, address, request_id),
+    do: Jido.call(instance, address, signal("waterpark.reserve", %{request_id: request_id}))
 
-  def approve(instance, ref, request_id, signal_id \\ Jido.Id.uuid7()) do
+  def approve(instance, address, request_id, signal_id \\ Jido.Id.uuid7()) do
     Jido.call(
       instance,
-      ref,
+      address,
       signal("waterpark.approved", %{request_id: request_id}, id: signal_id)
     )
   end
 
-  def timer(instance, ref),
-    do: Jido.call(instance, ref, signal("waterpark.timer", %{}))
+  def timer(instance, address),
+    do: Jido.call(instance, address, signal("waterpark.timer", %{}))
 
   def load(instance, namespace, count \\ 1_000) do
     refs = create_guests(instance, namespace, count)
-    Enum.each(refs, fn ref -> {:ok, _result} = visit(instance, ref) end)
+    Enum.each(refs, fn address -> {:ok, _result} = visit(instance, address) end)
     refs
   end
 

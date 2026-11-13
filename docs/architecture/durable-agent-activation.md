@@ -16,7 +16,7 @@ distributed failover remain outside Jido core.
 ## Goal
 
 A managed Agent is a durable logical entity. It stays alive when no BEAM
-process is resident for it. `Jido.Agent.Ref` is its stable address.
+process is resident for it. `Jido.Agent.Address` is its stable address.
 
 `Jido.AgentServer` is the warm, resident activation of that Agent. It runs one
 Agent at a time, serializes work, commits state, and protects the execution
@@ -31,10 +31,10 @@ distributed failover in this plan.
 ## Terms
 
 - **Agent**: The durable logical entity and its committed state.
-- **Agent Ref**: The stable public identity and address of one Agent.
+- **Agent Address**: The stable public identity and address of one Agent.
 - **Activation**: The current resident OTP runtime for one Agent.
 - **AgentServer**: The local Turn kernel inside an activation.
-- **Jido Instance**: The local runtime host. It routes by Agent Ref, controls
+- **Jido Instance**: The local runtime host. It routes by Agent Address, controls
   activation lifetime, and provides persistence.
 - **Passivation**: A clean stop of a resident activation while the durable
   Agent remains alive.
@@ -76,11 +76,11 @@ Jido Instance    -> Persistence profile -> codec and Store adapter
 
 Agent identity and process identity are not the same.
 
-- An Agent Ref remains stable for the logical life of the Agent.
+- An Agent Address remains stable for the logical life of the Agent.
 - Each activation has one `agent_activation_id` UUID.
 - A worker restart inside one activation keeps the activation ID.
 - Passivation followed by reactivation creates a new activation ID.
-- Neither worker restart nor reactivation changes the Agent Ref.
+- Neither worker restart nor reactivation changes the Agent Address.
 
 The runtime reports three separate state axes:
 
@@ -131,19 +131,19 @@ The public value types are:
 - `Jido.AgentServer.Snapshot.t()`
 - `Jido.AgentServer.Status.t()`
 
-`Jido.Agent.Ref` is the primary logical address. `server()` is an advanced,
+`Jido.Agent.Address` is the primary logical address. `server()` is an advanced,
 activation-specific handle. A direct AgentServer operation never activates or
 reactivates an Agent. The handle becomes invalid when the activation stops.
 
 The Jido Instance owns normal create and restore operations:
 
 - `Jido.create_agent/4` synchronously creates a new durable Agent and returns
-  its Ref without starting an activation.
+  its Address without starting an activation.
 - `Jido.activate_agent/4` restores an existing durable Agent.
 - There is no restore-or-create operation.
 - A tombstone, conflict, missing record, or invalid record has a distinct
   result.
-- Ref-based Signal delivery can activate a passivated Agent.
+- Address-based Signal delivery can activate a passivated Agent.
 
 `stop/3` stops the resident activation. It does not end the logical life of a
 durable Agent. An explicit Instance lifecycle operation must write a tombstone
@@ -156,7 +156,7 @@ to delete an Agent.
 ```elixir
 %Jido.AgentServer.Snapshot{
   agent: %Jido.Agent{},
-  agent_ref: %Jido.Agent.Ref{},
+  agent_address: %Jido.Agent.Address{},
   agent_activation_id: activation_id,
   agent_revision: non_neg_integer(),
   persistence_revision: non_neg_integer() | nil,
@@ -169,7 +169,7 @@ An accepted Turn returns one `TurnResult`:
 ```elixir
 %Jido.AgentServer.TurnResult{
   turn_id: turn_id,
-  agent_ref: %Jido.Agent.Ref{},
+  agent_address: %Jido.Agent.Address{},
   agent_activation_id: activation_id,
   status:
     :committed
@@ -205,8 +205,8 @@ The result rules are:
 
 The Jido Instance owns normal activation lifetime.
 
-- Ref-based Signal operations route to a current activation or start one.
-- Activation is single-flight for one Agent Ref.
+- Address-based Signal operations route to a current activation or start one.
+- Activation is single-flight for one Agent Address.
 - A bounded per-Agent FIFO holds input while activation starts.
 - The activation queue is not durable.
 - A stopped in-memory Agent cannot be restored.
@@ -281,7 +281,7 @@ The Instance owns local wake delivery:
 2. The Instance stores each timed wake in a one-minute bucket and one of 64 fixed shards.
 3. AgentServer commits the matching waiting receipt in the Agent record.
 4. The local wake capability reads the active-bucket index and finds a due occurrence.
-5. It creates a `Jido.Signal` and delivers it by Agent Ref.
+5. It creates a `Jido.Signal` and delivers it by Agent Address.
 6. The Instance routes to the warm activation or reactivates the Agent.
 7. AgentServer validates the wait match and resumes the Flow.
 
@@ -350,7 +350,7 @@ leave an auxiliary orphan, but a committed timed wait cannot lack its wake
 record.
 
 The latest receipt supports exact resume retry. The durable wait input key
-contains Agent Ref, Turn ID, Wait ID, and Signal ID:
+contains Agent Address, Turn ID, Wait ID, and Signal ID:
 
 - The same key and the same Signal content returns the existing result.
 - The same key with different content is a conflict.
@@ -364,8 +364,8 @@ state. AgentServer does not retry it without proof. An Instance reconciliation
 operation reads the authoritative record and replaces the faulted activation
 with a new activation ID.
 
-A tombstone permanently reserves an Agent Ref. The design has no Ref generation
-field and does not reuse a deleted Ref.
+A tombstone permanently reserves an Agent Address. The design has no Address generation
+field and does not reuse a deleted Address.
 
 ## Revision model
 
@@ -405,7 +405,7 @@ protocol:
 If a Signal arrives during passivation, the Instance activation path holds it
 in the bounded activation queue. It delivers the Signal after passivation and
 reactivation finish. A caller that uses a direct server handle gets a
-not-accepted error and must resolve the Agent Ref again.
+not-accepted error and must resolve the Agent Address again.
 
 A known persistence no-write can reopen admission. A revision conflict or an
 uncertain result leaves the activation quiesced or faulted. It must not report
@@ -413,11 +413,11 @@ successful passivation.
 
 ## Reactivation protocol
 
-Ref-based delivery to a passivated Agent uses one local activation path:
+Address-based delivery to a passivated Agent uses one local activation path:
 
-1. The Instance receives the Agent Ref and Signal.
+1. The Instance receives the Agent Address and Signal.
 2. It confirms that no activation is ready or starting.
-3. It starts one activation root for the Agent Ref.
+3. It starts one activation root for the Agent Address.
 4. The activation restores and validates the durable record.
 5. It creates a new activation ID and registers as ready.
 6. The Instance delivers queued Signals in FIFO order.
@@ -447,7 +447,7 @@ not restart healthy Plugins. Repeated failure can terminate the activation
 root.
 
 Authentication and authorization belong to the host or an explicit Plugin.
-An Agent Ref is an address, not a credential. AgentServer validates Signal and
+An Agent Address is an address, not a credential. AgentServer validates Signal and
 wait semantics only.
 
 ## Lifecycle controls
@@ -496,7 +496,7 @@ ring, error-policy callback, failure counter, or `ErrorReport` effect.
 Telemetry can contain safe identifiers and classifications:
 
 - namespace and local partition;
-- Agent Ref and activation ID;
+- Agent Address and activation ID;
 - Turn, execution, and Signal IDs;
 - Agent and persistence revisions;
 - work and residency states; and
@@ -511,7 +511,7 @@ The single-Instance path is:
 
 ```text
 Signal entry
-    -> Jido Instance route by Agent Ref
+    -> Jido Instance route by Agent Address
     -> local activation or reactivation
     -> AgentServer Turn
 ```
@@ -521,7 +521,7 @@ A future mesh can add one step before the local activation path:
 ```text
 Signal entry
     -> mesh selects the owning Instance
-    -> owning Instance routes by Agent Ref
+    -> owning Instance routes by Agent Address
     -> local activation or reactivation
     -> AgentServer Turn
 ```
@@ -537,7 +537,7 @@ AgentServer stays unchanged in both paths. A future mesh owns:
 - optional replication.
 
 The first version does not add placeholders for these features. It preserves
-the boundary by using Agent Ref at entry, keeping routing in the Instance, and
+the boundary by using Agent Address at entry, keeping routing in the Instance, and
 keeping all Agent commits behind the persistence adapter.
 
 ## Waterpark-like single-Instance simulation
@@ -546,16 +546,16 @@ The end-to-end proof is a Waterpark-like simulation that uses one Jido
 Instance. It demonstrates the programming model without implementing a mesh.
 
 The simulation has many durable, long-lived Agents. Signals enter through the
-Instance by Agent Ref. Only recently active Agents have resident
+Instance by Agent Address. Only recently active Agents have resident
 AgentServers. Idle Agents passivate and later reactivate from durable state.
 
 The automated example must prove:
 
 1. Many durable Agents start under one Instance.
-2. Signals addressed by Agent Ref update independent Agent state.
+2. Signals addressed by Agent Address update independent Agent state.
 3. Repeated activity keeps an activation warm.
 4. Idle timeout passivates an Agent without deleting it.
-5. A later Signal reactivates the same Agent Ref with its committed state.
+5. A later Signal reactivates the same Agent Address with its committed state.
 6. Worker failure keeps the activation ID and recovers from the local
    checkpoint.
 7. Passivation and reactivation change the activation ID.
@@ -581,7 +581,7 @@ those features can be added outside AgentServer.
 
 - Reduce the public AgentServer API to the accepted 13 functions.
 - Add or align `Pending`, `TurnResult`, `Snapshot`, and `Status`.
-- Make Agent Ref the normal address and keep server handles advanced.
+- Make Agent Address the normal address and keep server handles advanced.
 - Separate Agent lifecycle, work state, and residency state in public terms.
 
 ### 2. Activation root and worker
@@ -612,14 +612,14 @@ those features can be added outside AgentServer.
 - Add the Instance-level `idle_residency_timeout` setting.
 - Start the idle timer only from a safe idle state.
 - Implement the passivation state and protocol.
-- Queue Ref-based input that races with passivation.
-- Reactivate with the same Agent Ref and a new activation ID.
+- Queue Address-based input that races with passivation.
+- Reactivate with the same Agent Address and a new activation ID.
 
 ### 6. Local wake capability
 
 - Find due durable timer and cron occurrences for this Instance.
 - Convert each occurrence to a Signal.
-- Deliver by Agent Ref through the normal activation path.
+- Deliver by Agent Address through the normal activation path.
 - Reuse the same path for external event Signals.
 - Do not add a scheduler to AgentServer or Durable.
 
@@ -658,7 +658,7 @@ This design removes or moves these concepts from AgentServer:
 The plan is complete when:
 
 - A durable Agent remains addressable while no AgentServer process exists.
-- Ref-based Signal delivery activates or reuses one local activation.
+- Address-based Signal delivery activates or reuses one local activation.
 - One Agent has no concurrent commit owner inside the Instance.
 - AgentServer can passivate only from a proven safe state.
 - Worker restart and Agent reactivation have distinct identity rules.

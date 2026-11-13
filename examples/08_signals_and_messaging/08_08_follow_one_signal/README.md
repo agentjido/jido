@@ -5,7 +5,7 @@ delivery, idempotent retry, and a final reply.
 
 ## What you will learn
 
-- Stable Agent references address the coordinator and worker processes.
+- Stable Agent Addresses address the coordinator and worker processes.
 - One correlation ID and W3C trace cross three accepted Turns.
 - Causation links each generated Signal to the Signal that produced it.
 - Retrying the same child request ID prevents duplicate domain work.
@@ -36,7 +36,7 @@ is lost and the same child Signal is accepted twice.
 - Injected failure: the adapter loses the first acknowledgement after acceptance.
 - Recovery result: the duplicate reply recovers the accepted result.
 
-The child data includes the coordinator Ref as the explicit reply address. The
+The child data includes the coordinator Address as the explicit reply address. The
 application router performs the return call.
 
 ## Limits
@@ -47,7 +47,7 @@ network transport, remote lease, or distributed owner.
 
 ## Core Fit and Gaps
 
-Signals, stable Refs, AgentServer Turns, Plugin outbound preparation, trace
+Signals, stable Addresses, AgentServer Turns, Plugin outbound preparation, trace
 context, replies, persistence, and idempotent state compose through public
 APIs. Application code still owns child routing and its retry policy.
 

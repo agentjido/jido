@@ -688,7 +688,7 @@ defmodule Jido.AgentServer.Worker do
     data =
       Map.merge(Map.new(Lifecycle.runtime_keys(), &{&1, Keyword.fetch!(opts, &1)}), %{
         agent: agent,
-        agent_ref: agent_ref(agent, opts),
+        agent_address: agent_address(agent, opts),
         agent_activation_id: Keyword.fetch!(opts, :activation_id),
         agent_revision: Keyword.get(opts, :agent_revision, Keyword.get(opts, :state_version, 0)),
         persistence_revision:
@@ -732,14 +732,14 @@ defmodule Jido.AgentServer.Worker do
     end
   end
 
-  defp agent_ref(agent, opts) do
+  defp agent_address(agent, opts) do
     namespace =
       case opts[:jido] do
         nil -> "jido.local"
         jido -> Jido.Instance.NamespaceRegistry.namespace(jido) || "jido.local"
       end
 
-    Jido.Agent.Ref.new!(namespace: namespace, partition: opts[:partition], id: agent.id)
+    Jido.Agent.Address.new!(namespace: namespace, partition: opts[:partition], id: agent.id)
   end
 
   defp initialize_plugins(data) do
@@ -2856,9 +2856,9 @@ defmodule Jido.AgentServer.Worker do
 
   defp reconciliation_failure?(_reason), do: false
 
-  defp mark_reconciliation_required(%{jido: jido, agent_ref: ref}, reason)
+  defp mark_reconciliation_required(%{jido: jido, agent_address: address}, reason)
        when is_atom(jido) and not is_nil(jido) do
-    _ = Jido.Instance.RuntimeStore.put(jido, :agent_reconciliation, ref, reason)
+    _ = Jido.Instance.RuntimeStore.put(jido, :agent_reconciliation, address, reason)
     :ok
   end
 
@@ -3067,7 +3067,7 @@ defmodule Jido.AgentServer.Worker do
         fail_handoff(data, execution_error("Handoff predecessor effects failed", status))
 
       true ->
-        Jido.Instance.Wake.complete(data.jido, data.agent_ref, data.active.turn_id)
+        Jido.Instance.Wake.complete(data.jido, data.agent_address, data.active.turn_id)
         ReplyGate.done(data.active.requester)
         TraceContext.clear()
         idle_transition(%{data | active: nil})
@@ -3098,7 +3098,7 @@ defmodule Jido.AgentServer.Worker do
   end
 
   defp complete_terminal(data) do
-    Jido.Instance.Wake.complete(data.jido, data.agent_ref, data.active.turn_id)
+    Jido.Instance.Wake.complete(data.jido, data.agent_address, data.active.turn_id)
 
     if handoff_result?(data.active.result) do
       begin_handoff_release(data)
@@ -3136,7 +3136,7 @@ defmodule Jido.AgentServer.Worker do
 
     %Jido.AgentServer.TurnResult{
       turn_id: active.turn_id,
-      agent_ref: data.agent_ref,
+      agent_address: data.agent_address,
       agent_activation_id: data.agent_activation_id,
       status: status,
       durability:
@@ -3157,7 +3157,7 @@ defmodule Jido.AgentServer.Worker do
   defp completed_retry_result(data, turn_id) do
     %Jido.AgentServer.TurnResult{
       turn_id: turn_id,
-      agent_ref: data.agent_ref,
+      agent_address: data.agent_address,
       agent_activation_id: data.agent_activation_id,
       status: :committed,
       durability: if(data.persistence in [nil, false], do: :memory, else: :durable),
@@ -3562,7 +3562,7 @@ defmodule Jido.AgentServer.Worker do
   defp register_wakes(data) do
     Jido.Instance.Wake.register(
       data.jido,
-      data.agent_ref,
+      data.agent_address,
       data.active.turn_id,
       data.active.waits
     )

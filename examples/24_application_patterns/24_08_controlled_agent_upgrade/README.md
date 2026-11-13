@@ -1,7 +1,7 @@
 # 24_08 Controlled Agent Upgrade
 
 This application quiesces a durable Agent, replaces its definition and state
-schema, resumes under the same logical reference, survives one failed migration,
+schema, resumes under the same logical Address, survives one failed migration,
 and rolls back to the prior definition.
 
 ## What you will learn
@@ -27,7 +27,7 @@ shape with count 4.
 
 ## Important behavior
 
-The stable Agent reference is the logical identity. Each successful upgrade
+The stable Agent Address is the logical identity. Each successful upgrade
 replaces the hosting activation. The durable record is the canonical state
 owner. Admission is closed before migration. A failed migration does not commit
 candidate state. Rollback uses a declared reverse migration, not a process
@@ -44,13 +44,13 @@ not imply one coordinated child checkpoint.
 
 ## Core Fit and Gaps
 
-Public quiesce, stable references, persistence snapshots, migration Actions,
+Public quiesce, stable Addresses, persistence snapshots, migration Actions,
 and `Jido.upgrade_agent/4` provide the complete control path. Upgrade failure
 and rollback are explicit and tested. The first implementation attempt changed
 the origin module. Jido rejected it with `:upgrade_identity`; the working path
 keeps the origin and replaces the saved definition data.
 
-- Logical owner: stable account Agent reference.
+- Logical owner: stable account Agent Address.
 - Process owner: current AgentServer activation.
 - Canonical state owner: durable Agent record.
 - Commit point: successful persistence upgrade.

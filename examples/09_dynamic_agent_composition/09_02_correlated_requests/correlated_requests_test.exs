@@ -5,7 +5,7 @@ defmodule Jido.Examples.MultiAgent.CorrelatedRequestsTest do
   use ExUnit.Case, async: false
   @moduletag :integration
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.AgentServer.TurnResult
   alias Jido.Examples.{CorrelatedRequests, Worker}
 
@@ -20,8 +20,8 @@ defmodule Jido.Examples.MultiAgent.CorrelatedRequestsTest do
       id: instance
     )
 
-    coordinator = Ref.new!(namespace: namespace, id: "coordinator")
-    worker = Ref.new!(namespace: namespace, id: "worker")
+    coordinator = Address.new!(namespace: namespace, id: "coordinator")
+    worker = Address.new!(namespace: namespace, id: "worker")
     {:ok, ^coordinator} = Jido.create_agent(instance, coordinator, CorrelatedRequests)
     {:ok, ^worker} = Jido.create_agent(instance, worker, Worker)
 

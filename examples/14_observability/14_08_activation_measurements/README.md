@@ -37,9 +37,9 @@ store, sustained throughput, cluster placement, or maximum Agent density.
 
 ## Core Fit and Gaps
 
-Public Refs, status, resident counts, and telemetry support honest local
+Public Addresses, status, resident counts, and telemetry support honest local
 measurement. There is no public logical-Agent listing API, so the application
-must keep its own inventory of created Refs. Store event counts show load, but
+must keep its own inventory of created Addresses. Store event counts show load, but
 adapter-specific latency and capacity need adapter instrumentation.
 
 ## Files

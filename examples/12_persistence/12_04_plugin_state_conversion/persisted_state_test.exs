@@ -104,6 +104,6 @@ defmodule Jido.Examples.Persistence.PluginStateConversionTest do
   defp record_key(agent, instance),
     do:
       Persistence.agent_key(
-        Jido.Agent.Ref.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(instance), id: agent.id)
+        Jido.Agent.Address.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(instance), id: agent.id)
       )
 end

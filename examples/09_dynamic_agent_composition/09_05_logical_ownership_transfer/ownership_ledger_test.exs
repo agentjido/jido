@@ -5,7 +5,7 @@ defmodule Jido.Examples.OwnershipLedgerTest do
   use ExUnit.Case, async: true
   @moduletag :integration
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.AgentServer
   alias Jido.Examples.{OwnershipLedger, Worker}
 
@@ -16,9 +16,9 @@ defmodule Jido.Examples.OwnershipLedgerTest do
     store = {Jido.Persistence.ETS, table: :"ownership_ledger_store_#{suffix}"}
     start_supervised!({Jido, name: instance, namespace: namespace, persistence: store}, id: instance)
 
-    worker_ref = Ref.new!(namespace: namespace, id: "worker")
-    assert {:ok, ^worker_ref} = Jido.create_agent(instance, worker_ref, Worker)
-    assert {:ok, worker} = Jido.activate_agent(instance, worker_ref)
+    worker_address = Address.new!(namespace: namespace, id: "worker")
+    assert {:ok, ^worker_address} = Jido.create_agent(instance, worker_address, Worker)
+    assert {:ok, worker} = Jido.activate_agent(instance, worker_address)
 
     assert {:ok, ledger} =
              Jido.start_agent(instance, OwnershipLedger,
@@ -29,39 +29,45 @@ defmodule Jido.Examples.OwnershipLedgerTest do
     assert :ok = AgentServer.await_ready(worker)
     assert :ok = AgentServer.await_ready(ledger)
 
-    %{instance: instance, worker_ref: worker_ref, worker: worker, ledger: ledger}
+    %{instance: instance, worker_address: worker_address, worker: worker, ledger: ledger}
   end
 
   test "transfer changes logical ownership but not process ownership", c do
-    ref_document = Ref.to_map!(c.worker_ref)
-
-    assert {:ok, %{status: :committed}} =
-             AgentServer.call(c.ledger, OwnershipLedger.adopt_signal!(%{agent_ref: ref_document, owner: "team-a"}))
+    address_document = Address.to_map!(c.worker_address)
 
     assert {:ok, %{status: :committed}} =
              AgentServer.call(
                c.ledger,
-               OwnershipLedger.transfer_signal!(%{agent_ref: ref_document, from: "team-a", to: "team-b"})
+               OwnershipLedger.adopt_signal!(%{agent_address: address_document, owner: "team-a"})
              )
 
-    key = OwnershipLedger.ownership_key(ref_document)
+    assert {:ok, %{status: :committed}} =
+             AgentServer.call(
+               c.ledger,
+               OwnershipLedger.transfer_signal!(%{agent_address: address_document, from: "team-a", to: "team-b"})
+             )
+
+    key = OwnershipLedger.ownership_key(address_document)
     assert AgentServer.snapshot(c.ledger).agent.state.owners == %{key => "team-b"}
-    assert {:ok, same_worker} = Jido.resolve_agent(c.instance, c.worker_ref)
+    assert {:ok, same_worker} = Jido.resolve_agent(c.instance, c.worker_address)
     assert same_worker == c.worker
   end
 
   test "a stale transfer does not change committed ownership", c do
-    ref_document = Ref.to_map!(c.worker_ref)
+    address_document = Address.to_map!(c.worker_address)
 
     assert {:ok, %{status: :committed}} =
-             AgentServer.call(c.ledger, OwnershipLedger.adopt_signal!(%{agent_ref: ref_document, owner: "team-a"}))
+             AgentServer.call(
+               c.ledger,
+               OwnershipLedger.adopt_signal!(%{agent_address: address_document, owner: "team-a"})
+             )
 
     before = AgentServer.snapshot(c.ledger)
 
     assert {:ok, %{status: :failed}} =
              AgentServer.call(
                c.ledger,
-               OwnershipLedger.transfer_signal!(%{agent_ref: ref_document, from: "team-x", to: "team-b"})
+               OwnershipLedger.transfer_signal!(%{agent_address: address_document, from: "team-x", to: "team-b"})
              )
 
     after_failure = AgentServer.snapshot(c.ledger)

@@ -5,7 +5,7 @@ defmodule Jido.Examples.Persistence.HibernateAndThawTest do
   @moduletag :integration
   @moduletag group: :persistence
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.AgentServer.{Snapshot, Status, TurnResult}
   alias Jido.Examples.Persistence.HibernateAndThaw, as: Example
 
@@ -28,8 +28,8 @@ defmodule Jido.Examples.Persistence.HibernateAndThawTest do
   end
 
   test "a stopped activation restores the same durable Agent", c do
-    ref = create(c, "counter")
-    assert {:ok, first} = Jido.activate_agent(c.instance, ref)
+    address = create(c, "counter")
+    assert {:ok, first} = Jido.activate_agent(c.instance, address)
     first_id = Jido.AgentServer.status(first).agent_activation_id
 
     {:ok, signal} = Example.increment_signal(%{amount: 4})
@@ -39,40 +39,40 @@ defmodule Jido.Examples.Persistence.HibernateAndThawTest do
               status: :committed,
               agent_revision: 1,
               persistence_revision: 2
-            }} = Jido.call(c.instance, ref, signal)
+            }} = Jido.call(c.instance, address, signal)
 
     assert {:ok, %Snapshot{agent: %{state: %{count: 4}}}} = Jido.AgentServer.stop(first)
-    assert {:ok, restored} = Jido.activate_agent(c.instance, ref)
+    assert {:ok, restored} = Jido.activate_agent(c.instance, address)
     refute Jido.AgentServer.status(restored).agent_activation_id == first_id
 
     assert %Snapshot{agent: %{state: %{count: 4}}, agent_revision: 1} =
              Jido.AgentServer.snapshot(restored)
   end
 
-  test "idle passivation keeps the Ref alive and later delivery reactivates it", c do
-    ref = create(c, "idle-counter")
-    assert {:ok, first} = Jido.activate_agent(c.instance, ref)
+  test "idle passivation keeps the Address alive and later delivery reactivates it", c do
+    address = create(c, "idle-counter")
+    assert {:ok, first} = Jido.activate_agent(c.instance, address)
     first_id = Jido.AgentServer.status(first).agent_activation_id
 
-    eventually(fn -> match?(%Status{residency: :passivated}, Jido.status(c.instance, ref)) end)
-    assert {:error, :not_found} = Jido.resolve_agent(c.instance, ref)
+    eventually(fn -> match?(%Status{residency: :passivated}, Jido.status(c.instance, address)) end)
+    assert {:error, :not_found} = Jido.resolve_agent(c.instance, address)
 
     {:ok, signal} = Example.increment_signal(%{amount: 1})
-    assert {:ok, %TurnResult{status: :committed}} = Jido.call(c.instance, ref, signal)
-    assert {:ok, second} = Jido.resolve_agent(c.instance, ref)
+    assert {:ok, %TurnResult{status: :committed}} = Jido.call(c.instance, address, signal)
+    assert {:ok, second} = Jido.resolve_agent(c.instance, address)
     refute Jido.AgentServer.status(second).agent_activation_id == first_id
     assert Jido.AgentServer.snapshot(second).agent.state.count == 1
   end
 
   test "activation rejects a missing durable record", c do
-    missing = Ref.new!(namespace: c.namespace, id: "missing")
+    missing = Address.new!(namespace: c.namespace, id: "missing")
     assert {:error, :not_found} = Jido.activate_agent(c.instance, missing)
   end
 
   defp create(c, id) do
-    ref = Ref.new!(namespace: c.namespace, id: id)
-    {:ok, ^ref} = Jido.create_agent(c.instance, ref, Example)
-    ref
+    address = Address.new!(namespace: c.namespace, id: id)
+    {:ok, ^address} = Jido.create_agent(c.instance, address, Example)
+    address
   end
 
   defp eventually(fun, attempts \\ 200)

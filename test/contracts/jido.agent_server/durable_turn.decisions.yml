@@ -30,7 +30,7 @@
 
 - id: durable-turn-frontier-hydration
   date: 2026-10-27
-  decision: Replay durable workflow structure with Runic FactRef values and load only the hot facts that the active frontier and pending reactions need. Add each open Jido wait input to the hot set because wait resolution runs before the Runner restarts. Represent detached Join completion results with an internal replay event that creates a FactRef.
+  decision: Replay durable workflow structure with Runic FactAddress values and load only the hot facts that the active frontier and pending reactions need. Add each open Jido wait input to the hot set because wait resolution runs before the Runner restarts. Represent detached Join completion results with an internal replay event that creates a FactRef.
   driver: Long-running workflow history must not force every stored fact value into memory during each recovery or wait transition.
   approved_by: User-requested frontier fact hydration
 

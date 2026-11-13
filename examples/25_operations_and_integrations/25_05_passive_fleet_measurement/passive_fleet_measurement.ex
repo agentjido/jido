@@ -21,7 +21,7 @@ end
 defmodule Jido.Examples.Operations.PassiveFleetMeasurement do
   @moduledoc "Measures one bounded local activation and passivation run."
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Examples.Operations.MeasuredFleetAgent
 
   @doc "Creates logical Agents, activates them with bounded concurrency, and reports measurements."
@@ -77,16 +77,16 @@ defmodule Jido.Examples.Operations.PassiveFleetMeasurement do
 
   defp create(instance, namespace, count) do
     Enum.map(1..count, fn number ->
-      ref = Ref.new!(namespace: namespace, id: "fleet-agent-#{number}")
-      {:ok, ^ref} = Jido.create_agent(instance, ref, MeasuredFleetAgent)
-      ref
+      address = Address.new!(namespace: namespace, id: "fleet-agent-#{number}")
+      {:ok, ^address} = Jido.create_agent(instance, address, MeasuredFleetAgent)
+      address
     end)
   end
 
-  defp activate(instance, ref) do
+  defp activate(instance, address) do
     {:ok, signal} = MeasuredFleetAgent.activate_signal(%{})
     started = System.monotonic_time()
-    {:ok, result} = Jido.call(instance, ref, signal)
+    {:ok, result} = Jido.call(instance, address, signal)
     %{elapsed_us: elapsed_us(started), status: result.status}
   end
 

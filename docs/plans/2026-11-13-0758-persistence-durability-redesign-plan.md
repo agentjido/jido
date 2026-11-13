@@ -253,7 +253,7 @@ The runtime uses one normalized persistence profile from Instance startup throug
 
 #### KTD7: Partition wake manifests by time and identity
 
-- **Decision:** Use a fixed one-minute UTC epoch bucket and 64 deterministic shards selected from the stable Ref and Turn identity. Keep a small CAS-protected active-bucket index. Record one increasing shard generation in the shard and index. Confirm both records before Agent commit. Cleanup removes only the generation that it made empty. An inert empty shard value can remain.
+- **Decision:** Use a fixed one-minute UTC epoch bucket and 64 deterministic shards selected from the stable Address and Turn identity. Keep a small CAS-protected active-bucket index. Record one increasing shard generation in the shard and index. Confirm both records before Agent commit. Cleanup removes only the generation that it made empty. An inert empty shard value can remain.
 - **Reason:** R7 needs predictable recovery and bounded contention without Store enumeration.
 - **Rejected alternative:** One manifest or one key plus a second index for every wake.
 - **Consequences:** One unusually dense minute can still fill a shard; adapter size rejection remains explicit. The constants live in the namespace manifest and can change only in a new format.
@@ -261,7 +261,7 @@ The runtime uses one normalized persistence profile from Instance startup throug
 
 #### KTD8: Keep inspection read-only and safe by default
 
-- **Decision:** Add `mix jido.persistence.inspect` for exact keys or Agent Refs and `mix jido.persistence.export` for paged JSONL. Decode V3 record metadata without running Agent work. Exact inspection needs `--full` for saved values. Export needs `--include-state` for Agent state.
+- **Decision:** Add `mix jido.persistence.inspect` for exact keys or Agent Addresses and `mix jido.persistence.export` for paged JSONL. Decode V3 record metadata without running Agent work. Exact inspection needs `--full` for saved values. Export needs `--include-state` for Agent state.
 - **Reason:** R11-R13 require direct developer use without silent data disclosure.
 - **Rejected alternative:** Full values by default or runtime key enumeration.
 - **Consequences:** Export-all needs an adapter with scan. Commands warn before full output.
@@ -349,7 +349,7 @@ The runtime uses one normalized persistence profile from Instance startup throug
 - **Dependencies:** U2, U3.
 - **Affected surfaces:** New Mix tasks and inspection module, task tests, codecs, Store scan, File and ETS scans, docs, and package task discovery.
 - **Implementation direction:** Keep command parsing and output in Mix tasks; put read/decode/redact/projection behavior in Persistence. Require adapter and namespace configuration or a supported File path. Default to metadata and shape projection. Require `--full` for exact output and `--include-state` for export state. Stream JSONL pages to an explicit output path. Print full-data warnings to stderr. Never start Agent processes or write Store data.
-- **Test scenarios:** Exact Agent Ref; exact raw key; Term and JSON; redacted default; explicit full; unsupported scan; paged export; invalid record; old formats rejected; output file collision or explicit overwrite policy; bounded page handling.
+- **Test scenarios:** Exact Agent Address; exact raw key; Term and JSON; redacted default; explicit full; unsupported scan; paged export; invalid record; old formats rejected; output file collision or explicit overwrite policy; bounded page handling.
 - **Verification:** Mix task tests with captured IO and JSON parsing.
 - **Completion signal:** A developer can inspect a JSON File record directly and can inspect either codec through the task with redaction by default.
 

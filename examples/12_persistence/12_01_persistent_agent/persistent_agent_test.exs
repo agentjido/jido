@@ -122,7 +122,7 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
     id = unique_id("corrupt-counter")
 
     key =
-      Persistence.agent_key(Jido.Agent.Ref.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(jido), id: id))
+      Persistence.agent_key(Jido.Agent.Address.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(jido), id: id))
 
     assert :ok = ETS.put(key, <<0, 1, 2>>, opts)
 

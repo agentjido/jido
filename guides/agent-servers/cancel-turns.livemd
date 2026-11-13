@@ -166,7 +166,7 @@ See [Control Activations](inspect-and-control-activations.livemd).
 
 The `:turn_timeout` option cancels the same way on its own. Its caller gets `{:error, :turn_timeout}`, and its outcome has the status `:timed_out`.
 
-`Jido.cancel/3` and `Jido.cancel_turn/4` do the same through a `Jido.Agent.Ref`.
+`Jido.cancel/3` and `Jido.cancel_turn/4` do the same through a `Jido.Agent.Address`.
 
 ## Next steps
 

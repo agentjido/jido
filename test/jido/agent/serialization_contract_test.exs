@@ -11,7 +11,7 @@ defmodule Jido.Agent.SerializationContractTest do
     store = {Store, opts}
     agent = Probe.instantiate!(id: unique_id())
     assert :ok = Persistence.save_agent(store, agent, namespace: "persistence-test")
-    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
+    key = Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: agent.id))
     assert "jido:agent:v3:" <> _identity = key
     assert {:ok, bytes} = Store.get(key, opts)
     assert {:ok, record} = Jido.Persistence.Codec.Term.decode(bytes, [])

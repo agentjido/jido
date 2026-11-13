@@ -19,16 +19,16 @@ defmodule Jido.Examples.InstanceIsolation.Counter do
 end
 
 defmodule Jido.Examples.InstanceIsolation do
-  @moduledoc "Builds scoped Agent references and sends one counter command."
+  @moduledoc "Builds scoped Agent Addresses and sends one counter command."
 
   alias Jido.Signal
 
-  def ref(instance, id, partition), do: Jido.agent_ref(instance, id, partition: partition)
+  def address(instance, id, partition), do: Jido.agent_address(instance, id, partition: partition)
 
-  def increment(instance, ref) do
+  def increment(instance, address) do
     signal =
       Signal.new!("examples.instance.isolation.increment", %{}, source: "/examples/instance/isolation")
 
-    Jido.call(instance, ref, signal)
+    Jido.call(instance, address, signal)
   end
 end

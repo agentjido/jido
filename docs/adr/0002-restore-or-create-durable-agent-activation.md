@@ -6,15 +6,15 @@
 
 ## Context
 
-A caller with a stable Agent Ref must not first test storage and then choose a start function. That check has a race. Strict create and strict restore operations are still useful for lifecycle control.
+A caller with a stable Agent Address must not first test storage and then choose a start function. That check has a race. Strict create and strict restore operations are still useful for lifecycle control.
 
 ## Decision
 
-`Jido.activate_agent/4` is the restore-or-create operation for one stable Ref.
+`Jido.activate_agent/4` is the restore-or-create operation for one stable Address.
 
 It first returns the current local activation when one exists. Otherwise, Persistence reads the durable record. It restores an active record. It creates revision zero only after a not-found read. If that create conflicts, it reads and restores the winning record.
 
-A tombstone, an invalid record, and another storage error do not become a create operation. `Jido.start_agent_ref/4` and `Jido.thaw/4` keep their strict create and restore meanings.
+A tombstone, an invalid record, and another storage error do not become a create operation. The former `Jido.start_agent_ref/4` API and `Jido.thaw/4` keep their strict create and restore meanings.
 
 ## Consequences
 

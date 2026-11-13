@@ -6,7 +6,7 @@ documents.
 ## What you will learn
 
 - `Jido.Codec` routes a versioned Agent definition through a trusted Catalog.
-- `Jido.Agent.Ref` has a separate exact public representation.
+- `Jido.Agent.Address` has a separate exact public representation.
 - Complete-document byte, duplicate-key, and nesting limits apply before use.
 
 ## Read the code
@@ -17,7 +17,7 @@ Read [the codec example](codec_documents.ex) first.
 
 `mix test.examples examples/07_instance_catalog_documents/07_07_codec_documents --warnings-as-errors`
 
-Expected result: the definition and Ref round trip. Oversized, duplicate-key,
+Expected result: the definition and Address round trip. Oversized, duplicate-key,
 and deeply nested documents fail with explicit reasons.
 
 ## Important behavior
@@ -32,7 +32,7 @@ version selection and migration.
 
 ## Core Fit and Gaps
 
-Definition codecs, Catalog references, stable Agent references, and document
+Definition codecs, Catalog references, stable Agent Addresses, and document
 limits compose through public APIs. The application must still define which
 Catalog entries are allowed for each stored-document source. This is an
 authorization policy, not a Codec responsibility.

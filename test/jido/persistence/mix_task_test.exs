@@ -49,7 +49,7 @@ defmodule Jido.Persistence.MixTaskTest do
     assert Code.loaded?(ConfiguredInstance)
     agent = CounterAgent.instantiate!(id: "inspected-agent", state: %{count: 8})
     assert :ok = Persistence.save_agent(config, agent, namespace: "mix-task-instance")
-    ref = Jido.Agent.Ref.new!(namespace: "mix-task-instance", id: agent.id)
+    address = Jido.Agent.Address.new!(namespace: "mix-task-instance", id: agent.id)
 
     refute Process.whereis(ConfiguredInstance)
 
@@ -59,7 +59,7 @@ defmodule Jido.Persistence.MixTaskTest do
           "--instance",
           Atom.to_string(ConfiguredInstance),
           "--key",
-          Persistence.agent_key(ref)
+          Persistence.agent_key(address)
         ])
       end)
 
@@ -67,7 +67,7 @@ defmodule Jido.Persistence.MixTaskTest do
     assert output =~ "REDACTED"
     refute output =~ "\"count\":8"
     refute Process.whereis(ConfiguredInstance)
-    assert {:ok, _bytes, _condition} = Jido.Persistence.Store.read(config.store, Persistence.agent_key(ref))
+    assert {:ok, _bytes, _condition} = Jido.Persistence.Store.read(config.store, Persistence.agent_key(address))
   end
 
   test "full exact inspection warns on stderr and returns full JSON" do
@@ -77,7 +77,7 @@ defmodule Jido.Persistence.MixTaskTest do
     {:ok, config} = Config.open(store: {File, path: path}, codec: Codec.JSON)
     agent = CounterAgent.instantiate!(id: "full-agent", state: %{count: 13})
     assert :ok = Persistence.save_agent(config, agent, namespace: "mix-inspect")
-    ref = Jido.Agent.Ref.new!(namespace: "mix-inspect", id: agent.id)
+    address = Jido.Agent.Address.new!(namespace: "mix-inspect", id: agent.id)
 
     stderr =
       capture_io(:stderr, fn ->
@@ -91,7 +91,7 @@ defmodule Jido.Persistence.MixTaskTest do
               "--codec",
               "json",
               "--key",
-              Persistence.agent_key(ref),
+              Persistence.agent_key(address),
               "--full"
             ])
           end)

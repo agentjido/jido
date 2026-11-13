@@ -3,7 +3,7 @@ defmodule Jido.AgentServer do
   Runs one resident Agent activation.
 
   All Signal request modes use one serialized Turn path. Direct server handles
-  address only the current activation. Use `Jido.Agent.Ref` through the Jido
+  address only the current activation. Use `Jido.Agent.Address` through the Jido
   Instance when work must survive passivation or worker replacement.
   """
 

@@ -270,15 +270,15 @@ defmodule SystemTests.RestartTest do
 
   test "a durable Agent survives an instance restart", context do
     %{jido: jido, namespace: namespace, store: store} = context
-    {:ok, ref} = Jido.agent_ref(jido, "order-1")
-    {:ok, ^ref} = Jido.create_agent(jido, ref, Order)
+    {:ok, address} = Jido.agent_address(jido, "order-1")
+    {:ok, ^address} = Jido.create_agent(jido, address, Order)
 
-    {:ok, server} = Jido.activate_agent(jido, ref, Order)
+    {:ok, server} = Jido.activate_agent(jido, address, Order)
     :ok = Server.await_ready(server)
     {:ok, _agent, _directives} = Server.call(server, add_signal("sku-1"))
 
     stop_supervised!(jido)
-    assert {:error, _reason} = Jido.agent_ref(jido, "order-1")
+    assert {:error, _reason} = Jido.agent_address(jido, "order-1")
 
     start_supervised!(
       {Jido,
@@ -288,7 +288,7 @@ defmodule SystemTests.RestartTest do
        agent_server: [default_dispatch: {:noop, []}]}
     )
 
-    {:ok, server} = Jido.activate_agent(jido, ref, Order)
+    {:ok, server} = Jido.activate_agent(jido, address, Order)
     :ok = Server.await_ready(server)
 
     assert Server.snapshot(server).agent.state.items == ["sku-1"]

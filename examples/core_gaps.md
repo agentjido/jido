@@ -191,7 +191,7 @@ that makes the problem clear.
 - Result: `Jido.stop_agent/3` returned `{:error, :unsafe_resume}` because a
   normal stop could publish an unsafe checkpoint from the faulted process.
 - Public solution: Configure persistence on the Jido instance, resolve the
-  stable Agent Ref, call `Jido.reconcile_agent/3`, verify replacement from the
+  stable Agent Address, call `Jido.reconcile_agent/3`, verify replacement from the
   authoritative record, and then stop the replacement.
 - Core change: None proposed. The safety boundary and recovery operation are
   public and testable.

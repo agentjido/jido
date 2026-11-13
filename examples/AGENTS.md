@@ -113,7 +113,7 @@ runs one Action, explain that Jido lowers it to a canonical one-step Flow.
   barriers, monitors, and probes.
 - Use bounded waits. If a test needs an intentional unbounded wait, prove that
   cancellation and cleanup always terminate it.
-- Use stable `Jido.Agent.Ref` values when work must survive a process change,
+- Use stable `Jido.Agent.Address` values when work must survive a process change,
   passivation, or client reconnect.
 - Do not store a process identifier as durable or browser-facing identity.
 

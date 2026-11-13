@@ -11,14 +11,14 @@ defmodule Jido.Examples.OwnershipLedger do
     signal_source "/examples/multi-agent/ownership"
 
     route "examples.multi_agent.ownership.adopt", as: :adopt do
-      action %{agent_ref: agent_ref, owner: owner},
+      action %{agent_address: agent_address, owner: owner},
         schema:
           Jido.Joi.object(%{
-            agent_ref: Jido.Joi.map(),
+            agent_address: Jido.Joi.map(),
             owner: Jido.Joi.string() |> Jido.Joi.min(1)
           }),
         context: context do
-        key = ownership_key(agent_ref)
+        key = ownership_key(agent_address)
 
         if Map.has_key?(context.agent_state.owners, key) do
           {:error, Jido.Error.validation_error("Agent already has a logical owner")}
@@ -29,15 +29,15 @@ defmodule Jido.Examples.OwnershipLedger do
     end
 
     route "examples.multi_agent.ownership.transfer", as: :transfer do
-      action %{agent_ref: agent_ref, from: from, to: to},
+      action %{agent_address: agent_address, from: from, to: to},
         schema:
           Jido.Joi.object(%{
-            agent_ref: Jido.Joi.map(),
+            agent_address: Jido.Joi.map(),
             from: Jido.Joi.string() |> Jido.Joi.min(1),
             to: Jido.Joi.string() |> Jido.Joi.min(1)
           }),
         context: context do
-        key = ownership_key(agent_ref)
+        key = ownership_key(agent_address)
 
         case Map.get(context.agent_state.owners, key) do
           ^from -> {:ok, put_in(context.agent_state, [:owners, key], to)}
@@ -47,6 +47,6 @@ defmodule Jido.Examples.OwnershipLedger do
     end
   end
 
-  def ownership_key(agent_ref),
-    do: agent_ref |> Enum.sort() |> :erlang.term_to_binary() |> Base.url_encode64(padding: false)
+  def ownership_key(agent_address),
+    do: agent_address |> Enum.sort() |> :erlang.term_to_binary() |> Base.url_encode64(padding: false)
 end

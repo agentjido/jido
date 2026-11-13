@@ -32,13 +32,13 @@ defmodule Jido.Examples.InstanceIsolationTest do
   end
 
   test "namespace and partition are both part of logical identity", c do
-    assert {:ok, first_a} = InstanceIsolation.ref(c.first, "counter", "team-a")
-    assert {:ok, first_b} = InstanceIsolation.ref(c.first, "counter", "team-b")
-    assert {:ok, second_a} = InstanceIsolation.ref(c.second, "counter", "team-a")
+    assert {:ok, first_a} = InstanceIsolation.address(c.first, "counter", "team-a")
+    assert {:ok, first_b} = InstanceIsolation.address(c.first, "counter", "team-b")
+    assert {:ok, second_a} = InstanceIsolation.address(c.second, "counter", "team-a")
 
-    for {instance, ref} <- [{c.first, first_a}, {c.first, first_b}, {c.second, second_a}] do
-      assert {:ok, ^ref} = Jido.create_agent(instance, ref, Counter)
-      assert {:ok, server} = Jido.activate_agent(instance, ref)
+    for {instance, address} <- [{c.first, first_a}, {c.first, first_b}, {c.second, second_a}] do
+      assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
+      assert {:ok, server} = Jido.activate_agent(instance, address)
       assert :ok = AgentServer.await_ready(server)
     end
 
@@ -52,15 +52,15 @@ defmodule Jido.Examples.InstanceIsolationTest do
     assert count(c.second, second_a) == 1
   end
 
-  test "an instance rejects a reference from another namespace", c do
-    assert {:ok, foreign} = InstanceIsolation.ref(c.second, "counter", "team-a")
+  test "an instance rejects an Address from another namespace", c do
+    assert {:ok, foreign} = InstanceIsolation.address(c.second, "counter", "team-a")
 
     assert {:error, %Jido.Error.ValidationError{details: %{code: :jido_namespace_mismatch}}} =
              Jido.create_agent(c.first, foreign, Counter)
   end
 
-  defp count(instance, ref) do
-    {:ok, server} = Jido.resolve_agent(instance, ref)
+  defp count(instance, address) do
+    {:ok, server} = Jido.resolve_agent(instance, address)
     AgentServer.snapshot(server).agent.state.count
   end
 end

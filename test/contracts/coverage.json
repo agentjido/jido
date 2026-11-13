@@ -592,7 +592,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test concurrent Ref delivery joins one activation and serializes every Turn"
+            "test concurrent Address delivery joins one activation and serializes every Turn"
           ]
         },
         "jido.agent_server.I101": {
@@ -622,7 +622,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test Ref delivery activates, stays warm, passivates, and restores"
+            "test Address delivery activates, stays warm, passivates, and restores"
           ]
         },
         "jido.agent_server.I104": {
@@ -632,7 +632,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test Ref delivery activates, stays warm, passivates, and restores"
+            "test Address delivery activates, stays warm, passivates, and restores"
           ]
         },
         "jido.agent_server.I11": {
@@ -932,8 +932,8 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test Ref delivery activates, stays warm, passivates, and restores",
-            "test delete uses only the Ref and a tombstone prevents reactivation"
+            "test Address delivery activates, stays warm, passivates, and restores",
+            "test delete uses only the Address and a tombstone prevents reactivation"
           ]
         },
         "jido.agent_server.I96": {
@@ -1961,7 +1961,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test a durable Ref survives rebinding its namespace to another local instance",
+            "test a durable Address survives rebinding its namespace to another local instance",
             "test a failed instance start releases its namespace claim",
             "test a namespace is exact, local, and unique while its instance is live",
             "test an existing claim can bind after the previous binding is gone",
@@ -2018,13 +2018,13 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test Ref construction rejects invalid IDs and unknown options",
-            "test Ref creation rejects conflicting identity options before writing an Agent",
-            "test a Ref-first operation requires a stable instance namespace",
-            "test a durable Ref survives rebinding its namespace to another local instance",
-            "test a process label identifies each live server for one Agent Ref",
-            "test durable Ref creation is synchronous and activation is strict and single-flight",
-            "test the Ref API resolves each operation and preserves direct Server results"
+            "test Address construction rejects invalid IDs and unknown options",
+            "test Address creation rejects conflicting identity options before writing an Agent",
+            "test a durable Address survives rebinding its namespace to another local instance",
+            "test a process label identifies each live server for one Agent Address",
+            "test an Address-first operation requires a stable instance namespace",
+            "test durable Address creation is synchronous and activation is strict and single-flight",
+            "test the Address API resolves each operation and preserves direct Server results"
           ]
         },
         "jido.instance.I7": {
@@ -2034,8 +2034,8 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test Ref resolution distinguishes recovery and Registry loss",
-            "test the Ref API resolves each operation and preserves direct Server results"
+            "test Address resolution distinguishes recovery and Registry loss",
+            "test the Address API resolves each operation and preserves direct Server results"
           ]
         },
         "jido.instance.I8": {
@@ -2045,14 +2045,14 @@
           "status": "active",
           "testable": true,
           "tests": [
+            "test Address Plugin reads keep the selected Plugin",
+            "test Address controls preserve AgentServer results across passivation",
+            "test Address routing forwards context and explicit caller waits",
             "test Jido does not expose default-instance or AgentServer forwarding shortcuts",
-            "test Ref Plugin reads keep the selected Plugin",
-            "test Ref controls preserve AgentServer results across passivation",
-            "test Ref routing forwards context and explicit caller waits",
-            "test a durable Ref survives rebinding its namespace to another local instance",
+            "test a durable Address survives rebinding its namespace to another local instance",
             "test activation stop forwards the reason",
-            "test the Ref API accepts a generated instance identity",
-            "test the Ref API resolves each operation and preserves direct Server results"
+            "test the Address API accepts a generated instance identity",
+            "test the Address API resolves each operation and preserves direct Server results"
           ]
         },
         "jido.instance.I9": {
@@ -2062,7 +2062,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test durable Ref creation is synchronous and activation is strict and single-flight",
+            "test durable Address creation is synchronous and activation is strict and single-flight",
             "test durable creation requires Instance persistence",
             "test strict activation does not create a missing durable Agent"
           ]
@@ -2234,7 +2234,7 @@
             "test identity setup preserves adapter call order and exact stored bytes",
             "test identity validation preserves scope-first error order and exact key sets",
             "test missing namespaces and removed write gates fail before storage access",
-            "test the key contains only the exact Ref tuple"
+            "test the key contains only the exact Address tuple"
           ]
         },
         "jido.persistence.I3": {

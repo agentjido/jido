@@ -12,8 +12,7 @@ explicit boundary decision.
 
 ## Component review checklist
 
-Last checked: 2026-11-11 at checkpoint `390d1c0f`, on
-`migration/consolidated-v3`.
+Last checked: 2026-11-13 at checkpoint `1fe12e68`, on `release/v3`.
 
 The review covers four required checks for each component:
 
@@ -33,28 +32,29 @@ review, or that the available evidence covers only part of the component.
 findings are closed or that the component is ready for release. A confirmed
 component boundary in the inventory below does not complete these checks.
 
-Current count: **21 reviewed** and **17 waiting for the full review**.
+Current count: **38 reviewed** and **0 waiting for the full review**.
 
-- Top-level components: **18 reviewed**, **4 waiting**.
-- Sub-components: **3 reviewed**, **13 waiting**.
+- Top-level components: **22 reviewed**, **0 waiting**.
+- Sub-components: **16 reviewed**, **0 waiting**.
 - Before R7, the local checklist recorded **16 reviewed** and **21 waiting**.
   That evidence and the checkpoint note below are retained.
-- The latest completed component is Agent (R10).
-- The preceding set is Exec and Durable (R9), followed by Action and Flow
-  (R7).
+- The latest completed set is AI and its eight reasoning sub-components (R14).
+- The preceding set is Plugin and its five sub-components (R13), Jido (R12),
+  AgentServer (R11), Agent (R10), and Exec and Durable (R9).
 - The earlier set is Session, Thread, Instruction, Signal,
   Persistence, and Telemetry, plus Signal Router, Bus, and Dispatch.
 - Four defect fixes from this set are included in checkpoint `8525ec43`.
   Tests were not run after these fixes. Review completion does not establish
   that all fixes have test evidence.
 
-Some waiting components have focused test evidence, as noted below.
+Completed reviews can retain open findings, as noted below and in each linked
+component record.
 
 ### Top-level components
 
 | Component and review record | Public surface | API contract usage | Duplication | Elixir design | Review state |
 | --- | --- | --- | --- | --- | --- |
-| `Jido` | [ ] | [ ] | [ ] | [ ] | Waiting |
+| [`Jido`](docs/components/jido.md) | [x] | [x] | [x] | [x] | Reviewed (R12) |
 | [`Jido.Error`](docs/components/error.md) | [x] | [x] | [x] | [x] | Reviewed (R1, R2) |
 | [`Jido.Id`](docs/components/id.md) | [x] | [x] | [x] | [x] | Reviewed (R1, R2) |
 | [`Jido.Joi`](docs/components/joi.md) | [x] | [x] | [x] | [x] | Reviewed (R1, R2) |
@@ -69,12 +69,12 @@ Some waiting components have focused test evidence, as noted below.
 | [`Jido.Durable`](docs/components/durable.md) | [x] | [x] | [x] | [x] | Reviewed (R9) |
 | [`Jido.Signal`](docs/components/signal.md) | [x] | [x] | [x] | [x] | Reviewed (R5) |
 | [`Jido.Agent`](docs/components/agent.md) | [x] | [x] | [x] | [x] | Reviewed (R10) |
-| `Jido.Plugin` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.AgentServer` | [ ] | [ ] | [ ] | [ ] | Waiting |
+| [`Jido.Plugin`](docs/components/plugin.md) | [x] | [x] | [x] | [x] | Reviewed (R13) |
+| [`Jido.AgentServer`](docs/components/agent_server.md) | [x] | [x] | [x] | [x] | Reviewed (R11) |
 | [`Jido.Persistence`](docs/components/persistence.md) | [x] | [x] | [x] | [x] | Reviewed (R5) |
 | [`Jido.Session`](docs/components/session.md) | [x] | [x] | [x] | [x] | Reviewed (R5) |
 | [`Jido.Thread`](docs/components/thread.md) | [x] | [x] | [x] | [x] | Reviewed (R5) |
-| `Jido.AI` | [ ] | [ ] | [ ] | [ ] | Waiting |
+| [`Jido.AI`](docs/components/ai.md) | [x] | [x] | [x] | [x] | Reviewed (R14) |
 | [`Jido.Telemetry`](docs/components/telemetry.md) | [x] | [x] | [x] | [x] | Reviewed (R5) |
 
 ### Sub-components
@@ -87,19 +87,19 @@ sub-component checks.
 | [`Jido.Signal.Router`](docs/components/signal.md#router) | [x] | [x] | [x] | [x] | Reviewed (R5) |
 | [`Jido.Signal.Bus`](docs/components/signal.md#bus) | [x] | [x] | [x] | [x] | Reviewed (R5) |
 | [`Jido.Signal.Dispatch`](docs/components/signal.md#dispatch) | [x] | [x] | [x] | [x] | Reviewed (R5) |
-| `Jido.Plugin.Audit` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.Plugin.Bus` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.Plugin.Heartbeat` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.Plugin.Scheduler` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.Plugin.SensorManager` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.AI.Reasoning.Adaptive` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.AI.Reasoning.AlgorithmOfThoughts` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.AI.Reasoning.ChainOfDraft` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.AI.Reasoning.ChainOfThought` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.AI.Reasoning.GraphOfThoughts` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.AI.Reasoning.ReAct` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.AI.Reasoning.TreeOfThoughts` | [ ] | [ ] | [ ] | [ ] | Waiting |
-| `Jido.AI.Reasoning.TRM` | [ ] | [ ] | [ ] | [ ] | Waiting |
+| [`Jido.Plugin.Audit`](docs/components/plugin.md#audit-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R13) |
+| [`Jido.Plugin.Bus`](docs/components/plugin.md#bus-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R13) |
+| [`Jido.Plugin.Heartbeat`](docs/components/plugin.md#heartbeat-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R13) |
+| [`Jido.Plugin.Scheduler`](docs/components/plugin.md#scheduler-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R13) |
+| [`Jido.Plugin.SensorManager`](docs/components/plugin.md#sensor-manager-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R13) |
+| [`Jido.AI.Reasoning.Adaptive`](docs/components/ai.md#adaptive-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R14) |
+| [`Jido.AI.Reasoning.AlgorithmOfThoughts`](docs/components/ai.md#algorithm-of-thoughts-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R14) |
+| [`Jido.AI.Reasoning.ChainOfDraft`](docs/components/ai.md#chain-of-draft-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R14) |
+| [`Jido.AI.Reasoning.ChainOfThought`](docs/components/ai.md#chain-of-thought-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R14) |
+| [`Jido.AI.Reasoning.GraphOfThoughts`](docs/components/ai.md#graph-of-thoughts-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R14) |
+| [`Jido.AI.Reasoning.ReAct`](docs/components/ai.md#react-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R14) |
+| [`Jido.AI.Reasoning.TreeOfThoughts`](docs/components/ai.md#tree-of-thoughts-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R14) |
+| [`Jido.AI.Reasoning.TRM`](docs/components/ai.md#trm-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R14) |
 
 `Jido.Instance` stays within the `Jido` review as an internal namespace.
 `Jido.Application` needs a composition-root check with that review. Neither is
@@ -252,7 +252,7 @@ an additional public component in this checklist.
 - **R10 — Agent boundary review and refactor.** The review traced the public
   definition and instance API, generated module API, route and Plugin
   evaluation, complete state validation, Directives, static topology, Codec,
-  Ref and View values, AgentServer callers, tests, documentation, and duplicate
+  Address and View values, AgentServer callers, tests, documentation, and duplicate
   transition models.
   - An Agent definition is fixed for one activation. Evaluation returns one
     complete candidate state and runtime Directives. `Jido.Agent.Turn`, Diff,
@@ -263,7 +263,7 @@ an additional public component in this checklist.
   - Whole-definition replacement is an explicit, idle-only AgentServer
     administration operation. It accepts a trusted Codec document and Catalog,
     validates or migrates state, saves with revision control, and restarts the
-    activation under the same Agent Ref.
+    activation under the same Agent Address.
   - Checkpoint `390d1c0f` contains the refactor. Format, warning-free compile,
     3,192 package tests with 111 normal exclusions, 246 examples, and all 321
     active Covenant obligations passed. `git diff --check` also passed.
@@ -271,27 +271,74 @@ an additional public component in this checklist.
     mismatch visible. AgentServer and Plugin received required seam changes,
     but neither parent component completed all four review steps.
 
+- **R11 — AgentServer activation-kernel review and refactor.** The review
+  traced the public facade and values, stable Agent Address routing, request and
+  Turn paths, activation ownership, passivation, worker recovery, durable
+  waits, persistence revisions, Plugin runtime, callers, tests, and retained
+  Covenant obligations.
+  - AgentServer owns one resident activation and one serialized Turn path.
+    The Jido Instance owns logical Agent life, routing, persistence choice,
+    activation, passivation, reconciliation, deletion, and definition upgrade.
+  - The refactor removed the duplicate public activation, composition,
+    durable, effects, and handoff surfaces. Their retained behavior is now in
+    the AgentServer contract or in the Durable and Plugin runtime seams.
+  - The [AgentServer record](docs/components/agent_server.md) documents the 13
+    public facade functions, four public values, OTP boundary, durable
+    boundary, proof surface, and ownership limits. Checkpoint `c1aff364`
+    contains the activation-kernel implementation and component record.
+
+- **R12 — Jido instance and composition review.** The review traced the public
+  facade, generated instance API, Application composition, internal Instance
+  services, resident Agent lifecycle, stable Address lifecycle, callers, tests,
+  guides, and Covenant obligations.
+  - `Jido` is the component. `Jido.Instance` is an internal namespace, and
+    `Jido.Application` is the package composition root.
+  - The review found stale references to removed `agent_count/2` and
+    `hibernate/2` functions, old activate-or-create examples, and one stale
+    generated-API decision. These findings remain open.
+  - The [Jido record](docs/components/jido.md) contains the contract, OTP
+    boundary, duplication review, findings, and proof limits.
+
+- **R13 — Plugin parent and bundled capability reviews.** The review traced
+  Plugin declaration, callback ownership, normalization, contexts, Agent,
+  AgentServer and Persistence consumers, and the Audit, Bus, Heartbeat,
+  Scheduler, and Sensor Manager source and focused Covenant owners.
+  - The generic Plugin contract stays one optional behavior with three owner
+    groups. The five bundled capabilities remain explicit sub-components.
+  - Bus stays one capability with Manager, Client, and DSL public entries. An
+    empty `Jido.Plugin.Bus` facade is not required.
+  - The [Plugin record](docs/components/plugin.md) contains all six review
+    results and proof limits. No production defect was found.
+
+- **R14 — AI parent and reasoning reviews.** The review traced AI Agent
+  authoring, direct Flow routing, shared request Turns, model execution,
+  conversation projection, tools, policy, usage, the inference-client seam,
+  and all eight standard reasoning Flows.
+  - Each reasoning namespace is an independently usable Flow and remains a
+    sub-component. ReAct owns tool use and durable review waits. The other
+    strategies keep their explicit bounded graphs.
+  - The review confirmed one Adaptive input defect. It also found repeated
+    strategy structure and an all-or-nothing 22-callback inference-client
+    contract. These findings remain open.
+  - The [AI record](docs/components/ai.md) contains the parent and eight
+    sub-component results, findings, and proof limits.
+  - The focused instance, Plugin, AI, and malformed-input command passed 502
+    tests. Live provider calls and external adapters were not run.
+
 ### Remaining review list
 
-The following top-level components still need the full four-step review:
-
-- [ ] `Jido`, including internal Instance services and Application composition.
-- [ ] `Jido.Plugin`
-- [ ] `Jido.AgentServer`
-- [ ] `Jido.AI`
-
-The five bundled Plugin sub-components and eight AI reasoning sub-components
-also remain waiting, as listed in the sub-component table above. Do not mark
-these complete from a parent review alone.
+No component rows remain. All 22 top-level components and all 16
+sub-components have evidence for the four review steps.
 
 The seven foundational component reviews are complete. Catalog F1 is superseded by the confirmed scope in ADR 0004. Codec
 F2 remains an open recommendation. Their ownership and proof gaps remain visible
 in the linked records. The six R5 records and three Signal sub-component reviews are also complete.
 The Action and Flow records are complete under R7. Exec and Durable are
-complete under R9. Agent is complete under R10.
-Continue the component review with the waiting rows.
-Record later review findings and decisions in each owning component file,
-then update the matching checklist row with its evidence.
+complete under R9. Agent is complete under R10. AgentServer is complete under
+R11. Jido is complete under R12. Plugin and its five sub-components are
+complete under R13. AI and its eight reasoning sub-components are complete
+under R14. Open findings stay in each owning component record until a later
+decision or fix closes them.
 
 ## Working component rule
 
@@ -329,7 +376,7 @@ still needs review.
 
 | Module namespace | Classification | Sub-components | Important proof surfaces or internal parts | Status |
 | --- | --- | --- | --- | --- |
-| `Jido` | Component | None | Instance definition, supervision, namespace ownership, Agent start, activation, lookup, listing, stopping, and persistence defaults | Confirmed |
+| `Jido` | Component | None | Instance definition, supervision, namespace ownership, Agent start, activation, lookup, listing, stopping, and persistence defaults | Reviewed and confirmed |
 | `Jido.Application` | Application composition, not a public component | None | Shared supervisor and runtime child startup | Proposed |
 | `Jido.Error` | Component | None | Error construction, normalization, transport | Proposed |
 | `Jido.Id` | Component | None | Identifier creation and validation | Proposed |
@@ -345,13 +392,13 @@ still needs review.
 | `Jido.Durable` | Component | None | Persisted Flow execution, portable references and status, Signal wait input, continuation recovery, and host wake boundary | Confirmed |
 | `Jido.Signal` | Parent component | `Jido.Signal.Router`, `Jido.Signal.Bus`, `Jido.Signal.Dispatch` | Envelope, context, boundary rules, codec, catalog | Confirmed |
 | `Jido.Agent` | Component | None | Fixed definitions, instances, routes, runtime Directives, static topology, state validation, Codec, Plugin preparation, references, and views | Confirmed |
-| `Jido.Plugin` | Parent component | `Jido.Plugin.Audit`, `Jido.Plugin.Bus`, `Jido.Plugin.Heartbeat`, `Jido.Plugin.Scheduler`, `Jido.Plugin.SensorManager` | Plugin behavior, config, specification, manifest, normalization, contexts, runtime callbacks | Proposed |
-| `Jido.AgentServer` | Component | None | Lifecycle, activation, composition, durable Turns, effects, handoff, Plugin runtime, status, topology, supervision | Proposed |
+| `Jido.Plugin` | Parent component | `Jido.Plugin.Audit`, `Jido.Plugin.Bus`, `Jido.Plugin.Heartbeat`, `Jido.Plugin.Scheduler`, `Jido.Plugin.SensorManager` | Plugin behavior, config, specification, manifest, normalization, contexts, runtime callbacks | Reviewed and confirmed |
+| `Jido.AgentServer` | Component | None | Lifecycle, activation, composition, durable Turns, effects, handoff, Plugin runtime, status, topology, supervision | Reviewed and confirmed |
 | `Jido.Instance` | Internal namespace of `Jido` | None | Names, namespace registry, options, runtime store | Confirmed internal ownership |
 | `Jido.Persistence` | Component | None | Records, snapshots, checkpoints, stores, continuation storage, Plugin conversion, adapters | Proposed |
 | `Jido.Session` | Component | None | Session identity, revision, lifecycle, Thread reference | Proposed |
 | `Jido.Thread` | Component | None | Append-only entries and interaction history | Proposed |
-| `Jido.AI` | Parent component | `Jido.AI.Reasoning.Adaptive`, `Jido.AI.Reasoning.AlgorithmOfThoughts`, `Jido.AI.Reasoning.ChainOfDraft`, `Jido.AI.Reasoning.ChainOfThought`, `Jido.AI.Reasoning.GraphOfThoughts`, `Jido.AI.Reasoning.ReAct`, `Jido.AI.Reasoning.TreeOfThoughts`, `Jido.AI.Reasoning.TRM` | AI Agent authoring, inference client, shared reasoning actions, tools, skills, policy, budget, usage, context, AI Turn behavior | Parent and reasoning sub-components confirmed |
+| `Jido.AI` | Parent component | `Jido.AI.Reasoning.Adaptive`, `Jido.AI.Reasoning.AlgorithmOfThoughts`, `Jido.AI.Reasoning.ChainOfDraft`, `Jido.AI.Reasoning.ChainOfThought`, `Jido.AI.Reasoning.GraphOfThoughts`, `Jido.AI.Reasoning.ReAct`, `Jido.AI.Reasoning.TreeOfThoughts`, `Jido.AI.Reasoning.TRM` | AI Agent authoring, inference client, shared reasoning actions, tools, skills, policy, budget, usage, context, AI Turn behavior | Parent and reasoning sub-components reviewed and confirmed |
 | `Jido.Telemetry` | Component | None | AgentServer, Exec, Persistence, Signal, AI, semantic logging, metrics, OpenTelemetry mapping | Proposed |
 
 ### Inventory totals
@@ -397,13 +444,13 @@ Jido package
 │   ├── Jido.Signal.Bus                      sub-component, confirmed
 │   └── Jido.Signal.Dispatch                 sub-component, confirmed
 ├── Jido.Agent                               component, confirmed
-├── Jido.Plugin                              parent component, candidate
-│   ├── Jido.Plugin.Audit                    sub-component, candidate
-│   ├── Jido.Plugin.Bus                      sub-component, candidate
-│   ├── Jido.Plugin.Heartbeat                sub-component, candidate
-│   ├── Jido.Plugin.Scheduler                sub-component, candidate
-│   └── Jido.Plugin.SensorManager            sub-component, candidate
-├── Jido.AgentServer                         component, candidate
+├── Jido.Plugin                              parent component, confirmed
+│   ├── Jido.Plugin.Audit                    sub-component, confirmed
+│   ├── Jido.Plugin.Bus                      sub-component, confirmed
+│   ├── Jido.Plugin.Heartbeat                sub-component, confirmed
+│   ├── Jido.Plugin.Scheduler                sub-component, confirmed
+│   └── Jido.Plugin.SensorManager            sub-component, confirmed
+├── Jido.AgentServer                         component, confirmed
 ├── Jido.Persistence                         component, candidate
 ├── Jido.Session                             component, candidate
 ├── Jido.Thread                              component, candidate
@@ -583,11 +630,12 @@ children, post-commit work, dispatch, and persistence conversion.
 
 | Component | Major function | Current Covenant surface | Target Covenant surface | Boundary status |
 | --- | --- | --- | --- | --- |
-| Plugin contract | Callback facets and Agent-owned Plugin behavior | `jido.plugin` | `jido.plugin` | Cross-layer split needed |
-| Plugin definition | Config, manifest, specification, and normalization | Part of `jido.plugin` | `jido.plugin.definition` | New focused owner proposed |
+| Plugin contract | One declaration with optional Agent, AgentServer, and Persistence callback groups | `jido.plugin` | `jido.plugin` | Parent component reviewed and confirmed |
+| Plugin definition | Config, manifest, specification, and normalization | Part of `jido.plugin` | Part of `jido.plugin` | Internal authoring and normalization parts |
 
-Open boundary: Decide if Plugin is one cross-layer extension protocol or a
-definition component plus a runtime protocol.
+Resolved boundary: Plugin is one cross-layer extension protocol. Callback
+owner groups are internal seams. A separate public definition or runtime
+protocol would duplicate Plugin identity and options.
 
 ## `Jido.Plugin.*` included capabilities
 
@@ -595,14 +643,15 @@ These are first-party capabilities built on the Plugin contract.
 
 | Component | Major function | Current Covenant surface | Target Covenant surface | Boundary status |
 | --- | --- | --- | --- | --- |
-| Audit | Keep bounded committed audit records | `jido.plugin.audit` | `jido.plugin.audit` | Clear |
-| Bus Manager and Client | Own a Bus and consume Signal subscriptions | `jido.plugin.bus` | `jido.plugin.bus` | Relationship to Signal delivery is open |
-| Heartbeat | Send periodic Agent input | `jido.plugin.heartbeat` | `jido.plugin.heartbeat` | Clear |
-| Scheduler | Deliver delayed and recurring Signals | `jido.plugin.scheduler` | `jido.plugin.scheduler` | Clear |
-| Sensor Manager | Reconcile supervised input sensors | `jido.plugin.sensor_manager` | `jido.plugin.sensor_manager` | Clear |
+| Audit | Keep bounded committed audit records | `jido.plugin.audit` | `jido.plugin.audit` | Sub-component reviewed and confirmed |
+| Bus Manager and Client | Own a Bus and consume Signal subscriptions | `jido.plugin.bus` | `jido.plugin.bus` | Sub-component reviewed and confirmed |
+| Heartbeat | Send periodic Agent input | `jido.plugin.heartbeat` | `jido.plugin.heartbeat` | Sub-component reviewed and confirmed |
+| Scheduler | Deliver delayed and recurring Signals | `jido.plugin.scheduler` | `jido.plugin.scheduler` | Sub-component reviewed and confirmed |
+| Sensor Manager | Reconcile supervised input sensors | `jido.plugin.sensor_manager` | `jido.plugin.sensor_manager` | Sub-component reviewed and confirmed |
 
-Open boundary: Decide whether each included capability is part of core Jido or
-only shipped in the same package for convenience.
+Resolved boundary: These five capabilities are first-party Plugin
+sub-components in core Jido. Bus has Manager, Client, and DSL public entries;
+it does not need an empty namespace facade.
 
 ## `Jido.AgentServer`
 
@@ -627,7 +676,7 @@ activation, composition, durable, effects, and handoff Covenant partitions are
 retired. Their retained rules now live in the smaller AgentServer contract or
 in the Durable and Plugin runtime seams.
 
-An Agent stays logically alive through its stable `Jido.Agent.Ref`. The Jido
+An Agent stays logically alive through its stable `Jido.Agent.Address`. The Jido
 Instance owns creation, activation, passivation, persistence selection, wake
 records, reconciliation, definition upgrade, and local routing. A resident
 AgentServer can stop without deleting the Agent.
@@ -644,7 +693,7 @@ component. There is no `Jido.Instance` facade module in the current source.
 
 | Component | Major function | Current Covenant surface | Migration note | Boundary status |
 | --- | --- | --- | --- | --- |
-| `Jido` | Define and supervise Jido instances and manage live or durable Agents | `jido.instance` and AgentServer integration surfaces | Current Covenant naming describes the internal namespace instead of the public facade | Component confirmed |
+| `Jido` | Define and supervise Jido instances and manage live or durable Agents | `jido.instance` and AgentServer integration surfaces | Current Covenant naming describes the internal namespace instead of the public facade | Component reviewed and confirmed |
 
 Resolved boundary: `Jido` is the component. `Jido.Instance` is an internal
 namespace and proof surface of `Jido`, not a separate component.
@@ -704,8 +753,10 @@ Resolved boundary: Each current reasoning approach is a sub-component of
 `Jido.AI`. Shared reasoning actions and result values remain internal parts of
 the AI parent component.
 
-Open boundary: Decide whether tools, model execution, and AI Agent authoring
-are additional AI sub-components or proof surfaces of the parent.
+Resolved boundary: Tools, model execution, AI Agent authoring, conversation
+projection, and AI Turn behavior are proof surfaces of the parent. AI
+observation code stays under the Telemetry component. They are not additional
+AI sub-components.
 
 ## `Jido.Telemetry`
 
@@ -729,8 +780,9 @@ Instance namespace registry, persistence owner, and Runic runner.
 | --- | --- | --- | --- | --- |
 | Application composition | Start and supervise the shared Jido runtime | No focused component | `jido.application` | Stable gap |
 
-Open boundary: Decide whether application startup is a major component or only
-an integration contract over the runtime components that it starts.
+Resolved boundary: Application startup is the package composition root. It is
+an integration contract over the runtime components that it starts, not a
+public component.
 
 ## Decision ledger
 
@@ -835,7 +887,7 @@ Status: Resolved by Mike.
 
 Current source puts the fixed Agent definition and immutable instance value
 together with Route, Directive, static topology, Plugin preparation, Codec,
-Ref, Runner, validation, and view behavior under `Jido.Agent`.
+Address, Runner, validation, and view behavior under `Jido.Agent`.
 
 Decision: Agent is one component. Route, Directive, topology, Codec, schema,
 Runner, Plugin preparation, references, and views are internal parts or proof

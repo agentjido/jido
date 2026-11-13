@@ -67,11 +67,11 @@ store_path =
     persistence: {Jido.Persistence.File, path: store_path}
   )
 
-{:ok, order_ref} = Jido.agent_ref(ActivationGuide.Jido, "order-1001")
-order_ref
+{:ok, order_address} = Jido.agent_address(ActivationGuide.Jido, "order-1001")
+order_address
 ```
 
-The Ref is the stable Agent address. It contains no process or storage handle.
+The Address is the stable Agent address. It contains no process or storage handle.
 
 ## Create the logical Agent
 
@@ -81,14 +81,14 @@ AgentServer.
 ```elixir
 alias ActivationGuide.Order
 
-{:ok, ^order_ref} = Jido.create_agent(ActivationGuide.Jido, order_ref, Order)
-{:error, :not_found} = Jido.resolve_agent(ActivationGuide.Jido, order_ref)
+{:ok, ^order_address} = Jido.create_agent(ActivationGuide.Jido, order_address, Order)
+{:error, :not_found} = Jido.resolve_agent(ActivationGuide.Jido, order_address)
 
 {:ok, saved, 0} =
   Jido.Persistence.load_agent_with_revision(
     ActivationGuide.Jido,
     Order,
-    order_ref.id
+    order_address.id
   )
 
 saved.state
@@ -105,7 +105,7 @@ can finish asynchronously, so wait for readiness before direct use.
 alias ActivationGuide.Order
 alias Jido.AgentServer, as: Server
 
-{:ok, server} = Jido.activate_agent(ActivationGuide.Jido, order_ref)
+{:ok, server} = Jido.activate_agent(ActivationGuide.Jido, order_address)
 :ok = Server.await_ready(server)
 
 snapshot = Server.snapshot(server)
@@ -114,9 +114,9 @@ snapshot = Server.snapshot(server)
 
 The cell returns `{%{items: []}, 0}`.
 
-## Send work through the Ref
+## Send work through the Address
 
-Ref operations resolve the current activation for each call. Application code
+Address operations resolve the current activation for each call. Application code
 does not need to keep the AgentServer PID.
 
 ```elixir
@@ -124,9 +124,9 @@ alias ActivationGuide.Order
 
 {:ok, signal} = Order.add_item_signal(%{sku: "sku-red-mug"})
 {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
-  Jido.call(ActivationGuide.Jido, order_ref, signal)
+  Jido.call(ActivationGuide.Jido, order_address, signal)
 
-{Server.snapshot(server).agent.state, Jido.resolve_agent(ActivationGuide.Jido, order_ref) == {:ok, server}}
+{Server.snapshot(server).agent.state, Jido.resolve_agent(ActivationGuide.Jido, order_address) == {:ok, server}}
 ```
 
 The cell returns `{%{items: ["sku-red-mug"]}, true}`.
@@ -138,20 +138,20 @@ Activation returns the current local process when it is already active.
 ```elixir
 alias ActivationGuide.Order
 
-{:ok, ^server} = Jido.activate_agent(ActivationGuide.Jido, order_ref)
+{:ok, ^server} = Jido.activate_agent(ActivationGuide.Jido, order_address)
 ```
 
 Stopping the resident activation does not delete the logical Agent. A later
-activation restores the same Ref and state.
+activation restores the same Address and state.
 
 ```elixir
 alias ActivationGuide.Order
 alias Jido.AgentServer, as: Server
 
 {:ok, _snapshot} = Server.stop(server)
-{:error, :not_found} = Jido.resolve_agent(ActivationGuide.Jido, order_ref)
+{:error, :not_found} = Jido.resolve_agent(ActivationGuide.Jido, order_address)
 
-{:ok, restored_server} = Jido.activate_agent(ActivationGuide.Jido, order_ref)
+{:ok, restored_server} = Jido.activate_agent(ActivationGuide.Jido, order_address)
 :ok = Server.await_ready(restored_server)
 
 Server.snapshot(restored_server).agent.state
@@ -179,12 +179,12 @@ end
 
 alias ActivationGuide.{Order, Outcome}
 
-{:error, :conflict} = Jido.create_agent(ActivationGuide.Jido, order_ref, Order)
+{:error, :conflict} = Jido.create_agent(ActivationGuide.Jido, order_address, Order)
 
-{:ok, missing_ref} = Jido.agent_ref(ActivationGuide.Jido, "order-missing")
+{:ok, missing_address} = Jido.agent_address(ActivationGuide.Jido, "order-missing")
 
 {:error, :not_found} =
-  Outcome.of(Jido.activate_agent(ActivationGuide.Jido, missing_ref))
+  Outcome.of(Jido.activate_agent(ActivationGuide.Jido, missing_address))
 ```
 
 ## Refuse a deleted Agent
@@ -196,10 +196,10 @@ tombstone. Stop the resident activation before deletion.
 alias ActivationGuide.{Order, Outcome}
 
 {:ok, _snapshot} = Server.stop(restored_server)
-:ok = Jido.delete_agent(ActivationGuide.Jido, order_ref)
+:ok = Jido.delete_agent(ActivationGuide.Jido, order_address)
 
 {:error, :deleted} =
-  Outcome.of(Jido.activate_agent(ActivationGuide.Jido, order_ref))
+  Outcome.of(Jido.activate_agent(ActivationGuide.Jido, order_address))
 ```
 
 See [Deletion and Tombstones](deletion-and-tombstones.md) for the full deletion
@@ -207,16 +207,16 @@ contract.
 
 ## Use a partition
 
-The partition is part of the Ref. Each partition has a separate durable Agent
+The partition is part of the Address. Each partition has a separate durable Agent
 record and activation.
 
 ```elixir
 alias ActivationGuide.Order
 alias Jido.AgentServer, as: Server
 
-{:ok, eu_ref} = Jido.agent_ref(ActivationGuide.Jido, "order-1001", partition: "eu")
-{:ok, ^eu_ref} = Jido.create_agent(ActivationGuide.Jido, eu_ref, Order)
-{:ok, eu_server} = Jido.activate_agent(ActivationGuide.Jido, eu_ref)
+{:ok, eu_address} = Jido.agent_address(ActivationGuide.Jido, "order-1001", partition: "eu")
+{:ok, ^eu_address} = Jido.create_agent(ActivationGuide.Jido, eu_address, Order)
+{:ok, eu_server} = Jido.activate_agent(ActivationGuide.Jido, eu_address)
 :ok = Server.await_ready(eu_server)
 
 Server.snapshot(eu_server).agent.state

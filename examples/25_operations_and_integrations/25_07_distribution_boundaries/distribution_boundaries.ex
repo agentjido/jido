@@ -7,9 +7,9 @@ end
 defmodule Jido.Examples.Operations.DistributionBoundary do
   @moduledoc "Encodes and decodes stable logical Agent identity."
 
-  @doc "Returns the versioned public map for one Ref."
-  def encode_ref(ref), do: Jido.Agent.Ref.to_map(ref)
+  @doc "Returns the versioned public map for one Address."
+  def encode_address(address), do: Jido.Agent.Address.to_map(address)
 
-  @doc "Validates one versioned public Ref map."
-  def decode_ref(map), do: Jido.Agent.Ref.from_map(map)
+  @doc "Validates one versioned public Address map."
+  def decode_address(map), do: Jido.Agent.Address.from_map(map)
 end

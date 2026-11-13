@@ -1,7 +1,7 @@
 defmodule Jido.AgentServer.DurableActivationContractTest do
   use Covenant.Case, component: "jido.agent_server", async: false
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.AgentServer.{Snapshot, Status, TurnResult}
 
   defmodule Add do
@@ -155,8 +155,8 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
       id: instance
     )
 
-    ref = Ref.new!(namespace: namespace, id: "counter")
-    %{instance: instance, namespace: namespace, path: path, ref: ref}
+    address = Address.new!(namespace: namespace, id: "counter")
+    %{instance: instance, namespace: namespace, path: path, address: address}
   end
 
   @tag obligation: [
@@ -164,16 +164,16 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
          "jido.agent_server.I103",
          "jido.agent_server.I104"
        ]
-  test "Ref delivery activates, stays warm, passivates, and restores", %{instance: instance, ref: ref} do
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Counter)
-    assert {:error, :not_found} = Jido.resolve_agent(instance, ref)
+  test "Address delivery activates, stays warm, passivates, and restores", %{instance: instance, address: address} do
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
+    assert {:error, :not_found} = Jido.resolve_agent(instance, address)
 
     assert %Status{
              residency: :passivated,
              work_state: :idle,
              agent_revision: 0,
              persistence_revision: 0
-           } = Jido.status(instance, ref)
+           } = Jido.status(instance, address)
 
     assert {:ok,
             %TurnResult{
@@ -182,17 +182,17 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
               agent_revision: 1,
               persistence_revision: 2,
               agent_activation_id: first_activation
-            }} = Jido.call(instance, ref, add(2))
+            }} = Jido.call(instance, address, add(2))
 
-    assert {:ok, first_server} = Jido.resolve_agent(instance, ref)
+    assert {:ok, first_server} = Jido.resolve_agent(instance, address)
 
     assert %Snapshot{agent: %{state: %{count: 2}}, agent_activation_id: ^first_activation} =
              Jido.AgentServer.snapshot(first_server)
 
     assert {:ok, %TurnResult{agent_activation_id: ^first_activation, agent_revision: 2}} =
-             Jido.call(instance, ref, add(3))
+             Jido.call(instance, address, add(3))
 
-    first_root = activation_root(instance, ref)
+    first_root = activation_root(instance, address)
     monitor = Process.monitor(first_root)
     assert_receive {:DOWN, ^monitor, :process, ^first_root, _reason}, 2_000
 
@@ -200,33 +200,33 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
              residency: :passivated,
              agent_revision: 2,
              persistence_revision: 4
-           } = Jido.status(instance, ref)
+           } = Jido.status(instance, address)
 
     assert {:ok,
             %TurnResult{
               agent_activation_id: second_activation,
               agent_revision: 3,
               persistence_revision: 6
-            }} = Jido.call(instance, ref, add(4))
+            }} = Jido.call(instance, address, add(4))
 
     refute second_activation == first_activation
-    assert {:ok, second_server} = Jido.resolve_agent(instance, ref)
+    assert {:ok, second_server} = Jido.resolve_agent(instance, address)
     assert %Snapshot{agent: %{state: %{count: 9}}} = Jido.AgentServer.snapshot(second_server)
   end
 
   @tag obligation: "jido.agent_server.I97"
-  test "worker recovery keeps the activation identity", %{instance: instance, ref: ref} do
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Counter)
+  test "worker recovery keeps the activation identity", %{instance: instance, address: address} do
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
 
     assert {:ok, %TurnResult{agent_activation_id: activation_id}} =
-             Jido.call(instance, ref, add(1))
+             Jido.call(instance, address, add(1))
 
-    assert {:ok, worker} = Jido.resolve_agent(instance, ref)
+    assert {:ok, worker} = Jido.resolve_agent(instance, address)
     Process.exit(worker, :kill)
 
     replacement =
       eventually(fn ->
-        case Jido.resolve_agent(instance, ref) do
+        case Jido.resolve_agent(instance, address) do
           {:ok, pid} when pid != worker -> pid
           _ -> nil
         end
@@ -237,54 +237,54 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
   end
 
   @tag obligation: "jido.agent_server.I96"
-  test "an accepted failure is a TurnResult and does not change Agent state", %{instance: instance, ref: ref} do
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Counter)
+  test "an accepted failure is a TurnResult and does not change Agent state", %{instance: instance, address: address} do
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
 
     assert {:ok,
             %TurnResult{
               status: :failed,
               agent_revision: 0,
               persistence_revision: 2
-            }} = Jido.call(instance, ref, fail_signal())
+            }} = Jido.call(instance, address, fail_signal())
 
-    assert {:ok, server} = Jido.resolve_agent(instance, ref)
+    assert {:ok, server} = Jido.resolve_agent(instance, address)
     assert %Snapshot{agent: %{state: %{count: 0}}} = Jido.AgentServer.snapshot(server)
   end
 
   @tag obligation: "jido.agent_server.I95"
-  test "delete uses only the Ref and a tombstone prevents reactivation", %{instance: instance, ref: ref} do
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Counter)
-    assert :ok = Jido.delete_agent(instance, ref)
-    assert {:error, :deleted} = Jido.activate_agent(instance, ref)
-    assert {:error, :deleted} = Jido.call(instance, ref, add(1))
+  test "delete uses only the Address and a tombstone prevents reactivation", %{instance: instance, address: address} do
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
+    assert :ok = Jido.delete_agent(instance, address)
+    assert {:error, :deleted} = Jido.activate_agent(instance, address)
+    assert {:error, :deleted} = Jido.call(instance, address, add(1))
   end
 
   @tag obligation: "jido.agent_server.I98"
   test "a Signal resumes one durable Turn and exact retries return its saved result", %{
     instance: instance,
-    ref: ref
+    address: address
   } do
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Counter)
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
 
     assert {:ok, %TurnResult{status: :waiting, turn_id: turn_id, waits: [_wait]}} =
-             Jido.call(instance, ref, approval_request("request-1"))
+             Jido.call(instance, address, approval_request("request-1"))
 
-    assert {:ok, _first_server} = Jido.resolve_agent(instance, ref)
-    first_root = activation_root(instance, ref)
+    assert {:ok, _first_server} = Jido.resolve_agent(instance, address)
+    first_root = activation_root(instance, address)
     monitor = Process.monitor(first_root)
     assert_receive {:DOWN, ^monitor, :process, ^first_root, _reason}, 2_000
 
     approval = approval_signal("approval-1", "request-1")
 
     assert {:ok, %TurnResult{status: :committed, turn_id: ^turn_id} = completed} =
-             Jido.call(instance, ref, approval)
+             Jido.call(instance, address, approval)
 
-    assert {:ok, ^completed} = Jido.call(instance, ref, approval)
+    assert {:ok, ^completed} = Jido.call(instance, address, approval)
 
     conflicting = approval_signal("approval-1", "other-request")
-    assert {:error, :conflicting_input_id} = Jido.call(instance, ref, conflicting)
+    assert {:error, :conflicting_input_id} = Jido.call(instance, address, conflicting)
 
-    assert {:ok, server} = Jido.resolve_agent(instance, ref)
+    assert {:ok, server} = Jido.resolve_agent(instance, address)
     assert %Snapshot{agent: %{state: %{count: 1}}} = Jido.AgentServer.snapshot(server)
   end
 
@@ -293,12 +293,12 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
     instance: instance,
     namespace: namespace,
     path: path,
-    ref: ref
+    address: address
   } do
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Counter)
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
 
     assert {:ok, %TurnResult{status: :waiting, turn_id: turn_id}} =
-             Jido.call(instance, ref, delayed_increment())
+             Jido.call(instance, address, delayed_increment())
 
     assert :ok = stop_supervised(instance)
 
@@ -313,7 +313,7 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
 
     server =
       eventually(fn ->
-        case Jido.resolve_agent(instance, ref) do
+        case Jido.resolve_agent(instance, address) do
           {:ok, pid} ->
             case Jido.AgentServer.snapshot(pid) do
               %Snapshot{agent: %{state: %{count: 10}}} -> pid
@@ -329,15 +329,15 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
   end
 
   @tag obligation: "jido.agent_server.I100"
-  test "concurrent Ref delivery joins one activation and serializes every Turn", %{
+  test "concurrent Address delivery joins one activation and serializes every Turn", %{
     instance: instance,
-    ref: ref
+    address: address
   } do
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Counter)
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
 
     results =
       1..12
-      |> Task.async_stream(fn _index -> Jido.call(instance, ref, add(1)) end,
+      |> Task.async_stream(fn _index -> Jido.call(instance, address, add(1)) end,
         ordered: true,
         max_concurrency: 12,
         timeout: 5_000
@@ -347,7 +347,7 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
     assert 1 == results |> Enum.map(& &1.agent_activation_id) |> Enum.uniq() |> length()
     assert Enum.all?(results, &(&1.status == :committed))
 
-    assert {:ok, server} = Jido.resolve_agent(instance, ref)
+    assert {:ok, server} = Jido.resolve_agent(instance, address)
     assert %Snapshot{agent: %{state: %{count: 12}}} = Jido.AgentServer.snapshot(server)
   end
 
@@ -368,8 +368,8 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
       id: instance
     )
 
-    ref = Ref.new!(namespace: namespace, id: "counter")
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Counter)
+    address = Address.new!(namespace: namespace, id: "counter")
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
 
     assert {:ok,
             %TurnResult{
@@ -377,31 +377,31 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
               durability: :unknown,
               agent_revision: 0,
               persistence_revision: 1
-            }} = Jido.call(instance, ref, add(1))
+            }} = Jido.call(instance, address, add(1))
 
-    assert %Status{work_state: :faulted, admission: :blocked} = Jido.status(instance, ref)
-    assert {:error, :reconciliation_required} = Jido.call(instance, ref, add(1))
-    assert {:error, :reconciliation_required} = Jido.resolve_agent(instance, ref)
+    assert %Status{work_state: :faulted, admission: :blocked} = Jido.status(instance, address)
+    assert {:error, :reconciliation_required} = Jido.call(instance, address, add(1))
+    assert {:error, :reconciliation_required} = Jido.resolve_agent(instance, address)
 
-    assert {:ok, reconciled} = Jido.reconcile_agent(instance, ref)
+    assert {:ok, reconciled} = Jido.reconcile_agent(instance, address)
 
     assert %Snapshot{agent: %{state: %{count: 1}}, agent_revision: 1} =
              Jido.AgentServer.snapshot(reconciled)
 
     assert {:ok, %TurnResult{status: :committed, agent_revision: 2}} =
-             Jido.call(instance, ref, add(1))
+             Jido.call(instance, address, add(1))
   end
 
   @tag obligation: "jido.agent_server.I102"
   test "an Instance definition upgrade replaces an idle activation", %{
     instance: instance,
-    ref: ref
+    address: address
   } do
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, Counter)
-    assert {:ok, %TurnResult{agent_activation_id: first_id}} = Jido.call(instance, ref, add(1))
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
+    assert {:ok, %TurnResult{agent_activation_id: first_id}} = Jido.call(instance, address, add(1))
 
-    assert {:ok, ^ref} = Jido.upgrade_agent(instance, ref, Upgrade)
-    assert {:ok, replacement} = Jido.resolve_agent(instance, ref)
+    assert {:ok, ^address} = Jido.upgrade_agent(instance, address, Upgrade)
+    assert {:ok, replacement} = Jido.resolve_agent(instance, address)
 
     assert %Snapshot{
              agent: %{vsn: 2, state: %{count: 101}},
@@ -418,12 +418,12 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
     instance: instance,
     namespace: namespace
   } do
-    ref = Ref.new!(namespace: namespace, id: "plugin-counter")
-    assert {:ok, ^ref} = Jido.create_agent(instance, ref, PluginCounter)
-    assert {:ok, %TurnResult{agent_activation_id: activation_id}} = Jido.call(instance, ref, add(1))
-    assert {:ok, worker} = Jido.resolve_agent(instance, ref)
+    address = Address.new!(namespace: namespace, id: "plugin-counter")
+    assert {:ok, ^address} = Jido.create_agent(instance, address, PluginCounter)
+    assert {:ok, %TurnResult{agent_activation_id: activation_id}} = Jido.call(instance, address, add(1))
+    assert {:ok, worker} = Jido.resolve_agent(instance, address)
 
-    root = activation_root(instance, ref)
+    root = activation_root(instance, address)
     plugin_supervisor = Jido.AgentServer.Supervisor.plugin_supervisor(root)
 
     plugin = plugin_runtime(plugin_supervisor)
@@ -435,7 +435,7 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
 
     replacement =
       eventually(fn ->
-        case Jido.resolve_agent(instance, ref) do
+        case Jido.resolve_agent(instance, address) do
           {:ok, pid} when pid != worker -> pid
           _other -> nil
         end
@@ -482,8 +482,8 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
   defp unique_atom(label),
     do: String.to_atom("jido_durable_activation_#{label}_#{System.unique_integer([:positive])}")
 
-  defp activation_root(instance, ref) do
-    key = Jido.AgentServer.RegistrationGuard.registry_key(ref.id, ref.partition)
+  defp activation_root(instance, address) do
+    key = Jido.AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
     [{root, {:activation, _activation_id}}] = Registry.lookup(Jido.Instance.Names.registry(instance), key)
     root
   end

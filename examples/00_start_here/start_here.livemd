@@ -370,4 +370,4 @@ Continue with the focused chapters when you need more detail:
 * `04_agents` for pure Agent behavior.
 * `05_plugins` for reusable capabilities and effects.
 * `06_agent_server` for the live runtime.
-* `07_instance_catalog_documents` for Jido instances and stable references.
+* `07_instance_catalog_documents` for Jido instances and stable Agent Addresses.

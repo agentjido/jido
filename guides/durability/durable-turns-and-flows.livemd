@@ -253,8 +253,8 @@ Poll.until(fn -> 2 in Gate.started() end)
 :ok = Server.stop(restored)
 {:error, _reason} = Server.await(handle, 100)
 
-{:ok, ref} = Jido.agent_ref(DurableTurnsGuide.Jido, "report-7")
-{:ok, resumed} = Jido.activate_agent(DurableTurnsGuide.Jido, ref, Report)
+{:ok, address} = Jido.agent_address(DurableTurnsGuide.Jido, "report-7")
+{:ok, resumed} = Jido.activate_agent(DurableTurnsGuide.Jido, address, Report)
 :ok = Server.await_ready(resumed)
 
 Poll.until(fn -> Server.status(resumed).durable_turn.status == :completed end)

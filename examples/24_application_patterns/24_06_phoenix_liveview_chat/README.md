@@ -5,7 +5,7 @@ Session-backed Jido Agent and one transient LiveView client.
 
 ## What you will learn
 
-- How a stable `Jido.Agent.Ref` survives LiveView and Agent process replacement.
+- How a stable `Jido.Agent.Address` survives LiveView and Agent process replacement.
 - How a supervised task keeps model work outside the LiveView event callback.
 - How a portable PubSub target carries ordered model stream Signals.
 - How to accept one bounded image attachment as multimodal input.
@@ -40,7 +40,7 @@ call.
 
 ## Important behavior
 
-The LiveView stores the stable Agent reference, not the AgentServer PID. Model
+The LiveView stores the stable Agent Address, not the AgentServer PID. Model
 work runs under a `Task.Supervisor`. The durable Turn context contains a
 portable PubSub server name and topic. A PID dispatch target is not portable
 and AgentServer correctly rejects it.
@@ -52,25 +52,25 @@ cancelled, timed-out, uncertain, and committed operation states.
 
 A conversation ID selects a record. It is not an authorization credential.
 The host application must authenticate the user and authorize access before it
-resolves the Agent reference.
+resolves the Agent Address.
 
 ## Limits
 
 The local inference client is deterministic and does not measure provider
 latency. The image limit is one megabyte, but the demo stores the data URL in
 the Session. Production systems should store media in an authorized object
-store and put only a durable reference in the Session. PubSub stream chunks are
+store and put only a durable Address in the Session. PubSub stream chunks are
 ephemeral and are not replayed after a socket loss.
 
 ## Core Fit and Gaps
 
-Stable Agent references, durable Session state, normal `jido.ai.request`
+Stable Agent Addresses, durable Session state, normal `jido.ai.request`
 Signals, portable dispatch targets, and public Session projection compose into
 a Phoenix application without a Phoenix-specific Jido API. The first attempt
 used PID dispatch and produced a clear `:non_portable_term` failure. The public
 `:pubsub` adapter is the correct durable boundary.
 
-- Logical owner: conversation Agent reference.
+- Logical owner: conversation Agent Address.
 - Process owner: current AgentServer activation; LiveView owns only its socket.
 - Canonical state owner: Agent-owned Session.
 - Commit point: successful Agent Turn state commit.

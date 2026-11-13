@@ -6,7 +6,7 @@ defmodule Jido.Persistence.CrossBeamAtomTest do
   alias Jido.Test.Persistence.CheckpointPortabilityProbe, as: Probe
   alias Jido.Test.Persistence.StaticAtomAgent
 
-  test "Ref load brings in atoms defined by the trusted Agent module", c do
+  test "Address load brings in atoms defined by the trusted Agent module", c do
     source = {ETS, table: :cross_beam_static_atom_checkpoint}
     {ETS, adapter_opts} = source
     assert peer_call(c.peer_b, :code, :is_loaded, [StaticAtomAgent]) == false
@@ -24,16 +24,16 @@ defmodule Jido.Persistence.CrossBeamAtomTest do
                [namespace: "persistence-test"]
              ])
 
-    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
+    key = Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: agent.id))
     assert {:ok, bytes} = peer_call(c.peer_a, ETS, :get, [key, adapter_opts])
     assert :ok = peer_call(c.peer_b, ETS, :put, [key, bytes, adapter_opts])
 
-    ref = Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id)
+    address = Jido.Agent.Address.new!(namespace: "persistence-test", id: agent.id)
 
     assert {:ok, ^agent, 0, 0, nil} =
-             peer_call(c.peer_b, Persistence, :load_agent_ref, [
+             peer_call(c.peer_b, Persistence, :load_agent_address, [
                source,
-               ref,
+               address,
                []
              ])
   end
@@ -55,7 +55,7 @@ defmodule Jido.Persistence.CrossBeamAtomTest do
              ])
 
     atom_key =
-      Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: atom_agent.id))
+      Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: atom_agent.id))
 
     assert {:ok, atom_bytes} = peer_call(c.peer_a, ETS, :get, [atom_key, adapter_opts])
     assert :ok = peer_call(c.peer_b, ETS, :put, [atom_key, atom_bytes, adapter_opts])
@@ -82,7 +82,7 @@ defmodule Jido.Persistence.CrossBeamAtomTest do
              ])
 
     string_key =
-      Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: string_agent.id))
+      Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: string_agent.id))
 
     assert {:ok, string_bytes} = peer_call(c.peer_a, ETS, :get, [string_key, adapter_opts])
     assert :ok = peer_call(c.peer_b, ETS, :put, [string_key, string_bytes, adapter_opts])

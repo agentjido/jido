@@ -205,12 +205,12 @@ Map.take(Jido.AgentServer.snapshot(server).agent.state, [:paid_cents, :status])
 
 The cell returns `%{status: "paid", paid_cents: 1650}`.
 
-`Jido.AgentServer.status/2` reports the Agent's stable reference and its Agent revision. Each committed Turn moved that revision forward by one.
+`Jido.AgentServer.status/2` reports the Agent's stable Address and its Agent revision. Each committed Turn moved that revision forward by one.
 
 ```elixir
 status = Jido.AgentServer.status(server)
 
-{status.agent_ref.id, status.agent_revision}
+{status.agent_address.id, status.agent_revision}
 ```
 
 The cell returns `{"inv-2001", 3}`.
@@ -240,4 +240,4 @@ The cell returns `nil`.
 
 - [Test Jido Code](testing-jido-code.livemd) tests this Agent at each level.
 - [Define an Agent](../agents/define-and-instantiate-an-agent.livemd) lists the definition options and generated functions.
-- [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd) covers live Signal delivery and stable Agent references.
+- [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd) covers live Signal delivery and stable Agent Addresses.

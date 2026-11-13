@@ -5,7 +5,7 @@ without pretending that its OTP process moved.
 
 ## What you will learn
 
-- A durable ownership ledger can name the logical owner of a stable Agent Ref.
+- A durable ownership ledger can name the logical owner of a stable Agent Address.
 - Transfer validates the current owner before it commits the new owner.
 - The Jido instance remains the process owner before and after transfer.
 
@@ -35,7 +35,7 @@ data changes OTP supervision.
 
 ## Core Fit and Gaps
 
-Stable Refs and normal Agent state provide a clean application-level ownership
+Stable Addresses and normal Agent state provide a clean application-level ownership
 protocol. Runtime adoption, transfer, and owner-linked shutdown need a separate
 public contract if Jido intends to support them.
 

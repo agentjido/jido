@@ -87,10 +87,10 @@ defmodule Jido.Instance.WakeTest do
       id: {Jido, instance}
     )
 
-    ref = Jido.Agent.Ref.new!(namespace: namespace, id: "agent")
+    address = Jido.Agent.Address.new!(namespace: namespace, id: "agent")
     deadline = System.system_time(:millisecond) + 120_000
-    old_entry = %{agent_ref: ref, turn_id: "old-turn", wait_id: "old-wait", deadline: deadline}
-    new_entry = colliding_entry(ref, old_entry, deadline)
+    old_entry = %{agent_address: address, turn_id: "old-turn", wait_id: "old-wait", deadline: deadline}
+    new_entry = colliding_entry(address, old_entry, deadline)
 
     assert :ok = WakeStore.put(instance, [old_entry])
     delete_task = Task.async(fn -> WakeStore.delete(instance, old_entry) end)
@@ -116,10 +116,10 @@ defmodule Jido.Instance.WakeTest do
       id: {Jido, instance}
     )
 
-    ref = Jido.Agent.Ref.new!(namespace: namespace, id: "agent")
+    address = Jido.Agent.Address.new!(namespace: namespace, id: "agent")
 
     entry = %{
-      agent_ref: ref,
+      agent_address: address,
       turn_id: "turn",
       wait_id: "wait",
       deadline: System.system_time(:millisecond) + 120_000
@@ -130,15 +130,15 @@ defmodule Jido.Instance.WakeTest do
 
     log =
       capture_log(fn ->
-        Jido.Instance.Wake.complete(instance, ref, entry.turn_id)
+        Jido.Instance.Wake.complete(instance, address, entry.turn_id)
         assert_eventually(fn -> WakeStore.list(instance) == {:ok, []} end)
       end)
 
     assert log =~ "Jido wake cleanup failed; retrying"
   end
 
-  defp colliding_entry(ref, old_entry, deadline) do
-    target = shard(ref, old_entry.turn_id, old_entry.wait_id)
+  defp colliding_entry(address, old_entry, deadline) do
+    target = shard(address, old_entry.turn_id, old_entry.wait_id)
 
     1
     |> Stream.iterate(&(&1 + 1))
@@ -146,13 +146,13 @@ defmodule Jido.Instance.WakeTest do
       turn_id = "new-turn-#{index}"
       wait_id = "new-wait-#{index}"
 
-      if shard(ref, turn_id, wait_id) == target,
-        do: %{agent_ref: ref, turn_id: turn_id, wait_id: wait_id, deadline: deadline}
+      if shard(address, turn_id, wait_id) == target,
+        do: %{agent_address: address, turn_id: turn_id, wait_id: wait_id, deadline: deadline}
     end)
   end
 
-  defp shard(ref, turn_id, wait_id),
-    do: :erlang.phash2({Jido.Agent.Ref.to_map!(ref), turn_id, wait_id}, 64)
+  defp shard(address, turn_id, wait_id),
+    do: :erlang.phash2({Jido.Agent.Address.to_map!(address), turn_id, wait_id}, 64)
 
   defp assert_eventually(fun, attempts \\ 40)
 

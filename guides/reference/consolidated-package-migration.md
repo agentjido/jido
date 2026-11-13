@@ -156,7 +156,7 @@ signal = Jido.Signal.new!("order.unknown", %{}, source: "/orders")
 | --- | --- |
 | `MyApp.Jido.start_agent(agent, opts)` | `Jido.start_agent(MyApp.Jido, agent, opts)` |
 | `MyApp.Jido.stop_agent(id)`, `whereis_agent(id)`, `list_agents()`, `agent_count()` | `Jido.stop_agent/3`, `Jido.whereis_agent/3`, `Jido.list_agents/2`, `Jido.agent_count/2`, each with the instance first |
-| `MyApp.Jido.call(ref, signal)` and the other Ref functions | `Jido.call(MyApp.Jido, ref, signal)` and the same pattern |
+| `MyApp.Jido.call(address, signal)` and the other Address functions | `Jido.call(MyApp.Jido, address, signal)` and the same pattern |
 | `MyApp.Jido.hibernate(server)`, `thaw(module, id)` | `Jido.hibernate(MyApp.Jido, server)`, `Jido.thaw(MyApp.Jido, module, id)` |
 | Jido.await, Jido.abandon, and `MyApp.Jido.await/2` | `Jido.AgentServer.await/2`, `Jido.AgentServer.abandon/1` |
 | Jido.debug and `MyApp.Jido.debug/1` | The `:debug` [instance option](configuration-reference.md#instance-options) |
@@ -173,8 +173,8 @@ signal = Jido.Signal.new!("order.unknown", %{}, source: "/orders")
 ^server = Jido.whereis_agent(PackageGuide.Jido, "counter-2")
 1 = Jido.agent_count(PackageGuide.Jido)
 
-{:ok, ref} = Jido.agent_ref(PackageGuide.Jido, "counter-2")
-%{id: "counter-2"} = Jido.agent(PackageGuide.Jido, ref)
+{:ok, address} = Jido.agent_address(PackageGuide.Jido, "counter-2")
+%{id: "counter-2"} = Jido.agent(PackageGuide.Jido, address)
 
 signal = Jido.Signal.new!("order.placed", %{id: "o-1"}, source: "/orders")
 %{"type" => "order.placed"} = Jido.Signal.Codec.to_map(signal)

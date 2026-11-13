@@ -29,7 +29,7 @@ persistence adapter, durable lifecycle, or ordinary definition mutation.
 Optional `initialize/2`, `checkpoint/2`, and `restore/2` callbacks support
 initial-state transformation and custom portable checkpoint representation.
 
-The supporting public values are `Jido.Agent.Directive`, `Jido.Agent.Ref`,
+The supporting public values are `Jido.Agent.Directive`, `Jido.Agent.Address`,
 `Jido.Agent.Topology`, and `Jido.Agent.View`. Codec behavior is reached through
 the common Jido Codec boundary. Route is a public value contract. Runner,
 Validation, Schema, Callback, DSL implementation, and Plugin pipeline modules
@@ -62,9 +62,9 @@ Definitions are fixed for one activation. Static topology stays in the
 definition. Temporary children are AgentServer runtime operations. A permanent
 definition change uses the separate idle-only whole-definition upgrade path:
 trusted Codec document, explicit Catalog, optional state migration,
-revision-controlled persistence, and restart under the same Agent Ref.
+revision-controlled persistence, and restart under the same Agent Address.
 
-Keep Directive, Ref, Topology, View, Route, and Plugin preparation as proof
+Keep Directive, Address, Topology, View, Route, and Plugin preparation as proof
 surfaces inside Agent. They have distinct values or pure behavior but do not
 provide independent product capabilities outside the Agent definition and
 evaluation contract.
@@ -96,7 +96,7 @@ in removal records and negative assertions.
 - [Runner](../../lib/jido/agent/runner.ex)
 - [Directives](../../lib/jido/agent/directive.ex)
 - [Static topology](../../lib/jido/agent/topology.ex)
-- [Reference](../../lib/jido/agent/ref.ex)
+- [Reference](../../lib/jido/agent/address.ex)
 - [View](../../lib/jido/agent/view.ex)
 - [Focused tests](../../test/jido/agent)
 - [Agent obligations](../../test/contracts/jido/agent.obligations.md)

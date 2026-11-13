@@ -4,7 +4,7 @@ defmodule Jido.Examples.Runtime.DefinitionChangesTest do
   use ExUnit.Case, async: false
   @moduletag :integration
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.AgentServer.{Snapshot, TurnResult}
   alias Jido.Examples.DefinitionChanges, as: Example
 
@@ -19,19 +19,19 @@ defmodule Jido.Examples.Runtime.DefinitionChangesTest do
       id: instance
     )
 
-    ref = Ref.new!(namespace: namespace, id: "document")
-    agent = Example.V1.instantiate!(id: ref.id, state: %{count: 2})
-    {:ok, ^ref} = Jido.create_agent(instance, ref, agent)
-    %{instance: instance, ref: ref}
+    address = Address.new!(namespace: namespace, id: "document")
+    agent = Example.V1.instantiate!(id: address.id, state: %{count: 2})
+    {:ok, ^address} = Jido.create_agent(instance, address, agent)
+    %{instance: instance, address: address}
   end
 
-  test "an Instance-owned definition upgrade keeps the Ref and replaces the activation", c do
-    assert {:ok, first} = Jido.activate_agent(c.instance, c.ref)
+  test "an Instance-owned definition upgrade keeps the Address and replaces the activation", c do
+    assert {:ok, first} = Jido.activate_agent(c.instance, c.address)
 
-    assert {:ok, c.ref} ==
-             Jido.upgrade_agent(c.instance, c.ref, Example.AdvanceVersion)
+    assert {:ok, c.address} ==
+             Jido.upgrade_agent(c.instance, c.address, Example.AdvanceVersion)
 
-    assert {:ok, replacement} = Jido.activate_agent(c.instance, c.ref)
+    assert {:ok, replacement} = Jido.activate_agent(c.instance, c.address)
     refute replacement == first
 
     assert %Snapshot{
@@ -40,7 +40,7 @@ defmodule Jido.Examples.Runtime.DefinitionChangesTest do
            } = Jido.AgentServer.snapshot(replacement)
 
     assert {:ok, %TurnResult{status: :committed, agent_revision: 2}} =
-             Jido.call(c.instance, c.ref, Example.increment_signal())
+             Jido.call(c.instance, c.address, Example.increment_signal())
 
     assert %{count: 3} == Jido.AgentServer.snapshot(replacement).agent.state
   end

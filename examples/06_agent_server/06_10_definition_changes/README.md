@@ -8,7 +8,7 @@ document.
 
 - How the Agent Codec and a trusted Catalog define the complete replacement.
 - How a migration Action returns the complete state for the new schema.
-- How the stable Agent Ref remains valid when the AgentServer PID changes.
+- How the stable Agent Address remains valid when the AgentServer PID changes.
 
 ## Read the code
 

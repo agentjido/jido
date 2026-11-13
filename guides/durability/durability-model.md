@@ -6,7 +6,7 @@ This guide explains what Jido saves for an Agent, when each write happens, and w
 
 An Agent is durable when its AgentServer runs with a `persistence:` adapter. The server then keeps one record for each Agent and reads that record whenever an activation starts.
 
-The record key is the exact `{namespace, partition, id}` tuple of a `Jido.Agent.Ref`. The Agent module is checked against the record, but it is not part of the key. A durable Agent therefore needs an instance with a stable `:namespace`.
+The record key is the exact `{namespace, partition, id}` tuple of a `Jido.Agent.Address`. The Agent module is checked against the record, but it is not part of the key. A durable Agent therefore needs an instance with a stable `:namespace`.
 
 Jido saves four kinds of data:
 

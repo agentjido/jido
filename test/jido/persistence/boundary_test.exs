@@ -93,18 +93,18 @@ defmodule Jido.Persistence.BoundaryTest do
   end
 
   @tag obligation: "jido.persistence.I2"
-  test "the key contains only the exact Ref tuple", c do
-    ref = Agent.Ref.new!(namespace: "record-boundary", partition: "blue", id: c.agent.id)
-    assert "jido:agent:v3:" <> encoded = Persistence.agent_key(ref)
+  test "the key contains only the exact Address tuple", c do
+    address = Agent.Address.new!(namespace: "record-boundary", partition: "blue", id: c.agent.id)
+    assert "jido:agent:v3:" <> encoded = Persistence.agent_key(address)
 
-    assert {ref.namespace, ref.partition, ref.id} ==
+    assert {address.namespace, address.partition, address.id} ==
              encoded |> Base.url_decode64!(padding: false) |> :erlang.binary_to_term([:safe])
 
     for id <- ["a", "ab", "abc"] do
-      ref = Agent.Ref.new!(namespace: "key", partition: nil, id: id)
-      expected = :erlang.term_to_binary({ref.namespace, ref.partition, ref.id})
+      address = Agent.Address.new!(namespace: "key", partition: nil, id: id)
+      expected = :erlang.term_to_binary({address.namespace, address.partition, address.id})
       expected = Base.url_encode64(expected, padding: false)
-      assert Persistence.agent_key(ref) == "jido:agent:v3:" <> expected
+      assert Persistence.agent_key(address) == "jido:agent:v3:" <> expected
     end
   end
 
@@ -112,8 +112,8 @@ defmodule Jido.Persistence.BoundaryTest do
   test "stored envelopes reject invalid fields without changing their bytes", c do
     namespace = "record-boundary"
     assert :ok = Persistence.save_agent(c.store, c.agent, namespace: namespace)
-    ref = Agent.Ref.new!(namespace: namespace, id: c.agent.id)
-    key = Persistence.agent_key(ref)
+    address = Agent.Address.new!(namespace: namespace, id: c.agent.id)
+    key = Persistence.agent_key(address)
     {ETS, opts} = c.store
     {:ok, original} = ETS.get(key, opts)
     {:ok, record} = Record.decode(original)
@@ -143,13 +143,13 @@ defmodule Jido.Persistence.BoundaryTest do
     encoded_atom = <<131, 118, byte_size(atom_name)::16, atom_name::binary>>
     assert Record.decode(encoded_atom) == {:error, :invalid_persistence_record}
 
-    assert Record.validate(nil, ref, Basic) == {:error, {:invalid_persistence_record, :shape}}
+    assert Record.validate(nil, address, Basic) == {:error, {:invalid_persistence_record, :shape}}
 
-    assert Record.validate(%{record | fmt: 2}, ref, Basic) ==
+    assert Record.validate(%{record | fmt: 2}, address, Basic) ==
              {:error, {:invalid_persistence_record, :fmt}}
 
     for vsn <- [nil, 0, "1"] do
-      assert Record.validate(%{record | vsn: vsn}, ref, Basic) ==
+      assert Record.validate(%{record | vsn: vsn}, address, Basic) ==
                {:error, {:invalid_persistence_record, :vsn}}
     end
 
@@ -168,7 +168,7 @@ defmodule Jido.Persistence.BoundaryTest do
 
   @tag obligation: ["jido.persistence.I5", "jido.persistence.I12"]
   test "durable Turn data has one exact portable record shape", c do
-    ref = Agent.Ref.new!(namespace: "record-boundary", id: c.agent.id)
+    address = Agent.Address.new!(namespace: "record-boundary", id: c.agent.id)
     {:ok, checkpoint} = Persistence.snapshot(c.agent)
     signal = Jido.Signal.new!("turn.test", %{}, source: "/contract")
 
@@ -185,14 +185,14 @@ defmodule Jido.Persistence.BoundaryTest do
 
     for status <- [:running, :completed, :failed, :cancelled] do
       candidate = %{turn | status: status}
-      assert {:ok, record} = Record.build_active(c.agent, ref, 0, 0, checkpoint, candidate)
+      assert {:ok, record} = Record.build_active(c.agent, address, 0, 0, checkpoint, candidate)
       assert record.server_turn === candidate
-      assert :ok = Record.validate(record, ref, Basic)
+      assert :ok = Record.validate(record, address, Basic)
     end
 
     assert :ok =
              Persistence.save_agent(c.store, c.agent,
-               namespace: ref.namespace,
+               namespace: address.namespace,
                server_turn: turn
              )
 
@@ -201,13 +201,13 @@ defmodule Jido.Persistence.BoundaryTest do
                c.store,
                Basic,
                c.agent.id,
-               namespace: ref.namespace
+               namespace: address.namespace
              )
 
     assert restored == c.agent
 
     assert {:ok, _record} =
-             Record.build_active(c.agent, ref, 0, 0, checkpoint, %{turn | id: "x"})
+             Record.build_active(c.agent, address, 0, 0, checkpoint, %{turn | id: "x"})
 
     invalid = [
       %{turn | id: ""},
@@ -224,7 +224,7 @@ defmodule Jido.Persistence.BoundaryTest do
 
     for candidate <- invalid do
       assert {:error, {:invalid_persistence_record, :server_turn}} =
-               Record.build_active(c.agent, ref, 0, 0, checkpoint, candidate)
+               Record.build_active(c.agent, address, 0, 0, checkpoint, candidate)
     end
 
     instruction = Jido.Instruction.new!(target: ReceiptAction, params: %{})
@@ -250,7 +250,7 @@ defmodule Jido.Persistence.BoundaryTest do
         ]
 
     for candidate <- accepted_candidates do
-      assert {:ok, record} = Record.build_active(c.agent, ref, 0, 0, checkpoint, candidate)
+      assert {:ok, record} = Record.build_active(c.agent, address, 0, 0, checkpoint, candidate)
       assert record.server_turn === candidate
     end
 
@@ -272,7 +272,7 @@ defmodule Jido.Persistence.BoundaryTest do
         ]
 
     for candidate <- released_candidates do
-      assert {:ok, record} = Record.build_active(c.agent, ref, 0, 0, checkpoint, candidate)
+      assert {:ok, record} = Record.build_active(c.agent, address, 0, 0, checkpoint, candidate)
       assert record.server_turn === candidate
     end
 
@@ -300,7 +300,7 @@ defmodule Jido.Persistence.BoundaryTest do
           Map.put(released, :extra, true)
         ] do
       assert {:error, {:invalid_persistence_record, :server_turn}} =
-               Record.build_active(c.agent, ref, 0, 0, checkpoint, candidate)
+               Record.build_active(c.agent, address, 0, 0, checkpoint, candidate)
     end
   end
 
@@ -308,8 +308,8 @@ defmodule Jido.Persistence.BoundaryTest do
   test "identity validation preserves scope-first error order and exact key sets", c do
     {:ok, checkpoint} = Jido.Persistence.snapshot(c.agent)
 
-    ref = Agent.Ref.new!(namespace: "first", partition: "blue", id: c.agent.id)
-    {:ok, active} = Record.build_active(c.agent, ref, 0, 0, checkpoint)
+    address = Agent.Address.new!(namespace: "first", partition: "blue", id: c.agent.id)
+    {:ok, active} = Record.build_active(c.agent, address, 0, 0, checkpoint)
     tombstone = active |> Map.drop([:vsn, :checkpoint]) |> Map.put(:kind, :tombstone)
 
     changes = [
@@ -320,13 +320,13 @@ defmodule Jido.Persistence.BoundaryTest do
     ]
 
     for record <- [active, tombstone] do
-      assert :ok = Record.validate(record, ref, Basic)
+      assert :ok = Record.validate(record, address, Basic)
 
       for {{field, _value}, index} <- Enum.with_index(changes) do
         changed = Map.merge(record, Map.new(Enum.drop(changes, index)))
 
         assert {:error, {:invalid_persistence_record, ^field}} =
-                 Record.validate(changed, ref, Basic)
+                 Record.validate(changed, address, Basic)
       end
 
       for key <- Map.keys(record) do
@@ -338,17 +338,17 @@ defmodule Jido.Persistence.BoundaryTest do
           end
 
         assert {:error, {:invalid_persistence_record, ^field}} =
-                 Record.validate(Map.delete(record, key), ref, Basic)
+                 Record.validate(Map.delete(record, key), address, Basic)
 
         # Equal size alone does not prove an exact key set.
         changed = record |> Map.delete(key) |> Map.put(:extra, true)
 
         assert {:error, {:invalid_persistence_record, ^field}} =
-                 Record.validate(changed, ref, Basic)
+                 Record.validate(changed, address, Basic)
       end
 
       assert {:error, {:invalid_persistence_record, :shape}} =
-               Record.validate(Map.put(record, :extra, true), ref, Basic)
+               Record.validate(Map.put(record, :extra, true), address, Basic)
     end
   end
 
@@ -365,8 +365,8 @@ defmodule Jido.Persistence.BoundaryTest do
 
     namespace = "record-sequence"
     opts = [instance: :record_instance, partition: "blue", namespace: namespace]
-    ref = Agent.Ref.new!(namespace: namespace, partition: "blue", id: c.agent.id)
-    key = Persistence.agent_key(ref)
+    address = Agent.Address.new!(namespace: namespace, partition: "blue", id: c.agent.id)
+    key = Persistence.agent_key(address)
 
     record =
       %{

@@ -10,7 +10,7 @@ So a normal delete replaces the active record with a compact tombstone, using co
 
 ## Delete a stopped Agent
 
-Use `Jido.delete_agent/3` with a stable Ref. It refuses while a local server for that Ref is live, so stop the Agent first.
+Use `Jido.delete_agent/3` with a stable Address. It refuses while a local server for that Address is live, so stop the Agent first.
 
 ```elixir
 defmodule TombstonesGuide.Order do
@@ -37,29 +37,29 @@ store_path =
     persistence: {Jido.Persistence.File, path: store_path}
   )
 
-{:ok, ref} = Jido.agent_ref(TombstonesGuide.Jido, "order-1")
-{:ok, ^ref} = Jido.create_agent(TombstonesGuide.Jido, ref, Order)
-{:ok, server} = Jido.activate_agent(TombstonesGuide.Jido, ref)
+{:ok, address} = Jido.agent_address(TombstonesGuide.Jido, "order-1")
+{:ok, ^address} = Jido.create_agent(TombstonesGuide.Jido, address, Order)
+{:ok, server} = Jido.activate_agent(TombstonesGuide.Jido, address)
 :ok = Server.await_ready(server)
 
-{:error, :agent_running} = Jido.delete_agent(TombstonesGuide.Jido, ref)
+{:error, :agent_running} = Jido.delete_agent(TombstonesGuide.Jido, address)
 
 {:ok, _snapshot} = Server.stop(server)
-:ok = Jido.delete_agent(TombstonesGuide.Jido, ref)
+:ok = Jido.delete_agent(TombstonesGuide.Jido, address)
 
 {:error, :deleted} = Jido.Persistence.load_agent(TombstonesGuide.Jido, Order, "order-1")
 ```
 
-The `:persistence` option selects another adapter. The Ref supplies the namespace and partition.
+The `:persistence` option selects another adapter. The Address supplies the namespace and partition.
 
 Deleting again returns `:ok`. Deleting an ID that never had a record also returns `:ok` and writes a tombstone at revision zero, so you can reserve an ID against later creation.
 
 ```elixir
 alias TombstonesGuide.Order
 
-:ok = Jido.delete_agent(TombstonesGuide.Jido, ref)
+:ok = Jido.delete_agent(TombstonesGuide.Jido, address)
 
-{:ok, unused} = Jido.agent_ref(TombstonesGuide.Jido, "order-never-created")
+{:ok, unused} = Jido.agent_address(TombstonesGuide.Jido, "order-never-created")
 :ok = Jido.delete_agent(TombstonesGuide.Jido, unused)
 {:error, :deleted} = Jido.Persistence.load_agent(TombstonesGuide.Jido, Order, "order-never-created")
 ```
@@ -86,7 +86,7 @@ late_order = Order.instantiate!(id: "order-1")
   Jido.Persistence.save_agent(TombstonesGuide.Jido, late_order, revision: 99)
 
 outcome =
-  case Jido.activate_agent(TombstonesGuide.Jido, ref, Order) do
+  case Jido.activate_agent(TombstonesGuide.Jido, address, Order) do
     {:ok, pid} -> Server.await_ready(pid)
     {:error, reason} -> {:error, reason}
   end

@@ -126,7 +126,7 @@ A bare worker from `Jido.AgentServer.start_link/1` has no activation, and it rej
 
 ## A durable Agent outlives its processes
 
-Without a store, the Agent ends with its activation. With a store, the logical Agent continues with no process at all. Its identity is a `Jido.Agent.Ref`, the exact `{namespace, partition, id}` tuple, and no PID is part of that. An Agent can run on one activation today and on a new one tomorrow.
+Without a store, the Agent ends with its activation. With a store, the logical Agent continues with no process at all. Its identity is a `Jido.Agent.Address`, the exact `{namespace, partition, id}` tuple, and no PID is part of that. An Agent can run on one activation today and on a new one tomorrow.
 
 ```elixir
 {:ok, _durable_host} =
@@ -174,5 +174,5 @@ The saved Agent lasts as long as the store does. The ETS adapter in the example 
 ## Related
 
 - [OTP Concepts for Jido](otp-concepts-for-jido.md) covers the supervisors and their settings.
-- [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd) shows lookups, partitions, and Refs.
+- [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd) shows lookups, partitions, and Addresses.
 - [Hibernate and Thaw](../agent-servers/hibernate-thaw-and-activate.md) covers moving an Agent in and out of memory.

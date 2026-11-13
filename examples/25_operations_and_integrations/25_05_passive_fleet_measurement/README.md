@@ -36,12 +36,12 @@ placement, sustained load, and maximum density are not measured.
 
 ## Core Fit and Gaps
 
-Public Refs, resident counts, calls, and passivation support a reproducible
+Public Addresses, resident counts, calls, and passivation support a reproducible
 local report. Jido has no public logical-Agent listing API, so the application
-must retain its created Ref inventory. Scale claims require a separate
+must retain its created Address inventory. Scale claims require a separate
 controlled benchmark and published evidence.
 
-- Logical owner: the application-owned inventory of stable Agent references.
+- Logical owner: the application-owned inventory of stable Agent Addresses.
 - Process owner: the Jido instance owns each current activation.
 - Canonical state owner: each Agent record in the configured ETS store.
 - Commit point: each measured Agent call commits its own state and revision.

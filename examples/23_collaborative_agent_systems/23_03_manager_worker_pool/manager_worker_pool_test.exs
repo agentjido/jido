@@ -9,8 +9,8 @@ defmodule Jido.Examples.Collaboration.ManagerPoolTest do
 
   test "a manager reduces correlated results from a parallel worker pool" do
     jido = start_jido()
-    manager_ref = create(jido, "manager", Manager)
-    worker_refs = Enum.map(1..3, &create(jido, "worker-#{&1}", Worker))
+    manager_address = create(jido, "manager", Manager)
+    worker_addresses = Enum.map(1..3, &create(jido, "worker-#{&1}", Worker))
 
     tasks = [
       %{task_id: "task-a", value: 2, fail: false},
@@ -19,7 +19,7 @@ defmodule Jido.Examples.Collaboration.ManagerPoolTest do
     ]
 
     assert {:ok, state} =
-             ManagerPool.run(jido, manager_ref, worker_refs, "mission-pool-1", tasks)
+             ManagerPool.run(jido, manager_address, worker_addresses, "mission-pool-1", tasks)
 
     assert state.expected == ["task-a", "task-b", "task-c"]
 
@@ -33,9 +33,9 @@ defmodule Jido.Examples.Collaboration.ManagerPoolTest do
   end
 
   defp create(jido, id, module) do
-    {:ok, ref} = Jido.agent_ref(jido, id)
-    {:ok, ^ref} = Jido.create_agent(jido, ref, module)
-    ref
+    {:ok, address} = Jido.agent_address(jido, id)
+    {:ok, ^address} = Jido.create_agent(jido, address, module)
+    address
   end
 
   defp start_jido do

@@ -23,7 +23,7 @@ from the same public persistence adapter.
 
 ## Important behavior
 
-The Jido instance is the process owner. Each stable Ref identifies a logical
+The Jido instance is the process owner. Each stable Address identifies a logical
 Agent whose stored state can outlive that process owner. Shutdown does not
 delete the durable record.
 

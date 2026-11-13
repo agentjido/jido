@@ -437,7 +437,7 @@ defmodule Jido.Plugin.Bus.ContractTest do
     committed =
       %Jido.AgentServer.TurnResult{
         turn_id: "turn-1",
-        agent_ref: Jido.Agent.Ref.new!(namespace: "bus-contract", id: "agent-1"),
+        agent_address: Jido.Agent.Address.new!(namespace: "bus-contract", id: "agent-1"),
         agent_activation_id: "activation-1",
         status: :committed,
         durability: :memory,

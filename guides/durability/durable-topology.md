@@ -163,16 +163,16 @@ alias Jido.AgentServer, as: Server
 
 :ok = Server.stop(root)
 
-{:ok, root_ref} = Jido.agent_ref(TopologyGuide.Jido, "team")
-:ok = Jido.delete_agent(TopologyGuide.Jido, root_ref, TopologyGuide.Team)
+{:ok, root_address} = Jido.agent_address(TopologyGuide.Jido, "team")
+:ok = Jido.delete_agent(TopologyGuide.Jido, root_address, TopologyGuide.Team)
 
 {:error, :deleted} = Jido.Persistence.load_agent(TopologyGuide.Jido, TopologyGuide.Team, "team")
 
 {:ok, %{state: %{handled: 1}}} =
   Jido.Persistence.load_agent(TopologyGuide.Jido, TopologyGuide.Agent, triage_id)
 
-{:ok, member_ref} = Jido.agent_ref(TopologyGuide.Jido, triage_id)
-:ok = Jido.delete_agent(TopologyGuide.Jido, member_ref, TopologyGuide.Agent)
+{:ok, member_address} = Jido.agent_address(TopologyGuide.Jido, triage_id)
+:ok = Jido.delete_agent(TopologyGuide.Jido, member_address, TopologyGuide.Agent)
 
 :ok = Jido.stop(TopologyGuide.Jido)
 ```

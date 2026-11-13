@@ -48,7 +48,7 @@ For a script or Livebook, `Jido.start/1` starts one default instance. Later call
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `:name` | Required for `Jido.start_link/1`. The module name under `use Jido`. | The instance name, a non-nil atom. |
-| `:namespace` | `nil` | Stable identity for `Jido.Agent.Ref` functions and durable records. |
+| `:namespace` | `nil` | Stable identity for `Jido.Agent.Address` functions and durable records. |
 | `:persistence` | `nil` | The default adapter, as a `Jido.Persistence.Store` module or `{module, options}`. |
 | `:agent_server` | `[]` | Default options for each AgentServer in this instance. |
 | `:max_tasks` | `1_000` | The child limit of the instance Task supervisor. A non-negative integer or `:infinity`. |
@@ -99,7 +99,7 @@ end
 | Scope | Form | Separates | Created at runtime? |
 | --- | --- | --- | --- |
 | Instance | Atom | Processes, Task limit, adapter, and defaults | No. Use a fixed set. |
-| Namespace | Nonempty string | Durable identity. Part of every `Jido.Agent.Ref`. | No. One per instance. |
+| Namespace | Nonempty string | Durable identity. Part of every `Jido.Agent.Address`. | No. One per instance. |
 | Partition | Nonempty string, or none | Agent IDs and durable records inside one instance | Yes |
 
 A durable record's key is the exact `{namespace, partition, id}` tuple. Changing a namespace or partition points to different records. It does not move the old ones.
@@ -117,7 +117,7 @@ One namespace can bind to one live instance per node. A second instance gets an 
 
 This check is local to the node. Two nodes can bind one namespace to one store, and they then share its records. See [Deployment and Sizing](deployment-and-performance.md#run-more-than-one-node).
 
-An instance with no namespace can run Agents, but `Jido.agent_ref/3` returns an error with code `:jido_namespace_required`, and a persistent Agent cannot start.
+An instance with no namespace can run Agents, but `Jido.agent_address/3` returns an error with code `:jido_namespace_required`, and a persistent Agent cannot start.
 
 ### Partitions
 
@@ -137,8 +137,8 @@ nil = Jido.whereis_agent(TenantGuide.Billing, "ticket-1")
 [] = Jido.list_agents(TenantGuide.Billing)
 [{"ticket-1", ^acme}] = Jido.list_agents(TenantGuide.Billing, partition: "acme")
 
-{:ok, ref} = Jido.agent_ref(TenantGuide.Billing, "ticket-1", partition: "acme")
-{:ok, ^acme} = Jido.resolve_agent(TenantGuide.Billing, ref)
+{:ok, address} = Jido.agent_address(TenantGuide.Billing, "ticket-1", partition: "acme")
+{:ok, ^acme} = Jido.resolve_agent(TenantGuide.Billing, address)
 ```
 
 `Jido.list_agents/2` and `Jido.resident_agent_count/2` read one partition at a time. Without `:partition`, they count only Agents with no partition. Jido has no function that lists partitions, so your application keeps that list.
@@ -162,7 +162,7 @@ Do not create an instance for each tenant at runtime. Each instance name becomes
 Agents in different partitions of one instance share a Runner, a Task supervisor, and a persistence adapter. Jido has:
 
 - No rate limit, quota, or fair scheduling between partitions or instances. A queue limit applies to one Agent.
-- No access check. A caller that can reach an instance can use any partition. Check the tenant in your application before you build a `Jido.Agent.Ref` or look up an Agent.
+- No access check. A caller that can reach an instance can use any partition. Check the tenant in your application before you build a `Jido.Agent.Address` or look up an Agent.
 - No tenant label on Turn telemetry. Turn events carry `agent_id` and `agent_module`, but no instance, namespace, or partition. Persistence events carry `agent_namespace` and `agent_partition`. If you report by tenant, encode the tenant in the Agent ID or keep your own mapping.
 
 ## Next steps

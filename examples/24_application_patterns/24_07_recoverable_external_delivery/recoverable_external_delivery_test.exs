@@ -16,16 +16,16 @@ defmodule Jido.Examples.Patterns.RecoverableExternalDeliveryTest do
     jido = start_persistent_jido()
     start_supervised!(MemorySink.registry_child_spec(jido))
     start_supervised!({MemorySink, jido: jido})
-    {:ok, ref} = Jido.agent_ref(jido, "delivery-agent")
-    {:ok, ^ref} = Jido.create_agent(jido, ref, DeliveryAgent)
-    {:ok, server} = Jido.activate_agent(jido, ref)
+    {:ok, address} = Jido.agent_address(jido, "delivery-agent")
+    {:ok, ^address} = Jido.create_agent(jido, address, DeliveryAgent)
+    {:ok, server} = Jido.activate_agent(jido, address)
 
     :ok = MemorySink.available(jido, :unavailable)
 
     assert {:ok, %AgentServer.TurnResult{status: :committed}} =
              Jido.call(
                jido,
-               ref,
+               address,
                DeliveryAgent.record_and_deliver_signal!(%{effect_id: "effect-1", value: 7})
              )
 
@@ -40,13 +40,13 @@ defmodule Jido.Examples.Patterns.RecoverableExternalDeliveryTest do
 
     assert :ok =
              wait_until(fn ->
-               case Jido.resolve_agent(jido, ref) do
+               case Jido.resolve_agent(jido, address) do
                  {:ok, replacement} -> replacement != server
                  _other -> false
                end
              end)
 
-    {:ok, replacement} = Jido.resolve_agent(jido, ref)
+    {:ok, replacement} = Jido.resolve_agent(jido, address)
 
     assert :ok =
              wait_until(fn ->

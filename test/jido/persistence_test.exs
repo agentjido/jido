@@ -655,7 +655,7 @@ defmodule Jido.PersistenceTest do
   test "rejects an invalid persistence record" do
     {ETS, opts} = persistence = adapter(:invalid_record)
     agent = RuntimeAgent.instantiate!(id: unique_id("invalid-record"))
-    key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
+    key = Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: agent.id))
 
     assert :ok = ETS.put(key, <<0, 1, 2>>, opts)
 

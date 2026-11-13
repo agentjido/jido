@@ -1,7 +1,7 @@
 defmodule Jido.Persistence.RecordIdentityTest do
   use ExUnit.Case, async: false
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Persistence
   alias Jido.Persistence.{ETS, File}
   alias Jido.Test.AgentServer.Fixtures.CounterAgent, as: Basic
@@ -40,13 +40,13 @@ defmodule Jido.Persistence.RecordIdentityTest do
   test "writers with different instance names share one CAS record", c do
     {ETS, opts} = c.store
     barrier = {BarrierAdapter, Keyword.put(opts, :observer, self())}
-    ref = Ref.new!(namespace: "shared", id: c.agent.id)
-    key = Persistence.agent_key(ref)
+    address = Address.new!(namespace: "shared", id: c.agent.id)
+    key = Persistence.agent_key(address)
 
     writers =
       for instance <- [:first, :second] do
         Task.async(fn ->
-          Persistence.create_agent(barrier, c.agent, instance: instance, namespace: ref.namespace)
+          Persistence.create_agent(barrier, c.agent, instance: instance, namespace: address.namespace)
         end)
       end
 
@@ -59,7 +59,7 @@ defmodule Jido.Persistence.RecordIdentityTest do
     assert :ets.info(:"#{opts[:table]}_records", :size) == 1
 
     assert {:ok, restored} =
-             Persistence.load_agent(c.store, Basic, c.agent.id, namespace: ref.namespace)
+             Persistence.load_agent(c.store, Basic, c.agent.id, namespace: address.namespace)
 
     assert restored == c.agent
   end

@@ -44,17 +44,17 @@ defmodule Jido.Examples.Collaboration.IncidentResponseTest do
     assert Enum.map(resolved.agent.state.events, & &1.event) == [:reported, :contained, :approved]
     refute Map.has_key?(Map.from_struct(resolved), :children)
 
-    ref = resolved.agent_ref
+    address = resolved.agent_address
     activation_id = resolved.agent_activation_id
     assert :ok = Jido.stop_agent(jido, root)
     assert :ok = wait_until(fn -> Jido.resident_agent_count(jido) == 0 end)
 
-    assert {:ok, replacement} = Jido.activate_agent(jido, ref)
+    assert {:ok, replacement} = Jido.activate_agent(jido, address)
     assert :ok = AgentServer.await_ready(replacement)
     restored = AgentServer.snapshot(replacement)
     assert restored.agent.state.status == :resolved
     refute restored.agent_activation_id == activation_id
-    assert restored.agent_ref == ref
+    assert restored.agent_address == address
 
     assert :ok = Jido.stop_agent(jido, replacement)
   end

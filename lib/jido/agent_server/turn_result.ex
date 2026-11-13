@@ -6,7 +6,7 @@ defmodule Jido.AgentServer.TurnResult do
   not accepted or for a failed transport operation.
   """
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Exec.Wait
   alias Jido.Signal
 
@@ -15,7 +15,7 @@ defmodule Jido.AgentServer.TurnResult do
 
   @enforce_keys [
     :turn_id,
-    :agent_ref,
+    :agent_address,
     :agent_activation_id,
     :status,
     :durability,
@@ -24,7 +24,7 @@ defmodule Jido.AgentServer.TurnResult do
   ]
   defstruct [
     :turn_id,
-    :agent_ref,
+    :agent_address,
     :agent_activation_id,
     :status,
     :durability,
@@ -38,7 +38,7 @@ defmodule Jido.AgentServer.TurnResult do
 
   @type t :: %__MODULE__{
           turn_id: String.t(),
-          agent_ref: Ref.t(),
+          agent_address: Address.t(),
           agent_activation_id: String.t(),
           status: status(),
           durability: durability(),

@@ -328,10 +328,10 @@ authoring surface.
 - **kind:** functional
 - **status:** retired
 
-### jido.agent_server.I95 — Stable logical Agent reference
+### jido.agent_server.I95 — Stable logical Agent Address
 
-- **scope:** `Jido.Agent.Ref`, `Jido.create_agent/4`, Ref delivery through `Jido`
-- **must:** Use one stable Ref for a logical Agent across activation, worker replacement, passivation, and reactivation. Do not put a process identifier in the Ref.
+- **scope:** `Jido.Agent.Address`, `Jido.create_agent/4`, Address delivery through `Jido`
+- **must:** Use one stable Address for a logical Agent across activation, worker replacement, passivation, and reactivation. Do not put a process identifier in the Address.
 - **why:** A logical Agent can stay alive when no worker is resident.
 - **kind:** functional
 - **status:** active
@@ -354,7 +354,7 @@ authoring surface.
 
 ### jido.agent_server.I98 — Signal resume and retry
 
-- **scope:** durable Flow wait delivery through stable Ref input
+- **scope:** durable Flow wait delivery through stable Address input
 - **must:** Resume a waiting durable Flow with a `Jido.Signal`. Save accepted input before downstream work. Return the saved terminal result for an exact retry and reject a conflicting reuse.
 - **why:** External input must be safe to retry after an uncertain reply.
 - **kind:** ordering
@@ -363,15 +363,15 @@ authoring surface.
 ### jido.agent_server.I99 — Durable wake-up
 
 - **scope:** Instance wake store and Agent activation
-- **must:** Save a wake deadline outside the resident worker. Restore it after an Instance restart. Activate the stable Ref when the deadline is due and continue the saved Turn.
+- **must:** Save a wake deadline outside the resident worker. Restore it after an Instance restart. Activate the stable Address when the deadline is due and continue the saved Turn.
 - **why:** Timer work must survive a BEAM or Instance restart without a resident worker.
 - **kind:** ordering
 - **status:** active
 
 ### jido.agent_server.I100 — Single activation under concurrency
 
-- **scope:** concurrent Ref delivery through one Jido instance
-- **must:** Join concurrent activation requests on one resident activation and serialize their Turns. Do not start two workers for the same Ref.
+- **scope:** concurrent Address delivery through one Jido instance
+- **must:** Join concurrent activation requests on one resident activation and serialize their Turns. Do not start two workers for the same Address.
 - **why:** Concurrent network entry must not split one logical Agent.
 - **kind:** ordering
 - **status:** active
@@ -379,7 +379,7 @@ authoring surface.
 ### jido.agent_server.I101 — Uncertain write reconciliation
 
 - **scope:** durable Agent writes and Instance reconciliation
-- **must:** Stop admission after an indeterminate durable write. Reconcile storage before the Ref accepts more work. Continue from the confirmed stored revision.
+- **must:** Stop admission after an indeterminate durable write. Reconcile storage before the Address accepts more work. Continue from the confirmed stored revision.
 - **why:** The runtime must not guess whether an uncertain durable write committed.
 - **kind:** ordering
 - **status:** active
@@ -387,7 +387,7 @@ authoring surface.
 ### jido.agent_server.I102 — Definition upgrade
 
 - **scope:** `Jido.upgrade_agent/4`
-- **must:** Upgrade one idle logical Agent through its stable Ref. Save the upgraded definition and state before the replacement activation is ready.
+- **must:** Upgrade one idle logical Agent through its stable Address. Save the upgraded definition and state before the replacement activation is ready.
 - **why:** Definition changes must use the same durable identity and commit boundary.
 - **kind:** persisted-format
 - **status:** active

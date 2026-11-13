@@ -24,7 +24,7 @@ input, and the parent commits the correlated result.
 
 ## Important behavior
 
-The coordinator and worker have stable references and separate canonical
+The coordinator and worker have stable Addresses and separate canonical
 state. A result with the wrong correlation fields does not change the
 coordinator commit.
 

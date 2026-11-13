@@ -58,16 +58,16 @@ Then request the upgrade:
   command queue.
 - Jido validates the complete definition and state before it accepts them.
 - Persistence uses revision control before the activation changes.
-- The activation restarts under the same stable `Jido.Agent.Ref`.
+- The activation restarts under the same stable `Jido.Agent.Address`.
 - The AgentServer PID can change.
 - Jido does not migrate an active durable Flow.
 
-Use the stable Ref for later calls. Do not retain the old PID as the Agent
+Use the stable Address for later calls. Do not retain the old PID as the Agent
 identity.
 
 ## Example
 
 The runnable
 [Whole Definition Upgrade](../../examples/08_runtime/08_12_definition_changes/README.md)
-lesson shows the Codec document, Catalog, state migration, stable Ref, and new
+lesson shows the Codec document, Catalog, state migration, stable Address, and new
 PID in one ExUnit test.

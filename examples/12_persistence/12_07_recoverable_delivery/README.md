@@ -34,7 +34,7 @@ The memory sink is not durable. Completed IDs need an application retention poli
 
 ## Core Fit and Gaps
 
-Public Agent Refs, persistence, Plugin-owned state, runtime children, and
+Public Agent Addresses, persistence, Plugin-owned state, runtime children, and
 post-commit dispatch compose into a recoverable delivery protocol. The
 application still owns stable effect IDs and idempotent external delivery. No
 distributed transaction spans the Agent record and the sink.

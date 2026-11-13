@@ -50,7 +50,7 @@ the source of truth. A copied field can become stale.
 | `jido.plugin` | `definitions`, `agent_domain` | Put Config, Manifest, and Spec behavior in `jido.plugin.definition`. Keep the generic Plugin behavior and callback data in `jido.plugin`. |
 | `jido.telemetry` | `primitives`, `live_runtime` | Put pure trace data in `jido.trace`. Keep runtime context and telemetry behavior in `jido.telemetry`. |
 | `jido.agent_server.effects` | `agent_domain`, `live_runtime` | Keep Agent Directive rules in `jido.agent`. Keep effect execution, AgentServer directives, and reply gates in `jido.agent_server.effects`. |
-| `jido.instance` | `agent_domain`, `live_runtime` | Put `Jido.Agent.Ref` behavior in `jido.agent_reference`. Keep registry lookup, routing, options, and process ownership in `jido.instance`. |
+| `jido.instance` | `agent_domain`, `live_runtime` | Put `Jido.Agent.Address` behavior in `jido.agent_reference`. Keep registry lookup, routing, options, and process ownership in `jido.instance`. |
 
 Tests can still exercise a complete cross-layer path. For example, an Effects
 test can submit an Agent Directive. The Effects component does not own the

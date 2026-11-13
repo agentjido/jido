@@ -7,7 +7,7 @@ definition boundaries.
    named Jido supervision tree with bounded runtime options.
 2. [Namespaces and Partitions](07_02_namespaces_and_partitions/README.md)
    isolates equal Agent IDs by application and tenant scope.
-3. [Stable References](07_03_stable_references/README.md) defines the exact
+3. [Stable Addresses](07_03_stable_addresses/README.md) defines the exact
    portable Agent address.
 4. [Logical Identity](07_04_logical_identity/README.md) separates one durable
    Agent identity from its current process identity.
@@ -31,5 +31,5 @@ boundaries pass without a network or private Jido runtime API.
 
 ## Limits
 
-A stable reference is an address. It is not an authorization credential and
+An Agent Address is not an authorization credential and
 does not prove cluster ownership.

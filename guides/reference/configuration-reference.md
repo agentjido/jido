@@ -80,7 +80,7 @@ An instance is `use Jido` plus `config :my_app, MyApp.Jido, ...`, or a call to `
 | --- | --- | --- | --- |
 | `:name` | Required for `Jido.start_link/1`. Jido.Default for `Jido.start/1`. The module, under `use Jido`. | A non-nil atom | The instance name. |
 | `:otp_app` | None. Required by `use Jido`. | A non-nil atom | The application that holds the configuration. |
-| `:namespace` | `nil` | A nonempty string | Stable identity for `Jido.Agent.Ref` functions and durable records. Required for persistent Agents. |
+| `:namespace` | `nil` | A nonempty string | Stable identity for `Jido.Agent.Address` functions and durable records. Required for persistent Agents. |
 | `:persistence` | `nil` | A Store declaration, a `[store: ..., codec: ...]` profile, `nil`, or `false` | The one persistence profile for all Agents, Flow records, and wake records in the instance. Store declarations use the Term codec. |
 | `:agent_server` | `[]` | A keyword list of [AgentServer options](#agentserver-options) | Defaults for each AgentServer in the instance. Validated at start. Startup-only options are rejected. |
 | `:max_tasks` | `1_000` | A non-negative integer or `:infinity` | The child limit of the instance's Task supervisor. |

@@ -141,7 +141,7 @@ The absolute times use the system clock, so a large clock change moves them. A T
 
 ## Several writers
 
-Compare-and-swap protects each record, but Jido has no cluster writer lease. Two activations of one Ref on different nodes can both run until one fails a write. The loser can already have called an external system. Use one active node per Ref, through your deployment or a placement layer. Each adapter's documentation states who can share it. `Jido.Persistence.File`, for example, requires one owning BEAM.
+Compare-and-swap protects each record, but Jido has no cluster writer lease. Two activations of one Address on different nodes can both run until one fails a write. The loser can already have called an external system. Use one active node per Address, through your deployment or a placement layer. Each adapter's documentation states who can share it. `Jido.Persistence.File`, for example, requires one owning BEAM.
 
 ## Scope of a save
 

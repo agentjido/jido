@@ -14,12 +14,12 @@ defmodule Jido.Examples.Patterns.ControlledUpgradeTest do
     ToV2
   }
 
-  test "quiesce, migrate, replace, fail safely, and roll back under one Agent Ref" do
-    {jido, ref} = start_account()
-    {:ok, first} = Jido.activate_agent(jido, ref)
+  test "quiesce, migrate, replace, fail safely, and roll back under one Agent Address" do
+    {jido, address} = start_account()
+    {:ok, first} = Jido.activate_agent(jido, address)
 
     assert {:ok, %AgentServer.TurnResult{status: :committed}} =
-             Jido.call(jido, ref, AccountV1.increment_signal!(%{}))
+             Jido.call(jido, address, AccountV1.increment_signal!(%{}))
 
     assert AgentServer.snapshot(first).agent.state == %{count: 3}
     assert {:ok, %{admission: :quiesced}} = AgentServer.quiesce(first)
@@ -27,34 +27,34 @@ defmodule Jido.Examples.Patterns.ControlledUpgradeTest do
     assert {:error, :quiesced} =
              AgentServer.call(first, AccountV1.increment_signal!(%{}))
 
-    assert {:ok, ^ref} = Jido.upgrade_agent(jido, ref, ToV2)
-    {:ok, second} = Jido.activate_agent(jido, ref)
+    assert {:ok, ^address} = Jido.upgrade_agent(jido, address, ToV2)
+    {:ok, second} = Jido.activate_agent(jido, address)
     refute second == first
 
     assert %{module: AccountV1, vsn: 2, state: %{total: 3, currency: "USD"}} =
              AgentServer.snapshot(second).agent
 
     assert {:ok, %AgentServer.TurnResult{status: :committed}} =
-             Jido.call(jido, ref, AccountV2.increment_signal!(%{}))
+             Jido.call(jido, address, AccountV2.increment_signal!(%{}))
 
     assert AgentServer.snapshot(second).agent.state.total == 4
     assert {:ok, %{admission: :quiesced}} = AgentServer.quiesce(second)
 
     assert {:error, %Jido.Error.ExecutionError{message: "injected migration failure"}} =
-             Jido.upgrade_agent(jido, ref, FailUpgrade)
+             Jido.upgrade_agent(jido, address, FailUpgrade)
 
-    {:ok, after_failure} = Jido.activate_agent(jido, ref)
+    {:ok, after_failure} = Jido.activate_agent(jido, address)
 
     assert %{module: AccountV1, vsn: 2, state: %{total: 4, currency: "USD"}} =
              AgentServer.snapshot(after_failure).agent
 
-    assert {:ok, ^ref} = Jido.upgrade_agent(jido, ref, RollbackToV1Shape)
-    {:ok, rolled_back} = Jido.activate_agent(jido, ref)
+    assert {:ok, ^address} = Jido.upgrade_agent(jido, address, RollbackToV1Shape)
+    {:ok, rolled_back} = Jido.activate_agent(jido, address)
 
     assert %{module: AccountV1, vsn: 3, state: %{count: 4}} =
              AgentServer.snapshot(rolled_back).agent
 
-    assert AgentServer.snapshot(rolled_back).agent_ref == ref
+    assert AgentServer.snapshot(rolled_back).agent_address == address
   end
 
   defp start_account do
@@ -68,9 +68,9 @@ defmodule Jido.Examples.Patterns.ControlledUpgradeTest do
       id: jido
     )
 
-    {:ok, ref} = Jido.agent_ref(jido, "upgrade-account")
-    agent = AccountV1.instantiate!(id: ref.id, state: %{count: 2})
-    {:ok, ^ref} = Jido.create_agent(jido, ref, agent)
-    {jido, ref}
+    {:ok, address} = Jido.agent_address(jido, "upgrade-account")
+    agent = AccountV1.instantiate!(id: address.id, state: %{count: 2})
+    {:ok, ^address} = Jido.create_agent(jido, address, agent)
+    {jido, address}
   end
 end

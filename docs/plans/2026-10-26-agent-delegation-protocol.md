@@ -60,7 +60,7 @@ failure handling between Agents.
 ### `jido`
 
 - Owns `Agent`, `AgentServer`, topology, directives, and the OTP runtime.
-- Resolves an Agent reference to a live destination.
+- Resolves an Agent Address to a live destination.
 - Owns the durable request record, outbox work, reply inbox, timeout policy,
   and Flow resume operation.
 - Owns the Agent-specific Flow integration described in this note.
@@ -242,7 +242,7 @@ policy. The first version should record and ignore it by default.
 
 Keep the first version small:
 
-- One exact target Agent reference.
+- One exact target Agent Address.
 - One request Signal.
 - Zero replies for `agent_cast`.
 - One expected reply for `agent_request` and `agent_call`.

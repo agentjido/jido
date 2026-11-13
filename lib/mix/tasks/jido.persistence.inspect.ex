@@ -43,9 +43,9 @@ defmodule Mix.Tasks.Jido.Persistence.Inspect do
   end
 
   defp agent_key!(namespace, id, partition) do
-    ref = Jido.Agent.Ref.new!(namespace: namespace, id: id, partition: partition)
-    Jido.Persistence.agent_key(ref)
+    address = Jido.Agent.Address.new!(namespace: namespace, id: id, partition: partition)
+    Jido.Persistence.agent_key(address)
   rescue
-    error -> Mix.raise("invalid Agent Ref: #{Exception.message(error)}")
+    error -> Mix.raise("invalid Agent Address: #{Exception.message(error)}")
   end
 end

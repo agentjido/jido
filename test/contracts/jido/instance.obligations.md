@@ -3,13 +3,13 @@ modules:
   - Jido.Instance.Options
   - Jido.Instance.NamespaceRegistry
   - Jido.Instance.RuntimeStore
-  - Jido.Agent.Ref
+  - Jido.Agent.Address
 ---
 
 ## Purpose
 
 Protect Jido instance configuration, supervision identity, namespaces, Agent
-lifecycle selection, and stable Agent Ref routing. The public `Jido` module
+lifecycle selection, and stable Agent Address routing. The public `Jido` module
 owns runtime operations. `use Jido` only declares instance configuration and a
 supervision child. AgentServer Turn behavior, persistence record meaning, and
 downstream operation results stay with their owning components.
@@ -36,7 +36,7 @@ downstream operation results stay with their owning components.
 
 - **scope:** `Jido.start_link/1`, `Jido.Instance.NamespaceRegistry.namespace/1`
 - **must:** Bind an optional nonempty namespace to at most one live local instance. Keep the exact binding while that instance is live, release an unbound claim after failed startup, remove the binding after owner loss, and restore live bindings after the namespace registry worker restarts.
-- **why:** A stable Ref namespace must identify one current local instance without becoming stuck after failure.
+- **why:** A stable Address namespace must identify one current local instance without becoming stuck after failure.
 - **kind:** functional
 - **status:** active
 
@@ -56,34 +56,34 @@ downstream operation results stay with their owning components.
 - **kind:** functional
 - **status:** active
 
-### jido.instance.I6 — Stable Ref construction
+### jido.instance.I6 — Stable Address construction
 
-- **scope:** `Jido.agent_ref/3`, `Jido.create_agent/4`, `Jido.activate_agent/4`
-- **must:** Build a Ref only from a live stable namespace, exact Agent ID, and optional partition. Keep process and storage data out of the Ref. Reject malformed Refs, duplicate or unknown options, namespace mismatch, and operation identity conflicts before writing or starting work. Preserve the same Ref identity when its namespace later binds to another local instance.
+- **scope:** `Jido.agent_address/3`, `Jido.create_agent/4`, `Jido.activate_agent/3`
+- **must:** Build an Address only from a live stable namespace, exact Agent ID, and optional partition. Keep process and storage data out of the Address. Reject malformed Addresses, duplicate or unknown options, namespace mismatch, and operation identity conflicts before writing or starting work. Preserve the same Address identity when its namespace later binds to another local instance.
 - **why:** Stable identity must not depend on one process or local instance name.
 - **kind:** functional
 - **status:** active
 
-### jido.instance.I7 — Ref resolution
+### jido.instance.I7 — Address resolution
 
 - **scope:** `Jido.resolve_agent/2`
 - **must:** Resolve the exact namespace, partition, and Agent ID through the selected instance Registry. Return the ready AgentServer PID, `not_found` when no matching worker is registered, `recovering` while the matching worker is not ready, and `unavailable` when the Registry or a resolved worker is lost. Resolve each operation again after worker replacement and do not replay work.
-- **why:** A stable Ref must not retain or reuse a stale PID.
+- **why:** A stable Address must not retain or reuse a stale PID.
 - **kind:** functional
 - **status:** active
 
-### jido.instance.I8 — Ref operation routing
+### jido.instance.I8 — Address operation routing
 
 - **scope:** `Jido.call/4`, `Jido.cast/3`, `Jido.submit/4`, committed reads, and controls
-- **must:** Route each supported Ref function to the currently resolved AgentServer and preserve its public result and caller-wait contract. Return an AgentServer pending value from submit. Keep await and abandon with `Jido.AgentServer`. Return an explicit error for a missing target. Keep caller timeout separate from execution cancellation.
-- **why:** The Ref API must not change downstream runtime semantics.
+- **must:** Route each supported Address function to the currently resolved AgentServer and preserve its public result and caller-wait contract. Return an AgentServer pending value from submit. Keep await and abandon with `Jido.AgentServer`. Return an explicit error for a missing target. Keep caller timeout separate from execution cancellation.
+- **why:** The Address API must not change downstream runtime semantics.
 - **kind:** functional
 - **status:** active
 
 ### jido.instance.I9 — Durable Agent creation and activation
 
 - **scope:** `Jido.create_agent/4`, `Jido.activate_agent/4`
-- **must:** Require Instance persistence for durable creation. Create revision zero synchronously and return the exact Agent Ref only after that write succeeds. Do not start an activation during creation. Return the current local activation when one exists. Otherwise activation must strictly restore one active durable record. It must not create a missing record or replace a tombstone or invalid record.
+- **must:** Require Instance persistence for durable creation. Create revision zero synchronously and return the exact Agent Address only after that write succeeds. Do not start an activation during creation. Return the current local activation when one exists. Otherwise activation must strictly restore one active durable record. It must not create a missing record or replace a tombstone or invalid record.
 - **why:** Logical Agent creation must be durable before activation, and activation must not create a new Agent lifetime by accident.
 - **kind:** ordering
 - **status:** active

@@ -6,7 +6,7 @@ defmodule Jido.AgentServer.Status do
   It does not expose internal process phases or process handles.
   """
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.Exec.Wait
 
   @type lifecycle :: :alive | :deleted
@@ -14,7 +14,7 @@ defmodule Jido.AgentServer.Status do
   @type residency :: :passivated | :activating | :active | :passivating
 
   @enforce_keys [
-    :agent_ref,
+    :agent_address,
     :agent_activation_id,
     :lifecycle,
     :work_state,
@@ -27,7 +27,7 @@ defmodule Jido.AgentServer.Status do
     :queue_depth
   ]
   defstruct [
-    :agent_ref,
+    :agent_address,
     :agent_activation_id,
     :lifecycle,
     :work_state,
@@ -45,7 +45,7 @@ defmodule Jido.AgentServer.Status do
   ]
 
   @type t :: %__MODULE__{
-          agent_ref: Ref.t(),
+          agent_address: Address.t(),
           agent_activation_id: String.t() | nil,
           lifecycle: lifecycle(),
           work_state: work_state(),
@@ -65,7 +65,7 @@ defmodule Jido.AgentServer.Status do
   @doc false
   def new(runtime_phase, data, _mailbox) do
     %__MODULE__{
-      agent_ref: data.agent_ref,
+      agent_address: data.agent_address,
       agent_activation_id: data.agent_activation_id,
       lifecycle: :alive,
       work_state: work_state(runtime_phase),
@@ -84,9 +84,9 @@ defmodule Jido.AgentServer.Status do
   end
 
   @doc false
-  def passivated(ref, agent_revision, persistence_revision, turn) do
+  def passivated(address, agent_revision, persistence_revision, turn) do
     %__MODULE__{
-      agent_ref: ref,
+      agent_address: address,
       agent_activation_id: nil,
       lifecycle: :alive,
       work_state: if(open_turn?(turn), do: :waiting, else: :idle),

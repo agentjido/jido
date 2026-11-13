@@ -7,7 +7,7 @@ Hibernation saves an idle Agent and stops its process. Thaw starts a new process
 - How to hibernate a persistent Agent.
 - How `Jido.thaw/4` requires saved state and restores its revision.
 - How `attach`, `detach`, and `touch` control idle hibernation through a stable
-  Agent Ref.
+  Agent Address.
 
 ## Read the code
 

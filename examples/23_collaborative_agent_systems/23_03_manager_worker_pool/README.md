@@ -1,12 +1,12 @@
 # 23_03 Manager and worker pool
 
 This manager delegates three correlated tasks to durable worker Agent
-references in parallel and reduces completed and failed results into one
+Addresses in parallel and reduces completed and failed results into one
 canonical manager state.
 
 ## What you will learn
 
-- How stable Agent references separate logical workers from current processes.
+- How stable Agent Addresses separate logical workers from current processes.
 - How parallel worker Turns keep one task ID per result.
 - How one manager owns the ordered result set and isolates one worker failure.
 
@@ -35,7 +35,7 @@ version does not reject duplicate execution before the Action runs.
 
 ## Core Fit and Gaps
 
-Stable references, AgentServer serialization, and normal application
+Stable Addresses, AgentServer serialization, and normal application
 concurrency compose without a worker-pool API. Durable parallel dispatch needs
 an application idempotency rule at the worker boundary.
 

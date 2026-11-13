@@ -28,12 +28,12 @@ defmodule Jido.Examples.RecoverableDelivery.Probe do
 
     {:ok, sink_registry} = Registry.start_link(keys: :unique, name: Sink.registry(jido))
     {:ok, sink} = Sink.start_link(jido: jido)
-    {:ok, agent_ref} = Jido.agent_ref(jido, "delivery-example")
-    {:ok, ^agent_ref} = Jido.create_agent(jido, agent_ref, Agent)
+    {:ok, agent_address} = Jido.agent_address(jido, "delivery-example")
+    {:ok, ^agent_address} = Jido.create_agent(jido, agent_address, Agent)
 
     try do
       :ok = Sink.available(jido, false)
-      {:ok, server} = Jido.activate_agent(jido, agent_ref)
+      {:ok, server} = Jido.activate_agent(jido, agent_address)
 
       {:ok, route_signal_1} = Agent.record_and_deliver_signal(%{effect_id: "effect-1", value: 7})
 
@@ -52,13 +52,13 @@ defmodule Jido.Examples.RecoverableDelivery.Probe do
       :ok = Sink.available(jido, true)
 
       await(fn ->
-        case Jido.resolve_agent(jido, agent_ref) do
+        case Jido.resolve_agent(jido, agent_address) do
           {:ok, replacement} -> replacement != server
           _other -> false
         end
       end)
 
-      {:ok, restored} = Jido.resolve_agent(jido, agent_ref)
+      {:ok, restored} = Jido.resolve_agent(jido, agent_address)
       await(fn -> Server.snapshot(restored).agent.state.delivery.completed == %{"effect-1" => 7} end)
 
       snapshot = Server.snapshot(restored)

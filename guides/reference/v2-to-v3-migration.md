@@ -162,7 +162,7 @@ pending = Jido.AgentServer.submit(pid, MigrationGuide.Counter.increment_signal!(
 | V2 | V3 |
 | --- | --- |
 | `Jido.AgentServer.call/3` returns `{:ok, agent}` | `{:ok, agent, directives}`. It confirms the commit, not that Directives finished. |
-| `call("agent-id", signal)` | Find the PID with `Jido.whereis_agent/3`, or use a Ref with `Jido.call/4` |
+| `call("agent-id", signal)` | Find the PID with `Jido.whereis_agent/3`, or use an Address with `Jido.call/4` |
 | `state(server)` | `Jido.AgentServer.agent/2` for the Agent, `Jido.AgentServer.status/2` for runtime state, `Jido.AgentServer.snapshot/2` for both from one event |
 | `await_completion/2`, Jido.Await | `Jido.AgentServer.submit/3` and `Jido.AgentServer.await/2` for one Turn |
 | `stream_status/2`, `recent_events/2` | Start with `debug: true`, then read `Jido.AgentServer.history/1` |

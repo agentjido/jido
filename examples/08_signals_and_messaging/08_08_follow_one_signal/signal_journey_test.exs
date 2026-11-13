@@ -4,7 +4,7 @@ defmodule Jido.Examples.Signals.SignalJourneyTest do
   use ExUnit.Case, async: true
   @moduletag :integration
 
-  alias Jido.Agent.Ref
+  alias Jido.Agent.Address
   alias Jido.AgentServer
   alias Jido.Examples.Signals.SignalJourney
   alias Jido.Examples.Signals.SignalJourney.{Coordinator, Worker}
@@ -17,12 +17,12 @@ defmodule Jido.Examples.Signals.SignalJourneyTest do
     store = {Jido.Persistence.ETS, table: :"signal_journey_store_#{suffix}"}
     start_supervised!({Jido, name: instance, namespace: namespace, persistence: store}, id: instance)
 
-    coordinator = Ref.new!(namespace: namespace, id: "coordinator")
-    worker = Ref.new!(namespace: namespace, id: "worker")
+    coordinator = Address.new!(namespace: namespace, id: "coordinator")
+    worker = Address.new!(namespace: namespace, id: "worker")
 
-    for {ref, module} <- [{coordinator, Coordinator}, {worker, Worker}] do
-      assert {:ok, ^ref} = Jido.create_agent(instance, ref, module)
-      assert {:ok, server} = Jido.activate_agent(instance, ref)
+    for {address, module} <- [{coordinator, Coordinator}, {worker, Worker}] do
+      assert {:ok, ^address} = Jido.create_agent(instance, address, module)
+      assert {:ok, server} = Jido.activate_agent(instance, address)
       assert :ok = AgentServer.await_ready(server)
     end
 
@@ -40,7 +40,7 @@ defmodule Jido.Examples.Signals.SignalJourneyTest do
     assert journey.child_reply.data == %{
              request_id: "request-7",
              result: 8,
-             reply_to: Ref.to_map!(c.coordinator),
+             reply_to: Address.to_map!(c.coordinator),
              duplicate: true
            }
 

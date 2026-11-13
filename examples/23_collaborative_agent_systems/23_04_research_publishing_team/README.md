@@ -37,7 +37,7 @@ no human publication approval in this lesson.
 ## Core Fit and Gaps
 
 Pure Agents, Signals, replies, and bounded application concurrency are enough
-for a CrewAI-style local team. Durable missions need stable Agent references,
+for a CrewAI-style local team. Durable missions need stable Agent Addresses,
 idempotent role inputs, and a persisted coordinator, as shown by the other
 collaboration examples.
 

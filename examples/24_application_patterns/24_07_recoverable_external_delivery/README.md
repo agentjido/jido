@@ -47,11 +47,11 @@ transaction. Completed effect IDs need a retention policy.
 ## Core Fit and Gaps
 
 Plugin vertical ownership, commit-before-effects, supervised runtime children,
-persistence, and stable Agent references compose into recoverable delivery.
+persistence, and stable Agent Addresses compose into recoverable delivery.
 Ordinary Directives alone do not promise replay. The Plugin makes pending work
 durable and the external adapter makes repeated delivery idempotent.
 
-- Logical owner: delivery Agent reference.
+- Logical owner: delivery Agent Address.
 - Process owner: current AgentServer and Plugin worker activation.
 - Canonical state owner: Agent Plugin state for intent; sink for external
   record.
