@@ -32,6 +32,7 @@ defmodule Jido.Persistence.Store do
   @type condition :: :not_found | value() | {:token, token()}
   @type config :: {module(), keyword()}
   @type declaration :: module() | config() | nil | false
+  @type cursor :: binary() | nil
 
   @doc "Validates Store options before an operation starts."
   @callback validate_options(options()) :: :ok | {:error, term()}
@@ -50,7 +51,11 @@ defmodule Jido.Persistence.Store do
   @doc "Physically deletes one value for explicit maintenance."
   @callback delete(key(), options()) :: :ok | {:error, term()}
 
-  @optional_callbacks validate_options: 1, put: 3, delete: 2
+  @doc "Lists one page of key/value pairs for inspection and export."
+  @callback scan(binary(), cursor(), pos_integer(), options()) ::
+              {:ok, [{key(), value()}], cursor()} | {:error, term()}
+
+  @optional_callbacks put: 3, scan: 4
 
   @doc "Validates a byte adapter and returns its normalized configuration."
   @spec open(declaration()) :: {:ok, config()} | {:error, term()}
@@ -98,22 +103,47 @@ defmodule Jido.Persistence.Store do
   def compare_and_swap(_config, _key, _expected, _value),
     do: {:error, {:rejected, {:invalid_store_input, :compare_and_swap}}}
 
-  @doc false
+  @doc "Physically deletes one key from a validated Store."
+  @spec delete(config(), binary()) :: :ok | {:error, term()}
   def delete({adapter, opts}, key)
       when is_atom(adapter) and is_list(opts) and is_binary(key) do
     cond do
       not Keyword.keyword?(opts) ->
         {:error, {:invalid_persistence_config, :options}}
 
-      function_exported?(adapter, :delete, 2) ->
-        observe(:delete, adapter, fn -> protect(:delete, fn -> adapter.delete(key, opts) end) end)
-
       true ->
-        :ok
+        observe(:delete, adapter, fn -> safe_delete(adapter, key, opts) end)
     end
   end
 
   def delete(_config, _key), do: {:error, {:invalid_store_input, :delete}}
+
+  @doc "Returns one optional scan page for inspection tools."
+  @spec scan(config(), binary(), keyword()) ::
+          {:ok, [{binary(), binary()}], cursor()} | {:error, term()}
+  def scan(config, prefix, opts \\ [])
+
+  def scan({adapter, adapter_opts}, prefix, opts)
+      when is_atom(adapter) and is_list(adapter_opts) and is_binary(prefix) and is_list(opts) do
+    with true <- Keyword.keyword?(adapter_opts) and Keyword.keyword?(opts),
+         :ok <- validate_scan_options(opts) do
+      if function_exported?(adapter, :scan, 4) do
+        cursor = Keyword.get(opts, :cursor)
+        limit = Keyword.get(opts, :limit, 100)
+
+        observe(:scan, adapter, fn ->
+          protect(:scan, fn -> adapter.scan(prefix, cursor, limit, adapter_opts) end)
+        end)
+      else
+        {:error, :scan_not_supported}
+      end
+    else
+      false -> {:error, {:invalid_store_input, :scan}}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  def scan(_config, _prefix, _opts), do: {:error, {:invalid_store_input, :scan}}
 
   @doc false
   def protect(operation, fun) do
@@ -151,8 +181,10 @@ defmodule Jido.Persistence.Store do
 
   defp validate_adapter(adapter, opts) do
     with {:module, ^adapter} <- Code.ensure_loaded(adapter),
+         true <- function_exported?(adapter, :validate_options, 1),
          true <- function_exported?(adapter, :get, 2),
          true <- function_exported?(adapter, :compare_and_swap, 4),
+         true <- function_exported?(adapter, :delete, 2),
          :ok <- validate_adapter_options(adapter, opts) do
       :ok
     else
@@ -162,14 +194,10 @@ defmodule Jido.Persistence.Store do
   end
 
   defp validate_adapter_options(adapter, opts) do
-    if function_exported?(adapter, :validate_options, 1) do
-      case adapter.validate_options(opts) do
-        :ok -> :ok
-        {:error, reason} -> {:error, {:invalid_persistence_options, adapter, reason}}
-        result -> {:error, {:invalid_persistence_options, adapter, {:invalid_result, result}}}
-      end
-    else
-      :ok
+    case adapter.validate_options(opts) do
+      :ok -> :ok
+      {:error, reason} -> {:error, {:invalid_persistence_options, adapter, reason}}
+      result -> {:error, {:invalid_persistence_options, adapter, {:invalid_result, result}}}
     end
   rescue
     error -> {:error, {:invalid_persistence_options, adapter, {:error, error}}}
@@ -235,6 +263,43 @@ defmodule Jido.Persistence.Store do
     end
   end
 
+  defp safe_delete(adapter, key, opts) do
+    result =
+      try do
+        adapter.delete(key, opts)
+      rescue
+        error -> {:callback_fault, :error, error}
+      catch
+        kind, reason -> {:callback_fault, kind, reason}
+      end
+
+    case result do
+      :ok ->
+        :ok
+
+      {:error, :conflict} = error ->
+        error
+
+      {:error, {:rejected, _reason}} = error ->
+        error
+
+      {:error, :indeterminate} = error ->
+        error
+
+      {:error, {:indeterminate, _reason}} = error ->
+        error
+
+      {:error, reason} ->
+        {:error, {:indeterminate, reason}}
+
+      {:callback_fault, kind, reason} ->
+        {:error, {:indeterminate, persistence_failure_value(:delete, kind, reason)}}
+
+      invalid ->
+        {:error, {:indeterminate, invalid_adapter_result_value(:delete, invalid)}}
+    end
+  end
+
   defp invalid_adapter_result(operation, result),
     do: {:error, invalid_adapter_result_value(operation, result)}
 
@@ -270,6 +335,27 @@ defmodule Jido.Persistence.Store do
 
   defp validate_condition(_value),
     do: {:error, {:rejected, {:invalid_store_input, :condition}}}
+
+  defp validate_scan_options(opts) do
+    keys = Keyword.keys(opts)
+
+    cond do
+      keys -- [:cursor, :limit] != [] ->
+        {:error, {:invalid_store_input, :scan_options}}
+
+      keys -- Enum.uniq(keys) != [] ->
+        {:error, {:invalid_store_input, :scan_options}}
+
+      not (is_nil(Keyword.get(opts, :cursor)) or is_binary(Keyword.get(opts, :cursor))) ->
+        {:error, {:invalid_store_input, :scan_cursor}}
+
+      not (is_integer(Keyword.get(opts, :limit, 100)) and Keyword.get(opts, :limit, 100) > 0) ->
+        {:error, {:invalid_store_input, :scan_limit}}
+
+      true ->
+        :ok
+    end
+  end
 
   defp observe(operation, adapter, fun) do
     Semantic.with_span(

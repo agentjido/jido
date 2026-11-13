@@ -47,16 +47,9 @@ defmodule Jido.Examples.Persistence.PersistentAgent do
   alias Jido.Signal
 
   @doc "Restores a required counter record and starts its Server."
-  @spec restore(module(), String.t(), Jido.Persistence.adapter_config(), keyword()) ::
+  @spec restore(module(), String.t(), keyword()) ::
           DynamicSupervisor.on_start_child()
-  def restore(jido, id, persistence, opts \\ []) do
-    Jido.thaw(
-      jido,
-      __MODULE__,
-      id,
-      Keyword.put(opts, :persistence, persistence)
-    )
-  end
+  def restore(jido, id, opts \\ []), do: Jido.thaw(jido, __MODULE__, id, opts)
 
   @doc "Applies one uniquely identified increment command."
   @spec increment(Server.server(), String.t(), integer(), timeout()) :: Server.signal_result()

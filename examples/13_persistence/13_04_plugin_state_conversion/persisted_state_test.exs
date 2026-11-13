@@ -9,10 +9,9 @@ defmodule Jido.Examples.Persistence.PluginStateConversionTest do
   alias Jido.Persistence
   alias Jido.Persistence.ETS
 
-  test "a Persistence facet stores only its paired Plugin state in a different form", %{
-    jido: jido
-  } do
+  test "a Persistence facet stores only its paired Plugin state in a different form", c do
     persistence = persistence()
+    %{jido: jido} = restart_jido!(c, persistence)
 
     agent =
       ExampleAgent.instantiate!(id: unique_id("persisted-plugin"), state: %{visible: 3, owned: 7})
@@ -32,8 +31,9 @@ defmodule Jido.Examples.Persistence.PluginStateConversionTest do
              Persistence.load_agent_with_revision(persistence, ExampleAgent, agent.id, instance: jido)
   end
 
-  test "a malformed or missing owned value cannot restore an Agent", %{jido: jido} do
+  test "a malformed or missing owned value cannot restore an Agent", c do
     persistence = persistence()
+    %{jido: jido} = restart_jido!(c, persistence)
 
     agent =
       ExampleAgent.instantiate!(id: unique_id("invalid-plugin"), state: %{visible: 3, owned: 7})
@@ -53,7 +53,7 @@ defmodule Jido.Examples.Persistence.PluginStateConversionTest do
     assert {:error, :invalid_owned_value} =
              Persistence.load_agent(persistence, ExampleAgent, agent.id, instance: jido)
 
-    assert_restore_rejected(jido, agent.id, persistence)
+    assert_restore_rejected(jido, agent.id)
 
     replace_record(
       persistence,
@@ -65,14 +65,13 @@ defmodule Jido.Examples.Persistence.PluginStateConversionTest do
     assert {:error, {:invalid_persistence_record, :plugin_state}} =
              Persistence.load_agent(persistence, ExampleAgent, agent.id, instance: jido)
 
-    assert_restore_rejected(jido, agent.id, persistence)
+    assert_restore_rejected(jido, agent.id)
   end
 
-  defp assert_restore_rejected(jido, id, persistence) do
+  defp assert_restore_rejected(jido, id) do
     # Restore can stop the activation before start_agent returns its endpoint.
     case Jido.start_agent(jido, ExampleAgent,
            id: id,
-           persistence: persistence,
            persistence_mode: :restore
          ) do
       {:ok, server} -> assert {:error, _reason} = Jido.AgentServer.await_ready(server)
@@ -88,11 +87,13 @@ defmodule Jido.Examples.Persistence.PluginStateConversionTest do
 
   defp record({ETS, opts}, agent, instance) do
     assert {:ok, bytes} = ETS.get(record_key(agent, instance), opts)
-    :erlang.binary_to_term(bytes, [:safe])
+    assert {:ok, record} = Jido.Persistence.Codec.Term.decode(bytes, trusted: true)
+    record
   end
 
   defp replace_record({ETS, opts}, agent, record, instance) do
-    assert :ok = ETS.put(record_key(agent, instance), :erlang.term_to_binary(record), opts)
+    assert {:ok, bytes} = Jido.Persistence.Codec.Term.encode(record)
+    assert :ok = ETS.put(record_key(agent, instance), bytes, opts)
   end
 
   defp clean_record_on_exit({ETS, opts}, agent, instance) do

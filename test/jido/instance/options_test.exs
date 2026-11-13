@@ -39,6 +39,7 @@ defmodule Jido.Instance.OptionsTest do
     assert {:ok, validated} =
              Options.validate(
                name: name,
+               namespace: "options-test",
                persistence: Jido.Persistence.ETS,
                agent_server: durable_defaults
              )

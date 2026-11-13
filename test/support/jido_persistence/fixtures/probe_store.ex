@@ -13,6 +13,16 @@ defmodule Jido.Test.Persistence.ProbeStore do
   def start_link(_opts), do: Elixir.Agent.start_link(fn -> %{} end)
 
   @impl true
+  def validate_options(opts) do
+    allowed = [:store, :fault_revision, :write_result]
+
+    if Keyword.keyword?(opts) and Keyword.keys(opts) -- allowed == [] and
+         Keyword.keys(opts) == Enum.uniq(Keyword.keys(opts)) and is_pid(opts[:store]),
+       do: :ok,
+       else: {:error, :invalid_probe_store_options}
+  end
+
+  @impl true
   def get(key, opts) do
     Elixir.Agent.get(Keyword.fetch!(opts, :store), fn records ->
       case Map.fetch(records, key) do
@@ -28,13 +38,13 @@ defmodule Jido.Test.Persistence.ProbeStore do
 
   @impl true
   def compare_and_swap(key, expected, value, opts) do
-    record = :erlang.binary_to_term(value, [:safe])
     fault_revision = Keyword.get(opts, :fault_revision, 1)
+    record_revision = record_revision(value)
 
     Elixir.Agent.get_and_update(Keyword.fetch!(opts, :store), fn records ->
       if Map.get(records, key, :not_found) == expected do
         result =
-          case if(match?(%{rev: ^fault_revision}, record),
+          case if(record_revision == fault_revision,
                  do: Keyword.get(opts, :write_result, :ok),
                  else: :ok
                ) do
@@ -49,6 +59,13 @@ defmodule Jido.Test.Persistence.ProbeStore do
     end)
   end
 
+  defp record_revision(value) do
+    case Jido.Persistence.Codec.Term.decode(value, []) do
+      {:ok, %{rev: revision}} when is_integer(revision) -> revision
+      _other -> nil
+    end
+  end
+
   @impl true
   def delete(key, opts),
     do: Elixir.Agent.update(Keyword.fetch!(opts, :store), &Map.delete(&1, key))
@@ -57,9 +74,10 @@ defmodule Jido.Test.Persistence.ProbeStore do
   def rewrite_record({__MODULE__, opts}, id, update) do
     key = Jido.Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-probe", id: id))
 
-    with {:ok, bytes} <- get(key, opts) do
-      record = :erlang.binary_to_term(bytes, [:safe])
-      put(key, :erlang.term_to_binary(update.(record)), opts)
+    with {:ok, bytes} <- get(key, opts),
+         {:ok, record} <- Jido.Persistence.Codec.Term.decode(bytes, []),
+         {:ok, updated} <- Jido.Persistence.Codec.Term.encode(update.(record)) do
+      put(key, updated, opts)
     end
   end
 end

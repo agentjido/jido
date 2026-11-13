@@ -9,6 +9,16 @@ defmodule Jido.Persistence.TokenTest do
     @behaviour Jido.Persistence.Store
 
     @impl true
+    def validate_options(opts) do
+      allowed = [:before_cas, :observer, :read_override, :store]
+
+      if Keyword.keyword?(opts) and Keyword.keys(opts) -- allowed == [] and
+           Keyword.keys(opts) == Enum.uniq(Keyword.keys(opts)) and is_pid(opts[:store]),
+         do: :ok,
+         else: {:error, :invalid_options}
+    end
+
+    @impl true
     def get(key, opts) do
       case Keyword.get(opts, :read_override) do
         nil ->
@@ -53,6 +63,9 @@ defmodule Jido.Persistence.TokenTest do
         Map.put(values, key, {bytes, new_token()})
       end)
     end
+
+    @impl true
+    def delete(key, opts), do: Elixir.Agent.update(Keyword.fetch!(opts, :store), &Map.delete(&1, key))
 
     defp new_token, do: "opaque-#{System.unique_integer([:positive])}"
   end

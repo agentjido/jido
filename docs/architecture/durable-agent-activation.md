@@ -65,7 +65,7 @@ This dependency direction is fixed:
 Jido.AgentServer -> Jido.Agent
 Jido.AgentServer -> Jido.Durable -> Jido.Flow -> Jido.Exec
 Jido Instance    -> Jido.AgentServer
-Jido Instance    -> Persistence adapter
+Jido Instance    -> Persistence profile -> codec and Store adapter
 ```
 
 `Jido.Exec` does not depend on `Jido.Agent` or `Jido.Durable`.
@@ -277,16 +277,18 @@ separate public wait-delivery API.
 
 The Instance owns local wake delivery:
 
-1. A Flow commits a durable timer, cron, event, or other wait.
-2. The persistence record holds the continuation and wait identity.
-3. A local wake capability finds a due occurrence or receives an event.
-4. It creates a `Jido.Signal` and delivers it by Agent Ref.
-5. The Instance routes to the warm activation or reactivates the Agent.
-6. AgentServer validates the wait match and resumes the Flow.
+1. A Flow confirms its execution checkpoint.
+2. The Instance stores each timed wake in a one-minute bucket and one of 64 fixed shards.
+3. AgentServer commits the matching waiting receipt in the Agent record.
+4. The local wake capability reads the active-bucket index and finds a due occurrence.
+5. It creates a `Jido.Signal` and delivers it by Agent Ref.
+6. The Instance routes to the warm activation or reactivates the Agent.
+7. AgentServer validates the wait match and resumes the Flow.
 
 `Jido.Durable` defines and restores the wait. It does not schedule work.
-AgentServer does not contain a scheduler. The first implementation needs only
-one local wake capability for one Instance.
+AgentServer does not contain a scheduler. One local wake capability owns one
+Instance. A recovery read failure retries with bounded backoff and prevents
+the instance start from reporting ready.
 
 ## Deadlines and cancellation
 
@@ -325,8 +327,13 @@ automatic effect retry.
 
 ## Durable execution and persistence
 
-Persistence belongs to the Jido Instance. The adapter must atomically compare
-and swap one complete Agent record. It must distinguish:
+Persistence belongs to the Jido Instance. One profile fixes its Store and
+codec for Agent, Flow, and wake records. A namespace manifest pins that codec
+and all V3 record layouts. Per-Agent Store replacement is not supported. The
+default Term codec is compact. The tagged JSON codec is opt-in.
+
+The adapter must atomically compare and swap one complete Agent record. It
+must distinguish:
 
 - successful write;
 - known no-write;
@@ -336,6 +343,11 @@ and swap one complete Agent record. It must distinguish:
 The record contains the frozen Agent snapshot and only the latest durable Turn
 receipt. A later durable Turn replaces the earlier receipt. Core has no Agent
 journal and no general Turn-result history.
+
+For a durable Flow, Jido prepares the execution record and timed wakes before
+it writes the Agent receipt. The Agent record is the commit point. A crash can
+leave an auxiliary orphan, but a committed timed wait cannot lack its wake
+record.
 
 The latest receipt supports exact resume retry. The durable wait input key
 contains Agent Ref, Turn ID, Wait ID, and Signal ID:

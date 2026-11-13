@@ -119,7 +119,7 @@ alias RevisionsGuide.Ticket
     persistence: {Jido.Persistence.ETS, table: :revisions_guide_live}
   )
 
-{:ok, server} = Jido.start_agent(RevisionsGuide.Jido, Ticket, id: "ticket-2", persistence: :inherit)
+{:ok, server} = Jido.start_agent(RevisionsGuide.Jido, Ticket, id: "ticket-2")
 :ok = Server.await_ready(server)
 monitor = Process.monitor(server)
 

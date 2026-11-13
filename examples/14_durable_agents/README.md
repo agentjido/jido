@@ -4,8 +4,7 @@ One durable Flow is the current AgentServer Turn. Other state-changing Turns
 wait. Reads, status, and cancellation remain available.
 
 ```elixir
-{:ok, server} = Jido.start_agent(MyJido, ReportAgent,
-  id: "report", persistence: :inherit)
+{:ok, server} = Jido.start_agent(MyJido, ReportAgent, id: "report")
 :ok = Jido.AgentServer.await_ready(server)
 Jido.AgentServer.call(server, request)
 ```

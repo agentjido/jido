@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 91,
+      "active": 92,
       "coverage": 1.0,
-      "covered": 91
+      "covered": 92
     },
     "jido.agent_server": {
       "active": 13,
@@ -1977,12 +1977,13 @@
         "jido.instance.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 9,
+          "passing": 10,
           "status": "active",
           "testable": true,
           "tests": [
             "test Telemetry sets and clears debug overrides for the default instance",
             "test a later start keeps the first namespace and persistence options",
+            "test a persistent instance rejects a per-Agent Store override",
             "test a plain instance persistence default survives a runtime store worker restart",
             "test an inline instance keeps its Redis persistence function",
             "test application and start options replace the declared persistence default",
@@ -2069,10 +2070,10 @@
       }
     },
     "jido.persistence": {
-      "active": 16,
+      "active": 17,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 16,
+      "covered": 17,
       "form": "light",
       "obligations": {
         "jido.persistence.I1": {
@@ -2090,7 +2091,7 @@
             "test normalizes module, tuple, and disabled adapter declarations",
             "test opens only byte adapters with atomic compare-and-swap",
             "test rejects adapters without atomic writes before use",
-            "test requires keyword options and supports optional adapter validation",
+            "test requires keyword options, validation, and delete",
             "test the Store behavior has one required read and atomic write contract",
             "test the documented public API excludes persistence implementation helpers",
             "test validates adapter declarations"
@@ -2189,11 +2190,12 @@
         "jido.persistence.I15": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
-            "test built-in adapters obey the required binary get and CAS contract"
+            "test built-in adapters obey the required binary get and CAS contract",
+            "test scan is optional and its facade options are strict"
           ]
         },
         "jido.persistence.I16": {
@@ -2205,6 +2207,18 @@
           "tests": [
             "test stored upgrade rejects a nonterminal durable Turn without changing bytes",
             "test stored upgrade resolves old code only after the Action and commits the next revision"
+          ]
+        },
+        "jido.persistence.I17": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test instance readiness waits for a retried wake recovery read",
+            "test wake cleanup preserves index membership for a concurrent shard write",
+            "test wake cleanup retries a temporary Store failure"
           ]
         },
         "jido.persistence.I2": {
@@ -2242,13 +2256,14 @@
         "jido.persistence.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
             "test Store entry points reject malformed configurations, keys, options, and bytes",
             "test bad write conditions are rejected before an adapter call",
             "test byte reads keep exact-byte conditions and stale writes conflict",
+            "test delete outcomes distinguish rejection from uncertain failure",
             "test the Store behavior has one required read and atomic write contract",
             "test write outcomes distinguish rejection, unknown commit, and callback faults"
           ]
@@ -5647,8 +5662,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 234,
+    "active": 235,
     "coverage": 1.0,
-    "covered": 234
+    "covered": 235
   }
 }

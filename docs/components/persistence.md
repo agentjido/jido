@@ -1,29 +1,30 @@
 ---
 title: Jido.Persistence component
 status: current
-last-reviewed: 2026-11-10
+last-reviewed: 2026-11-13
 ---
 
 # Jido.Persistence component
 
-Purpose: Record stored-value, checkpoint, and adapter boundaries.
-Review result: All four checks have evidence (R5). Decisions remain open.
-This record does not approve implementation or a production store.
+Purpose: Record stored-value, codec, checkpoint, inspection, and adapter boundaries.
+Review result: The confirmed V3 persistence design is implemented locally.
 
 ## Contract and coverage
 
-Review state: HEAD `85023dd` with local changes. The seventeen files contain
-4,170 lines. Persistence owns stored records. AgentServer owns live state,
-leases, Turn admission, and the decision to commit.
+Persistence owns stored records, codecs, namespace manifests, and Store
+operations. AgentServer owns live state, Turn admission, and the Agent record
+commit point.
 
 | Responsibility | Entry points and invariants | Coverage |
 | --- | --- | --- |
 | Facade | `snapshot/1,2`, `restore/1,2`, `upgrade/2,3`, `resolve_config/2`; `save_agent/2,3`, `load_agent/3,4`, `load_agent_with_revision/3,4`, `upgrade_agent/4,5`, `delete_agent/3,4`. Return result tuples; invalid public inputs become structured errors. | Public tests, AgentServer activation/durable callers, manual save/load traced. |
 | Record | Namespaced partition/ID key, module check, format, revision, checkpoint, active/deleted state. Tombstones retain a fence against stale writes. | Encode/decode, mismatch, stale revision, deletion and recreation traced. |
-| Store | `open/1`, `read/2`, `compare_and_swap/4`, `delete/2`; adapter requires get and CAS, with optional option validation, put, and delete. A condition is missing, exact bytes, or an adapter token. | Custom adapter, malformed result, exception, conflict and uncertain-write paths traced. |
+| Profile and codec | One Store and codec per instance namespace. Term is default and loads declared release modules before safe decode; tagged JSON is opt-in. The namespace manifest pins codec and V3 layouts. | Config, codec, cross-BEAM Ref load, JSON File, and manifest mismatch tests. |
+| Store | `open/1`, `read/2`, `compare_and_swap/4`, `delete/2`, and optional `scan/3`; adapter requires option validation, get, CAS, and delete. A condition is missing, exact bytes, or an adapter token. | Custom adapter, malformed result, strict option, delete, scan, conflict, and uncertain-write paths traced. |
 | Snapshot and Checkpoint | Complete stored Agent definition and state, reference checks, module identity, explicit upgrade Action. Default and custom checkpoint paths differ. | Round-trip, changed code, invalid state, upgrade and forbidden directive paths traced. |
 | Plugin conversion | Convert only the Plugin-owned state slice with a declared persistence facet. Custom Agent checkpoints can own an opaque format. | Plugin and checkpoint tests traced. |
 | ContinuationStore | Internal Runic bridge for facts, batches, and join references. CAS index updates, bounded deltas, tail recovery, runtime registration and best-effort cleanup. | Durable AgentServer execution and continuation tests traced. |
+| WakeStore | One-minute buckets, 64 shards, generation-aware active index, startup retry, and cleanup retry. Runtime recovery does not scan. | Recovery fault, cleanup race, cleanup retry, and durable wait tests traced. |
 | Adapters | ETS, File, Mnesia, Redis, Ecto, S3, Bedrock, plus Ecto migration support. Each owns its atomic write and option contract. | All source and adapter tests read; local backends tested. External services have proof limits below. |
 
 `Store` contains callback faults and checks result shape. A malformed or timed
@@ -36,9 +37,9 @@ revision. Load/delete select the stored identity and instance; upgrade also
 accepts its Action context. Unknown or repeated facade options are rejected.
 `server_turn` and open/create helpers are reserved for AgentServer. Snapshot
 helpers delegate their options to the checkpoint/snapshot boundary. Store
-configuration is an adapter module or `{module, keyword_options}`; inheritance
-selects the instance configuration. Disabled storage is distinct from a store
-that returns not-found.
+configuration is an adapter declaration or a unique `[store: ..., codec: ...]`
+profile. Agent runtime inheritance always selects that one instance profile.
+Disabled storage is distinct from a store that returns not-found.
 
 ## Adapter boundaries
 
@@ -47,8 +48,8 @@ that returns not-found.
 | ETS | Supervised local table ownership. It is not durable across node loss. |
 | File | Temporary write and rename under a local-node lock. No proof of power-loss durability or coordination between separate BEAM nodes sharing a directory. |
 | Mnesia | Existing set table with key/value fields; transactional CAS. Rejects use inside an existing transaction. |
-| Redis | Injected command function, prefix, optional TTL; Lua owns atomic comparison and update. Expiry also applies to a stored deletion fence. |
-| Ecto | Repo, schema and repo options; write token separates equal-value writes. PostgreSQL and SQLite support is conditional on dependencies. Migration helpers own table/version setup. |
+| Redis | Injected command function and prefix; Lua owns atomic comparison and update. The adapter has no automatic TTL. |
+| Ecto | Repo, schema and repo options; write token separates equal-value writes. Writes reject an outer Repo transaction. PostgreSQL and SQLite support is conditional on dependencies. |
 | S3 | Conditional object write with ETag token, checksum and size limit. Monitored worker and watchdog bound the adapter call. No hidden write retry. |
 | Bedrock | Optional supported dependency versions and isolated call with no retry. Real service proof is paused in the current test profile. |
 
@@ -67,17 +68,12 @@ it does not provide transactional rollback for an external effect.
 
 ## Findings and decisions
 
-- **F1 — Design decision, P2, high confidence.** Redis expiry can remove a
-  tombstone as well as a value. A missing key can then satisfy a creation CAS.
-  Decide whether durable Agent storage forbids TTL or promises fences only
-  within the retention interval. The smallest change is an explicit supported
-  option policy. Rejecting an existing TTL is a compatibility change. Verify
-  expiry, deletion, and stale recreation against a real Redis service before
-  claiming a lifetime fence. See the Redis source linked below.
-- **F2 — Investigation, P2.** File rename and local locking do not establish
+- **F1 — Resolved.** Redis automatic TTL is not supported. Backend eviction
+  remains an operator durability risk.
+- **F2 — Deployment limit.** File rename and local locking do not establish
   shared-directory or power-loss guarantees. State the supported deployment
   model before adding locks or sync operations. No disk-failure test was run.
-- **F3 — Design decision, P3.** Continuation storage and Plugin checkpoint
+- **F3 — Retained boundary.** Continuation storage and Plugin checkpoint
   conversion have distinct contracts but require the host persistence
   lifecycle. Retain them within Persistence for now. Separate proof surfaces
   can make their guarantees clearer without adding public components.

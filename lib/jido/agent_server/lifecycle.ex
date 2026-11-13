@@ -357,7 +357,7 @@ defmodule Jido.AgentServer.Lifecycle do
 
   defp open_activation(data, mode) do
     with :ok <- ServerSupervisor.close_execution(data.activation_state),
-         {:ok, config} <- Jido.Persistence.resolve_config(data.persistence, data.jido),
+         {:ok, config} <- Jido.Persistence.resolve_agent_config(data.persistence, data.jido),
          {:ok, agent, revision, agent_revision, turn} <-
            Jido.Persistence.open_agent(
              config,
@@ -527,6 +527,13 @@ defmodule Jido.AgentServer.Lifecycle do
     do:
       {:jido_execution, Jido.Instance.NamespaceRegistry.namespace(data.jido), data.partition, data.agent.id,
        data.active.turn_id}
+
+  def prepare_execution(data, receipt, owner) do
+    id = execution_identity(data)
+
+    with :ok <- Jido.Persistence.ContinuationStore.register(data.jido, id, data.persistence, owner),
+         do: Jido.Persistence.ContinuationStore.prepare(data.jido, id, receipt)
+  end
 
   def start_execution(data, owner, hooks, policy) do
     id = execution_identity(data)

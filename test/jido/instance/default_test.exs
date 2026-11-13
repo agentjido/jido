@@ -78,7 +78,10 @@ defmodule Jido.Instance.DefaultTest do
              Jido.start(name: name, namespace: later_namespace, persistence: later_persistence)
 
     assert Jido.Instance.NamespaceRegistry.namespace(name) == first_namespace
-    assert Jido.Instance.RuntimeStore.instance_persistence(name) == first_persistence
+
+    assert %Jido.Persistence.Config{store: ^first_persistence} =
+             Jido.Instance.RuntimeStore.instance_persistence(name)
+
     assert Jido.Instance.NamespaceRegistry.lookup(later_namespace) == nil
   end
 
@@ -141,10 +144,11 @@ defmodule Jido.Instance.DefaultTest do
 
   @tag obligation: "jido.instance.I5"
   test "stop and thaw use the explicit default instance identity" do
-    assert {:ok, _jido} = Jido.start(namespace: "default-persistence-test")
-
     table = :"default_lifecycle_#{System.unique_integer([:positive])}"
     persistence = {Jido.Persistence.ETS, table: table}
+
+    assert {:ok, _jido} =
+             Jido.start(namespace: "default-persistence-test", persistence: persistence)
 
     on_exit(fn ->
       if :ets.whereis(table) != :undefined, do: :ets.delete(table)
@@ -153,12 +157,12 @@ defmodule Jido.Instance.DefaultTest do
     id = unique_id("default-persisted-agent")
     agent = DefaultAgent.instantiate!(id: id)
 
-    assert {:ok, server} = Jido.start_agent(Jido.Default, agent, persistence: persistence)
+    assert {:ok, server} = Jido.start_agent(Jido.Default, agent)
     assert :ok = AgentServer.await_ready(server)
     assert {:ok, %Jido.AgentServer.Snapshot{}} = AgentServer.stop(server)
     assert Jido.whereis_agent(Jido.Default, id) == nil
 
-    assert {:ok, restored_server} = Jido.thaw(Jido.Default, DefaultAgent, id, persistence: persistence)
+    assert {:ok, restored_server} = Jido.thaw(Jido.Default, DefaultAgent, id)
     assert :ok = AgentServer.await_ready(restored_server)
     assert %Jido.Agent{id: ^id} = AgentServer.snapshot(restored_server).agent
   end

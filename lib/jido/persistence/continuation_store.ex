@@ -2,12 +2,12 @@ defmodule Jido.Persistence.ContinuationStore do
   @moduledoc false
   @behaviour Runic.Runner.Store
 
-  alias Jido.Persistence.Store
+  alias Jido.Persistence.{Config, Store}
   alias Jido.Exec.Runtime
   alias __MODULE__.JoinCompletedRef
   alias Runic.Workflow.{Fact, FactResolver, Rehydration}
 
-  @prefix "jido:execution:"
+  @prefix "jido:execution:v3:"
   @fact_tag :jido_fact_value
   @fact_version 1
   @fact_index_write_attempts 8
@@ -32,8 +32,23 @@ defmodule Jido.Persistence.ContinuationStore do
   @impl true
   def load_fact(hash, {id, jido}), do: load_fact(id, hash, jido)
 
-  def register(jido, id, config, owner \\ self()),
-    do: Jido.Instance.RuntimeStore.put(jido, __MODULE__, id, {owner, config})
+  def register(jido, id, config, owner \\ self()) do
+    with {:ok, %Config{} = profile} <- Config.open(config) do
+      Jido.Instance.RuntimeStore.put(jido, __MODULE__, id, {owner, profile})
+    end
+  end
+
+  def prepare(jido, id, value) do
+    with {:ok, config} <- config(jido, id),
+         record = {:jido_execution_prepared, 3, value},
+         {:ok, bytes} <- Config.encode(config, record) do
+      case Store.compare_and_swap(config.store, prepared_key(id), :not_found, bytes) do
+        :ok -> :ok
+        {:error, :conflict} -> accept_prepared(config, id, record)
+        {:error, _reason} = error -> error
+      end
+    end
+  end
 
   # Terminal checkpoint collection is best effort. A failed physical delete
   # must not change a Turn result which is already durable in the Agent record.
@@ -233,12 +248,13 @@ defmodule Jido.Persistence.ContinuationStore do
   defp append_batch(config, id, batch_count, condition, events) do
     next = batch_count + 1
 
-    with :ok <-
+    with {:ok, bytes} <- Config.encode(config, events),
+         :ok <-
            Store.compare_and_swap(
-             config,
+             config.store,
              batch_key(id, next),
              :not_found,
-             :erlang.term_to_binary(events)
+             bytes
            ),
          :ok <- write_batch_count(config, id, condition, next) do
       {:ok, next}
@@ -246,17 +262,18 @@ defmodule Jido.Persistence.ContinuationStore do
   end
 
   defp save_fact_value(config, id, hash, value) do
-    case Store.read(config, fact_key(id, hash)) do
+    case Store.read(config.store, fact_key(id, hash)) do
       {:ok, _bytes, _condition} ->
         accept_existing_fact(config, id, hash, value)
 
       {:error, :not_found} ->
-        with :ok <- record_fact_hash(config, id, hash) do
+        with :ok <- record_fact_hash(config, id, hash),
+             {:ok, bytes} <- Config.encode(config, full_fact_record(value)) do
           case Store.compare_and_swap(
-                 config,
+                 config.store,
                  fact_key(id, hash),
                  :not_found,
-                 encode(full_fact_record(value))
+                 bytes
                ) do
             :ok -> :ok
             {:error, :conflict} -> accept_existing_fact(config, id, hash, value)
@@ -283,8 +300,8 @@ defmodule Jido.Persistence.ContinuationStore do
     do: {@fact_tag, @fact_version, 0, fact_digest(value), :full, value}
 
   defp load_fact_value(config, id, hash) do
-    with {:ok, bytes, _condition} <- Store.read(config, fact_key(id, hash)),
-         {:ok, record} <- decode(bytes) do
+    with {:ok, bytes, _condition} <- Store.read(config.store, fact_key(id, hash)),
+         {:ok, record} <- decode(config, bytes) do
       decode_fact_record(record)
     end
   end
@@ -296,6 +313,13 @@ defmodule Jido.Persistence.ContinuationStore do
 
   defp decode_fact_record(_record), do: {:error, :invalid_execution_checkpoint}
 
+  defp accept_prepared(config, id, expected) do
+    with {:ok, bytes, _condition} <- Store.read(config.store, prepared_key(id)),
+         {:ok, actual} <- decode(config, bytes) do
+      if actual == expected, do: :ok, else: {:error, :execution_prepare_conflict}
+    end
+  end
+
   defp record_fact_hash(config, id, hash),
     do: record_fact_hash(config, id, hash, @fact_index_write_attempts)
 
@@ -306,24 +330,26 @@ defmodule Jido.Persistence.ContinuationStore do
       if Enum.any?(hashes, &(&1 === hash)) do
         :ok
       else
-        case Store.compare_and_swap(
-               config,
-               fact_index_key(id),
-               condition,
-               encode({:jido_fact_index, 1, [hash | hashes]})
-             ) do
-          :ok -> :ok
-          {:error, :conflict} -> record_fact_hash(config, id, hash, attempts - 1)
-          error -> error
+        with {:ok, bytes} <- Config.encode(config, {:jido_fact_index, 1, [hash | hashes]}) do
+          case Store.compare_and_swap(
+                 config.store,
+                 fact_index_key(id),
+                 condition,
+                 bytes
+               ) do
+            :ok -> :ok
+            {:error, :conflict} -> record_fact_hash(config, id, hash, attempts - 1)
+            error -> error
+          end
         end
       end
     end
   end
 
   defp read_fact_index(config, id) do
-    case Store.read(config, fact_index_key(id)) do
+    case Store.read(config.store, fact_index_key(id)) do
       {:ok, bytes, condition} ->
-        case decode(bytes) do
+        case decode(config, bytes) do
           {:ok, {:jido_fact_index, 1, hashes}} when is_list(hashes) ->
             {:ok, hashes, condition}
 
@@ -340,9 +366,10 @@ defmodule Jido.Persistence.ContinuationStore do
   end
 
   defp read_batch_count(config, id) do
-    case Store.read(config, key(id)) do
+    case Store.read(config.store, key(id)) do
       {:ok, bytes, condition} ->
-        with {:ok, batch_count} when is_integer(batch_count) and batch_count >= 0 <- decode(bytes) do
+        with {:ok, batch_count} when is_integer(batch_count) and batch_count >= 0 <-
+               decode(config, bytes) do
           recover_tail(config, id, batch_count, condition)
         else
           _invalid -> {:error, :invalid_execution_checkpoint}
@@ -361,9 +388,9 @@ defmodule Jido.Persistence.ContinuationStore do
   defp recover_tail(config, id, batch_count, condition) do
     next = batch_count + 1
 
-    case Store.read(config, batch_key(id, next)) do
+    case Store.read(config.store, batch_key(id, next)) do
       {:ok, bytes, _chunk_condition} ->
-        with {:ok, [_ | _]} <- decode(bytes),
+        with {:ok, [_ | _]} <- decode(config, bytes),
              :ok <- write_batch_count(config, id, condition, next) do
           read_batch_count(config, id)
         end
@@ -380,22 +407,25 @@ defmodule Jido.Persistence.ContinuationStore do
     do: {:ok, batches}
 
   defp read_batches(config, id, index, last, batches) do
-    with {:ok, bytes, _condition} <- Store.read(config, batch_key(id, index)),
-         {:ok, [_ | _] = events} <- decode(bytes) do
+    with {:ok, bytes, _condition} <- Store.read(config.store, batch_key(id, index)),
+         {:ok, [_ | _] = events} <- decode(config, bytes) do
       read_batches(config, id, index + 1, last, [events | batches])
     end
   end
 
   defp write_batch_count(config, id, condition, batch_count) do
-    Store.compare_and_swap(config, key(id), condition, encode(batch_count))
+    with {:ok, bytes} <- Config.encode(config, batch_count) do
+      Store.compare_and_swap(config.store, key(id), condition, bytes)
+    end
   end
 
   # Runic events contain domain atoms and code references. These are trusted
   # runtime records, not ingress payloads, so :safe cannot decode them.
-  defp decode(bytes) when is_binary(bytes) do
-    {:ok, :erlang.binary_to_term(bytes)}
-  rescue
-    ArgumentError -> {:error, :invalid_execution_checkpoint}
+  defp decode(config, bytes) when is_binary(bytes) do
+    case Config.decode(config, bytes, trusted: true) do
+      {:ok, value} -> {:ok, value}
+      {:error, _reason} -> {:error, :invalid_execution_checkpoint}
+    end
   end
 
   defp delete_execution(config, id) do
@@ -405,17 +435,18 @@ defmodule Jido.Persistence.ContinuationStore do
       fact_keys = for hash <- Enum.uniq(indexed_hashes), do: fact_key(id, hash)
 
       Enum.each(
-        [key(id), fact_index_key(id) | batch_keys ++ fact_keys],
+        [key(id), prepared_key(id), fact_index_key(id) | batch_keys ++ fact_keys],
         &delete_record(config, &1)
       )
     end
   end
 
-  defp delete_record(config, key), do: Store.delete(config, key)
+  defp delete_record(config, key), do: Store.delete(config.store, key)
 
   defp key(id), do: @prefix <> Base.url_encode64(:erlang.term_to_binary(id), padding: false)
 
   defp batch_key(id, index), do: key(id) <> ":batches:" <> Integer.to_string(index)
+  defp prepared_key(id), do: key(id) <> ":prepared"
   defp fact_index_key(id), do: key(id) <> ":facts:index"
 
   defp fact_key(id, hash) do
@@ -424,11 +455,9 @@ defmodule Jido.Persistence.ContinuationStore do
       Base.url_encode64(:erlang.term_to_binary(hash, [:deterministic]), padding: false)
   end
 
-  defp fact_digest(value), do: :crypto.hash(:sha256, encode(value))
+  defp fact_digest(value), do: :crypto.hash(:sha256, :erlang.term_to_binary(value, [:deterministic]))
 
   defp verify_fact_digest(value, digest) do
     if fact_digest(value) == digest, do: :ok, else: {:error, :invalid_execution_checkpoint}
   end
-
-  defp encode(value), do: :erlang.term_to_binary(value, [:deterministic])
 end

@@ -52,11 +52,18 @@ defmodule Jido.Agent.FlowModesTest do
 
     managed = AgentServer.snapshot(managed_server).agent
 
+    durable_jido = :"flow_modes_durable_#{System.unique_integer([:positive])}"
+
+    start_supervised!(
+      {Jido,
+       name: durable_jido,
+       namespace: "test/flow-modes/#{System.unique_integer([:positive])}",
+       persistence: {ETS, table: __MODULE__}},
+      id: {Jido, durable_jido}
+    )
+
     assert {:ok, durable_server} =
-             Jido.start_agent(jido, Worker,
-               id: unique_id("durable"),
-               persistence: {ETS, table: __MODULE__}
-             )
+             Jido.start_agent(durable_jido, Worker, id: unique_id("durable"))
 
     assert :ok = AgentServer.await_ready(durable_server)
 

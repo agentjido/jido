@@ -449,6 +449,7 @@ defmodule Jido.Instance.RefTest do
 
     assert Jido.AgentServer.snapshot(server).agent.state.count == 8
     assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(server)
+    eventually(fn -> Jido.resolve_agent(second, ref) == {:error, :not_found} end)
     assert :ok = Jido.delete_agent(second, ref)
 
     assert {:error, :deleted} =

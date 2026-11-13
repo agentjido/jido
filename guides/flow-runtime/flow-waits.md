@@ -86,12 +86,15 @@ signal = fn type, data ->
 end
 
 storage = Path.join(System.tmp_dir!(), "flow-waits-guide-#{System.unique_integer([:positive])}")
-{:ok, _instance} = Jido.start_link(name: FlowWaitsGuide.Jido, namespace: "flow_waits_guide")
+{:ok, _instance} =
+  Jido.start_link(name: FlowWaitsGuide.Jido,
+    namespace: "flow_waits_guide",
+    persistence: {Jido.Persistence.File, path: storage}
+  )
 
 {:ok, server} =
   Jido.start_agent(FlowWaitsGuide.Jido, FlowWaitsGuide.RefundAgent,
     id: "refund-agent",
-    persistence: {Jido.Persistence.File, path: storage},
     turn_timeout: :infinity
   )
 

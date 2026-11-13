@@ -132,6 +132,8 @@ defmodule Jido.Test.AgentServer.DurableFixtures do
   defmodule Corrupt do
     @behaviour Jido.Persistence.Store
 
+    def validate_options(opts), do: Jido.Persistence.File.validate_options(opts)
+
     def get(key, opts) do
       case Jido.Persistence.File.get(key, opts) do
         {:ok, bytes} = result -> corrupt(bytes, result)
@@ -140,22 +142,25 @@ defmodule Jido.Test.AgentServer.DurableFixtures do
     end
 
     defp corrupt(bytes, result) do
-      case :erlang.binary_to_term(bytes) do
-        [_ | _] -> {:ok, :erlang.term_to_binary(:invalid)}
+      case Jido.Persistence.Codec.Term.decode(bytes, trusted: true) do
+        {:ok, [_ | _]} -> Jido.Persistence.Codec.Term.encode(:invalid)
         _ -> result
       end
     end
 
     def compare_and_swap(key, expected, value, opts),
       do: Jido.Persistence.File.compare_and_swap(key, expected, value, opts)
+
+    def delete(key, opts), do: Jido.Persistence.File.delete(key, opts)
   end
 
   defmodule Storage do
     @behaviour Jido.Persistence.Store
+    def validate_options(opts), do: Jido.Persistence.File.validate_options(opts)
     def get(key, opts), do: Jido.Persistence.File.get(key, opts)
 
     def compare_and_swap(key, expected, value, opts) do
-      record = :erlang.binary_to_term(value, [:safe])
+      {:ok, record} = Jido.Persistence.Codec.Term.decode(value, trusted: true)
 
       kind =
         case record do
@@ -176,18 +181,23 @@ defmodule Jido.Test.AgentServer.DurableFixtures do
         do: :input_write,
         else: :other
     end
+
+    def delete(key, opts), do: Jido.Persistence.File.delete(key, opts)
   end
 
   defmodule Reject do
     @behaviour Jido.Persistence.Store
+    def validate_options(opts), do: Jido.Persistence.File.validate_options(opts)
     def get(key, opts), do: Jido.Persistence.File.get(key, opts)
 
     def compare_and_swap(key, expected, value, opts) do
-      case :erlang.binary_to_term(value, [:safe]) do
-        %{rev: revision} when revision > 0 -> {:error, {:rejected, :offline}}
+      case Jido.Persistence.Codec.Term.decode(value, trusted: true) do
+        {:ok, %{rev: revision}} when revision > 0 -> {:error, {:rejected, :offline}}
         _ -> Jido.Persistence.File.compare_and_swap(key, expected, value, opts)
       end
     end
+
+    def delete(key, opts), do: Jido.Persistence.File.delete(key, opts)
   end
 
   defmodule Worker do

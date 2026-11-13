@@ -6,10 +6,14 @@ defmodule Jido.Persistence.CrossBeamAtomTest do
   alias Jido.Test.Persistence.CheckpointPortabilityProbe, as: Probe
   alias Jido.Test.Persistence.StaticAtomAgent
 
-  test "load brings in atoms defined by the trusted Agent module", c do
+  test "Ref load brings in atoms defined by the trusted Agent module", c do
     source = {ETS, table: :cross_beam_static_atom_checkpoint}
     {ETS, adapter_opts} = source
     assert peer_call(c.peer_b, :code, :is_loaded, [StaticAtomAgent]) == false
+
+    assert_raise ArgumentError, fn ->
+      peer_call(c.peer_b, :erlang, :binary_to_existing_atom, ["jido_static_persistence_probe", :utf8])
+    end
 
     agent = StaticAtomAgent.instantiate!(id: "static-atom")
 
@@ -24,12 +28,13 @@ defmodule Jido.Persistence.CrossBeamAtomTest do
     assert {:ok, bytes} = peer_call(c.peer_a, ETS, :get, [key, adapter_opts])
     assert :ok = peer_call(c.peer_b, ETS, :put, [key, bytes, adapter_opts])
 
-    assert {:ok, ^agent} =
-             peer_call(c.peer_b, Persistence, :load_agent, [
+    ref = Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id)
+
+    assert {:ok, ^agent, 0, 0, nil} =
+             peer_call(c.peer_b, Persistence, :load_agent_ref, [
                source,
-               StaticAtomAgent,
-               agent.id,
-               [namespace: "persistence-test"]
+               ref,
+               []
              ])
   end
 

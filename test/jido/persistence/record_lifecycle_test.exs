@@ -10,8 +10,16 @@ defmodule Jido.Persistence.RecordLifecycleTest do
     @behaviour Jido.Persistence.Store
 
     @impl true
+    def validate_options(opts) do
+      if Keyword.keyword?(opts) and Keyword.keys(opts) -- [:observer, :table] == [] and
+           Keyword.keys(opts) == Enum.uniq(Keyword.keys(opts)),
+         do: ETS.validate_options(Keyword.delete(opts, :observer)),
+         else: {:error, :invalid_options}
+    end
+
+    @impl true
     def get(key, opts) do
-      result = ETS.get(key, opts)
+      result = ETS.get(key, Keyword.delete(opts, :observer))
       send(Keyword.fetch!(opts, :observer), {:persistence_read, self(), result})
 
       receive do
@@ -22,7 +30,11 @@ defmodule Jido.Persistence.RecordLifecycleTest do
     end
 
     @impl true
-    defdelegate compare_and_swap(key, expected, value, opts), to: ETS
+    def compare_and_swap(key, expected, value, opts),
+      do: ETS.compare_and_swap(key, expected, value, Keyword.delete(opts, :observer))
+
+    @impl true
+    def delete(key, opts), do: ETS.delete(key, Keyword.delete(opts, :observer))
   end
 
   defp persistence(name) do
@@ -50,9 +62,10 @@ defmodule Jido.Persistence.RecordLifecycleTest do
       )
 
     assert {:ok, bytes} = ETS.get(key, opts)
+    assert {:ok, tombstone} = Jido.Persistence.Codec.Term.decode(bytes, [])
 
-    assert :erlang.binary_to_term(bytes, [:safe]) == %{
-             fmt: 2,
+    assert tombstone == %{
+             fmt: 3,
              kind: :tombstone,
              namespace: Jido.Instance.NamespaceRegistry.namespace(jido),
              agent_module: RuntimeAgent,
@@ -78,9 +91,10 @@ defmodule Jido.Persistence.RecordLifecycleTest do
       )
 
     assert {:ok, missing_bytes} = ETS.get(missing_key, opts)
+    assert {:ok, missing_tombstone} = Jido.Persistence.Codec.Term.decode(missing_bytes, [])
 
-    assert %{fmt: 2, kind: :tombstone, rev: 0, agent_rev: 0} =
-             :erlang.binary_to_term(missing_bytes, [:safe])
+    assert %{fmt: 3, kind: :tombstone, rev: 0, agent_rev: 0} =
+             missing_tombstone
   end
 
   @tag obligation: "jido.persistence.I13"
@@ -132,7 +146,7 @@ defmodule Jido.Persistence.RecordLifecycleTest do
         checkpoint: checkpoint
       }
 
-      bytes = :erlang.term_to_binary(record)
+      {:ok, bytes} = Jido.Persistence.Codec.Term.encode(record)
       assert :ok = ETS.put(key, bytes, opts)
 
       assert {:error, {:invalid_persistence_record, :fmt}} =
@@ -158,10 +172,11 @@ defmodule Jido.Persistence.RecordLifecycleTest do
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     assert :ok = Persistence.save_agent(persistence, agent, namespace: "persistence-test")
     assert {:ok, original} = ETS.get(key, opts)
-    record = :erlang.binary_to_term(original, [:safe])
+    assert {:ok, record} = Jido.Persistence.Codec.Term.decode(original, [])
 
     different_definition = %{record | vsn: RuntimeAgent.vsn() + 1}
-    assert :ok = ETS.put(key, :erlang.term_to_binary(different_definition), opts)
+    assert {:ok, different_bytes} = Jido.Persistence.Codec.Term.encode(different_definition)
+    assert :ok = ETS.put(key, different_bytes, opts)
 
     assert {:error, {:invalid_persistence_record, :vsn}} =
              Persistence.load_agent(persistence, RuntimeAgent, agent.id, namespace: "persistence-test")
@@ -171,7 +186,7 @@ defmodule Jido.Persistence.RecordLifecycleTest do
           %{record | kind: :future},
           Map.put(record, :future_field, true)
         ] do
-      bytes = :erlang.term_to_binary(changed)
+      {:ok, bytes} = Jido.Persistence.Codec.Term.encode(changed)
       assert :ok = ETS.put(key, bytes, opts)
 
       assert {:error, _reason} =

@@ -8,13 +8,15 @@ An adapter stores binary keys and values. It knows nothing about Agents, revisio
 
 | Callback | Required | Purpose |
 | --- | --- | --- |
+| `validate_options/1` | Yes | Reject malformed, unknown, and duplicate options before an operation starts |
 | `get/2` | Yes | Return one value, and optionally an opaque token |
 | `compare_and_swap/4` | Yes | Write one value if the read condition still holds |
-| `validate_options/1` | No | Check options before an operation starts |
-| `delete/2` | No | Physically remove a key, for maintenance and Flow cleanup |
+| `delete/2` | Yes | Physically remove a key, for maintenance and Flow cleanup |
 | `put/3` | No | Replace a value unconditionally, for explicit maintenance. Jido's own write paths do not call it |
+| `scan/4` | No | Return one prefix-bounded page for inspection and export |
 
-`Jido.Persistence` validates the configuration on each operation, so keep `validate_options/1` cheap. Leave out `delete/2` only if you accept that [Flow execution records](flow-continuations.md) stay in storage after a Turn ends.
+`Jido.Persistence` validates the configuration on each operation, so keep
+`validate_options/1` cheap. Runtime durability never requires `scan/4`.
 
 ## Implement the behaviour
 
@@ -28,7 +30,8 @@ defmodule CustomAdapterGuide.VersionedStore do
 
   @impl true
   def validate_options(opts) do
-    if is_atom(opts[:server]) and not is_nil(opts[:server]),
+    if Keyword.keyword?(opts) and Keyword.keys(opts) == [:server] and
+         is_atom(opts[:server]) and not is_nil(opts[:server]),
       do: :ok,
       else: {:error, ":server must name a running store"}
   end
@@ -103,10 +106,17 @@ defmodule CustomAdapterGuide.TimeoutStore do
   @behaviour Jido.Persistence.Store
 
   @impl true
+  def validate_options([]), do: :ok
+  def validate_options(_opts), do: {:error, :invalid_options}
+
+  @impl true
   def get(_key, _opts), do: {:error, :not_found}
 
   @impl true
   def compare_and_swap(_key, _expected, _value, _opts), do: {:error, :timeout}
+
+  @impl true
+  def delete(_key, _opts), do: :ok
 end
 
 {:error, {:indeterminate, :timeout}} =
@@ -203,8 +213,7 @@ end
 
 {:ok, order} =
   Jido.start_agent(CustomAdapterGuide.Jido, CustomAdapterGuide.Order,
-    id: "order-1001",
-    persistence: :inherit
+    id: "order-1001"
   )
 
 :ok = Jido.AgentServer.await_ready(order)

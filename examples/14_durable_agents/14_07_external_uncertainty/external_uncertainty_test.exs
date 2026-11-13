@@ -16,8 +16,9 @@ defmodule Jido.Examples.Durable.ExternalUncertaintyTest do
     start_supervised!({MemoryProvider, name: provider})
     start_supervised!({PublicationProbe, self()})
     persistence = {Jido.Persistence.File, path: c.tmp_dir}
+    c = restart_jido!(c, persistence)
     id = unique_id("publication")
-    {:ok, server} = Jido.start_agent(c.jido, Example, id: id, persistence: persistence)
+    {:ok, server} = Jido.start_agent(c.jido, Example, id: id)
     assert :ok = Jido.AgentServer.await_ready(server)
     {:ok, provider: provider, server: server, id: id, persistence: persistence}
   end
@@ -89,7 +90,7 @@ defmodule Jido.Examples.Durable.ExternalUncertaintyTest do
     assert Jido.AgentServer.snapshot(c.server).agent.state.status == :idle
     assert MemoryProvider.records(c.provider) == %{"publish-1" => "Report: OTP"}
     assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(c.server)
-    assert {:ok, awake} = Jido.thaw(c.jido, Example, c.id, persistence: c.persistence)
+    assert {:ok, awake} = Jido.thaw(c.jido, Example, c.id)
     assert :ok = Jido.AgentServer.await_ready(awake)
 
     assert %Jido.AgentServer.Status{work_state: :idle, active_turn_id: nil} =
@@ -114,7 +115,7 @@ defmodule Jido.Examples.Durable.ExternalUncertaintyTest do
     assert MemoryProvider.records(c.provider) == %{}
     assert MemoryProvider.attempts(c.provider) == 0
     assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(c.server)
-    assert {:ok, awake} = Jido.thaw(c.jido, Example, c.id, persistence: c.persistence)
+    assert {:ok, awake} = Jido.thaw(c.jido, Example, c.id)
     assert :ok = Jido.AgentServer.await_ready(awake)
     assert Jido.AgentServer.snapshot(awake).agent == agent
     assert :ok = Jido.stop_agent(c.jido, awake)

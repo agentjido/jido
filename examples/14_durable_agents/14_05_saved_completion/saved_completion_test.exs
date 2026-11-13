@@ -12,12 +12,12 @@ defmodule Jido.Examples.Durable.SavedCompletionTest do
   test "a saved completion survives a lost storage reply without repeating Flow work", c do
     start_supervised!({CompletionProbe, self()})
     persistence = {CompletionStorage, path: c.tmp_dir}
+    c = restart_jido!(c, persistence)
     id = unique_id("completion")
 
     assert {:ok, server} =
              Jido.start_agent(c.jido, Example,
                id: id,
-               persistence: persistence,
                exec_opts: [hooks: [on_complete: fn _, _, _ -> CompletionProbe.completed() end]]
              )
 
@@ -67,7 +67,7 @@ defmodule Jido.Examples.Durable.SavedCompletionTest do
     assert agent.state.completed == 2
     assert CompletionProbe.count() > count
     assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(restored)
-    assert {:ok, awake} = Jido.thaw(c.jido, Example, id, persistence: persistence)
+    assert {:ok, awake} = Jido.thaw(c.jido, Example, id)
     assert :ok = Jido.AgentServer.await_ready(awake)
     assert Jido.AgentServer.snapshot(awake).agent == agent
     assert :ok = Jido.stop_agent(c.jido, awake)

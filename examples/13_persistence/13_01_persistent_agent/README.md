@@ -37,12 +37,14 @@ The example uses local ETS storage. ETS data does not survive a BEAM restart.
 - [Identity test](checkpoint_identity_test.exs)
 
 ```elixir
-opts = [id: "counter", persistence: {Jido.Persistence.File, path: "tmp/counters"}]
+store = {Jido.Persistence.File, path: "tmp/counters"}
+{:ok, _instance} = Jido.start_link(name: instance, namespace: "counters", persistence: store)
+opts = [id: "counter"]
 {:ok, server} = Jido.start_agent(instance, Jido.Examples.Persistence.PersistentAgent,
   Keyword.put(opts, :persistence_mode, :create))
 :ok = Jido.AgentServer.await_ready(server)
 :ok = Jido.stop_agent(instance, server)
-# Use the same ID and store:
+# Use the same ID and instance Store:
 {:ok, restored} = Jido.start_agent(instance, Jido.Examples.Persistence.PersistentAgent,
   Keyword.put(opts, :persistence_mode, :restore))
 :ok = Jido.AgentServer.await_ready(restored)

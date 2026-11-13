@@ -46,8 +46,8 @@ The function must return these shapes:
 | Command | Reply |
 | --- | --- |
 | `["GET", key]` | `{:ok, value}`, or `{:ok, nil}` for a missing key |
-| `["EVAL", script, "1", key, mode, previous, value, ttl]` | `{:ok, 1}` when written, `{:ok, 0}` on a failed comparison |
-| `["SET", key, value]`, with `"PX", ttl` when set | `{:ok, "OK"}` |
+| `["EVAL", script, "1", key, mode, previous, value]` | `{:ok, 1}` when written, `{:ok, 0}` on a failed comparison |
+| `["SET", key, value]` | `{:ok, "OK"}` |
 | `["DEL", key]` | `{:ok, count}` |
 | Any failure | `{:error, reason}` |
 
@@ -57,19 +57,16 @@ The function must return these shapes:
 | --- | --- | --- |
 | `:command_fn` | Required | A function of one argument |
 | `:prefix` | `"jido"` | Each Redis key is `"<prefix>:<key>"` |
-| `:ttl` | None | Key lifetime in milliseconds, set again on each write |
 
 Conditional writes run one Lua `EVAL` that compares and replaces the value, so the connection must permit `EVAL`. A `{:error, reason}` reply to `EVAL` becomes `{:error, {:indeterminate, reason}}`, because the script may have run.
 
-### Be careful with TTL and eviction
+### Do not expire durable keys
 
-`:ttl` applies to every key the adapter writes. When a key expires, Redis removes it with no record that it existed:
-
-- An expired active record makes the Agent load as `{:error, :not_found}`.
-- An expired [tombstone](../durability/deletion-and-tombstones.md) removes the fence against stale writers, so a new record can be created at revision zero.
-- An expired Flow execution record makes [recovery of that Turn](flow-continuations.md) fail.
-
-Leave `:ttl` unset for Agents that must not disappear. The same risks apply to a Redis eviction policy that can remove these keys. Jido has only the durability that your Redis persistence and replication settings provide.
+The adapter has no TTL option. Jido does not expire persistence records
+automatically. Configure Redis so eviction does not remove these keys. An
+evicted Agent record, tombstone, Flow record, or wake record can break restore
+or remove a stale-writer fence. Jido has only the durability that your Redis
+persistence, replication, and eviction settings provide.
 
 ### Test without a server
 
@@ -81,7 +78,7 @@ defmodule RedisGuide.FakeRedis do
 
   def command(["GET", key]), do: {:ok, Agent.get(__MODULE__, &Map.get(&1, key))}
 
-  def command(["EVAL", _script, "1", key, mode, previous, value, _ttl]) do
+  def command(["EVAL", _script, "1", key, mode, previous, value]) do
     Agent.get_and_update(__MODULE__, fn data ->
       current = Map.get(data, key)
       matched? = if mode == "missing", do: is_nil(current), else: current == previous

@@ -12,10 +12,11 @@ defmodule Jido.Examples.Workflow.EffectfulStepsTest do
     start_supervised!({Service, %{read: {:ok, %{revision: "r1", answer: "safe", private: "secret"}}}})
   end
 
-  test "portable service context stays outside committed Agent state", %{jido: jido} do
+  test "portable service context stays outside committed Agent state", c do
     client = service()
     persistence = {Jido.Persistence.ETS, table: :"workflow_#{System.unique_integer([:positive])}"}
-    server = start_agent!(jido, Example, persistence: persistence, persistence_mode: :create)
+    %{jido: jido} = restart_jido!(c, persistence)
+    server = start_agent!(jido, Example, persistence_mode: :create)
     before = Jido.AgentServer.snapshot(server)
     {:ok, command} = Example.fetch_record_signal(%{key: "one"})
     service_name = Module.concat(__MODULE__, ReadService)
@@ -47,7 +48,7 @@ defmodule Jido.Examples.Workflow.EffectfulStepsTest do
     monitor = Process.monitor(server)
     assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(server)
     assert_receive {:DOWN, ^monitor, :process, ^server, :shutdown}, 1000
-    assert {:ok, restored} = Jido.thaw(jido, Example, candidate.id, persistence: persistence)
+    assert {:ok, restored} = Jido.thaw(jido, Example, candidate.id)
     assert :ok = Jido.AgentServer.await_ready(restored)
     assert Jido.AgentServer.snapshot(restored).agent.state == candidate.state
     assert Jido.AgentServer.snapshot(restored).agent_revision == 1

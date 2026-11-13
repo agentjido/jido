@@ -25,7 +25,7 @@ adds no DSL.
 ### jido.agent_server.durable_turn.I1 — Saved Flow acceptance
 
 - **scope:** persistent Flow Turn admission
-- **must:** Before the first Action starts, validate Flow input and save one portable running receipt with the stable Turn ID, original and admitted Signals, prepared Plugin input, safe context, Flow definition fingerprint, and absolute expiry. Publish its Agent revision only after the required save. A rejected or uncertain acceptance save starts no Action and closes durable authority.
+- **must:** Before the first Action starts, validate Flow input and save one prepared execution record. Then save one portable running Agent receipt with the stable Turn ID, original and admitted Signals, prepared Plugin input, safe context, Flow definition fingerprint, and absolute expiry. The Agent record is the commit point. A rejected or uncertain preparation or acceptance save starts no Action and closes durable authority.
 - **why:** Recovery needs a confirmed description of the accepted Flow before work starts.
 - **kind:** ordering
 - **status:** active
@@ -65,7 +65,7 @@ adds no DSL.
 ### jido.agent_server.durable_turn.I6 — Saved wait suspension
 
 - **scope:** a durable Flow with open waits
-- **must:** Save pending waits, their stable IDs, and their absolute deadline before suspending and releasing the Runic Worker. Keep the Turn active, committed reads available, and later Turns queued. Restore the same waits after hibernation or runtime loss without rerunning confirmed Actions.
+- **must:** Confirm Flow progress and prepare every timed wake before saving the Agent receipt that exposes a pending wait. The Agent record is the commit point. Then suspend and release the Runic Worker. Keep the Turn active, committed reads available, and later Turns queued. Restore the same waits after hibernation or runtime loss without rerunning confirmed Actions. An unmatched prepared wake is a safe orphan; a committed timed wait cannot lack its prepared wake.
 - **why:** Waiting must consume no Worker while retaining exact durable progress.
 - **kind:** ordering
 - **status:** retired

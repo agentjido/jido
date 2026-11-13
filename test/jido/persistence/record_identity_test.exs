@@ -9,17 +9,27 @@ defmodule Jido.Persistence.RecordIdentityTest do
 
   defmodule BarrierAdapter do
     @behaviour Jido.Persistence.Store
-    defdelegate get(key, opts), to: ETS
+
+    def validate_options(opts) do
+      if Keyword.keyword?(opts) and Keyword.keys(opts) -- [:observer, :table] == [] and
+           Keyword.keys(opts) == Enum.uniq(Keyword.keys(opts)),
+         do: ETS.validate_options(Keyword.delete(opts, :observer)),
+         else: {:error, :invalid_options}
+    end
+
+    def get(key, opts), do: ETS.get(key, Keyword.delete(opts, :observer))
 
     def compare_and_swap(key, expected, value, opts) do
       send(Keyword.fetch!(opts, :observer), {:identity_cas, self(), key})
 
       receive do
-        :write -> ETS.compare_and_swap(key, expected, value, opts)
+        :write -> ETS.compare_and_swap(key, expected, value, Keyword.delete(opts, :observer))
       after
         5_000 -> {:error, {:rejected, :barrier_timeout}}
       end
     end
+
+    def delete(key, opts), do: ETS.delete(key, Keyword.delete(opts, :observer))
   end
 
   setup do

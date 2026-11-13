@@ -14,15 +14,15 @@ Plugin callback rules, or durable Flow progress.
 The public boundary is `Jido.AgentServer.hibernate/2`, `snapshot/2`, and
 `upgrade/3`. Durable lifecycle policy is internal to
 `Jido.AgentServer.Lifecycle`. Durable storage conversion belongs to
-`Jido.Persistence`. Persistence configuration uses AgentServer options; this
-component has no DSL.
+`Jido.Persistence`. The Jido instance supplies one persistence profile to
+every AgentServer; this component has no DSL.
 
 ## Obligations
 
 ### jido.agent_server.durable.I1 — Explicit durable configuration
 
 - **scope:** AgentServer startup and persistent control
-- **must:** Keep persistence disabled by default. Accept an explicit adapter or inherit the selected Jido instance adapter. Require an activation and a stable instance namespace. Validate a finite persistence timeout, create or restore mode, and the persistence requirement for idle hibernation before startup.
+- **must:** Keep persistence disabled when the Jido instance has no profile. In a persistent instance, inherit its one Store and codec and reject per-Agent replacement. Require an activation and a stable instance namespace. Validate a finite persistence timeout, create or restore mode, and the persistence requirement for idle hibernation before startup.
 - **why:** Durable authority must be explicit and bounded.
 - **kind:** functional
 - **status:** retired

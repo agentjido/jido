@@ -67,7 +67,7 @@ defmodule Jido.Test.Persistence.AdapterConformanceTest do
       ["GET", key] ->
         {:ok, Elixir.Agent.get(store, &Map.get(&1, key))}
 
-      ["EVAL", _script, "1", key, mode, expected, value, _ttl] ->
+      ["EVAL", _script, "1", key, mode, expected, value] ->
         Elixir.Agent.get_and_update(store, fn values ->
           current = Map.get(values, key, :not_found)
           wanted = if mode == "missing", do: :not_found, else: expected
@@ -77,6 +77,12 @@ defmodule Jido.Test.Persistence.AdapterConformanceTest do
           else
             {{:ok, 0}, values}
           end
+        end)
+
+      ["DEL", key] ->
+        Elixir.Agent.get_and_update(store, fn values ->
+          deleted = if Map.has_key?(values, key), do: 1, else: 0
+          {{:ok, deleted}, Map.delete(values, key)}
         end)
     end
   end

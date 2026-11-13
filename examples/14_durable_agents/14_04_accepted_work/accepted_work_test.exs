@@ -13,12 +13,10 @@ defmodule Jido.Examples.Durable.AcceptedWorkTest do
   test "a topology member commits its Flow and restores completion without another Turn", c do
     id = unique_id("accepted-report")
     persistence = {Jido.Persistence.File, path: c.tmp_dir}
+    c = restart_jido!(c, persistence)
 
     assert {:ok, root} =
-             Jido.start_agent(c.jido, Example.Team,
-               id: id,
-               persistence: persistence
-             )
+             Jido.start_agent(c.jido, Example.Team, id: id)
 
     assert :ok = Jido.AgentServer.await_ready(root)
     assert [server] = TopologyAssertions.members(root)

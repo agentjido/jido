@@ -34,6 +34,8 @@ defmodule Jido.Test.Persistence.AdapterConformance do
     assert [{:ok, winner}] = Enum.filter(results, &match?({:ok, _}, &1))
     assert Enum.count(results, &match?({{:error, :conflict}, _}, &1)) == 3
     assert {:ok, ^winner, _condition} = Store.read(store, key)
+    assert :ok = Store.delete(store, key)
+    assert {:error, :not_found} = Store.read(store, key)
 
     :ok
   end

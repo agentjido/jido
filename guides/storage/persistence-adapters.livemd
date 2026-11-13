@@ -45,7 +45,9 @@ The cell returns `"invoice.pay"`.
 
 ## Check an adapter declaration
 
-An adapter declaration is a module or a `{module, options}` tuple. `Jido.Persistence.resolve_config/2` checks the declaration without starting anything. It requires the `get/2` and `compare_and_swap/4` callbacks and runs the adapter's option validation.
+An adapter declaration is a module or a `{module, options}` tuple.
+`Jido.Persistence.resolve_config/2` checks it without starting anything. It
+requires option validation, get, compare-and-swap, and delete callbacks.
 
 ```elixir
 results = %{
@@ -54,7 +56,11 @@ results = %{
   disabled: Jido.Persistence.resolve_config(false, nil)
 }
 
-{:ok, {Jido.Persistence.ETS, [table: :adapters_guide]}} = results.ets
+{:ok,
+ %Jido.Persistence.Config{
+   store: {Jido.Persistence.ETS, [table: :adapters_guide]},
+   codec: Jido.Persistence.Codec.Term
+ }} = results.ets
 
 {:error, {:invalid_persistence_options, Jido.Persistence.File, ":path must be a non-empty string"}} =
   results.file_without_path
@@ -80,8 +86,7 @@ Configure the adapter on the instance. A persistent Agent also needs a stable na
 
 {:ok, invoice} =
   Jido.start_agent(AdaptersGuide.EtsJido, AdaptersGuide.Invoice,
-    id: "inv-1001",
-    persistence: :inherit
+    id: "inv-1001"
   )
 
 :ok = Jido.AgentServer.await_ready(invoice)
@@ -142,8 +147,7 @@ file_store = {Jido.Persistence.File, path: path}
 
 {:ok, invoice} =
   Jido.start_agent(AdaptersGuide.FileJido, AdaptersGuide.Invoice,
-    id: "inv-2001",
-    persistence: :inherit
+    id: "inv-2001"
   )
 
 :ok = Jido.AgentServer.await_ready(invoice)
@@ -151,10 +155,11 @@ file_store = {Jido.Persistence.File, path: path}
 :ok = Jido.stop_agent(AdaptersGuide.FileJido, invoice)
 Supervisor.stop(AdaptersGuide.FileJido)
 
-path |> Path.join("records") |> File.ls!() |> length()
+path |> Path.join("records/*.bin") |> Path.wildcard() |> length()
 ```
 
-The cell returns `1`, the one file for this Agent. Its name is a hash of the storage key.
+The cell returns `2`, one namespace manifest and one Agent record. Their names
+are hashes of the storage keys. A bounded radix index supports optional scan.
 
 The instance is gone, but the record remains on disk. A new instance with the same namespace can read it:
 
@@ -175,32 +180,36 @@ state
 
 The cell returns `%{paid_cents: 250}`. The instance name changed and the record still loaded, because the key uses the namespace.
 
-## Override per Agent
+## Select JSON for the instance
 
-`:persistence` on `Jido.start_agent/3` also accepts a declaration, which replaces the instance default for that Agent. The Agent still takes its namespace from the instance.
+JSON is opt-in because it adds storage and encoding overhead. Select it in the
+instance profile. Every Agent and auxiliary record uses the same codec.
 
 ```elixir
 {:ok, _instance} =
-  Jido.start_link(name: AdaptersGuide.MixedJido, namespace: "billing")
+  Jido.start_link(
+    name: AdaptersGuide.JsonJido,
+    namespace: "billing-json",
+    persistence: [
+      store: {Jido.Persistence.ETS, table: :adapters_guide_json},
+      codec: Jido.Persistence.Codec.JSON
+    ]
+  )
 
 {:ok, invoice} =
-  Jido.start_agent(AdaptersGuide.MixedJido, AdaptersGuide.Invoice,
-    id: "inv-3001",
-    persistence: {Jido.Persistence.ETS, table: :adapters_guide_override}
-  )
+  Jido.start_agent(AdaptersGuide.JsonJido, AdaptersGuide.Invoice, id: "inv-3001")
 
 :ok = Jido.AgentServer.await_ready(invoice)
 
 {:ok, %{id: "inv-3001"}} =
   Jido.Persistence.load_agent(
-    {Jido.Persistence.ETS, table: :adapters_guide_override},
+    AdaptersGuide.JsonJido,
     AdaptersGuide.Invoice,
-    "inv-3001",
-    namespace: "billing"
+    "inv-3001"
   )
 
-:ok = Jido.stop_agent(AdaptersGuide.MixedJido, invoice)
-Supervisor.stop(AdaptersGuide.MixedJido)
+:ok = Jido.stop_agent(AdaptersGuide.JsonJido, invoice)
+Supervisor.stop(AdaptersGuide.JsonJido)
 ```
 
 The cell returns `:ok`.

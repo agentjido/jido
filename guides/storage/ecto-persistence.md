@@ -2,7 +2,10 @@
 
 This guide stores Jido records in a SQL table through your application's Ecto repository. Use it when you already run PostgreSQL, or SQLite for a single node.
 
-`Jido.Persistence.Ecto` supports the PostgreSQL and SQLite Ecto adapters only. It stores opaque bytes in one table, one row per storage key. Your application owns the repository, the database, and the migration.
+`Jido.Persistence.Ecto` supports the PostgreSQL and SQLite Ecto adapters only.
+It stores codec bytes in one table, one row per storage key. Your application
+owns the repository, database, and migration. Use the opt-in JSON codec when
+you need to inspect the value column directly.
 
 The code here runs in your application and needs a database, so the examples are fragments.
 
@@ -78,7 +81,7 @@ Then use the instance as you would with any other adapter:
 <!-- partial -->
 ```elixir
 {:ok, invoice} =
-  Jido.start_agent(MyApp.Jido, MyApp.Invoice, id: "inv-1001", persistence: :inherit)
+  Jido.start_agent(MyApp.Jido, MyApp.Invoice, id: "inv-1001")
 
 :ok = Jido.AgentServer.await_ready(invoice)
 ```
@@ -92,6 +95,10 @@ Then use the instance as you would with any other adapter:
 | `:repo_options` | `[]` | A keyword list sent to each repository call, such as `:prefix` or `:timeout`. It cannot set `:on_conflict` or `:conflict_target` |
 
 Any other option fails validation.
+
+Persistence writes return a confirmed rejection when the caller is already
+inside `Repo.transaction/2`. Jido cannot publish a durable commit that still
+depends on an outer transaction. Reads are allowed in an outer transaction.
 
 ## Use another table or prefix
 
@@ -150,7 +157,10 @@ Application tables can stay in the same database. Do not read or join `value` in
 
 `Jido.AgentServer` writes from its own process, so its saves commit independently of any transaction you have open in another process.
 
-A direct `Jido.Persistence.save_agent/3` call runs in the calling process. Inside your `Repo.transaction/2`, it joins that transaction, and its `:ok` is not final until the transaction commits. If the transaction rolls back, so does the save.
+A direct `Jido.Persistence.save_agent/3` call runs in the calling process. It
+returns `{:error, {:rejected, :ecto_outer_transaction}}` when that process is
+already inside `Repo.transaction/2`. Run the persistence write outside the
+outer transaction.
 
 ## Failures
 

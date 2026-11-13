@@ -89,17 +89,21 @@ Every path that writes or reads a checkpoint uses these callbacks:
 
 - `Jido.Persistence.save_agent/3` and `Jido.Persistence.load_agent/4`, directly.
 - `Jido.Persistence.snapshot/2` and `Jido.Persistence.restore/2`.
-- An AgentServer started with `persistence:`, which runs `dump/3` before each commit that it saves.
+- An AgentServer in a persistent Jido instance, which runs `dump/3` before each commit that it saves.
 - `Jido.thaw/4` and a start with `persistence_mode: :restore`, which run `load/3` before the Plugin's runtime starts.
 
 Here the Plugin runs live with a local store. The converted value reaches storage, and the thawed server sees the live form again:
 
 ```elixir
-{:ok, _instance} = Jido.start(name: PluginPersistenceGuide.Jido, namespace: "plugin-persistence-guide")
 store = {Jido.Persistence.ETS, table: :plugin_persistence_guide}
+{:ok, _instance} =
+  Jido.start(name: PluginPersistenceGuide.Jido,
+    namespace: "plugin-persistence-guide",
+    persistence: store
+  )
 
 {:ok, server} =
-  Jido.start_agent(PluginPersistenceGuide.Jido, PluginPersistenceGuide.Customer, id: "c-live", persistence: store)
+  Jido.start_agent(PluginPersistenceGuide.Jido, PluginPersistenceGuide.Customer, id: "c-live")
 
 :ok = Jido.AgentServer.await_ready(server)
 
@@ -110,7 +114,7 @@ store = {Jido.Persistence.ETS, table: :plugin_persistence_guide}
 :ok = Jido.AgentServer.hibernate(server)
 
 {:ok, thawed} =
-  Jido.thaw(PluginPersistenceGuide.Jido, PluginPersistenceGuide.Customer, "c-live", persistence: store)
+  Jido.thaw(PluginPersistenceGuide.Jido, PluginPersistenceGuide.Customer, "c-live")
 
 :ok = Jido.AgentServer.await_ready(thawed)
 %{orders: 1, recent_orders: ["o-9"]} = Jido.AgentServer.snapshot(thawed).agent.state

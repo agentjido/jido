@@ -32,6 +32,9 @@ defmodule ContinuationGuide.ObservedStore do
   def start_link, do: Agent.start_link(fn -> MapSet.new() end, name: __MODULE__)
 
   @impl true
+  def validate_options(opts), do: ETS.validate_options(opts)
+
+  @impl true
   def get(key, opts), do: ETS.get(key, opts)
 
   @impl true
@@ -49,6 +52,7 @@ defmodule ContinuationGuide.ObservedStore do
 
   def families do
     Agent.get(__MODULE__, &MapSet.to_list/1)
+    |> Enum.filter(&(String.starts_with?(&1, "jido:agent:") or String.starts_with?(&1, "jido:execution:")))
     |> Enum.frequencies_by(fn
       "jido:agent:" <> _rest -> :agent
       "jido:execution:" <> _rest -> :execution
@@ -120,7 +124,6 @@ store = {ContinuationGuide.ObservedStore, table: :continuation_guide}
 {:ok, refund} =
   Jido.start_agent(ContinuationGuide.Jido, ContinuationGuide.Refund,
     id: "refund-1001",
-    persistence: :inherit,
     turn_timeout: :infinity
   )
 
@@ -184,11 +187,12 @@ ContinuationGuide.Poll.until(fn -> ContinuationGuide.ObservedStore.families() ==
 
 Each write is confirmed before the next action depends on it:
 
-1. **Acceptance.** Jido validates Flow input and saves the running receipt in a new Agent revision. No Action starts before this save.
-2. **Progress.** Jido confirms the current execution records before it starts the next node.
-3. **Wait input.** Jido saves accepted input before it acknowledges delivery, and saves the wait's resolution before downstream work starts.
-4. **Completion.** A successful Flow saves the candidate Agent and terminal receipt in one Agent revision. A failed or cancelled Flow saves its terminal receipt with unchanged state.
-5. **Collection.** After the terminal revision is durable, a background task deletes the execution records.
+1. **Preparation.** Jido writes a prepared execution record before the Agent receipt can make the Turn visible.
+2. **Acceptance.** Jido saves the running receipt in a new Agent revision. This Agent record is the commit point. No Action starts before it.
+3. **Progress.** Jido confirms the current execution records before it starts the next node.
+4. **Wait.** Jido confirms Flow checkpoints and each timed wake before it saves the waiting Agent receipt. It saves accepted input before it acknowledges delivery, and saves wait resolution before downstream work starts.
+5. **Completion.** A successful Flow saves the candidate Agent and terminal receipt in one Agent revision. A failed or cancelled Flow saves its terminal receipt with unchanged state.
+6. **Collection.** After the terminal revision is durable, a background task deletes the execution records.
 
 Collection is best effort. A failed delete does not change the Turn result, but it leaves those records behind.
 
@@ -198,6 +202,7 @@ Each record belongs to one execution, identified by namespace, partition, Agent 
 
 | Record | Purpose |
 | --- | --- |
+| A prepared receipt | Proves the execution identity was stored before Agent acceptance |
 | A batch count | How many event batches are confirmed |
 | Event batches | One key per ordered batch of workflow events |
 | Facts | One key per complete produced value, with a digest |
@@ -224,9 +229,11 @@ Execution records use the ordinary Store contract, so an adapter needs nothing e
 
 - **Write rate.** Each step writes several keys, and each write is a conditional write with its own read. `Jido.Persistence.S3` is meant for low-frequency records, so measure before you use it for frequent Flow Turns.
 - **Value size.** One batch or fact is one value, so adapter limits apply per step. `Jido.Persistence.Bedrock` allows 128 KiB and `Jido.Persistence.S3` allows 5,000,000 bytes. Pass references to large payloads through a Flow, not the payloads.
-- **`delete/2`.** `delete/2` is optional for an adapter, but without it execution records stay after every Flow Turn.
-- **Expiry.** A store that expires keys, such as [Redis with `:ttl`](redis-and-s3-persistence.md), can remove a record that a waiting Flow still needs.
-- **Trust.** Execution records hold workflow events with atoms and code references, so Jido decodes them without the `:safe` option of `:erlang.binary_to_term/2`. The digests detect corruption and do not authenticate a writer. Allow only your application to write to this storage.
+- **`delete/2`.** Every Store adapter must support physical delete. Jido uses
+  it to collect completed Flow execution records.
+- **Expiry.** Jido does not apply automatic TTL. Backend eviction or an
+  operator deletion can still remove a record that a waiting Flow needs.
+- **Trust.** Execution records hold workflow events with atoms and code references. The selected persistence codec treats these as trusted application records. Digests detect corruption and do not authenticate a writer. Allow only your application to write to this storage.
 - **Wait inputs.** One execution keeps at most 1,024 accepted wait inputs.
 
 ## Related

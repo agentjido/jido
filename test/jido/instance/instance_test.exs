@@ -43,7 +43,7 @@ defmodule Jido.Instance.ContractTest do
           ["SET", key, value, "PX", _ttl] ->
             {{:ok, "OK"}, Map.put(state, key, value)}
 
-          ["EVAL", _script, "1", key, mode, expected, value, _ttl] ->
+          ["EVAL", _script, "1", key, mode, expected, value] ->
             matches? =
               case mode do
                 "missing" -> not Map.has_key?(state, key)
@@ -220,7 +220,9 @@ defmodule Jido.Instance.ContractTest do
     module = compile_inline_redis_instance("inline-persistence")
     on_exit(fn -> unload_module(module) end)
 
-    assert {Redis, opts} = module.__jido_persistence__()
+    assert %Jido.Persistence.Config{store: {Redis, opts}, codec: Jido.Persistence.Codec.Term} =
+             module.__jido_persistence__()
+
     assert is_function(opts[:command_fn], 1)
     assert {:ok, {:echo, ["PING"]}} = opts[:command_fn].(["PING"])
     assert opts[:prefix] == "inline-persistence"
@@ -242,15 +244,17 @@ defmodule Jido.Instance.ContractTest do
     )
 
     {:ok, _pid} = TestInstance.start_link(persistence: runtime_persistence)
-    assert Jido.Instance.RuntimeStore.instance_persistence(TestInstance) == runtime_persistence
 
-    assert {:ok, ^runtime_persistence} =
+    assert %Jido.Persistence.Config{store: ^runtime_persistence} =
+             Jido.Instance.RuntimeStore.instance_persistence(TestInstance)
+
+    assert {:ok, %Jido.Persistence.Config{store: ^runtime_persistence}} =
              Jido.Persistence.resolve_config(:inherit, TestInstance)
 
     agent = RedisTestAgent.instantiate!(id: "configured-persistence")
 
     assert {:ok, server} =
-             Jido.start_agent(TestInstance, agent, persistence: :inherit, persistence_mode: :create)
+             Jido.start_agent(TestInstance, agent, persistence_mode: :create)
 
     assert :ok = Server.await_ready(server)
     assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(server)
@@ -260,10 +264,31 @@ defmodule Jido.Instance.ContractTest do
 
     stop_test_instance()
     {:ok, _pid} = TestInstance.start_link()
-    assert Jido.Instance.RuntimeStore.instance_persistence(TestInstance) == application_persistence
 
-    assert {:ok, ^application_persistence} =
+    assert %Jido.Persistence.Config{store: ^application_persistence} =
+             Jido.Instance.RuntimeStore.instance_persistence(TestInstance)
+
+    assert {:ok, %Jido.Persistence.Config{store: ^application_persistence}} =
              Jido.Persistence.resolve_config(:inherit, TestInstance)
+  end
+
+  @tag obligation: "jido.instance.I4"
+  test "a persistent instance rejects a per-Agent Store override" do
+    instance_store =
+      {Jido.Persistence.ETS, table: String.to_atom("jido_instance_store_#{System.unique_integer([:positive])}")}
+
+    other_store =
+      {Jido.Persistence.ETS, table: String.to_atom("jido_agent_store_#{System.unique_integer([:positive])}")}
+
+    {:ok, _pid} = TestInstance.start_link(persistence: instance_store)
+
+    assert {:error, %Jido.Error.ValidationError{message: "Per-Agent persistence is not supported"}} =
+             Jido.start_agent(TestInstance, RedisTestAgent,
+               id: "override-rejected",
+               persistence: other_store
+             )
+
+    assert Jido.whereis_agent(TestInstance, "override-rejected") == nil
   end
 
   @tag obligation: ["jido.instance.I4", "jido.instance.I5"]
@@ -431,14 +456,24 @@ defmodule Jido.Instance.ContractTest do
     persistence = {Jido.Persistence.ETS, table: table}
 
     instance_pid =
-      start_supervised!({Jido, name: instance, persistence: persistence}, id: instance)
+      start_supervised!(
+        {Jido, name: instance, namespace: "test/runtime-store/#{instance}", persistence: persistence},
+        id: instance
+      )
 
     runtime_store = Jido.Instance.Names.runtime_store(instance)
 
-    assert Jido.Instance.RuntimeStore.instance_persistence(instance) == persistence
+    assert %Jido.Persistence.Config{store: ^persistence} =
+             Jido.Instance.RuntimeStore.instance_persistence(instance)
+
     assert :ok = Supervisor.terminate_child(instance_pid, runtime_store)
-    assert Jido.Instance.RuntimeStore.instance_persistence(instance) == persistence
+
+    assert %Jido.Persistence.Config{store: ^persistence} =
+             Jido.Instance.RuntimeStore.instance_persistence(instance)
+
     assert {:ok, _runtime_store_pid} = Supervisor.restart_child(instance_pid, runtime_store)
-    assert Jido.Instance.RuntimeStore.instance_persistence(instance) == persistence
+
+    assert %Jido.Persistence.Config{store: ^persistence} =
+             Jido.Instance.RuntimeStore.instance_persistence(instance)
   end
 end

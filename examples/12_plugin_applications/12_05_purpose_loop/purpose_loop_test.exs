@@ -94,17 +94,15 @@ defmodule Jido.Examples.Applications.PurposeLoopTest do
     eventually(fn -> Jido.resident_agent_count(jido) == 0 end)
   end
 
-  test "a paused loop restores, resumes, drains, rejects new work, and cleans up", %{
-    jido: jido
-  } do
+  test "a paused loop restores, resumes, drains, rejects new work, and cleans up", c do
     id = unique_id("purpose-loop-recovery")
     table = String.to_atom("purpose_loop_#{System.unique_integer([:positive])}")
     persistence = {Jido.Persistence.ETS, table: table}
+    %{jido: jido} = restart_jido!(c, persistence)
 
     {:ok, agent_server} =
       Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Agent,
         id: id,
-        persistence: persistence,
         persistence_mode: :create
       )
 
@@ -173,8 +171,7 @@ defmodule Jido.Examples.Applications.PurposeLoopTest do
     assert restored.state.budget_remaining == 3
     assert restored.state.remaining == ["two", "three", "four"]
 
-    assert {:ok, restarted_server} =
-             Jido.thaw(jido, Agent, id, persistence: persistence)
+    assert {:ok, restarted_server} = Jido.thaw(jido, Agent, id)
 
     assert :ok = Jido.AgentServer.await_ready(restarted_server)
     assert restarted_server != agent_server

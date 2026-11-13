@@ -26,7 +26,7 @@ defmodule Jido.Persistence.ApiTest do
              upgrade_agent: 5
            ]
 
-    assert documented_functions(Store) == [compare_and_swap: 4, open: 1, read: 2]
+    assert documented_functions(Store) == [compare_and_swap: 4, delete: 2, open: 1, read: 2, scan: 3]
     assert documented_functions(Plugin) == []
 
     assert public_module?(Persistence)
@@ -44,11 +44,12 @@ defmodule Jido.Persistence.ApiTest do
                delete: 2,
                get: 2,
                put: 3,
+               scan: 4,
                validate_options: 1
              ]
 
     assert Store.behaviour_info(:optional_callbacks) |> Enum.sort() ==
-             [delete: 2, put: 3, validate_options: 1]
+             [put: 3, scan: 4]
   end
 
   @tag obligation: ["jido.persistence.I10", "jido.persistence.I11"]

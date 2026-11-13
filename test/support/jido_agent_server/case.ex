@@ -92,6 +92,17 @@ defmodule Jido.Test.Case do
     Jido.Signal.new!(type, data, source: source)
   end
 
+  @doc "Restarts the test Jido instance with one instance-level persistence profile."
+  def restart_jido!(%{jido: jido} = context, persistence) do
+    namespace = Jido.Instance.NamespaceRegistry.namespace(jido)
+    :ok = ExUnit.Callbacks.stop_supervised(jido)
+
+    pid =
+      ExUnit.Callbacks.start_supervised!({Jido, name: jido, namespace: namespace, persistence: persistence})
+
+    %{context | jido_pid: pid}
+  end
+
   setup context do
     test_id = System.unique_integer([:positive])
     jido_name = :"jido_test_#{test_id}"

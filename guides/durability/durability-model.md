@@ -84,7 +84,7 @@ alias Jido.AgentServer, as: Server
   )
 
 {:ok, server} =
-  Jido.start_agent(DurabilityModelGuide.Jido, Invoice, id: "invoice-1", persistence: :inherit)
+  Jido.start_agent(DurabilityModelGuide.Jido, Invoice, id: "invoice-1")
 
 :ok = Server.await_ready(server)
 

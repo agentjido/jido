@@ -2,18 +2,25 @@
 modules:
   - Jido.Persistence
   - Jido.Persistence.Checkpoint
+  - Jido.Persistence.Codec
+  - Jido.Persistence.Codec.JSON
+  - Jido.Persistence.Codec.Term
+  - Jido.Persistence.Config
+  - Jido.Persistence.Inspector
   - Jido.Persistence.Plugin
   - Jido.Persistence.Record
   - Jido.Persistence.Snapshot
   - Jido.Persistence.Store
+  - Jido.Persistence.WakeStore
+  - Jido.Instance.Wake
 ---
 
 ## Purpose
 
 Protect portable Agent records and the shared storage boundary. This component
 owns adapter configuration, durable identity, record data, snapshots, Plugin
-state conversion, revisions, and logical deletion. It uses the strict
-`Jido.Codec.Term` contract.
+state conversion, revisions, codecs, inspection, and logical deletion. One
+instance profile selects a binary Store and one persistence codec.
 
 The supported public boundary is `Jido.Persistence`, `Jido.Persistence.Store`,
 and the bundled adapter modules. Persistence Plugin callbacks use the generic
@@ -21,14 +28,15 @@ and the bundled adapter modules. Persistence Plugin callbacks use the generic
 and adapter-operation modules are internal.
 
 It does not own live AgentServer recovery, commit publication, durable Flow
-progress, or the private behavior of one storage backend.
+progress or the private behavior of one storage backend. It owns the durable
+wake record layout and wake recovery health, but not wait semantics.
 
 ## Obligations
 
 ### jido.persistence.I1 — Explicit adapter configuration
 
 - **scope:** `Jido.Persistence.resolve_config/2`, `Jido.Persistence.Store.open/1`
-- **must:** Accept a module or `{module, keyword}` adapter declaration. Treat nil and false as disabled. Resolve inheritance only from the selected Jido instance. Require binary reads and atomic compare-and-swap before an operation starts. Validate adapter options and contain validator faults.
+- **must:** Accept a module or `{module, keyword}` Store declaration as shorthand for the Term codec. Accept one unique `store:` and `codec:` profile. Treat nil and false as disabled. Resolve inheritance only from the selected Jido instance. Use that one profile for Agent, Flow, and wake records. Reject a per-Agent Store replacement. Require a stable namespace and create or validate its exact codec and record-layout manifest before durable work starts.
 - **why:** A storage operation needs one valid and explicit storage authority.
 - **kind:** functional
 - **status:** active
@@ -49,10 +57,10 @@ progress, or the private behavior of one storage backend.
 - **kind:** persisted-format
 - **status:** active
 
-### jido.persistence.I4 — Atomic write result
+### jido.persistence.I4 — Atomic write and delete result
 
-- **scope:** `Jido.Persistence.Store.compare_and_swap/4`
-- **must:** Send one valid condition and one binary value to the adapter. Keep conflict and explicit rejection certain. Treat an explicit indeterminate result, unknown error, invalid reply, callback fault, throw, or exit as an unknown commit result. Do not retry inside the shared Store.
+- **scope:** `Jido.Persistence.Store.compare_and_swap/4`, `Jido.Persistence.Store.delete/2`
+- **must:** Send one valid condition and one binary value to the adapter. Keep conflict and explicit rejection certain. Apply the same result rules to physical delete. Treat an explicit indeterminate result, unknown error, invalid reply, callback fault, throw, or exit as an unknown write result. Do not retry inside the shared Store.
 - **why:** The caller must know when storage can be ahead of its local state.
 - **kind:** functional
 - **status:** active
@@ -60,7 +68,7 @@ progress, or the private behavior of one storage backend.
 ### jido.persistence.I5 — Exact record envelope
 
 - **scope:** `Jido.Persistence.Record`
-- **must:** Read and write the exact format-1 active or tombstone record shape. Validate format, kind, identity, nonnegative revision, Agent version, optional durable Turn data, checkpoint shape, and portability in a fixed order. Reject earlier formats and extra or missing fields without changing stored bytes.
+- **must:** Read and write the exact V3 active or tombstone record shape under the V3 key prefix. Encode it through the instance codec. Validate format, kind, identity, nonnegative revision, Agent version, optional durable Turn data, checkpoint shape, and portability in a fixed order. Reject every other format and extra or missing fields without changing stored bytes. Do not add a runtime or inspection compatibility path.
 - **why:** Record data must have one strict and forward-safe boundary.
 - **kind:** persisted-format
 - **status:** active
@@ -92,7 +100,7 @@ progress, or the private behavior of one storage backend.
 ### jido.persistence.I9 — Portable term boundary
 
 - **scope:** snapshots, records, and converted Plugin state
-- **must:** Use the public `Jido.Codec.Term` contract. Accept nested portable values. Reject processes, ports, references, functions, improper lists, non-byte-aligned bitstrings, and other local runtime values. Return a bounded path to the rejected value and do not write invalid data.
+- **must:** Use the compact Term persistence codec by default and the bounded tagged JSON codec only when selected by the instance profile. Accept nested portable values. Reject processes, ports, references, functions, improper lists, non-byte-aligned bitstrings, and other local runtime values. Restore atoms only when they exist in the compatible application release. Return a bounded path to a rejected checkpoint value and do not write invalid data.
 - **why:** Durable data must be safe to move to another BEAM instance.
 - **kind:** persisted-format
 - **status:** active
@@ -137,11 +145,11 @@ progress, or the private behavior of one storage backend.
 - **kind:** security
 - **status:** active
 
-### jido.persistence.I15 — Built-in adapter conformance
+### jido.persistence.I15 — Built-in adapter conformance and inspection
 
 - **scope:** built-in persistence adapters
-- **must:** Each active built-in adapter obeys the shared binary read and atomic compare-and-swap contract. Backend-specific configuration, maintenance, and fault mapping stay in that adapter's package tests.
-- **why:** All bundled adapters must implement the same storage boundary.
+- **must:** Each active built-in adapter obeys the shared binary read, atomic compare-and-swap, mandatory delete, and strict unique-option contract. Redis does not accept automatic TTL. Ecto rejects writes inside an outer Repo transaction. Optional scans are paged, prefix-bounded, and use bounded page work. Runtime recovery never uses scan. Inspection tasks load configuration without starting the application or Agents. They safely decode only V3 records and produce JSON. Exact inspection needs explicit full mode for saved values. JSONL export redacts Agent state and projects prepared values, fact values, and execution batches to metadata and shape by default.
+- **why:** All bundled adapters must implement the same durability boundary while developer inspection stays above the byte Store.
 - **kind:** functional
 - **status:** active
 
@@ -150,5 +158,13 @@ progress, or the private behavior of one storage backend.
 - **scope:** `Jido.Persistence.upgrade_agent/5`
 - **must:** Read one active record and run one explicit upgrade Action before old code reference resolution. Refuse a nonterminal durable Turn. Write the complete upgraded Agent at the next revision with the condition from that read. Keep stored bytes unchanged after validation, Action, encoding, or compare-and-swap failure.
 - **why:** An inactive durable Agent needs a safe code and data evolution path.
+- **kind:** ordering
+- **status:** active
+
+### jido.persistence.I17 — Sharded wake durability and recovery health
+
+- **scope:** `Jido.Persistence.WakeStore`, `Jido.Instance.Wake`
+- **must:** Store timed wakes in deterministic one-minute buckets and 64 shards. Keep a small active index that records each shard generation. Confirm the shard and index before the Agent wait record commits. Do not remove a newer generation during concurrent cleanup. Retry failed startup reads before readiness. Retry failed cleanup with an observable warning. Delete a delivered or stale wake without delivering it again. Do not use Store scan for runtime recovery.
+- **why:** A committed timed wait must remain reachable across crashes, cleanup races, and temporary Store failures.
 - **kind:** ordering
 - **status:** active

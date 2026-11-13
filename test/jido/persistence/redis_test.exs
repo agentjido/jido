@@ -23,7 +23,6 @@ defmodule Jido.Persistence.RedisTest do
       case command do
         ["GET", key] -> {{:ok, Map.get(state.data, key)}, state}
         ["SET", key, value] -> {{:ok, "OK"}, put_in(state.data[key], value)}
-        ["SET", key, value, "PX", _ttl] -> {{:ok, "OK"}, put_in(state.data[key], value)}
         ["DEL", key] -> {{:ok, 1}, update_in(state.data, &Map.delete(&1, key))}
       end
     end)
@@ -44,13 +43,13 @@ defmodule Jido.Persistence.RedisTest do
     assert {:error, :not_found} = Redis.get("key", opts)
   end
 
-  test "uses the configured prefix and TTL" do
+  test "uses the configured prefix without automatic TTL" do
     pid = start_store()
-    opts = opts(pid, prefix: "custom", ttl: 60_000)
+    opts = opts(pid, prefix: "custom")
 
     assert :ok = Redis.put("key", "value", opts)
 
-    assert [["SET", "custom:key", "value", "PX", "60000"]] =
+    assert [["SET", "custom:key", "value"]] =
              pid |> Elixir.Agent.get(&Enum.reverse(&1.commands))
   end
 
@@ -60,7 +59,7 @@ defmodule Jido.Persistence.RedisTest do
     end
   end
 
-  test "compares binary values in one EVAL command with prefix and TTL" do
+  test "compares binary values in one EVAL command with a prefix" do
     observer = self()
 
     command_fn = fn command ->
@@ -68,13 +67,13 @@ defmodule Jido.Persistence.RedisTest do
       {:ok, 1}
     end
 
-    opts = [command_fn: command_fn, prefix: "custom", ttl: 60_000]
+    opts = [command_fn: command_fn, prefix: "custom"]
     assert :ok = Redis.compare_and_swap("key", <<0, 255>>, <<1, 0>>, opts)
 
-    assert_receive {:command, ["EVAL", script, "1", "custom:key", "value", <<0, 255>>, <<1, 0>>, "60000"]}
+    assert_receive {:command, ["EVAL", script, "1", "custom:key", "value", <<0, 255>>, <<1, 0>>]}
 
     assert :ok = Redis.compare_and_swap("key", :not_found, <<1>>, command_fn: command_fn)
-    assert_receive {:command, ["EVAL", ^script, "1", "jido:key", "missing", "", <<1>>, ""]}
+    assert_receive {:command, ["EVAL", ^script, "1", "jido:key", "missing", "", <<1>>]}
   end
 
   test "maps atomic write conflicts and rejects invalid replies" do
@@ -87,18 +86,18 @@ defmodule Jido.Persistence.RedisTest do
     end
   end
 
-  test "rejects an invalid TTL before it sends a conditional write" do
+  test "rejects TTL because records do not expire automatically" do
     observer = self()
 
-    for ttl <- [0, -1, "1000"] do
-      assert_raise ArgumentError, ~r/:ttl must be a positive integer/, fn ->
+    for ttl <- [1, 0, -1, "1000"] do
+      assert_raise ArgumentError, ~r/supports only :command_fn and :prefix/, fn ->
         Redis.compare_and_swap("key", :not_found, "value",
           ttl: ttl,
           command_fn: fn command -> send(observer, {:unexpected, command}) end
         )
       end
 
-      assert_raise ArgumentError, ~r/:ttl must be a positive integer/, fn ->
+      assert_raise ArgumentError, ~r/supports only :command_fn and :prefix/, fn ->
         Redis.put("key", "value",
           ttl: ttl,
           command_fn: fn command -> send(observer, {:unexpected, command}) end
@@ -128,7 +127,9 @@ defmodule Jido.Persistence.RedisTest do
   test "validates adapter options" do
     command_fn = fn _command -> {:ok, "OK"} end
 
-    assert :ok = Redis.validate_options(command_fn: command_fn, prefix: "custom", ttl: 1)
+    assert :ok = Redis.validate_options(command_fn: command_fn, prefix: "custom")
+    assert {:error, _reason} = Redis.validate_options(command_fn: command_fn, ttl: 1)
+    assert {:error, _reason} = Redis.validate_options(command_fn: command_fn, prefix: "a", prefix: "b")
     assert {:error, _reason} = Redis.validate_options([])
     assert {:error, _reason} = Redis.validate_options(command_fn: command_fn, prefix: :invalid)
     assert {:error, _reason} = Redis.validate_options([:not_keyword])
