@@ -4,19 +4,16 @@ defmodule Jido.Examples.Runtime.StableReferenceTest do
   use ExUnit.Case, async: true
   @moduletag :integration
 
-  import Jido.Test.Eventually
-
   alias Jido.Agent.Ref
   alias Jido.Examples.StableReference
-  alias Jido.Test.Persistence.ProbeStore
 
   setup do
-    store = start_supervised!(ProbeStore)
     primary = :"ref_primary_#{System.unique_integer([:positive])}"
     other = :"ref_other_#{System.unique_integer([:positive])}"
     primary_namespace = "chat/primary/#{System.unique_integer([:positive])}"
     other_namespace = "chat/secondary/#{System.unique_integer([:positive])}"
-    persistence = {ProbeStore, store: store}
+    table = :"logical_identity_#{System.unique_integer([:positive])}"
+    persistence = {Jido.Persistence.ETS, table: table}
 
     start_supervised!(
       {Jido, name: primary, namespace: primary_namespace, persistence: persistence},
@@ -31,7 +28,7 @@ defmodule Jido.Examples.Runtime.StableReferenceTest do
     ref = Ref.new!(namespace: primary_namespace, partition: "team-a", id: "conversation")
 
     %{
-      store: persistence,
+      persistence: persistence,
       primary: primary,
       other: other,
       ref: ref,
@@ -51,13 +48,7 @@ defmodule Jido.Examples.Runtime.StableReferenceTest do
     Process.exit(first, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^first, _reason}, 1_000
 
-    replacement =
-      eventually(fn ->
-        case Jido.resolve_agent(c.primary, c.ref) do
-          {:ok, pid} when pid != first -> pid
-          _result -> nil
-        end
-      end)
+    replacement = await_replacement(c.primary, c.ref, first, 100)
 
     assert replacement != first
     assert :ok = Jido.AgentServer.await_ready(replacement)
@@ -133,7 +124,7 @@ defmodule Jido.Examples.Runtime.StableReferenceTest do
     rebound = :"ref_rebound_#{System.unique_integer([:positive])}"
 
     start_supervised!(
-      {Jido, name: rebound, namespace: c.ref.namespace, persistence: c.store},
+      {Jido, name: rebound, namespace: c.ref.namespace, persistence: c.persistence},
       id: rebound
     )
 
@@ -152,5 +143,20 @@ defmodule Jido.Examples.Runtime.StableReferenceTest do
     assert {:ok, server} = Jido.activate_agent(instance, ref)
     assert :ok = Jido.AgentServer.await_ready(server)
     server
+  end
+
+  defp await_replacement(_instance, _ref, _first, 0), do: nil
+
+  defp await_replacement(instance, ref, first, attempts) do
+    case Jido.resolve_agent(instance, ref) do
+      {:ok, pid} when pid != first ->
+        pid
+
+      _result ->
+        receive do
+        after
+          10 -> await_replacement(instance, ref, first, attempts - 1)
+        end
+    end
   end
 end

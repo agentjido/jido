@@ -45,5 +45,5 @@ ownership, routing, or fencing.
 - [Source](stable_reference.ex)
 - [Tests](stable_reference_test.exs)
 
-Previous: [Whole Definition Upgrade](../../06_agent_server/06_10_definition_changes/README.md) |
-Next: [State Migration](../../12_persistence/12_09_state_migration/README.md)
+Previous: [Stable references](../07_03_stable_references/README.md) |
+Next: [Catalog discovery](../07_05_catalog_discovery/README.md)
