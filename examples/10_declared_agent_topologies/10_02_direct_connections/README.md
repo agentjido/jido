@@ -11,7 +11,9 @@ Explicit outputs form a local root → worker → sink → root pipeline.
 ## Read the code
 
 Read [the Agent](direct_connections.ex), then [the behavior tests](direct_connections_test.exs).
-The [worker](worker.ex) commits work and emits completion. The [sink](sink.ex) transforms completion into a receipt. Tests use the [shared runtime assertions](../../../test/support/agent_topology_assertions.ex).
+The [worker](worker.ex) commits work and emits completion. The [sink](sink.ex)
+transforms completion into a receipt. Tests observe all runtimes through
+`Jido.list_agents/2` and public AgentServer snapshots.
 
 ## Run it
 

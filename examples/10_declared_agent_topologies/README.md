@@ -9,7 +9,8 @@ starts no processes.
 1. [10_01 Named Agents](10_01_named_agents/README.md) — initial state, independent commits, JSON parity, and shutdown.
 2. [10_02 Direct Connections](10_02_direct_connections/README.md) — root → worker → sink → root, output contracts, and explicit emission.
 3. [10_03 Local Bus Broadcast](10_03_bus_broadcast/README.md) — declared Bus and counted broadcast.
-4. [10_04 Nested Agents](10_04_nested_agents/README.md) — nested ownership and subtree removal.
+4. [10_04 Nested Agents](10_04_nested_agents/README.md) — nested ownership,
+   failure isolation, root shutdown, and snapshot limits.
 The IDs follow the recommended reading order.
 
 ## Run the section
@@ -19,8 +20,8 @@ mix test.examples examples/10_declared_agent_topologies
 ```
 
 The [Cell Agent](support/cell.ex) supports member and Bus lessons. The
-[shared test assertions](../../test/support/agent_topology_assertions.ex)
-observe readiness and shutdown through AgentServer and OTP APIs.
+[public runtime support](support/runtime.ex) observes readiness and shutdown
+through `Jido.list_agents/2`, AgentServer snapshots, and process monitors.
 
 ## Limits
 

@@ -23,9 +23,9 @@ Stopping the owner stops its member runtimes.
 
 ## Important behavior
 
-Call `Server.await_ready(server)` before using the member runtimes.
-`Server.children(server)` returns runtime records; its tags are opaque. The
-tests identify these example members through their domain labels.
+Call `Jido.AgentServer.await_ready/2` before using the root. The tests use
+`Jido.list_agents/2` and public snapshots to find example members by their
+domain labels. They do not inspect private supervisor records.
 
 These members have separate domain state and share the owning supervisor
 lifetime. They are not independently supervised application roots.
@@ -41,7 +41,7 @@ coordinated snapshot of running member states.
 - [Source](independent.ex)
 - [Cell Agent](cell.ex)
 - [Tests](independent_test.exs)
-- [Test runtime assertions](../../../test/support/agent_topology_assertions.ex)
+- [Public runtime support](../support/runtime.ex)
 
 ```elixir
 topology do

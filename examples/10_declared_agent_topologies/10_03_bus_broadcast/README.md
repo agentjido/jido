@@ -28,8 +28,8 @@ The count binds from root state at startup. A root command is selected by its
 route; its emitted Signal follows the declared output connections. The root
 reply confirms its own commit. The tests wait separately for member commits.
 
-The Bus runtime belongs to the AgentServer supervisor. The cleanup test
-monitors that supervisor and its supervised descendants through public OTP APIs.
+The Bus runtime belongs to the AgentServer supervisor. The cleanup test uses
+public Agent listing and process monitors for every resident Agent.
 
 ## Limits
 
@@ -42,7 +42,7 @@ small behavior example, not a 1,000-worker capacity test.
 - [Source](swarm.ex)
 - [Cell Agent](../support/cell.ex)
 - [Tests](bus_swarm_test.exs)
-- [Test runtime assertions](../../../test/support/agent_topology_assertions.ex)
+- [Public runtime support](../support/runtime.ex)
 
 This is also the fixed-group lesson: the Agent declares stable worker roles
 and the Bus routes work. A separate controller membership table is not needed.
