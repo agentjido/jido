@@ -36,14 +36,14 @@ defmodule Jido.Instance.Ownership do
   defp reject_cycle(child, child), do: {:error, :self_ownership}
 
   defp reject_cycle(child, owner) do
-    ancestor?(owner, child, MapSet.new())
+    ancestor?(owner, child, %{})
   end
 
   defp ancestor?(current, child, _visited) when current == child,
     do: {:error, :ownership_cycle}
 
   defp ancestor?(current, child, visited) do
-    if MapSet.member?(visited, current) do
+    if Map.has_key?(visited, current) do
       {:error, :ownership_cycle}
     else
       case ServerSupervisor.live_worker(current) do
@@ -53,7 +53,7 @@ defmodule Jido.Instance.Ownership do
               :ok
 
             {:ok, %{parent_activation: parent}} when is_pid(parent) ->
-              ancestor?(parent, child, MapSet.put(visited, current))
+              ancestor?(parent, child, Map.put(visited, current, true))
 
             {:error, _reason} ->
               {:error, :ownership_ancestry_unavailable}
