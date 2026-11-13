@@ -31,12 +31,11 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
 
     flow do
       selection "decision" do
-        await("approved",
+        await "approved",
           event: "counter.approved",
           match: %{request_id: input(:request_id)}
-        )
 
-        timer("expired", after_ms: 3_600_000)
+        timer "expired", after_ms: 3_600_000
       end
 
       step "finish", _decision <- result("decision"), inline: [context: context] do
@@ -51,7 +50,7 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
     use Jido.Flow, name: "durable_activation_delayed_increment"
 
     flow do
-      timer("delay", after_ms: 300)
+      timer "delay", after_ms: 300
 
       step "finish", _timer <- result("delay"), inline: [context: context] do
         {:ok, %{count: context.agent_state.count + 10}}

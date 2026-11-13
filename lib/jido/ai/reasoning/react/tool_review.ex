@@ -23,25 +23,23 @@ defmodule Jido.AI.Reasoning.ReAct.ToolReview do
     selection "decision" do
       needs ["request"]
 
-      await("approved",
+      await "approved",
         event: "jido.ai.review.approved",
         match: %{
           review_id: result("request", [:turn, :review_id]),
           request_id: result("request", [:turn, :request_id]),
           run_id: result("request", [:turn, :run_id])
         }
-      )
 
-      await("denied",
+      await "denied",
         event: "jido.ai.review.denied",
         match: %{
           review_id: result("request", [:turn, :review_id]),
           request_id: result("request", [:turn, :request_id]),
           run_id: result("request", [:turn, :run_id])
         }
-      )
 
-      timer("expired", after_ms: 300_000)
+      timer "expired", after_ms: 300_000
     end
 
     invoke "next",

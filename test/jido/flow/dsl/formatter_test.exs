@@ -202,7 +202,15 @@ defmodule Jido.Flow.DSL.FormatterTest do
     {formatter, _opts} =
       Mix.Tasks.Format.formatter_for_file("flow.ex", dot_formatter: @formatter_path)
 
-    source = "step(1)\nstate(:count)\noutput(result(\"value\"))\nEnum.map(items, fun)\n"
+    source = """
+    def await(check, deadline), do: await(check, deadline)
+    def timer(name, options), do: timer(name, options)
+    step(1)
+    state(:count)
+    output(result("value"))
+    Enum.map(items, fun)
+    """
+
     assert formatter.(source) == source
   end
 
@@ -226,5 +234,31 @@ defmodule Jido.Flow.DSL.FormatterTest do
 
     assert formatter.(source) == source
     assert formatter.(formatter.(source)) == source
+  end
+
+  test "await and timer declarations omit parentheses" do
+    {formatter, _opts} =
+      Mix.Tasks.Format.formatter_for_file("flow.ex", dot_formatter: @formatter_path)
+
+    source = """
+    await(
+      "approved",
+      event: "report.approved",
+      match: %{report_id: result("request", :report_id)}
+    )
+
+    timer("expired", after_ms: 60_000)
+    """
+
+    expected = """
+    await "approved",
+      event: "report.approved",
+      match: %{report_id: result("request", :report_id)}
+
+    timer "expired", after_ms: 60_000
+    """
+
+    assert formatter.(source) == expected
+    assert formatter.(expected) == expected
   end
 end

@@ -41,17 +41,15 @@ defmodule Jido.Examples.Durable.DurableWait.Approval do
     selection "decision" do
       needs ["request"]
 
-      await("approved",
+      await "approved",
         event: "examples.durable.wait.approve",
         match: %{request_id: result("request", :request_id)}
-      )
 
-      await("cancelled",
+      await "cancelled",
         event: "examples.durable.wait.cancel",
         match: %{request_id: result("request", :request_id)}
-      )
 
-      timer("expired", after_ms: 3_600_000)
+      timer "expired", after_ms: 3_600_000
     end
 
     step "finish", values <- %{request: result("request"), decision: result("decision")} do

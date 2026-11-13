@@ -34,10 +34,9 @@ defmodule Jido.Examples.Durable.Waterpark.Approval do
     schema: Jido.Joi.object(%{request_id: Jido.Joi.string()})
 
   flow do
-    await("approved",
+    await "approved",
       event: "waterpark.approved",
       match: %{request_id: input(:request_id)}
-    )
 
     step "finish", _approval <- result("approved"), inline: [context: context] do
       {:ok, %{context.agent_state | status: :approved}}
@@ -53,7 +52,7 @@ defmodule Jido.Examples.Durable.Waterpark.Timer do
   use Jido.Flow, name: "waterpark_timer"
 
   flow do
-    timer("wake", after_ms: 250)
+    timer "wake", after_ms: 250
 
     step "finish", _wake <- result("wake"), inline: [context: context] do
       {:ok, %{context.agent_state | status: :timer_done}}

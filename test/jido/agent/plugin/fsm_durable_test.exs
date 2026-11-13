@@ -13,8 +13,8 @@ defmodule Jido.Agent.Plugin.FSMDurableTest do
 
     flow do
       selection "decision" do
-        await("approved", event: "approved", match: %{request_id: input(:request_id)})
-        timer("expired", after_ms: 3_600_000)
+        await "approved", event: "approved", match: %{request_id: input(:request_id)}
+        timer "expired", after_ms: 3_600_000
       end
 
       step "finish", decision <- result("decision"), inline: [context: context] do

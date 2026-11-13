@@ -55,17 +55,15 @@ defmodule Jido.Examples.StartHere.ObservedExpense.Approval do
     selection "decision" do
       needs ["request"]
 
-      await("approved",
+      await "approved",
         event: "examples.start_here.observed.approve",
         match: %{report_id: result("request", :report_id)}
-      )
 
-      await("rejected",
+      await "rejected",
         event: "examples.start_here.observed.reject",
         match: %{report_id: result("request", :report_id)}
-      )
 
-      timer("expired", after_ms: 60_000)
+      timer "expired", after_ms: 60_000
     end
 
     step "finish", values <- %{request: result("request"), decision: result("decision")} do

@@ -43,10 +43,9 @@ defmodule Jido.Examples.Observability.RuntimeTimeline.ReleaseFlow do
     selection "decision" do
       needs ["request"]
 
-      await("release",
+      await "release",
         event: "examples.observability.runtime_timeline.release",
         match: %{request_id: result("request", :request_id)}
-      )
     end
 
     step "complete",
