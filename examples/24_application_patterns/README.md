@@ -8,6 +8,9 @@ applications.
 3. [Runtime Subscription](24_03_runtime_subscription/README.md).
 4. [Purpose Loop](24_04_purpose_loop/README.md).
 5. [Compensation](24_05_compensation/README.md).
+6. [Phoenix LiveView Chat](24_06_phoenix_liveview_chat/README.md).
+7. [Recoverable External Delivery](24_07_recoverable_external_delivery/README.md).
+8. [Controlled Agent Upgrade](24_08_controlled_agent_upgrade/README.md).
 
 ```sh
 mix test.examples examples/24_application_patterns --warnings-as-errors

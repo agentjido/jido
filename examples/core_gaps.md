@@ -88,3 +88,78 @@ that makes the problem clear.
   route definition and gave a specific correction.
 - Follow-up question: Should the Agent route guide place an output-schema
   example beside its first state or reply selector?
+
+### EX-006: A reply-only route still needs explicit state projection
+
+- Example: [23_02 Specialist pipeline](23_collaborative_agent_systems/23_02_specialist_pipeline/README.md).
+- Classification: Documentation and authoring friction.
+- Attempted contract: Return `%{reply: value}` from a stateless Agent route and
+  select that field with `reply/2`.
+- Result: Agent validation treated the complete Action output as candidate
+  state and rejected the unrecognized `:reply` key.
+- Public solution: Return both `state` and `reply`, declare both output fields,
+  and select each with `state/1` and `reply/2`.
+- Core change: None proposed. Explicit projection is safe and supported.
+- Follow-up question: Should the first reply-selector example state that reply
+  selection does not disable the default state projection?
+
+### EX-007: Static declared topology has no public selected-subtree removal
+
+- Example: [23_06 Nested organization](23_collaborative_agent_systems/23_06_nested_organization/README.md).
+- Classification: Candidate Jido core change or explicit non-goal.
+- Attempted contract: Remove one declared department and its descendants while
+  the company root remains active.
+- Result: The public runtime can stop the complete root-owned subtree, but no
+  public operation addresses one declared member subtree for controlled
+  removal.
+- Public solution: The example proves complete root shutdown only and does not
+  call private topology functions.
+- Core change: Decide whether controlled declared-subtree removal belongs in
+  Jido core or whether applications must model changing membership through
+  separately owned dynamic Agents.
+- Follow-up question: If supported, how does removal coordinate admission,
+  child persistence, in-flight Turns, and rollback after partial shutdown?
+
+### EX-008: Definition upgrade cannot replace the Agent origin module
+
+- Example: [24_08 Controlled Agent Upgrade](24_application_patterns/24_08_controlled_agent_upgrade/README.md).
+- Classification: Documentation and authoring friction.
+- Attempted contract: Migrate an Account V1 Agent snapshot into an instance
+  created directly from the compiled Account V2 module.
+- Result: `Jido.upgrade_agent/4` rejected the candidate with
+  `:upgrade_identity` because its origin module changed.
+- Public solution: Use the V2 definition as a complete data template, preserve
+  the saved origin module, instantiate the migrated state, and snapshot the
+  result.
+- Core change: None proposed. Stable origin is an intentional persistence and
+  callback boundary.
+- Follow-up question: Should the upgrade guide include one complete schema and
+  route replacement example that states this origin rule?
+
+### EX-009: Definition rollback is a new forward version
+
+- Example: [24_08 Controlled Agent Upgrade](24_application_patterns/24_08_controlled_agent_upgrade/README.md).
+- Classification: Documentation and operational-model friction.
+- Attempted contract: Upgrade V1 to V2, then restore the V1 definition with
+  version 1.
+- Result: `Jido.upgrade_agent/4` rejected the reverse migration with
+  `:definition_version_not_advanced`.
+- Public solution: Publish version 3 with the earlier behavior and migrate V2
+  state into the version 1 state shape.
+- Core change: None proposed. Monotonic versions make upgrade history clear.
+- Follow-up question: Should Jido call this a forward rollback in its operator
+  guide and include a version timeline?
+
+### EX-010: Durable AI stream dispatch must be portable
+
+- Example: [24_06 Phoenix LiveView Chat](24_application_patterns/24_06_phoenix_liveview_chat/README.md).
+- Classification: Documentation and integration friction.
+- Attempted contract: Send model stream Signals directly to the LiveView PID
+  through `jido_ai_dispatch` during a durable Agent Turn.
+- Result: AgentServer rejected the Turn because the PID in durable context was
+  not portable.
+- Public solution: Subscribe the LiveView to a conversation topic and use the
+  portable `:pubsub` dispatch target in Turn context.
+- Core change: None proposed. Durable context must stay portable.
+- Follow-up question: Should the AI streaming guide use PubSub as its first
+  hosted Agent example and reserve PID dispatch for pure or transient runs?

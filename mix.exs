@@ -313,13 +313,14 @@ defmodule Jido.MixProject do
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18.5", only: [:dev, :test]},
       {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
+      {:phoenix_playground, "~> 0.1.9", only: [:dev, :test]},
       {:reach, "~> 2.8", only: [:dev, :test], runtime: false},
 
       # Test support
       {:ecto_sqlite3, "~> 0.24.1", only: :test},
       {:mimic, "~> 2.0", only: :test},
       {:opentelemetry, "~> 1.0", only: :test, runtime: false},
-      {:plug, "~> 1.0", only: :test},
+      {:plug, "~> 1.0", only: [:dev, :test]},
       {:postgrex, "~> 0.19 or ~> 1.0", only: :test},
       {:stream_data, "~> 1.4", only: :test, runtime: false}
     ]

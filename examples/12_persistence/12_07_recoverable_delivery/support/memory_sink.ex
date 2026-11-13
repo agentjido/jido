@@ -16,16 +16,34 @@ defmodule Jido.Examples.RecoverableDelivery.MemorySink do
   def deliver(jido, directive), do: GenServer.call(address(jido), {:deliver, directive})
 
   @impl true
-  def init(_opts), do: {:ok, %{records: %{}, available?: true}}
+  def init(_opts), do: {:ok, %{records: %{}, availability: :available}}
 
   @impl true
   def handle_call(:records, _from, state), do: {:reply, state.records, state}
 
   def handle_call({:available, value}, _from, state),
-    do: {:reply, :ok, %{state | available?: value}}
+    do: {:reply, :ok, %{state | availability: availability(value)}}
 
-  def handle_call({:deliver, _directive}, _from, %{available?: false} = state),
+  def handle_call({:deliver, _directive}, _from, %{availability: :unavailable} = state),
     do: {:reply, {:error, :sink_unavailable}, state}
+
+  def handle_call(
+        {:deliver, %{effect_id: id, value: value}},
+        _from,
+        %{availability: :uncertain_once} = state
+      ) do
+    case Map.fetch(state.records, id) do
+      :error ->
+        next = %{state | records: Map.put(state.records, id, value), availability: :available}
+        {:reply, {:error, :outcome_unknown}, next}
+
+      {:ok, ^value} ->
+        {:reply, :ok, %{state | availability: :available}}
+
+      {:ok, _other} ->
+        {:reply, {:error, :effect_identity_conflict}, state}
+    end
+  end
 
   def handle_call({:deliver, %{effect_id: id, value: value}}, _from, state) do
     case Map.fetch(state.records, id) do
@@ -34,6 +52,10 @@ defmodule Jido.Examples.RecoverableDelivery.MemorySink do
       {:ok, _other} -> {:reply, {:error, :effect_identity_conflict}, state}
     end
   end
+
+  defp availability(true), do: :available
+  defp availability(false), do: :unavailable
+  defp availability(value) when value in [:available, :unavailable, :uncertain_once], do: value
 
   defp address(jido), do: {:via, Registry, {Jido.Instance.Names.registry(jido), {__MODULE__, :sink}}}
 end
