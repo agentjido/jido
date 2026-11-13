@@ -73,3 +73,18 @@ that makes the problem clear.
   data rule.
 - Follow-up question: Should custom Signal compilation or JSON serialization
   identify the first non-JSON data path in its error details?
+
+### EX-005: Agent output selectors require a declared output shape
+
+- Example: [06_02 Pure and Hosted Execution Parity](06_agent_server/06_02_pure_hosted_parity/README.md).
+- Classification: Documentation and authoring friction.
+- Attempted contract: Select `output(:state)` and `output(:reply)` from an
+  inline route Action that used the default broad output schema.
+- Result: Agent compilation failed with `:unsupported_output_path` and named
+  the missing `:state` field.
+- Public solution: Declare an Action output schema that contains both selected
+  fields.
+- Core change: None proposed. Compile-time path validation prevented an unsafe
+  route definition and gave a specific correction.
+- Follow-up question: Should the Agent route guide place an output-schema
+  example beside its first state or reply selector?
