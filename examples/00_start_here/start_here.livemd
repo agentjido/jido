@@ -1,0 +1,373 @@
+# Start Here: One Expense Through Jido
+
+## Learning Path
+
+This Livebook connects the six `00_start_here` lessons. It uses the source files
+and public APIs from the examples. It does not copy their Agent, Action, Flow,
+or Plugin definitions.
+
+Run each cell in order. The notebook uses the current Jido checkout. The example
+code makes no network call and needs no credential. Mix can download missing
+dependencies when it starts the notebook.
+
+The six lessons use separate modules so that each lesson can run by itself. The
+expense domain connects them. Each lesson adds one Jido boundary:
+
+| Lesson  | New boundary                                                        |
+| ------- | ------------------------------------------------------------------- |
+| `00_01` | An Agent is a validated value.                                      |
+| `00_02` | An Action validates one unit of work.                               |
+| `00_03` | A Flow connects work through data.                                  |
+| `00_04` | A Signal selects Agent behavior.                                    |
+| `00_05` | AgentServer commits state.                                          |
+| `00_06` | A durable host can wait, resume, run an effect, and report failure. |
+
+## Install The Current Checkout
+
+This notebook is inside `examples/00_start_here`. The path points two levels up
+to the Jido Mix project.
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("../..", __DIR__)}
+])
+```
+
+## Load The Example Modules
+
+The notebook loads each existing source file. A reload does not redefine a
+module that is already in the Livebook runtime.
+
+```elixir
+example_sources = [
+  {Jido.Examples.StartHere.ValidatedExpense,
+   "00_01_validated_state/validated_state.ex"},
+  {Jido.Examples.StartHere.SubmitExpense,
+   "00_02_submit_action/submit_action.ex"},
+  {Jido.Examples.StartHere.TriageExpense,
+   "00_03_triage_flow/triage_flow.ex"},
+  {Jido.Examples.StartHere.RoutedExpense,
+   "00_04_routed_agent/routed_agent.ex"},
+  {Jido.Examples.StartHere.HostedExpense,
+   "00_05_hosted_agent/hosted_agent.ex"},
+  {Jido.Examples.StartHere.ExpenseNotification,
+   "00_06_runtime_inspection/notification.ex"},
+  {Jido.Examples.StartHere.ObservedExpense,
+   "00_06_runtime_inspection/runtime_inspection.ex"}
+]
+
+Enum.each(example_sources, fn {module, relative_path} ->
+  unless Code.ensure_loaded?(module) do
+    Code.require_file(Path.join(__DIR__, relative_path))
+  end
+end)
+
+alias Jido.AgentServer
+
+alias Jido.Examples.StartHere.{
+  ExpenseNotifications,
+  HostedExpense,
+  ObservedExpense,
+  RoutedExpense,
+  SubmitExpense,
+  TriageExpense,
+  ValidatedExpense
+}
+
+:ok
+```
+
+## 00_01: Start With Validated State
+
+An Agent starts as an immutable value. Its schema supplies defaults and rejects
+invalid state before an Agent value exists. No process starts in this cell.
+
+Files: [lesson](00_01_validated_state/README.md),
+[source](00_01_validated_state/validated_state.ex), and
+[test](00_01_validated_state/validated_state_test.exs).
+
+```elixir
+draft_expense = ValidatedExpense.instantiate!(id: "expense-livebook-draft")
+
+submitted_expense =
+  ValidatedExpense.instantiate!(
+    id: "expense-livebook-submitted",
+    state: %{report_id: "report-7", amount_cents: 12_500, status: :submitted}
+  )
+
+invalid_expense =
+  ValidatedExpense.instantiate(
+    id: "expense-livebook-invalid",
+    state: %{report_id: "report-8", amount_cents: -1, status: :submitted}
+  )
+
+%{
+  default_state: draft_expense.state,
+  explicit_state: submitted_expense.state,
+  invalid_state_rejected?: match?({:error, %Jido.Error.ValidationError{}}, invalid_expense)
+}
+```
+
+The important result is not only the error. The invalid Agent value was never
+created.
+
+## 00_02: Run One Action
+
+An Action validates one request and one result. `Jido.Exec` runs the Action
+through the same execution model that Jido uses for a one-step Flow.
+
+Files: [lesson](00_02_submit_action/README.md),
+[source](00_02_submit_action/submit_action.ex), and
+[test](00_02_submit_action/submit_action_test.exs).
+
+```elixir
+valid_submission =
+  Jido.Exec.run(SubmitExpense, %{report_id: "report-7", amount_cents: 12_500})
+
+invalid_submission =
+  Jido.Exec.run(SubmitExpense, %{report_id: "", amount_cents: 0})
+
+%{
+  valid: valid_submission,
+  invalid_input_rejected?:
+    match?({:error, %Jido.Error.ValidationError{}}, invalid_submission)
+}
+```
+
+This Action returns a value. It does not store Agent state.
+
+## 00_03: Connect Work In A Flow
+
+The Flow first submits the expense. It then classifies the review from the
+submitted result. The explicit output selects the final result.
+
+Files: [lesson](00_03_triage_flow/README.md),
+[source](00_03_triage_flow/triage_flow.ex), and
+[test](00_03_triage_flow/triage_flow_test.exs).
+
+```elixir
+{:ok, automatic_expense} =
+  Jido.Exec.run(TriageExpense, %{report_id: "report-7", amount_cents: 12_500})
+
+{:ok, manual_expense} =
+  Jido.Exec.run(TriageExpense, %{report_id: "report-8", amount_cents: 75_000})
+
+%{
+  small_expense: automatic_expense,
+  large_expense: manual_expense
+}
+```
+
+The Flow is still pure execution. It has no Agent process and makes no commit.
+
+## 00_04: Route A Signal To The Flow
+
+The Agent route maps one Signal type to the triage Flow. `Jido.Agent.cmd/3`
+evaluates one Turn. It returns a new candidate Agent and leaves the source
+Agent unchanged.
+
+Files: [lesson](00_04_routed_agent/README.md),
+[source](00_04_routed_agent/routed_agent.ex), and
+[test](00_04_routed_agent/routed_agent_test.exs).
+
+```elixir
+routed_source = RoutedExpense.instantiate!(id: "expense-livebook-routed")
+
+{:ok, routed_signal} =
+  RoutedExpense.submit_signal(%{report_id: "report-7", amount_cents: 12_500})
+
+{:ok, routed_candidate, routed_directives} =
+  Jido.Agent.cmd(routed_source, routed_signal)
+
+%{
+  source_status: routed_source.state.status,
+  candidate_state: routed_candidate.state,
+  directives: routed_directives,
+  source_and_candidate_are_different?: routed_source != routed_candidate
+}
+```
+
+Pure evaluation does not commit the candidate and does not run Directives.
+
+## 00_05: Host And Commit The Same Turn
+
+AgentServer owns one running Agent. It serializes Turns, validates candidate
+state, and commits a valid result. The pure and hosted paths use the same Agent
+behavior.
+
+Files: [lesson](00_05_hosted_agent/README.md),
+[source](00_05_hosted_agent/hosted_agent.ex), and
+[test](00_05_hosted_agent/hosted_agent_test.exs).
+
+This cell stops its prior Jido instance before it starts a new one. You can run
+the cell more than once.
+
+```elixir
+hosted_instance = StartHereLivebook.HostedJido
+:ok = Jido.stop(hosted_instance)
+{:ok, _hosted_jido} = Jido.start(name: hosted_instance)
+
+hosted_source = HostedExpense.instantiate!(id: "expense-livebook-hosted")
+
+{:ok, hosted_signal} =
+  HostedExpense.submit_signal(%{report_id: "report-7", amount_cents: 12_500})
+
+{:ok, pure_candidate, []} = Jido.Agent.cmd(hosted_source, hosted_signal)
+
+{:ok, hosted_server} = Jido.start_agent(hosted_instance, hosted_source)
+:ok = AgentServer.await_ready(hosted_server)
+
+{:ok, committed_turn} = AgentServer.call(hosted_server, hosted_signal)
+hosted_snapshot = AgentServer.snapshot(hosted_server)
+
+{:ok, invalid_hosted_signal} =
+  HostedExpense.submit_signal(%{report_id: "", amount_cents: 0})
+
+{:ok, failed_turn} = AgentServer.call(hosted_server, invalid_hosted_signal)
+snapshot_after_failure = AgentServer.snapshot(hosted_server)
+
+%{
+  committed_turn_status: committed_turn.status,
+  agent_revision: hosted_snapshot.agent_revision,
+  pure_and_hosted_state_match?: hosted_snapshot.agent.state == pure_candidate.state,
+  failed_turn_status: failed_turn.status,
+  failure_changed_committed_state?: snapshot_after_failure != hosted_snapshot
+}
+```
+
+The last value must be `false`. A failed Turn does not change committed state.
+
+## 00_06: Wait, Resume, Commit, And Run An Effect
+
+This final lesson uses a persistent Jido instance because a Flow wait needs a
+durable execution host. The ETS store is local to this Livebook runtime. It
+does not survive loss of the BEAM.
+
+The first Signal starts a Turn and leaves it waiting. The approval Signal
+resumes the same Turn. AgentServer commits the approved state before the
+notification Plugin records its effect.
+
+Files: [lesson](00_06_runtime_inspection/README.md),
+[Agent and Flow](00_06_runtime_inspection/runtime_inspection.ex),
+[notification capability](00_06_runtime_inspection/notification.ex), and
+[test](00_06_runtime_inspection/runtime_inspection_test.exs).
+
+```elixir
+runtime_instance = StartHereLivebook.RuntimeJido
+:ok = Jido.stop(runtime_instance)
+
+{:ok, _runtime_jido} =
+  Jido.start(
+    name: runtime_instance,
+    namespace: "examples/start-here/livebook",
+    persistence: {Jido.Persistence.ETS, table: StartHereLivebook.RuntimeStore}
+  )
+
+{:ok, runtime_server} =
+  Jido.start_agent(runtime_instance, ObservedExpense,
+    id: "expense-livebook-observed",
+    persistence: :inherit
+  )
+
+:ok = AgentServer.await_ready(runtime_server)
+
+{:ok, review_signal} =
+  ObservedExpense.review_signal(%{report_id: "report-7", amount_cents: 12_500})
+
+{:ok, waiting_turn} = AgentServer.call(runtime_server, review_signal)
+waiting_status = AgentServer.status(runtime_server)
+
+{:ok, approval_signal} = ObservedExpense.decision_signal("report-7", :approve)
+{:ok, committed_approval} = AgentServer.call(runtime_server, approval_signal)
+
+{:ok, [notification]} =
+  ExpenseNotifications.await(runtime_instance, runtime_server, 1)
+
+{:ok, invalid_review_signal} =
+  ObservedExpense.review_signal(%{report_id: "", amount_cents: 0})
+
+{:ok, failed_review} = AgentServer.call(runtime_server, invalid_review_signal)
+status_after_failure = AgentServer.status(runtime_server)
+snapshot_after_runtime_failure = AgentServer.snapshot(runtime_server)
+
+notification_runtime =
+  ExpenseNotifications.runtime(runtime_instance, runtime_server)
+
+notification_monitor = Process.monitor(notification_runtime)
+{:ok, stopped_snapshot} = AgentServer.stop(runtime_server)
+
+notification_runtime_stopped? =
+  receive do
+    {:DOWN, ^notification_monitor, :process, ^notification_runtime, _reason} -> true
+  after
+    1_000 -> false
+  end
+
+%{
+  wait: %{
+    turn_status: waiting_turn.status,
+    work_state: waiting_status.work_state,
+    turn_id: waiting_turn.turn_id,
+    active_turn_id: waiting_status.active_turn_id
+  },
+  resume: %{
+    turn_status: committed_approval.status,
+    same_turn?: committed_approval.turn_id == waiting_turn.turn_id
+  },
+  effect: %{
+    notification_status: notification.status,
+    observed_committed_status: notification.snapshot.agent.state.status
+  },
+  later_failure: %{
+    turn_status: failed_review.status,
+    committed?: status_after_failure.last_outcome.committed?,
+    preserved_agent_status: snapshot_after_runtime_failure.agent.state.status
+  },
+  cleanup: %{
+    stopped_agent_status: stopped_snapshot.agent.state.status,
+    notification_runtime_stopped?: notification_runtime_stopped?
+  }
+}
+```
+
+This cell shows three different views:
+
+* `TurnResult` reports the result of one request.
+* `Status` reports current operational state.
+* `Snapshot` contains the full private AgentServer state.
+
+Build an application-owned public view before you send runtime information to
+an external client.
+
+## Clean Up
+
+Stop both Jido instances. This stops the remaining hosted Agent and all owned
+processes.
+
+```elixir
+:ok = Jido.stop(hosted_instance)
+:ok = Jido.stop(runtime_instance)
+
+%{
+  hosted_instance_stopped?: Process.whereis(hosted_instance) == nil,
+  runtime_instance_stopped?: Process.whereis(runtime_instance) == nil
+}
+```
+
+## Check The Chapter
+
+The Livebook is an interactive path. The colocated ExUnit tests remain the
+integration proof. From the Jido Mix project, run:
+
+```text
+mix test.examples examples/00_start_here --warnings-as-errors
+```
+
+Continue with the focused chapters when you need more detail:
+
+* `01_actions` for Action contracts.
+* `02_flow_authoring` and `03_flow_execution` for Flows.
+* `04_agents` for pure Agent behavior.
+* `05_plugins` for reusable capabilities and effects.
+* `06_agent_server` for the live runtime.
+* `07_instance_catalog_documents` for Jido instances and stable references.

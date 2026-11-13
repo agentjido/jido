@@ -3,6 +3,11 @@
 Build one expense-approval application in six small lessons. Each lesson runs
 offline and has its own behavior test.
 
+For an interactive path through all six lessons, open the
+[Start Here Livebook](start_here.livemd). It loads the tested example modules
+and runs the value, Action, Flow, Agent, AgentServer, wait, effect, failure, and
+cleanup paths in order.
+
 1. [Validated state](00_01_validated_state/README.md) defines the Agent state.
 2. [Submit Action](00_02_submit_action/README.md) validates one unit of work.
 3. [Triage Flow](00_03_triage_flow/README.md) composes the Action in a Flow.
