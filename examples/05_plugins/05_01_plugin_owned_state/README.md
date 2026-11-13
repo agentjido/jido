@@ -39,6 +39,4 @@ Plugin processes or Directive dispatch.
 
 - [Agent and Plugin source](plugin_state_agent.ex)
 - [Behavior tests](plugin_state_agent_test.exs)
-- [Shared test setup](../../../test/support/basic_sdk_case.ex)
-
-Previous: [Route Selection](../01_03_route_selection/README.md) | Next: [Directive Agent](../01_05_directive_agent/README.md)
+Previous: [Agents](../../04_agents/README.md) | Next: [Prepared Input](../05_02_prepared_input/README.md)

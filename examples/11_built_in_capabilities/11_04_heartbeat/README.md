@@ -45,5 +45,5 @@ scheduling and persistence lessons when a missed occurrence must be recovered.
 - [Source](heartbeat.ex)
 - [Tests](heartbeat_test.exs)
 
-Previous: [Managed Jobs](../08_07_managed_jobs/README.md) |
-Next: [Runtime Inspection](../08_09_runtime_inspection/README.md)
+Previous: [Keyed Timers](../11_03_keyed_timers/README.md) |
+Next: [Sensor Manager](../11_05_sensor_manager/README.md)

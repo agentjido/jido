@@ -1,8 +1,8 @@
-Code.require_file("sink.ex", __DIR__)
-Code.require_file("support/memory_sink.ex", __DIR__)
-Code.require_file("delivery_plugin.ex", __DIR__)
-Code.require_file("delivery_worker.ex", __DIR__)
-Code.require_file("recoverable_delivery.ex", __DIR__)
+Code.require_file("../../support/recoverable_delivery/delivery_plugin.ex", __DIR__)
+Code.require_file("../../support/recoverable_delivery/sink.ex", __DIR__)
+Code.require_file("../../support/recoverable_delivery/memory_sink.ex", __DIR__)
+Code.require_file("../../support/recoverable_delivery/recoverable_delivery.ex", __DIR__)
+Code.require_file("../../support/recoverable_delivery/delivery_worker.ex", __DIR__)
 
 defmodule Jido.Examples.Persistence.RecoverableDeliveryTest do
   use Jido.Test.Agent.Case

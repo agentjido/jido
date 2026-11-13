@@ -41,5 +41,5 @@ example does not provide an external compliance archive.
 - [Agent and Flow](audit.ex)
 - [Tests](audit_test.exs)
 
-Previous: [Secure Signal](../../05_plugins/05_08_secure_signal/README.md) |
-Next: [Application Patterns](../../24_application_patterns/README.md)
+Previous: [Declared Agent Topologies](../../10_declared_agent_topologies/README.md) |
+Next: [Scheduled Signals](../11_02_scheduled_signals/README.md)

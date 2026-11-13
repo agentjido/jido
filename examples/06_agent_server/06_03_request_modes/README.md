@@ -58,7 +58,7 @@ transport errors return `{:error, reason}`. A caller wait timeout does not
 cancel accepted or queued work. Cast returns before the work commits.
 
 Previous: [Start and Address](../06_01_start_and_address/README.md) |
-Next: [Turn Control](../08_02_turn_control/README.md)
+Next: [Turn Result](../06_04_turn_result/README.md)
 
 The tests also prove overload with one queued slot, cast drop under overload,
 and an expired admission deadline. `await(pending, 0)` can time out while the

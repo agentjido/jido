@@ -30,4 +30,4 @@ The test first saves the committed `Snapshot`. It then checks the failed
 - [Tests](failure_outcome_test.exs)
 
 Previous: [Request Modes](../06_03_request_modes/README.md) |
-Next: [Turn Control](../06_06_turn_control/README.md)
+Next: [Commit Before Effects](../06_05_commit_before_effects/README.md)

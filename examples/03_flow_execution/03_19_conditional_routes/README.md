@@ -41,6 +41,4 @@ circuit-breaker feature.
 
 - [Source](conditional_routes.ex)
 - [Tests](conditional_routes_test.exs)
-- [Shared test adapter](../../../test/support/workflow_sdk_case.ex)
-
-Previous: [Effectful Steps](../04_02_effectful_steps/README.md) | Next: [Parallel Join](../04_04_parallel_join/README.md)
+Previous: [Effectful Steps](../03_18_effectful_steps/README.md) | Next: [Parallel Join](../03_20_parallel_join/README.md)

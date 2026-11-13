@@ -1,4 +1,4 @@
-# 14.08 Waterpark
+# 13_08 Waterpark
 
 This example proves the durable Agent activation model in one Jido Instance.
 It creates 20 long-lived Agents. Normal delivery uses `Jido.Agent.Ref`, not a

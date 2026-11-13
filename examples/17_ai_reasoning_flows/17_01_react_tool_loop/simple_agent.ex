@@ -1,5 +1,5 @@
 unless Code.ensure_loaded?(Jido.Examples.AI.Tools.Add) do
-  Code.require_file("../../15_ai_agents/support/arithmetic_tools.ex", __DIR__)
+  Code.require_file("../../support/arithmetic_tools.ex", __DIR__)
 end
 
 defmodule Jido.Examples.AI.SimpleAgent do

@@ -42,6 +42,4 @@ delivery, retry, idempotency, or durable effect recovery.
 - [Agent source](directive_agent.ex)
 - [Directive, Plugin, and runtime](effects.ex)
 - [Behavior tests](directive_agent_test.exs)
-- [Shared test setup](../../../test/support/basic_sdk_case.ex)
-
-Previous: [Plugin State Agent](../01_04_plugin_state_agent/README.md) | Next: [OTP supervision](../01_06_otp_supervision/README.md)
+Previous: [Pure Execution](../04_04_pure_execution/README.md) | Next: [Agent Callbacks](../04_06_agent_callbacks/README.md)

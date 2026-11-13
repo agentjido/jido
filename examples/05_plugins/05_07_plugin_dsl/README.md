@@ -68,5 +68,5 @@ new atoms.
 - [Plugin, section, and entity](thresholds.ex)
 - [Tests](plugin_dsl_test.exs)
 
-Previous: [State Middleware](../05_03_state_middleware/README.md) |
-Next: [Composition](../05_05_composition/README.md)
+Previous: [Supervised Runtime](../05_06_supervised_runtime/README.md) |
+Next: [Composition](../05_09_composition/README.md)

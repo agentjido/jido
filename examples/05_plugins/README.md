@@ -38,7 +38,8 @@ mix test.examples examples/05_plugins --warnings-as-errors
 
 - [Replies and Directives](../04_agents/04_05_replies_and_directives/README.md): validation and post-commit dispatch.
 - [JSON and Scheduler](../04_agents/04_08_data_defined_agent/README.md): import a saved document with a core runtime Plugin.
-- Keyed timers will move to the built-in Scheduler capability in chapter 11.
+- [Keyed timers](../11_built_in_capabilities/11_03_keyed_timers/README.md):
+  replace and cancel named timers through the built-in Scheduler capability.
 - [Audit](../11_built_in_capabilities/11_01_audit/README.md): bounded records in owned Agent state.
 - [SensorManager](../24_application_patterns/24_02_inbox/README.md): manage an input source and reject duplicates.
 - [Subscription](../24_application_patterns/24_03_runtime_subscription/README.md): rebuild a live resource from committed state.

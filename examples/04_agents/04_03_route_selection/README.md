@@ -50,4 +50,4 @@ Forward and transform routes are shown in
 They produce explicit Directives rather than changing domain state. Routes
 select the first match; output connections select all matching edges.
 
-Previous: [Typed Command Agent](../01_02_typed_command_agent/README.md) | Next: [Plugin State Agent](../01_04_plugin_state_agent/README.md)
+Previous: [State Schemas](../04_02_state_schemas/README.md) | Next: [Pure Execution](../04_04_pure_execution/README.md)

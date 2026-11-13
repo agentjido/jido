@@ -58,5 +58,5 @@ version identifies its contract; it does not perform an automatic upgrade.
 An authoring-only Plugin needs no runtime adapter and can be part of an
 AgentServer definition. Pure authoring does not start runtime work.
 
-Previous: [Data-defined Agent](../01_07_data_defined_agent/README.md) |
-Next: [Flow Authoring](../../02_flow_authoring/README.md)
+Previous: [Secure Signal](../05_11_secure_signal/README.md) |
+Next: [AgentServer](../../06_agent_server/README.md)

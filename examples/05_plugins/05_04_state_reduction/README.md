@@ -42,4 +42,4 @@ does not export or persist an audit history.
 - [Directive, Plugin, and Agent](state_middleware.ex)
 - [Tests](state_middleware_test.exs)
 
-Previous: [Runtime Admission](../05_02_runtime_admission/README.md) | Next: [Plugin DSL](../05_04_plugin_dsl/README.md)
+Previous: [Runtime Admission](../05_03_runtime_admission/README.md) | Next: [Directives and Hooks](../05_05_directives_and_hooks/README.md)

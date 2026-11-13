@@ -11,7 +11,8 @@ A fresh BEAM restores the same AgentServer Turn from a synced DETS file.
 ## Read the code
 
 Read [the supervisor](vm_recovery.ex), then [the adapter](support/dets_store.ex).
-The Flow is shared with [Saved Progress](../13_02_saved_progress/saved_progress.ex).
+The Flow is shared with
+[Saved Progress](../support/saved_progress_agent.ex).
 
 ```text
 application supervisor (:rest_for_one)

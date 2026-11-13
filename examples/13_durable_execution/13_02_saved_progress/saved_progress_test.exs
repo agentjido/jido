@@ -1,5 +1,5 @@
-Code.require_file("advance.ex", __DIR__)
-Code.require_file("saved_progress.ex", __DIR__)
+Code.require_file("../support/saved_progress_advance.ex", __DIR__)
+Code.require_file("../support/saved_progress_agent.ex", __DIR__)
 Code.require_file("../support/durable_step_probe.exs", __DIR__)
 
 defmodule Jido.Examples.Durable.SavedProgressTest do

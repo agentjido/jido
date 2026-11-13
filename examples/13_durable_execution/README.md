@@ -3,6 +3,19 @@
 This chapter keeps `Jido.Durable` and durable AgentServer hosting in one
 recovery path. Every example runs with local storage and no external service.
 
+## Choose the runtime mode
+
+Use durable AgentServer hosting when a stable logical Agent owns domain state,
+routes Signals, and may activate or passivate. Use `Jido.Durable` when the
+application owns a durable Flow run and reads or resumes it through the facade.
+Both modes save Flow progress at component boundaries. Neither mode resumes in
+the middle of an Action, makes external I/O exactly once, or creates one atomic
+checkpoint for a parent and all child Agents.
+
+The AgentServer lessons come first because they add logical identity, state
+commit, and process lifecycle. The `Jido.Durable` lessons then show the same
+Flow wait and recovery contracts without an Agent domain owner.
+
 ## AgentServer recovery proofs
 
 1. [Saved Agent State](13_01_saved_agent/README.md) restores committed state.

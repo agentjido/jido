@@ -36,5 +36,5 @@ application state or a durable Signal Bus when that work must survive loss.
 - [Source](scheduled_counter.ex)
 - [Tests](scheduled_counter_test.exs)
 
-Previous: [Failure Outcome](../08_03_failure_outcome/README.md) |
-Next: [Keyed Timers](../08_05_keyed_timers/README.md)
+Previous: [Audit](../11_01_audit/README.md) |
+Next: [Keyed Timers](../11_03_keyed_timers/README.md)

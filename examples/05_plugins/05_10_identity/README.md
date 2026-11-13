@@ -54,4 +54,4 @@ are not included.
 - [Shared cryptographic helpers](../support/crypto.ex)
 - [Tests](identity_test.exs)
 
-Previous: [Composition](../05_05_composition/README.md) | Next: [Secure Signal](../05_08_secure_signal/README.md)
+Previous: [Composition](../05_09_composition/README.md) | Next: [Secure Signal](../05_11_secure_signal/README.md)

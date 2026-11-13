@@ -46,4 +46,4 @@ effects. The profile merge is shallow, not recursive.
 - [Agent and state contract](typed_command_agent.ex)
 - [Behavior tests](typed_command_agent_test.exs)
 
-Previous: [Minimal Agent](../01_01_minimal_agent/README.md) | Next: [Route Selection](../01_03_route_selection/README.md)
+Previous: [Agent Definition](../04_01_agent_definition/README.md) | Next: [Route Selection](../04_03_route_selection/README.md)

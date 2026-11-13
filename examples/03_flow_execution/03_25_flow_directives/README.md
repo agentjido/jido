@@ -42,5 +42,5 @@ dependency, and executor mechanics belong to `jido_action` tests.
 - [Recording Plugin](effects.ex)
 - [Tests](flow_directives_test.exs)
 
-Previous: [Executable Continuation](../04_08_executable_continuation/README.md) |
+Previous: [Executable Continuation](../03_24_executable_continuation/README.md) |
 Next: [Flow Durability](../../13_durable_execution/README.md)

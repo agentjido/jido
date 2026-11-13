@@ -1,5 +1,5 @@
-Code.require_file("../13_02_saved_progress/advance.ex", __DIR__)
-Code.require_file("../13_02_saved_progress/saved_progress.ex", __DIR__)
+Code.require_file("../support/saved_progress_advance.ex", __DIR__)
+Code.require_file("../support/saved_progress_agent.ex", __DIR__)
 Code.require_file("support/dets_store.ex", __DIR__)
 Code.require_file("vm_recovery.ex", __DIR__)
 Code.require_file("../support/durable_step_probe.exs", __DIR__)
@@ -16,7 +16,10 @@ defmodule Jido.Examples.Durable.VMRecoveryTest do
   alias Jido.Test.Examples.Durable.{ObservedAgent, Peer, StepProbe}
 
   @instance VMRecovery.Instance
-  @sources Path.wildcard(Path.expand("../13_02_saved_progress/*.ex", __DIR__)) ++
+  @sources [
+             Path.expand("../support/saved_progress_advance.ex", __DIR__),
+             Path.expand("../support/saved_progress_agent.ex", __DIR__)
+           ] ++
              Path.wildcard(Path.expand("**/*.ex", __DIR__)) ++
              [Path.expand("../support/durable_step_probe.exs", __DIR__)]
 

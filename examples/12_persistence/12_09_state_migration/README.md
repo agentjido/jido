@@ -19,7 +19,7 @@ definition and state.
 
 Use `Jido.AgentServer.upgrade/3` for an idle running activation. That API takes
 a complete trusted Agent Codec document and can use a separate state migration
-Action or Flow. See [Whole Definition Upgrade](../08_12_definition_changes/README.md).
+Action or Flow. See [Definition Changes](../../06_agent_server/06_10_definition_changes/README.md).
 
-Previous: [Stable Reference](../08_13_stable_reference/README.md) |
-Next: [Pending Job Recovery](../08_15_pending_job_recovery/README.md)
+Previous: [Definition Revision](../12_08_definition_revision/README.md) |
+Next: [Durable Execution](../../13_durable_execution/README.md)

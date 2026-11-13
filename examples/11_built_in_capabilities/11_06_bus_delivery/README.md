@@ -42,4 +42,4 @@ The example Bus and cursor use local memory. This does not prove disk durability
 - [Source](bus_delivery.ex)
 - [Tests](bus_delivery_test.exs)
 
-Previous: [Keyed Timers](../08_05_keyed_timers/README.md) | Next: [Managed Jobs](../08_07_managed_jobs/README.md)
+Previous: [Sensor Manager](../11_05_sensor_manager/README.md) | Next: [Persistence](../../12_persistence/README.md)

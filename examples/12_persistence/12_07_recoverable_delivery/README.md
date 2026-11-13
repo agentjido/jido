@@ -9,7 +9,11 @@ An Agent saves business state and external delivery intent in one checkpoint.
 
 ## Read the code
 
-Read [the Agent](recoverable_delivery.ex), then the [Plugin](delivery_plugin.ex), [worker](delivery_worker.ex), [sink contract](sink.ex), and [memory sink](support/memory_sink.ex).
+Read the shared [Agent](../../support/recoverable_delivery/recoverable_delivery.ex),
+then the [Plugin](../../support/recoverable_delivery/delivery_plugin.ex),
+[worker](../../support/recoverable_delivery/delivery_worker.ex),
+[sink contract](../../support/recoverable_delivery/sink.ex), and
+[memory sink](../../support/recoverable_delivery/memory_sink.ex).
 
 ## Run it
 
@@ -27,11 +31,11 @@ The memory sink is not durable. Completed IDs need an application retention poli
 
 ## Files
 
-- [Agent](recoverable_delivery.ex)
-- [Plugin](delivery_plugin.ex)
-- [Worker](delivery_worker.ex)
-- [Sink](sink.ex)
-- [Memory sink](support/memory_sink.ex)
+- [Shared Agent](../../support/recoverable_delivery/recoverable_delivery.ex)
+- [Shared Plugin](../../support/recoverable_delivery/delivery_plugin.ex)
+- [Shared Worker](../../support/recoverable_delivery/delivery_worker.ex)
+- [Shared sink contract](../../support/recoverable_delivery/sink.ex)
+- [Shared memory sink](../../support/recoverable_delivery/memory_sink.ex)
 - [Demo](demo.exs)
 - [Tests](recoverable_delivery_test.exs)
 

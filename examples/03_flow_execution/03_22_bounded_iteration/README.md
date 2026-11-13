@@ -42,4 +42,4 @@ or multi-Turn work.
 - [Source](bounded_iteration.ex)
 - [Tests](bounded_iteration_test.exs)
 
-Previous: [Ordered Batch](../04_05_ordered_batch/README.md) | Next: [Nested Flow](../04_07_nested_flow/README.md)
+Previous: [Ordered Batch](../03_21_ordered_batch/README.md) | Next: [Nested Flow](../03_23_nested_flow/README.md)

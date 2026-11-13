@@ -41,4 +41,4 @@ language or allow one Plugin to change another Plugin's input.
 - [Composed Agent](composition.ex)
 - [Tests](composition_test.exs)
 
-Previous: [Plugin DSL](../05_04_plugin_dsl/README.md) | Next: [Identity](../05_07_identity/README.md)
+Previous: [Plugin DSL](../05_07_plugin_dsl/README.md) | Next: [Identity](../05_10_identity/README.md)

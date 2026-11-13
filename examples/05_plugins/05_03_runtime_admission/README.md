@@ -45,4 +45,4 @@ not provide distributed authorization, token rotation, or durable leases.
 - [Plugin, runtime, and Agent](runtime_admission.ex)
 - [Tests](runtime_admission_test.exs)
 
-Previous: [Prepared Input](../05_01_prepared_input/README.md) | Next: [State Middleware](../05_03_state_middleware/README.md)
+Previous: [Prepared Input](../05_02_prepared_input/README.md) | Next: [State Reduction](../05_04_state_reduction/README.md)

@@ -29,7 +29,7 @@ the Agent's running state.
 
 ## Limits
 
-Active Tasks are not durable. Use `08_15_pending_job_recovery` when the
+Active Tasks are not durable. Use `13_13_pending_job_recovery` when the
 application must choose an explicit retry after loss.
 
 ## Files
@@ -38,5 +38,5 @@ application must choose an explicit retry after loss.
 - [Local job runtime](job_runtime.ex)
 - [Tests](managed_jobs_test.exs)
 
-Previous: [Bus Delivery](../08_06_bus_delivery/README.md) |
-Next: [Heartbeat](../08_08_heartbeat/README.md)
+Previous: [Turn Control](../06_06_turn_control/README.md) |
+Next: [Runtime Inspection](../06_08_runtime_inspection/README.md)

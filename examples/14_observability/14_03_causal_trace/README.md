@@ -38,5 +38,5 @@ Agent placement or cross-node lifecycle guarantees.
 - [Shared EventProbe](../support/event_probe.ex)
 - [Tests](causal_trace_test.exs)
 
-Previous: [Agent Observation](../08_10_agent_observation/README.md) |
-Next: [Whole Definition Upgrade](../08_12_definition_changes/README.md)
+Previous: [Metrics](../14_02_metrics/README.md) |
+Next: [OpenTelemetry](../14_04_open_telemetry/README.md)

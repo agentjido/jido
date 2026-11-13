@@ -16,10 +16,10 @@ commits acknowledgement after the idempotent sink confirms the record.
 
 ## Read the code
 
-Read the [Agent](../../12_persistence/12_07_recoverable_delivery/recoverable_delivery.ex),
-the [Plugin](../../12_persistence/12_07_recoverable_delivery/delivery_plugin.ex),
-the [worker](../../12_persistence/12_07_recoverable_delivery/delivery_worker.ex),
-and the [idempotent sink](../../12_persistence/12_07_recoverable_delivery/support/memory_sink.ex).
+Read the shared [Agent](../../support/recoverable_delivery/recoverable_delivery.ex),
+[Plugin](../../support/recoverable_delivery/delivery_plugin.ex),
+[worker](../../support/recoverable_delivery/delivery_worker.ex), and
+[idempotent sink](../../support/recoverable_delivery/memory_sink.ex).
 Then read the [compensation pattern](../24_05_compensation/README.md).
 
 ## Run it
@@ -67,6 +67,8 @@ durable and the external adapter makes repeated delivery idempotent.
 ## Files
 
 - [Tests](recoverable_external_delivery_test.exs)
+- [Shared Agent](../../support/recoverable_delivery/recoverable_delivery.ex)
+- [Shared Plugin](../../support/recoverable_delivery/delivery_plugin.ex)
 - [Compensation lesson](../24_05_compensation/README.md)
 
 [Previous: Phoenix LiveView chat](../24_06_phoenix_liveview_chat/README.md)

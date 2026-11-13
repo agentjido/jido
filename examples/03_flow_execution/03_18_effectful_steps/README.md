@@ -40,7 +40,7 @@ next to the Flow that uses it.
 
 This folder keeps its original `effectful_steps` name, but the work is
 synchronous I/O. Jido also uses “effects” for deferred Directives that run
-after commit. The [Flow Directives lesson](../04_09_flow_directives/README.md)
+after commit. The [Flow Directives lesson](../03_25_flow_directives/README.md)
 teaches that separate contract.
 
 ## Limits
@@ -57,4 +57,4 @@ across a crash. External writes still need application idempotency.
 - [Tests](effectful_steps_test.exs)
 - [Local service adapter](read_service.ex)
 
-Previous: [Sequential Flow](../04_01_sequential_flow/README.md) | Next: [Choice and Fallback](../04_03_conditional_routes/README.md)
+Previous: [Sequential Flow](../03_17_sequential_flow/README.md) | Next: [Choice and Fallback](../03_19_conditional_routes/README.md)

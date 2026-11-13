@@ -54,4 +54,4 @@ Turns.
 - [Agent source](minimal_agent.ex)
 - [Behavior tests](minimal_agent_test.exs)
 
-Previous: [Basic overview](../README.md) | Next: [Typed Command Agent](../01_02_typed_command_agent/README.md)
+Previous: [Flow Execution](../../03_flow_execution/README.md) | Next: [State Schemas](../04_02_state_schemas/README.md)

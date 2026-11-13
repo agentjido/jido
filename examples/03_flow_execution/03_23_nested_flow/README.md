@@ -39,4 +39,4 @@ trace or persistence contract.
 - [Source](nested_flow.ex)
 - [Tests](nested_flow_test.exs)
 
-Previous: [Bounded Iteration](../04_06_bounded_iteration/README.md) | Next: [Executable Continuation](../04_08_executable_continuation/README.md)
+Previous: [Bounded Iteration](../03_22_bounded_iteration/README.md) | Next: [Executable Continuation](../03_24_executable_continuation/README.md)

@@ -42,4 +42,5 @@ runtime state or grant external authority.
 - [Tests](prepared_input_test.exs)
 
 Previous: [Topologies](../../10_declared_agent_topologies/README.md) |
-Next: [Runtime Admission](../05_02_runtime_admission/README.md)
+Previous: [Plugin-Owned State](../05_01_plugin_owned_state/README.md) |
+Next: [Runtime Admission](../05_03_runtime_admission/README.md)

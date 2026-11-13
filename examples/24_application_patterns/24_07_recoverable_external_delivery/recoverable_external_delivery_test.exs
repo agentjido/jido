@@ -1,8 +1,8 @@
-Code.require_file("../../12_persistence/12_07_recoverable_delivery/sink.ex", __DIR__)
-Code.require_file("../../12_persistence/12_07_recoverable_delivery/support/memory_sink.ex", __DIR__)
-Code.require_file("../../12_persistence/12_07_recoverable_delivery/delivery_plugin.ex", __DIR__)
-Code.require_file("../../12_persistence/12_07_recoverable_delivery/delivery_worker.ex", __DIR__)
-Code.require_file("../../12_persistence/12_07_recoverable_delivery/recoverable_delivery.ex", __DIR__)
+Code.require_file("../../support/recoverable_delivery/delivery_plugin.ex", __DIR__)
+Code.require_file("../../support/recoverable_delivery/sink.ex", __DIR__)
+Code.require_file("../../support/recoverable_delivery/memory_sink.ex", __DIR__)
+Code.require_file("../../support/recoverable_delivery/recoverable_delivery.ex", __DIR__)
+Code.require_file("../../support/recoverable_delivery/delivery_worker.ex", __DIR__)
 
 defmodule Jido.Examples.Patterns.RecoverableExternalDeliveryTest do
   use ExUnit.Case, async: false
@@ -31,9 +31,21 @@ defmodule Jido.Examples.Patterns.RecoverableExternalDeliveryTest do
     assert AgentServer.snapshot(server).agent.state.delivery.pending == %{"effect-1" => 7}
     assert MemorySink.records(jido) == %{}
 
-    assert :ok = Jido.stop_agent(jido, server)
     :ok = MemorySink.available(jido, :uncertain_once)
-    {:ok, replacement} = Jido.activate_agent(jido, ref)
+
+    monitor = Process.monitor(server)
+    Process.exit(server, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^server, :killed}, 1_000
+
+    assert :ok =
+             wait_until(fn ->
+               case Jido.resolve_agent(jido, ref) do
+                 {:ok, replacement} -> replacement != server
+                 _other -> false
+               end
+             end)
+
+    {:ok, replacement} = Jido.resolve_agent(jido, ref)
 
     assert :ok =
              wait_until(fn ->

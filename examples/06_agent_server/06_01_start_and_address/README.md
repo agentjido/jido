@@ -62,4 +62,4 @@ Clean activation shutdown clears it. Configure persistence for complete instance
 or BEAM loss. An interrupted uncommitted Turn is not recovered. This example
 does not provide distributed ownership or durable external delivery.
 
-Previous: [Directive Agent](../01_05_directive_agent/README.md) | Next: [Data-defined Agent](../01_07_data_defined_agent/README.md)
+Previous: [Plugins](../../05_plugins/README.md) | Next: [Pure and Hosted Parity](../06_02_pure_hosted_parity/README.md)

@@ -32,6 +32,6 @@ The example does not prescribe automatic restart, a shutdown reason, or cross-no
 
 - [Source](indeterminate_write_probe.ex)
 - [Tests](indeterminate_write_test.exs)
-- [Fault adapter](../../../test/support/persistence/fixtures/probe_store.ex)
+- [Fault adapter](../../../test/support/jido_persistence/fixtures/probe_store.ex)
 
 Previous: [Durable Delete](../12_05_durable_delete/README.md) | Next: [Recoverable Delivery](../12_07_recoverable_delivery/README.md)

@@ -10,7 +10,9 @@ AgentServer saves a ten-step Flow and resumes its interrupted step after a crash
 
 ## Read the code
 
-Read [the Flow and Agent](saved_progress.ex), then [Advance](advance.ex).
+Read the shared [Flow and Agent](../support/saved_progress_agent.ex), then
+[Advance](../support/saved_progress_advance.ex). VM Recovery uses the same
+stable building blocks in the next lesson.
 
 ```elixir
 {:ok, server} = Jido.start_agent(MyJido, Jido.Examples.Durable.SavedProgress.Agent,
@@ -48,8 +50,8 @@ Caller Pending handles do not survive the Server crash.
 
 ## Files
 
-- [Source](saved_progress.ex)
-- [Action](advance.ex)
+- [Shared Flow and Agent](../support/saved_progress_agent.ex)
+- [Shared Action](../support/saved_progress_advance.ex)
 - [Tests](saved_progress_test.exs)
 - [Test support](../support/durable_step_probe.exs)
 

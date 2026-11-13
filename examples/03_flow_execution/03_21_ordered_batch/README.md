@@ -38,4 +38,4 @@ belong to Jido Flow core tests.
 - [Source](ordered_batch.ex)
 - [Tests](ordered_batch_test.exs)
 
-Previous: [Parallel Join](../04_04_parallel_join/README.md) | Next: [Bounded Iteration](../04_06_bounded_iteration/README.md)
+Previous: [Parallel Join](../03_20_parallel_join/README.md) | Next: [Bounded Iteration](../03_22_bounded_iteration/README.md)

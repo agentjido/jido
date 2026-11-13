@@ -41,4 +41,4 @@ cancellation.
 - [Source](executable_continuation.ex)
 - [Tests](executable_continuation_test.exs)
 
-Previous: [Nested Flow](../04_07_nested_flow/README.md) | Next: [Flow Directives](../04_09_flow_directives/README.md)
+Previous: [Nested Flow](../03_23_nested_flow/README.md) | Next: [Flow Directives](../03_25_flow_directives/README.md)

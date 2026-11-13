@@ -36,4 +36,4 @@ The timers are not durable. Plugin or Agent loss removes pending timer processes
 - [Timer Plugin](timer.ex)
 - [Tests](burst_buncher_test.exs)
 
-Previous: [Scheduled Signals](../08_04_scheduled_signals/README.md) | Next: [Bus Delivery](../08_06_bus_delivery/README.md)
+Previous: [Scheduled Signals](../11_02_scheduled_signals/README.md) | Next: [Heartbeat](../11_04_heartbeat/README.md)

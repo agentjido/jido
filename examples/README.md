@@ -26,5 +26,6 @@ All supported examples run without network access, credentials, paid APIs, or
 live providers. Deterministic local adapters preserve external application
 boundaries.
 
-The suite conversion is in progress. Older chapter names remain supported
-until their lessons move to the table-of-contents structure.
+Chapters `00` through `25` now follow the table-of-contents structure. Some
+chapters combine closely related bullets into one comparison or application
+lesson. The chapter README states that mapping and the limits of each proof.

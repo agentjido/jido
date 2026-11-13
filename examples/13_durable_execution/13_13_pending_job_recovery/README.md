@@ -37,5 +37,5 @@ runtime service must be supplied again when a retry needs a non-default client.
 - [Local job runtime](job_runtime.ex)
 - [Tests](pending_job_recovery_test.exs)
 
-Previous: [State Migration](../08_14_state_migration/README.md) |
-Next: [Multi-Agent](../../09_dynamic_agent_composition/README.md)
+Previous: [Durable Timed Resume](../13_12_durable_timed_resume/README.md) |
+Next: [Observability](../../14_observability/README.md)

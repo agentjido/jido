@@ -49,7 +49,7 @@ cannot cancel a later Turn. A different active ID returns `{:error, :stale_turn}
 returns `{:error, :not_running}`. Commit in progress returns
 `{:error, :commit_in_progress}`. Neither API reverses committed effects.
 
-Previous: [Request Modes](../08_01_request_modes/README.md) | Next: [Failure Outcome](../08_03_failure_outcome/README.md)
+Previous: [Commit Before Effects](../06_05_commit_before_effects/README.md) | Next: [Managed Jobs](../06_07_managed_jobs/README.md)
 
 `quiesce/2` closes admission, rejects queued Turns with `:quiesced`, and waits
 for active work and effects. Reads remain available. With `active: :cancel`,

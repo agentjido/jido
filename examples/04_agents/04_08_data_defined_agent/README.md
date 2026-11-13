@@ -46,12 +46,11 @@ full DSL, data, and JSON format matrix.
 
 - [Source](data_defined_agent.ex)
 - [Tests](data_defined_agent_test.exs)
-- [Authoring tests](../../../test/authoring/agents/json_test.exs)
 - [Scheduler import tests](../../../test/jido/agent/scheduler_codec_test.exs)
 
-Previous: [OTP supervision](../01_06_otp_supervision/README.md) | Next: [Authoring Plugin](../01_08_authoring_plugin/README.md)
+Previous: [Agent Views](../04_07_agent_views/README.md) | Next: [Plugins](../../05_plugins/README.md)
 
 The [saved input document](fixtures/agent.json) is checked in. The Scheduler
 startup test reads it directly with `registry/0`; it does not first encode a
-new document. See [Plugin DSL](../../05_plugins/05_04_plugin_dsl/README.md) for
+new document. See [Plugin DSL](../../05_plugins/05_07_plugin_dsl/README.md) for
 custom syntax that lowers to the same contribution format.

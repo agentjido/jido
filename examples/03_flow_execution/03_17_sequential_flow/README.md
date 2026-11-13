@@ -44,5 +44,5 @@ This example does not teach parallel execution, collections, or external I/O.
 - [Source](sequential_flow.ex)
 - [Tests](sequential_flow_test.exs)
 
-Previous: [Dynamic Invoke](../../03_flow_execution/03_15_dynamic_invoke/README.md) |
-Next: [Effectful Steps](../04_02_effectful_steps/README.md)
+Previous: [Batch Processing](../03_16_batch_processing/README.md) |
+Next: [Effectful Steps](../03_18_effectful_steps/README.md)

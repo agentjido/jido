@@ -52,5 +52,5 @@ opts = [id: "counter", persistence: {Jido.Persistence.File, path: "tmp/counters"
 [hibernate lesson](../12_02_hibernate_and_thaw/README.md) shows complete shutdown
 and thaw rather than starting two owners for the same identity.
 
-Previous: [Plugin Applications](../../12_plugin_applications/README.md) |
+Previous: [Built-in Capabilities](../../11_built_in_capabilities/README.md) |
 Next: [Hibernate And Thaw](../12_02_hibernate_and_thaw/README.md)

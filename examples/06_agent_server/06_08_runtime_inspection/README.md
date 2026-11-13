@@ -47,5 +47,5 @@ which domain fields are secret. Semantic Telemetry remains in the next lesson.
 live Agent value with a runtime revision. `Persistence.snapshot/1` produces a
 portable saved value. The redacted debugger view is neither of these snapshots.
 
-Previous: [Heartbeat](../08_08_heartbeat/README.md) |
-Next: [Agent Observation](../08_10_agent_observation/README.md)
+Previous: [Managed Jobs](../06_07_managed_jobs/README.md) |
+Next: [Definition Changes](../06_10_definition_changes/README.md)

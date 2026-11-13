@@ -45,5 +45,5 @@ key exchange, rotation, or secure hardware storage.
 - [Shared cryptographic helpers](../support/crypto.ex)
 - [Tests](secure_signal_test.exs)
 
-Previous: [Identity](../05_07_identity/README.md) |
-Next: [Plugin Applications](../../12_plugin_applications/README.md)
+Previous: [Identity](../05_10_identity/README.md) |
+Next: [Authoring Extension](../05_12_authoring_extension/README.md)
