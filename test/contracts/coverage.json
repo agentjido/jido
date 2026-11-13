@@ -6,9 +6,9 @@
       "covered": 92
     },
     "jido.agent_server": {
-      "active": 13,
+      "active": 14,
       "coverage": 1.0,
-      "covered": 13
+      "covered": 14
     },
     "jido.plugin": {
       "active": 34,
@@ -1085,10 +1085,10 @@
       }
     },
     "jido.agent_server.composition": {
-      "active": 0,
+      "active": 1,
       "app": "jido.agent_server",
-      "coverage": null,
-      "covered": 0,
+      "coverage": 1.0,
+      "covered": 1,
       "form": "light",
       "obligations": {
         "jido.agent_server.composition.I1": {
@@ -1106,6 +1106,19 @@
           "status": "retired",
           "testable": false,
           "tests": []
+        },
+        "jido.agent_server.composition.I11": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a timed out removal closes admission and a retry finishes cleanup",
+            "test explicit cancellation stops an accepted pre-commit turn",
+            "test removal keeps durable child state for a replacement root activation",
+            "test removal stops one selected subtree and keeps the root and sibling alive"
+          ]
         },
         "jido.agent_server.composition.I2": {
           "failing": 0,

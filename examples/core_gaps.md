@@ -103,22 +103,23 @@ that makes the problem clear.
 - Follow-up question: Should the first reply-selector example state that reply
   selection does not disable the default state projection?
 
-### EX-007: Static declared topology has no public selected-subtree removal
+### EX-007: Controlled declared-subtree removal (resolved)
 
 - Example: [23_06 Nested organization](23_collaborative_agent_systems/23_06_nested_organization/README.md).
-- Classification: Candidate Jido core change or explicit non-goal.
+- Classification: Resolved Jido core gap.
 - Attempted contract: Remove one declared department and its descendants while
   the company root remains active.
-- Result: The public runtime can stop the complete root-owned subtree, but no
-  public operation addresses one declared member subtree for controlled
-  removal.
-- Public solution: The example proves complete root shutdown only and does not
-  call private topology functions.
-- Core change: Decide whether controlled declared-subtree removal belongs in
-  Jido core or whether applications must model changing membership through
-  separately owned dynamic Agents.
-- Follow-up question: If supported, how does removal coordinate admission,
-  child persistence, in-flight Turns, and rollback after partial shutdown?
+- Result: `Jido.AgentServer.remove_topology_member/4` removes one named member
+  slot and its owned descendants from the current root activation.
+- Public solution: The operation closes subtree admission, finishes accepted
+  Turns by default, stops descendants before their parent, and keeps the root
+  and sibling subtrees active. Repeated calls are safe. A partial timeout keeps
+  removal pending so a retry can continue cleanup.
+- Core change: Add the controlled operation to the public AgentServer facade.
+  Keep the static declaration and durable child records unchanged. A new root
+  activation creates the declared subtree again and restores saved state when
+  persistence is enabled.
+- Follow-up question: None.
 
 ### EX-008: Definition upgrade cannot replace the Agent origin module
 

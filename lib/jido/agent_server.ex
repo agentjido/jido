@@ -7,7 +7,7 @@ defmodule Jido.AgentServer do
   Instance when work must survive passivation or worker replacement.
   """
 
-  alias Jido.AgentServer.{Pending, Snapshot, Status, TurnResult, Worker}
+  alias Jido.AgentServer.{Pending, Snapshot, Status, Topology, TurnResult, Worker}
   alias Jido.Signal
 
   @typedoc "A local handle for one resident Agent activation."
@@ -51,6 +51,28 @@ defmodule Jido.AgentServer do
   @doc "Reopens admission when the resident activation is safe."
   @spec resume(server(), timeout()) :: {:ok, Status.t()} | {:error, term()}
   def resume(server, timeout \\ 5_000), do: Worker.resume(server, timeout)
+
+  @doc """
+  Removes one declared topology member slot from the current activation.
+
+  The operation closes admission for the selected member and all of its owned
+  descendants. It then finishes accepted Turns by default and stops
+  descendants before their parent. Use `active: :cancel` to cancel pre-commit
+  work. `timeout:` is a finite budget and defaults to 5,000 ms.
+
+  The root stays active. The declared topology and durable child records stay
+  unchanged. A replacement root activation creates the declared member again
+  and restores its saved state when persistence is enabled.
+
+  A repeated call for the same removed slot returns `:ok`. If a timeout or
+  shutdown error occurs after removal starts, the function returns
+  `{:error, {:topology_removal_incomplete, reason}}`. Admission stays closed
+  for members that entered removal, and a repeated call continues cleanup.
+  """
+  @spec remove_topology_member(server(), atom(), pos_integer(), keyword()) ::
+          :ok | {:error, term()}
+  def remove_topology_member(server, name, slot, opts \\ []),
+    do: Topology.remove_member(server, name, slot, opts)
 
   @doc "Stops one resident activation and returns its committed snapshot."
   @spec stop(server(), term(), timeout()) :: {:ok, Snapshot.t()} | {:error, term()}

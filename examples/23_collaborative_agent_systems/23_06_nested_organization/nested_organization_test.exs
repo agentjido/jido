@@ -7,7 +7,7 @@ defmodule Jido.Examples.Collaboration.NestedOrganizationTest do
   alias Jido.AgentServer
   alias Jido.Examples.Collaboration.NestedOrganization.{Company, Worker}
 
-  test "nested departments isolate worker failure and stop as one owned subtree" do
+  test "one department subtree can stop while the company stays active" do
     suffix = System.unique_integer([:positive])
     jido = :"nested_organization_#{suffix}"
     start_supervised!({Jido, name: jido}, id: jido)
@@ -36,6 +36,27 @@ defmodule Jido.Examples.Collaboration.NestedOrganizationTest do
     assert AgentServer.snapshot(failed).agent_revision == 0
     assert AgentServer.snapshot(successful).agent.state.completed == 1
     refute Map.has_key?(Map.from_struct(AgentServer.snapshot(root)), :children)
+
+    selected =
+      jido
+      |> Jido.list_agents()
+      |> Enum.filter(fn {id, _pid} ->
+        String.starts_with?(id, "company/$topology/departments/1")
+      end)
+
+    assert length(selected) == 7
+    monitors = Map.new(selected, fn {_id, pid} -> {pid, Process.monitor(pid)} end)
+
+    assert :ok = Company.remove_department(root, 1)
+
+    for {pid, monitor} <- monitors do
+      assert_receive {:DOWN, ^monitor, :process, ^pid, _reason}, 5_000
+    end
+
+    assert Process.alive?(root)
+    assert AgentServer.snapshot(root).agent.module == Company
+    assert Jido.resident_agent_count(jido) == 8
+    assert :ok = Company.remove_department(root, 1)
 
     assert :ok = Jido.stop_agent(jido, root)
     assert :ok = wait_until(fn -> Jido.resident_agent_count(jido) == 0 end)
