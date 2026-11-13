@@ -344,4 +344,4 @@ These limits protect resources. They do not make a document trustworthy. `Jido.C
 
 - [Portable Values](portable-values-and-references.md) covers atoms and references inside a document.
 - [Store Flows as JSON](../flow-data/flow-storage.md) applies this workflow to Flows.
-- [Checkpoints and Upgrades](../durability/checkpoints-and-data-upgrades.md) covers stored Agent data.
+- Checkpoints and Upgrades covers stored Agent data.

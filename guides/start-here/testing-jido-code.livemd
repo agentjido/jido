@@ -6,7 +6,7 @@ This tutorial writes ExUnit tests for an invoice system at each level: an Action
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -254,4 +254,4 @@ The cell returns `%{total: 2, failures: 0}`.
 - [Test Actions](../actions/testing-actions.livemd) adds retries, timeouts, and telemetry.
 - [Test Flows](../flow-runtime/testing-flows.livemd) adds stubbed Actions and managed runs.
 - [Test Agent Definitions](../agents/testing-agent-definitions.livemd) tests route selection and rejected definitions.
-- [Test Jido Systems](../operations/test-jido-systems.livemd) covers multi-Agent tests.
+- Test Jido Systems covers multi-Agent tests.

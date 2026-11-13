@@ -2,13 +2,13 @@
 
 This tutorial uses `Jido.Plugin.Heartbeat` to send an Agent a Signal on a fixed interval, so that periodic work runs as a normal Turn.
 
-The Plugin only produces Signals. It adds no Agent state and does not detect missed beats or report liveness. For cron rules or one-shot delays, use [Schedules](scheduler.livemd).
+The Plugin only produces Signals. It adds no Agent state and does not detect missed beats or report liveness. For cron rules or one-shot delays, use Schedules.
 
 ## Install Jido
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -158,12 +158,12 @@ An invalid value fails the Agent definition with the message "Heartbeat Plugin o
 ## Delivery behavior
 
 - The Plugin casts each tick to the Agent, so it does not wait for the Turn. A Turn longer than the interval leaves ticks queued behind it. Excess casts are dropped and logged at the postponed Turn limit.
-- The next tick is scheduled after the previous one is sent. The interval is a delay between ticks, not a wall-clock alignment. Use [Schedules](scheduler.livemd) for work that must land on a clock slot.
+- The next tick is scheduled after the previous one is sent. The interval is a delay between ticks, not a wall-clock alignment. Use Schedules for work that must land on a clock slot.
 - A tick with no matching route fails its Turn at every interval. Under the default `:log_only` error policy, each failure logs a warning and appears in `last_outcome` from `Jido.AgentServer.status/2`. Under `:stop_on_error`, the first one stops the Agent.
 - Each tick is a fresh Signal with a new ID.
 - The timer holds nothing durable. After a restart it starts over, and ticks that fell in the gap are not sent.
 
 ## Next steps
 
-- [Schedules](scheduler.livemd)
+- Schedules
 - [Status and Turn History](../agent-servers/status-and-history.md)

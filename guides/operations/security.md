@@ -81,7 +81,7 @@ Read other credentials from your application's configuration inside the Action, 
 
 Turn, effect, lifecycle, and persistence telemetry uses a fixed allowlist. It excludes Agent and Plugin state, Signal and Directive data, raw errors, process handles, and caller context. The semantic logger uses the same fields. It does include IDs and Signal types, so do not put personal data in an Agent ID or a Signal type.
 
-Other events have looser rules. Review Action, Flow, Dispatch, and Bus metadata before you send it to an outside service. See [Telemetry and Tracing](telemetry-tracing-and-logs.md#what-events-contain).
+Other events have looser rules. Review Action, Flow, Dispatch, and Bus metadata before you send it to an outside service. See Telemetry and Tracing.
 
 `Jido.Error.to_map/1` builds a map for external use. It redacts values under known sensitive keys, bounds its size, and has no stacktrace.
 

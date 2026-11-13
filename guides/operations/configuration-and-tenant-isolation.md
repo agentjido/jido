@@ -52,7 +52,7 @@ For a script or Livebook, `Jido.start/1` starts one default instance. Later call
 | `:persistence` | `nil` | The default adapter, as a `Jido.Persistence.Store` module or `{module, options}`. |
 | `:agent_server` | `[]` | Default options for each AgentServer in this instance. |
 | `:max_tasks` | `1_000` | The child limit of the instance Task supervisor. A non-negative integer or `:infinity`. |
-| `:debug` | Off | `true` or `:verbose` sets the instance log level. See [Telemetry and Tracing](telemetry-tracing-and-logs.md#log-modes). |
+| `:debug` | Off | `true` or `:verbose` sets the instance log level. See Telemetry and Tracing. |
 | `:otp_app` | None | The application that holds the configuration. |
 
 `Jido.start_link/1` rejects an unknown or repeated key with a `Jido.Error.ValidationError`. The child spec raises the same error, so a bad option stops your application at boot.
@@ -169,4 +169,4 @@ Agents in different partitions of one instance share a Runner, a Task supervisor
 
 - [Production Setup](production-configuration.md)
 - [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd)
-- [Durability Model](../durability/durability-model.md)
+- Durability Model

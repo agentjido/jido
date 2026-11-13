@@ -175,7 +175,7 @@ Finishes the current Flow and requests a new Turn. A Flow can have one Handoff. 
 
 ### Timer, await, and selection
 
-These kinds pause a Flow. See [Flow Waits](../flow-runtime/flow-waits.md).
+These kinds pause a Flow. See Flow Waits.
 
 | Kind | Field | Required | Rule |
 | --- | --- | --- | --- |

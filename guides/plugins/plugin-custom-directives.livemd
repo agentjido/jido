@@ -6,7 +6,7 @@ A Plugin can own Directive types. A handler returns one as data, and the Plugin 
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 

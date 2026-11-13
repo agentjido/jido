@@ -1,6 +1,6 @@
 # Deployment and Sizing
 
-This guide explains how Jido uses a node's resources and which settings limit it, so you can plan a deployment and size it from your own measurements. Jido publishes no capacity figures, because results depend on your Actions, state size, and store. [Load Testing](load-and-performance-testing.md) shows how to measure them.
+This guide explains how Jido uses a node's resources and which settings limit it, so you can plan a deployment and size it from your own measurements. Jido publishes no capacity figures, because results depend on your Actions, state size, and store. Load Testing shows how to measure them.
 
 ## How work uses processes
 
@@ -55,7 +55,7 @@ true = per_agent.processes >= 2
 
 Treat `per_agent` as an estimate for one Agent shape on one runtime version. Multiply it by your expected live Agent count and compare the result with your node's memory and `:erlang.system_info(:process_limit)`.
 
-To hold fewer Agents in memory, use `:idle_timeout` with `idle_policy: :hibernate`, which saves a durable Agent and stops it when unused. See [Hibernate and Thaw](../agent-servers/hibernate-thaw-and-activate.md).
+To hold fewer Agents in memory, use `:idle_timeout` with `idle_policy: :hibernate`, which saves a durable Agent and stops it when unused. See Hibernate and Thaw.
 
 ## What limits throughput
 
@@ -70,7 +70,7 @@ The time of one Turn usually comes from your code and your store:
 | --- | --- |
 | Admission | The queue ahead of this request. |
 | Evaluation | Your Actions, including external calls and retries. |
-| Commit | Schema validation, and one store write for a durable Turn. A durable Flow Turn also writes at acceptance and between steps. See [Durability Model](../durability/durability-model.md). |
+| Commit | Schema validation, and one store write for a durable Turn. A durable Flow Turn also writes at acceptance and between steps. See Durability Model. |
 | Effects | Directive delivery and Plugin hooks, after the caller has its result. |
 
 Large Agent state costs more at each commit, because the commit copies the entire state to its checkpoint and a durable commit writes it to your store. Keep large data in your own store and hold references in the Agent.
@@ -110,19 +110,19 @@ To run several nodes:
 3. Use the same namespace for the same logical Agents on each node.
 4. Move an Agent by hibernating it on its old node and activating it on its new one.
 
-If two nodes activate one Ref, compare-and-swap rejects the stale write, and the losing activation stops at that point. It can run Actions before then. See [Revisions and Conflicts](../durability/durable-revisions-and-conflicts.md).
+If two nodes activate one Ref, compare-and-swap rejects the stale write, and the losing activation stops at that point. It can run Actions before then. See Revisions and Conflicts.
 
 ## Roll out new code
 
 A rolling deploy stops old nodes and starts new ones. Plan for these points:
 
-- **Drain the old node.** Follow [Shutdown and Recovery](shutdown-and-recovery.md#drain-an-instance). Allow enough time in your platform's stop setting.
+- **Drain the old node.** Follow Shutdown and Recovery. Allow enough time in your platform's stop setting.
 - **Activate on the new node.** Jido does not do this for you. See [Production Setup](production-configuration.md#activate-durable-agents-after-boot).
-- **Keep saved records readable.** Restore checks the code that a record references, and a Flow in progress needs a compatible definition. See [Checkpoints and Upgrades](../durability/checkpoints-and-data-upgrades.md).
-- **Change running Agents in place** only through a planned upgrade. See [Upgrade Live Agents](../agent-servers/upgrade-live-agents.md).
+- **Keep saved records readable.** Restore checks the code that a record references, and a Flow in progress needs a compatible definition. See Checkpoints and Upgrades.
+- **Change running Agents in place** only through a planned upgrade. See Upgrade Live Agents.
 
 ## Next steps
 
-- [Load Testing](load-and-performance-testing.md)
+- Load Testing
 - [Production Setup](production-configuration.md)
-- [Metrics and OTel](metrics-and-open-telemetry.md)
+- Metrics and OTel

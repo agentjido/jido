@@ -67,7 +67,7 @@ Each key is `{id, vsn}`, and each value is the registered target. See [Catalog a
 
 `Jido.Codec.encode_json/2` returns a JSON string instead. The default size limit is 8 MiB. Set another with `:maximum_json_bytes`.
 
-A document stores the definition only. Encoding an instance drops its `id` and `state`, so use [persistence](../durability/checkpoints-and-data-upgrades.md) to save running data.
+A document stores the definition only. Encoding an instance drops its `id` and `state`, so use persistence to save running data.
 
 ```elixir
 ticket = DocumentGuide.TicketAgent.instantiate!(id: "ticket-1", state: %{queue: "billing"})
@@ -174,4 +174,4 @@ Limit the route list with `:operation_limit`, from 0 to 500. The default is 100.
 
 - [Jido.Codec Documents](../data/versioned-documents.md) covers the document contract and limits.
 - [Portable Values](../data/portable-values-and-references.md) covers how atoms and Maps are encoded.
-- [Checkpoints and Upgrades](../durability/checkpoints-and-data-upgrades.md) covers saved instances.
+- Checkpoints and Upgrades covers saved instances.

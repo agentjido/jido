@@ -10,7 +10,7 @@ The package is one Mix project and one OTP application, `:jido`. It compiles 521
 | --- | --- | --- |
 | Run Agents under an instance | `Jido` | [Instances and Tenants](../operations/configuration-and-tenant-isolation.md) |
 | Define an Agent | `Jido.Agent` | [Define an Agent](../agents/define-and-instantiate-an-agent.livemd) |
-| Talk to a live Agent | `Jido.AgentServer` | [Call, Cast, and Await](../agent-servers/send-signals-to-live-agents.livemd) |
+| Talk to a live Agent | `Jido.AgentServer` | Call, Cast, and Await |
 | Write one unit of work | `Jido.Action` | [Actions](../actions/actions.md) |
 | Combine work into a graph | `Jido.Flow` | [Flows](../flows/flows.md) |
 | Run an Action or Flow without an Agent | `Jido.Exec` | [Execution](../flow-runtime/execution.md) |
@@ -372,4 +372,4 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 ## Related
 
 - [Public API Guide](public-api-reference.md)
-- [Package Consolidation](consolidated-package-migration.md), for where modules from the four earlier packages went
+- Package Consolidation, for where modules from the four earlier packages went

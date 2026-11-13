@@ -16,7 +16,7 @@ This guide compares the seven `Jido.Persistence.Store` adapters that Jido includ
 
 "Data survives" and "Shared" state the adapter's limit. The system you connect to sets the real guarantee. An adapter cannot make a relaxed database, a Redis without persistence, or a relaxed Bedrock cluster durable.
 
-Jido includes only these seven. Raft support comes through Bedrock, which uses Bedrock Raft. To target another store, write a [custom adapter](../storage/custom-persistence-adapter.md).
+Jido includes only these seven. Raft support comes through Bedrock, which uses Bedrock Raft. To target another store, write a custom adapter.
 
 ## Choose by need
 
@@ -29,7 +29,7 @@ Jido includes only these seven. Raft support comes through Bedrock, which uses B
 | Several BEAM nodes with frequent writes | `Jido.Persistence.Ecto`, `Jido.Persistence.Redis`, or `Jido.Persistence.Bedrock` |
 | Low-frequency records in object storage | `Jido.Persistence.S3` |
 
-This guide makes no throughput claim. Measure with your own record sizes, as [Load Testing](../operations/load-and-performance-testing.md) describes.
+This guide makes no throughput claim. Measure with your own record sizes, as Load Testing describes.
 
 ## Options
 
@@ -114,7 +114,7 @@ store = {Jido.Persistence.ETS, table: :matrix_guide}
 
 ## Limits that affect Flows
 
-A durable Flow writes several keys per step through the same adapter, one value for each batch or produced value. These facts affect your choice. See [Continuation Storage](../storage/flow-continuations.md).
+A durable Flow writes several keys per step through the same adapter, one value for each batch or produced value. These facts affect your choice. See Continuation Storage.
 
 - `Jido.Persistence.Bedrock` and `Jido.Persistence.S3` apply their limits to each value, so a large step result can fail. Pass a reference to a large payload through a Flow.
 - `Jido.Persistence.S3` makes at least one request per write, and its documents describe it as for low-frequency records.
@@ -124,5 +124,5 @@ A durable Flow writes several keys per step through the same adapter, one value 
 ## Related
 
 - [Storage Model](../storage/persistence-storage-model.md)
-- [Custom Adapters](../storage/custom-persistence-adapter.md)
-- [Revisions and Conflicts](../durability/durable-revisions-and-conflicts.md)
+- Custom Adapters
+- Revisions and Conflicts

@@ -6,7 +6,7 @@ This tutorial writes ExUnit tests for an Agent without starting a process, and t
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -230,5 +230,5 @@ The cell returns `%{total: 11, failures: 0}`. In a Mix project, put these module
 ## Next steps
 
 - [Test Actions](../actions/testing-actions.livemd) covers a handler alone.
-- [Test Plugins](../plugins/testing-plugins.livemd) covers Plugin state and Directives.
-- [Test Jido Systems](../operations/test-jido-systems.livemd) covers multi-Agent and runtime tests.
+- Test Plugins covers Plugin state and Directives.
+- Test Jido Systems covers multi-Agent and runtime tests.

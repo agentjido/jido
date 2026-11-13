@@ -17,7 +17,7 @@ The code here runs in your application and needs a database, so the examples are
 ```elixir
 defp deps do
   [
-    {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"},
+    {:jido, github: "agentjido/jido", branch: "release/v3"},
     {:ecto_sql, "~> 3.14"},
     {:postgrex, "~> 0.19 or ~> 1.0"}
   ]
@@ -174,10 +174,10 @@ outer transaction.
 
 Validation checks configuration only. It does not query the database, so a missing table appears on the first read or write. A persistent Agent then fails during startup, and `Jido.AgentServer.await_ready/2` returns `{:error, reason}`.
 
-Other than a missing table or column, a failed write is uncertain even when the database seems to have rejected it, because the connection can drop after a commit. The runtime stops the activation and a new one reads the stored row. See [Recovery Limits](../durability/recovery-and-effect-limits.md).
+Other than a missing table or column, a failed write is uncertain even when the database seems to have rejected it, because the connection can drop after a commit. The runtime stops the activation and a new one reads the stored row. See Recovery Limits.
 
 ## Related
 
 - [Storage Model](persistence-storage-model.md): the records in this table.
 - [Production Setup](../operations/production-configuration.md): instance and supervision setup.
-- [Continuation Storage](flow-continuations.md): durable Flows add more rows per Turn.
+- Continuation Storage: durable Flows add more rows per Turn.

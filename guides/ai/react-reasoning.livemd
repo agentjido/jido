@@ -6,7 +6,7 @@ This tutorial runs `Jido.AI.Reasoning.ReAct` through each path it can take: tool
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -17,7 +17,7 @@ The root Flow is fixed and short:
 1. `start_request` loads the Session, selects tools, and appends the user message.
 2. `input_guard` checks the input.
 3. `loop` is a Flow Iterate component. Each iteration runs one model call and acts on the result.
-4. `continuation` finalizes the outcome or hands control to [Tool Review](tool-review.md).
+4. `continuation` finalizes the outcome or hands control to Tool Review.
 
 ```elixir
 Jido.AI.Reasoning.ReAct.flow().components |> Map.keys() |> Enum.sort()
@@ -262,7 +262,7 @@ The cell returns `{:completed, 2, 1, :system}`. The limits on rounds and calls a
 - A string input is longer than 2,000 characters, or a list input is larger than 2 MB. These limits are fixed.
 - The text contains `ignore previous instructions` or `reveal your system prompt`, in any letter case.
 
-These two phrases are a fixed list and a minimal check. Treat them as a floor, not as prompt-injection protection, and check input in your own Action if you need more. It blocks with reason code `:review` when review is required on a host without waits. See [Tool Review](tool-review.md).
+These two phrases are a fixed list and a minimal check. Treat them as a floor, not as prompt-injection protection, and check input in your own Action if you need more. It blocks with reason code `:review` when review is required on a host without waits. See Tool Review.
 
 ```elixir
 reply = ReActGuide.run([], %{input: String.duplicate("x", 2_001)})

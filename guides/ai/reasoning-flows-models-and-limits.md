@@ -48,7 +48,7 @@ A request can narrow Agent-level AI policy, but it cannot widen or remove it. `i
 | `instructions` | Nothing. The Agent's value stays. |
 | `limits` | Lower a limit. A higher value or `nil` keeps the Agent's value, and a limit the request leaves out keeps the Agent's value. |
 | `review_tools: true` | Nothing. The Agent's value stays. |
-| `tool_policy` | Hide tools, select fewer visible tools, and add review. See [Tool Review](tool-review.md). |
+| `tool_policy` | Hide tools, select fewer visible tools, and add review. See Tool Review. |
 
 ```elixir
 {:ok, preflight} =
@@ -91,7 +91,7 @@ If the Agent does not set a field, a request can set it to any value that the sc
 | `prompt_cache` | `%{enabled:, ttl:}` | `%{enabled: false}` | Provider prompt caching. |
 | `stream` | boolean | `false` | Call `stream_text/3` and publish stream Signals. |
 | `output_schema` | JSON Schema map or `nil` | `nil` | Require a structured final answer. |
-| `review_tools` | boolean | `false` | Require [Tool Review](tool-review.md) for all visible tools. |
+| `review_tools` | boolean | `false` | Require Tool Review for all visible tools. |
 | `tool_policy` | map | see below | Narrow the tools for this request. See [Tools and Toolsets](tools-skills-and-toolsets.livemd). |
 | `context` | `%{max_messages:, max_bytes:}` | `64`, `200_000` | The history window. See [Thread Projection](thread-projection.md). |
 | `limits` | map | see below | Request budgets. See [Model Budgets and Usage](budgets-and-usage.md). |

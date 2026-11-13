@@ -1,10 +1,10 @@
 defmodule Jido.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "3.0.0-beta.2"
   @description "A durable actor and agent framework for Elixir"
   @source_url "https://github.com/agentjido/jido"
-  @source_ref "migration/consolidated-v3"
+  @source_ref "v#{@version}"
 
   def project do
     [
@@ -99,6 +99,10 @@ defmodule Jido.MixProject do
               "Jido.Exec.Frame",
               "Jido.Instruction.Compiler",
               "Jido.Instruction.Config",
+              "Jido.Persistence.Codec.JSON.decode/2",
+              "Jido.Persistence.Codec.JSON.encode/1",
+              "Jido.Persistence.Codec.Term.decode/2",
+              "Jido.Persistence.Codec.Term.encode/1",
               "Jido.Persistence.Record",
               "Jido.Telemetry.set_debug/2"
             ],
@@ -313,6 +317,7 @@ defmodule Jido.MixProject do
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18.5", only: [:dev, :test]},
       {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
+      {:git_ops, "~> 2.12", only: :dev, runtime: false},
       {:phoenix_playground, "~> 0.1.9", only: [:dev, :test]},
       {:reach, "~> 2.8", only: [:dev, :test], runtime: false},
 
@@ -443,17 +448,23 @@ defmodule Jido.MixProject do
   end
 
   defp package do
+    guide_files =
+      for {_section, guides} <- guide_toc(),
+          {_title, path} <- guides,
+          File.regular?(path),
+          do: path
+
     [
-      files: [
-        ".formatter.exs",
-        "CHANGELOG.md",
-        "LICENSE",
-        "README.md",
-        "guides",
-        "lib",
-        "mix.exs",
-        "usage-rules.md"
-      ],
+      files:
+        [
+          ".formatter.exs",
+          "CHANGELOG.md",
+          "LICENSE",
+          "README.md",
+          "lib",
+          "mix.exs",
+          "usage-rules.md"
+        ] ++ guide_files,
       maintainers: ["Mike Hostetler"],
       licenses: ["Apache-2.0"],
       links: %{

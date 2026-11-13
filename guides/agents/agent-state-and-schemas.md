@@ -194,5 +194,5 @@ State and schema failures are `Jido.Error.ValidationError` values. State checks 
 ## Related
 
 - [Jido.Joi Validation](../data/joi-validation.md) covers schema functions.
-- [State and Directives](agent-results-and-directives.md) covers how a Turn returns state.
+- State and Directives covers how a Turn returns state.
 - [Agent Callbacks](agent-callbacks.md) covers `initialize/2`.

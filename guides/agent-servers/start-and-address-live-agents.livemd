@@ -6,7 +6,7 @@ This tutorial starts a Jido instance, runs a ticket Agent inside it, and reaches
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -223,6 +223,6 @@ Use a name only for a small, fixed set of Agents, because the runtime does not g
 
 ## Next steps
 
-- [Call, Cast, and Await](send-signals-to-live-agents.livemd) sends Signals to a running Agent.
-- [Agent Lifecycle](agent-activation-control.md) explains activations, recovery, and startup options.
-- [Hibernate and Thaw](hibernate-thaw-and-activate.md) keeps an Agent's identity across process lifetimes.
+- Call, Cast, and Await sends Signals to a running Agent.
+- Agent Lifecycle explains activations, recovery, and startup options.
+- Hibernate and Thaw keeps an Agent's identity across process lifetimes.

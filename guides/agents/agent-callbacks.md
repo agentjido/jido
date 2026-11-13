@@ -115,5 +115,5 @@ A `restore/2` that calls `instantiate/1` also runs `initialize/2`, because `inst
 ## Related
 
 - [Agent State and Schemas](agent-state-and-schemas.md) covers the steps around `initialize/2`.
-- [Checkpoints and Upgrades](../durability/checkpoints-and-data-upgrades.md) covers saved data and version changes.
-- [Plugin Persistence](../plugins/plugin-persistence.md) covers Plugin-owned state in snapshots.
+- Checkpoints and Upgrades covers saved data and version changes.
+- Plugin Persistence covers Plugin-owned state in snapshots.

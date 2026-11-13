@@ -63,21 +63,21 @@ Each callback has one owner. The owner decides where the callback runs and what 
 
 | Owner | Callback | Purpose | Guide |
 |---|---|---|---|
-| Agent | `prepare/2` | Derive portable input for this Turn. | [Plugin Routing](plugin-input-and-routes.md) |
-| Agent | `select_route/2` | Choose among matching routes. | [Plugin Routing](plugin-input-and-routes.md) |
-| Agent | `state_spec/1` | Declare one owned state field and its schema. | [Plugin State](plugin-state-and-directives.md) |
-| Agent | `directives/1` | Declare owned Directive types. | [Custom Directives](plugin-custom-directives.livemd) |
-| Agent | `reduce/2` | Compute the next value of the owned field. | [Plugin State](plugin-state-and-directives.md) |
-| AgentServer | `validate_options/1` | Check AgentServer-owned options before startup. | [Supervised Resources](plugin-supervised-resources.livemd) |
-| AgentServer | `admit/3` | Reject a Turn or derive transient input. | [Plugin Routing](plugin-input-and-routes.md) |
-| AgentServer | `child_spec/1` | Start one supervised runtime process. | [Supervised Resources](plugin-supervised-resources.livemd) |
-| AgentServer | `await_ready/2` | Report that the runtime can accept work. | [Supervised Resources](plugin-supervised-resources.livemd) |
-| AgentServer | `after_commit/3` | Observe each committed Turn. | [Post-Commit Work](plugin-post-commit-work.md) |
-| AgentServer | `dispatch/4` | Run one owned Directive after commit. | [Custom Directives](plugin-custom-directives.livemd) |
-| AgentServer | `prepare_outbound/4` | Transform or reject an outbound Signal. | [Post-Commit Work](plugin-post-commit-work.md) |
-| Persistence | `dump/3`, `load/3` | Convert the owned value for storage. | [Plugin Persistence](plugin-persistence.md) |
+| Agent | `prepare/2` | Derive portable input for this Turn. | Plugin Routing |
+| Agent | `select_route/2` | Choose among matching routes. | Plugin Routing |
+| Agent | `state_spec/1` | Declare one owned state field and its schema. | Plugin State |
+| Agent | `directives/1` | Declare owned Directive types. | Custom Directives |
+| Agent | `reduce/2` | Compute the next value of the owned field. | Plugin State |
+| AgentServer | `validate_options/1` | Check AgentServer-owned options before startup. | Supervised Resources |
+| AgentServer | `admit/3` | Reject a Turn or derive transient input. | Plugin Routing |
+| AgentServer | `child_spec/1` | Start one supervised runtime process. | Supervised Resources |
+| AgentServer | `await_ready/2` | Report that the runtime can accept work. | Supervised Resources |
+| AgentServer | `after_commit/3` | Observe each committed Turn. | Post-Commit Work |
+| AgentServer | `dispatch/4` | Run one owned Directive after commit. | Custom Directives |
+| AgentServer | `prepare_outbound/4` | Transform or reject an outbound Signal. | Post-Commit Work |
+| Persistence | `dump/3`, `load/3` | Convert the owned value for storage. | Plugin Persistence |
 
-Agent callbacks are pure. They run on both the pure path, `Jido.Agent.cmd/3`, and the live path through `Jido.AgentServer`. AgentServer callbacks run only on the live path. On the pure path `context.plugin_inputs[plugin].runtime` is `nil` and no post-commit callback runs. [Pure or Live Execution](../core-concepts/pure-or-live-execution.md) compares the two paths.
+Agent callbacks are pure. They run on both the pure path, `Jido.Agent.cmd/3`, and the live path through `Jido.AgentServer`. AgentServer callbacks run only on the live path. On the pure path `context.plugin_inputs[plugin].runtime` is `nil` and no post-commit callback runs. Pure or Live Execution compares the two paths.
 
 ## When callbacks run in a Turn
 
@@ -93,7 +93,7 @@ On the live path, one Turn calls Plugin callbacks in this order:
 8. `after_commit/3` for each Plugin, in declaration order.
 9. Directives run in batch order. `dispatch/4` handles owned Directives, and `prepare_outbound/4` runs in reverse declaration order for each outbound Signal.
 
-A failure before commit fails the Turn with no state change. A failure after commit does not undo the commit. [Post-Commit Work](plugin-post-commit-work.md) covers that case.
+A failure before commit fails the Turn with no state change. A failure after commit does not undo the commit. Post-Commit Work covers that case.
 
 ## Declare a Plugin and its options
 
@@ -275,10 +275,10 @@ reply = PluginDesign.EscalatingTicket.reply_signal!(%{})
 [:supervisor, :manager] = twice.state.escalated
 ```
 
-A Plugin can also add routes through `derive_routes/1`. See [Plugin Routing](plugin-input-and-routes.md).
+A Plugin can also add routes through `derive_routes/1`. See Plugin Routing.
 
 ## Next steps
 
-- [Write a Stateful Plugin](write-a-stateful-plugin.livemd) builds a Plugin step by step.
-- [Plugin Routing](plugin-input-and-routes.md) covers Turn input and route selection.
-- [Audit Records](../built-in-plugins/audit-records.md) shows a bundled Plugin that uses these contracts.
+- Write a Stateful Plugin builds a Plugin step by step.
+- Plugin Routing covers Turn input and route selection.
+- Audit Records shows a bundled Plugin that uses these contracts.

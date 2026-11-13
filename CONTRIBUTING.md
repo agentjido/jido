@@ -8,7 +8,7 @@ Signals, plugins, persistence, and AI capabilities.
 Jido requires Elixir `~> 1.18` and OTP 27 or later.
 
 ```sh
-git clone --branch migration/consolidated-v3 https://github.com/agentjido/jido.git
+git clone --branch release/v3 https://github.com/agentjido/jido.git
 cd jido
 mix deps.get
 mix test
@@ -39,8 +39,8 @@ paid-provider checks require an approved test environment.
 
 ## Pull requests
 
-Create consolidation work from `migration/consolidated-v3` until the V3
-cutover is complete. Explain public or compatibility changes in the pull
-request. Include the commands and results that prove the change.
+Create V3 work from `release/v3` until the V3 cutover is complete. Explain
+public or compatibility changes in the pull request. Include the commands and
+results that prove the change.
 
 See [the documentation index](docs/README.md), [the architecture map](docs/architecture/module-dependency-map.md), and [the usage rules](usage-rules.md) for more project context.

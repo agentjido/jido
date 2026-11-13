@@ -6,7 +6,7 @@ This tutorial interrupts a four-step Flow, watches the AgentServer resume the sa
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 

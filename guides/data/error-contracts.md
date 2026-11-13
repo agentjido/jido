@@ -226,4 +226,4 @@ Some modules keep their own error values, so read their guides for the details:
 ## Related
 
 - [Flow Errors](../flow-runtime/flow-errors.md) covers failures in Flows.
-- [Errors and Async](../from-typescript/errors-and-async.md) introduces error tuples for TypeScript developers.
+- Errors and Async introduces error tuples for TypeScript developers.

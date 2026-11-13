@@ -233,6 +233,6 @@ paid = Signal.new!("invoice.paid", %{}, source: "/billing")
 
 ## Related
 
-- [Transforms and Forwards](../agents/route-transforms-and-forwards.md) for Agent route behavior.
+- Transforms and Forwards for Agent route behavior.
 - [Signal Bus](signal-bus-and-subscriptions.md), which uses these path rules for subscriptions.
 - [Signal Dispatch Adapters](dispatch-adapters.md) to deliver a Signal to a target. A dispatch target can be a Router target, but the Router does not deliver it.

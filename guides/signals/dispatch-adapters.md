@@ -330,5 +330,5 @@ Each delivery through an adapter or `:noop` emits `[:jido, :dispatch, :start]`, 
 
 ## Related
 
-- [State and Directives](../agents/agent-results-and-directives.md) to dispatch from an Agent with `Jido.Agent.Directive.Emit`.
+- State and Directives to dispatch from an Agent with `Jido.Agent.Directive.Emit`.
 - [Signal Bus](signal-bus-and-subscriptions.md) for the Bus that the `:bus` adapter publishes to.

@@ -6,7 +6,7 @@ This tutorial writes ExUnit tests for an AI Agent at each level: its definition,
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -260,7 +260,7 @@ Assert on `status`, `reason_code`, and the counters. Avoid asserting on reason t
 
 An AgentServer gets its client from the same `:context` option on `call/3` or from the `:ai_inference_client` application setting. A context with a module name is portable, so it also works for a durable Turn.
 
-Start a fresh Jido instance for each test. See [Test Jido Systems](../operations/test-jido-systems.livemd).
+Start a fresh Jido instance for each test. See Test Jido Systems.
 
 ```elixir
 defmodule TestingAIGuide.ServerTest do
@@ -315,5 +315,5 @@ Keep real-provider tests out of the default suite. Tag them, exclude the tag in 
 ## Next steps
 
 - [Inference Clients](inference-clients.md) covers the client contract.
-- [Tool Review](tool-review.md) has a test pattern for waits.
-- [Test Jido Systems](../operations/test-jido-systems.livemd) covers wider system tests.
+- Tool Review has a test pattern for waits.
+- Test Jido Systems covers wider system tests.

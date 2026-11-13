@@ -6,7 +6,7 @@ In this tutorial you save an invoice Agent to files, kill its server, stop the w
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 

@@ -6,7 +6,7 @@ This tutorial builds an AI Agent that answers invoice questions with one tool, i
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 

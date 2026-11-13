@@ -143,7 +143,7 @@ stale = put_in(snapshot.references[StorageModelGuide.ApplyPayment], <<0::128>>)
 {:error, %Jido.Error.ValidationError{code: :changed_reference}} = Jido.Persistence.restore(stale)
 ```
 
-[Checkpoints and Upgrades](../durability/checkpoints-and-data-upgrades.md) covers `Jido.Persistence.upgrade/3` and `Jido.Persistence.upgrade_agent/5`.
+Checkpoints and Upgrades covers `Jido.Persistence.upgrade/3` and `Jido.Persistence.upgrade_agent/5`.
 
 Three things are not in a checkpoint:
 
@@ -164,7 +164,7 @@ waiting = StorageModelGuide.Invoice.instantiate!(id: "inv-1002", state: %{note: 
 [:snapshot, :agent, :state, :note, :owner] = path
 ```
 
-See [Portable Values](../data/portable-values-and-references.md) for the full rule. A [Plugin](../plugins/plugin-persistence.md) can convert its own state value into a portable form with `dump/3` and `load/3`.
+See [Portable Values](../data/portable-values-and-references.md) for the full rule. A Plugin can convert its own state value into a portable form with `dump/3` and `load/3`.
 
 ## Revisions
 
@@ -186,7 +186,7 @@ paid = %{invoice | state: %{invoice.state | paid_cents: 500}}
   Jido.Persistence.load_agent_with_revision(store, StorageModelGuide.Invoice, "inv-1001", namespace: "billing")
 ```
 
-Saving the identical record at the same revision succeeds, so a retry of a confirmed write does no harm. A revision check is not a writer lease. It rejects a stale write, but it does not stop two nodes from running the same Agent. See [Revisions and Conflicts](../durability/durable-revisions-and-conflicts.md).
+Saving the identical record at the same revision succeeds, so a retry of a confirmed write does no harm. A revision check is not a writer lease. It rejects a stale write, but it does not stop two nodes from running the same Agent. See Revisions and Conflicts.
 
 ## Tombstones
 
@@ -222,7 +222,7 @@ A read returns the value and a condition for the next write. The condition is on
 | `{:error, {:rejected, reason}}` | No. The adapter finished a check before the write started | Fix the cause. For example, the value is too large |
 | `{:error, {:indeterminate, reason}}` or `{:error, :indeterminate}` | Unknown | Do not retry blindly. Read first, then make a domain decision |
 
-Any other adapter error, a raise, or an invalid reply counts as indeterminate. `Jido.AgentServer` stops an activation after an uncertain write, so a new activation reads the stored truth before more work starts. See [Recovery Limits](../durability/recovery-and-effect-limits.md).
+Any other adapter error, a raise, or an invalid reply counts as indeterminate. `Jido.AgentServer` stops an activation after an uncertain write, so a new activation reads the stored truth before more work starts. See Recovery Limits.
 
 ## Other record families
 
@@ -233,8 +233,8 @@ cannot commit a timed wait without its wake data. Wake data uses one-minute
 buckets, 64 fixed shards, and a small active-bucket index. Each shard and index
 entry has a generation. Cleanup cannot remove index membership for a newer
 concurrent shard write. Failed recovery reads and cleanup writes retry with an
-observable warning. Runtime recovery does not scan the Store. [Continuation
-Storage](flow-continuations.md) lists the Flow records.
+observable warning. Runtime recovery does not scan the Store. Continuation
+Storage lists the Flow records.
 
 ## Inspect and export records
 
@@ -280,6 +280,6 @@ application state.
 
 ## Related
 
-- [Persistence Adapters](persistence-adapters.livemd): configure and swap a store.
-- [Custom Adapters](custom-persistence-adapter.md): implement the byte contract.
-- [Durability Model](../durability/durability-model.md): how the runtime uses this storage.
+- Persistence Adapters: configure and swap a store.
+- Custom Adapters: implement the byte contract.
+- Durability Model: how the runtime uses this storage.

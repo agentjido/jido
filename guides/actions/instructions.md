@@ -175,4 +175,4 @@ An Instruction is a runtime value. It has no JSON form, because module atoms and
 
 - [Actions](actions.md)
 - [Action Context](action-context.md)
-- [Definitions and Runtime](../core-concepts/definitions-instances-activations.md)
+- Definitions and Runtime

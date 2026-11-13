@@ -1,6 +1,6 @@
 # Telemetry Events
 
-This guide lists every `:telemetry` event Jido emits, with its measurements and metadata. Use it when you write a handler or a metric. For how to use the events, see [Telemetry and Tracing](../operations/telemetry-tracing-and-logs.md), and for reporters and spans, see [Metrics and OTel](../operations/metrics-and-open-telemetry.md).
+This guide lists every `:telemetry` event Jido emits, with its measurements and metadata. Use it when you write a handler or a metric. For how to use the events, see Telemetry and Tracing, and for reporters and spans, see Metrics and OTel.
 
 ## Inventory functions
 
@@ -273,6 +273,6 @@ Each counter counts events. `jido.agent_server.directives.returned.count` does n
 
 ## Related
 
-- [Telemetry and Tracing](../operations/telemetry-tracing-and-logs.md)
-- [Metrics and OTel](../operations/metrics-and-open-telemetry.md)
-- [Configuration Reference](configuration-reference.md)
+- Telemetry and Tracing
+- Metrics and OTel
+- Configuration Reference

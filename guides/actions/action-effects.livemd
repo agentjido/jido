@@ -4,7 +4,7 @@ In this tutorial you build Actions that return plain outputs, deferred effect re
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -315,6 +315,6 @@ signal = Jido.Signal.new!("refund.record", %{amount_cents: 50}, source: "/billin
 
 ## Next steps
 
-- [State and Directives](../agents/agent-results-and-directives.md)
-- [Runtime Effects](../agent-servers/runtime-directives-and-effects.md)
-- [Recovery Limits](../durability/recovery-and-effect-limits.md)
+- State and Directives
+- Runtime Effects
+- Recovery Limits

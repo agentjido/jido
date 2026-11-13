@@ -8,7 +8,7 @@ For the Bus API itself, see [Signal Bus](../signals/signal-bus-and-subscriptions
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -278,9 +278,9 @@ The default memory store does not survive a Bus or Agent restart. A durable subs
 
 ## The `signal_bus` section
 
-`Jido.Plugin.Bus.DSL` is a different tool. It adds a `signal_bus` section that declares one local Bus as an endpoint for Agent topology connections, with `bus(:name)` references. That Bus is private to the topology, so `Jido.Signal.Bus.whereis/2` does not find it by the declared name. Use the Manager when other code must publish to the Bus by name. Use the section when only topology connections reach it. See [Connect Agent Outputs](../composition/connect-agent-outputs.livemd).
+`Jido.Plugin.Bus.DSL` is a different tool. It adds a `signal_bus` section that declares one local Bus as an endpoint for Agent topology connections, with `bus(:name)` references. That Bus is private to the topology, so `Jido.Signal.Bus.whereis/2` does not find it by the declared name. Use the Manager when other code must publish to the Bus by name. Use the section when only topology connections reach it. See Connect Agent Outputs.
 
 ## Next steps
 
 - [Durable Subscriptions](../signals/durable-subscriptions.md)
-- [Supervised Resources](../plugins/plugin-supervised-resources.livemd)
+- Supervised Resources

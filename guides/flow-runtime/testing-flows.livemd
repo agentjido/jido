@@ -6,7 +6,7 @@ In this tutorial you write ExUnit tests for a Flow: its output and effects, its 
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -319,7 +319,7 @@ end
 - Do not sleep and hope. Wait on a message from an Action or hook with `assert_receive`.
 - A blocking Action under `Jido.Exec.run/4` blocks your test, because the call has no caller-side timeout. Pass `:timeout`, or send the Action a release message.
 - Durable runs reject PIDs in context. Pass a registered name, then look it up in the Action with `Process.whereis/1`.
-- To test waits, start a durable Agent as shown in [Flow Waits](flow-waits.md#host-the-flow-in-an-agent). Set `after_ms: 0` on a `timer` to test expiry without a delay.
+- To test waits, start a durable Agent as shown in Flow Waits. Set `after_ms: 0` on a `timer` to test expiry without a delay.
 
 ## Next steps
 

@@ -339,7 +339,11 @@
   ],
   checks: [
     source_paths: ["lib"],
-    layer_coverage: [require_all_modules: true, forbid_multiple_matches: true]
+    layer_coverage: [
+      require_all_modules: true,
+      forbid_multiple_matches: true,
+      ignore: ["Jido.Formatter"]
+    ]
   ],
   boundaries: [
     public: [],

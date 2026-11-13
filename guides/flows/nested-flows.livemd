@@ -4,7 +4,7 @@ Run this Livebook to call one Flow from another, pass data across the boundary, 
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 

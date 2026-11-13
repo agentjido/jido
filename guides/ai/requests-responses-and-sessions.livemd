@@ -6,7 +6,7 @@ This tutorial sends AI requests to an Agent, reads the response, and follows the
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -195,7 +195,7 @@ pending = Jido.AgentServer.submit(server, TicketAgent.request_signal!(%{input: "
 
 `call/3` waits for the reply. `submit/3` admits the request and returns a handle for `await/2`. Both commit, so the second request sees the first. The cell returns `"I have seen 1 user messages."`, `"I have seen 2 user messages."`, and the revisions 4 and 8.
 
-Use `call/3` with a longer timeout for real model calls, because the default is 5 seconds. [Call, Cast, and Await](../agent-servers/send-signals-to-live-agents.livemd) covers the options.
+Use `call/3` with a longer timeout for real model calls, because the default is 5 seconds. Call, Cast, and Await covers the options.
 
 ## Do not cast an AI request
 

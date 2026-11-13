@@ -2,7 +2,7 @@
 
 This guide stores Jido records in a Bedrock cluster, a distributed key-value store that runs inside your Elixir application. Jido talks to Bedrock through `Jido.Persistence.Bedrock`.
 
-Jido has no separate Raft adapter. Raft appears here only because Bedrock uses the `bedrock_raft` package, and you add that package as a dependency. To run your own Raft log, write a [custom adapter](custom-persistence-adapter.md) that gives one atomic conditional write per key.
+Jido has no separate Raft adapter. Raft appears here only because Bedrock uses the `bedrock_raft` package, and you add that package as a dependency. To run your own Raft log, write a custom adapter that gives one atomic conditional write per key.
 
 This adapter has a narrower test record than the others. Jido's test suite exercises it against a local stand-in for the repository, and its service suite against a live cluster is currently paused. Test your own cluster setup before you rely on it, including the failure cases below.
 
@@ -16,7 +16,7 @@ Bedrock is optional for Jido. The adapter supports Bedrock `0.7.2` and later `0.
 ```elixir
 defp deps do
   [
-    {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"},
+    {:jido, github: "agentjido/jido", branch: "release/v3"},
     {:bedrock, "~> 0.7.2"},
     {:bedrock_raft, "~> 0.10.0"}
   ]
@@ -72,7 +72,7 @@ Bedrock accepts keys of at most 16 KiB and values of at most 128 KiB. The adapte
 | Value over 131,072 bytes | `{:error, {:rejected, {:bedrock_value_too_large, size, 131_072}}}` |
 | Key in the system keyspace | `{:error, {:rejected, :bedrock_system_key_not_allowed}}` |
 
-The value limit matters for Jido. A record holds the complete Agent, including its definition and state, and a [Flow execution record](flow-continuations.md) holds one step's values. A write over the limit is a certain failure, but it still fails the Turn. Measure your largest Agent before you choose this adapter. Keep large documents outside Agent state.
+The value limit matters for Jido. A record holds the complete Agent, including its definition and state, and a Flow execution record holds one step's values. A write over the limit is a certain failure, but it still fails the Turn. Measure your largest Agent before you choose this adapter. Keep large documents outside Agent state.
 
 ## Write behavior
 
@@ -87,7 +87,7 @@ Bedrock retries commit failures by default, and a commit timeout can have an unk
 | A resolver abort | `{:error, :conflict}` |
 | Any other transaction failure | `{:error, {:indeterminate, reason}}` |
 
-After an indeterminate result, read before you decide what to do. See [Recovery Limits](../durability/recovery-and-effect-limits.md).
+After an indeterminate result, read before you decide what to do. See Recovery Limits.
 
 Each transaction runs in a fresh process. A write therefore does not join a Bedrock transaction your application has open. It commits on its own, and your transaction cannot roll it back.
 
@@ -98,5 +98,5 @@ The adapter does not make a relaxed cluster durable. Bedrock's cluster configura
 ## Related
 
 - [Storage Model](persistence-storage-model.md): records, conditions, and write results.
-- [Persistence Adapters](persistence-adapters.livemd): compare the shipped adapters.
-- [Custom Adapters](custom-persistence-adapter.md): implement another store.
+- Persistence Adapters: compare the shipped adapters.
+- Custom Adapters: implement another store.

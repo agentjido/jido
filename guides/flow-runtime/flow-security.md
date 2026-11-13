@@ -196,7 +196,7 @@ Do these in production:
 
 A Store's contents decide what a resumed run does next. Limit who can write to it. `Jido.Durable.start/4` rejects PIDs, ports, references, and functions in params, context, and metadata. Direct Runic callers must enforce their own portability boundary. Portability checks do not filter secrets or malicious data.
 
-An Action module that changes after a graph is built fails with `details.reason: :incompatible_target` instead of running new code against the old graph. A durable Turn compares a fingerprint of its Flow and loaded code in the same way. See [Durable Turns and Flows](../durability/durable-turns-and-flows.livemd).
+An Action module that changes after a graph is built fails with `details.reason: :incompatible_target` instead of running new code against the old graph. A durable Turn compares a fingerprint of its Flow and loaded code in the same way. See Durable Turns and Flows.
 
 ## Check your setup
 

@@ -37,7 +37,7 @@ This guide is a lookup table from what you write in TypeScript and Node.js to it
 | `class` with fields and methods | `defmodule` with `defstruct` and functions | Functions take the struct as an argument and return a new one |
 | `interface` that a class implements | `@behaviour` with `@callback` | Checked at compile time, with warnings |
 | `import { f } from "./m"` | `alias M` then `M.f()`, or `import M` | Calls name a module, so no file path appears |
-| `throw` | `raise`, or return `{:error, reason}` | See [Errors and Async](errors-and-async.md) |
+| `throw` | `raise`, or return `{:error, reason}` | See Errors and Async |
 | Decorator, code generation | `use` and macros | Runs at compile time |
 
 These rows show the first differences you will meet in code.
@@ -111,7 +111,7 @@ Elixir has a standard module named `Agent` for holding state in a process. It is
 | A CloudEvents object, a queue message | Signal | `Jido.Signal` | Has a `type`, a `source`, and `data` |
 | A state type plus a reducer's `switch` | Agent | `Jido.Agent` | Routes map a Signal type to an Action or Flow |
 | One call to `reducer(state, event)` | Turn | `Jido.Agent.cmd/3` | Returns next state and Directives |
-| `{ type: "email", to }` returned from a reducer | Directive | `Jido.Agent.Directive` | See [Effects as Data](effects-as-data.md) |
+| `{ type: "email", to }` returned from a reducer | Directive | `Jido.Agent.Directive` | See Effects as Data |
 | A class instance with a request queue, under a process manager | AgentServer | `Jido.AgentServer` | Commits state, then performs Directives |
 | A service container | Jido instance | `Jido` | A supervisor with a registry |
 | A middleware or extension package | Plugin | `Jido.Plugin` | Adds its own state, routes, and Directive handling |
@@ -172,4 +172,4 @@ The `as: :apply_payment` option generated `apply_payment_signal!/1`. Unlike a re
 
 - [Jido Mental Model](../start-here/jido-mental-model.md) follows one Signal through these pieces.
 - [Build Your First Action](../start-here/first-action.livemd) starts the hands-on path.
-- [Effects as Data](effects-as-data.md) explains the Directive row.
+- Effects as Data explains the Directive row.

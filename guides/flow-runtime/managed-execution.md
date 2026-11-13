@@ -181,6 +181,6 @@ durability contract.
 
 ## Next steps
 
-- [Flow Waits](flow-waits.md) explains saved Signal and timer waits.
+- Flow Waits explains saved Signal and timer waits.
 - [Debug Flows](debugging-flows.md) explains workflow inspection.
 - [Flow Security](flow-security.md) explains what a Store can contain.

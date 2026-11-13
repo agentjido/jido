@@ -157,6 +157,6 @@ Three behaviors matter in application code:
 
 ## Related
 
-- [Persistence Adapters](persistence-adapters.livemd): configure a store on an instance.
+- Persistence Adapters: configure a store on an instance.
 - [Storage Model](persistence-storage-model.md): what these adapters store.
-- [Test Jido Systems](../operations/test-jido-systems.livemd): test patterns for persistent Agents.
+- Test Jido Systems: test patterns for persistent Agents.

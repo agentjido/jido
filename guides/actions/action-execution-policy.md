@@ -234,7 +234,7 @@ Long-running work that must survive the caller belongs under `Jido.Durable` or a
 
 ## Observe attempts
 
-Each attempt emits `[:jido, :action, :start]` and `[:jido, :action, :stop]` telemetry events with its own `attempt_id`. The `attempt` metadata value starts at `0`. Normal errors complete the span with `outcome: :error`. See [Telemetry and Tracing](../operations/telemetry-tracing-and-logs.md).
+Each attempt emits `[:jido, :action, :start]` and `[:jido, :action, :stop]` telemetry events with its own `attempt_id`. The `attempt` metadata value starts at `0`. Normal errors complete the span with `outcome: :error`. See Telemetry and Tracing.
 
 ## Related
 

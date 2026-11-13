@@ -101,7 +101,7 @@ A Signal carries no signature. A passing check means the Signal has the right sh
 
 The catalog does not authorize operations or execute commands. Decide what a caller may do with your own policy, using an identity you verified at the edge, such as an authenticated connection or a verified signature. Do not set a `tenantid` from the request body and then treat it as verified.
 
-For a live Agent, [Admission and Deadlines](../agent-servers/agent-server-admission.md) and [Plugin Routing](../plugins/plugin-input-and-routes.md) cover where a check can run before a Turn. The Secure Signal example chapter shows a Plugin that verifies signed input. [Security Model](../operations/security.md) describes the wider model.
+For a live Agent, Admission and Deadlines and Plugin Routing cover where a check can run before a Turn. The Secure Signal example chapter shows a Plugin that verifies signed input. [Security Model](../operations/security.md) describes the wider model.
 
 ## Schema code is trusted
 

@@ -177,7 +177,7 @@ To go through a run one unit at a time, start it with `dispatch_mode: :manual` a
 | `:missing_key` with `ref_type: :result` | The Action output lacks the field | `details.path`, the Action's `output_schema` |
 | `:missing_key` with `ref_type: :context` | Context was not passed, or not passed again on resume | `details.path` |
 | `"Action output validation must return a map"` from the Flow | `output` is a list or scalar | Wrap it: `output %{items: result("items")}` |
-| `:unsupported_host` | A Flow with a wait ran outside a durable Agent | [Flow Waits](flow-waits.md) |
+| `:unsupported_host` | A Flow with a wait ran outside a durable Agent | Flow Waits |
 | `:execution_active` forever | A manual run needs another `step`, or an Action is blocked | `Runic.Runner.admission_status/2` |
 | `:admission_stopped` | A failure elsewhere in the run stopped new units | `causes` from `Runic.Runner.admission_status/2` |
 | `:non_portable_durable_value` | Managed data holds a PID, reference, port, or function | `details.path`, `details.type` |

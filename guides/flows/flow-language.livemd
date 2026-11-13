@@ -4,7 +4,7 @@ Run this Livebook to see each common Flow declaration work on an order-processin
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 

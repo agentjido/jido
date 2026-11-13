@@ -6,7 +6,7 @@ In this tutorial you attach a telemetry handler to a live Agent and follow one T
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 

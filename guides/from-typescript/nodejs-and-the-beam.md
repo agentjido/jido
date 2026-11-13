@@ -64,7 +64,7 @@ const invoices = await Promise.all(
 true = elapsed_microseconds < 300_000
 ```
 
-The three calls overlap, so the total is less than three times 100 ms. Results keep input order, as they do with `Promise.all`. [Errors and Async](errors-and-async.md) covers failure and timeouts.
+The three calls overlap, so the total is less than three times 100 ms. Results keep input order, as they do with `Promise.all`. Errors and Async covers failure and timeouts.
 
 ## Busy work does not hold the others back
 
@@ -296,10 +296,10 @@ restarted =
 :ok = Jido.stop(BeamGuide.Jido)
 ```
 
-The `billing` worker crashed. The `returns` worker never noticed. The Turn in progress and any queued casts are lost in a crash, and an activation allows three restarts in five seconds. [Agent Lifecycle](../agent-servers/agent-activation-control.md) lists every effect of a restart.
+The `billing` worker crashed. The `returns` worker never noticed. The Turn in progress and any queued casts are lost in a crash, and an activation allows three restarts in five seconds. Agent Lifecycle lists every effect of a restart.
 
 ## Next steps
 
 - [TypeScript Concept Map](typescript-concept-map.md) translates tools, syntax, and Jido terms.
-- [Errors and Async](errors-and-async.md) moves `try`, `catch`, and `Promise` code to Elixir.
+- Errors and Async moves `try`, `catch`, and `Promise` code to Elixir.
 - [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd) runs Agents in a Jido instance.

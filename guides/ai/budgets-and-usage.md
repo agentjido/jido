@@ -263,7 +263,7 @@ The request paid for both answers. Read an answer from `model_attempts` only whe
 
 ### See limits in your logs
 
-Limit hits log at `:warning` when the AI semantic logger is on. It is off by default. See [Telemetry and Tracing](../operations/telemetry-tracing-and-logs.md#limit-warnings).
+Limit hits log at `:warning` when the AI semantic logger is on. It is off by default. See Telemetry and Tracing.
 
 ## Read usage
 
@@ -367,7 +367,7 @@ children = [
 ]
 ```
 
-See [Metrics and OTel](../operations/metrics-and-open-telemetry.md) for the full setup.
+See Metrics and OTel for the full setup.
 
 ## Related
 

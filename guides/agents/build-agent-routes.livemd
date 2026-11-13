@@ -6,7 +6,7 @@ This tutorial builds an order Agent that uses each executable route form, then s
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -127,7 +127,7 @@ order = RoutesGuide.OrderAgent.instantiate!(id: "order-1")
 order.state.quotes
 ```
 
-The cell returns `0`. A route has exactly one handler. It can be an Action or Flow module, an inline `action`, an inline `flow`, a `transform`, or a `forward`. See [Transforms and Forwards](route-transforms-and-forwards.md) for the last two.
+The cell returns `0`. A route has exactly one handler. It can be an Action or Flow module, an inline `action`, an inline `flow`, a `transform`, or a `forward`. See Transforms and Forwards for the last two.
 
 A positional module can be an Action or a Flow. Jido resolves which one it is. The route for `order.submit` would look the same with a Flow module.
 
@@ -189,7 +189,7 @@ The cell returns `{1, "order.priced", %{total_cents: 1000}}`. A reply route need
 inspected === order
 ```
 
-The cell returns `true`, because `state :unchanged` kept the source state. [Agent Turns and Replies](turns-state-and-replies.md) explains how a caller receives a reply.
+The cell returns `true`, because `state :unchanged` kept the source state. Agent Turns and Replies explains how a caller receives a reply.
 
 ## Select one route
 
@@ -236,7 +236,7 @@ code
 
 The cell returns `:unmatched_input`.
 
-A Plugin that implements route selection can choose a different matching route. See [Plugin Routing](../plugins/plugin-input-and-routes.md).
+A Plugin that implements route selection can choose a different matching route. See Plugin Routing.
 
 ## Declare routes as data
 
@@ -301,6 +301,6 @@ The cell returns `[:unknown_output_field, :duplicate, :wildcard_helper, :invalid
 
 ## Next steps
 
-- [Transforms and Forwards](route-transforms-and-forwards.md) covers routes that change or pass on a Signal.
-- [Agent Turns and Replies](turns-state-and-replies.md) covers the path from Signal to committed state.
+- Transforms and Forwards covers routes that change or pass on a Signal.
+- Agent Turns and Replies covers the path from Signal to committed state.
 - [Inline Actions](../flows/inline-actions.md) covers the inline Action syntax.

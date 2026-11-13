@@ -195,7 +195,7 @@ end
   Jido.Exec.run(Support.RequestReview, %{}, %{jido_exec_capabilities: [:waits]})
 ```
 
-`:waits` is the only capability. Immediate `Jido.Exec.run/4` does not offer it. See [Flow Waits](../flow-runtime/flow-waits.md).
+`:waits` is the only capability. Immediate `Jido.Exec.run/4` does not offer it. See Flow Waits.
 
 ## Keep context portable for durable execution
 
@@ -207,10 +207,10 @@ Prefer a registered name or a module to a pid when an Action can move to durable
 
 `Jido.Exec.run/4` does not write Runic's failure warning to the logs, so a failed Action does not print its params or context. The returned error, Runic Workflows, and stored data can still hold them. Do not place API keys or tokens in either one. Pass a module or a name, and have the Action read the secret from its own store.
 
-Telemetry metadata for Actions does not include params, context, or results. See [Telemetry and Tracing](../operations/telemetry-tracing-and-logs.md).
+Telemetry metadata for Actions does not include params, context, or results. See Telemetry and Tracing.
 
 ## Related
 
 - [Instructions and Targets](instructions.md)
-- [Agent Turns and Replies](../agents/turns-state-and-replies.md)
+- Agent Turns and Replies
 - [Test Actions](testing-actions.livemd)

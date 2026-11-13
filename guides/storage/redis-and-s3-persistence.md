@@ -124,7 +124,7 @@ A stand-in checks your wiring and failure handling. It cannot prove anything abo
 
 ## S3
 
-`Jido.Persistence.S3` stores each record as one object with conditional writes. It is for low-frequency records. A durable [Flow](flow-continuations.md) writes several keys per step, and each write is one request.
+`Jido.Persistence.S3` stores each record as one object with conditional writes. It is for low-frequency records. A durable Flow writes several keys per step, and each write is one request.
 
 ### Supply a request function
 
@@ -286,5 +286,5 @@ revised = %{report | state: %{title: "Q3 revised"}}
 ## Related
 
 - [Storage Model](persistence-storage-model.md): conditions and write results.
-- [Custom Adapters](custom-persistence-adapter.md): when neither function shape fits your service.
-- [Continuation Storage](flow-continuations.md): the write load of durable Flows.
+- Custom Adapters: when neither function shape fits your service.
+- Continuation Storage: the write load of durable Flows.

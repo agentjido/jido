@@ -1,6 +1,6 @@
 # Production Setup
 
-Follow these steps to take a Jido instance from development defaults to a configured production service. Each step names the setting and the behavior it changes. For every option, see the [Configuration Reference](../reference/configuration-reference.md).
+Follow these steps to take a Jido instance from development defaults to a configured production service. Each step names the setting and the behavior it changes. For every option, see the Configuration Reference.
 
 ## Add the instance to your tree
 
@@ -32,7 +32,7 @@ Keep the namespace fixed once records exist. It is part of every durable record 
 
 ## Configure the instance
 
-Put values that vary by environment in `config/runtime.exs`. The adapter options below are for an Ecto store. See [Persistence Adapters](../storage/persistence-adapters.livemd) to choose one. The ETS adapter loses its data when the BEAM stops, so do not use it for durable production data.
+Put values that vary by environment in `config/runtime.exs`. The adapter options below are for an Ecto store. See Persistence Adapters to choose one. The ETS adapter loses its data when the BEAM stops, so do not use it for durable production data.
 
 <!-- partial -->
 ```elixir
@@ -51,7 +51,7 @@ Per-Agent Store and codec choices are not supported.
 
 ## Set your limits
 
-Each limit below has a default. Decide on each one, because the right value depends on your Actions and your callers. Use [Load Testing](load-and-performance-testing.md) to find values for your system.
+Each limit below has a default. Decide on each one, because the right value depends on your Actions and your callers. Use Load Testing to find values for your system.
 
 | Option | Default | Effect when reached | Set it from |
 | --- | --- | --- | --- |
@@ -68,7 +68,7 @@ Also set these per call or per Agent when the default does not fit:
 
 - `:admission_timeout` on `Jido.AgentServer.call/3` and `Jido.AgentServer.submit/3`, which defaults to 5,000 ms.
 - `:exec_opts` on an Agent, for retries and concurrency inside a Turn. See [Execution Policy](../actions/action-execution-policy.md).
-- `:error_policy` on an Agent, for its response to failed Turns. The default is `:log_only`. See [Agent Lifecycle](../agent-servers/agent-activation-control.md).
+- `:error_policy` on an Agent, for its response to failed Turns. The default is `:log_only`. See Agent Lifecycle.
 
 An instance rejects an invalid default at boot.
 
@@ -93,11 +93,11 @@ config :jido, :ai_telemetry,
   semantic_log_mode: :errors
 ```
 
-Failures log at `:warning`. So do AI requests that hit a limit, under `:ai_telemetry`. See [Limit warnings](telemetry-tracing-and-logs.md#limit-warnings). Other events log at `:debug`, so your `Logger` level also has to allow them. [Telemetry and Tracing](telemetry-tracing-and-logs.md#log-modes) describes each mode.
+Failures log at `:warning`. So do AI requests that hit a limit, under `:ai_telemetry`. See Limit warnings. Other events log at `:debug`, so your `Logger` level also has to allow them. Telemetry and Tracing describes each mode.
 
 ## Export metrics and traces
 
-Pass `Jido.Telemetry.metrics/0` to your metrics reporter. Add `Jido.Telemetry.AI.metrics/0` if you use AI Agents. Jido starts no reporter and no OpenTelemetry SDK. See [Metrics and OTel](metrics-and-open-telemetry.md).
+Pass `Jido.Telemetry.metrics/0` to your metrics reporter. Add `Jido.Telemetry.AI.metrics/0` if you use AI Agents. Jido starts no reporter and no OpenTelemetry SDK. See Metrics and OTel.
 
 ## Activate durable Agents after boot
 
@@ -127,11 +127,11 @@ end
 
 Activation is safe to repeat, because `Jido.activate_agent/3` returns the live process when the Agent is already running. A tombstone, an invalid record, or changed Agent code returns an error and does not create new state. See [Durable Agent Activation](../durability/durable-agent-activation.livemd).
 
-Run recovery after an instance restart as well as after a node restart. An instance that restarts comes back with no Agents. Put both children under a `:rest_for_one` supervisor so that a new instance also gets a new recovery run. [Shutdown and Recovery](shutdown-and-recovery.md#restart-agents-with-the-instance) has a full example.
+Run recovery after an instance restart as well as after a node restart. An instance that restarts comes back with no Agents. Put both children under a `:rest_for_one` supervisor so that a new instance also gets a new recovery run. Shutdown and Recovery has a full example.
 
 ## Drain before you stop
 
-Stopping an instance ends each running Turn with `:indeterminate`. To let work finish, drain from your application's `prep_stop/1` callback. [Shutdown and Recovery](shutdown-and-recovery.md#drain-an-instance) has the code.
+Stopping an instance ends each running Turn with `:indeterminate`. To let work finish, drain from your application's `prep_stop/1` callback. Shutdown and Recovery has the code.
 
 ## Handle secrets
 
@@ -168,5 +168,5 @@ These settings apply to the whole node. Set them under `config :jido`.
 ## Next steps
 
 - [Deployment and Sizing](deployment-and-performance.md)
-- [Shutdown and Recovery](shutdown-and-recovery.md)
+- Shutdown and Recovery
 - [Security Model](security.md)

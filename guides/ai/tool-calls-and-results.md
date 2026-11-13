@@ -6,7 +6,7 @@ This guide follows one tool call in `Jido.AI.Reasoning.ReAct` from the model's r
 
 1. The model returns a response with tool calls.
 2. `Jido.AI.Reasoning.Actions.GuardOutput` validates the whole batch. A bad batch runs no tools.
-3. If any call needs review, the Flow [waits for approval](tool-review.md).
+3. If any call needs review, the Flow waits for approval.
 4. A Flow Parallel component runs each call as its own node. Results are joined in the order of the calls.
 5. `Jido.AI.Reasoning.ReAct.Actions.RecordToolResults` converts each result, then appends a `:ai_tool_attempt` entry and a `:tool` message to the Thread.
 6. The next model call sees the tool messages.
@@ -278,5 +278,5 @@ A tool Action can return `{:ok, value, effects}`. The tool attempt counts them i
 ## Related
 
 - [ReAct Reasoning](react-reasoning.livemd)
-- [Tool Review](tool-review.md)
+- Tool Review
 - [Model Budgets and Usage](budgets-and-usage.md)

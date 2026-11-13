@@ -88,10 +88,10 @@ Implement these to extend Jido. An optional callback can be left out.
 | `Jido.Action` | `c:Jido.Action.run/2` | `c:Jido.Action.on_before_validate_params/1` | [Actions](../actions/actions.md) |
 | `Jido.Agent` | None | `c:Jido.Agent.initialize/2`, `c:Jido.Agent.checkpoint/2`, `c:Jido.Agent.restore/2` | [Agent Callbacks](../agents/agent-callbacks.md) |
 | `Jido.Plugin` | None | `c:Jido.Plugin.state_spec/1`, `c:Jido.Plugin.validate_options/1`, `c:Jido.Plugin.directives/1`, `c:Jido.Plugin.select_route/2`, `c:Jido.Plugin.prepare/2`, `c:Jido.Plugin.reduce/2`, `c:Jido.Plugin.admit/3`, `c:Jido.Plugin.prepare_outbound/4`, `c:Jido.Plugin.dispatch/4`, `c:Jido.Plugin.after_commit/3`, `c:Jido.Plugin.child_spec/1`, `c:Jido.Plugin.await_ready/2`, `c:Jido.Plugin.dump/3`, `c:Jido.Plugin.load/3` | [Plugin Design](../plugins/plugin-design.md) |
-| `Jido.Persistence.Store` | `c:Jido.Persistence.Store.validate_options/1`, `c:Jido.Persistence.Store.get/2`, `c:Jido.Persistence.Store.compare_and_swap/4`, `c:Jido.Persistence.Store.delete/2` | `c:Jido.Persistence.Store.put/3`, `c:Jido.Persistence.Store.scan/4` | [Custom Adapters](../storage/custom-persistence-adapter.md) |
+| `Jido.Persistence.Store` | `c:Jido.Persistence.Store.validate_options/1`, `c:Jido.Persistence.Store.get/2`, `c:Jido.Persistence.Store.compare_and_swap/4`, `c:Jido.Persistence.Store.delete/2` | `c:Jido.Persistence.Store.put/3`, `c:Jido.Persistence.Store.scan/4` | Custom Adapters |
 | `Jido.Signal.Dispatch.Adapter` | `c:Jido.Signal.Dispatch.Adapter.options_schema/0`, `c:Jido.Signal.Dispatch.Adapter.deliver/2` | None | [Signal Dispatch Adapters](../signals/dispatch-adapters.md) |
 | `Jido.Signal.Bus.Store` | `c:Jido.Signal.Bus.Store.init/1`, `c:Jido.Signal.Bus.Store.append/2`, `c:Jido.Signal.Bus.Store.read/2`, `c:Jido.Signal.Bus.Store.latest_cursor/1`, `c:Jido.Signal.Bus.Store.put_subscription/2`, `c:Jido.Signal.Bus.Store.list_subscriptions/1`, `c:Jido.Signal.Bus.Store.delete_subscription/2` | None | [Durable Subscriptions](../signals/durable-subscriptions.md) |
-| `Jido.Plugin.Scheduler.DeliveryAdapter` | `c:Jido.Plugin.Scheduler.DeliveryAdapter.schedule/3`, `c:Jido.Plugin.Scheduler.DeliveryAdapter.reconcile/2` | None | [Schedules](../built-in-plugins/scheduler.livemd) |
+| `Jido.Plugin.Scheduler.DeliveryAdapter` | `c:Jido.Plugin.Scheduler.DeliveryAdapter.schedule/3`, `c:Jido.Plugin.Scheduler.DeliveryAdapter.reconcile/2` | None | Schedules |
 | `Jido.Codec.Contract` | `c:Jido.Codec.Contract.type/0`, `c:Jido.Codec.Contract.version/0`, `c:Jido.Codec.Contract.target/0`, `c:Jido.Codec.Contract.decode/2` | `c:Jido.Codec.Contract.encode/2` | [Jido.Codec Documents](../data/versioned-documents.md) |
 | `Jido.AI.ToolSource` | `c:Jido.AI.ToolSource.list_tools/2`, `c:Jido.AI.ToolSource.run_tool/3` | None | [Tools and Toolsets](../ai/tools-skills-and-toolsets.livemd) |
 | `Jido.AI.InferenceClient` | Each model operation, 22 callbacks. Start from `c:Jido.AI.InferenceClient.generate_text/3`. | None | [Inference Clients](../ai/inference-clients.md) |
@@ -917,5 +917,5 @@ Selects and validates the inference client for one AI operation.
 ## Related
 
 - [Module and Namespace Map](module-and-namespace-map.md)
-- [Configuration Reference](configuration-reference.md)
+- Configuration Reference
 - [Telemetry Events](telemetry-event-reference.md)

@@ -6,7 +6,7 @@ This tutorial builds an invoice Agent with the DSL, creates an instance, runs on
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 
@@ -184,4 +184,4 @@ The cell returns `900`.
 
 - [Agent State and Schemas](agent-state-and-schemas.md) covers defaults, initial state, and validation.
 - [Routes and Handlers](build-agent-routes.livemd) covers every route form.
-- [Definitions and Runtime](../core-concepts/definitions-instances-activations.md) explains how a definition becomes a live process.
+- Definitions and Runtime explains how a definition becomes a live process.

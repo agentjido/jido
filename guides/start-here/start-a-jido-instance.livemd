@@ -8,7 +8,7 @@ Actions and Flows run through `Jido.Exec.run/4` without an instance. You need on
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 

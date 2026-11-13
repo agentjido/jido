@@ -1,9 +1,8 @@
 # Jido V3 Consolidation
 
 > [!WARNING]
-> The `migration/consolidated-v3` branch is an integration candidate. It is
-> not the current Jido release. APIs, module ownership, and project structure
-> can change before the V3 release.
+> The `release/v3` branch is the Jido V3 release candidate. It is not the
+> current stable Jido release. APIs can change during the beta period.
 
 This branch consolidates the four core Jido repositories, `jido`,
 `jido_action`, `jido_signal`, and `jido_ai`, into one Mix project and one OTP
@@ -11,13 +10,11 @@ application. The first source port is complete. The project is now testing and
 refining the module boundaries that became visible after the packages moved
 together.
 
-Many release-quality parts are missing, incomplete, or out of date. These
-include:
+Release-readiness work includes:
 
-- complete user and module documentation;
-- tutorials and a reviewed example set;
+- final review of user and module documentation;
+- final review of tutorials and examples;
 - migration guidance from the four separate packages;
-- final package, version, and release configuration;
 - a complete public API and compatibility review; and
 - final performance baselines across the supported runtime matrix.
 
@@ -38,13 +35,13 @@ The repository keeps its architecture and consolidation decisions in
 Use the [documentation index](docs/README.md) for project documents, required
 fixed paths, and material that still needs review.
 
-## Use the migration branch
+## Use the release branch
 
-Until the consolidated package has a release, point Mix at the official
-migration branch:
+Until the consolidated package has a beta release, point Mix at the official
+release branch:
 
 ```elixir
-{:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+{:jido, github: "agentjido/jido", branch: "release/v3"}
 ```
 
 ## Local checks

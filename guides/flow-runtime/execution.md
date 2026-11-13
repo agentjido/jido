@@ -13,7 +13,7 @@ This guide explains how `Jido.Exec` runs an Action or Flow: which entry point to
 
 A generated Flow module also has `run/2`. It calls `Jido.Exec.run/4` with default options. One Action is compiled as a one-step Flow and uses the same execution path.
 
-This guide covers immediate execution. See [Direct Runic Execution](managed-execution.md) for the advanced Runner escape hatch and [Flow Waits](flow-waits.md) for work that suspends.
+This guide covers immediate execution. See [Direct Runic Execution](managed-execution.md) for the advanced Runner escape hatch and Flow Waits for work that suspends.
 
 ## Run a target
 

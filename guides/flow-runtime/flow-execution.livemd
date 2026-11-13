@@ -6,7 +6,7 @@ In this tutorial you run an order Flow with `Jido.Exec.run/4`, pass runtime cont
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 

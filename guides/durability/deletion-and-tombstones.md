@@ -112,7 +112,7 @@ If a server is running, the delete succeeds and the server finds out at its next
 Deletion changes one record. It leaves other data in place, so plan for each item.
 
 - **Tombstones.** They stay forever, as nothing expires them. Each adapter's `delete/2` callback removes bytes for explicit maintenance, but Jido has no public function for this. Removing a tombstone also removes its protection, so a delayed writer or an activation could recreate the Agent.
-- **Topology members.** Deleting a root does not delete its members' records. See [Durable Topology](durable-topology.md).
+- **Topology members.** Deleting a root does not delete its members' records. See Durable Topology.
 - **Flow graphs of a pending Turn.** Deletion is allowed while the record has a nonterminal durable Turn, and it does not remove that Turn's `jido:execution:` keys. Jido removes these keys when a Turn ends. To avoid orphaned keys, finish or cancel the Turn before you delete the Agent.
 - **Your domain data.** The tombstone replaces saved state in the current record. Signals already delivered, audit records, external systems, and store backups are outside that record, so a tombstone alone is not an erasure guarantee.
 
@@ -122,5 +122,5 @@ Deletion changes one record. It leaves other data in place, so plan for each ite
 
 ## Next steps
 
-- [Revisions and Conflicts](durable-revisions-and-conflicts.md) explains how the tombstone keeps the write barrier.
+- Revisions and Conflicts explains how the tombstone keeps the write barrier.
 - [Durable Agent Activation](durable-agent-activation.livemd) shows which start functions refuse a tombstone.

@@ -26,7 +26,7 @@ Remove the four dependencies and add one.
 def deps do
   [
     # Removes {:jido, ...}, {:jido_action, ...}, {:jido_signal, ...}, {:jido_ai, ...}
-    {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+    {:jido, github: "agentjido/jido", branch: "release/v3"}
   ]
 end
 ```

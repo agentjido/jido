@@ -6,7 +6,7 @@ A Plugin can run one supervised process for as long as its Agent runs. In this t
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "migration/consolidated-v3"}
+  {:jido, github: "agentjido/jido", branch: "release/v3"}
 ])
 ```
 

@@ -2,7 +2,7 @@
 
 This guide shows how to create a `Jido.Trace`, accept one from an HTTP request, and follow it through an Agent Turn and the Signals that the Turn sends.
 
-`Jido.Trace` is one validated W3C Trace Context value. Jido carries it on Signals, gives it to Actions, and adds it to logs and telemetry. Exporting spans is a separate step, covered in [Metrics and OTel](../operations/metrics-and-open-telemetry.md).
+`Jido.Trace` is one validated W3C Trace Context value. Jido carries it on Signals, gives it to Actions, and adds it to logs and telemetry. Exporting spans is a separate step, covered in Metrics and OTel.
 
 ## Create a trace
 
@@ -186,10 +186,10 @@ false = Map.has_key?(Trace.telemetry_context(Trace.new()), :parent_span_id)
 %{traceparent: "00-" <> _, tracestate: "vendor=value"} = Trace.metadata(child)
 ```
 
-Jido's Turn telemetry includes these trace fields. [Telemetry and Tracing](../operations/telemetry-tracing-and-logs.md) describes the events and logs.
+Jido's Turn telemetry includes these trace fields. Telemetry and Tracing describes the events and logs.
 
 ## Related
 
 - [CloudEvents Context](../signals/cloudevents-envelope-and-context.md) lists the Signal attributes.
-- [Metrics and OTel](../operations/metrics-and-open-telemetry.md) connects traces to OpenTelemetry.
+- Metrics and OTel connects traces to OpenTelemetry.
 - [Telemetry Events](../reference/telemetry-event-reference.md) lists event metadata.

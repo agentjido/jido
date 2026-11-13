@@ -311,4 +311,4 @@ The projection has limits. Refinements and transforms do not appear in it, and a
 
 - [Schemas and Validation](../actions/schemas-validation.md) covers Action schemas in full.
 - [Jido.Joi Validation](../data/joi-validation.md) covers parsing, initialization, and stored values.
-- [Errors and Async](errors-and-async.md) shows how to handle the errors that validation returns.
+- Errors and Async shows how to handle the errors that validation returns.

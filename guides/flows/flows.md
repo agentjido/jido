@@ -95,7 +95,7 @@ A `flow` block declares one or more components. At least one is required.
 | `iterate` | Runs one Action as a bounded loop over local state. | [Iterate and State](flow-iterate-state.md) |
 | `invoke` | Selects an Action or Flow at runtime and continues in this graph. | [Dynamic Flows](dynamic-flows.md) |
 | `handoff` | Ends the root Flow and returns a successor to run in a new Turn. | [Dynamic Flows](dynamic-flows.md) |
-| `timer`, `await`, `selection` | Wait for a deadline or a host input under a host that supports waits. | [Flow Waits](../flow-runtime/flow-waits.md) |
+| `timer`, `await`, `selection` | Wait for a deadline or a host input under a host that supports waits. | Flow Waits |
 
 `Jido.Exec.run/4` does not support waits. A Flow with a `timer`, `await`, or `selection` returns `{:error, %Jido.Error.ValidationError{}}` from that function with the message "execution host does not support waits".
 
