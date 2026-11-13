@@ -43,4 +43,4 @@ dependency, and executor mechanics belong to `jido_action` tests.
 - [Tests](flow_directives_test.exs)
 
 Previous: [Executable Continuation](../04_08_executable_continuation/README.md) |
-Next: [Flow Durability](../../05_flow_durability/README.md)
+Next: [Flow Durability](../../13_durable_execution/README.md)

@@ -1,6 +1,6 @@
 # 03 Flow Execution
 
-These 14 offline examples use one execution model. `Jido.Exec.run/4` lowers an
+These offline examples use one execution model. `Jido.Exec.run/4` lowers an
 Action or Flow to a Runic workflow and runs it to completion. Each authored
 Flow component becomes one Runic component.
 
@@ -20,6 +20,8 @@ The lessons follow the execution model in order:
 12. `03_12_wait_and_signal` - pause and resume through a host.
 13. `03_13_compile_to_runic` - inspect and execute the compiled workflow.
 14. `03_14_runic_runner` - dispatch the workflow one Runic unit at a time.
+15. `03_15_human_approval` - address one approval event.
+16. `03_16_batch_processing` - bound concurrent Map work and Reduce it.
 
 The last two lessons are advanced escape hatches. Normal application code uses
 `Jido.Exec.run/4`.

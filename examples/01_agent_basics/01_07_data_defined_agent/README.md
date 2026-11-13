@@ -40,7 +40,7 @@ store validated state and identity; the tests prove this round trip. A
 persistence checkpoint adds revision and recovery data for an Activation and
 pending work. Use persistence to recover execution.
 
-See [Named Members](../../10_topologies/10_01_named_agents/README.md) for a JSON
+See [Named Members](../../10_declared_agent_topologies/10_01_named_agents/README.md) for a JSON
 round trip that starts a composed Agent. The core authoring tests cover the
 full DSL, data, and JSON format matrix.
 
@@ -53,5 +53,5 @@ Previous: [OTP supervision](../01_06_otp_supervision/README.md) | Next: [Authori
 
 The [saved input document](fixtures/agent.json) is checked in. The Scheduler
 startup test reads it directly with `registry/0`; it does not first encode a
-new document. See [Plugin DSL](../../11_plugins/11_04_plugin_dsl/README.md) for
+new document. See [Plugin DSL](../../05_plugins/05_04_plugin_dsl/README.md) for
 custom syntax that lowers to the same contribution format.

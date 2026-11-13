@@ -1,0 +1,44 @@
+# 10_04 Nested Agents
+
+An Agent owns a team whose Agent definition declares two workers.
+
+## What you will learn
+
+- How an Agent definition can contain another Agent definition.
+- How each nested Agent owns its declared member runtimes.
+- How stopping the root stops its complete static subtree.
+
+## Read the code
+
+Read the root Agent, then `Hierarchy.Team` in the same file, then the Cell Agent and tests.
+
+## Run it
+
+```sh
+mix test.examples examples/10_declared_agent_topologies/10_04_nested_agents
+```
+
+Expected result: The root, team, and two workers start. Workers keep separate state.
+Stopping the root stops the complete team subtree.
+
+## Important behavior
+
+Containment comes from nested Agent declarations. There is no separate
+`owns` graph or Controller. The definition stays fixed for the activation.
+
+## Limits
+
+Removal is intentional and does not leave a detached team. This example
+does not define remote placement, orphan adoption, or member-state recovery.
+
+## Files
+
+- [Source](hierarchy.ex)
+- [Cell Agent](../support/cell.ex)
+- [Tests](hierarchy_test.exs)
+- [Test runtime assertions](../../../test/support/agent_topology_assertions.ex)
+
+This is also the Agent hierarchy lesson. Nested definitions replace the old
+recursive spawn example; subtree ownership follows the OTP supervisor tree.
+
+Previous: [Local Bus Broadcast](../10_03_bus_broadcast/README.md) | Next: [Plugins](../../05_plugins/README.md)

@@ -27,7 +27,7 @@ stable. Each lesson uses public Jido APIs and deterministic local services.
 
 1. [Whole Definition Upgrade](08_12_definition_changes/README.md): trusted replacement with state migration.
 2. [Stable Reference](08_13_stable_reference/README.md): durable identity after runtime replacement.
-3. [State Migration](08_14_state_migration/README.md): change schema, definition, and state together. Continue with [Definition Revision](../13_persistence/13_08_definition_revision/README.md).
+3. [State Migration](08_14_state_migration/README.md): change schema, definition, and state together. Continue with [Definition Revision](../12_persistence/12_08_definition_revision/README.md).
 4. [Pending Job Recovery](08_15_pending_job_recovery/README.md): explicit retry after runtime loss.
 
 ## Run the section
@@ -46,5 +46,5 @@ This local duplication keeps the important behavior visible. The small
 
 These examples use local processes and persistence adapters. Remote placement
 and cluster ownership are outside this supported example suite.
-See [Persistence](../13_persistence/README.md) and
-[Durable execution](../14_durable_agents/README.md) for stored state and Flow recovery.
+See [Persistence](../12_persistence/README.md) and
+[Durable execution](../13_durable_execution/README.md) for stored state and Flow recovery.

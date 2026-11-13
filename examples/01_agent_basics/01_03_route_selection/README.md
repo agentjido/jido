@@ -46,7 +46,7 @@ route table as the command boundary.
 - [Tests](route_selection_test.exs)
 
 Forward and transform routes are shown in
-[Direct Connections](../../10_topologies/10_02_direct_connections/README.md).
+[Direct Connections](../../10_declared_agent_topologies/10_02_direct_connections/README.md).
 They produce explicit Directives rather than changing domain state. Routes
 select the first match; output connections select all matching edges.
 

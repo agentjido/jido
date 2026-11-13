@@ -38,4 +38,4 @@ runtime service must be supplied again when a retry needs a non-default client.
 - [Tests](pending_job_recovery_test.exs)
 
 Previous: [State Migration](../08_14_state_migration/README.md) |
-Next: [Multi-Agent](../../09_multi_agent/README.md)
+Next: [Multi-Agent](../../09_dynamic_agent_composition/README.md)
