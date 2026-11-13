@@ -9,6 +9,14 @@ defmodule Jido.Examples.RecoverableDelivery.MemorySink do
     GenServer.start_link(__MODULE__, opts, name: address(Keyword.fetch!(opts, :jido)))
   end
 
+  @doc "Returns the application-owned Registry child for the local sink."
+  def registry_child_spec(jido) do
+    Supervisor.child_spec(
+      {Registry, keys: :unique, name: registry(jido)},
+      id: {__MODULE__, jido}
+    )
+  end
+
   def records(jido), do: GenServer.call(address(jido), :records)
   def available(jido, value), do: GenServer.call(address(jido), {:available, value})
 
@@ -57,5 +65,8 @@ defmodule Jido.Examples.RecoverableDelivery.MemorySink do
   defp availability(false), do: :unavailable
   defp availability(value) when value in [:available, :unavailable, :uncertain_once], do: value
 
-  defp address(jido), do: {:via, Registry, {Jido.Instance.Names.registry(jido), {__MODULE__, :sink}}}
+  @doc false
+  def registry(jido), do: Module.concat(jido, RecoverableDeliverySinkRegistry)
+
+  defp address(jido), do: {:via, Registry, {registry(jido), {__MODULE__, :sink}}}
 end

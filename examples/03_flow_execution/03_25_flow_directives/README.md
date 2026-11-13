@@ -18,7 +18,7 @@ Plugin](effects.ex), and finish with the behavior test.
 ## Run it
 
 ```sh
-mix test.examples examples/03_flow_execution/03_25_flow_directives
+mix test.examples examples/03_flow_execution/03_25_flow_directives --warnings-as-errors
 ```
 
 Expected result: direct execution returns `first`, `side`, and `final` in order.
@@ -30,6 +30,9 @@ dispatches no record.
 Flow collects Directives from each successful component. It returns the batch
 only after the complete execution succeeds. AgentServer validates the candidate
 and batch, commits once, and then dispatches in batch order.
+
+The host application supervises the Registry that addresses the Plugin
+runtime. The example does not use Jido's private instance registry.
 
 ## Limits
 

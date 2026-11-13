@@ -17,6 +17,7 @@ defmodule Jido.Examples.Persistence.RecoverableDeliveryTest do
   alias Jido.Examples.RecoverableDelivery.MemorySink, as: Sink
 
   setup %{jido: jido} do
+    start_supervised!(Sink.registry_child_spec(jido))
     start_supervised!({Sink, jido: jido})
     store = {ProbeStore, store: start_supervised!(ProbeStore)}
     {:ok, store: store}

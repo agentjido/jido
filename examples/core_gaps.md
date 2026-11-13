@@ -181,3 +181,19 @@ that makes the problem clear.
 - Follow-up question: Can ownership transfer commit atomically with the old
   owner's release, or must the contract expose a recoverable intermediate
   state?
+
+### EX-012: An indeterminate activation rejects direct stop
+
+- Example: [12_06 Indeterminate Write](12_persistence/12_06_indeterminate_write/README.md).
+- Classification: Documentation and operational-model friction.
+- Attempted contract: Stop an activation after its persistence adapter saved a
+  candidate revision but returned an indeterminate result.
+- Result: `Jido.stop_agent/3` returned `{:error, :unsafe_resume}` because a
+  normal stop could publish an unsafe checkpoint from the faulted process.
+- Public solution: Configure persistence on the Jido instance, resolve the
+  stable Agent Ref, call `Jido.reconcile_agent/3`, verify replacement from the
+  authoritative record, and then stop the replacement.
+- Core change: None proposed. The safety boundary and recovery operation are
+  public and testable.
+- Follow-up question: Should the persistence guide show reconcile-before-stop
+  as the standard operator response to an indeterminate write?

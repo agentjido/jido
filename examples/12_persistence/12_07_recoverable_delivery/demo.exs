@@ -26,6 +26,7 @@ defmodule Jido.Examples.RecoverableDelivery.Probe do
         persistence: persistence
       )
 
+    {:ok, sink_registry} = Registry.start_link(keys: :unique, name: Sink.registry(jido))
     {:ok, sink} = Sink.start_link(jido: jido)
     {:ok, agent_ref} = Jido.agent_ref(jido, "delivery-example")
     {:ok, ^agent_ref} = Jido.create_agent(jido, agent_ref, Agent)
@@ -69,6 +70,7 @@ defmodule Jido.Examples.RecoverableDelivery.Probe do
       IO.inspect(Sink.records(jido), label: "One external record")
     after
       GenServer.stop(sink)
+      GenServer.stop(sink_registry)
       Supervisor.stop(instance)
       File.rm_rf!(path)
     end

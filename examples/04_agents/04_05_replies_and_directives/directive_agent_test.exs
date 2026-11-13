@@ -8,6 +8,7 @@ defmodule Jido.Examples.Basic.DirectiveAgentTest do
   alias Jido.Examples.DirectiveAgent.Effects
 
   test "every handler observes committed state and dispatch follows batch order", %{jido: jido} do
+    start_supervised!(Effects.registry_child_spec(jido))
     server = start_agent!(jido, Agent)
     id = Jido.AgentServer.snapshot(server).agent.id
     runtime = Effects.runtime(jido, id)
@@ -47,6 +48,7 @@ defmodule Jido.Examples.Basic.DirectiveAgentTest do
   end
 
   test "an invalid later Directive prevents the entire commit and all dispatch", %{jido: jido} do
+    start_supervised!(Effects.registry_child_spec(jido))
     server = start_agent!(jido, Agent)
     before = Jido.AgentServer.snapshot(server)
 
@@ -82,6 +84,7 @@ defmodule Jido.Examples.Basic.DirectiveAgentTest do
   test "a failed second dispatch preserves the commit and prevents the third effect", %{
     jido: jido
   } do
+    start_supervised!(Effects.registry_child_spec(jido))
     server = start_agent!(jido, Agent)
     command = change(9, :dispatch_failure)
 

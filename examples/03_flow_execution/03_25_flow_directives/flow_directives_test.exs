@@ -18,6 +18,7 @@ defmodule Jido.Examples.Workflow.FlowDirectivesTest do
   end
 
   test "live dispatch starts after the single Agent commit", %{jido: jido} do
+    start_supervised!(Effects.registry_child_spec(jido))
     server = start_agent!(jido, Example)
     {:ok, signal} = Example.run_signal(%{})
 
@@ -41,6 +42,7 @@ defmodule Jido.Examples.Workflow.FlowDirectivesTest do
   end
 
   test "a later failure discards earlier Directives", %{jido: jido} do
+    start_supervised!(Effects.registry_child_spec(jido))
     server = start_agent!(jido, Example)
     before = Jido.AgentServer.snapshot(server)
     {:ok, signal} = Example.fail_signal(%{})

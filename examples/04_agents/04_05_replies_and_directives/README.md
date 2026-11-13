@@ -20,7 +20,7 @@ Read [the Agent](directive_agent.ex) first. Then read
 Run this command from the `jido` repository root:
 
 ```sh
-mix test.examples examples/04_agents/04_05_replies_and_directives/directive_agent_test.exs
+mix test.examples examples/04_agents/04_05_replies_and_directives --warnings-as-errors
 ```
 
 Expected result: the tests complete without failures. A valid batch runs in
@@ -31,6 +31,7 @@ order after commit, while an invalid Directive prevents dispatch.
 An invalid Directive prevents the complete commit and all dispatch. A dispatch
 failure happens after commit, does not undo that commit, and prevents later
 Directives in the batch. Stopping the Agent Server also stops its Plugin runtime.
+The host application supervises the Registry that addresses that runtime.
 
 ## Limits
 

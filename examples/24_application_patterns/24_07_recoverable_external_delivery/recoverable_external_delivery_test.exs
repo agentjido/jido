@@ -14,6 +14,7 @@ defmodule Jido.Examples.Patterns.RecoverableExternalDeliveryTest do
 
   test "saved intent recovers from process loss and an uncertain external outcome" do
     jido = start_persistent_jido()
+    start_supervised!(MemorySink.registry_child_spec(jido))
     start_supervised!({MemorySink, jido: jido})
     {:ok, ref} = Jido.agent_ref(jido, "delivery-agent")
     {:ok, ^ref} = Jido.create_agent(jido, ref, DeliveryAgent)

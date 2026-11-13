@@ -40,14 +40,25 @@ defmodule Jido.Examples.DirectiveAgent.Effects do
   def child_spec(init),
     do: Supervisor.child_spec({Jido.Examples.DirectiveAgent.EffectRuntime, init}, id: __MODULE__)
 
+  @doc "Returns the application-owned Registry child for this Plugin runtime."
+  def registry_child_spec(instance) do
+    Supervisor.child_spec(
+      {Registry, keys: :unique, name: registry(instance)},
+      id: {__MODULE__, instance}
+    )
+  end
+
   def runtime(jido, id) do
-    case Registry.lookup(Jido.Instance.Names.registry(jido), {__MODULE__, id}) do
+    case Registry.lookup(registry(jido), {__MODULE__, id}) do
       [{pid, _}] -> pid
       [] -> nil
     end
   end
 
   def records(jido, id), do: GenServer.call(runtime(jido, id), :records)
+
+  @doc false
+  def registry(instance), do: Module.concat(instance, DirectiveEffectRuntimeRegistry)
 end
 
 defmodule Jido.Examples.DirectiveAgent.EffectRuntime do
@@ -57,7 +68,8 @@ defmodule Jido.Examples.DirectiveAgent.EffectRuntime do
 
   def start_link(init) do
     name =
-      {:via, Registry, {Jido.Instance.Names.registry(init.jido), {Jido.Examples.DirectiveAgent.Effects, init.agent_id}}}
+      {:via, Registry,
+       {Jido.Examples.DirectiveAgent.Effects.registry(init.jido), {Jido.Examples.DirectiveAgent.Effects, init.agent_id}}}
 
     GenServer.start_link(__MODULE__, init, name: name)
   end

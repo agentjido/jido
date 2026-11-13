@@ -29,15 +29,24 @@ defmodule Jido.Examples.FlowDirectives.Effects do
   def dispatch(runtime, directive, context, _opts),
     do: GenServer.call(runtime, {:record, directive, context})
 
+  @doc "Returns the application-owned Registry child for this Plugin runtime."
+  def registry_child_spec(instance) do
+    Supervisor.child_spec(
+      {Registry, keys: :unique, name: registry(instance)},
+      id: {__MODULE__, instance}
+    )
+  end
+
   @doc "Reads recorded labels and the public snapshots seen during dispatch."
   def records(instance, server) do
     id = Jido.AgentServer.snapshot(server).agent.id
-
-    [{runtime, _}] =
-      Registry.lookup(Jido.Instance.Names.registry(instance), {__MODULE__, id})
+    [{runtime, _}] = Registry.lookup(registry(instance), {__MODULE__, id})
 
     GenServer.call(runtime, :records)
   end
+
+  @doc false
+  def registry(instance), do: Module.concat(instance, FlowDirectiveRuntimeRegistry)
 end
 
 defmodule Jido.Examples.FlowDirectives.Effects.Runtime do
@@ -46,7 +55,8 @@ defmodule Jido.Examples.FlowDirectives.Effects.Runtime do
 
   def start_link(init) do
     name =
-      {:via, Registry, {Jido.Instance.Names.registry(init.jido), {Jido.Examples.FlowDirectives.Effects, init.agent_id}}}
+      {:via, Registry,
+       {Jido.Examples.FlowDirectives.Effects.registry(init.jido), {Jido.Examples.FlowDirectives.Effects, init.agent_id}}}
 
     GenServer.start_link(__MODULE__, init, name: name)
   end
