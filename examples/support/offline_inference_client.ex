@@ -5,8 +5,17 @@ defmodule Jido.Examples.Support.OfflineInferenceClient do
 
   @impl true
   def generate_text(model, context, options) do
-    text = Keyword.get(options, :offline_response, response_for(model))
-    {:ok, response(model, context, text, "offline-text")}
+    case Keyword.fetch(options, :offline_object) do
+      {:ok, value} ->
+        {:ok,
+         model
+         |> response(context, JSON.encode!(value), "offline-object")
+         |> Map.put(:object, value)}
+
+      :error ->
+        text = Keyword.get(options, :offline_response, response_for(model))
+        {:ok, response(model, context, text, "offline-text")}
+    end
   end
 
   @impl true
@@ -15,7 +24,11 @@ defmodule Jido.Examples.Support.OfflineInferenceClient do
   @impl true
   def generate_object(model, context, _schema, options) do
     value = Keyword.get(options, :offline_object, %{"status" => "ok"})
-    {:ok, response(model, context, JSON.encode!(value), "offline-object")}
+
+    {:ok,
+     model
+     |> response(context, JSON.encode!(value), "offline-object")
+     |> Map.put(:object, value)}
   end
 
   @impl true

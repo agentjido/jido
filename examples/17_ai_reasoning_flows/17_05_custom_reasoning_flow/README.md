@@ -41,4 +41,4 @@ core SDK gap.
 - [Source](schema_driven_overrides.ex)
 - [Tests](schema_driven_overrides_test.exs)
 
-Previous: [ReAct tool loop](../17_01_react_tool_loop/README.md)
+[Previous: Revision and adaptive reasoning](../17_04_revision_and_adaptive/README.md)

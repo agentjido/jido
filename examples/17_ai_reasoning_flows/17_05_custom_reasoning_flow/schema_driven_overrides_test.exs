@@ -1,7 +1,7 @@
 Code.require_file("schema_driven_overrides.ex", __DIR__)
 
 defmodule Jido.Examples.AI.SchemaDrivenOverridesTest do
-  use Jido.Test.Case, async: true
+  use ExUnit.Case, async: true
 
   @moduletag :integration
 
@@ -13,7 +13,7 @@ defmodule Jido.Examples.AI.SchemaDrivenOverridesTest do
   end
 
   test "a request can use or replace one schema default" do
-    agent = Agent.instantiate!(id: unique_id("schema-ai"))
+    agent = Agent.instantiate!(id: "schema-ai-#{System.unique_integer([:positive])}")
 
     assert {:ok, _agent, [%Jido.Agent.Directive.Reply{signal: configured}]} =
              Agent.cmd(agent, Agent.request_signal!(%{input: "Ada"}))

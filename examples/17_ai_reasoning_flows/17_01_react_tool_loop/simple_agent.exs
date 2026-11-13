@@ -1,7 +1,9 @@
+Code.require_file("../../support/offline_inference_client.ex", __DIR__)
+Code.require_file("react_offline_client.ex", __DIR__)
 Code.require_file("simple_agent.ex", __DIR__)
 
 alias Jido.AI.Reasoning.ReAct
-alias Jido.Examples.AI.SimpleAgent
+alias Jido.Examples.AI.{ReActOfflineClient, SimpleAgent}
 
 program = SimpleAgent.route_executable!("jido.ai.request")
 
@@ -25,3 +27,14 @@ end
   })
 
 IO.inspect(Enum.map(preflight.tools, & &1.name()), label: "Prepared tools")
+
+agent = SimpleAgent.instantiate!(id: "simple-ai-runner")
+request = SimpleAgent.request_signal!(%{input: "Use both tools."})
+
+{:ok, _candidate, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  SimpleAgent.cmd(agent, request, context: %{jido_ai_inference_client: ReActOfflineClient})
+
+IO.inspect(
+  Map.take(reply.data, [:output, :status, :model_calls, :tool_calls, :tool_rounds]),
+  label: "Reply"
+)

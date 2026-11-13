@@ -9,7 +9,8 @@ Run one complete ReAct tool round with deterministic model output.
 
 ## Read the code
 
-Read [the Agent](simple_agent.ex), then read the test and offline runner.
+Read [the Agent](simple_agent.ex), then read the
+[offline client](react_offline_client.ex) and runner.
 
 ## Run it
 
@@ -18,9 +19,9 @@ mix test.examples examples/17_ai_reasoning_flows/17_01_react_tool_loop --warning
 mix run examples/17_ai_reasoning_flows/17_01_react_tool_loop/simple_agent.exs
 ```
 
-Expected result: the runner prints the public ReAct graphs and prepared tools.
-The deterministic behavior test requests two tools and commits the final reply
-to the Session.
+Expected result: the runner prints the public ReAct graphs and prepared tools,
+requests `add` and `multiply`, and prints `Results: 5 and 20.`. The same Turn
+commits the final reply to the Session.
 
 ## Important behavior
 
@@ -35,14 +36,14 @@ model quality, or recovery after process loss.
 ## Core Fit and Gaps
 
 - Logical owner: the AI Agent.
-- Process owner: AgentServer for the hosted test.
+- Process owner: none; this lesson uses pure `Agent.cmd/3` execution.
 - Canonical state owner: the AI Agent Session state.
 - Commit point: the final successful Agent Turn.
 - Persisted data: none.
 - Retry boundary: no retry in this example.
 - Idempotency rule: tool calls are deterministic but not durable.
-- Injected failure: deterministic malformed and failed model results in tests.
-- Recovery result: failed work does not commit a final assistant message.
+- Injected failure: none; Chapter 18 tests model and tool failures.
+- Recovery result: not tested in this lesson.
 - Non-guarantees: no live provider, durability, or model-quality claim.
 
 The public AI Agent, ReAct, tool, and Session contracts compose without a
@@ -54,7 +55,8 @@ documentation friction, not a missing SDK operation.
 ## Files
 
 - [Agent](simple_agent.ex)
+- [Offline client](react_offline_client.ex)
 - [Tests](simple_agent_test.exs)
 - [Offline runner](simple_agent.exs)
 
-Next: [Custom reasoning Flow](../17_05_custom_reasoning_flow/README.md)
+Next: [Linear reasoning comparison](../17_02_linear_reasoning_comparison/README.md)
