@@ -5,9 +5,10 @@ defmodule Jido.Persistence.Record do
   alias Jido.Agent.Ref
   alias Jido.Error
   alias Jido.Codec.Term
+  alias Jido.Persistence.Config
 
-  @format_version 2
-  @key_prefix "jido:agent:v2:"
+  @format_version 3
+  @key_prefix "jido:agent:v3:"
   @common_keys [:fmt, :kind, :namespace, :agent_module, :agent_id, :partition, :rev, :agent_rev]
   @active_keys @common_keys ++ [:vsn, :checkpoint]
 
@@ -79,11 +80,11 @@ defmodule Jido.Persistence.Record do
 
   @doc false
   @spec encode(map()) :: {:ok, binary()} | {:error, term()}
-  def encode(record) do
-    {:ok, :erlang.term_to_binary(record)}
-  rescue
-    error -> {:error, {:checkpoint_encode_failed, error}}
-  end
+  def encode(record), do: Jido.Persistence.Codec.Term.encode(record)
+
+  @doc false
+  @spec encode(map(), Config.t()) :: {:ok, binary()} | {:error, term()}
+  def encode(record, %Config{} = config), do: Config.encode(config, record)
 
   @doc false
   @spec decode(term()) :: {:ok, term()} | {:error, :invalid_persistence_record}
@@ -91,9 +92,23 @@ defmodule Jido.Persistence.Record do
     # Load the trusted envelope fields before safe decoding on a cold node.
     _ = Code.ensure_loaded?(Jido.Persistence.Snapshot)
     _ = Code.ensure_loaded?(Jido.Signal)
-    {:ok, :erlang.binary_to_term(value, [:safe])}
-  rescue
-    ArgumentError -> {:error, :invalid_persistence_record}
+
+    case Jido.Persistence.Codec.Term.decode(value, []) do
+      {:ok, record} -> {:ok, record}
+      {:error, _reason} -> {:error, :invalid_persistence_record}
+    end
+  end
+
+  @doc false
+  @spec decode(term(), Config.t()) :: {:ok, term()} | {:error, :invalid_persistence_record}
+  def decode(value, %Config{} = config) do
+    _ = Code.ensure_loaded?(Jido.Persistence.Snapshot)
+    _ = Code.ensure_loaded?(Jido.Signal)
+
+    case Config.decode(config, value) do
+      {:ok, record} -> {:ok, record}
+      {:error, _reason} -> {:error, :invalid_persistence_record}
+    end
   end
 
   @doc false

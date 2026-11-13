@@ -147,7 +147,7 @@ defmodule Jido.Persistence.EctoTest do
   test "validates the repo, schema, and repository options", %{opts: opts} do
     assert :ok = EctoPersistence.validate_options(opts)
 
-    assert {:ok, {EctoPersistence, ^opts}} =
+    assert {:ok, %Jido.Persistence.Config{store: {EctoPersistence, ^opts}}} =
              Persistence.resolve_config({EctoPersistence, opts}, nil)
 
     for invalid <- [
@@ -170,6 +170,24 @@ defmodule Jido.Persistence.EctoTest do
 
     assert {:error, {:rejected, {:ecto, Exqlite.Error, _message}}} =
              EctoPersistence.compare_and_swap("key", :not_found, "value", missing_opts)
+  end
+
+  test "direct writes reject an outer Repo transaction", %{opts: opts} do
+    assert {:ok,
+            [
+              {:error, {:rejected, :ecto_outer_transaction}},
+              {:error, {:rejected, :ecto_outer_transaction}},
+              {:error, {:rejected, :ecto_outer_transaction}}
+            ]} =
+             EctoRepo.transaction(fn ->
+               [
+                 EctoPersistence.put("nested", "value", opts),
+                 EctoPersistence.compare_and_swap("nested", :not_found, "value", opts),
+                 EctoPersistence.delete("nested", opts)
+               ]
+             end)
+
+    assert {:error, :not_found} = EctoPersistence.get("nested", opts)
   end
 
   test "only a statement the database never ran is definite during CAS" do

@@ -45,3 +45,33 @@
   decision: Add Jido.Agent.Callback to this mutation profile.
   driver: The module is used only to contain Agent checkpoint and restore callback faults in persistence snapshots.
   approved_by: Final hardening audit
+
+- id: persistence-v3-instance-profile
+  date: 2026-11-13
+  decision: Use one Store and one fixed codec for each durable Jido instance and namespace. Term is the default codec and tagged JSON is opt-in.
+  driver: Agent, Flow, and wake recovery need one storage authority, while developers need an inspectable format without semantic adapters.
+  approved_by: User-confirmed persistence design review
+
+- id: persistence-v3-clean-format-break
+  date: 2026-11-13
+  decision: Use V3 manifest, Agent, execution, and wake records with no V2 runtime, migration, or inspection compatibility path.
+  driver: The old formats are unreleased, and one exact namespace manifest gives a smaller and safer startup contract.
+  approved_by: User-confirmed persistence design review
+
+- id: persistence-v3-durability-order
+  date: 2026-11-13
+  decision: Prepare Flow and timed wake records before the matching Agent record. The Agent record is the durable commit point.
+  driver: A single-key Store cannot atomically write all record families, so auxiliary records can be safe orphans but a committed timed wait cannot miss its wake data.
+  approved_by: User-confirmed persistence design review
+
+- id: persistence-v3-store-hardening
+  date: 2026-11-13
+  decision: Require option validation, get, compare-and-swap, and delete. Keep paged scan optional. Forbid Redis TTL and reject Ecto writes inside an outer transaction.
+  driver: Durability needs explicit cleanup and confirmed write boundaries. Runtime recovery must not depend on key enumeration.
+  approved_by: User-confirmed persistence design review
+
+- id: persistence-v3-wake-generations
+  date: 2026-11-13
+  decision: Store one monotonically increasing generation in each wake shard and its active-index entry. Cleanup can remove only the generation that it made empty.
+  driver: A cleanup on one node must not remove index membership for a newer wake that another node wrote to the same shard.
+  approved_by: Persistence durability verification

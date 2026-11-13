@@ -8,22 +8,23 @@ defmodule Jido.Examples.Persistence.IndeterminateWriteTest do
   alias Jido.Persistence
   alias Jido.Test.Persistence.ProbeStore
 
-  test "an uncertain stored write blocks output and later evaluation on stale state", %{
-    jido: jido
-  } do
+  test "an uncertain stored write blocks output and later evaluation on stale state", c do
     store = {ProbeStore, store: start_supervised!(ProbeStore)}
     {ProbeStore, opts} = store
+
+    fault_store =
+      {ProbeStore,
+       opts
+       |> Keyword.put(:write_result, :indeterminate)
+       |> Keyword.put(:fault_revision, 2)}
+
+    %{jido: jido} = restart_jido!(c, fault_store)
     id = unique_id("example-indeterminate-write")
     context = %{}
 
     assert {:ok, server} =
              Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, Probe,
                id: id,
-               persistence:
-                 {ProbeStore,
-                  opts
-                  |> Keyword.put(:write_result, :indeterminate)
-                  |> Keyword.put(:fault_revision, 2)},
                persistence_mode: :create,
                default_dispatch: {:pid, target: self()}
              )

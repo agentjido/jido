@@ -87,6 +87,7 @@
       "Jido.Plugin.Normalizer"
     ],
     live_runtime: [
+      "Mix.Tasks.Jido.Persistence.*",
       "Jido",
       "Jido.AgentServer",
       "Jido.AgentServer.*",

@@ -62,12 +62,13 @@ defmodule Jido.Test.Persistence.Contracts.Recovery do
   end
 
   def start!(context, id, persistence) do
+    Jido.Test.Case.restart_jido!(context, persistence)
+
     {:ok, server} =
       Jido.Test.AgentServer.Assertions.start_agent(
         context.jido,
         Jido.Test.Persistence.PersistentProbe,
         id: id,
-        persistence: persistence,
         persistence_mode: :create
       )
 
@@ -75,8 +76,7 @@ defmodule Jido.Test.Persistence.Contracts.Recovery do
   end
 
   def restore!(context, id) do
-    {:ok, server} =
-      Jido.thaw(context.jido, Jido.Test.Persistence.PersistentProbe, id, persistence: context.store)
+    {:ok, server} = Jido.thaw(context.jido, Jido.Test.Persistence.PersistentProbe, id)
 
     :ok = Jido.AgentServer.await_ready(server)
     server

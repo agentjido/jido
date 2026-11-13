@@ -11,8 +11,9 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
   alias Jido.Persistence
   alias Jido.Persistence.ETS
 
-  test "a persistent Agent restores its last durable commit and continues", %{jido: jido} do
+  test "a persistent Agent restores its last durable commit and continues", c do
     persistence = persistence(:restore)
+    %{jido: jido} = restart_jido!(c, persistence)
     id = unique_id("persistent-counter")
 
     counter = start_counter(jido, id, persistence)
@@ -29,7 +30,7 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
 
     stop_server(jido, counter)
 
-    assert {:ok, restored} = PersistentAgent.restore(jido, id, persistence)
+    assert {:ok, restored} = PersistentAgent.restore(jido, id)
     assert :ok = Jido.AgentServer.await_ready(restored)
 
     assert %{
@@ -49,8 +50,9 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
     assert agent_result(restored).agent_revision == 3
   end
 
-  test "an identical-state commit stores a new revision and restores it", %{jido: jido} do
+  test "an identical-state commit stores a new revision and restores it", c do
     persistence = persistence(:duplicate)
+    %{jido: jido} = restart_jido!(c, persistence)
     id = unique_id("persistent-counter")
     duplicate = PersistentAgent.increment_signal!("command-1", 7)
 
@@ -67,7 +69,7 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
     assert first.state.count == 7
     stop_server(jido, counter)
 
-    assert {:ok, restored} = PersistentAgent.restore(jido, id, persistence)
+    assert {:ok, restored} = PersistentAgent.restore(jido, id)
 
     assert :ok = Jido.AgentServer.await_ready(restored)
     snapshot = Jido.AgentServer.snapshot(restored)
@@ -107,15 +109,16 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
     assert failed_revision > stored_revision
 
     stop_server(jido, restored)
-    assert {:ok, restored_again} = PersistentAgent.restore(jido, id, persistence)
+    assert {:ok, restored_again} = PersistentAgent.restore(jido, id)
     assert :ok = Jido.AgentServer.await_ready(restored_again)
     snapshot = Jido.AgentServer.snapshot(restored_again)
     assert snapshot.agent == first
     assert snapshot.agent_revision == 2
   end
 
-  test "a corrupt record prevents restore", %{jido: jido} do
+  test "a corrupt record prevents restore", c do
     {ETS, opts} = persistence = persistence(:corrupt)
+    %{jido: jido} = restart_jido!(c, persistence)
     id = unique_id("corrupt-counter")
 
     key =
@@ -125,15 +128,14 @@ defmodule Jido.Examples.Persistence.PersistentAgentTest do
 
     assert {:error, _reason} =
              with(
-               {:ok, server} <- PersistentAgent.restore(jido, id, persistence),
+               {:ok, server} <- PersistentAgent.restore(jido, id),
                do: Jido.AgentServer.await_ready(server)
              )
   end
 
-  defp start_counter(jido, id, persistence) do
+  defp start_counter(jido, id, _persistence) do
     start_agent!(jido, PersistentAgent,
       id: id,
-      persistence: persistence,
       persistence_mode: :create
     )
   end

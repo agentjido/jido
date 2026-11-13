@@ -137,7 +137,7 @@ Without a store, the Agent ends with its activation. With a store, the logical A
   )
 
 {:ok, durable} =
-  Jido.start_agent(LayersGuide.DurableJido, LayersGuide.Queue, id: "queue-d", persistence: :inherit)
+  Jido.start_agent(LayersGuide.DurableJido, LayersGuide.Queue, id: "queue-d")
 
 :ok = Jido.AgentServer.await_ready(durable)
 first_activation = Jido.AgentServer.activation(durable)

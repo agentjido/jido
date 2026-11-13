@@ -37,8 +37,7 @@ defmodule Jido.Test.Persistence.Contracts.Agent do
         assert :ok = Jido.hibernate(c.jido, server)
         assert_receive {:DOWN, ^monitor, :process, ^server, {:shutdown, :hibernate}}, 5_000
 
-        assert {:ok, restored} =
-                 Jido.thaw(c.jido, Probe, id, persistence: c.store)
+        assert {:ok, restored} = Jido.thaw(c.jido, Probe, id)
 
         assert :ok = Server.await_ready(restored)
 
@@ -52,7 +51,6 @@ defmodule Jido.Test.Persistence.Contracts.Agent do
         assert {:error, :not_found} =
                  Jido.Test.AgentServer.Assertions.start_result(c.jido, Probe,
                    id: required_id,
-                   persistence: c.store,
                    persistence_mode: :restore
                  )
 
@@ -61,7 +59,6 @@ defmodule Jido.Test.Persistence.Contracts.Agent do
         assert {:ok, server} =
                  Jido.start_agent(c.jido, Probe,
                    id: if_found_id,
-                   persistence: c.store,
                    persistence_mode: :create
                  )
 
@@ -93,7 +90,6 @@ defmodule Jido.Test.Persistence.Contracts.Agent do
   def start!(context, id, opts \\ []) do
     defaults = [
       id: id,
-      persistence: context.store,
       persistence_mode: :create
     ]
 

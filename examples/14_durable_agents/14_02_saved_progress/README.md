@@ -13,8 +13,11 @@ AgentServer saves a ten-step Flow and resumes its interrupted step after a crash
 Read [the Flow and Agent](saved_progress.ex), then [Advance](advance.ex).
 
 ```elixir
+{:ok, _instance} =
+  Jido.start_link(name: MyJido, namespace: "saved-progress", persistence: Jido.Persistence.ETS)
+
 {:ok, server} = Jido.start_agent(MyJido, Jido.Examples.Durable.SavedProgress.Agent,
-  id: "ten-steps", persistence: Jido.Persistence.ETS)
+  id: "ten-steps")
 :ok = Jido.AgentServer.await_ready(server)
 {:ok, signal} = Jido.Examples.Durable.SavedProgress.Agent.run_signal(%{value: 0})
 {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =

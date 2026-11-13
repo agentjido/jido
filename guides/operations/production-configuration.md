@@ -41,13 +41,13 @@ import Config
 config :my_app, MyApp.Jido,
   persistence: {Jido.Persistence.Ecto, repo: MyApp.Repo},
   agent_server: [
-    persistence: :inherit,
     turn_timeout: 30_000,
     max_postponed_signals: 200
   ]
 ```
 
-Setting `persistence: :inherit` under `:agent_server` makes every Agent in the instance durable. To choose per Agent, leave it out and pass `persistence: :inherit` to `Jido.start_agent/3`.
+The instance persistence profile applies to every Agent in that instance.
+Per-Agent Store and codec choices are not supported.
 
 ## Set your limits
 

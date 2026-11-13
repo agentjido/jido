@@ -271,10 +271,12 @@ The Server validates the whole batch before commit and runs it after commit. A f
 
 ## Persistence
 
-V2 configured storage on the instance. V3 needs a stable namespace and an adapter, and each Agent opts in.
+V3 also configures persistence on the instance. A persistent V3 instance needs
+a stable namespace and one persistence profile. All Agents in that instance
+use the same Store and codec.
 
 ```elixir
-{:ok, durable} = Jido.start_agent(MigrationGuide.Jido, MigrationGuide.Counter, id: "counter-3", persistence: :inherit)
+{:ok, durable} = Jido.start_agent(MigrationGuide.Jido, MigrationGuide.Counter, id: "counter-3")
 :ok = Jido.AgentServer.await_ready(durable)
 
 {:ok, %{state: %{count: 5}}, []} =

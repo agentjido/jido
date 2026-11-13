@@ -38,7 +38,7 @@ invoice = Invoice.instantiate!(id: "invoice-1", state: %{total_cents: 1_200})
 
 {:ok, ^invoice} = Jido.Persistence.restore(snapshot)
 
-%{format: 1, state_format: :default, agent: ^invoice} = snapshot
+%{format: 3, state_format: :default, agent: ^invoice} = snapshot
 [AddLine] = Map.keys(snapshot.references)
 ```
 
@@ -46,7 +46,7 @@ The snapshot has four fields:
 
 | Field | Meaning |
 | --- | --- |
-| `:format` | Snapshot format. Version 1 is the only supported format |
+| `:format` | Snapshot format. Version 3 is the only supported format |
 | `:agent` | The complete Agent, with its definition and state as data |
 | `:references` | A map from each module the definition depends on to its 16-byte BEAM MD5 |
 | `:state_format` | `:default`, or `:custom` when the Agent has a `checkpoint/2` callback |
@@ -66,7 +66,7 @@ Restore also compares every saved fingerprint with the loaded module, and it ret
 | `:changed_reference` | A referenced module now has a different MD5 |
 | `:unavailable_reference` | A referenced module cannot be loaded |
 | `:snapshot_references` | The reference map is incomplete |
-| `:unsupported_snapshot_format` | The snapshot format is not 1 |
+| `:unsupported_snapshot_format` | The snapshot format is not 3 |
 
 ## Deploy changed code
 
@@ -85,7 +85,6 @@ alias UpgradesGuide.Invoice
 {:ok, server} =
   Jido.start_agent(UpgradesGuide.Jido, Invoice,
     id: "invoice-2",
-    persistence: :inherit,
     state: %{total_cents: 1_200}
   )
 

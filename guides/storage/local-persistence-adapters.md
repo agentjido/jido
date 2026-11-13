@@ -67,13 +67,19 @@ file_store = {Jido.Persistence.File, path: path}
 {:ok, %{id: "ticket-1001"}} =
   Jido.Persistence.load_agent(file_store, LocalStoresGuide.Ticket, "ticket-1001", namespace: "support")
 
-[record_file] = File.ls!(Path.join(path, "records"))
+[record_file] = Path.wildcard(Path.join(path, "records/*.bin"))
 true = String.ends_with?(record_file, ".bin")
 
 File.rm_rf!(path)
 ```
 
-Each write goes to a temporary file and then renames it over the record. Writes and deletes for one key share a lock inside the local BEAM.
+Each write goes to a temporary file and then renames it over the record. A
+small `.key` sidecar verifies the hashed file name. A bounded, fixed-depth hash
+radix index under `<path>/scan_index/` supports optional paged scan and JSONL
+export. Writes and deletes for one key share a lock inside the local BEAM.
+
+With `Jido.Persistence.Codec.JSON`, each `.bin` file is a valid tagged JSON
+document that normal JSON tools can parse. The default Term codec is smaller.
 
 That lock is the limit of this adapter:
 

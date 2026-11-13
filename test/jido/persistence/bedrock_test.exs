@@ -40,7 +40,9 @@ defmodule Jido.Persistence.BedrockTest do
 
   test "validates the Bedrock repo and all adapter options", %{opts: opts} do
     assert :ok = Bedrock.validate_options(opts)
-    assert {:ok, {Bedrock, ^opts}} = Persistence.resolve_config({Bedrock, opts}, nil)
+
+    assert {:ok, %Jido.Persistence.Config{store: {Bedrock, ^opts}}} =
+             Persistence.resolve_config({Bedrock, opts}, nil)
 
     assert {:error, _reason} = Bedrock.validate_options([])
     assert {:error, _reason} = Bedrock.validate_options(repo: String)

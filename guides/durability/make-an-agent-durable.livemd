@@ -57,9 +57,10 @@ instance_options = [
 {:ok, _} = Jido.start_link(instance_options)
 ```
 
-## Start the Agent with persistence
+## Start the Agent
 
-Pass `persistence: :inherit` to use the instance adapter. An adapter tuple also works here and overrides the instance default.
+Every Agent in a persistent instance uses the instance Store and codec. Jido
+does not support a per-Agent persistence override.
 
 The server writes revision zero before it reports ready, so wait with `Jido.AgentServer.await_ready/2` before you send work.
 
@@ -68,15 +69,17 @@ alias Jido.AgentServer, as: Server
 alias MakeDurableGuide.Invoice
 
 {:ok, server} =
-  Jido.start_agent(MakeDurableGuide.Jido, Invoice, id: "invoice-42", persistence: :inherit)
+  Jido.start_agent(MakeDurableGuide.Jido, Invoice, id: "invoice-42")
 
 :ok = Server.await_ready(server)
 
 %{state_version: 0} = Server.snapshot(server)
-store_path |> Path.join("**/*") |> Path.wildcard() |> Enum.count(&File.regular?/1)
+store_path |> Path.join("records/*.bin") |> Path.wildcard() |> length()
 ```
 
-The cell returns `1`, the one file that holds this Agent's record.
+The cell returns `2`: one namespace manifest and one Agent record. Each `.bin`
+file has a `.key` sidecar. A bounded radix index supports optional scan and
+JSONL export.
 
 ## Commit a Turn
 
@@ -193,7 +196,7 @@ alias Jido.AgentServer, as: Server
 alias MakeDurableGuide.Invoice
 
 result =
-  case Jido.start_agent(MakeDurableGuide.Jido, Invoice, id: "invoice-42", persistence: :inherit) do
+  case Jido.start_agent(MakeDurableGuide.Jido, Invoice, id: "invoice-42") do
     {:ok, pid} -> Server.await_ready(pid)
     {:error, reason} -> {:error, reason}
   end

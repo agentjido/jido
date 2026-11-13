@@ -139,14 +139,14 @@ defmodule Jido.Persistence.PluginIntegrationTest do
     assert_receive {:dump, 12, dump_context}
     assert dump_context.plugin == Package
     assert dump_context.plugin_vsn == 4
-    assert dump_context.record_format == 2
+    assert dump_context.record_format == 3
     assert dump_context.direction == :dump
     assert dump_context.reason == :test
 
     {ETS, opts} = c.persistence
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     assert {:ok, bytes} = ETS.get(key, opts)
-    record = :erlang.binary_to_term(bytes, [:safe])
+    assert {:ok, record} = Jido.Persistence.Codec.Term.decode(bytes, [])
     assert record.checkpoint.agent.state.visible == 8
     assert record.checkpoint.agent.state.owned == "sealed:12"
     refute Map.has_key?(record.checkpoint.agent.state, :adapter)
@@ -240,9 +240,10 @@ defmodule Jido.Persistence.PluginIntegrationTest do
     {ETS, opts} = c.persistence
     key = Persistence.agent_key(Jido.Agent.Ref.new!(namespace: "persistence-test", id: agent.id))
     assert {:ok, bytes} = ETS.get(key, opts)
+    assert {:ok, stored_record} = Jido.Persistence.Codec.Term.decode(bytes, [])
 
     assert %{checkpoint: %{state_format: :custom, agent: %{state: payload}}} =
-             :erlang.binary_to_term(bytes, [:safe])
+             stored_record
 
     assert payload == %{id: agent.id, complete: %{value: 7, owned: 9}}
 
@@ -319,9 +320,10 @@ defmodule Jido.Persistence.PluginIntegrationTest do
 
     assert :ok = Persistence.save_agent(c.persistence, agent, namespace: "persistence-test")
     assert {:ok, bytes} = ETS.get(key, opts)
-    record = :erlang.binary_to_term(bytes, [:safe])
+    assert {:ok, record} = Jido.Persistence.Codec.Term.decode(bytes, [])
     stored = update_in(record.checkpoint.agent.state, &Map.delete(&1, :owned))
-    assert :ok = ETS.put(key, :erlang.term_to_binary(stored), opts)
+    assert {:ok, stored_bytes} = Jido.Persistence.Codec.Term.encode(stored)
+    assert :ok = ETS.put(key, stored_bytes, opts)
 
     assert {:error, {:invalid_persistence_record, :plugin_state}} =
              Persistence.load_agent(c.persistence, agent.module, agent.id, namespace: "persistence-test")

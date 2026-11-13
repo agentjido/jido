@@ -76,6 +76,7 @@ defmodule Jido.Instance.Options do
          :ok <- Jido.AgentServer.Worker.validate_defaults(agent_server),
          :ok <- validate_max_tasks(Keyword.get(opts, :max_tasks, @default_max_tasks)),
          {:ok, persistence} <- validate_persistence(Keyword.get(opts, :persistence)),
+         :ok <- validate_persistence_namespace(persistence, Keyword.get(opts, :namespace)),
          :ok <- validate_inherited_persistence(agent_server, persistence) do
       validated =
         opts
@@ -200,6 +201,16 @@ defmodule Jido.Instance.Options do
   end
 
   defp validate_inherited_persistence(_agent_server, _persistence), do: :ok
+
+  defp validate_persistence_namespace(nil, _namespace), do: :ok
+  defp validate_persistence_namespace(%Jido.Persistence.Config{}, namespace) when is_binary(namespace), do: :ok
+
+  defp validate_persistence_namespace(%Jido.Persistence.Config{}, _namespace) do
+    invalid("Persistent Jido instances require a stable namespace", %{
+      namespace: nil,
+      persistence: :configured
+    })
+  end
 
   defp invalid(message, details) do
     {:error,

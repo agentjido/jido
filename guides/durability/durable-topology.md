@@ -45,7 +45,7 @@ alias Jido.AgentServer, as: Server
     persistence: {Jido.Persistence.ETS, table: :durable_topology_guide}
   )
 
-{:ok, root} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Team, id: "team", persistence: :inherit)
+{:ok, root} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Team, id: "team")
 :ok = Server.await_ready(root)
 
 member_ids = fn root, name ->

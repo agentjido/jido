@@ -160,7 +160,7 @@ alias Jido.AgentServer, as: Server
   )
 
 {:ok, server} =
-  Jido.start_agent(DurableTurnsGuide.Jido, Report, id: "report-7", persistence: :inherit)
+  Jido.start_agent(DurableTurnsGuide.Jido, Report, id: "report-7")
 
 :ok = Server.await_ready(server)
 

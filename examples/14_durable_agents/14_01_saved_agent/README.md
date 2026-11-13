@@ -34,9 +34,10 @@ its acceptance and failure in new revisions. Missing required state fails readin
 alias Jido.Examples.Durable.SavedAgent
 alias Jido.AgentServer, as: Server
 
-{:ok, _instance} = Jido.start_link(name: ReportExample, namespace: "reports")
 store = {Jido.Persistence.File, path: "tmp/report-example"}
-opts = [id: "report-agent", persistence: store]
+{:ok, _instance} =
+  Jido.start_link(name: ReportExample, namespace: "reports", persistence: store)
+opts = [id: "report-agent"]
 
 {:ok, server} = Jido.start_agent(ReportExample, SavedAgent,
   Keyword.put(opts, :persistence_mode, :create))
@@ -47,7 +48,7 @@ opts = [id: "report-agent", persistence: store]
 ```
 
 In a fresh BEAM, load the same code, start the same instance namespace, and use
-`persistence_mode: :restore` with the same ID and store. Wait for readiness
+`persistence_mode: :restore` with the same ID and instance Store. Wait for readiness
 before reading the restored Agent. The behavior test executes both BEAM lifetimes.
 Use a new path or ID for another `:create` run.
 

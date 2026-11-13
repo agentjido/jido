@@ -68,10 +68,50 @@ defmodule Jido.Persistence.FileTest do
     assert {:ok, ^value} = FilePersistence.get(key, opts)
   end
 
+  test "scans binary records by prefix in stable pages", %{opts: opts} do
+    assert :ok = FilePersistence.put("agent:b", <<2>>, opts)
+    assert :ok = FilePersistence.put("other:a", <<0>>, opts)
+    assert :ok = FilePersistence.put("agent:a", <<1>>, opts)
+
+    assert Enum.sort(scan_all("agent:", opts, 1)) == [
+             {"agent:a", <<1>>},
+             {"agent:b", <<2>>}
+           ]
+  end
+
+  test "scan cursors bound work for binary key prefixes", %{opts: opts} do
+    prefix = <<0, 255>>
+    first_key = prefix <> <<0>>
+    second_key = prefix <> <<1>>
+
+    assert :ok = FilePersistence.put(first_key, <<1>>, opts)
+    assert :ok = FilePersistence.put(second_key, <<2>>, opts)
+    assert :ok = FilePersistence.put("unrelated", <<3>>, opts)
+
+    assert Enum.sort(scan_all(prefix, opts, 1)) == [
+             {first_key, <<1>>},
+             {second_key, <<2>>}
+           ]
+
+    assert {:error, :invalid_scan_cursor} = FilePersistence.scan(prefix, "not a cursor", 1, opts)
+
+    assert :ok = FilePersistence.delete(first_key, opts)
+    assert scan_all(prefix, opts, 1) == [{second_key, <<2>>}]
+  end
+
   test "validates required keyword options" do
     assert :ok = FilePersistence.validate_options(path: "/tmp/jido")
     assert {:error, _reason} = FilePersistence.validate_options([])
     assert {:error, _reason} = FilePersistence.validate_options(path: "")
     assert {:error, _reason} = FilePersistence.validate_options([:not_keyword])
+  end
+
+  defp scan_all(prefix, opts, limit, cursor \\ nil, entries \\ []) do
+    assert {:ok, page, next_cursor} = FilePersistence.scan(prefix, cursor, limit, opts)
+    entries = entries ++ page
+
+    if is_nil(next_cursor),
+      do: entries,
+      else: scan_all(prefix, opts, limit, next_cursor, entries)
   end
 end

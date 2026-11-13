@@ -16,10 +16,11 @@ defmodule Jido.Examples.Persistence.RecoverableDeliveryTest do
   alias Jido.Examples.RecoverableDelivery.Deliver
   alias Jido.Examples.RecoverableDelivery.MemorySink, as: Sink
 
-  setup %{jido: jido} do
-    start_supervised!({Sink, jido: jido})
+  setup c do
     store = {ProbeStore, store: start_supervised!(ProbeStore)}
-    {:ok, store: store}
+    c = restart_jido!(c, store)
+    start_supervised!({Sink, jido: c.jido})
+    {:ok, Map.put(c, :store, store)}
   end
 
   test "saved delivery intent resumes after loss without duplicating the external record", c do
@@ -62,7 +63,6 @@ defmodule Jido.Examples.Persistence.RecoverableDeliveryTest do
     assert {:ok, server} =
              Jido.Test.AgentServer.ExampleRuntime.start_agent(c.jido, Example,
                id: id,
-               persistence: c.store,
                persistence_mode: if(restore == false, do: :create, else: :restore)
              )
 

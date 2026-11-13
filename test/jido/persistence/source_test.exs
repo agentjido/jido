@@ -17,10 +17,12 @@ defmodule Jido.Persistence.SourceTest do
   @tag obligation: "jido.persistence.I1"
   test "module and live instance sources resolve one selected adapter" do
     default = {ETS, table: :persistence_source_default}
-    assert {:ok, ^default} = Jido.Persistence.resolve_config(:inherit, ConfiguredSource)
-    assert {:ok, ^default, ConfiguredSource} = Persistence.resolve_source(ConfiguredSource, [])
+    default_config = %Jido.Persistence.Config{store: default, codec: Jido.Persistence.Codec.Term}
+    assert {:ok, ^default_config} = Jido.Persistence.resolve_config(:inherit, ConfiguredSource)
+    assert {:ok, ^default_config, ConfiguredSource} = Persistence.resolve_source(ConfiguredSource, [])
 
     live = {ETS, table: :persistence_source_live}
+    live_config = %Jido.Persistence.Config{store: live, codec: Jido.Persistence.Codec.Term}
     namespace = "persistence/source/#{System.unique_integer([:positive])}"
 
     start_supervised!(
@@ -28,10 +30,10 @@ defmodule Jido.Persistence.SourceTest do
       id: {Jido, ConfiguredSource}
     )
 
-    assert {:ok, ^live} = Jido.Persistence.resolve_config(:inherit, ConfiguredSource)
-    assert {:ok, ^live, ConfiguredSource} = Persistence.resolve_source(ConfiguredSource, [])
+    assert {:ok, ^live_config} = Jido.Persistence.resolve_config(:inherit, ConfiguredSource)
+    assert {:ok, ^live_config, ConfiguredSource} = Persistence.resolve_source(ConfiguredSource, [])
 
-    assert {:ok, ^live, :explicit_instance} =
+    assert {:ok, ^live_config, :explicit_instance} =
              Persistence.resolve_source(ConfiguredSource, instance: :explicit_instance)
 
     runtime_name = :"persistence_source_runtime_#{System.unique_integer([:positive])}"
@@ -41,7 +43,7 @@ defmodule Jido.Persistence.SourceTest do
       id: {Jido, runtime_name}
     )
 
-    assert {:ok, ^live, ^runtime_name} = Persistence.resolve_source(runtime_name, [])
+    assert {:ok, ^live_config, ^runtime_name} = Persistence.resolve_source(runtime_name, [])
   end
 
   @tag obligation: "jido.persistence.I1"

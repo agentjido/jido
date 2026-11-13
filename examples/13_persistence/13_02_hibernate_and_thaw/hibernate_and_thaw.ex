@@ -20,7 +20,5 @@ defmodule Jido.Examples.Persistence.HibernateAndThaw do
   end
 
   @doc "Starts this Agent only when its durable record exists."
-  def thaw(jido, id, persistence) do
-    Jido.thaw(jido, __MODULE__, id, persistence: persistence)
-  end
+  def thaw(jido, id), do: Jido.thaw(jido, __MODULE__, id)
 end

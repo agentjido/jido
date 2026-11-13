@@ -33,3 +33,9 @@
   decision: Replay durable workflow structure with Runic FactRef values and load only the hot facts that the active frontier and pending reactions need. Add each open Jido wait input to the hot set because wait resolution runs before the Runner restarts. Represent detached Join completion results with an internal replay event that creates a FactRef.
   driver: Long-running workflow history must not force every stored fact value into memory during each recovery or wait transition.
   approved_by: User-requested frontier fact hydration
+
+- id: durable-turn-v3-prepare-before-agent-commit
+  date: 2026-11-13
+  decision: Prepare the execution record and each timed wake before the matching Agent receipt. Treat the Agent record as the durable commit point.
+  driver: Single-key Stores can leave safe auxiliary orphans, but they must not expose a committed timed wait without its recovery data.
+  approved_by: User-confirmed persistence design review

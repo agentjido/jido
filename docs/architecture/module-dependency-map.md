@@ -98,11 +98,11 @@ primitives <- value_model <- definitions <- execution <- agent_domain <- live_ru
 | `definitions` | `Jido.Action`, `Jido.Flow`, `Jido.Instruction`, `Jido.Plugin.Config`, `Jido.Plugin.Manifest`, `Jido.Plugin.Spec`, Signal catalogs and routers, and definition codecs | `primitives`, `value_model` |
 | `execution` | `Jido.Exec` and Jido-owned Runic implementations | `primitives`, `value_model`, `definitions` |
 | `agent_domain` | `Jido.Agent`, `Jido.Agent.Codec`, the generic Plugin behavior, callback contexts, input, and normalizer | All lower layers through `execution` |
-| `live_runtime` | AgentServer, Persistence, Instance, Signal Bus and Dispatch, telemetry, tracing, and root runtime services | All lower layers through `agent_domain` |
+| `live_runtime` | AgentServer, Persistence and its inspection Mix tasks, Instance, Signal Bus and Dispatch, telemetry, tracing, and root runtime services | All lower layers through `agent_domain` |
 | `capabilities` | `Jido.AI` and bundled Plugin implementations | All lower layers through `live_runtime` |
 | `composition` | `Jido.Application`, `Jido.Catalog.Discovery` | All lower layers |
 
-The current Reach check covers all 348 production files and reports no layer
+The current Reach check covers all production source files and reports no layer
 violations.
 
 ### Covenant ownership rule
@@ -716,12 +716,19 @@ Disposition terms:
 | `Jido.Persistence.AgentCheckpoint` | Removed | Agent dump, load, identity, and state-conversion policy now belong to `Jido.Persistence.Checkpoint` |
 | `Jido.Persistence.Bedrock` | Keep | Bedrock adapter |
 | `Jido.Persistence.Checkpoint` | Keep | Durable Agent checkpoint value |
+| `Jido.Persistence.CLI` | Added internal | Strict shared parsing for persistence inspection Mix tasks |
+| `Jido.Persistence.Codec` | Added | Stable persistence byte-codec behavior |
+| `Jido.Persistence.Codec.Term` | Added | Compact default codec for compatible application releases |
+| `Jido.Persistence.Codec.JSON` | Added | Opt-in bounded tagged JSON codec |
+| `Jido.Persistence.Config` | Added | One validated Store and codec profile for an instance namespace |
 | `Jido.Persistence.ContinuationStore` | Keep | Canonical Runic workflow checkpoint, fact, and saved wait receipt store |
 | `Jido.Persistence.Ecto` | Keep | Ecto adapter |
 | `Jido.Persistence.ETS` | Keep | ETS adapter |
 | `Jido.Persistence.File` | Keep | File adapter |
 | `Jido.Persistence.Identity` | Removed | The Persistence facade resolves Agent Refs and Record owns stable key construction |
+| `Jido.Persistence.Inspector` | Added | Redacted exact read and optional paged JSONL export above Store bytes |
 | `Jido.Persistence.Mnesia` | Keep | Mnesia adapter |
+| `Jido.Persistence.NamespaceManifest` | Added internal | Pins codec and V3 record layouts before durable readiness |
 | `Jido.Persistence.Plugin` | Keep | Persistence-owned Plugin callback execution |
 | `Jido.Persistence.Record` | Keep | Stored record envelope |
 | `Jido.Persistence.Redis` | Keep | Redis adapter |
@@ -729,6 +736,7 @@ Disposition terms:
 | `Jido.Persistence.Snapshot` | Keep | Portable Agent snapshot value |
 | `Jido.Persistence.Source` | Removed | Configuration and instance-source resolution now belong to `Jido.Persistence` |
 | `Jido.Persistence.Store` | Keep | Canonical byte-store behavior and safe invocation boundary |
+| `Jido.Persistence.WakeStore` | Added internal | One-minute, 64-shard timed wake records and active-bucket index |
 
 ### AgentServer and instance runtime
 

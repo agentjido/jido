@@ -13,9 +13,9 @@ defmodule Jido.Examples.Runtime.PendingJobRecoveryTest do
   alias Jido.Examples.PendingJobRecovery.JobRuntime, as: Jobs
   alias Jido.Examples.PendingJobRecovery.JobRuntime.Server, as: JobServer
 
-  setup do
+  setup c do
     store = {ProbeStore, store: start_supervised!(ProbeStore)}
-    {:ok, store: store}
+    {:ok, c |> restart_jido!(store) |> Map.put(:store, store)}
   end
 
   test "saved approval requires an explicit new attempt after runtime loss", c do
@@ -104,7 +104,6 @@ defmodule Jido.Examples.Runtime.PendingJobRecoveryTest do
     assert {:ok, server} =
              Jido.Test.AgentServer.ExampleRuntime.start_agent(c.jido, Example,
                id: id,
-               persistence: c.store,
                persistence_mode: if(restore == false, do: :create, else: :restore)
              )
 

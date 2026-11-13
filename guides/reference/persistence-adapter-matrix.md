@@ -10,7 +10,7 @@ This guide compares the seven `Jido.Persistence.Store` adapters that Jido includ
 | `Jido.Persistence.File` | Until you delete the files | No. One BEAM must own the directory. | A lock in the BEAM, then a temporary file and rename | None | A directory | [Local Stores](../storage/local-persistence-adapters.md) |
 | `Jido.Persistence.Mnesia` | As your table copies define | As your table copies define | A Mnesia transaction with a write lock | None | A running Mnesia and a `set` table with attributes `[:key, :value]` | [Local Stores](../storage/local-persistence-adapters.md) |
 | `Jido.Persistence.Ecto` | As your database defines | Yes | One `INSERT`, or one conditional `UPDATE` | None | A running repo and a migrated table. PostgreSQL or SQLite only. | [Ecto Storage](../storage/ecto-persistence.md) |
-| `Jido.Persistence.Redis` | As your Redis defines. `:ttl` expires keys. | Yes | One Lua `EVAL` | None | `:command_fn`, which runs one command. The connection must permit `EVAL`. | [Redis and S3 Stores](../storage/redis-and-s3-persistence.md) |
+| `Jido.Persistence.Redis` | As your Redis defines. Jido does not expire keys. | Yes | One Lua `EVAL` | None | `:command_fn`, which runs one command. The connection must permit `EVAL`. | [Redis and S3 Stores](../storage/redis-and-s3-persistence.md) |
 | `Jido.Persistence.S3` | As your bucket defines | Yes | A conditional `PUT` with an ETag token | 5,000,000 bytes | `:request_fn`, which signs and sends one request | [Redis and S3 Stores](../storage/redis-and-s3-persistence.md) |
 | `Jido.Persistence.Bedrock` | As your cluster's durability mode defines | Yes | One Bedrock transaction | Value 128 KiB. Key plus prefix 16 KiB. | A supervised cluster and a module with `use Bedrock.Repo` | [Bedrock and Raft Storage](../storage/bedrock-persistence.md) |
 
@@ -45,7 +45,6 @@ This guide makes no throughput claim. Measure with your own record sizes, as [Lo
 | Ecto | `:repo_options` | `[]` | Options for repo calls, such as `:prefix` and `:timeout`. It rejects `:on_conflict` and `:conflict_target`. |
 | Redis | `:command_fn` | Required | A one-argument function. |
 | Redis | `:prefix` | `"jido"` | Each key is `"<prefix>:<key>"`. |
-| Redis | `:ttl` | None | The key lifetime in milliseconds, a positive integer. |
 | S3 | `:bucket` | Required | A nonempty string. |
 | S3 | `:request_fn` | Required | A one-argument function. |
 | S3 | `:prefix` | `"jido/"` | A string prepended to each object key. |
@@ -54,7 +53,7 @@ This guide makes no throughput claim. Measure with your own record sizes, as [Lo
 | Bedrock | `:prefix` | `"jido:persistence:"` | A nonempty binary below the system keyspace. |
 | Bedrock | `:timeout_in_ms` | `5_000` | A positive integer or `:infinity`, per transaction. |
 
-Ecto, S3, and Bedrock reject unknown options. Mnesia accepts `:table` alone. ETS, File, and Redis ignore other keys.
+Every built-in adapter rejects unknown and duplicate options.
 
 ```elixir
 alias Jido.Persistence.Store
@@ -83,7 +82,9 @@ alias Jido.Persistence.Store
 
 ## Callback contract
 
-Each adapter here implements all five `Jido.Persistence.Store` callbacks. A custom adapter must implement `c:Jido.Persistence.Store.get/2` and `c:Jido.Persistence.Store.compare_and_swap/4`. Without `c:Jido.Persistence.Store.delete/2`, Flow execution records remain after each Flow Turn.
+Each adapter implements the required option validation, get,
+compare-and-swap, and delete callbacks. Maintenance `put/3` and paged
+`scan/4` are optional. ETS and File implement scan for inspection and export.
 
 | Callback | ETS | File | Mnesia | Ecto | Redis | S3 | Bedrock |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -91,6 +92,7 @@ Each adapter here implements all five `Jido.Persistence.Store` callbacks. A cust
 | `compare_and_swap/4` compares | Bytes | Bytes | Bytes | Bytes | Bytes | ETag | Bytes |
 | Maintenance `put/3` | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Maintenance `delete/2` | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Inspection `scan/4` | Yes | Yes | No | No | No | No | No |
 
 Each adapter reports write results the same way:
 
@@ -116,7 +118,8 @@ A durable Flow writes several keys per step through the same adapter, one value 
 
 - `Jido.Persistence.Bedrock` and `Jido.Persistence.S3` apply their limits to each value, so a large step result can fail. Pass a reference to a large payload through a Flow.
 - `Jido.Persistence.S3` makes at least one request per write, and its documents describe it as for low-frequency records.
-- `Jido.Persistence.Redis` with `:ttl` can remove a record that a waiting Flow still needs.
+- Redis eviction can remove a record that a waiting Flow still needs. Jido
+  does not configure automatic expiry.
 
 ## Related
 

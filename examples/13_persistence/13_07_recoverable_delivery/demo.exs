@@ -11,10 +11,10 @@ defmodule Jido.Examples.RecoverableDelivery.Probe do
     jido = __MODULE__.Instance
     suffix = :crypto.strong_rand_bytes(12) |> Base.url_encode64(padding: false)
     path = Path.join(System.tmp_dir!(), "jido-delivery-#{suffix}")
-    {:ok, instance} = Jido.start_link(name: jido)
-    {:ok, sink} = Sink.start_link(jido: jido)
     persistence = {Jido.Persistence.File, path: path}
-    opts = [id: "delivery-example", persistence: persistence, restart: :temporary]
+    {:ok, instance} = Jido.start_link(name: jido, namespace: "delivery-example", persistence: persistence)
+    {:ok, sink} = Sink.start_link(jido: jido)
+    opts = [id: "delivery-example", restart: :temporary]
 
     try do
       :ok = Sink.available(jido, false)

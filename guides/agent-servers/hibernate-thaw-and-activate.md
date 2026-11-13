@@ -35,10 +35,11 @@ end
 
 ## Hibernate an Agent
 
-Start the Agent with `persistence: :inherit` to use the instance's store. With persistence on, each commit also saves. `Jido.start_agent/3` ignores the instance's store unless you pass this option: the Agent starts with fresh state over any save, and its commits are not saved.
+Start the Agent in the persistent instance. It automatically uses the
+instance's one Store and codec, and each commit saves.
 
 ```elixir
-{:ok, cart} = Jido.start_agent(HibernateGuide.Jido, HibernateGuide.Cart, id: "cart-1", persistence: :inherit)
+{:ok, cart} = Jido.start_agent(HibernateGuide.Jido, HibernateGuide.Cart, id: "cart-1")
 :ok = Jido.AgentServer.await_ready(cart)
 
 {:ok, _agent, []} = Jido.AgentServer.call(cart, HibernateGuide.Cart.add_signal!(%{sku: "tea"}))
@@ -61,7 +62,8 @@ A durable Flow Turn suspended on a wait can hibernate with its progress saved. S
 
 ## Thaw an Agent
 
-`Jido.thaw/4` starts a new process from the saved Agent. It uses the instance's store unless you pass `:persistence`, and it accepts the other startup options. In a partition, pass `:partition`.
+`Jido.thaw/4` starts a new process from the saved Agent. It uses the instance
+profile. In a partition, pass `:partition`.
 
 ```elixir
 {:ok, thawed} = Jido.thaw(HibernateGuide.Jido, HibernateGuide.Cart, "cart-1")
@@ -121,13 +123,13 @@ end
 
 ## Hibernate when idle
 
-Set `idle_policy: :hibernate` to save and stop an Agent after its idle budget runs out. Start it with a persistence source, or the start returns a `Jido.Error.ValidationError`.
+Set `idle_policy: :hibernate` to save and stop an Agent after its idle budget
+runs out. The instance must have persistence.
 
 ```elixir
 {:ok, idle_cart} =
   Jido.start_agent(HibernateGuide.Jido, HibernateGuide.Cart,
     id: "cart-3",
-    persistence: :inherit,
     idle_timeout: 50,
     idle_policy: :hibernate
   )

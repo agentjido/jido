@@ -115,9 +115,16 @@ defmodule Jido.Persistence.LiveStateTest do
     defdelegate delete(key, opts), to: ETS
 
     def compare_and_swap(key, expected, value, opts) do
-      case :erlang.binary_to_term(value, [:safe]) do
+      case decode_term(value) do
         %{rev: revision} when revision > 0 -> {:error, {:rejected, :storage_unavailable}}
         _other -> ETS.compare_and_swap(key, expected, value, opts)
+      end
+    end
+
+    defp decode_term(value) do
+      case Jido.Persistence.Codec.Term.decode(value, []) do
+        {:ok, decoded} -> decoded
+        {:error, _reason} -> :not_an_external_term
       end
     end
   end
@@ -262,15 +269,14 @@ defmodule Jido.Persistence.LiveStateTest do
   end
 
   test "persistent custom and Plugin checkpoints convert before storage and dispatch", c do
+    jido = persistent_instance(c.persistence)
+
     for {module, input} <- [
           {CustomAgent, %{payload: "portable"}},
           {PluginAgent, %{payload: :portable, owned: %{bits: "portable"}}}
         ] do
       assert {:ok, server} =
-               Jido.Test.AgentServer.Assertions.start_agent(c.jido, module,
-                 persistence: c.persistence,
-                 default_dispatch: {:pid, target: self()}
-               )
+               Jido.Test.AgentServer.Assertions.start_agent(jido, module, default_dispatch: {:pid, target: self()})
 
       assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
                Server.call(server, signal("local.update", input))
@@ -280,7 +286,7 @@ defmodule Jido.Persistence.LiveStateTest do
       committed = Server.snapshot(server).agent
 
       assert {:ok, ^committed, 2} =
-               Persistence.load_agent_with_revision(c.persistence, module, committed.id, instance: c.jido)
+               Persistence.load_agent_with_revision(c.persistence, module, committed.id, instance: jido)
     end
   end
 
@@ -296,12 +302,10 @@ defmodule Jido.Persistence.LiveStateTest do
 
     for {module, adapter, input, saved_revision} <- cases do
       persistence = {adapter, elem(c.persistence, 1)}
+      jido = persistent_instance(persistence)
 
       assert {:ok, server} =
-               Jido.Test.AgentServer.Assertions.start_agent(c.jido, module,
-                 persistence: persistence,
-                 default_dispatch: {:pid, target: self()}
-               )
+               Jido.Test.AgentServer.Assertions.start_agent(jido, module, default_dispatch: {:pid, target: self()})
 
       before = Jido.Test.AgentServer.Assertions.committed(server)
       monitor = Process.monitor(server)
@@ -312,7 +316,7 @@ defmodule Jido.Persistence.LiveStateTest do
       assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000
 
       assert {:ok, saved, ^saved_revision} =
-               Persistence.load_agent_with_revision(persistence, module, before.agent.id, instance: c.jido)
+               Persistence.load_agent_with_revision(persistence, module, before.agent.id, instance: jido)
 
       assert saved == before.agent
       refute_received {:signal, %{type: "local.updated"}}
@@ -322,12 +326,26 @@ defmodule Jido.Persistence.LiveStateTest do
   defp record(c, id) do
     {ETS, opts} = c.persistence
     assert {:ok, bytes} = ETS.get(key(c, id), opts)
-    :erlang.binary_to_term(bytes, [:safe])
+    assert {:ok, record} = Jido.Persistence.Codec.Term.decode(bytes, [])
+    record
+  end
+
+  defp persistent_instance(persistence) do
+    id = System.unique_integer([:positive])
+    name = :"live_state_persistence_#{id}"
+
+    start_supervised!(
+      {Jido, name: name, namespace: "test/live-state/#{id}", persistence: persistence},
+      id: {Jido, name}
+    )
+
+    name
   end
 
   defp put_record(c, id, record) do
     {ETS, opts} = c.persistence
-    assert :ok = ETS.put(key(c, id), :erlang.term_to_binary(record), opts)
+    assert {:ok, bytes} = Jido.Persistence.Codec.Term.encode(record)
+    assert :ok = ETS.put(key(c, id), bytes, opts)
   end
 
   defp key(c, id),

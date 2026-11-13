@@ -109,7 +109,7 @@ The check is on the host. Passing `jido_exec_capabilities` in the context does n
 
 ## Start a durable Agent
 
-Give the Agent persistence and a long `turn_timeout`. [Make an Agent Durable](../durability/make-an-agent-durable.livemd) covers the options. Use `submit/3` so that your process can do other work while the request waits. `Jido.Persistence.File` keeps this example self-contained.
+Give the Jido instance persistence and give the Agent a long `turn_timeout`. [Make an Agent Durable](../durability/make-an-agent-durable.livemd) covers the options. Use `submit/3` so that your process can do other work while the request waits. `Jido.Persistence.File` keeps this example self-contained.
 
 ```elixir
 review_dir = Path.join(System.tmp_dir!(), "tool-review-#{System.unique_integer([:positive])}")
@@ -117,12 +117,15 @@ review_dir = Path.join(System.tmp_dir!(), "tool-review-#{System.unique_integer([
 Application.put_env(:jido, :ai_inference_client, ToolReviewGuide.LocalModel)
 Process.register(self(), :billing_reviews)
 
-{:ok, _instance} = Jido.start(name: ToolReviewGuide.Jido, namespace: "guides/tool-review")
+{:ok, _instance} =
+  Jido.start(name: ToolReviewGuide.Jido,
+    namespace: "guides/tool-review",
+    persistence: {Jido.Persistence.File, path: review_dir}
+  )
 
 {:ok, server} =
   Jido.start_agent(ToolReviewGuide.Jido, ToolReviewGuide.BillingAgent,
     id: "billing-1",
-    persistence: {Jido.Persistence.File, path: review_dir},
     turn_timeout: :infinity
   )
 

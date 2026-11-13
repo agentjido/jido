@@ -106,12 +106,12 @@ defmodule Jido.AgentServer.Property.LifecycleModelTest do
     id = unique_id("runtime-property")
     path = Path.join(c.tmp_dir, id)
     persistence = {Jido.Persistence.File, path: path}
+    c = Jido.Test.Case.restart_jido!(c, persistence)
 
     {:ok, server} =
       Jido.Test.AgentServer.Assertions.start_agent(c.jido, Counter,
         id: id,
         state: %{count: initial_count},
-        persistence: persistence,
         persistence_mode: :create
       )
 
@@ -144,7 +144,7 @@ defmodule Jido.AgentServer.Property.LifecycleModelTest do
     assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 5_000
     assert Jido.whereis_agent(c.jido, id) == nil
 
-    assert {:ok, restored} = Jido.thaw(c.jido, Counter, id, persistence: persistence)
+    assert {:ok, restored} = Jido.thaw(c.jido, Counter, id)
     assert :ok = Server.await_ready(restored)
     assert Server.snapshot(restored).agent.state == expected
     assert :ok = Jido.stop_agent(c.jido, restored)

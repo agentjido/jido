@@ -19,7 +19,7 @@ defmodule Jido.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
-      dialyzer: [plt_add_apps: [:ex_unit], ignore_warnings: ".dialyzer_ignore.exs"],
+      dialyzer: [plt_add_apps: [:ex_unit, :mix], ignore_warnings: ".dialyzer_ignore.exs"],
       docs: docs(),
       package: package(),
       test_ignore_filters: test_ignore_filters(),

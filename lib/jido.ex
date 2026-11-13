@@ -93,8 +93,9 @@ defmodule Jido do
     - `:namespace` - Nonempty binary for stable Agent Ref operations.
       Required for persistent Agents.
       One exact namespace can be bound to one live local instance per node.
-    - `:persistence` - Optional `Jido.Persistence.Store` module or
-      `{module, options}` tuple. The default is no durable persistence.
+    - `:persistence` - Optional persistence profile. A Store declaration uses
+      the compact Term codec. A profile can select the opt-in JSON codec.
+      The default is no durable persistence.
 
   ## Example
 
@@ -121,8 +122,8 @@ defmodule Jido do
       @otp_app unquote(otp_app)
 
       @doc false
-      @spec __jido_persistence__() :: {module(), keyword()} | nil
-      def __jido_persistence__, do: Jido.Persistence.Store.normalize_adapter(unquote(persistence))
+      @spec __jido_persistence__() :: Jido.Persistence.Config.t() | nil
+      def __jido_persistence__, do: Jido.Persistence.Config.normalize(unquote(persistence))
 
       @doc false
       @spec child_spec(term()) :: Supervisor.child_spec()
@@ -245,10 +246,9 @@ defmodule Jido do
     - `:namespace` - Nonempty stable namespace for Ref-first functions.
       Required for persistent Agents.
     - `:max_tasks` - Task Supervisor child limit; defaults to `1_000`
-    - `:persistence` - Optional persistence adapter for durable Agent creation,
-      activation, `thaw/4`, and `persistence: :inherit`. `start_agent/3`
-      ignores it unless you pass `persistence: :inherit`. Without that option,
-      the Agent does not read or save the adapter's records.
+    - `:persistence` - Optional instance persistence profile. All Agents in the
+      instance use this one Store and codec. Persistent instances require a
+      stable namespace.
     - `:agent_server` - Optional AgentServer runtime defaults
 
   ## Example
@@ -268,10 +268,25 @@ defmodule Jido do
           name: Keyword.fetch!(opts, :name)
         )
 
+      result = await_wake_readiness(result, Keyword.fetch!(opts, :name))
+
       if not match?({:ok, _pid}, result), do: NamespaceRegistry.release(claim)
       result
     end
   end
+
+  defp await_wake_readiness({:ok, pid} = started, name) do
+    case Jido.Instance.Wake.await_ready(name) do
+      :ok ->
+        started
+
+      {:error, _reason} = error ->
+        Supervisor.stop(pid)
+        error
+    end
+  end
+
+  defp await_wake_readiness(result, _name), do: result
 
   defp await_previous_children(name) do
     if Process.whereis(name) do
@@ -283,6 +298,7 @@ defmodule Jido do
         Names.registration_guard(name),
         Names.registry(name),
         Names.runtime_store(name),
+        Names.wake(name),
         Names.agent_supervisor(name)
       ]
 
@@ -331,10 +347,14 @@ defmodule Jido do
     runtime_store = Names.runtime_store(name)
 
     with :ok <-
-           NamespaceRegistry.bind(claim, Keyword.get(opts, :namespace), name, self()) do
+           NamespaceRegistry.bind(claim, Keyword.get(opts, :namespace), name, self()),
+         :ok <- RuntimeStore.ensure_table(runtime_store),
+         :ok <-
+           Jido.Persistence.NamespaceManifest.open(
+             Keyword.get(opts, :persistence),
+             Keyword.get(opts, :namespace)
+           ) do
       Jido.Telemetry.configure_debug(name, opts[:debug])
-
-      :ok = RuntimeStore.ensure_table(runtime_store)
 
       idle_residency_timeout =
         opts
@@ -884,9 +904,8 @@ defmodule Jido do
   and partition. Starting a duplicate returns an error and leaves the existing
   Agent unchanged.
 
-  This function ignores the instance's `:persistence` adapter unless you pass
-  `persistence: :inherit`. Without that option, the Agent starts with fresh
-  state over any saved record, and its commits are not saved.
+  An instance with persistence uses its one configured Store and codec for all
+  Agents. Per-Agent Store overrides are not supported.
 
   This is the standard example startup API. Domain command functions can stay
   in the Agent module; they do not need a matching startup wrapper.
@@ -897,13 +916,39 @@ defmodule Jido do
     if is_list(opts) and Keyword.keyword?(opts) do
       {instance_opts, runtime_opts} = Keyword.split(opts, [:id, :state])
 
-      with {:ok, agent} <- startup_agent(agent, instance_opts, runtime_opts) do
+      with :ok <- validate_agent_persistence_override(runtime_opts),
+           {:ok, agent} <- startup_agent(agent, instance_opts, runtime_opts) do
         runtime_opts
+        |> inherit_instance_persistence(instance)
         |> Keyword.merge(agent: agent, jido: instance)
         |> Jido.AgentServer.Worker.start()
       end
     else
       {:error, Jido.Error.validation_error("Agent startup options must be a keyword list", kind: :config)}
+    end
+  end
+
+  defp validate_agent_persistence_override(opts) do
+    case Keyword.fetch(opts, :persistence) do
+      :error ->
+        :ok
+
+      {:ok, value} when value in [:inherit, nil, false] ->
+        :ok
+
+      {:ok, value} ->
+        {:error,
+         Jido.Error.validation_error("Per-Agent persistence is not supported",
+           kind: :config,
+           details: %{persistence: value}
+         )}
+    end
+  end
+
+  defp inherit_instance_persistence(opts, instance) do
+    case Jido.Instance.RuntimeStore.instance_persistence(instance) do
+      %Jido.Persistence.Config{} -> Keyword.put(opts, :persistence, :inherit)
+      nil -> Keyword.put(opts, :persistence, false)
     end
   end
 

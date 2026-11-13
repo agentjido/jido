@@ -31,15 +31,21 @@ defmodule Jido.Test.Examples.Durable.CompletionStorage do
   alias Jido.Test.Examples.Durable.CompletionProbe
 
   @impl Jido.Persistence.Store
+  def validate_options(opts), do: Jido.Persistence.File.validate_options(opts)
+
+  @impl Jido.Persistence.Store
   def get(key, opts), do: Jido.Persistence.File.get(key, opts)
 
   @impl Jido.Persistence.Store
   def compare_and_swap(key, expected, bytes, opts) do
     with :ok <- Jido.Persistence.File.compare_and_swap(key, expected, bytes, opts) do
-      case :erlang.binary_to_term(bytes, [:safe]) do
-        %{server_turn: %{status: :completed}} -> CompletionProbe.saved()
+      case Jido.Persistence.Codec.Term.decode(bytes, trusted: true) do
+        {:ok, %{server_turn: %{status: :completed}}} -> CompletionProbe.saved()
         _ -> :ok
       end
     end
   end
+
+  @impl Jido.Persistence.Store
+  def delete(key, opts), do: Jido.Persistence.File.delete(key, opts)
 end

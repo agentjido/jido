@@ -4,15 +4,50 @@ This guide explains what Jido writes to storage, which layer owns each part, and
 
 Jido persistence stores versioned checkpoints of one Agent. It is not an event journal. Each save replaces the previous record for that Agent.
 
-## Three layers
+## Four layers
 
 | Layer | Owns | Does not own |
 | --- | --- | --- |
-| `Jido.Persistence` | Durable identity, record contents, revisions, tombstones, restore checks | Bytes on disk or in a service |
+| `Jido.Persistence` | Durable identity, record contents, revisions, tombstones, restore checks | Storage operations |
+| `Jido.Persistence.Codec` | Mapping supported logical values to bytes | Keys, revisions, or atomic writes |
 | `Jido.Persistence.Store` | The byte contract: read a value, write it only if a condition still holds, classify the result | Keys, record formats, revisions |
 | An adapter such as `Jido.Persistence.ETS` | Storing binary keys and values atomically | What the bytes mean |
 
-Adapters see opaque binaries. This is why one adapter works for Agent records and for Flow execution records. See [Continuation Storage](flow-continuations.md) for the second kind.
+Adapters see opaque binaries. Record owners and developer tools use the codec
+above the Store. This keeps adapters simple, while the opt-in JSON codec makes
+stored values readable. The compact Term codec is the default. One adapter
+works for Agent, Flow, wake, and namespace records.
+
+## Configure one instance profile
+
+One Jido instance owns one Store and one codec. All Agents, Flow records, and
+wake records in the namespace use that profile. A Store declaration selects
+the compact Term codec:
+
+```elixir
+persistence: {Jido.Persistence.File, path: "data/jido"}
+```
+
+Select tagged JSON only when you need readable files or service values:
+
+```elixir
+persistence: [
+  store: {Jido.Persistence.File, path: "data/jido"},
+  codec: Jido.Persistence.Codec.JSON
+]
+```
+
+JSON adds size and encoding overhead. Both codecs preserve supported Elixir
+values across nodes that run the same compatible application release.
+The Term format records referenced module names and loads those release modules
+before safe term decoding. This makes their static atoms available on a cold
+node. Runtime-created atoms are not supported. Per-Agent Store or codec
+overrides are rejected.
+
+At startup, Jido creates or validates a namespace manifest. It pins the codec,
+Agent, execution, and wake formats, and the wake layout. A mismatch stops the
+instance before it accepts Agent work. This V3 format does not read older
+persistence keys or records.
 
 The examples below use this Agent and the in-memory ETS adapter:
 
@@ -67,11 +102,12 @@ Pass `:namespace` directly, or pass `:instance` with a running Jido instance tha
 
 ## What a record holds
 
-An encoded record is one Erlang term, written with `:erlang.term_to_binary/1` and read with the `:safe` option. An active record has these fields:
+An encoded record is one logical map passed through the instance codec. An
+active record has these fields:
 
 | Field | Meaning |
 | --- | --- |
-| `fmt` | Record format. Jido reads and writes format `1` only |
+| `fmt` | Record format. Jido reads and writes format `3` only |
 | `kind` | `:active` or `:tombstone` |
 | `namespace`, `partition`, `agent_id` | The durable identity, checked on every read |
 | `agent_module` | The module that saved the Agent |
@@ -90,7 +126,7 @@ The checkpoint holds the whole Agent, including its definition. `Jido.Persistenc
 {:ok, snapshot} = Jido.Persistence.snapshot(invoice)
 
 [:agent, :format, :references, :state_format] = snapshot |> Map.keys() |> Enum.sort()
-1 = snapshot.format
+3 = snapshot.format
 :default = snapshot.state_format
 %{StorageModelGuide.ApplyPayment => <<_digest::binary-size(16)>>} = snapshot.references
 ```
@@ -190,7 +226,51 @@ Any other adapter error, a raise, or an invalid reply counts as indeterminate. `
 
 ## Other record families
 
-Flow Turns write more than the Agent record. Acceptance and completion use Agent record revisions, and step progress uses separate keys in the same store. All of these use the byte contract above, so an adapter needs no extra support. [Continuation Storage](flow-continuations.md) lists them.
+Flow Turns write more than the Agent record. Jido prepares Flow execution data
+and timed wake data before it commits the matching Agent receipt. The Agent
+record is the commit point. A crash can leave safe auxiliary orphans, but it
+cannot commit a timed wait without its wake data. Wake data uses one-minute
+buckets, 64 fixed shards, and a small active-bucket index. Each shard and index
+entry has a generation. Cleanup cannot remove index membership for a newer
+concurrent shard write. Failed recovery reads and cleanup writes retry with an
+observable warning. Runtime recovery does not scan the Store. [Continuation
+Storage](flow-continuations.md) lists the Flow records.
+
+## Inspect and export records
+
+`mix jido.persistence.inspect` reads one exact key. The command writes a JSON
+metadata and shape projection. Pass `--full` only when the terminal is safe for
+all saved values:
+
+```sh
+mix jido.persistence.inspect \
+  --adapter Jido.Persistence.File \
+  --path data/jido \
+  --codec json \
+  --namespace billing \
+  --id inv-1001
+```
+
+`mix jido.persistence.export` writes scanned records as JSONL. ETS and File
+support the optional paged scan. Runtime durability never needs this scan.
+Other adapters return `:scan_not_supported` unless they implement it.
+
+Pass `--instance MyApp.Jido` instead of `--adapter` to use the configured
+profile of any Store. This loads application configuration but does not start
+the application, the Jido instance, or its Agents.
+
+```sh
+mix jido.persistence.export \
+  --adapter Jido.Persistence.File \
+  --path data/jido \
+  --codec json \
+  --prefix 'jido:' \
+  --output jido-records.jsonl
+```
+
+The export refuses to replace an existing file. Pass `--force` to replace it,
+and pass `--include-state` only when the output location is safe for full
+application state.
 
 ## Telemetry
 

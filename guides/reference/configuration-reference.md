@@ -81,18 +81,23 @@ An instance is `use Jido` plus `config :my_app, MyApp.Jido, ...`, or a call to `
 | `:name` | Required for `Jido.start_link/1`. Jido.Default for `Jido.start/1`. The module, under `use Jido`. | A non-nil atom | The instance name. |
 | `:otp_app` | None. Required by `use Jido`. | A non-nil atom | The application that holds the configuration. |
 | `:namespace` | `nil` | A nonempty string | Stable identity for `Jido.Agent.Ref` functions and durable records. Required for persistent Agents. |
-| `:persistence` | `nil` | A `Jido.Persistence.Store` module, `{module, options}`, `nil`, or `false` | The default adapter. |
+| `:persistence` | `nil` | A Store declaration, a `[store: ..., codec: ...]` profile, `nil`, or `false` | The one persistence profile for all Agents, Flow records, and wake records in the instance. Store declarations use the Term codec. |
 | `:agent_server` | `[]` | A keyword list of [AgentServer options](#agentserver-options) | Defaults for each AgentServer in the instance. Validated at start. Startup-only options are rejected. |
 | `:max_tasks` | `1_000` | A non-negative integer or `:infinity` | The child limit of the instance's Task supervisor. |
 | `:debug` | Off | `nil`, `false`, `true`, or `:verbose` | Sets the instance log mode. `true` selects `:interesting` and `:verbose` selects `:all`. |
 
 `use Jido` itself accepts only `:otp_app`, `:namespace`, and `:persistence`. Set the others in config or as `start_link` arguments. Options passed at start override config, and config overrides the `use` options, except `:name`, which is always the module.
 
-Setting `agent_server: [persistence: :inherit]` without an instance `:persistence` is an error.
+Persistent instances require a stable namespace. Jido creates a namespace
+manifest at startup and rejects a codec or record-layout mismatch. JSON is
+opt-in with `codec: Jido.Persistence.Codec.JSON`. Per-Agent Store and codec
+overrides are not supported.
 
 ## AgentServer options
 
-Set these in the instance's `:agent_server` option, or per Agent. Each timeout accepts milliseconds from `0` to `4_294_967_295`.
+Set these in the instance's `:agent_server` option, or per Agent, except for
+the instance-owned persistence profile. Each timeout accepts milliseconds
+from `0` to `4_294_967_295`.
 
 | Option | Default | Allowed values | Effect |
 | --- | --- | --- | --- |
@@ -109,7 +114,7 @@ Set these in the instance's `:agent_server` option, or per Agent. Each timeout a
 | `:default_dispatch` | `nil` | `nil` or a dispatch target | The target for an Emit with no target. |
 | `:readiness_timeout` | `5_000` | A finite timeout | The bound on Plugin startup and composition changes. |
 | `:commit_timeout` | `5_000` | A finite timeout | The bound on Plugin `after_commit/3` callbacks in one Turn. |
-| `:persistence` | `false` | A store, `{store, options}`, `:inherit`, `nil`, or `false` | Whether and where the Agent saves. The instance must have a `:namespace`. If it does not, the start returns a `Jido.Error.ValidationError` and starts no worker. |
+| `:persistence` | Resolved from the instance | `:inherit`, `nil`, or `false` | Internal selection of the instance profile. `Jido.start_agent/3` rejects a Store or codec override. |
 | `:persistence_mode` | `:create` | `:create`, `:restore` | What startup does with a stored record. |
 | `:persistence_timeout` | `5_000` | A finite timeout | The bound on one durable save or restore. |
 | `:idle_timeout` | `:infinity` | A timeout or `:infinity` | The idle budget. |

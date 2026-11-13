@@ -8,6 +8,14 @@ defmodule Jido.Persistence.StoreTest do
     @behaviour Jido.Persistence.Store
 
     @impl true
+    def validate_options(opts) do
+      if Keyword.keyword?(opts) and Keyword.keys(opts) -- [:owner, :token_reads] == [] and
+           Keyword.keys(opts) == Enum.uniq(Keyword.keys(opts)),
+         do: :ok,
+         else: {:error, :invalid_options}
+    end
+
+    @impl true
     def get(key, opts) do
       Elixir.Agent.get(Keyword.fetch!(opts, :owner), fn values ->
         case Map.fetch(values, key) do
@@ -34,6 +42,11 @@ defmodule Jido.Persistence.StoreTest do
       end)
     end
 
+    @impl true
+    def delete(key, opts) do
+      Elixir.Agent.update(Keyword.fetch!(opts, :owner), &Map.delete(&1, key))
+    end
+
     defp match_condition?(nil, :not_found), do: true
     defp match_condition?({bytes, _token}, bytes), do: true
     defp match_condition?({_bytes, token}, {:token, token}), do: true
@@ -44,11 +57,22 @@ defmodule Jido.Persistence.StoreTest do
     @behaviour Jido.Persistence.Store
 
     @impl true
+    def validate_options(opts) do
+      if Keyword.keyword?(opts) and Keyword.keys(opts) -- [:read, :write, :delete] == [] and
+           Keyword.keys(opts) == Enum.uniq(Keyword.keys(opts)),
+         do: :ok,
+         else: {:error, :invalid_options}
+    end
+
+    @impl true
     def get(key, opts), do: Keyword.fetch!(opts, :read).(key)
 
     @impl true
     def compare_and_swap(key, expected, bytes, opts),
       do: Keyword.fetch!(opts, :write).(key, expected, bytes)
+
+    @impl true
+    def delete(key, opts), do: Keyword.get(opts, :delete, fn _key -> :ok end).(key)
   end
 
   setup do
@@ -212,6 +236,42 @@ defmodule Jido.Persistence.StoreTest do
   end
 
   @tag obligation: "jido.persistence.I4"
+  test "delete outcomes distinguish rejection from uncertain failure" do
+    read = fn _key -> {:error, :not_found} end
+    write = fn _key, _expected, _bytes -> :ok end
+
+    for {reply, expected} <- [
+          {:ok, :ok},
+          {{:error, :conflict}, {:error, :conflict}},
+          {{:error, {:rejected, :protected}}, {:error, {:rejected, :protected}}},
+          {{:error, :indeterminate}, {:error, :indeterminate}},
+          {{:error, {:indeterminate, :timeout}}, {:error, {:indeterminate, :timeout}}},
+          {{:error, :offline}, {:error, {:indeterminate, :offline}}},
+          {:invalid, {:error, {:indeterminate, %ExecutionError{}}}}
+        ] do
+      delete = fn _key -> reply end
+      {:ok, store} = Store.open({ReplyAdapter, read: read, write: write, delete: delete})
+
+      case expected do
+        {:error, {:indeterminate, %ExecutionError{}}} ->
+          assert {:error, {:indeterminate, %ExecutionError{}}} = Store.delete(store, "record")
+
+        _ ->
+          assert Store.delete(store, "record") == expected
+      end
+    end
+
+    delete = fn _key -> raise "delete failed" end
+    {:ok, store} = Store.open({ReplyAdapter, read: read, write: write, delete: delete})
+
+    assert {:error,
+            {:indeterminate,
+             %ExecutionError{
+               details: %{code: :persistence_callback_failed, operation: :delete}
+             }}} = Store.delete(store, "record")
+  end
+
+  @tag obligation: "jido.persistence.I4"
   test "bad write conditions are rejected before an adapter call" do
     read = fn _key -> {:error, :not_found} end
     write = fn _, _, _ -> flunk("unexpected write") end
@@ -272,6 +332,17 @@ defmodule Jido.Persistence.StoreTest do
       {ReplyAdapter, read: fn _key -> flunk("unexpected read") end, write: fn _key, _condition, _bytes -> :ok end}
 
     assert :ok = Store.compare_and_swap(token_store, "record", {:token, "x"}, "bytes")
+  end
+
+  @tag obligation: "jido.persistence.I15"
+  test "scan is optional and its facade options are strict", %{owner: owner} do
+    store = {MemoryAdapter, owner: owner}
+
+    assert {:error, :scan_not_supported} = Store.scan(store, "jido:")
+    assert {:error, {:invalid_store_input, :scan_options}} = Store.scan(store, "jido:", unknown: true)
+    assert {:error, {:invalid_store_input, :scan_options}} = Store.scan(store, "jido:", limit: 1, limit: 2)
+    assert {:error, {:invalid_store_input, :scan_cursor}} = Store.scan(store, "jido:", cursor: 1)
+    assert {:error, {:invalid_store_input, :scan_limit}} = Store.scan(store, "jido:", limit: 0)
   end
 
   @tag obligation: "jido.persistence.I14"

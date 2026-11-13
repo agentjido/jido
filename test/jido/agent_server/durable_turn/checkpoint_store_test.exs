@@ -27,6 +27,15 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   defmodule Bytes do
     @behaviour Jido.Persistence.Store
 
+    def validate_options(opts) do
+      allowed = [:delete_owner, :store]
+
+      if Keyword.keyword?(opts) and Keyword.keys(opts) -- allowed == [] and
+           Keyword.keys(opts) == Enum.uniq(Keyword.keys(opts)) and is_pid(opts[:store]),
+         do: :ok,
+         else: {:error, :invalid_options}
+    end
+
     def get(key, opts) do
       Agent.get(opts[:store], fn records ->
         case Map.fetch(records, key) do
@@ -75,6 +84,15 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   defmodule BarrierBytes do
     @behaviour Jido.Persistence.Store
     alias Jido.AgentServer.DurableTurn.CheckpointStoreTest.Bytes
+
+    def validate_options(opts) do
+      allowed = [:barrier_owner, :barrier_stage, :delete_owner, :store]
+
+      if Keyword.keyword?(opts) and Keyword.keys(opts) -- allowed == [] and
+           Keyword.keys(opts) == Enum.uniq(Keyword.keys(opts)) and is_pid(opts[:store]),
+         do: :ok,
+         else: {:error, :invalid_options}
+    end
 
     def get(key, opts), do: Bytes.get(key, opts)
     def delete(key, opts), do: Bytes.delete(key, opts)
@@ -128,7 +146,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
     records = Agent.get(c.store, &Map.values/1)
     assert length(records) == 3
 
-    decoded = Enum.map(records, &:erlang.binary_to_term/1)
+    decoded = Enum.map(records, fn bytes -> elem(Jido.Persistence.Codec.Term.decode(bytes, trusted: true), 1) end)
     assert Enum.count(decoded, &(&1 == 2)) == 1
     assert Enum.count(decoded, &is_list/1) == 2
 
@@ -207,8 +225,8 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
     {key, record} =
       Agent.get(c.store, fn records ->
         Enum.find_value(records, fn {key, bytes} ->
-          case :erlang.binary_to_term(bytes) do
-            {:jido_fact_value, 1, 0, digest, :full, %{value: 1}} ->
+          case Jido.Persistence.Codec.Term.decode(bytes, trusted: true) do
+            {:ok, {:jido_fact_value, 1, 0, digest, :full, %{value: 1}}} ->
               {key, {:jido_fact_value, 1, 0, digest, :full, %{value: 2}}}
 
             _other ->
@@ -217,7 +235,8 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
         end)
       end)
 
-    Agent.update(c.store, &Map.put(&1, key, :erlang.term_to_binary(record, [:deterministic])))
+    {:ok, bytes} = Jido.Persistence.Codec.Term.encode(record)
+    Agent.update(c.store, &Map.put(&1, key, bytes))
 
     assert {:error, :invalid_execution_checkpoint} = Store.load_fact(c.id, :checked, c.jido)
   end
@@ -241,7 +260,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
       Agent.get(c.store, fn records ->
         records
         |> Map.values()
-        |> Enum.map(&:erlang.binary_to_term/1)
+        |> Enum.map(fn bytes -> elem(Jido.Persistence.Codec.Term.decode(bytes, trusted: true), 1) end)
         |> Enum.find(&is_list/1)
       end)
 
@@ -268,7 +287,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
     assert {:ok, 1} = Store.append(id, [:event], c.jido)
 
     expected =
-      "jido:execution:" <>
+      "jido:execution:v3:" <>
         Base.url_encode64(:erlang.term_to_binary(id), padding: false)
 
     assert expected in Agent.get(c.store, &Map.keys/1)
@@ -277,7 +296,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   @tag obligation: "jido.agent_server.durable_turn.I2"
   test "rejects an invalid batch count", c do
     key =
-      "jido:execution:" <>
+      "jido:execution:v3:" <>
         Base.url_encode64(:erlang.term_to_binary(c.id), padding: false)
 
     Agent.update(c.store, &Map.put(&1, key, :erlang.term_to_binary(:invalid)))

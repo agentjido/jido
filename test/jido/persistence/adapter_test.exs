@@ -12,6 +12,7 @@ defmodule Jido.Persistence.AdapterTest do
   end
 
   defmodule CompatibleAdapter do
+    def validate_options(opts), do: if(Keyword.keyword?(opts), do: :ok, else: {:error, :invalid})
     def get(_key, _opts), do: {:error, :not_found}
     def put(_key, _value, _opts), do: :ok
     def compare_and_swap(_key, _expected, _value, _opts), do: :ok
@@ -19,12 +20,10 @@ defmodule Jido.Persistence.AdapterTest do
   end
 
   defmodule MinimalAdapter do
-    @behaviour Jido.Persistence.Store
+    def validate_options(opts), do: if(Keyword.keyword?(opts), do: :ok, else: {:error, :invalid})
 
-    @impl true
     def get(_key, _opts), do: {:error, :not_found}
 
-    @impl true
     def compare_and_swap(_key, _expected, _value, _opts), do: :ok
   end
 
@@ -77,7 +76,9 @@ defmodule Jido.Persistence.AdapterTest do
 
   @tag obligation: "jido.persistence.I1"
   test "validates adapter declarations" do
-    assert {:ok, {ETS, []}} = Persistence.resolve_config(ETS, nil)
+    assert {:ok, %Jido.Persistence.Config{store: {ETS, []}, codec: Jido.Persistence.Codec.Term}} =
+             Persistence.resolve_config(ETS, nil)
+
     assert {:ok, nil} = Persistence.resolve_config(nil, nil)
 
     assert {:error, {:invalid_persistence_adapter, String}} =
@@ -91,9 +92,12 @@ defmodule Jido.Persistence.AdapterTest do
   end
 
   @tag obligation: "jido.persistence.I1"
-  test "requires keyword options and supports optional adapter validation" do
-    assert {:ok, {CompatibleAdapter, []}} = Persistence.resolve_config(CompatibleAdapter, nil)
-    assert {:ok, {MinimalAdapter, []}} = Persistence.resolve_config(MinimalAdapter, nil)
+  test "requires keyword options, validation, and delete" do
+    assert {:ok, %Jido.Persistence.Config{store: {CompatibleAdapter, []}}} =
+             Persistence.resolve_config(CompatibleAdapter, nil)
+
+    assert {:error, {:invalid_persistence_adapter, MinimalAdapter}} =
+             Persistence.resolve_config(MinimalAdapter, nil)
 
     assert {:error, {:invalid_persistence_config, _}} =
              Persistence.resolve_config({ETS, [:not_keyword]}, nil)

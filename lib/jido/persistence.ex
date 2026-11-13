@@ -40,20 +40,23 @@ defmodule Jido.Persistence do
   conversion and keep their opaque callback contract.
 
   Each durable Agent uses one exact `{namespace, partition, id}` Ref key and
-  record format 1. Supply `:namespace`, or use the namespace of a live Jido
+  record format 3. Supply `:namespace`, or use the namespace of a live Jido
   `:instance`. The Agent module is checked in the record, but is not part of
   its key. `:instance` also supplies checkpoint callback context.
 
-  Reads and writes use record format 1 with a complete snapshot format 1
-  payload. Earlier record and snapshot shapes require conversion outside Jido
-  before this version starts.
+  One Jido instance owns one persistence profile. The profile combines a
+  binary Store and a codec. The compact Term codec is the default. The tagged
+  JSON codec is opt-in. A namespace manifest pins the codec and V3 record
+  formats before the instance starts. Earlier record shapes are not read.
+  Durable values can move between nodes that run a compatible application
+  release. Runtime-created atoms are not supported.
   Restore does not rebuild a saved definition from the current source module.
   """
 
   alias Jido.Agent
   alias Jido.Agent.Ref
   alias Jido.Error
-  alias Jido.Persistence.{Checkpoint, Record, Store}
+  alias Jido.Persistence.{Checkpoint, Config, Record, Store}
   alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
   alias Jido.Codec.Term
 
@@ -73,7 +76,8 @@ defmodule Jido.Persistence do
   ]
 
   @typedoc "A direct persistence adapter declaration."
-  @type adapter_config :: {module(), keyword()} | module() | nil | false
+  @type adapter_config ::
+          {module(), keyword()} | module() | Config.t() | keyword() | nil | false
 
   @typedoc "A portable snapshot returned by `snapshot/2`."
   @type snapshot :: %{
@@ -129,19 +133,38 @@ defmodule Jido.Persistence do
   Pass `nil` or `false` to disable persistence. A disabled or unconfigured source
   returns `{:ok, nil}`.
 
-  The result is a normalized `{adapter, options}` tuple or `nil`. This function
-  checks required adapter callbacks and options. It does not start the adapter
+  The result is a normalized persistence profile or `nil`. This function
+  checks the codec, required adapter callbacks, and options. It does not start the adapter
   or confirm that its storage is durable or shared across nodes.
   """
   @spec resolve_config(:inherit | adapter_config(), atom() | nil) ::
-          {:ok, {module(), keyword()} | nil} | {:error, term()}
+          {:ok, Config.t() | nil} | {:error, term()}
   def resolve_config(:inherit, jido), do: resolve_instance_config(jido)
   def resolve_config(nil, _jido), do: {:ok, nil}
 
   def resolve_config(config, _jido) do
-    config
-    |> normalize_adapter_result()
-    |> validate_adapter_result()
+    Config.open(config)
+  end
+
+  @doc false
+  @spec resolve_agent_config(term(), atom() | nil) ::
+          {:ok, Config.t() | nil} | {:error, term()}
+  def resolve_agent_config(requested, jido) do
+    with {:ok, instance_config} <- resolve_instance_config(jido) do
+      case requested do
+        value when value in [:inherit, nil, false] ->
+          {:ok, instance_config}
+
+        value ->
+          with {:ok, requested_config} <- Config.open(value),
+               true <- requested_config == instance_config do
+            {:ok, instance_config}
+          else
+            false -> {:error, :instance_persistence_profile_mismatch}
+            {:error, _reason} = error -> error
+          end
+      end
+    end
   end
 
   @doc false
@@ -222,23 +245,16 @@ defmodule Jido.Persistence do
   defp save_record(source, agent, previous_module, opts) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
       Store.protect(:compare_and_swap, fn ->
-        with {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+        with {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
              {:ok, ref} <- resolve_ref(instance, agent.id, opts),
              {:ok, record} <- build_record(agent, instance, opts, ref),
              {:ok, expected_revision} <- expected_revision(opts),
              {:ok, expected_value} <-
-               current_value(
-                 adapter,
-                 adapter_opts,
-                 record,
-                 ref,
-                 expected_revision,
-                 previous_module
-               ),
-             {:ok, value} <- Record.encode(record),
+               current_value(config, record, ref, expected_revision, previous_module),
+             {:ok, value} <- Record.encode(record, config),
              :ok <-
                Store.compare_and_swap(
-                 {adapter, adapter_opts},
+                 config.store,
                  Record.agent_key(ref),
                  expected_value,
                  value
@@ -256,15 +272,15 @@ defmodule Jido.Persistence do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
       Store.protect(:compare_and_swap, fn ->
         with :ok <- validate_operation_options(opts, @create_options),
-             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+             {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
              :ok <- validate_initial_revision(opts),
              {:ok, ref} <- resolve_ref(instance, agent.id, opts),
              {:ok, record} <-
                build_record(agent, instance, Keyword.put(opts, :revision, 0), ref),
-             {:ok, value} <- Record.encode(record),
+             {:ok, value} <- Record.encode(record, config),
              :ok <-
                Store.compare_and_swap(
-                 {adapter, adapter_opts},
+                 config.store,
                  Record.agent_key(ref),
                  :not_found,
                  value
@@ -332,11 +348,11 @@ defmodule Jido.Persistence do
   def load_agent_ref(source, %Ref{} = ref, opts) do
     Store.protect(:get, fn ->
       with :ok <- validate_operation_options(opts, [:instance]),
-           {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+           {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
            :ok <- validate_ref_instance(ref, instance),
            {:ok, value, _condition} <-
-             Store.read({adapter, adapter_opts}, Record.agent_key(ref)),
-           {:ok, record} <- Record.decode(value),
+             Store.read(config.store, Record.agent_key(ref)),
+           {:ok, record} <- Record.decode(value, config),
            {:ok, agent_module} <- record_agent_module(record),
            :ok <- Record.validate(record, ref, agent_module),
            :ok <- Record.require_active(record),
@@ -380,11 +396,11 @@ defmodule Jido.Persistence do
           with :ok <- validate_operation_options(opts, @upgrade_options),
                context = Keyword.get(opts, :context, %{}),
                :ok <- Jido.Agent.Schema.plain_map(context),
-               {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+               {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
                {:ok, ref} <- resolve_ref(instance, agent_id, opts),
                key = Record.agent_key(ref),
-               {:ok, value, condition} <- Store.read({adapter, adapter_opts}, key),
-               {:ok, record} <- decode_record(value, agent_module),
+               {:ok, value, condition} <- Store.read(config.store, key),
+               {:ok, record} <- decode_record(value, agent_module, config),
                :ok <- Record.validate(record, ref, agent_module),
                :ok <- Record.require_active(record),
                :ok <- require_inactive_turn(record),
@@ -408,10 +424,10 @@ defmodule Jido.Persistence do
                    ],
                    ref
                  ),
-               {:ok, next_value} <- Record.encode(next_record),
+               {:ok, next_value} <- Record.encode(next_record, config),
                :ok <-
                  Store.compare_and_swap(
-                   {adapter, adapter_opts},
+                   config.store,
                    key,
                    condition,
                    next_value
@@ -451,9 +467,9 @@ defmodule Jido.Persistence do
     PersistenceTelemetry.observe(:delete, source, agent_module, agent_id, opts, fn ->
       Store.protect(:delete, fn ->
         with :ok <- validate_operation_options(opts, @identity_options),
-             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+             {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
              {:ok, ref} <- resolve_ref(instance, agent_id, opts) do
-          delete_current(adapter, adapter_opts, ref, agent_module)
+          delete_current(config, ref, agent_module)
         end
       end)
     end)
@@ -469,12 +485,12 @@ defmodule Jido.Persistence do
   def delete_agent_ref(source, %Ref{} = ref, opts) do
     Store.protect(:compare_and_swap, fn ->
       with :ok <- validate_operation_options(opts, [:instance]),
-           {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+           {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
            :ok <- validate_ref_instance(ref, instance),
-           {:ok, value, _condition} <- Store.read({adapter, adapter_opts}, Record.agent_key(ref)),
-           {:ok, record} <- Record.decode(value),
+           {:ok, value, _condition} <- Store.read(config.store, Record.agent_key(ref)),
+           {:ok, record} <- Record.decode(value, config),
            {:ok, agent_module} <- record_agent_module(record) do
-        delete_current(adapter, adapter_opts, ref, agent_module)
+        delete_current(config, ref, agent_module)
       end
     end)
   end
@@ -544,11 +560,11 @@ defmodule Jido.Persistence do
     PersistenceTelemetry.observe(:load, source, agent_module, agent_id, telemetry_opts, fn ->
       Store.protect(:get, fn ->
         with :ok <- validate_operation_options(opts, @identity_options),
-             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+             {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
              {:ok, ref} <- resolve_ref(instance, agent_id, opts),
              {:ok, value, _condition} <-
-               Store.read({adapter, adapter_opts}, Record.agent_key(ref)),
-             {:ok, record} <- decode_record(value, agent_module),
+               Store.read(config.store, Record.agent_key(ref)),
+             {:ok, record} <- decode_record(value, agent_module, config),
              :ok <- Record.validate(record, ref, agent_module),
              :ok <- Record.require_active(record),
              {:ok, agent} <- Checkpoint.restore_agent(record, agent_module, agent_id, instance) do
@@ -604,8 +620,8 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp current_value(adapter, opts, record, ref, expected_revision, current_module) do
-    case Store.read({adapter, opts}, Record.agent_key(ref)) do
+  defp current_value(%Config{} = config, record, ref, expected_revision, current_module) do
+    case Store.read(config.store, Record.agent_key(ref)) do
       {:error, :not_found} when expected_revision in [:any, 0] ->
         {:ok, :not_found}
 
@@ -613,7 +629,7 @@ defmodule Jido.Persistence do
         {:error, :conflict}
 
       {:ok, value, condition} ->
-        with {:ok, current} <- decode_record(value, current_module),
+        with {:ok, current} <- decode_record(value, current_module, config),
              :ok <- Record.validate(current, ref, current_module),
              :ok <- Record.require_active_for_write(current),
              :ok <- check_revision(current, record, expected_revision) do
@@ -676,9 +692,7 @@ defmodule Jido.Persistence do
           nil
       end
 
-    config
-    |> normalize_adapter_result()
-    |> validate_adapter_result()
+    Config.open(config)
   rescue
     error -> {:error, {:invalid_persistence_config, error}}
   end
@@ -692,16 +706,6 @@ defmodule Jido.Persistence do
 
   defp require_adapter(nil), do: {:error, :persistence_not_configured}
   defp require_adapter(config), do: {:ok, config}
-
-  defp normalize_adapter_result(config) do
-    {:ok, Store.normalize_adapter(config)}
-  rescue
-    error -> {:error, {:invalid_persistence_config, error}}
-  end
-
-  defp validate_adapter_result({:ok, nil}), do: {:ok, nil}
-  defp validate_adapter_result({:ok, config}), do: Store.open(config)
-  defp validate_adapter_result({:error, _reason} = error), do: error
 
   defp build_record(agent, instance, opts, ref) do
     partition = Keyword.get(opts, :partition)
@@ -735,13 +739,13 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp delete_current(adapter, adapter_opts, ref, agent_module) do
-    case read_for_delete({adapter, adapter_opts}, Record.agent_key(ref)) do
+  defp delete_current(%Config{} = config, ref, agent_module) do
+    case read_for_delete(config.store, Record.agent_key(ref)) do
       {:error, :not_found} ->
         with {:ok, tombstone} <- Record.build_tombstone(ref, agent_module, 0, 0),
-             {:ok, value} <- Record.encode(tombstone) do
+             {:ok, value} <- Record.encode(tombstone, config) do
           Store.compare_and_swap(
-            {adapter, adapter_opts},
+            config.store,
             Record.agent_key(ref),
             :not_found,
             value
@@ -749,7 +753,7 @@ defmodule Jido.Persistence do
         end
 
       {:ok, expected_value, condition} ->
-        with {:ok, current} <- decode_record(expected_value, agent_module),
+        with {:ok, current} <- decode_record(expected_value, agent_module, config),
              :ok <- Record.validate(current, ref, agent_module) do
           case Record.kind(current) do
             :tombstone ->
@@ -763,9 +767,9 @@ defmodule Jido.Persistence do
                        Record.revision(current) + 1,
                        Record.agent_revision(current)
                      ),
-                   {:ok, value} <- Record.encode(tombstone) do
+                   {:ok, value} <- Record.encode(tombstone, config) do
                 Store.compare_and_swap(
-                  {adapter, adapter_opts},
+                  config.store,
                   Record.agent_key(ref),
                   condition,
                   value
@@ -779,10 +783,10 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp decode_record(value, agent_module) do
+  defp decode_record(value, agent_module, %Config{} = config) do
     # The caller module supplies domain atoms; Record loads trusted envelope fields.
     _ = Code.ensure_loaded?(agent_module)
-    Record.decode(value)
+    Record.decode(value, config)
   end
 
   defp read_for_delete(config, key) do

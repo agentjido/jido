@@ -3,11 +3,10 @@ defmodule Jido.Persistence.Redis do
   Redis persistence adapter for binary keys and values.
 
   The required `:command_fn` option executes one Redis command. The optional
-  `:prefix` defaults to `"jido"`. The optional `:ttl` sets the key lifetime in
-  milliseconds.
+  `:prefix` defaults to `"jido"`. Records do not expire automatically.
 
   Conditional writes use one Lua `EVAL` command to compare and replace the
-  value atomically, including its TTL. The Redis connection must permit EVAL.
+  value atomically. The Redis connection must permit EVAL.
   """
 
   @behaviour Jido.Persistence.Store
@@ -21,11 +20,7 @@ defmodule Jido.Persistence.Redis do
   elseif current ~= ARGV[2] then
     return 0
   end
-  if ARGV[4] == '' then
-    redis.call('SET', KEYS[1], ARGV[3])
-  else
-    redis.call('SET', KEYS[1], ARGV[3], 'PX', ARGV[4])
-  end
+  redis.call('SET', KEYS[1], ARGV[3])
   return 1
   """
 
@@ -35,14 +30,17 @@ defmodule Jido.Persistence.Redis do
       not Keyword.keyword?(opts) ->
         {:error, "options must be a keyword list"}
 
+      Keyword.keys(opts) -- [:command_fn, :prefix] != [] ->
+        {:error, "supports only :command_fn and :prefix options"}
+
+      Keyword.keys(opts) -- Enum.uniq(Keyword.keys(opts)) != [] ->
+        {:error, "options must be unique"}
+
       not is_function(Keyword.get(opts, :command_fn), 1) ->
         {:error, "requires a :command_fn option"}
 
       not is_binary(Keyword.get(opts, :prefix, @default_prefix)) ->
         {:error, ":prefix must be a string"}
-
-      not valid_ttl?(Keyword.get(opts, :ttl)) ->
-        {:error, ":ttl must be a positive integer"}
 
       true ->
         :ok
@@ -66,15 +64,8 @@ defmodule Jido.Persistence.Redis do
   def put(key, value, opts) when is_binary(key) and is_binary(value) and is_list(opts) do
     validate_options!(opts)
     command_fn = Keyword.fetch!(opts, :command_fn)
-    ttl = opts |> Keyword.get(:ttl) |> encode_ttl()
 
-    command =
-      case ttl do
-        "" -> ["SET", redis_key(key, opts), value]
-        ttl -> ["SET", redis_key(key, opts), value, "PX", ttl]
-      end
-
-    case command_fn.(command) do
+    case command_fn.(["SET", redis_key(key, opts), value]) do
       {:ok, "OK"} -> :ok
       {:error, reason} -> {:error, reason}
       result -> {:error, {:invalid_redis_result, result}}
@@ -88,8 +79,7 @@ defmodule Jido.Persistence.Redis do
     validate_options!(opts)
     command_fn = Keyword.fetch!(opts, :command_fn)
     {mode, previous} = if expected == :not_found, do: {"missing", ""}, else: {"value", expected}
-    ttl = opts |> Keyword.get(:ttl) |> encode_ttl()
-    command = ["EVAL", @compare_and_swap, "1", redis_key(key, opts), mode, previous, value, ttl]
+    command = ["EVAL", @compare_and_swap, "1", redis_key(key, opts), mode, previous, value]
 
     case command_fn.(command) do
       {:ok, 1} -> :ok
@@ -112,12 +102,6 @@ defmodule Jido.Persistence.Redis do
   end
 
   defp redis_key(key, opts), do: "#{Keyword.get(opts, :prefix, @default_prefix)}:#{key}"
-
-  defp encode_ttl(nil), do: ""
-  defp encode_ttl(ttl), do: Integer.to_string(ttl)
-
-  defp valid_ttl?(nil), do: true
-  defp valid_ttl?(ttl), do: is_integer(ttl) and ttl > 0
 
   defp validate_options!(opts) do
     case validate_options(opts) do

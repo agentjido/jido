@@ -1423,9 +1423,11 @@ defmodule Jido.AgentServer.Worker do
 
     storage_expired =
       if operation.kind in [
+           :durable_prepare,
            :durable_accept,
            :durable_release,
            :durable_terminal,
+           :durable_wait,
            :durable_advance,
            :durable_start,
            :durable_suspend,
@@ -2124,12 +2126,14 @@ defmodule Jido.AgentServer.Worker do
       restore_handoff: :preparing,
       prepare_handoff: :preparing,
       release_handoff: :preparing,
+      durable_prepare: :saving,
       durable_accept: :saving,
       durable_release: :saving,
       durable_resume_intent: :saving,
       durable_start: :starting,
       durable_advance: :running,
       durable_terminal: :saving,
+      durable_wait: :saving,
       durable_suspend: :starting,
       durable_input: :starting,
       start: :starting,
@@ -2161,7 +2165,11 @@ defmodule Jido.AgentServer.Worker do
                   active: %{data.active | durable: true, persisted: true}
               }
 
-              durable_write(:durable_accept, data, data.agent, receipt)
+              owner = self()
+
+              durable_operation(:durable_prepare, data, fn ->
+                Lifecycle.prepare_execution(data, receipt, owner)
+              end)
 
             {:error, reason} ->
               cleanup(data, {:error, reason})
@@ -2217,6 +2225,9 @@ defmodule Jido.AgentServer.Worker do
       {:error, reason} -> stop_durable(data, reason)
     end
   end
+
+  defp operation_result(:durable_prepare, :ok, data),
+    do: durable_write(:durable_accept, data, data.agent, data.server_turn)
 
   defp operation_result(:durable_release, :ok, data) do
     case publish_durable_revision(data) do
@@ -2337,6 +2348,13 @@ defmodule Jido.AgentServer.Worker do
     end
   end
 
+  defp operation_result(:durable_wait, :ok, data) do
+    case publish_durable_revision(data) do
+      {:ok, data} -> enter_waiting(data)
+      {:error, reason} -> stop_durable(data, reason)
+    end
+  end
+
   defp operation_result(:durable_advance, {:error, :non_portable_flow_output}, data),
     do:
       cleanup(
@@ -2347,10 +2365,12 @@ defmodule Jido.AgentServer.Worker do
   defp operation_result(kind, {:error, reason}, data)
        when kind in [
               :durable_accept,
+              :durable_prepare,
               :durable_release,
               :durable_start,
               :durable_advance,
               :durable_terminal,
+              :durable_wait,
               :durable_suspend,
               :durable_input
             ],
@@ -3520,17 +3540,21 @@ defmodule Jido.AgentServer.Worker do
 
     case register_wakes(data) do
       :ok ->
-        data = arm_idle(data)
-        result = turn_result(data, :waiting)
-        replies = reply(data.active.from, {:ok, result})
-        ReplyGate.done(data.active.requester)
-        data = data |> put_in([:active, :from], nil) |> put_in([:active, :requester], nil)
-
-        {:next_state, :waiting, data, replies ++ [{:next_event, :internal, :control_progress}]}
+        durable_write(:durable_wait, data, data.agent, data.server_turn)
 
       {:error, reason} ->
         stop_durable(data, reason)
     end
+  end
+
+  defp enter_waiting(data) do
+    data = arm_idle(data)
+    result = turn_result(data, :waiting)
+    replies = reply(data.active.from, {:ok, result})
+    ReplyGate.done(data.active.requester)
+    data = data |> put_in([:active, :from], nil) |> put_in([:active, :requester], nil)
+
+    {:next_state, :waiting, data, replies ++ [{:next_event, :internal, :control_progress}]}
   end
 
   defp register_wakes(%{jido: nil}), do: :ok

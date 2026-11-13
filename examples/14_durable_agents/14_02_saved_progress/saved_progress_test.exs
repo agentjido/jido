@@ -16,9 +16,9 @@ defmodule Jido.Examples.Durable.SavedProgressTest do
     start_supervised!({StepProbe, self()})
     id = unique_id("saved-progress")
     persistence = Jido.Persistence.ETS
+    c = restart_jido!(c, persistence)
 
-    assert {:ok, server} =
-             Jido.start_agent(c.jido, ObservedAgent.new(id), persistence: persistence)
+    assert {:ok, server} = Jido.start_agent(c.jido, ObservedAgent.new(id))
 
     assert :ok = Jido.AgentServer.await_ready(server)
     {:ok, request} = SavedProgress.Agent.run_signal(%{value: 0})

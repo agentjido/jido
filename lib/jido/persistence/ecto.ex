@@ -75,12 +75,14 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
       schema = Keyword.get(opts, :schema, @default_schema)
       records = [record_attributes(key, value)]
 
-      protect_operation(fn ->
-        case repo.insert_all(schema, records, upsert_options(opts)) do
-          {1, _returned} -> :ok
-          result -> {:error, {:invalid_ecto_result, result}}
-        end
-      end)
+      with :ok <- reject_outer_transaction(repo) do
+        protect_write(fn ->
+          case repo.insert_all(schema, records, upsert_options(opts)) do
+            {1, _returned} -> :ok
+            result -> {:error, {:invalid_ecto_result, result}}
+          end
+        end)
+      end
     end
 
     @impl true
@@ -88,13 +90,16 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
         when is_binary(key) and (expected == :not_found or is_binary(expected)) and
                is_binary(value) and is_list(opts) do
       validate_options!(opts)
+      repo = Keyword.fetch!(opts, :repo)
 
-      protect_write(fn ->
-        case expected do
-          :not_found -> insert_missing(key, value, opts)
-          expected_value -> update_expected(key, expected_value, value, opts)
-        end
-      end)
+      with :ok <- reject_outer_transaction(repo) do
+        protect_write(fn ->
+          case expected do
+            :not_found -> insert_missing(key, value, opts)
+            expected_value -> update_expected(key, expected_value, value, opts)
+          end
+        end)
+      end
     end
 
     @impl true
@@ -104,12 +109,14 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
       schema = Keyword.get(opts, :schema, @default_schema)
       query = from(record in schema, where: field(record, :key) == ^key)
 
-      protect_operation(fn ->
-        case repo.delete_all(query, repo_options(opts)) do
-          {count, _returned} when is_integer(count) and count >= 0 -> :ok
-          result -> {:error, {:invalid_ecto_result, result}}
-        end
-      end)
+      with :ok <- reject_outer_transaction(repo) do
+        protect_write(fn ->
+          case repo.delete_all(query, repo_options(opts)) do
+            {count, _returned} when is_integer(count) and count >= 0 -> :ok
+            result -> {:error, {:invalid_ecto_result, result}}
+          end
+        end)
+      end
     end
 
     defp insert_missing(key, value, opts) do
@@ -163,6 +170,9 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
         Enum.any?(Keyword.keys(opts), &(&1 not in [:repo, :schema, :repo_options])) ->
           {:error, "supports only :repo, :schema, and :repo_options options"}
+
+        Keyword.keys(opts) -- Enum.uniq(Keyword.keys(opts)) != [] ->
+          {:error, "options must be unique"}
 
         true ->
           :ok
@@ -241,6 +251,12 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
     defp repo_options(opts), do: Keyword.get(opts, :repo_options, [])
 
     defp write_token, do: :crypto.strong_rand_bytes(16)
+
+    defp reject_outer_transaction(repo) do
+      if function_exported?(repo, :in_transaction?, 0) and repo.in_transaction?(),
+        do: {:error, {:rejected, :ecto_outer_transaction}},
+        else: :ok
+    end
 
     defp protect_operation(fun) do
       fun.()

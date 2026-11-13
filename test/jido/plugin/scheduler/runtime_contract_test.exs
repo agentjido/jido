@@ -506,16 +506,23 @@ defmodule Jido.Plugin.Scheduler.RuntimeContractTest do
   end
 
   @tag obligation: "jido.plugin.scheduler.I7"
-  test "Agent restore recreates a future timer with the same generation", %{jido: jido} do
+  test "Agent restore recreates a future timer with the same generation" do
     path = Path.join(System.tmp_dir!(), unique_id("scheduler-restore"))
     on_exit(fn -> File.rm_rf!(path) end)
     persistence = {Jido.Persistence.File, path: path}
+    instance = :"scheduler_restore_#{System.unique_integer([:positive])}"
+
+    start_supervised!(
+      {Jido,
+       name: instance, namespace: "test/scheduler/#{System.unique_integer([:positive])}", persistence: persistence},
+      id: {Jido, instance}
+    )
+
     id = unique_id("timed-agent")
 
     {:ok, server} =
-      Jido.Test.AgentServer.Assertions.start_agent(jido, TimedAgent,
+      Jido.Test.AgentServer.Assertions.start_agent(instance, TimedAgent,
         id: id,
-        persistence: persistence,
         persistence_mode: :create
       )
 
@@ -533,9 +540,8 @@ defmodule Jido.Plugin.Scheduler.RuntimeContractTest do
     assert {:ok, %Jido.AgentServer.Snapshot{}} = Server.stop(server)
 
     {:ok, restored} =
-      Jido.Test.AgentServer.Assertions.start_agent(jido, TimedAgent,
+      Jido.Test.AgentServer.Assertions.start_agent(instance, TimedAgent,
         id: id,
-        persistence: persistence,
         persistence_mode: :restore
       )
 

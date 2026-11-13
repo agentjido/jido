@@ -7,11 +7,25 @@ defmodule Jido.Examples.Durable.VMRecovery.DetsStore do
     do: GenServer.start_link(__MODULE__, opts, name: Keyword.fetch!(opts, :table))
 
   @impl Jido.Persistence.Store
+  def validate_options(opts) do
+    cond do
+      not Keyword.keyword?(opts) -> {:error, "options must be a keyword list"}
+      Keyword.keys(opts) != [:server] -> {:error, "requires one unique :server option"}
+      not is_atom(Keyword.fetch!(opts, :server)) -> {:error, ":server must be an atom"}
+      true -> :ok
+    end
+  end
+
+  @impl Jido.Persistence.Store
   def get(key, opts), do: GenServer.call(Keyword.fetch!(opts, :server), {:get, key})
 
   @impl Jido.Persistence.Store
   def compare_and_swap(key, expected, value, opts),
     do: GenServer.call(Keyword.fetch!(opts, :server), {:compare_and_swap, key, expected, value})
+
+  @impl Jido.Persistence.Store
+  def delete(key, opts),
+    do: GenServer.call(Keyword.fetch!(opts, :server), {:delete, key})
 
   @impl GenServer
   def init(opts) do
@@ -38,6 +52,11 @@ defmodule Jido.Examples.Durable.VMRecovery.DetsStore do
         error -> error
       end
 
+    {:reply, result, table}
+  end
+
+  def handle_call({:delete, key}, _, table) do
+    result = with :ok <- :dets.delete(table, key), do: :dets.sync(table)
     {:reply, result, table}
   end
 

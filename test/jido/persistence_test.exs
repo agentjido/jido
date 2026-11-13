@@ -90,10 +90,18 @@ defmodule Jido.PersistenceTest do
   test "configuration resolution supports inherited and explicit adapters" do
     configured = {ETS, table: ConfiguredInstance}
 
-    assert {:ok, ^configured} = Persistence.resolve_config(:inherit, ConfiguredInstance)
+    configured_profile = %Jido.Persistence.Config{
+      store: configured,
+      codec: Jido.Persistence.Codec.Term
+    }
+
+    assert {:ok, ^configured_profile} = Persistence.resolve_config(:inherit, ConfiguredInstance)
     assert {:ok, nil} = Persistence.resolve_config(:inherit, DisabledInstance)
     assert {:ok, nil} = Persistence.resolve_config(:inherit, nil)
-    assert {:ok, {ETS, []}} = Persistence.resolve_config(ETS, ConfiguredInstance)
+
+    assert {:ok, %Jido.Persistence.Config{store: {ETS, []}}} =
+             Persistence.resolve_config(ETS, ConfiguredInstance)
+
     assert {:ok, nil} = Persistence.resolve_config(false, ConfiguredInstance)
   end
 
@@ -151,6 +159,14 @@ defmodule Jido.PersistenceTest do
     @behaviour Jido.Persistence.Store
 
     @impl true
+    def validate_options(opts) do
+      if Keyword.keyword?(opts) and Keyword.keys(opts) -- [:allow_read] == [] and
+           Keyword.keys(opts) == Enum.uniq(Keyword.keys(opts)),
+         do: :ok,
+         else: {:error, :invalid_options}
+    end
+
+    @impl true
     def get(_key, opts) do
       if Keyword.get(opts, :allow_read),
         do: {:error, :not_found},
@@ -171,6 +187,14 @@ defmodule Jido.PersistenceTest do
     @behaviour Jido.Persistence.Store
 
     @impl true
+    def validate_options(opts) do
+      if Keyword.keyword?(opts) and Keyword.keys(opts) -- [:get_reply, :reply] == [] and
+           Keyword.keys(opts) == Enum.uniq(Keyword.keys(opts)),
+         do: :ok,
+         else: {:error, :invalid_options}
+    end
+
+    @impl true
     def get(_key, opts), do: Keyword.get(opts, :get_reply, Keyword.fetch!(opts, :reply))
 
     @impl true
@@ -187,6 +211,13 @@ defmodule Jido.PersistenceTest do
     @behaviour Jido.Persistence.Store
 
     @impl true
+    def validate_options(opts) do
+      if Keyword.keyword?(opts) and Keyword.keys(opts) == [:mode],
+        do: :ok,
+        else: {:error, :invalid_options}
+    end
+
+    @impl true
     def get(_key, _opts), do: {:error, :not_found}
 
     @impl true
@@ -197,14 +228,25 @@ defmodule Jido.PersistenceTest do
         :exit -> exit(:cas_exited)
       end
     end
+
+    @impl true
+    def delete(_key, _opts), do: :ok
   end
 
   defmodule BarrierAdapter do
     @behaviour Jido.Persistence.Store
 
     @impl true
+    def validate_options(opts) do
+      if Keyword.keyword?(opts) and Keyword.keys(opts) -- [:observer, :table] == [] and
+           Keyword.keys(opts) == Enum.uniq(Keyword.keys(opts)),
+         do: ETS.validate_options(Keyword.delete(opts, :observer)),
+         else: {:error, :invalid_options}
+    end
+
+    @impl true
     def get(key, opts) do
-      result = ETS.get(key, opts)
+      result = ETS.get(key, Keyword.delete(opts, :observer))
       send(Keyword.fetch!(opts, :observer), {:read, self(), result})
 
       receive do
@@ -215,15 +257,29 @@ defmodule Jido.PersistenceTest do
     end
 
     @impl true
-    defdelegate put(key, value, opts), to: ETS
+    def put(key, value, opts), do: ETS.put(key, value, Keyword.delete(opts, :observer))
     @impl true
-    defdelegate compare_and_swap(key, expected, value, opts), to: ETS
+    def compare_and_swap(key, expected, value, opts),
+      do: ETS.compare_and_swap(key, expected, value, Keyword.delete(opts, :observer))
+
     @impl true
-    defdelegate delete(key, opts), to: ETS
+    def delete(key, opts), do: ETS.delete(key, Keyword.delete(opts, :observer))
   end
 
   defp adapter(name) do
     {ETS, table: :"agent_persistence_#{name}_#{System.unique_integer([:positive])}"}
+  end
+
+  defp persistent_instance(persistence) do
+    id = System.unique_integer([:positive])
+    name = :"persistence_instance_#{id}"
+
+    start_supervised!(
+      {Jido, name: name, namespace: "test/persistence/#{id}", persistence: persistence},
+      id: {Jido, name}
+    )
+
+    name
   end
 
   test "public persistence operations emit bounded semantic spans" do
@@ -346,7 +402,7 @@ defmodule Jido.PersistenceTest do
     eventually(fn -> Server.snapshot(pid).agent.state.ticks > 4 end, timeout: 5_000)
   end
 
-  test "contains adapter faults and reports indeterminate writes", %{jido: jido} do
+  test "contains adapter faults and reports indeterminate writes" do
     agent = RuntimeAgent.instantiate!(id: unique_id("persistence-fault"))
 
     assert {:error, %Jido.Error.ExecutionError{} = error} =
@@ -368,14 +424,6 @@ defmodule Jido.PersistenceTest do
              Persistence.delete_agent(RaisingAdapter, RuntimeAgent, agent.id, namespace: "persistence-test")
 
     assert Jido.Error.code(error) == :persistence_callback_failed
-
-    assert {:error, {:indeterminate, %Jido.Error.ExecutionError{}}} =
-             Jido.Test.AgentServer.Assertions.start_result(jido, agent,
-               persistence: {RaisingAdapter, allow_read: true},
-               persistence_mode: :create
-             )
-
-    eventually(fn -> Jido.whereis_agent(jido, agent.id) == nil end)
   end
 
   test "validates adapter replies before fault containment returns a result" do
@@ -453,14 +501,14 @@ defmodule Jido.PersistenceTest do
     end
   end
 
-  test "writes every successful commit and preserves the Server revision", %{jido: jido} do
+  test "writes every successful commit and preserves the Server revision" do
     persistence = adapter(:commit)
+    jido = persistent_instance(persistence)
     id = unique_id("commit")
 
     {:ok, pid} =
       Jido.Test.AgentServer.Assertions.start_agent(jido, RuntimeAgent,
         id: id,
-        persistence: persistence,
         persistence_mode: :create
       )
 
@@ -476,14 +524,14 @@ defmodule Jido.PersistenceTest do
     assert restored.state.events == [:saved]
   end
 
-  test "stop persists and stops an idle Agent Server", %{jido: jido} do
+  test "stop persists and stops an idle Agent Server" do
     persistence = adapter(:hibernate)
+    jido = persistent_instance(persistence)
     id = unique_id("hibernate")
 
     {:ok, pid} =
       Jido.Test.AgentServer.Assertions.start_agent(jido, RuntimeAgent,
         id: id,
-        persistence: persistence,
         persistence_mode: :create
       )
 
@@ -500,12 +548,12 @@ defmodule Jido.PersistenceTest do
     assert restored.state.events == [:saved]
   end
 
-  test "a persistence conflict removes the stale Server's write authority", %{jido: jido} do
+  test "a persistence conflict removes the stale Server's write authority" do
     persistence = adapter(:stale_server)
+    jido = persistent_instance(persistence)
     agent = RuntimeAgent.instantiate!(id: unique_id("stale-server"))
 
     opts = [
-      persistence: persistence,
       persistence_mode: :create,
       default_dispatch: {:pid, target: self()}
     ]
@@ -549,8 +597,9 @@ defmodule Jido.PersistenceTest do
              Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id, instance: jido)
   end
 
-  test "thaw restores, starts, and rebuilds Plugin runtimes", %{jido: jido} do
+  test "thaw restores, starts, and rebuilds Plugin runtimes" do
     persistence = adapter(:thaw)
+    jido = persistent_instance(persistence)
     id = unique_id("thaw")
     agent = RuntimeAgent.instantiate!(id: id, state: %{events: [:saved], ticks: 2})
 
@@ -561,8 +610,7 @@ defmodule Jido.PersistenceTest do
                reason: :hibernate
              )
 
-    assert {:ok, pid} =
-             Jido.thaw(jido, RuntimeAgent, id, persistence: persistence)
+    assert {:ok, pid} = Jido.thaw(jido, RuntimeAgent, id)
 
     assert :ok = Server.await_ready(pid)
     assert Server.snapshot(pid).agent.state.events == [:saved]
@@ -575,8 +623,9 @@ defmodule Jido.PersistenceTest do
              Persistence.load_agent_with_revision(persistence, RuntimeAgent, id, instance: jido)
   end
 
-  test "explicit restore loads an existing record", %{jido: jido} do
+  test "explicit restore loads an existing record" do
     persistence = adapter(:automatic_restore)
+    jido = persistent_instance(persistence)
     id = unique_id("automatic-restore")
     agent = RestoreAgent.instantiate!(id: id, state: %{create: true})
 
@@ -585,7 +634,6 @@ defmodule Jido.PersistenceTest do
     assert {:ok, pid} =
              Jido.Test.AgentServer.Assertions.start_agent(jido, RestoreAgent,
                id: id,
-               persistence: persistence,
                persistence_mode: :restore
              )
 
