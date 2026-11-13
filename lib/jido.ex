@@ -2,8 +2,9 @@ defmodule Jido do
   use Supervisor
 
   alias Jido.Agent.Address
+  alias Jido.AgentOwnership
   alias Jido.AgentServer
-  alias Jido.Instance.{Names, NamespaceRegistry, Options, RuntimeStore}
+  alias Jido.Instance.{Names, NamespaceRegistry, Options, Ownership, RuntimeStore}
 
   @shutdown_timeout_ms 10_000
 
@@ -422,6 +423,62 @@ defmodule Jido do
     with :ok <- ensure_reconciled(instance, address), do: resolve_address_target(instance, address)
   end
 
+  @doc """
+  Returns the local runtime ownership of one resident Agent.
+
+  The result is `{:ok, nil}` when the activation has no dynamic owner. This
+  read does not activate a passivated Agent. Static topology ownership is not
+  transferable through this API.
+  """
+  @spec agent_ownership(atom(), Address.t()) ::
+          {:ok, AgentOwnership.t() | nil} | {:error, term()}
+  def agent_ownership(instance, %Address{} = address) do
+    with {:ok, target} <- ownership_target(instance, address),
+         do: Ownership.get(target.server)
+  end
+
+  @doc """
+  Adopts or transfers one resident Agent to another resident Agent.
+
+  Both Addresses must select different activations in the same Jido instance
+  and partition. Pass `expected: nil` to adopt an unowned Agent. Pass the exact
+  `Jido.AgentOwnership` value returned by the prior operation or by
+  `agent_ownership/2` to transfer an owned Agent. `request_id:` is a required
+  nonempty string. Retrying the last accepted request with the same arguments
+  returns the same ownership value without advancing its fence.
+
+  The operation does not stop, restart, cancel, or replay an accepted Turn.
+  Work that already captured runtime context keeps that context. A later Turn
+  captures the current owner. The operation releases the old owner link before
+  it returns success. The child activation stops when the current owner
+  activation stops. Ownership survives worker replacement inside those
+  activation roots, but it is not durable and does not survive child activation
+  loss, passivation, or instance shutdown.
+
+  A returned fence identifies one exact child activation and ownership
+  generation. A stale ownership value returns `{:error, :stale_ownership}`.
+  """
+  @spec transfer_agent_ownership(atom(), Address.t(), Address.t(), keyword()) ::
+          {:ok, AgentOwnership.t()} | {:error, term()}
+  def transfer_agent_ownership(instance, %Address{} = child, %Address{} = owner, opts) do
+    with {:ok, child} <- validate_instance_address(instance, child),
+         {:ok, owner} <- validate_instance_address(instance, owner),
+         :ok <- validate_ownership_addresses(child, owner),
+         {:ok, expected, request_id} <- validate_ownership_options(child, opts),
+         {:ok, child_target} <- ownership_target(instance, child),
+         {:ok, owner_target} <- ownership_target(instance, owner) do
+      Ownership.transfer(instance, child_target, owner_target, expected, request_id)
+    end
+  end
+
+  def transfer_agent_ownership(_instance, child, owner, opts),
+    do:
+      invalid_runtime_input(:transfer_agent_ownership, %{
+        child_address: child,
+        owner_address: owner,
+        opts: opts
+      })
+
   @doc "Creates one durable Agent with an explicit stable Agent Address."
   @spec create_agent(atom(), Address.t(), module() | Jido.Agent.t(), keyword()) ::
           {:ok, Address.t()} | {:error, term()}
@@ -746,6 +803,77 @@ defmodule Jido do
   defp validate_instance_address(instance, address) do
     with {:ok, namespace} <- require_instance_namespace(instance) do
       Address.validate_namespace(address, namespace)
+    end
+  end
+
+  defp ownership_target(instance, address) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         :ok <- ensure_reconciled(instance, address) do
+      key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
+
+      case Registry.lookup(Names.registry(instance), key) do
+        [{activation, {:activation, activation_id}}] ->
+          with {:ok, server} <- resolve_registered_agent(activation) do
+            {:ok,
+             %{
+               address: address,
+               activation: activation,
+               activation_id: activation_id,
+               server: server,
+               jido: instance,
+               partition: address.partition
+             }}
+          end
+
+        _other ->
+          {:error, :not_found}
+      end
+    end
+  rescue
+    ArgumentError -> {:error, :unavailable}
+  end
+
+  defp validate_ownership_addresses(child, owner) do
+    cond do
+      child == owner -> {:error, :self_ownership}
+      child.partition != owner.partition -> {:error, :different_partition}
+      true -> :ok
+    end
+  end
+
+  defp validate_ownership_options(child, opts) do
+    keys = if Keyword.keyword?(opts), do: Keyword.keys(opts), else: []
+
+    cond do
+      not Keyword.keyword?(opts) ->
+        invalid_runtime_input(:transfer_agent_ownership, %{opts: opts})
+
+      keys != Enum.uniq(keys) or Enum.sort(keys) != [:expected, :request_id] ->
+        invalid_runtime_input(:transfer_agent_ownership, %{opts: opts})
+
+      not (is_binary(opts[:request_id]) and byte_size(opts[:request_id]) > 0) ->
+        invalid_runtime_input(:transfer_agent_ownership, %{request_id: opts[:request_id]})
+
+      is_nil(opts[:expected]) ->
+        {:ok, nil, opts[:request_id]}
+
+      match?(%AgentOwnership{}, opts[:expected]) ->
+        validate_expected_ownership(child, opts[:expected], opts[:request_id])
+
+      true ->
+        invalid_runtime_input(:transfer_agent_ownership, %{expected: opts[:expected]})
+    end
+  end
+
+  defp validate_expected_ownership(child, expected, request_id) do
+    with {:ok, expected_child} <- Address.validate(expected.agent_address),
+         {:ok, _expected_owner} <- Address.validate(expected.owner_address),
+         true <- expected_child == child,
+         true <- is_binary(expected.fence) and byte_size(expected.fence) > 0,
+         true <- is_binary(expected.request_id) and byte_size(expected.request_id) > 0 do
+      {:ok, expected, request_id}
+    else
+      _ -> invalid_runtime_input(:transfer_agent_ownership, %{expected: expected})
     end
   end
 

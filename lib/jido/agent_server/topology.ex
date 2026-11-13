@@ -661,8 +661,8 @@ defmodule Jido.AgentServer.Topology do
     end)
   end
 
-  defp topology_parent?(nil), do: false
-  defp topology_parent?(parent), do: Map.has_key?(plans(parent.state), parent.tag)
+  defp topology_parent?(%{state: state, tag: tag}), do: Map.has_key?(plans(state), tag)
+  defp topology_parent?(_parent), do: false
   defp tag(name, index), do: "$topology/#{name}/#{index}"
 
   defp child_supervisor(context, :owned) do

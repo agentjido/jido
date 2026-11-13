@@ -3,7 +3,9 @@ modules:
   - Jido.Instance.Options
   - Jido.Instance.NamespaceRegistry
   - Jido.Instance.RuntimeStore
+  - Jido.Instance.Ownership
   - Jido.Agent.Address
+  - Jido.AgentOwnership
 ---
 
 ## Purpose
@@ -85,5 +87,13 @@ downstream operation results stay with their owning components.
 - **scope:** `Jido.create_agent/4`, `Jido.activate_agent/4`
 - **must:** Require Instance persistence for durable creation. Create revision zero synchronously and return the exact Agent Address only after that write succeeds. Do not start an activation during creation. Return the current local activation when one exists. Otherwise activation must strictly restore one active durable record. It must not create a missing record or replace a tombstone or invalid record.
 - **why:** Logical Agent creation must be durable before activation, and activation must not create a new Agent lifetime by accident.
+- **kind:** ordering
+- **status:** active
+
+### jido.instance.I10 — Local Agent ownership transfer
+
+- **scope:** `Jido.transfer_agent_ownership/4`, `Jido.agent_ownership/2`
+- **must:** Adopt only an unowned resident Agent or transfer it with the exact current ownership value. Serialize ownership changes in one instance and partition, reject self-ownership and cycles, and return an activation-specific fence. Make one matching request ID idempotent until the next accepted transfer. Keep an accepted Turn running and keep the same child activation. Release the old owner before success is visible. Stop the child activation when the current owner activation stops. Preserve ownership across worker replacement, but release it after child activation loss, passivation, or instance stop. Keep ownership outside Agent state and durable records.
+- **why:** Dynamic local ownership needs a fenced, testable lifetime boundary without claiming durable or distributed supervision.
 - **kind:** ordering
 - **status:** active

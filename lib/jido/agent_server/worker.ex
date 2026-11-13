@@ -11,6 +11,7 @@ defmodule Jido.AgentServer.Worker do
   require Logger
 
   alias Jido.Agent
+  alias Jido.AgentOwnership
   alias Jido.Agent.Directive.Reply
 
   alias Jido.AgentServer.{
@@ -619,6 +620,36 @@ defmodule Jido.AgentServer.Worker do
     with :ok <- Lifecycle.validate_wait(timeout), do: :gen_statem.call(server, :status, timeout)
   end
 
+  @doc false
+  @spec ownership(server(), timeout()) :: {:ok, AgentOwnership.t() | nil} | {:error, term()}
+  def ownership(server, timeout) do
+    with :ok <- Lifecycle.validate_wait(timeout),
+         do: safe_runtime_call(server, :ownership, timeout)
+  end
+
+  @doc false
+  @spec ownership_context(server(), timeout()) :: {:ok, map()} | {:error, term()}
+  def ownership_context(server, timeout) do
+    with :ok <- Lifecycle.validate_wait(timeout),
+         do: safe_runtime_call(server, :ownership_context, timeout)
+  end
+
+  @doc false
+  @spec transfer_ownership(server(), map(), AgentOwnership.t() | nil, String.t(), timeout()) ::
+          {:ok, AgentOwnership.t()} | {:error, term()}
+  def transfer_ownership(server, owner, expected, request_id, timeout) do
+    with :ok <- Lifecycle.validate_wait(timeout),
+         do: safe_runtime_call(server, {:transfer_ownership, owner, expected, request_id}, timeout)
+  end
+
+  defp safe_runtime_call(server, request, timeout) do
+    try do
+      :gen_statem.call(server, request, timeout)
+    catch
+      :exit, _reason -> {:error, :unavailable}
+    end
+  end
+
   @doc """
   Waits for Plugin startup and readiness. Caller timeout does not stop startup.
 
@@ -821,6 +852,109 @@ defmodule Jido.AgentServer.Worker do
       parent -> Map.put(parent, :monitor, Process.monitor(parent.activation))
     end
   end
+
+  defp change_ownership(%{parent: parent} = data, owner, expected, request_id) do
+    request = %{expected: expected, owner_address: owner.address, request_id: request_id}
+
+    cond do
+      not is_nil(parent) and not match?(%{kind: :dynamic_ownership}, parent) ->
+        {:error, :ownership_not_transferable}
+
+      data.parent_effect != nil ->
+        {:error, :ownership_transition_pending}
+
+      idempotent_ownership_request?(parent, request) ->
+        {:ok, public_ownership(data.agent_address, parent), data}
+
+      conflicting_ownership_request?(parent, request_id) ->
+        {:error, :request_id_conflict}
+
+      public_ownership(data.agent_address, parent) != expected ->
+        {:error, :stale_ownership}
+
+      not Process.alive?(owner.activation) ->
+        {:error, :owner_unavailable}
+
+      match?(%{activation: activation} when activation == owner.activation, parent) ->
+        {:error, :same_owner}
+
+      true ->
+        install_ownership(data, owner, request)
+    end
+  end
+
+  defp idempotent_ownership_request?(%{kind: :dynamic_ownership, last_request: request}, request),
+    do: true
+
+  defp idempotent_ownership_request?(_parent, _request), do: false
+
+  defp conflicting_ownership_request?(%{kind: :dynamic_ownership, request_id: request_id}, request_id),
+    do: true
+
+  defp conflicting_ownership_request?(_parent, _request_id), do: false
+
+  defp install_ownership(data, owner, request) do
+    sequence = ownership_sequence(data.activation_state) + 1
+    fence = data.agent_activation_id <> ":" <> Integer.to_string(sequence)
+
+    stored = %{
+      kind: :dynamic_ownership,
+      activation: owner.activation,
+      agent_id: owner.address.id,
+      address: owner.address,
+      policy: :stop,
+      dispatch: nil,
+      jido: owner.jido,
+      partition: owner.partition,
+      fence: fence,
+      request_id: request.request_id,
+      last_request: request
+    }
+
+    monitor = Process.monitor(owner.activation)
+
+    try do
+      true =
+        :ets.insert(data.activation_state, [
+          {:parent, stored},
+          {:ownership_sequence, sequence}
+        ])
+
+      release_parent_monitor(data.parent)
+      parent = Map.put(stored, :monitor, monitor)
+      ownership = public_ownership(data.agent_address, parent)
+      {:ok, ownership, %{data | parent: parent}}
+    rescue
+      ArgumentError ->
+        Process.demonitor(monitor, [:flush])
+        {:error, :ownership_unavailable}
+    end
+  end
+
+  defp ownership_sequence(state) do
+    case :ets.lookup(state, :ownership_sequence) do
+      [{:ownership_sequence, sequence}] when is_integer(sequence) and sequence >= 0 -> sequence
+      _other -> 0
+    end
+  end
+
+  defp release_parent_monitor(%{monitor: monitor}) when is_reference(monitor),
+    do: Process.demonitor(monitor, [:flush])
+
+  defp release_parent_monitor(_parent), do: true
+
+  defp public_ownership(_agent_address, nil), do: nil
+
+  defp public_ownership(agent_address, %{kind: :dynamic_ownership} = parent) do
+    %AgentOwnership{
+      agent_address: agent_address,
+      owner_address: parent.address,
+      fence: parent.fence,
+      request_id: parent.request_id
+    }
+  end
+
+  defp public_ownership(_agent_address, _parent), do: :not_transferable
 
   defp forget_child_monitors(monitors, tag, token) do
     Enum.reduce(monitors, %{}, fn {ref, value}, acc ->
@@ -1123,6 +1257,40 @@ defmodule Jido.AgentServer.Worker do
 
   def handle_event({:call, from}, :status, phase, data) do
     {:keep_state_and_data, [{:reply, from, public_status(phase, data)}]}
+  end
+
+  def handle_event({:call, from}, :ownership, _phase, data) do
+    result =
+      case data.parent do
+        nil -> {:ok, nil}
+        %{kind: :dynamic_ownership} = parent -> {:ok, public_ownership(data.agent_address, parent)}
+        _other -> {:error, :ownership_not_transferable}
+      end
+
+    {:keep_state_and_data, reply(from, result)}
+  end
+
+  def handle_event({:call, from}, :ownership_context, _phase, data) do
+    context = %{
+      activation: data.activation,
+      jido: data.jido,
+      partition: data.partition,
+      parent_activation: if(data.parent, do: data.parent.activation)
+    }
+
+    {:keep_state_and_data, reply(from, {:ok, context})}
+  end
+
+  def handle_event(
+        {:call, from},
+        {:transfer_ownership, owner, expected, request_id},
+        _phase,
+        data
+      ) do
+    case change_ownership(data, owner, expected, request_id) do
+      {:ok, ownership, data} -> {:keep_state, data, reply(from, {:ok, ownership})}
+      {:error, reason} -> {:keep_state_and_data, reply(from, {:error, reason})}
+    end
   end
 
   def handle_event(

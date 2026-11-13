@@ -29,14 +29,15 @@ delete the durable record.
 
 ## Limits
 
-This lesson proves local process ownership only. It does not provide remote
-failover, a distributed lease, or automatic transfer to another instance.
+This lesson proves instance and activation shutdown for independent Agents. It
+does not repeat the owner-linked transfer proof from 09_05 and does not provide
+remote failover or a distributed lease.
 
 ## Core Fit and Gaps
 
-Activation stop, instance stop, namespace rebinding, and durable reactivation
-compose through public APIs. There is no public dynamic parent relation whose
-shutdown policy can be transferred between live Agent owners.
+Activation stop, instance stop, namespace rebinding, durable reactivation, and
+the local runtime ownership contract compose through public APIs. Runtime
+ownership is released by activation stop and is not restored from persistence.
 
 ## Files
 

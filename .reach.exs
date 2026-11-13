@@ -89,6 +89,7 @@
     live_runtime: [
       "Mix.Tasks.Jido.Persistence.*",
       "Jido",
+      "Jido.AgentOwnership",
       "Jido.AgentServer",
       "Jido.AgentServer.*",
       "Jido.Durable",
