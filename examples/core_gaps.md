@@ -45,3 +45,31 @@ that makes the problem clear.
 - Core change: None proposed. The example bypassed the public execution path.
 - Follow-up question: Should public ReAct graph inspection expose a supported
   expansion view without executing a model round?
+
+### EX-003: An inline Action host needs two declaration macro arities
+
+- Example: [01_05 Inline Actions](01_actions/01_05_inline_actions/README.md).
+- Classification: Documentation and authoring friction.
+- Attempted contract: Import one three-argument host macro for an inline Action
+  declaration with a `do` block.
+- Result: Compilation failed with `undefined function inline_action/4`.
+- Public solution: Define and import both arities. The four-argument form joins
+  the option list and `do` block before it calls `parse_callback!/3`.
+- Core change: None proposed. The public compiler API works after the host
+  follows Elixir macro call shape.
+- Follow-up question: Should the inline Action guide include a minimal host
+  that shows both arities before it shows bound input?
+
+### EX-004: JSON Signal schemas need string keys
+
+- Example: [08_01 Signal Envelope](08_signals_and_messaging/08_01_signal_envelope/README.md).
+- Classification: Documentation and boundary friction.
+- Attempted contract: Serialize a custom Signal created from a Joi object with
+  atom keys.
+- Result: `Jido.Signal.Codec.serialize/2` returned
+  `{:json_encode_failed, "Signal data must contain JSON values or binary data"}`.
+- Public solution: Use a string-key Joi schema for JSON-bound Signal data.
+- Core change: None proposed. The Signal catalog guide already states the wire
+  data rule.
+- Follow-up question: Should custom Signal compilation or JSON serialization
+  identify the first non-JSON data path in its error details?
