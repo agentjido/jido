@@ -33,3 +33,9 @@
   decision: Separate durable Agent creation from activation. Jido.create_agent/4 synchronously creates revision zero through the Instance persistence adapter and does not start a process. Jido.activate_agent/4 strictly restores an existing record and never creates one.
   driver: A logical Agent must exist durably before it is activated. Restore-or-create made process startup decide Agent identity and lifetime.
   approved_by: Durable Agent activation design review
+
+- id: instance-local-agent-ownership
+  date: 2026-11-13
+  decision: Keep dynamic Agent ownership local to one child activation. Use stable Addresses, an activation-specific fence, and one idempotency request ID for adoption and transfer.
+  driver: Applications need owner-linked shutdown and safe transfer without storing process ownership in Agent state or claiming a durable distributed lease.
+  approved_by: EX-011 implementation

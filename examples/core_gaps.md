@@ -164,23 +164,26 @@ that makes the problem clear.
 - Follow-up question: Should the AI streaming guide use PubSub as its first
   hosted Agent example and reserve PID dispatch for pure or transient runs?
 
-### EX-011: Dynamic runtime adoption and ownership transfer have no public API
+### EX-011: Dynamic runtime adoption and ownership transfer — resolved
 
 - Example: [09_05 Logical ownership transfer](09_dynamic_agent_composition/09_05_logical_ownership_transfer/README.md).
-- Classification: Candidate Jido core change or explicit non-goal.
+- Classification: Resolved Jido core change.
 - Attempted contract: Adopt an independent Agent into a live parent, transfer
   its runtime ownership to another parent, and apply owner-linked shutdown.
-- Result: The current public API can create, activate, resolve, and stop stable
-  Agents, but it has no dynamic child adoption or process-owner transfer
-  operation. The old example README named APIs that do not exist.
-- Public solution: Store logical ownership in an application Agent. The Jido
-  instance remains the process owner, and shutdown stays explicit.
-- Core change: Decide whether dynamic runtime ownership is a Jido capability or
-  an application protocol. If it is a core capability, define adoption,
-  transfer, fencing, in-flight Turn, persistence, and shutdown semantics.
-- Follow-up question: Can ownership transfer commit atomically with the old
-  owner's release, or must the contract expose a recoverable intermediate
-  state?
+- Result: `Jido.transfer_agent_ownership/4` now adopts an unowned resident Agent
+  or transfers it with the exact current `Jido.AgentOwnership` value. The
+  activation-specific fence rejects stale owners, and a matching request ID
+  makes the last accepted request idempotent.
+- Public solution: Use stable child and owner Addresses. Pass `expected: nil`
+  for adoption and the current ownership value for transfer. Use
+  `Jido.agent_ownership/2` to read the current local relation.
+- Core change: The child activation replaces its owner monitor before success
+  is visible. An in-flight Turn continues without cancellation or replay. The
+  current owner activation stops the child. Ownership survives worker recovery
+  but is not persisted and is released by child activation loss, passivation,
+  or instance shutdown.
+- Follow-up question: None for EX-011. Durable or distributed ownership needs a
+  separate lease and failover contract.
 
 ### EX-012: An indeterminate activation rejects direct stop
 

@@ -114,6 +114,7 @@ Guides: [Instances and Tenants](../operations/configuration-and-tenant-isolation
 | --- | --- |
 | `Jido.activate_agent/3` | Activates one existing durable Agent with an explicit stable Agent Address. |
 | `Jido.agent_address/3` | Builds one stable Agent Address in the selected instance namespace. |
+| `Jido.agent_ownership/2` | Returns the local runtime ownership of one resident Agent. |
 | `Jido.call/4` | Sends one synchronous Signal through a stable Agent Address. |
 | `Jido.cancel_turn/4` | Cancels one matching Turn for a stable Agent Address. |
 | `Jido.cast/3` | Sends one best-effort asynchronous Signal through a stable Agent Address. |
@@ -131,6 +132,7 @@ Guides: [Instances and Tenants](../operations/configuration-and-tenant-isolation
 | `Jido.stop_agent/3` | Stops an Agent with options in the selected Jido instance. |
 | `Jido.submit/4` | Submits one AgentServer turn through a stable Agent Address. |
 | `Jido.thaw/4` | Thaws an Agent with options in the selected Jido instance. |
+| `Jido.transfer_agent_ownership/4` | Adopts or transfers one resident Agent with a fenced expected ownership value. |
 | `Jido.upgrade_agent/4` | Applies one trusted upgrade Action to an inactive durable Agent. |
 | `Jido.whereis_agent/3` | Looks up an Agent with options in the selected Jido instance. |
 
@@ -222,6 +224,11 @@ Stable identity for one logical Agent.
 | `Jido.Agent.Address.to_map/1` | Returns the exact version-1 public map for one Agent Address. |
 | `Jido.Agent.Address.to_map!/1` | Returns the exact version-1 public map or raises its validation error. |
 | `Jido.Agent.Address.validate/1` | Validates one Agent Address without changing its identity fields. |
+
+### `Jido.AgentOwnership`
+
+A process-neutral, activation-scoped fence for one local Agent ownership
+relation. The struct is the public contract and has no public functions.
 
 ### `Jido.Agent.Route`
 

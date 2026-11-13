@@ -1,43 +1,51 @@
-# 09_05 Logical ownership transfer
+# 09_05 Runtime ownership transfer
 
-Adopt and transfer an independent Agent in application-owned domain state
-without pretending that its OTP process moved.
+Adopt and transfer one resident Agent between local owner activations without
+replacing the child process.
 
 ## What you will learn
 
-- A durable ownership ledger can name the logical owner of a stable Agent Address.
-- Transfer validates the current owner before it commits the new owner.
-- The Jido instance remains the process owner before and after transfer.
+- `Jido.transfer_agent_ownership/4` adopts an unowned resident Agent.
+- The returned `Jido.AgentOwnership` value fences a later transfer.
+- Only the current owner activation applies owner-linked shutdown.
 
 ## Read the code
 
-Read [the ownership ledger Agent](ownership_ledger.ex) first.
+Read [the ownership transfer client](ownership_ledger.ex) first.
 
 ## Run it
 
 `mix test.examples examples/09_dynamic_agent_composition/09_05_logical_ownership_transfer --warnings-as-errors`
 
 Expected result: ownership moves from `team-a` to `team-b`, while the worker
-resolves to the same process. A stale transfer fails without an Agent-state
-revision.
+resolves to the same process. A stale transfer fails. Stopping `team-a` does
+not stop the worker, but stopping `team-b` does.
 
 ## Important behavior
 
-The ledger is the canonical owner of logical ownership data. AgentServer owns
-the ledger process. The Jido instance owns the worker activation. A transfer is
-one ledger commit; it does not move or restart the worker process.
+Adoption passes `expected: nil`. A transfer passes the exact current ownership
+value. The fence contains the child activation identity and its ownership
+generation. A matching `request_id` retry returns the same result. An accepted
+Turn continues; transfer does not cancel or replay it. Work that already
+captured runtime context keeps that context. A later Turn captures the new
+owner.
+
+The child monitors the owner activation root, not one owner worker PID. Worker
+replacement keeps ownership. The operation releases the old owner link before
+it returns success.
 
 ## Limits
 
-Jido core does not currently expose public dynamic child adoption or process
-ownership transfer. This example does not claim that application ownership
-data changes OTP supervision.
+Ownership is local and activation-scoped. It is not saved in Agent state or in
+the persistence record. Child activation loss, passivation, or instance
+shutdown releases it. Reactivation starts unowned. This example does not prove
+distributed ownership, remote failover, or authorization.
 
 ## Core Fit and Gaps
 
-Stable Addresses and normal Agent state provide a clean application-level ownership
-protocol. Runtime adoption, transfer, and owner-linked shutdown need a separate
-public contract if Jido intends to support them.
+Stable Addresses, `Jido.AgentOwnership`, and the public transfer operation
+compose cleanly. The runtime keeps process ownership separate from durable
+Agent state. A distributed or durable lease remains outside this contract.
 
 ## Files
 

@@ -762,9 +762,11 @@ Disposition terms:
 | `Jido.AgentServer.TopologyRuntime` | Removed | Static topology startup and explicit runtime child operations belong to `Jido.AgentServer.Topology` |
 | `Jido.AgentServer.Lifecycle` | Keep | Canonical Turn, wait, cancellation, commit, effect, and recovery policy owner |
 | `Jido.AgentServer.Status` | Keep | Public typed process-neutral status view for state, active Turn, waits, effects, revision, and last failure |
+| `Jido.AgentOwnership` | Keep | Public process-neutral fence for one local activation ownership relation |
 | `Jido.Instance.Names` | Keep internal | Canonical per-instance runtime naming and partition-key policy |
 | `Jido.Instance.NamespaceRegistry` | Keep | Instance namespace ownership process |
 | `Jido.Instance.Options` | Keep | Instance option materialization and validation |
+| `Jido.Instance.Ownership` | Keep internal | Serializes local adoption and transfer and rejects ownership cycles |
 | `Jido.Instance.RefFacade` | Removed | Public calls are in `Jido`; Address-specific validation is in `Jido.Agent.Address` |
 | `Jido.Instance.RuntimeStore` | Keep internal | Per-instance runtime infrastructure and live settings; replaces `Jido.RuntimeStore` and root setting delegates |
 

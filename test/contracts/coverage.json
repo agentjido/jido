@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 92,
+      "active": 93,
       "coverage": 1.0,
-      "covered": 92
+      "covered": 93
     },
     "jido.agent_server": {
       "active": 13,
@@ -1890,10 +1890,10 @@
       }
     },
     "jido.instance": {
-      "active": 9,
+      "active": 10,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 9,
+      "covered": 10,
       "form": "light",
       "obligations": {
         "jido.instance.I1": {
@@ -1920,6 +1920,19 @@
             "test validation errors retain the rejected field",
             "test validation keeps exact defaults and accepts all boundary values",
             "test validation rejects duplicate option keys"
+          ]
+        },
+        "jido.instance.I10": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test adoption and fenced transfer keep one process and one accepted Turn",
+            "test ownership survives worker recovery and is released by activation replacement",
+            "test static topology ownership cannot be transferred",
+            "test the current owner activation controls shutdown and cycles are rejected"
           ]
         },
         "jido.instance.I2": {
@@ -5662,8 +5675,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 235,
+    "active": 236,
     "coverage": 1.0,
-    "covered": 235
+    "covered": 236
   }
 }

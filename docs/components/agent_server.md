@@ -44,6 +44,11 @@ The worker, activation supervisor, Plugin roots, execution workers, internal
 state-machine phases, effect detail, and composition records are not public
 inspection data.
 
+`Jido.transfer_agent_ownership/4` adds one local owner monitor to a resident
+child activation. The Instance owns Address validation, transfer serialization,
+and cycle checks. AgentServer keeps the accepted relation across worker
+replacement. The relation ends with the child activation and is not durable.
+
 ## Durable boundary
 
 AgentServer can host a durable Flow Turn, but it does not own durable workflow
