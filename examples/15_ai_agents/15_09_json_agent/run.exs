@@ -18,6 +18,6 @@ signal =
     input: "Use add for 2 plus 3 and multiply for 4 times 5. Report both results."
   })
 
-{:ok, preflight} = Jido.AI.Reasoning.preflight(definition, signal.data)
+{:ok, preflight} = Jido.AI.Reasoning.preflight(definition.module, signal.data)
 IO.inspect(Enum.map(preflight.tools, & &1.name()), label: "Prepared tools")
 IO.inspect(agent.state, label: "Initial Agent state")

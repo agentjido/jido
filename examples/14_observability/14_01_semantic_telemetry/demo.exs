@@ -4,28 +4,12 @@
 Code.require_file("../support/event_probe.ex", __DIR__)
 Code.require_file("turn_observation.ex", __DIR__)
 
-defmodule ObservationDemo do
-  def capture(_event, _measurements, %{agent_id: id, signal_id: signal_id}, {owner, id}),
-    do: send(owner, {:effects_stopped, signal_id})
-
-  def capture(_event, _measurements, _metadata, _config), do: :ok
-end
-
 alias Jido.AgentServer, as: Server
 alias Jido.Examples.TurnObservation, as: Agent
 alias Jido.Examples.Runtime.EventProbe
 
 {:ok, instance} = Jido.start_link(name: ObservationProbe)
 probe = EventProbe.attach("observed")
-handler = {ObservationDemo, make_ref()}
-
-:ok =
-  :telemetry.attach(
-    handler,
-    [:jido, :agent_server, :effects, :stop],
-    &ObservationDemo.capture/4,
-    {self(), "observed"}
-  )
 
 try do
   {:ok, server} = Jido.start_agent(ObservationProbe, Agent, id: "observed")
@@ -33,24 +17,15 @@ try do
 
   {:ok, route_signal_1} = Agent.record_signal(%{value: 7})
 
-  {:ok, _agent, _directives} =
+  {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
     Jido.AgentServer.call(server, route_signal_1, [])
 
   {:ok, route_signal_2} = Agent.send_to_missing_child_signal(%{value: 11})
 
-  {:ok, _agent, _directives} =
+  {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
     Jido.AgentServer.call(server, route_signal_2, [])
 
-  # A call confirms the commit. Observe effect completion separately.
-  delivery_id = route_signal_2.id
-
-  receive do
-    {:effects_stopped, ^delivery_id} -> :ok
-  after
-    5_000 -> raise "No effect completion event"
-  end
-
-  %{agent_revision: 2} = Server.status(server)
+  %{agent_revision: 1} = Server.status(server)
   :ok = Jido.stop_agent(ObservationProbe, server)
 
   outcomes =
@@ -63,19 +38,12 @@ try do
 
   [
     %{outcome: %{status: :ok}, revision: 1},
-    %{outcome: %{status: :ok, committed?: true}, revision: 2}
+    %{outcome: %{status: :error, committed?: false}, revision: 1}
   ] = outcomes
 
-  true =
-    Enum.any?(EventProbe.events(probe), fn event ->
-      event.event == [:jido, :agent_server, :effects, :stop] and
-        event.metadata.status == :error
-    end)
-
-  IO.inspect(outcomes, label: "Committed Turns; delivery has a separate effects event")
+  IO.inspect(outcomes, label: "Committed and failed Turns")
   IO.inspect(Enum.map(Jido.Telemetry.metrics(), & &1.name), label: "Public metric names")
 after
-  :telemetry.detach(handler)
   EventProbe.detach(probe)
   Supervisor.stop(instance)
 end

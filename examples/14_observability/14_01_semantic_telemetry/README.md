@@ -16,7 +16,7 @@ Read [the observed Agent](turn_observation.ex), then the shared
 ## Run it
 
 ```sh
-mix test.examples examples/14_observability/14_01_semantic_telemetry
+mix test.examples examples/14_observability/14_01_semantic_telemetry --warnings-as-errors
 ```
 
 Expected result: one Turn event reports a successful commit. The other reports

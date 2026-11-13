@@ -17,7 +17,10 @@ then the [Plugin](../../support/recoverable_delivery/delivery_plugin.ex),
 
 ## Run it
 
-`mix test.examples examples/12_persistence/12_07_recoverable_delivery`
+```sh
+mix test.examples examples/12_persistence/12_07_recoverable_delivery --warnings-as-errors
+mix run examples/12_persistence/12_07_recoverable_delivery/demo.exs
+```
 
 Expected result: intent saved while the sink is unavailable resumes after restore and creates one idempotent external record.
 
@@ -28,6 +31,13 @@ Delivery is at least once. The application owns stable effect IDs. The sink must
 ## Limits
 
 The memory sink is not durable. Completed IDs need an application retention policy.
+
+## Core Fit and Gaps
+
+Public Agent Refs, persistence, Plugin-owned state, runtime children, and
+post-commit dispatch compose into a recoverable delivery protocol. The
+application still owns stable effect IDs and idempotent external delivery. No
+distributed transaction spans the Agent record and the sink.
 
 ## Files
 
