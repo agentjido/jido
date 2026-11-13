@@ -9,9 +9,8 @@ same Agent, Plugin, Signal, and AgentServer contracts as an application Plugin.
 3. [Keyed Timers](11_03_keyed_timers/README.md) replaces an existing timer by
    key.
 4. [Heartbeat](11_04_heartbeat/README.md) delivers periodic input.
-5. SensorManager is used by the
-   [Inbox application](../24_application_patterns/24_02_inbox/README.md). A
-   focused capability lesson remains to be added.
+5. [Sensor Manager](11_05_sensor_manager/README.md) keeps tagged input processes
+   aligned with committed Plugin state.
 6. [Bus Delivery](11_06_bus_delivery/README.md) uses an ordered local Bus
    subscription.
 
