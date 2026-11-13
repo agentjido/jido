@@ -50,4 +50,9 @@ defmodule Jido.Examples.Collaboration.NestedOrganization.Company do
       count 2
     end
   end
+
+  @doc "Removes one department subtree from the current company activation."
+  def remove_department(server, slot, opts \\ []) do
+    Jido.AgentServer.remove_topology_member(server, :departments, slot, opts)
+  end
 end

@@ -27,3 +27,9 @@
   decision: Keep child and topology-member operations on Jido.AgentServer. Type their child records and option boundaries. Keep Jido.AgentServer.Topology internal, and keep the logical topology DSL in Jido.Agent.
   driver: Runtime composition needs one public facade without exposing OTP resource owners or creating a second DSL.
   approved_by: Component hardening pass
+
+- id: composition-declared-subtree-removal
+  date: 2026-11-13
+  decision: Remove one selected declared member subtree only from the current root activation. Close admission before ordered shutdown, keep durable child records, and keep partial removal intent for retry. Do not change the static Agent definition.
+  driver: A root-owned static topology needs one safe public operation for selected-subtree cleanup without private API access or live definition mutation.
+  approved_by: EX-007 implementation request

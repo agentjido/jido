@@ -1,7 +1,7 @@
 ---
 title: Jido.AgentServer component
 status: current
-last-reviewed: 2026-11-12
+last-reviewed: 2026-11-13
 ---
 
 # Jido.AgentServer component
@@ -16,12 +16,13 @@ definition upgrade. AgentServer owns only the current resident activation.
 
 ## Public contract
 
-The facade has 13 functions:
+The facade has 14 functions:
 
 - `child_spec/1`
 - `call/3`, `cast/3`, `submit/3`, `await/2`, and `abandon/1`
 - `cancel_turn/3`
 - `quiesce/2`, `resume/2`, and `stop/3`
+- `remove_topology_member/4`
 - `snapshot/2`, `status/2`, and `await_ready/2`
 
 The public values are `Pending`, `TurnResult`, `Snapshot`, and `Status`.
@@ -32,6 +33,13 @@ All request modes use one Turn path. Accepted terminal states are data in a
 `TurnResult`. `{:error, reason}` means that work was not accepted or the
 transport failed. Cast runs the same Turn and commit path but discards its
 reply.
+
+`remove_topology_member/4` removes one declared member slot from the current
+root activation. It closes admission for the selected subtree, settles
+accepted work, and stops descendants before their parent. It keeps the root,
+the static definition, and durable child records. A partial failure keeps the
+removal pending for a safe retry. A replacement root activation creates the
+declared slot again.
 
 ## OTP boundary
 
@@ -60,7 +68,8 @@ operation can change the persistence revision without changing Agent state.
 The focused contract suite covers stable Address delivery, warm residency,
 passivation, worker recovery, accepted failure values, durable Signal retry,
 timer wake-up after Instance restart, concurrent activation, uncertain-write
-reconciliation, definition upgrade, and stable Plugin runtime.
+reconciliation, definition upgrade, stable Plugin runtime, and controlled
+declared-subtree removal.
 
 ## Sources
 
@@ -69,4 +78,5 @@ reconciliation, definition upgrade, and stable Plugin runtime.
 - [Status](../../lib/jido/agent_server/status.ex)
 - [Durable activation contract](../../test/jido/agent_server/durable_activation_contract_test.exs)
 - [AgentServer obligations](../../test/contracts/jido/agent_server.obligations.md)
+- [Declared-subtree removal decision](../adr/0005-activation-local-declared-subtree-removal.md)
 - [Architecture plan](../architecture/durable-agent-activation.md)

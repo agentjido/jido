@@ -1,7 +1,7 @@
 ---
 title: Jido durable Agent activation plan
 status: implemented
-last-reviewed: 2026-11-12
+last-reviewed: 2026-11-13
 ---
 
 # Jido durable Agent activation plan
@@ -101,7 +101,7 @@ its activation stops.
 
 ## Public AgentServer API
 
-The accepted `Jido.AgentServer` API has 13 functions:
+The accepted `Jido.AgentServer` API has 14 functions:
 
 ```elixir
 child_spec/1
@@ -116,6 +116,7 @@ cancel_turn/3
 
 quiesce/2
 resume/2
+remove_topology_member/4
 stop/3
 
 snapshot/2
@@ -579,7 +580,7 @@ those features can be added outside AgentServer.
 
 ### 1. Contract and types
 
-- Reduce the public AgentServer API to the accepted 13 functions.
+- Keep the public AgentServer API at the accepted 14 functions.
 - Add or align `Pending`, `TurnResult`, `Snapshot`, and `Status`.
 - Make Agent Address the normal address and keep server handles advanced.
 - Separate Agent lifecycle, work state, and residency state in public terms.

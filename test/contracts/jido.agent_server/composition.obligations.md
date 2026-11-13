@@ -95,3 +95,11 @@ runtime component has no separate DSL.
 - **why:** Users need one stable composition boundary without access to resource-hosting internals.
 - **kind:** functional
 - **status:** retired
+
+### jido.agent_server.composition.I11 — Controlled declared-subtree removal
+
+- **scope:** `Jido.AgentServer.remove_topology_member/4`
+- **must:** Remove one selected declared member slot only from the current root activation. Close admission for the selected member and all owned descendants before shutdown. Finish accepted Turns by default, support explicit pre-commit cancellation, and stop descendants before their parent. Keep the root and sibling subtrees active. Keep the static declaration and durable child records unchanged. Preserve removal through root-worker recovery in the same activation. Return success for a repeated removal. On a timeout or partial shutdown, keep removal intent and closed admission so a repeated call can continue cleanup without restoring the subtree.
+- **why:** Applications need one bounded lifecycle operation for a selected static subtree without private topology access or a mutable Agent definition.
+- **kind:** ordering
+- **status:** active

@@ -17,6 +17,7 @@ defmodule Jido.AgentServer.ApiTest do
              {:function, :cast, 3},
              {:function, :child_spec, 1},
              {:function, :quiesce, 2},
+             {:function, :remove_topology_member, 4},
              {:function, :resume, 2},
              {:function, :snapshot, 2},
              {:function, :status, 2},

@@ -88,7 +88,7 @@ authoring surface.
 ### jido.agent_server.I9 — Public API boundary
 
 - **scope:** documented `Jido.AgentServer` functions and types
-- **must:** Keep the documented 13-function facade exact. Keep `Pending`, `Snapshot`, `Status`, and `TurnResult` public and typed. Keep workers, supervisors, state-machine callbacks, Plugin roots, and coordinator data internal. Do not add a second AgentServer DSL.
+- **must:** Keep the documented 14-function facade exact, including controlled declared-topology member removal. Keep `Pending`, `Snapshot`, `Status`, and `TurnResult` public and typed. Keep workers, supervisors, state-machine callbacks, Plugin roots, and coordinator data internal. Do not add a second AgentServer DSL.
 - **why:** Users need one stable runtime entry point without OTP implementation data.
 - **kind:** functional
 - **status:** active
