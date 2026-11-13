@@ -23,14 +23,12 @@ defmodule Jido.Examples.CodecDocuments do
   end
 
   def encode_definition do
-    Jido.Codec.encode(AddressableAgent.definition(),
-      catalog: catalog(),
-      codec: Jido.Agent.Codec
-    )
+    Jido.Codec.encode(AddressableAgent.definition(), catalog: catalog())
   end
 
   def decode_definition(document) do
-    Jido.Codec.decode(document, catalog: catalog(), codec: Jido.Agent.Codec)
+    {:ok, codec} = Jido.Codec.Encoder.codec(AddressableAgent.definition())
+    Jido.Codec.decode(document, catalog: catalog(), codec: codec)
   end
 
   def envelope(%Ref{} = ref, definition_document) do

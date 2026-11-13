@@ -23,7 +23,8 @@ Flow wait and recovery contracts without an Agent domain owner.
 3. [VM Recovery](13_03_vm_recovery/README.md) restores the same Turn in a fresh BEAM.
 4. [Accepted Work](13_04_accepted_work/README.md) runs durable work in a topology member.
 5. [Saved Completion](13_05_saved_completion/README.md) restores a completion after a lost write reply.
-6. [Durable Wait](13_06_durable_wait/README.md) passivates and resumes one approval Turn.
+6. [Durable Approval Agent](13_06_durable_wait/README.md) passivates, resumes,
+   and deduplicates one approval Turn.
 7. [External Uncertainty](13_07_external_uncertainty/README.md) repeats one operation ID after uncertain I/O.
 8. [Waterpark](13_08_waterpark/README.md) activates and passivates a bounded Agent fleet.
 

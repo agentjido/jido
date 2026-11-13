@@ -31,7 +31,13 @@ defmodule Jido.Examples.Durable.DurableWaitTest do
   test "a matching Signal resumes one passivated approval Turn", c do
     {:ok, request} = Example.request_signal(%{request_id: "report-1"})
 
-    assert {:ok, %TurnResult{status: :waiting, turn_id: turn_id, waits: [wait | _]}} =
+    assert {:ok,
+            %TurnResult{
+              status: :waiting,
+              turn_id: turn_id,
+              agent_activation_id: first_activation_id,
+              waits: [wait | _]
+            }} =
              Jido.call(c.instance, c.ref, request)
 
     assert is_binary(wait.id)
@@ -42,8 +48,16 @@ defmodule Jido.Examples.Durable.DurableWaitTest do
 
     {:ok, approval} = Example.resolve_signal(%{request_id: "report-1", decision: :approve})
 
-    assert {:ok, %TurnResult{status: :committed, turn_id: ^turn_id}} =
+    assert {:ok,
+            %TurnResult{
+              status: :committed,
+              turn_id: ^turn_id,
+              agent_activation_id: second_activation_id
+            } = completion} =
              Jido.call(c.instance, c.ref, approval)
+
+    refute second_activation_id == first_activation_id
+    assert {:ok, ^completion} = Jido.call(c.instance, c.ref, approval)
 
     assert %Snapshot{agent: %{state: %{request_id: "report-1", status: :approved}}} =
              snapshot(c)

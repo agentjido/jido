@@ -83,8 +83,7 @@ defmodule Jido.Examples.DataDefinedAgent do
   def encode do
     registry = registry()
 
-    {:ok, document} =
-      Jido.Codec.encode(definition(), catalog: registry, codec: Jido.Agent.Codec)
+    {:ok, document} = Jido.Codec.encode(definition(), catalog: registry)
 
     {document, registry}
   end
@@ -94,7 +93,8 @@ defmodule Jido.Examples.DataDefinedAgent do
 
   @doc "Imports the JSON document without starting an Agent or its Plugins."
   def from_json(json) do
-    Jido.Codec.decode_json(json, catalog: registry(), codec: Jido.Agent.Codec)
+    {:ok, codec} = Jido.Codec.Encoder.codec(definition())
+    Jido.Codec.decode_json(json, catalog: registry(), codec: codec)
   end
 
   @doc "Builds a request to deliver a count command after the current Turn."

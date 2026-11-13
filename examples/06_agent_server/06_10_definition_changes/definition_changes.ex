@@ -76,8 +76,7 @@ defmodule Jido.Examples.DefinitionChanges do
         {"actions/runtime-definition-increment-v2", 1} => IncrementV2
       })
 
-    {:ok, document} =
-      Jido.Codec.encode(definition, catalog: catalog, codec: Jido.Agent.Codec)
+    {:ok, document} = Jido.Codec.encode(definition, catalog: catalog)
 
     {document, catalog}
   end

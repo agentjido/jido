@@ -41,6 +41,18 @@ local report. Jido has no public logical-Agent listing API, so the application
 must retain its created Ref inventory. Scale claims require a separate
 controlled benchmark and published evidence.
 
+- Logical owner: the application-owned inventory of stable Agent references.
+- Process owner: the Jido instance owns each current activation.
+- Canonical state owner: each Agent record in the configured ETS store.
+- Commit point: each measured Agent call commits its own state and revision.
+- Persisted data: Agent state and revisions remain in ETS for the BEAM lifetime.
+- Retry boundary: none; the measurement sends one call to each Agent.
+- Idempotency rule: none; the benchmark does not repeat delivery.
+- Injected failure: none; the test forces idle passivation as a lifecycle event.
+- Recovery result: later activation loads the same logical Agent state.
+- Limits and non-guarantees: the report is not a capacity, cluster, or
+  host-loss durability claim.
+
 ## Files
 
 - [Source](passive_fleet_measurement.ex)

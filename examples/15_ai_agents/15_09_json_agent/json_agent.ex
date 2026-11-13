@@ -53,10 +53,7 @@ defmodule Jido.Examples.AI.JSONAgent do
 
   @doc "Encodes the SimpleAgent definition with the normal Agent codec."
   def encode_json do
-    Jido.Codec.encode_json(definition(),
-      catalog: registry(),
-      codec: Jido.Agent.Codec
-    )
+    Jido.Codec.encode_json(definition(), catalog: registry())
   end
 
   @doc "Reads the stored SimpleAgent document."
@@ -64,14 +61,12 @@ defmodule Jido.Examples.AI.JSONAgent do
 
   @doc "Decodes and validates the stored SimpleAgent definition."
   def import do
-    Jido.Codec.decode_json(fixture_json(),
-      catalog: registry(),
-      codec: Jido.Agent.Codec
-    )
+    {:ok, codec} = Jido.Codec.Encoder.codec(definition())
+    Jido.Codec.decode_json(fixture_json(), catalog: registry(), codec: codec)
   end
 
   @doc "Builds the standard AI request Signal for an imported definition."
   def request_signal!(definition, params) do
-    Jido.Agent.DSL.input_signal!(definition, @request_type, params)
+    Jido.Signal.new!(@request_type, params, source: definition.signal_source)
   end
 end

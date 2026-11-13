@@ -39,6 +39,20 @@ work without changing the domain result. A route that selects nested output
 must declare those fields in the target Action output schema so the Agent
 compiler can validate each path.
 
+- Logical owner: the Agent value in pure mode and the stable Agent identity in
+  hosted mode.
+- Process owner: none in pure mode; AgentServer in hosted mode.
+- Canonical state owner: the returned immutable value in pure mode and the
+  committed Agent record in hosted mode.
+- Commit point: no commit in pure mode; AgentServer revision 1 in hosted mode.
+- Persisted data: none in this in-memory parity proof.
+- Retry boundary: none; each mode evaluates one Signal once.
+- Idempotency rule: none; the example does not repeat the Signal.
+- Injected failure: none; validation and effect failure have separate lessons.
+- Recovery result: none; this lesson compares evaluation and commit only.
+- Limits and non-guarantees: parity does not add hosted lifecycle or effect
+  guarantees to pure execution.
+
 ## Files
 
 - [Agent](pure_hosted_parity.ex)

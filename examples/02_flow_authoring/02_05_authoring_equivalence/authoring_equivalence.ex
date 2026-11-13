@@ -38,10 +38,10 @@ defmodule Jido.Examples.Compilation.AuthoringEquivalence do
   end
 
   def from_json do
-    options = [catalog: catalog(), codec: Jido.Flow.Codec]
+    {:ok, codec} = Jido.Codec.Encoder.codec(from_map())
 
-    with {:ok, json} <- Jido.Codec.encode_json(from_map(), options) do
-      Jido.Codec.decode_json(json, options)
+    with {:ok, json} <- Jido.Codec.encode_json(from_map(), catalog: catalog()) do
+      Jido.Codec.decode_json(json, catalog: catalog(), codec: codec)
     end
   end
 end

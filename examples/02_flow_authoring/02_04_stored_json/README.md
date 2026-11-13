@@ -21,11 +21,16 @@ an untrusted target is rejected.
 ## Important behavior
 
 The document stores trusted references. It does not store or evaluate Elixir
-source code.
+source code. The example gets the current writer through the public
+`Jido.Codec.Encoder` protocol and passes that opaque codec value to decode.
 
 ## Limits
 
 Catalog trust and document transport remain application responsibilities.
+Decode with only an explicit Catalog still depends on the globally published
+codec index. An offline importer that has only the document has no public
+selector for a bundled codec type and version. See `EX-013` in the
+[gap register](../../core_gaps.md).
 
 ## Files
 
