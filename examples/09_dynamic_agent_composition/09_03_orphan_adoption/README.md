@@ -1,31 +1,18 @@
-# 09_03 Independent Agent Ownership
+# 09_03 Process replacement
 
-An independent Agent can survive its owner's supervisor and later accept a new owner.
+A stable Agent Ref resolves a replacement process after abnormal process loss.
 
-Read [the Agents and startup helper](orphan_adoption.ex) and
+Read [the stable replacement client](orphan_adoption.ex) and
 [the tests](orphan_adoption_test.exs).
 
-```elixir
-Parent.start_worker(server, :continue)
-Parent.start_worker(server, :emit_orphan,
-  orphan_dispatch: {:pid, target: observer})
-
-Jido.AgentServer.adopt_child(new_owner, worker, :adopted)
-```
-
-The helper uses `spawn_child/4` with `placement: :independent` and
-`on_parent_exit:`. The `:emit_orphan` policy requires an explicit destination.
-It sends `jido.agent_server.orphaned` there after the old owner stops.
-The new owner sends work with `agent_send/2`.
+The Jido instance restarts the activation from its durable record. The logical
+Agent Ref and activation ID stay stable while the worker PID changes.
 
 ```sh
 mix test.examples examples/09_dynamic_agent_composition/09_03_orphan_adoption
 ```
 
-Adoption is local. It does not provide a distributed lease.
+This is process replacement, not adoption or ownership transfer. Jido core has
+no current public API for dynamic child adoption or runtime ownership transfer.
 
-This transfers local runtime ownership. It does not move a declared topology
-member or change an Agent definition. Declared members follow their owning
-supervisor lifetime; independent Agents use the explicit policy shown here.
-
-Previous: [Correlated Requests](../09_02_correlated_requests/README.md) | Next: [Topology](../../10_declared_agent_topologies/README.md)
+Previous: [Correlated Requests](../09_02_correlated_requests/README.md) | Next: [Independent Agents](../09_04_independent_agents/README.md)

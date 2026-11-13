@@ -51,13 +51,11 @@ defmodule Jido.Examples.MultiAgent.StableReplacementTest do
 
   defp eventually(fun, attempts) do
     case fun.() do
-      nil ->
-        Process.sleep(10)
-        eventually(fun, attempts - 1)
-
-      false ->
-        Process.sleep(10)
-        eventually(fun, attempts - 1)
+      value when value in [nil, false] ->
+        receive do
+        after
+          10 -> eventually(fun, attempts - 1)
+        end
 
       value ->
         value

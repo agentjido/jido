@@ -1,16 +1,16 @@
-# 09_02 Correlated Requests
+# 09_02 Correlated requests
 
-A parent Agent records pending work and accepts only the matching result from
-its owned child.
+A coordinator Agent records pending work and accepts only a matching result
+from an independently addressed worker.
 
 ## What you will learn
 
-- How parent and child work use separate Turns and commits.
+- How coordinator and worker use separate Turns and commits.
 - How stable request IDs reject stale, duplicate, or unrelated results.
 
 ## Read the code
 
-Read [the parent Agent](correlated_requests.ex), then read the shared
+Read [the coordinator Agent](correlated_requests.ex), then read the shared
 [Worker Agent](../support/worker.ex).
 
 ## Run it
@@ -24,8 +24,9 @@ input, and the parent commits the correlated result.
 
 ## Important behavior
 
-Cancellation returns explicit child-stop intent. A reused request ID or a result
-with the wrong correlation fields does not change the candidate state.
+The coordinator and worker have stable references and separate canonical
+state. A result with the wrong correlation fields does not change the
+coordinator commit.
 
 ## Limits
 

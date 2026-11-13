@@ -163,3 +163,21 @@ that makes the problem clear.
 - Core change: None proposed. Durable context must stay portable.
 - Follow-up question: Should the AI streaming guide use PubSub as its first
   hosted Agent example and reserve PID dispatch for pure or transient runs?
+
+### EX-011: Dynamic runtime adoption and ownership transfer have no public API
+
+- Example: [09_05 Logical ownership transfer](09_dynamic_agent_composition/09_05_logical_ownership_transfer/README.md).
+- Classification: Candidate Jido core change or explicit non-goal.
+- Attempted contract: Adopt an independent Agent into a live parent, transfer
+  its runtime ownership to another parent, and apply owner-linked shutdown.
+- Result: The current public API can create, activate, resolve, and stop stable
+  Agents, but it has no dynamic child adoption or process-owner transfer
+  operation. The old example README named APIs that do not exist.
+- Public solution: Store logical ownership in an application Agent. The Jido
+  instance remains the process owner, and shutdown stays explicit.
+- Core change: Decide whether dynamic runtime ownership is a Jido capability or
+  an application protocol. If it is a core capability, define adoption,
+  transfer, fencing, in-flight Turn, persistence, and shutdown semantics.
+- Follow-up question: Can ownership transfer commit atomically with the old
+  owner's release, or must the contract expose a recoverable intermediate
+  state?

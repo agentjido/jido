@@ -1,12 +1,12 @@
-# 09_01 Owned Agent Lifecycle
+# 09_01 Logical Agent lifecycle
 
-A parent Agent starts, tracks, restarts, and stops owned child Agents without
-putting child PIDs in domain state.
+A Jido instance creates, activates, stops, and restores one durable logical
+Agent without putting its process PID in domain state.
 
 ## What you will learn
 
-- How `agent_start` and `agent_stop` Directives manage owned children.
-- How stable child identity survives an abnormal restart.
+- How stable identity survives activation replacement.
+- How the Jido instance owns the activation process.
 
 ## Read the code
 
@@ -19,17 +19,18 @@ Read [the parent Agent](child_lifecycle.ex), then read the shared
 mix test.examples examples/09_dynamic_agent_composition/09_01_child_lifecycle
 ```
 
-Expected result: the parent creates one child per tag, preserves committed child
-state across restart, and removes owned processes on stop.
+Expected result: one stable Agent Ref preserves committed state across two
+different activation processes.
 
 ## Important behavior
 
-The Agent stores desired child tags. AgentServer stores live child metadata.
-An explicit child stop and parent shutdown remove the owned processes.
+The Agent record owns domain state. The Jido instance owns its current
+AgentServer activation. Stopping the activation does not delete the record.
 
 ## Limits
 
-This example does not implement a worker queue or capacity policy.
+This example has no dynamic parent Agent relation. It does not implement
+adoption or ownership transfer.
 
 ## Files
 
