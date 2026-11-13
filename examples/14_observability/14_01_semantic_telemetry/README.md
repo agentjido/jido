@@ -1,6 +1,7 @@
 # 14_01 Agent Observation
 
-An external collector distinguishes successful Turns from committed Directive failures.
+An external collector distinguishes a committed Turn from a Turn that fails
+before commit.
 
 ## What you will learn
 
@@ -18,9 +19,8 @@ Read [the observed Agent](turn_observation.ex), then the shared
 mix test.examples examples/14_observability/14_01_semantic_telemetry
 ```
 
-Expected result: both Turn events report successful commits. A separate
-effects event reports the later Directive failure without exposing private
-Agent state.
+Expected result: one Turn event reports a successful commit. The other reports
+a validation failure with no commit and without exposing private Agent state.
 
 The standalone collector also prints the public metric names:
 
@@ -45,8 +45,9 @@ backpressure contract.
 - [Demo](demo.exs)
 - [Tests](agent_observation_test.exs)
 
-Turn commit and effect dispatch have separate results. Inspect the Turn event
-for the commit and `[:jido, :agent_server, :effects, :stop]` for delivery failure.
+This lesson stops at the Turn boundary. See
+[Commit Before Effects](../../06_agent_server/06_05_commit_before_effects/README.md)
+for a state commit followed by a separate effect failure.
 
 `Jido.Telemetry.metrics/0` supplies current AgentServer counters and Turn
 and persistence duration summaries. Lifecycle, commit, effects, and settlement
