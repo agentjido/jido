@@ -17,9 +17,11 @@ delivery, replay, acknowledgement, and trace propagation.
    acknowledgement and repeated delivery after subscriber loss.
 7. [Trace and Causation](08_07_trace_and_causation/README.md) carries one W3C
    trace through child work and a reply.
-8. Follow One Signal remains to be added as an end-to-end Agent journey.
-9. Delivery guarantees and limits are stated in lessons 4 through 6. A focused
-   comparison lesson remains to be added.
+8. [Follow One Signal](08_08_follow_one_signal/README.md) traces a correlated
+   request through coordinator and worker Turns, uncertain delivery, retry,
+   deduplication, and reply.
+9. [Delivery Guarantees](08_09_delivery_guarantees/README.md) compares
+   acceptance, retention, acknowledgement, retry, and duplicate boundaries.
 
 Run the current chapter with:
 
