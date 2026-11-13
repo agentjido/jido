@@ -20,7 +20,7 @@ an upgrade Action. Restore does not select a new definition automatically.
 
 - [Source](definition_revision.ex)
 - [Tests](definition_revision_test.exs)
-- [Schema and state upgrade](../../08_runtime/08_14_state_migration/README.md)
+- [Schema and state upgrade](../12_09_state_migration/README.md)
 
 A nested definition is captured as data rather than reselected from current
 source on restore. Topology intent includes members, their initial inputs,

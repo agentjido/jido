@@ -22,9 +22,18 @@ The lessons follow the execution model in order:
 14. `03_14_runic_runner` - dispatch the workflow one Runic unit at a time.
 15. `03_15_human_approval` - address one approval event.
 16. `03_16_batch_processing` - bound concurrent Map work and Reduce it.
+17. `03_17_sequential_flow` - connect ordered steps.
+18. `03_18_effectful_steps` - pass an application service in execution context.
+19. `03_19_conditional_routes` - select a branch with a fallback.
+20. `03_20_parallel_join` - join independent work.
+21. `03_21_ordered_batch` - preserve source order through Map and Reduce.
+22. `03_22_bounded_iteration` - stop a repair loop at an explicit limit.
+23. `03_23_nested_flow` - use one Flow inside another Flow.
+24. `03_24_executable_continuation` - continue with an Action or Flow.
+25. `03_25_flow_directives` - return ordered Directives with Flow output.
 
-The last two lessons are advanced escape hatches. Normal application code uses
-`Jido.Exec.run/4`.
+Lessons 13 and 14 are advanced Runic escape paths. Normal application code
+uses `Jido.Exec.run/4`.
 
 Run the chapter with:
 

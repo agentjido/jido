@@ -11,8 +11,7 @@ putting child PIDs in domain state.
 ## Read the code
 
 Read [the parent Agent](child_lifecycle.ex), then read the shared
-[Worker Agent](../support/worker.ex) and
-[Keep State Action](../../08_runtime/support/keep_state.ex).
+[Worker Agent](../support/worker.ex).
 
 ## Run it
 
@@ -37,7 +36,6 @@ This example does not implement a worker queue or capacity policy.
 - [Source](child_lifecycle.ex)
 - [Tests](child_lifecycle_test.exs)
 - [Worker Agent](../support/worker.ex)
-- [Keep State Action](../../08_runtime/support/keep_state.ex)
+- Previous: [Pending Job Recovery](../../13_durable_execution/13_13_pending_job_recovery/README.md)
 
-Previous: [Pending Job Recovery](../../08_runtime/08_15_pending_job_recovery/README.md) |
 Next: [Correlated Requests](../09_02_correlated_requests/README.md)

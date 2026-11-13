@@ -28,7 +28,7 @@ and returns a typed Audit Directive with the domain candidate. The Plugin
 has no runtime projection. Its bounded records are part of portable Agent state.
 
 Audit records describe successful domain decisions. Use the
-[Failure Outcome lesson](../../08_runtime/08_03_failure_outcome/README.md) when
+[Turn Result lesson](../../06_agent_server/06_04_turn_result/README.md) when
 an application must handle failed Turns at the Agent Server policy boundary.
 
 ## Limits

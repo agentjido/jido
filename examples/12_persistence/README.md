@@ -12,10 +12,12 @@ These examples move from one durable Agent record to recovery after uncertain wr
 6. [Indeterminate Write](12_06_indeterminate_write/README.md) — stop an activation after an uncertain result.
 7. [Recoverable Delivery](12_07_recoverable_delivery/README.md) — save and resume external delivery intent.
 8. [Definition Revision](12_08_definition_revision/README.md) — retain saved definitions and code provenance; upgrade explicitly.
+9. [State Migration](12_09_state_migration/README.md) — change schema,
+   definition, and state together with a deterministic local migration.
 
 ## Run the section
 
-`mix test.examples examples/12_persistence`
+`mix test.examples examples/12_persistence --warnings-as-errors`
 
 Expected result: all examples pass without network access or credentials.
 
@@ -34,9 +36,8 @@ Expected result: all examples pass without network access or credentials.
 
 ## Limits
 
-The examples use deterministic local stores and controlled faults. Use the
-persistence conformance suites for all local adapters and the optional service
-suites for shared external adapters.
+The examples use deterministic local stores and controlled faults. They do not
+contact or prove a shared external persistence service.
 
 Continue with [Durable Agents](../13_durable_execution/README.md) for an abrupt whole-BEAM
 restart proof and the proposed execution recovery learning path.

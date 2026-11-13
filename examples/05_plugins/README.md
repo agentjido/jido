@@ -1,36 +1,42 @@
 # 05 Plugins
 
-Plugins can extend Agent authoring and execution. A Plugin can add a domain
-language to the Agent DSL, validate its data, own state, and manage runtime
-resources. These are parts of one extension contract.
+Plugins add one complete, reusable capability to an Agent. These lessons show
+the ownership boundaries one part at a time.
 
 ## Learning order
 
-1. [Prepared Input](05_01_prepared_input/README.md) — derive portable input from the incoming Signal.
-2. [Runtime Admission](05_02_runtime_admission/README.md) — derive transient input from private runtime state.
-3. [State Middleware](05_03_state_middleware/README.md) — read the complete candidate and reduce one owned field.
-4. [Plugin DSL](05_04_plugin_dsl/README.md) — add a section and named entities to Agent syntax; use the same Plugin through Map and JSON authoring.
-5. [Composition](05_05_composition/README.md) — combine pure and live inputs in one Agent.
-6. [Identity](05_07_identity/README.md) — combine signature checks with live replay protection.
-7. [Secure Signal](05_08_secure_signal/README.md) — decrypt input and encrypt output in Plugin order.
+1. [Plugin-Owned State](05_01_plugin_owned_state/README.md) separates Agent
+   domain state from Plugin state.
+2. [Prepared Input](05_02_prepared_input/README.md) derives portable input from
+   an incoming Signal.
+3. [Runtime Admission](05_03_runtime_admission/README.md) derives transient
+   input from private runtime state.
+4. [State Reduction](05_04_state_reduction/README.md) reduces one owned field
+   from the complete candidate state.
+5. A focused custom Directive and post-commit lesson remains to be added.
+6. A focused supervised runtime-resource lesson remains to be added.
+7. [Plugin DSL](05_07_plugin_dsl/README.md) adds validated Agent syntax.
+8. [Plugin State Conversion](../12_persistence/12_04_plugin_state_conversion/README.md)
+   owns the persisted representation of Plugin state.
+9. [Composition](05_09_composition/README.md) combines pure and live Plugin
+   input in one Agent.
 
-Numbers are stable IDs. Use this reading order. Each lesson keeps its teaching
-code local. Small copies of input and identity Plugins make the composition
-lessons readable without opening an earlier lesson. Cryptographic primitives
-remain in [shared support](support/crypto.ex).
+Advanced examples continue with [Identity](05_10_identity/README.md),
+[Secure Signal](05_11_secure_signal/README.md), and
+[Authoring Extension](05_12_authoring_extension/README.md). Cryptographic
+primitives remain in [shared support](support/crypto.ex).
 
 ## Run the section
 
 ```sh
-mix test.examples examples/05_plugins
+mix test.examples examples/05_plugins --warnings-as-errors
 ```
 
 ## Core Plugins and related lessons
 
-- [Plugin State Agent](../01_agent_basics/01_04_plugin_state_agent/README.md): one owned state field.
-- [Directive Agent](../01_agent_basics/01_05_directive_agent/README.md): validation and post-commit dispatch.
-- [JSON and Scheduler](../01_agent_basics/01_07_data_defined_agent/README.md): import a saved document with a core runtime Plugin.
-- [Keyed Timers](../08_runtime/08_05_keyed_timers/README.md): Plugin-owned OTP timers.
+- [Replies and Directives](../04_agents/04_05_replies_and_directives/README.md): validation and post-commit dispatch.
+- [JSON and Scheduler](../04_agents/04_08_data_defined_agent/README.md): import a saved document with a core runtime Plugin.
+- Keyed timers will move to the built-in Scheduler capability in chapter 11.
 - [Audit](../11_built_in_capabilities/11_01_audit/README.md): bounded records in owned Agent state.
 - [SensorManager](../24_application_patterns/24_02_inbox/README.md): manage an input source and reject duplicates.
 - [Subscription](../24_application_patterns/24_03_runtime_subscription/README.md): rebuild a live resource from committed state.

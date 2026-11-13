@@ -11,8 +11,7 @@ its owned child.
 ## Read the code
 
 Read [the parent Agent](correlated_requests.ex), then read the shared
-[Worker Agent](../support/worker.ex) and
-[Keep State Action](../../08_runtime/support/keep_state.ex).
+[Worker Agent](../support/worker.ex).
 
 ## Run it
 
@@ -38,6 +37,4 @@ policy, or durable request ledger.
 - [Source](correlated_requests.ex)
 - [Tests](correlated_requests_test.exs)
 - [Worker Agent](../support/worker.ex)
-- [Keep State Action](../../08_runtime/support/keep_state.ex)
-
 Previous: [Child Lifecycle](../09_01_child_lifecycle/README.md) | Next: [Orphan Adoption](../09_03_orphan_adoption/README.md)
