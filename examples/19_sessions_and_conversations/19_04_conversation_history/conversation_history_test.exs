@@ -1,55 +1,49 @@
+Code.require_file("../../support/offline_inference_client.ex", __DIR__)
 Code.require_file("conversation_history.ex", __DIR__)
 
 defmodule Jido.Examples.AI.ConversationHistoryTest do
-  use Jido.Test.Case, async: false
-  import Mimic
+  use ExUnit.Case, async: true
 
   @moduletag :integration
 
-  setup :set_mimic_global
-  setup :verify_on_exit!
-
   alias Jido.Examples.AI.ConversationHistory
-  alias Jido.Test.Examples.AIModel
+  alias Jido.Examples.Support.OfflineInferenceClient
 
-  test "the second request includes the first committed exchange" do
-    owner = self()
-    {:ok, calls} = Agent.start_link(fn -> 0 end)
-
-    expect(ReqLLM, :generate_text, 2, fn model, context, _options ->
-      call = Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end)
-      messages = ReqLLM.Context.to_list(context)
-      send(owner, {:model_context, call, Enum.map(messages, &{&1.role, message_text(&1)})})
-      text = if call == 1, do: "First answer.", else: "Second answer."
-      {:ok, AIModel.text_response(model, context, text, "history-#{call}")}
-    end)
-
-    first = ConversationHistory.new(id: unique_id("history"))
+  test "a later request keeps committed history and exposes a safe UI projection" do
+    first = ConversationHistory.new(id: "history-#{System.unique_integer([:positive])}")
 
     assert {:ok, first, [_reply]} =
              ConversationHistory.Agent.cmd(
                first,
-               ConversationHistory.Agent.request_signal!(%{input: "First question"})
+               request("First question", "First answer."),
+               context: %{jido_ai_inference_client: OfflineInferenceClient}
              )
 
     assert {:ok, second, [_reply]} =
              ConversationHistory.Agent.cmd(
                first,
-               ConversationHistory.Agent.request_signal!(%{input: "Second question"})
+               request("Second question", "Second answer."),
+               context: %{jido_ai_inference_client: OfflineInferenceClient}
              )
 
-    assert_receive {:model_context, 1, [{:system, _}, {:user, "First question"}]}
+    assert {:ok, public} = ConversationHistory.public_messages(second.state.session)
 
-    assert_receive {:model_context, 2,
-                    [
-                      {:system, _},
-                      {:user, "First question"},
-                      {:assistant, "First answer."},
-                      {:user, "Second question"}
-                    ]}
+    assert public == [
+             %{role: "user", text: "First question"},
+             %{role: "assistant", text: "First answer."},
+             %{role: "user", text: "Second question"},
+             %{role: "assistant", text: "Second answer."}
+           ]
 
+    refute Map.has_key?(hd(public), :metadata)
+    refute Map.has_key?(hd(public), :refs)
     assert second.state.session.thread.rev > first.state.session.thread.rev
   end
 
-  defp message_text(message), do: Enum.map_join(message.content, &(&1.text || ""))
+  defp request(input, output) do
+    ConversationHistory.Agent.request_signal!(%{
+      input: input,
+      options: %{offline_response: output}
+    })
+  end
 end

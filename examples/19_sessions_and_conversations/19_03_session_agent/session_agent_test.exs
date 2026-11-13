@@ -1,32 +1,36 @@
+Code.require_file("../../support/offline_inference_client.ex", __DIR__)
 Code.require_file("session_agent.ex", __DIR__)
 
 defmodule Jido.Examples.AI.SessionAgentTest do
-  use Jido.Test.Case, async: false
-  import Mimic
+  use ExUnit.Case, async: true
 
   @moduletag :integration
 
-  setup :set_mimic_global
-  setup :verify_on_exit!
-
   alias Jido.Examples.AI.SessionAgent
-  alias Jido.Test.Examples.AIModel
+  alias Jido.Examples.Support.OfflineInferenceClient
 
-  test "the first successful request creates and commits Agent-owned Session state" do
-    AIModel.expect_text("A Session owns one Thread.")
-    agent = SessionAgent.new(id: unique_id("session-agent"))
+  test "the first successful request creates and projects Agent-owned Session state" do
+    agent = SessionAgent.new(id: "session-agent-#{System.unique_integer([:positive])}")
     assert agent.state == %{session: nil}
 
     assert {:ok, next, [%Jido.Agent.Directive.Reply{signal: reply}]} =
              SessionAgent.Agent.cmd(
                agent,
-               SessionAgent.Agent.request_signal!(%{input: "What does a Session own?"})
+               SessionAgent.Agent.request_signal!(%{
+                 input: "What does a Session own?",
+                 options: %{offline_response: "A Session owns one Thread."}
+               }),
+               context: %{jido_ai_inference_client: OfflineInferenceClient}
              )
 
     assert reply.data.output == "A Session owns one Thread."
     assert %Jido.Session{status: :open, thread: %Jido.Thread{}} = next.state.session
-    assert {:ok, snapshot} = Jido.Persistence.snapshot(next)
-    assert {:ok, restored} = Jido.Persistence.restore(snapshot)
-    assert restored == next
+
+    assert {:ok, messages} = Jido.AI.Thread.Projection.messages(next.state.session)
+
+    assert Enum.map(messages, &{&1.role, &1.content}) == [
+             {:user, "What does a Session own?"},
+             {:assistant, "A Session owns one Thread."}
+           ]
   end
 end

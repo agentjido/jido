@@ -1,7 +1,7 @@
 Code.require_file("session_value.ex", __DIR__)
 
 defmodule Jido.Examples.AI.SessionValueTest do
-  use Jido.Test.Case, async: true
+  use ExUnit.Case, async: true
 
   @moduletag :integration
 

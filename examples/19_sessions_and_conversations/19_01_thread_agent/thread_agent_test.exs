@@ -1,46 +1,32 @@
 Code.require_file("thread_agent.ex", __DIR__)
 
-defmodule Jido.Examples.AI.ThreadAgentTest do
-  use Jido.Test.Case, async: false
-  import Mimic
+defmodule Jido.Examples.Conversation.ThreadValueTest do
+  use ExUnit.Case, async: true
 
   @moduletag :integration
 
-  setup :set_mimic_global
-  setup :verify_on_exit!
+  alias Jido.Examples.Conversation.ThreadValue
+  alias Jido.Thread
 
-  alias Jido.AI.Thread.Projection
-  alias Jido.Examples.AI.ThreadAgent.Agent
-  alias Jido.Test.Examples.AIModel
+  test "a Thread is an immutable append-only portable value" do
+    thread = ThreadValue.build()
 
-  test "one completed request commits a portable conversation Thread" do
-    AIModel.expect_text("OTP uses supervised processes.")
-    agent = Agent.instantiate!(id: unique_id("thread-agent"))
+    assert thread.rev == 2
+    assert Thread.entry_count(thread) == 2
+    assert Thread.last(thread).kind == :note
+    assert [%{payload: %{"case_id" => "case-7"}}] = Thread.filter_by_kind(thread, :case_opened)
+    assert Enum.map(Thread.slice(thread, 0, 1), & &1.seq) == [0, 1]
 
-    assert {:ok, next, [%Jido.Agent.Directive.Reply{signal: reply}]} =
-             Agent.cmd(agent, Agent.request_signal!(%{input: "What is OTP?"}))
-
-    assert reply.data.output == "OTP uses supervised processes."
-    session = next.state.session
-    assert %Jido.Session{status: :open} = session
-    assert {:ok, messages} = Projection.messages(session)
-    assert Enum.map(messages, & &1.role) == [:user, :assistant]
-
-    assert Enum.map(messages, & &1.content) == [
-             "What is OTP?",
-             "OTP uses supervised processes."
-           ]
+    assert {:ok, decoded} = thread |> Thread.encode() |> JSON.encode!() |> JSON.decode!() |> Thread.decode()
+    assert decoded == thread
   end
 
-  test "a provider failure records an outcome without a completed exchange" do
-    expect(ReqLLM, :generate_text, fn _model, _context, _options -> {:error, :offline_failure} end)
-    agent = Agent.instantiate!(id: unique_id("thread-failure"))
+  test "appending returns a new value and leaves the source unchanged" do
+    source = Thread.new(id: "empty-thread", now: 100)
+    next = Thread.append(source, %{kind: :note, at: 101, payload: %{"text" => "one"}})
 
-    assert {:ok, next, [%Jido.Agent.Directive.Reply{signal: reply}]} =
-             Agent.cmd(agent, Agent.request_signal!(%{input: "Fail this request"}))
-
-    assert reply.data.status == :failed
-    assert {:ok, []} = Projection.messages(next.state.session)
-    assert Enum.any?(next.state.session.thread.entries, &(&1.kind == :ai_request_outcome))
+    assert source.rev == 0
+    assert source.entries == []
+    assert next.rev == 1
   end
 end

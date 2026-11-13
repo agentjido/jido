@@ -20,7 +20,15 @@ defmodule Jido.Examples.AI.ConversationHistory do
   @moduledoc "Builds the AI Agent used to teach committed conversation projection."
 
   alias Jido.Examples.AI.ConversationHistory.Agent
+  alias Jido.AI.Thread.Projection
 
   @doc "Builds an Agent whose later requests use its committed Session."
   def new(opts \\ []), do: Agent.instantiate!(opts)
+
+  @doc "Builds an application-owned public projection for a browser or API."
+  def public_messages(session) do
+    with {:ok, messages} <- Projection.messages(session) do
+      {:ok, Enum.map(messages, &%{role: Atom.to_string(&1.role), text: &1.content})}
+    end
+  end
 end

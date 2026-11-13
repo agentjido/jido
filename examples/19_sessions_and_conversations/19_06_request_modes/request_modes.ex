@@ -5,7 +5,7 @@ defmodule Jido.Examples.AI.RequestModes.Agent do
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct do
-      model "openai:gpt-4o-mini"
+      model "offline:request-modes"
       instructions "Answer in one short sentence."
     end
   end
