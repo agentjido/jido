@@ -29,9 +29,9 @@ Do not divide examples into Learn and Prove tracks. Put normal behavior,
 validation, failure, recovery, and compatibility in the same learning
 sequence. Each example must teach its public contract and test that contract.
 
-The default suite runs without network access. Examples that need an external
-service, credentials, or a paid API are opt-in. They are still part of the
-same table of contents.
+The complete suite runs without network access, credentials, or paid APIs.
+Use deterministic local adapters to preserve each application boundary. Do
+not add live-provider, external-service, or paid runners to this suite.
 
 ## Dogfooding and core-gap feedback
 
@@ -557,7 +557,7 @@ Proposed lessons:
 9. Streaming.
 10. Tool policy and human review.
 11. Skills and toolsets.
-12. Tool sources and opt-in MCP tools.
+12. Tool sources and the offline MCP boundary.
 13. JSON AI Agents.
 14. Offline testing.
 
@@ -574,13 +574,13 @@ Built-in reasoning uses `generate_text/3` and `stream_text/3`. A text request
 can contain supported media content parts. Other multimodal operations use the
 matching `Jido.AI.InferenceClient` callback from an application Action or Flow.
 The examples must not imply that Jido core supplies built-in image, audio, or
-video workflows. Offline clients test content shape and Flow behavior. Real
-media providers use opt-in runners.
+video workflows. Offline clients test content shape and Flow behavior. The
+suite does not call real media providers.
 
 Official MCP client support comes from `jido_connect` through
-`Jido.AI.ToolSource`. The MCP example is opt-in and states its server and
-credential requirements. Jido core owns the ToolSource contract. It does not
-own the MCP client implementation.
+`Jido.AI.ToolSource`. The offline example uses a deterministic ToolSource
+fixture. It does not start an MCP server or implement an MCP client. Jido core
+owns the ToolSource contract. It does not own the MCP client implementation.
 
 ### 16 Guardrail Flows
 
@@ -639,7 +639,7 @@ Proposed lessons:
 6. Tool errors as safe model input.
 7. Provider and model attempt telemetry.
 8. Scripted outages, rate limits, timeouts, and malformed output.
-9. Opt-in live provider resilience checks.
+9. Offline provider resilience matrix.
 
 ReAct owns the built-in retry, fallback-model, and output-repair path. Other
 reasoning strategies do not retry a failed model call or select a fallback
@@ -726,9 +726,9 @@ Proposed lessons:
 8. Retrieval and answer quality gates.
 
 The default examples use offline documents, embeddings, retrieval fixtures,
-and scorers. External vector stores, embedding services, rerankers, and model
-providers use opt-in runners. The application supplies storage and retrieval
-Actions. Jido core does not own a Retriever API.
+and scorers. Deterministic local adapters replace vector stores, embedding
+services, rerankers, and model providers. The application supplies storage and
+retrieval Actions. Jido core does not own a Retriever API.
 
 ### 22 Application-Level Evaluation Examples
 
@@ -739,15 +739,15 @@ Proposed lessons:
 
 1. Datasets and named cases as test fixtures.
 2. Deterministic scorers and assertions.
-3. Opt-in model judges with recorded inputs and outputs.
+3. Offline model judges with recorded inputs and outputs.
 4. Tool trajectory and argument checks.
 5. Budget, latency, and token checks.
 6. Failure, refusal, and guardrail cases.
-7. Offline regression fixtures and opt-in live experiments.
+7. Offline regression fixtures and repeatable experiments.
 
 Evaluation uses normal example runners, ExUnit tests, Flow results, tool traces,
 usage data, and telemetry. Every scorer must state what it measures and what it
-does not prove. Live experiments must not run in the default suite.
+does not prove. The suite does not include live experiments.
 
 ## Part IV: Build complete agent systems
 
@@ -780,7 +780,7 @@ A sensor reports an incident. A coordinator owns the canonical incident state
 and activates nested triage and specialist teams. The organization correlates
 child work, escalates to a human, isolates one failed team, removes a finished
 subtree, and recovers after coordinator process loss. The default runner is
-deterministic. An opt-in runner can add model-backed analysis.
+deterministic and can use a local inference fixture for model-backed analysis.
 
 This example must name the state owner for each artifact and decision. Team
 topology describes ownership and delivery. It does not create shared memory.
@@ -800,8 +800,8 @@ The research-and-publishing team is the CrewAI-style example:
 This is the Jido form of a CrewAI-style team. It uses normal Agent definitions,
 Flows, topology, Signals, correlated requests, Sessions, budgets, and durable
 state. It must not create a second orchestration API based on roles or tasks.
-The default runner uses deterministic inference fixtures. An opt-in runner can
-use a live model provider.
+The runner uses deterministic inference fixtures. It does not use a live model
+provider.
 
 The first version must not claim shared mutable team memory or transparent
 recovery of all member state. The coordinator owns canonical mission state.
@@ -843,7 +843,7 @@ the public contracts cannot prove each step. It must record any missing
 contract as a core gap.
 
 The Phoenix example is an end-to-end chat application in one Phoenix Playground
-script. It is opt-in and stays outside Jido core. The example must:
+script. It runs offline and stays outside Jido core. The example must:
 
 - Start Phoenix LiveView and one Jido instance from the script.
 - Create or resolve one Session-backed AI Agent for a conversation ID.
@@ -858,7 +858,7 @@ script. It is opt-in and stays outside Jido core. The example must:
 - Show waiting, failed, cancelled, timed-out, uncertain, and committed Turn
   states.
 - Use a deterministic local inference client by default.
-- Provide a separate opt-in mode for a live model provider.
+- Run without a live model provider or network access.
 
 The example can use `Jido.Agent.View` for safe assistant and operation metadata,
 but chat does not depend on it. The application must project public messages
@@ -878,18 +878,18 @@ copy old APIs that returned the full Agent from each call.
 
 ### 25 Operations and Integrations
 
-Purpose: Define production boundaries and opt-in integrations.
+Purpose: Define production boundaries and offline integration contracts.
 
 Proposed lessons:
 
 1. Production configuration and shutdown.
 2. Persistence adapter selection.
 3. Secrets and credential boundaries.
-4. Redis, Postgres, S3, MinIO, and Bedrock integrations.
+4. External adapter boundaries with deterministic local services.
 5. Passive Agent Fleet benchmarks and load checks.
 6. Security, authorization, and sandbox limits.
 7. Distribution boundaries.
-8. Live AI provider setup.
+8. Offline AI provider configuration and failure handling.
 
 Fleet benchmarks must publish the runtime and hardware environment, logical
 and resident Agent counts, concurrency, store configuration, activation and
@@ -908,11 +908,11 @@ Provider keys must stay outside Agent defaults and per-request options.
 Redaction is defense in depth, not proof that a value is safe. Credential
 examples must cover least privilege, tenant scope, rotation, missing and invalid
 credentials, log redaction, and safe error output. Tests use fake credentials.
-Live credentials are only for explicit opt-in runners.
+The examples do not accept live credentials.
 
-External integration examples can use network services or paid APIs. Each one
-must state the required service, credentials, setup, possible cost, and cleanup.
-They must stay separate from the default offline gate.
+External integration examples use deterministic local services behind the
+same application ports. They must state what a real adapter must supply. They
+must not contact a network service.
 
 ## Structure decisions
 
@@ -925,12 +925,13 @@ The outline uses these decisions:
 5. `Jido.Durable` and durable AgentServer hosting stay in one chapter.
 6. The same sequence provides learning material and integration tests.
 7. Collaborative Agent Systems uses several examples.
-8. External integrations are opt-in and state their service requirements.
+8. All examples run offline. External boundaries use deterministic local
+   services and state what real adapters must supply.
 9. Application-level AI patterns use normal Jido Flows, not new core APIs.
 10. Official MCP client support stays in `jido_connect` and enters Jido through
     `Jido.AI.ToolSource`.
 11. Advanced AI reasoning strategies use grouped comparison lessons.
-12. The Phoenix Playground LiveView chat is an opt-in application pattern.
+12. The Phoenix Playground LiveView chat is an offline application pattern.
     Jido core stays framework-neutral.
 13. Multimodal examples use content parts and application Actions over the
     existing inference-client contract.
@@ -975,7 +976,5 @@ Tests must check each item that has an observable result. Documentation must
 explain items that cannot be checked directly. Recovery is a tested contract,
 not an assumed runtime property.
 
-Offline runner commands must run in the offline example gate. Live, paid, and
-external-service runners must have separate opt-in gates. Each opt-in example
-must name its service requirements and must fail with a clear setup message
-when those requirements are absent.
+All runner commands must run in the offline example gate. No example runner
+can require a live provider, paid API, credential, or network service.
