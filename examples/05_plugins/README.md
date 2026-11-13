@@ -13,8 +13,10 @@ the ownership boundaries one part at a time.
    input from private runtime state.
 4. [State Reduction](05_04_state_reduction/README.md) reduces one owned field
    from the complete candidate state.
-5. A focused custom Directive and post-commit lesson remains to be added.
-6. A focused supervised runtime-resource lesson remains to be added.
+5. [Directives and Hooks](05_05_directives_and_hooks/README.md) validates a
+   custom effect, observes the commit, and dispatches after it.
+6. [Supervised Runtime](05_06_supervised_runtime/README.md) starts an
+   activation-local resource and proves shutdown cleanup.
 7. [Plugin DSL](05_07_plugin_dsl/README.md) adds validated Agent syntax.
 8. [Plugin State Conversion](../12_persistence/12_04_plugin_state_conversion/README.md)
    owns the persisted representation of Plugin state.
