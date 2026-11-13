@@ -18,7 +18,7 @@ read [the behavior tests](plugin_state_agent_test.exs).
 Run this command from the `jido` repository root:
 
 ```sh
-mix test.examples examples/05_plugins/05_01_plugin_owned_state/plugin_state_agent_test.exs
+mix test.examples examples/05_plugins/05_01_plugin_owned_state --warnings-as-errors
 ```
 
 Expected result: the tests complete without failures. A valid Turn commits both

@@ -18,7 +18,7 @@ Read [the counter](example.ex), [the Application](application.ex), then
 ## Run it
 
 ```sh
-mix test.examples examples/06_agent_server/06_01_start_and_address
+mix test.examples examples/06_agent_server/06_01_start_and_address --warnings-as-errors
 ```
 
 Expected result: a worker restart retains count seven and revision one. Its old
@@ -39,7 +39,7 @@ Jido.AgentServer.snapshot(server).agent.state # %{count: 7}
 :ok = Supervisor.stop(app)
 ```
 
-## Process tree and ownership
+## Important behavior
 
 ```text
 Application supervisor (:rest_for_one)
@@ -61,5 +61,11 @@ The local checkpoint survives worker failure within the same Jido instance.
 Clean activation shutdown clears it. Configure persistence for complete instance
 or BEAM loss. An interrupted uncommitted Turn is not recovered. This example
 does not provide distributed ownership or durable external delivery.
+
+## Files
+
+- [Counter](example.ex)
+- [Application](application.ex)
+- [Tests](example_test.exs)
 
 Previous: [Plugins](../../05_plugins/README.md) | Next: [Pure and Hosted Parity](../06_02_pure_hosted_parity/README.md)

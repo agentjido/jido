@@ -16,7 +16,7 @@ Read [the live debugger](agent_live_debugger.ex), then read its behavior test.
 ## Run it
 
 ```sh
-mix test.examples examples/06_agent_server/06_08_runtime_inspection
+mix test.examples examples/06_agent_server/06_08_runtime_inspection --warnings-as-errors
 ```
 
 Expected result: the debugger returns committed public state, Plugin state,

@@ -15,7 +15,7 @@ Read [the counter](hibernate_and_thaw.ex), then read its behavior test.
 
 ## Run it
 
-`mix test.examples examples/12_persistence/12_02_hibernate_and_thaw`
+`mix test.examples examples/12_persistence/12_02_hibernate_and_thaw --warnings-as-errors`
 
 Expected result: the old process stops, the new process has the saved count and
 revision, and a missing required record does not start an Agent. An attachment

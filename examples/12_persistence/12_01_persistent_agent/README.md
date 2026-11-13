@@ -13,7 +13,7 @@ Read [the persistent Agent](persistent_agent.ex), then the [identity probe](chec
 
 ## Run it
 
-`mix test.examples examples/12_persistence/12_01_persistent_agent`
+`mix test.examples examples/12_persistence/12_01_persistent_agent --warnings-as-errors`
 
 Expected result: each successful durable command saves its execution intent and
 its terminal Agent state. It advances the saved revision twice. Restore returns

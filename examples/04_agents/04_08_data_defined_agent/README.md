@@ -2,6 +2,14 @@
 
 Import an Agent from JSON with a state Plugin and the core Scheduler Plugin.
 
+## What you will learn
+
+- How trusted Catalog entries resolve data-defined Actions and Plugins.
+- How one JSON definition starts the same Agent behavior as a code definition.
+- Where definition data ends and instance identity, state, and persistence begin.
+
+## Read the code
+
 Read [the definition and Action](data_defined_agent.ex), then the tests.
 `Agent.define!/1` validates data. `Agent.instantiate!/2` adds identity and state.
 `registry/0` supplies stable application identifiers for the Actions, Plugins,
@@ -22,9 +30,13 @@ request = Jido.Examples.DataDefinedAgent.schedule_signal!(0)
 `MyApp.Jido` must be a running Jido instance. The schedule request commits
 before the Scheduler delivers the count command in a second Turn.
 
+## Run it
+
 ```sh
-mix test.examples examples/04_agents/04_08_data_defined_agent
+mix test.examples examples/04_agents/04_08_data_defined_agent --warnings-as-errors
 ```
+
+## Important behavior
 
 Expected result: JSON round trips preserve the definition; direct and live
 commands produce the same state. The imported Scheduler retains its options,
@@ -40,6 +52,12 @@ store validated state and identity; the tests prove this round trip. A
 persistence checkpoint adds revision and recovery data for an Activation and
 pending work. Use persistence to recover execution.
 
+## Limits
+
+Parity applies only to targets and schemas that both definitions can resolve
+through the trusted Catalog. Code-only callbacks are outside the JSON parity
+claim. One-shot Scheduler timers are not durable.
+
 See [Named Members](../../10_declared_agent_topologies/10_01_named_agents/README.md) for a JSON
 round trip that starts a composed Agent. The core authoring tests cover the
 full DSL, data, and JSON format matrix.
@@ -54,3 +72,9 @@ The [saved input document](fixtures/agent.json) is checked in. The Scheduler
 startup test reads it directly with `registry/0`; it does not first encode a
 new document. See [Plugin DSL](../../05_plugins/05_07_plugin_dsl/README.md) for
 custom syntax that lowers to the same contribution format.
+
+## Files
+
+- [Source](data_defined_agent.ex)
+- [Tests](data_defined_agent_test.exs)
+- [Saved input document](fixtures/agent.json)

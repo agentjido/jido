@@ -16,7 +16,7 @@ Read [the Agent and two Flows](ordered_batch.ex) first. Then read
 ## Run it
 
 ```sh
-mix test.examples examples/03_flow_execution/03_21_ordered_batch
+mix test.examples examples/03_flow_execution/03_21_ordered_batch --warnings-as-errors
 ```
 
 Expected result: results keep source order, collected errors keep their

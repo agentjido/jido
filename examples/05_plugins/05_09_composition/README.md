@@ -19,7 +19,7 @@ both inputs visible in this lesson. Their contracts match the earlier lessons.
 ## Run it
 
 ```sh
-mix test.examples examples/05_plugins/05_09_composition
+mix test.examples examples/05_plugins/05_09_composition --warnings-as-errors
 ```
 
 Expected result: a valid tenant and live token commit one owner value. A

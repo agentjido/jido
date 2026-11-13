@@ -17,7 +17,7 @@ read [the behavior tests](executable_continuation_test.exs).
 ## Run it
 
 ```sh
-mix test.examples examples/03_flow_execution/03_24_executable_continuation
+mix test.examples examples/03_flow_execution/03_24_executable_continuation --warnings-as-errors
 ```
 
 Expected result: Invoke selects `Finish` when no additions remain. Otherwise,

@@ -9,6 +9,11 @@ A member in a declared static topology runs one Flow as a durable Agent Turn.
 - Agent state is read from `Jido.AgentServer.snapshot/2`.
 - Worker recovery restores the saved member state without another Turn.
 
+## Read the code
+
+Read [the Agent and Flow](accepted_work.ex), then
+[the tests](accepted_work_test.exs).
+
 ## Core result
 
 ```elixir
@@ -23,6 +28,8 @@ snapshot.agent.state # %{report: "Report: OTP"}
 result.agent_ref.id == snapshot.agent.id
 ```
 
+## Important behavior
+
 The topology member handle in the behavior test comes from test-only OTP
 inspection. It is not a public AgentServer member API. Application code should
 address independent durable Agents with stable `Jido.Agent.Ref` values.
@@ -30,7 +37,7 @@ address independent durable Agents with stable `Jido.Agent.Ref` values.
 ## Run it
 
 ```sh
-mix test.examples examples/13_durable_execution/13_04_accepted_work
+mix test.examples examples/13_durable_execution/13_04_accepted_work --warnings-as-errors
 ```
 
 ## Limits

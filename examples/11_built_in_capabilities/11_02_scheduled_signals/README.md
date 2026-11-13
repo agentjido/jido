@@ -14,7 +14,7 @@ Read [the scheduled counter](scheduled_counter.ex), then read its behavior test.
 ## Run it
 
 ```sh
-mix test.examples examples/11_built_in_capabilities/11_02_scheduled_signals
+mix test.examples examples/11_built_in_capabilities/11_02_scheduled_signals --warnings-as-errors
 ```
 
 Expected result: a one-shot schedule increments the counter in a second Turn,

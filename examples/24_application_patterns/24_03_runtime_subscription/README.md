@@ -16,7 +16,7 @@ Read [the Agent](subscription.ex), then [the Plugin and runtime](subscription_pl
 ## Run it
 
 ```sh
-mix test.examples examples/24_application_patterns/24_03_runtime_subscription
+mix test.examples examples/24_application_patterns/24_03_runtime_subscription --warnings-as-errors
 ```
 
 Expected result: a subscription commits, resource replacement rejects the old

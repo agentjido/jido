@@ -17,7 +17,7 @@ Read [the Agent and Flow](conditional_routes.ex) first. Then read
 ## Run it
 
 ```sh
-mix test.examples examples/03_flow_execution/03_19_conditional_routes
+mix test.examples examples/03_flow_execution/03_19_conditional_routes --warnings-as-errors
 ```
 
 Expected result: a successful primary response wins, an unavailable primary

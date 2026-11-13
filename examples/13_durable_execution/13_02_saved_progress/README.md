@@ -28,7 +28,7 @@ Jido.AgentServer.snapshot(server).agent.state # %{value: 10}
 ## Run it
 
 ```sh
-mix test.examples examples/13_durable_execution/13_02_saved_progress
+mix test.examples examples/13_durable_execution/13_02_saved_progress --warnings-as-errors
 ```
 
 Expected result: steps 1–5 run once; step 6 starts twice after the crash; final

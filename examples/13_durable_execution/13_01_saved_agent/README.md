@@ -85,4 +85,10 @@ proves the five-completed, sixth-interrupted recovery rule. The saved request is
 a domain fact; later report work needs its own Turn. There is no external I/O
 or exactly-once delivery claim.
 
+## Files
+
+- [Agent](saved_agent.ex)
+- [Flow](request_report.ex)
+- [Tests](saved_agent_test.exs)
+
 Previous: [Durable overview](../README.md) | Next: [Saved Progress](../13_02_saved_progress/README.md)

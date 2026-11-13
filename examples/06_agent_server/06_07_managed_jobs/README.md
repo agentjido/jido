@@ -15,7 +15,7 @@ Read [the managed-jobs Agent](managed_jobs.ex) first. Then read the local
 ## Run it
 
 ```sh
-mix test.examples examples/06_agent_server/06_07_managed_jobs
+mix test.examples examples/06_agent_server/06_07_managed_jobs --warnings-as-errors
 ```
 
 Expected result: job intent commits before work starts, completion arrives in a

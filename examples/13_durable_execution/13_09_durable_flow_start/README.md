@@ -1,12 +1,41 @@
-# 13_09 Start and Result
+# 13_09 Durable Flow Start and Result
 
-`Jido.Durable.start/4` runs a Flow from a `Jido.Signal`. It saves the execution
-through a normal Jido persistence adapter. It does not require an Agent or an
-AgentServer. Configure the adapter on the Jido instance. A durable operation
-cannot select or replace that adapter.
+`Jido.Durable.start/4` saves and runs one Flow from a Signal without an Agent
+or AgentServer.
 
-The completed status contains a portable reference. Pass this reference to
-`Jido.Durable.status/2` or `Jido.Durable.result/2`. The result has the same
-shape as `Jido.Exec.run/4`.
+## What you will learn
 
-See [the ExUnit proof](start_and_result_test.exs).
+- How the Jido instance owns the durable persistence adapter.
+- How a portable operation reference returns status and result.
+
+## Read the code
+
+Read [the Flow](start_and_result.ex), then [the test](start_and_result_test.exs).
+
+## Run it
+
+`mix test.examples examples/13_durable_execution/13_09_durable_flow_start --warnings-as-errors`
+
+Expected result: the durable result has the same output shape as
+`Jido.Exec.run/4`.
+
+## Important behavior
+
+A durable operation cannot select or replace the instance persistence adapter.
+
+## Limits
+
+This mode has no Agent identity, Agent state, or AgentServer effects lifecycle.
+
+## Core Fit and Gaps
+
+The public durable facade, Signal, Flow, and persistence contracts compose
+without a separate workflow model. No core gap was found.
+
+## Files
+
+- [Flow](start_and_result.ex)
+- [Tests](start_and_result_test.exs)
+
+[Previous: Waterpark](../13_08_waterpark/README.md) |
+[Next: Restart Recovery](../13_10_durable_flow_restart/README.md)

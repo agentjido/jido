@@ -15,7 +15,7 @@ Read the owner definition first, then the local Cell Agent and tests.
 ## Run it
 
 ```sh
-mix test.examples examples/10_declared_agent_topologies/10_01_named_agents
+mix test.examples examples/10_declared_agent_topologies/10_01_named_agents --warnings-as-errors
 ```
 
 Expected result: The root and two members start. A command changes only the selected member.

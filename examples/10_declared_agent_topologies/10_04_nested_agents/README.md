@@ -17,7 +17,7 @@ Read the root Agent, then `Hierarchy.Team` in the same file, then the Cell Agent
 ## Run it
 
 ```sh
-mix test.examples examples/10_declared_agent_topologies/10_04_nested_agents
+mix test.examples examples/10_declared_agent_topologies/10_04_nested_agents --warnings-as-errors
 ```
 
 Expected result: The root, team, and two workers start. Workers keep separate

@@ -19,7 +19,7 @@ and [the local service adapter](read_service.ex).
 ## Run it
 
 ```sh
-mix test.examples examples/03_flow_execution/03_18_effectful_steps
+mix test.examples examples/03_flow_execution/03_18_effectful_steps --warnings-as-errors
 ```
 
 Expected result: guarded work makes no service call, selected data persists,

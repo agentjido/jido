@@ -15,7 +15,7 @@ Read [the router Agent](route_selection.ex), then read its behavior test.
 ## Run it
 
 ```sh
-mix test.examples examples/04_agents/04_03_route_selection
+mix test.examples examples/04_agents/04_03_route_selection --warnings-as-errors
 ```
 
 Expected result: `order.create` uses the first, exact route. Another order

@@ -17,7 +17,7 @@ Read [the Agent and Flow](parallel_join.ex) first. Then read
 ## Run it
 
 ```sh
-mix test.examples examples/03_flow_execution/03_20_parallel_join
+mix test.examples examples/03_flow_execution/03_20_parallel_join --warnings-as-errors
 ```
 
 Expected result: both branch results reach the join, shared context reaches

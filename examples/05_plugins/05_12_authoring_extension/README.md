@@ -19,7 +19,7 @@ Read [the Plugin and Agent](authoring_plugin.ex), then read
 ## Run it
 
 ```sh
-mix test.examples examples/05_plugins/05_12_authoring_extension
+mix test.examples examples/05_plugins/05_12_authoring_extension --warnings-as-errors
 ```
 
 Expected result: DSL and Map authoring produce the same contribution. Invalid

@@ -19,7 +19,7 @@ Read [the Directive, Plugin, and Agent](state_middleware.ex), then read the
 ## Run it
 
 ```sh
-mix test.examples examples/05_plugins/05_04_state_reduction
+mix test.examples examples/05_plugins/05_04_state_reduction --warnings-as-errors
 ```
 
 Expected result: the Action changes `count`. The Plugin records the count before and after the

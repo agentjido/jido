@@ -17,7 +17,7 @@ Read [the Agent and Flow](bounded_iteration.ex) first. Then read
 ## Run it
 
 ```sh
-mix test.examples examples/03_flow_execution/03_22_bounded_iteration
+mix test.examples examples/03_flow_execution/03_22_bounded_iteration --warnings-as-errors
 ```
 
 Expected result: complete input runs no repair, three repairs succeed,

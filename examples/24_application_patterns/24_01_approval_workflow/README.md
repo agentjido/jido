@@ -24,7 +24,7 @@ Mermaid sequence diagram and uses the same source modules and local adapters.
 ## Run it
 
 ```sh
-mix test.examples examples/24_application_patterns/24_01_approval_workflow
+mix test.examples examples/24_application_patterns/24_01_approval_workflow --warnings-as-errors
 ```
 
 Expected result: a booking succeeds or fails in a later Turn, stale selection

@@ -15,7 +15,7 @@ Read [the Agent and Flow](audit.ex), then read the behavior test.
 ## Run it
 
 ```sh
-mix test.examples examples/11_built_in_capabilities/11_01_audit
+mix test.examples examples/11_built_in_capabilities/11_01_audit --warnings-as-errors
 ```
 
 Expected result: three selected events commit with domain state, the oldest

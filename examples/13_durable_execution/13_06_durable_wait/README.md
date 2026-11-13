@@ -11,6 +11,18 @@ resumes the same Turn.
 - Receive `status: :waiting` and portable waits in a `TurnResult`.
 - Resume the Flow by sending a matching Signal through the same Ref.
 
+## Read the code
+
+Read [the Agent and Flow](durable_wait.ex), then
+[the behavior tests](durable_wait_test.exs).
+
+## Run it
+
+`mix test.examples examples/13_durable_execution/13_06_durable_wait --warnings-as-errors`
+
+Expected result: the Agent passivates while waiting, reactivates through its
+stable Ref, and completes once after approval.
+
 ## Core shape
 
 ```elixir

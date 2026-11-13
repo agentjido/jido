@@ -17,7 +17,7 @@ behavior tests.
 ## Run it
 
 ```sh
-mix test.examples examples/07_instance_catalog_documents/07_04_logical_identity
+mix test.examples examples/07_instance_catalog_documents/07_04_logical_identity --warnings-as-errors
 ```
 
 Expected result: calls reach the correct conversation before and after process

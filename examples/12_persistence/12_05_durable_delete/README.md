@@ -14,7 +14,7 @@ Read [the order Agent](durable_delete.ex), then read its behavior test.
 
 ## Run it
 
-`mix test.examples examples/12_persistence/12_05_durable_delete`
+`mix test.examples examples/12_persistence/12_05_durable_delete --warnings-as-errors`
 
 Expected result: load returns `:deleted`, and an old initial writer cannot
 replace the tombstone. A byte comparison rejects a condition that is only a

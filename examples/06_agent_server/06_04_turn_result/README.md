@@ -18,11 +18,21 @@ execution error. Its accept Action updates Agent state.
 ## Run it
 
 ```sh
-mix test.examples examples/06_agent_server/06_04_turn_result
+mix test.examples examples/06_agent_server/06_04_turn_result --warnings-as-errors
 ```
 
 The test first saves the committed `Snapshot`. It then checks the failed
 `TurnResult`, confirms that the snapshot is unchanged, and commits valid work.
+
+## Important behavior
+
+An accepted execution failure is a Turn result, not a caller crash. The
+committed Agent remains available for later work.
+
+## Limits
+
+A failed `TurnResult` describes accepted work. Admission and transport errors
+still return `{:error, reason}` before a Turn result exists.
 
 ## Files
 

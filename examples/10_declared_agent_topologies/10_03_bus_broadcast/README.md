@@ -15,7 +15,7 @@ Read the root Agent and its connections, then the Cell Agent and tests.
 ## Run it
 
 ```sh
-mix test.examples examples/10_declared_agent_topologies/10_03_bus_broadcast
+mix test.examples examples/10_declared_agent_topologies/10_03_bus_broadcast --warnings-as-errors
 ```
 
 Expected result: One root command commits and emits a work Signal. Each of the three members

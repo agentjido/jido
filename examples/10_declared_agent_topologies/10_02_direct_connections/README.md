@@ -18,12 +18,12 @@ transforms completion into a receipt. Tests observe all runtimes through
 ## Run it
 
 ```sh
-mix test.examples examples/10_declared_agent_topologies/10_02_direct_connections
+mix test.examples examples/10_declared_agent_topologies/10_02_direct_connections --warnings-as-errors
 ```
 
 Expected result: the request commits at the root, the worker doubles its value, the sink transforms completion into a receipt, and the root commits the receipt. An incompatible destination is rejected. Owner shutdown stops all runtimes.
 
-## Important behavior and limits
+## Important behavior
 
 ```elixir
 connections do
@@ -42,8 +42,17 @@ edges for the logical source and output type. Use distinct request and result
 types to avoid an unintended cycle. Jido checks that destinations accept the
 Signal type. Output production remains `:unchecked`.
 
+## Limits
+
 The root call confirms its own commit. Every destination commits a separate
 Turn. Delivery uses best-effort casts; there is no pipeline transaction or
 durable acknowledgement. Use the Bus lesson for counted broadcast.
+
+## Files
+
+- [Root Agent](direct_connections.ex)
+- [Worker](worker.ex)
+- [Sink](sink.ex)
+- [Tests](direct_connections_test.exs)
 
 Previous: [Named Agents](../10_01_named_agents/README.md) | Next: [Local Bus Broadcast](../10_03_bus_broadcast/README.md)

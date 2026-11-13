@@ -15,7 +15,7 @@ Read [the Agent and state rules](purpose_loop.ex), then [the clock and Signal bu
 ## Run it
 
 ```sh
-mix test.examples examples/24_application_patterns/24_04_purpose_loop
+mix test.examples examples/24_application_patterns/24_04_purpose_loop --warnings-as-errors
 ```
 
 Expected result: scheduled work reaches idle, a restored paused Agent resumes,

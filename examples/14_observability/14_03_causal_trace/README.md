@@ -15,7 +15,7 @@ shared [EventProbe](../support/event_probe.ex), and the behavior test.
 ## Run it
 
 ```sh
-mix test.examples examples/14_observability/14_03_causal_trace
+mix test.examples examples/14_observability/14_03_causal_trace --warnings-as-errors
 ```
 
 Expected result: the parent, child, and result Turns share one trace ID with the

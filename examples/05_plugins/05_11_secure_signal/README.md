@@ -16,7 +16,7 @@ then [the identity Plugin](identity_plugin.ex).
 ## Run it
 
 ```sh
-mix test.examples examples/05_plugins/05_11_secure_signal
+mix test.examples examples/05_plugins/05_11_secure_signal --warnings-as-errors
 ```
 
 Expected result: the Agent accepts a signed encrypted request and returns a

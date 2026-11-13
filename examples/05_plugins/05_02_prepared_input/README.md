@@ -18,7 +18,7 @@ Read [the Plugin and Agent](prepared_input.ex), then read the
 ## Run it
 
 ```sh
-mix test.examples examples/05_plugins/05_02_prepared_input
+mix test.examples examples/05_plugins/05_02_prepared_input --warnings-as-errors
 ```
 
 Expected result: direct and live commands select the same tenant. They preserve

@@ -17,7 +17,7 @@ the request results, serial commit order, and timeout boundary.
 ## Run it
 
 ```sh
-mix test.examples examples/06_agent_server/06_03_request_modes
+mix test.examples examples/06_agent_server/06_03_request_modes --warnings-as-errors
 ```
 
 Expected result: the three request modes commit in arrival order. A caller can

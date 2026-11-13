@@ -16,7 +16,7 @@ Read [the Bus delivery Agent](bus_delivery.ex), then read its behavior test.
 ## Run it
 
 ```sh
-mix test.examples examples/11_built_in_capabilities/11_06_bus_delivery
+mix test.examples examples/11_built_in_capabilities/11_06_bus_delivery --warnings-as-errors
 ```
 
 Expected result: matching records commit in order, a failed Turn retries before

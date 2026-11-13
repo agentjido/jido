@@ -13,7 +13,7 @@ Read [the payload Agent](checkpoint_portability_probe.ex), then read its behavio
 
 ## Run it
 
-`mix test.examples examples/12_persistence/12_03_portable_checkpoint`
+`mix test.examples examples/12_persistence/12_03_portable_checkpoint --warnings-as-errors`
 
 Expected result: portable nested data saves and loads. A stored PID is rejected with its value path.
 

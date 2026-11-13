@@ -16,7 +16,7 @@ Read [the parent Agent](child_lifecycle.ex), then read the shared
 ## Run it
 
 ```sh
-mix test.examples examples/09_dynamic_agent_composition/09_01_child_lifecycle
+mix test.examples examples/09_dynamic_agent_composition/09_01_child_lifecycle --warnings-as-errors
 ```
 
 Expected result: one stable Agent Ref preserves committed state across two

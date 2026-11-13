@@ -17,7 +17,7 @@ Read [the Agent and Flow](sequential_flow.ex) first. Then read
 ## Run it
 
 ```sh
-mix test.examples examples/03_flow_execution/03_17_sequential_flow
+mix test.examples examples/03_flow_execution/03_17_sequential_flow --warnings-as-errors
 ```
 
 Expected result: the value is doubled, failures do not commit, and schema

@@ -15,7 +15,7 @@ Read [the pending-job Agent](pending_job_recovery.ex), then the local
 ## Run it
 
 ```sh
-mix test.examples examples/13_durable_execution/13_13_pending_job_recovery
+mix test.examples examples/13_durable_execution/13_13_pending_job_recovery --warnings-as-errors
 ```
 
 Expected result: saved approval survives Agent loss, no Task appears on restore,

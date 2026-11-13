@@ -16,7 +16,7 @@ Read [the coordinator Agent](correlated_requests.ex), then read the shared
 ## Run it
 
 ```sh
-mix test.examples examples/09_dynamic_agent_composition/09_02_correlated_requests
+mix test.examples examples/09_dynamic_agent_composition/09_02_correlated_requests --warnings-as-errors
 ```
 
 Expected result: the request commits as waiting, the child returns twice the

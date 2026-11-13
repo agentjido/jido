@@ -18,7 +18,7 @@ Read [the Agent](inbox.ex), then [the input sensor](inbox_sensor.ex).
 ## Run it
 
 ```sh
-mix test.examples examples/24_application_patterns/24_02_inbox
+mix test.examples examples/24_application_patterns/24_02_inbox --warnings-as-errors
 ```
 
 Expected result: repeated IDs commit once. Sensor and Manager replacement keep

@@ -29,7 +29,7 @@ graph checkpoints use the same adapter. AgentServer owns all execution decisions
 ## Run it
 
 ```sh
-mix test.examples examples/13_durable_execution/13_03_vm_recovery
+mix test.examples examples/13_durable_execution/13_03_vm_recovery --warnings-as-errors
 ```
 
 Expected result: the writer saves steps 1–5, then dies while step 6 runs. The reader

@@ -19,7 +19,7 @@ Read [the Agent](identity.ex), [the identity Plugin](identity_plugin.ex), then
 ## Run it
 
 ```sh
-mix test.examples examples/05_plugins/05_10_identity
+mix test.examples examples/05_plugins/05_10_identity --warnings-as-errors
 ```
 
 Expected result: one valid request commits and receives a signed reply. A

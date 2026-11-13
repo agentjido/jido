@@ -38,7 +38,7 @@ show the DSL data, direct and live commands, Map validation, and JSON import.
 ## Run it
 
 ```sh
-mix test.examples examples/05_plugins/05_07_plugin_dsl
+mix test.examples examples/05_plugins/05_07_plugin_dsl --warnings-as-errors
 ```
 
 Expected result: adding three reaches `:first` and `:third` once. Direct and

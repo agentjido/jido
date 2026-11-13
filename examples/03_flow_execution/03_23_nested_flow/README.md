@@ -17,7 +17,7 @@ Read [the Agent, child Flow, and parent Flow](nested_flow.ex) first. Then read
 ## Run it
 
 ```sh
-mix test.examples examples/03_flow_execution/03_23_nested_flow
+mix test.examples examples/03_flow_execution/03_23_nested_flow --warnings-as-errors
 ```
 
 Expected result: writer and editor results stay separate, context is shared,

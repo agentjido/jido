@@ -15,7 +15,7 @@ Read [the burst buncher](burst_buncher.ex) first. Then read the
 ## Run it
 
 ```sh
-mix test.examples examples/11_built_in_capabilities/11_03_keyed_timers
+mix test.examples examples/11_built_in_capabilities/11_03_keyed_timers --warnings-as-errors
 ```
 
 Expected result: a size or timeout flush emits one ordered batch, while stale

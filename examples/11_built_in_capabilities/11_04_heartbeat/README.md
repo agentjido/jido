@@ -18,7 +18,7 @@ behavior test can trigger each tick through an explicit synchronization point.
 ## Run it
 
 ```sh
-mix test.examples examples/11_built_in_capabilities/11_04_heartbeat
+mix test.examples examples/11_built_in_capabilities/11_04_heartbeat --warnings-as-errors
 ```
 
 Expected result: explicit ticks produce the configured Signals. An invalid

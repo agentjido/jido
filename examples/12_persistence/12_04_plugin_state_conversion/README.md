@@ -13,7 +13,7 @@ Read [the Agent](persisted_state.ex), then [the Plugin callbacks](persisted_stat
 
 ## Run it
 
-`mix test.examples examples/12_persistence/12_04_plugin_state_conversion`
+`mix test.examples examples/12_persistence/12_04_plugin_state_conversion --warnings-as-errors`
 
 Expected result: the Plugin-owned integer is stored as a string and restores as an integer. An invalid stored value does not start an Agent.
 

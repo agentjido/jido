@@ -18,7 +18,7 @@ not enter Signal data, Action input, or Turn context.
 ## Run it
 
 ```sh
-mix test.examples examples/06_agent_server/06_06_turn_control
+mix test.examples examples/06_agent_server/06_06_turn_control --warnings-as-errors
 ```
 
 Expected result: status reports the active Turn. A stale ID is rejected. The

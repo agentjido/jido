@@ -20,7 +20,7 @@ Read [the Plugin, runtime, and Agent](runtime_admission.ex), then read the
 ## Run it
 
 ```sh
-mix test.examples examples/05_plugins/05_03_runtime_admission
+mix test.examples examples/05_plugins/05_03_runtime_admission --warnings-as-errors
 ```
 
 Expected result: the authorization contains a transient lease reference. The Action consumes
