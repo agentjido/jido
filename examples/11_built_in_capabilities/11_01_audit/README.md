@@ -1,0 +1,45 @@
+# 11_01 Audit
+
+The built-in Audit Plugin commits selected domain records with Agent state.
+
+## What you will learn
+
+- How a Flow returns Agent state and `Jido.Plugin.Audit.Record` together.
+- How `max_entries` keeps only the newest records.
+- How a failed Flow leaves domain and Audit Plugin state unchanged.
+
+## Read the code
+
+Read [the Agent and Flow](audit.ex), then read the behavior test.
+
+## Run it
+
+```sh
+mix test.examples examples/11_built_in_capabilities/11_01_audit --warnings-as-errors
+```
+
+Expected result: three selected events commit with domain state, the oldest
+record is removed, and one failed Flow adds no record.
+
+## Important behavior
+
+A guard Step rejects failed work. The next inline Step selects a domain fact
+and returns a typed Audit Directive with the domain candidate. The Plugin
+has no runtime projection. Its bounded records are part of portable Agent state.
+
+Audit records describe successful domain decisions. Use the
+[Turn Result lesson](../../06_agent_server/06_04_turn_result/README.md) when
+an application must handle failed Turns at the Agent Server policy boundary.
+
+## Limits
+
+Audit Plugin state is durable only when the Agent uses persistence. This
+example does not provide an external compliance archive.
+
+## Files
+
+- [Agent and Flow](audit.ex)
+- [Tests](audit_test.exs)
+
+Previous: [Declared Agent Topologies](../../10_declared_agent_topologies/README.md) |
+Next: [Scheduled Signals](../11_02_scheduled_signals/README.md)

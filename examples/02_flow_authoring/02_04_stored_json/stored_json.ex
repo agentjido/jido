@@ -28,13 +28,13 @@ defmodule Jido.Examples.Compilation.StoredJSON do
   end
 
   def document do
-    {:ok, json} =
-      Jido.Codec.encode_json(flow(), catalog: catalog(), codec: Jido.Flow.Codec)
+    {:ok, json} = Jido.Codec.encode_json(flow(), catalog: catalog())
 
     json
   end
 
   def decode(json \\ document()) do
-    Jido.Codec.decode_json(json, catalog: catalog(), codec: Jido.Flow.Codec)
+    {:ok, codec} = Jido.Codec.Encoder.codec(flow())
+    Jido.Codec.decode_json(json, catalog: catalog(), codec: codec)
   end
 end

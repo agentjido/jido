@@ -1,0 +1,38 @@
+[
+  {
+    "run": {
+      "id": "run-pass",
+      "tool_trajectory": [
+        {"tool": "rag_lookup_policy", "arguments": {"query": "retention limit"}, "status": "ok"}
+      ],
+      "usage": {"total_tokens": 24, "total_cost": 0.002},
+      "latency_ms": 40,
+      "guardrail": {"decision": "passed", "findings": []}
+    },
+    "expected": {
+      "tool_trajectory": [
+        {"tool": "rag_lookup_policy", "arguments": {"query": "retention limit"}, "status": "ok"}
+      ],
+      "budgets": {"total_tokens": 30, "total_cost": 0.01, "latency_ms": 100},
+      "guardrail": {"decision": "passed", "findings": []}
+    }
+  },
+  {
+    "run": {
+      "id": "run-budget-regression",
+      "tool_trajectory": [
+        {"tool": "rag_lookup_policy", "arguments": {"query": "retention limit"}, "status": "ok"}
+      ],
+      "usage": {"total_tokens": 44, "total_cost": 0.02},
+      "latency_ms": 140,
+      "guardrail": {"decision": "passed", "findings": []}
+    },
+    "expected": {
+      "tool_trajectory": [
+        {"tool": "rag_lookup_policy", "arguments": {"query": "retention limit"}, "status": "ok"}
+      ],
+      "budgets": {"total_tokens": 30, "total_cost": 0.01, "latency_ms": 100},
+      "guardrail": {"decision": "passed", "findings": []}
+    }
+  }
+]

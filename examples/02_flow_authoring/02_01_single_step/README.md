@@ -1,9 +1,34 @@
-# Single Step
+# 02_01 Single Step
 
-`Jido.Flow.new!/1` converts one data-authored Step to one canonical component.
-The expected dependency data is `%{"echo" => %{needs: [], references: [], effective: []}}`.
-Validation rejects the same definition without an explicit output.
+One data-authored Step becomes one validated canonical Flow component.
 
-Read [`single_step.ex`](single_step.ex) and run its paired offline test.
+## What you will learn
 
-See [the ExUnit proof](single_step_test.exs).
+- How `Jido.Flow.new!/1` normalizes a Step.
+- Why every Flow needs an explicit output.
+
+## Read the code
+
+Read [the Flow](single_step.ex), then [the test](single_step_test.exs).
+
+## Run it
+
+`mix test.examples examples/02_flow_authoring/02_01_single_step --warnings-as-errors`
+
+Expected result: the dependency map contains one independent `echo` component,
+and the invalid definition reports its missing output.
+
+## Important behavior
+
+Authoring validates structure before execution starts.
+
+## Limits
+
+This lesson does not execute the Flow or teach runtime state.
+
+## Files
+
+- [Flow](single_step.ex)
+- [Tests](single_step_test.exs)
+
+[Next: Dependency Graph](../02_02_dependency_graph/README.md)
