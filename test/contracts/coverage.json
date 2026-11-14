@@ -2165,7 +2165,7 @@
         "jido.persistence.I12": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 14,
+          "passing": 15,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2176,6 +2176,7 @@
             "test malformed token reads and read failures do not write",
             "test missing namespaces and removed write gates fail before storage access",
             "test nested portable values survive a save and load",
+            "test offline re-checkpoint retains settled Turn metadata and rejects a stale revision",
             "test operation options reject malformed, duplicate, and unsupported keys before storage",
             "test outer definition and record changes fail closed without a replacement write",
             "test public operations reject invalid Agent and identity input",

@@ -219,9 +219,12 @@ defmodule Jido.Persistence do
   A failed check does not replace the stored record. A tombstone preserves the
   revision barrier after logical deletion. This check is not a writer lease.
 
-  The public options are `:instance`, `:namespace`, `:partition`, `:reason`,
-  `:revision`, and `:expected_revision`. `:server_turn` is reserved for the
-  AgentServer durable record. Unknown and duplicate options return an error.
+  The options are `:instance`, `:namespace`, `:partition`, `:reason`,
+  `:revision`, `:expected_revision`, `:agent_revision`, and `:server_turn`.
+  AgentServer supplies the last two values for its durable record. Offline
+  maintenance must retain them when re-checkpointing a previously loaded,
+  settled Agent; never replace an active Turn. A direct save is not a writer
+  lease. Unknown and duplicate options return an error.
   """
   @spec save_agent(adapter_config() | atom(), Agent.t(), keyword()) ::
           :ok | {:error, term()}

@@ -26,6 +26,7 @@ and `null/0,1` because Jido does not use them.
 | Struct support | `enforce_keys/1`, `struct_fields/1`, `type_spec/1,2` |
 | Error access | `error_code/1`, `error_path/1`, `error_message/1`, `changed_value?/1` |
 | JSON Schema | `to_json_schema/1` |
+| Deterministic schema data | `canonicalize/1` |
 
 The data lifecycle has three different operations:
 
@@ -36,6 +37,13 @@ The data lifecycle has three different operations:
 Map and keyword schemas are open by default. Stored Agent state uses a closed
 boundary. Jido does not use the Zoi `:strip` policy because stripping changes
 the data shape.
+
+Object and struct field lists use deterministic key order, including nested
+schemas and extensions. Their authored map iteration order cannot change
+generated code fingerprints between clean builds. Keyword fields, union
+branches, effects, and ordinary lists retain their order. `canonicalize/1`
+also normalizes schemas inside enclosing data; it does not authorize a code
+upgrade or change the strict checkpoint reference check.
 
 `Jido.Joi.Schema` and `Jido.Joi.Runtime` have `@moduledoc false`. Their exports
 support the root facade and are not separate component APIs.
@@ -66,6 +74,9 @@ all definition, Agent, Plugin, persistence, and AI namespaces consume Joi.
 
 There is no focused active Covenant component for `Jido.Joi`. Unit tests in
 `test/jido/joi_test.exs` and Agent runtime tests cover the current lifecycle.
+`test/jido/joi_rebuild_test.exs` compiles the same schema-based Action in two
+independent VMs with different atom creation order, restores its checkpoint,
+and confirms that a real executable body change still rejects recovery.
 
 The lack of a focused Covenant owner is a proof gap. Joi behavior also appears
 inside broad legacy authoring proof, but that proof does not define a complete

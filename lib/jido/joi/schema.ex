@@ -23,6 +23,38 @@ defmodule Jido.Joi.Schema do
 
   def schema?(value), do: is_struct(value) and not is_nil(Zoi.Type.impl_for(value))
 
+  # Map iteration depends on the VM's atom table. Object field order must not
+  # enter generated module code or durable fingerprints. Keep ordered schema
+  # branches, keyword fields, effects, and default data in their original order.
+  @doc false
+  def canonicalize_fields(%module{fields: fields} = schema)
+      when module in [Zoi.Types.Map, Zoi.Types.Struct] and is_list(fields) do
+    normalized =
+      schema
+      |> Map.from_struct()
+      |> Map.delete(:fields)
+      |> canonicalize_fields()
+      |> Map.put(:fields, fields |> canonicalize_fields() |> Enum.sort_by(&elem(&1, 0)))
+
+    struct!(module, normalized)
+  end
+
+  def canonicalize_fields(%_{} = schema), do: canonicalize_struct(schema)
+
+  def canonicalize_fields(value) when is_map(value),
+    do: Map.new(value, fn {key, child} -> {key, canonicalize_fields(child)} end)
+
+  def canonicalize_fields([head | tail]),
+    do: [canonicalize_fields(head) | canonicalize_fields(tail)]
+
+  def canonicalize_fields(value) when is_tuple(value),
+    do: value |> Tuple.to_list() |> Enum.map(&canonicalize_fields/1) |> List.to_tuple()
+
+  def canonicalize_fields(value), do: value
+
+  defp canonicalize_struct(%module{} = schema),
+    do: module |> struct!(schema |> Map.from_struct() |> canonicalize_fields())
+
   def kind(%Zoi.Types.Any{}), do: :any
   def kind(%Zoi.Types.Array{}), do: :array
   def kind(%Zoi.Types.Atom{}), do: :atom

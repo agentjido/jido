@@ -101,6 +101,48 @@ defmodule Jido.Persistence.SnapshotTest do
     Agent.instantiate!(definition, id: agent.id, state: agent.state)
   end
 
+  @tag obligation: "jido.persistence.I12"
+  test "offline re-checkpoint retains settled Turn metadata and rejects a stale revision" do
+    store = {Persistence.ETS, table: __MODULE__}
+    opts = [namespace: "offline-recheckpoint"]
+    agent = %{F.agent() | id: "recheckpoint-#{System.unique_integer([:positive])}"}
+    signal = F.signal([])
+
+    assert {:ok, running} =
+             Jido.Durable.Continuation.running(%{
+               id: "settled-turn",
+               signal: signal,
+               admitted_signal: signal,
+               context: %{},
+               plugin_inputs: %{},
+               target: F.Flow,
+               expires_at: :infinity
+             })
+
+    turn = Jido.Durable.Continuation.put_status!(running, :completed)
+    assert :ok = Persistence.save_agent(store, agent, opts ++ [revision: 8, agent_revision: 4, server_turn: turn])
+
+    assert {:ok, ^agent, 8, 4, ^turn} =
+             Persistence.load_agent_with_server_turn(store, agent.module, agent.id, opts)
+
+    assert :ok =
+             Persistence.save_agent(
+               store,
+               agent,
+               opts ++ [revision: 9, expected_revision: 8, agent_revision: 4, server_turn: turn]
+             )
+
+    assert {:error, :conflict} =
+             Persistence.save_agent(
+               store,
+               agent,
+               opts ++ [revision: 10, expected_revision: 8, agent_revision: 4, server_turn: turn]
+             )
+
+    assert {:ok, ^agent, 9, 4, ^turn} =
+             Persistence.load_agent_with_server_turn(store, agent.module, agent.id, opts)
+  end
+
   @tag obligation: "jido.persistence.I6"
   test "complete definition and state round trip without a source module" do
     source = F.agent()

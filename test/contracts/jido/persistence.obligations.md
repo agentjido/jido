@@ -129,6 +129,10 @@ wake record layout and wake recovery health, but not wait semantics.
 - **kind:** ordering
 - **status:** active
 
+Offline re-checkpointing of a verified, settled Agent preserves its Agent
+revision and completed Turn metadata. It uses the loaded durable revision as
+the expected predecessor; a stale write leaves the newer record unchanged.
+
 ### jido.persistence.I13 — Tombstone deletion
 
 - **scope:** `Jido.Persistence.delete_agent/4`

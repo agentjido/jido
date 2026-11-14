@@ -46,8 +46,6 @@ defmodule Jido.Joi do
     discriminated_union: 3,
     enum: 1,
     enum: 2,
-    extend: 2,
-    extend: 3,
     float: 0,
     float: 1,
     function: 0,
@@ -99,34 +97,57 @@ defmodule Jido.Joi do
     defdelegate unquote(name)(unquote_splicing(args)), to: Zoi
   end
 
+  @doc """
+  Gives object and struct schemas a deterministic field order.
+
+  Traverses enclosing data and nested schemas. Keyword fields, union branches,
+  effects, and ordinary lists retain their order. This does not validate or
+  change stored values, and does not authorize a checkpoint code upgrade.
+  """
+  @spec canonicalize(term()) :: term()
+  defdelegate canonicalize(value), to: Jido.Joi.Schema, as: :canonicalize_fields
+
   @doc "Creates an open field-based map schema."
   @spec object(map(), options()) :: schema()
-  def object(fields, opts \\ []), do: Zoi.object(fields, open_options(opts))
+  def object(fields, opts \\ []),
+    do: fields |> Zoi.object(open_options(opts)) |> Jido.Joi.Schema.canonicalize_fields()
+
+  @doc "Extends a schema with deterministic object field order."
+  def extend(schema, fields, opts \\ []),
+    do: schema |> Zoi.extend(fields, opts) |> Jido.Joi.Schema.canonicalize_fields()
 
   @doc "Creates an open keyword schema."
   @spec keyword(keyword() | schema(), options()) :: schema()
-  def keyword(fields, opts \\ []), do: Zoi.keyword(fields, open_options(opts))
+  def keyword(fields, opts \\ []),
+    do: fields |> Zoi.keyword(open_options(opts)) |> Jido.Joi.Schema.canonicalize_fields()
 
   @doc "Creates a closed struct schema."
   @spec struct(module(), map() | options() | nil, options()) :: schema()
   def struct(module, fields_or_opts \\ nil, opts \\ [])
 
   def struct(module, nil, opts),
-    do: Zoi.struct(module, nil, closed_options(opts))
+    do: module |> Zoi.struct(nil, closed_options(opts)) |> Jido.Joi.Schema.canonicalize_fields()
 
   def struct(module, opts, []) when is_list(opts) and opts != [],
-    do: Zoi.struct(module, closed_options(opts), [])
+    do: module |> Zoi.struct(closed_options(opts), []) |> Jido.Joi.Schema.canonicalize_fields()
 
   def struct(module, fields, opts),
-    do: Zoi.struct(module, fields, closed_options(opts))
+    do: module |> Zoi.struct(fields, closed_options(opts)) |> Jido.Joi.Schema.canonicalize_fields()
 
   @doc "Creates an open map schema."
   def map(), do: Zoi.map(open_options([]))
   def map(opts) when is_list(opts), do: Zoi.map(open_options(opts))
-  def map(fields), do: Zoi.map(fields, open_options([]))
-  def map(fields, opts) when is_list(opts), do: Zoi.map(fields, open_options(opts))
-  def map(key_type, value_type), do: Zoi.map(key_type, value_type, open_options([]))
-  def map(key_type, value_type, opts), do: Zoi.map(key_type, value_type, open_options(opts))
+
+  def map(fields),
+    do: fields |> Zoi.map(open_options([])) |> Jido.Joi.Schema.canonicalize_fields()
+
+  def map(fields, opts) when is_list(opts),
+    do: fields |> Zoi.map(open_options(opts)) |> Jido.Joi.Schema.canonicalize_fields()
+
+  def map(key_type, value_type), do: map(key_type, value_type, [])
+
+  def map(key_type, value_type, opts),
+    do: key_type |> Zoi.map(value_type, open_options(opts)) |> Jido.Joi.Schema.canonicalize_fields()
 
   @doc "Parse external input with a Joi schema."
   @spec parse(schema(), input(), options()) :: result()

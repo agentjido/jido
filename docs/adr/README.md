@@ -12,6 +12,7 @@ This directory records decisions that constrain the Jido V3 architecture. The [m
 | [0004](0004-passive-catalog-reference-resolution.md) | Accepted | Keep Catalog passive and resolve registered values for hydration |
 | [0005](0005-activation-local-declared-subtree-removal.md) | Accepted | Remove one declared subtree from the current activation |
 | [0006](0006-local-agent-ownership-transfer.md) | Accepted | Keep dynamic Agent ownership local and activation-scoped |
+| [0007](0007-deterministic-schema-field-order.md) | Accepted | Keep object schema field order stable across builds |
 
 ## Backlog
 
