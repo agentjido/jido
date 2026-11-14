@@ -4,7 +4,7 @@ defmodule Jido.Examples.AgentLiveDebugger do
   use Jido.Agent,
     name: "examples_agent_live_debugger",
     description: "Provides public state for a safe debugger snapshot",
-    plugins: [Jido.Plugin.Scheduler]
+    plugins: [Jido.Plugin.Timer]
 
   state do
     schema Jido.Joi.object(%{

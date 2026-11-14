@@ -1,8 +1,8 @@
-defmodule Jido.Plugin.Scheduler.Cron do
+defmodule Jido.Plugin.Timer.Cron do
   alias Jido.Joi
   @moduledoc "Creates or replaces one recurring Signal schedule."
 
-  alias Jido.Plugin.Scheduler.CronRules
+  alias Jido.Plugin.Timer.CronRules
 
   @schema Joi.struct(
             __MODULE__,

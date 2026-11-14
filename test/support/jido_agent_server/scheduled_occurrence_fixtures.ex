@@ -16,11 +16,11 @@ end
 defmodule Jido.Test.AgentServer.ScheduledOccurrenceFixtures.FastRuntimeAgent do
   @moduledoc false
 
-  alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Timer
   alias Jido.Test.AgentServer.RuntimeFixtures.{Record, ReturnDirective, Tick}
   alias Jido.Test.AgentServer.ScheduledOccurrenceFixtures.Clock
 
-  use Jido.Agent, name: "fast_runtime_agent", plugins: [{Scheduler, %{time_scale: Clock}}]
+  use Jido.Agent, name: "fast_runtime_agent", plugins: [{Timer, %{time_scale: Clock}}]
 
   state do
     schema Jido.Joi.object(%{
@@ -39,12 +39,12 @@ end
 defmodule Jido.Test.AgentServer.ScheduledOccurrenceFixtures.TimedAgent do
   @moduledoc false
 
-  alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.Occurrence
+  alias Jido.Plugin.Timer
+  alias Jido.Plugin.Timer.Occurrence
   alias Jido.Signal
   alias Jido.Test.AgentServer.ScheduledOccurrenceFixtures.Clock
 
-  use Jido.Agent, name: "timed_occurrence_probe", plugins: [{Scheduler, %{time_scale: Clock}}]
+  use Jido.Agent, name: "timed_occurrence_probe", plugins: [{Timer, %{time_scale: Clock}}]
 
   state do
     schema Jido.Joi.object(%{
@@ -70,7 +70,31 @@ defmodule Jido.Test.AgentServer.ScheduledOccurrenceFixtures.TimedAgent do
           )
 
         directive =
-          Scheduler.cron(input.job_id, input.cron, tick, generation: generation)
+          Timer.cron(input.job_id, input.cron, tick, generation: generation)
+
+        {:ok, %{context.agent_state | generation: generation}, [directive]}
+      end
+    end
+
+    route "test.interval.arm", as: :arm_interval do
+      action input,
+        schema:
+          Jido.Joi.object(%{
+            job_id: Jido.Joi.string() |> Jido.Joi.min(1),
+            interval_ms: Jido.Joi.integer() |> Jido.Joi.min(1)
+          }),
+        context: context do
+        generation = context.agent_state.generation + 1
+
+        tick =
+          Signal.new!(
+            "test.schedule.tick",
+            %{job_id: input.job_id, generation: generation},
+            source: "/test/scheduled_occurrences"
+          )
+
+        directive =
+          Timer.every(input.job_id, input.interval_ms, tick, generation: generation)
 
         {:ok, %{context.agent_state | generation: generation}, [directive]}
       end

@@ -61,7 +61,7 @@ Continue with [Direct Connections](../10_02_direct_connections/README.md).
 Previous: [Topology overview](../README.md) | Next: [Direct Connections](../10_02_direct_connections/README.md)
 
 The JSON test builds its stable Registry independently. Each member declares
-the core Scheduler Plugin. A scheduled command proves that an imported member
+the core Timer Plugin. A scheduled command proves that an imported member
 starts its Plugin runtime. Stopping the owner stops these runtimes too.
 For creation requested by a Turn, see
 [dynamic children](../../09_dynamic_agent_composition/09_01_child_lifecycle/README.md).

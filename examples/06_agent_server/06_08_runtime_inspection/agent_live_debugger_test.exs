@@ -3,7 +3,7 @@ Code.require_file("agent_live_debugger.ex", __DIR__)
 defmodule Jido.Test.Examples.Runtime.InspectionFixture do
   @moduledoc false
 
-  use Jido.Agent, name: "test_runtime_inspection", plugins: [Jido.Plugin.Scheduler]
+  use Jido.Agent, name: "test_runtime_inspection", plugins: [Jido.Plugin.Timer]
 
   state do
     schema Jido.Joi.object(%{

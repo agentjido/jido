@@ -34,7 +34,7 @@ The current code has durable Runic checkpoints, wait receipts, and recovery poli
 
 - Application code that runs a durable Flow without an Agent.
 - AgentServer, which composes durable Flow execution with Agent state and OTP lifecycle.
-- A host capability, such as AgentServer Scheduler, that delivers cron occurrence Signals or wakes a timed wait.
+- A host capability, such as the Timer Plugin, that delivers cron occurrence Signals or wakes a timed wait.
 
 ### Requirements
 
@@ -42,7 +42,7 @@ The current code has durable Runic checkpoints, wait receipts, and recovery poli
 - **R2:** Initial and resumed external input must use `Jido.Signal`; duplicate wait delivery must be inert by Signal ID.
 - **R3:** Durable execution must reuse `Jido.Flow`, `Jido.Exec`, Runic history, and `Jido.Persistence.Store` adapters. It must not add a second workflow language or a public Journal.
 - **R4:** Durable execution must persist waits and expose the next wake time. A host can resume the execution for timers or deliver cron occurrence Signals.
-- **R5:** AgentServer must use the same durable runtime primitives while it keeps Agent commit, process, wait-timer, and Scheduler integration policy.
+- **R5:** AgentServer must use the same durable runtime primitives while it keeps Agent commit, process, wait-timer, and Timer integration policy.
 - **R6:** The change must include basic unit tests and supported offline examples for direct completion, Signal wait resume, and host-driven scheduled resume.
 
 ### Key Flows
@@ -98,7 +98,7 @@ Out of scope:
 
 - Add `store:` to `Jido.Exec`: storage alone does not define Signal acceptance, wait recovery, or uncertain work.
 - Add `Jido.Durable.Journal`: this creates retention, query, replay, and compatibility promises that are not required.
-- Add a scheduler or queue to Durable: AgentServer Scheduler and application hosts already own delivery.
+- Add a scheduler or queue to Durable: the Timer Plugin and application hosts already own delivery.
 - Add a new package: explicitly excluded.
 
 ### Dependencies
@@ -178,7 +178,7 @@ Jido.AgentServer
 - **Decision:** Durable status exposes pending waits and `next_wake_at`. The host calls resume for timer deadlines and delivers cron occurrence Signals. Durable does not calculate cron expressions.
 - **Reason:** R4 needs scheduled durability without a second scheduler.
 - **Rejected alternative:** Add cron definitions, timers, and leases to Durable.
-- **Consequences:** AgentServer can use its existing wait timers and Scheduler Plugin. Other hosts can use their own scheduler.
+- **Consequences:** AgentServer can use its existing wait timers and Timer Plugin. Other hosts can use their own scheduler.
 - **Governs:** R4, R5; U2, U3, U4.
 
 #### KTD5: Move portable durable ownership out of Exec and live primitives out of AgentServer
@@ -230,7 +230,7 @@ Jido.AgentServer
 - **Requirements:** R5.
 - **Dependencies:** U1.
 - **Affected surfaces:** AgentServer Lifecycle, AgentServer public wait delivery, persistence record validation, durable-turn tests, and contract documents.
-- **Implementation direction:** Replace extracted bodies with direct Durable Runtime calls. Keep Agent acceptance/commit records, wait timer arming, Scheduler Plugin use, and OTP recovery in AgentServer.
+- **Implementation direction:** Replace extracted bodies with direct Durable Runtime calls. Keep Agent acceptance/commit records, wait timer arming, Timer Plugin use, and OTP recovery in AgentServer.
 - **Test scenarios:** Durable Agent completion, process recovery, wait resume, timer wait, cancellation, and checkpoint cleanup remain unchanged.
 - **Verification:** `mix test test/jido/agent_server/durable test/jido/agent_server/durable_turn`.
 - **Completion signal:** AgentServer durable behavior passes with shared runtime ownership.

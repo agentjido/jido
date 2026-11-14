@@ -1,8 +1,11 @@
-# Agent Heartbeats
+# Periodic Timer Signals
 
-This tutorial uses `Jido.Plugin.Heartbeat` to send an Agent a Signal on a fixed interval, so that periodic work runs as a normal Turn.
+This tutorial uses a static `Jido.Plugin.Timer` interval to send an Agent a
+periodic Signal. A heartbeat is one application meaning for this Timer mode. It
+is not a separate timer engine.
 
-The Plugin only produces Signals. It adds no Agent state and does not detect missed beats or report liveness. For cron rules or one-shot delays, use Schedules.
+Timer only produces Signals. It does not detect missed beats or report
+liveness. Use a cron definition when work must align with a wall-clock slot.
 
 ## Install Jido
 
@@ -14,7 +17,8 @@ Mix.install([
 
 ## Start a Jido instance
 
-The Plugin runs a supervised timer process, so the Agent must start through an instance.
+Timer runs under the Agent activation, so the Agent must start through an
+instance.
 
 ```elixir
 {:ok, _instance} = Jido.start_link(name: HeartbeatGuide.Jido)
@@ -38,13 +42,16 @@ end
 
 ## Receive the default tick
 
-Declare the Plugin and add a route for its Signal. Without `:signal_type`, each tick is a `Jido.Plugin.Heartbeat.Signal.Tick` with the type `"jido.agent.heartbeat"` and the source `"/plugin/heartbeat"`. The value of `:signal_data` becomes the input of the routed Action.
+Declare Timer with an interval and add a route for its Signal. Without
+`:signal_type`, each tick is a `Jido.Plugin.Timer.Signal.Tick` with the type
+`"jido.agent.heartbeat"` and the source `"/plugin/heartbeat"`. The value of
+`:signal_data` becomes the Action input.
 
 ```elixir
 defmodule HeartbeatGuide.Monitor do
   use Jido.Agent,
     name: "heartbeat_guide_monitor",
-    plugins: [{Jido.Plugin.Heartbeat, %{interval: 20, signal_data: %{check: "disk"}}}]
+    plugins: [{Jido.Plugin.Timer, %{interval: 20, signal_data: %{check: "disk"}}}]
 
   state do
     schema Jido.Joi.object(%{
@@ -73,16 +80,20 @@ end
 :ok = Jido.AgentServer.await_ready(monitor)
 ```
 
-The timer starts with the Plugin, and the first tick arrives one interval later. Wait for a few beats and read the state:
+The first tick arrives after one full interval. Wait for a few ticks and read
+the state:
 
 ```elixir
 :ok = HeartbeatGuide.Wait.until(fn -> Jido.AgentServer.snapshot(monitor).agent.state.beats >= 3 end)
 
 Jido.AgentServer.snapshot(monitor).agent.state.last
 # => %{type: "jido.agent.heartbeat", source: "/plugin/heartbeat", input: %{check: "disk"}}
+
+Jido.AgentServer.plugin_state(monitor, Jido.Plugin.Timer)
+# => {:ok, %{cron: %{}, every: %{heartbeat: %{status: :running, ...}}}}
 ```
 
-The timer stops with the Agent:
+The Timer stops with the Agent:
 
 ```elixir
 :ok = Jido.stop_agent(HeartbeatGuide.Jido, monitor)
@@ -90,16 +101,17 @@ The timer stops with the Agent:
 
 ## Send your own Signal type
 
-Set `:signal_type` and `:source` when the tick should read as a domain event. The route then matches your type.
+Set `:signal_type` and `:source` when the periodic Signal is a domain event.
+The route then matches that type.
 
 ```elixir
 defmodule HeartbeatGuide.InvoiceSweeper do
   use Jido.Agent,
     name: "heartbeat_guide_invoice_sweeper",
     plugins: [
-      {Jido.Plugin.Heartbeat,
+      {Jido.Plugin.Timer,
        %{
-         interval: 60_000,
+         interval: 20,
          signal_type: "invoice.sweep_due",
          signal_data: %{batch_size: 50},
          source: "/billing/sweeper"
@@ -120,18 +132,9 @@ defmodule HeartbeatGuide.InvoiceSweeper do
     end
   end
 end
-```
 
-## Change the interval at start
-
-The Heartbeat options belong to the AgentServer side of the Plugin, so you can override them per start with `:plugin_runtime_options`. This keeps a production interval in the definition and a short one in a test.
-
-```elixir
 {:ok, sweeper} =
-  Jido.start_agent(HeartbeatGuide.Jido, HeartbeatGuide.InvoiceSweeper,
-    id: "sweeper-1",
-    plugin_runtime_options: [{Jido.Plugin.Heartbeat, [interval: 20]}]
-  )
+  Jido.start_agent(HeartbeatGuide.Jido, HeartbeatGuide.InvoiceSweeper, id: "sweeper-1")
 
 :ok = Jido.AgentServer.await_ready(sweeper)
 :ok = HeartbeatGuide.Wait.until(fn -> length(Jido.AgentServer.snapshot(sweeper).agent.state.sweeps) >= 2 end)
@@ -144,6 +147,9 @@ Jido.AgentServer.snapshot(sweeper).agent.state.sweeps |> Enum.take(2)
 :ok = Jido.stop_agent(HeartbeatGuide.Jido, sweeper)
 ```
 
+Static Timer options are part of the Agent definition. Runtime options cannot
+replace them when the Agent starts.
+
 ## Options
 
 | Option | Default | Accepted values |
@@ -153,17 +159,23 @@ Jido.AgentServer.snapshot(sweeper).agent.state.sweeps |> Enum.take(2)
 | `:signal_data` | `%{}` | Plain map, not a struct. |
 | `:source` | `"/plugin/heartbeat"` | Non-empty URI reference. |
 
-An invalid value fails the Agent definition with the message "Heartbeat Plugin options are invalid". An unknown option key is rejected as well.
+An invalid value fails the Agent definition with the message "Timer static
+interval options are invalid". An unknown option key is also rejected.
 
 ## Delivery behavior
 
-- The Plugin casts each tick to the Agent, so it does not wait for the Turn. A Turn longer than the interval leaves ticks queued behind it. Excess casts are dropped and logged at the postponed Turn limit.
-- The next tick is scheduled after the previous one is sent. The interval is a delay between ticks, not a wall-clock alignment. Use Schedules for work that must land on a clock slot.
-- A tick with no matching route fails its Turn at every interval. Under the default `:log_only` error policy, each failure logs a warning and appears in `last_outcome` from `Jido.AgentServer.status/2`. Under `:stop_on_error`, the first one stops the Agent.
+- The Timer casts each tick to the Agent. A long Turn can leave ticks queued
+  behind it. Excess casts are dropped and logged at the postponed Turn limit.
+- The next tick starts after the previous tick is sent. This is a fixed-delay
+  interval, not wall-clock alignment.
 - Each tick is a fresh Signal with a new ID.
-- The timer holds nothing durable. After a restart it starts over, and ticks that fell in the gap are not sent.
+- The interval definition is in the Agent `:timer` state. A runtime replacement
+  starts one new full interval. Ticks missed while offline are not replayed.
+
+`Jido.Plugin.Heartbeat` was removed. Use `Jido.Plugin.Timer` for all new and
+migrated Agents.
 
 ## Next steps
 
-- Schedules
+- [Timers](timers.livemd)
 - [Status and Turn History](../agent-servers/status-and-history.md)

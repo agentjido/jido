@@ -7,8 +7,8 @@ defmodule Jido.Examples.Durability.SignalResumeTest do
   alias Jido.Durable
   alias Jido.Durable.Status
   alias Jido.Examples.Durability.SignalResume
-  alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.Occurrence
+  alias Jido.Plugin.Timer
+  alias Jido.Plugin.Timer.Occurrence
 
   test "signal/5 resumes a wait with a host-created cron occurrence" do
     persistence = {Jido.Persistence.ETS, table: Module.concat(__MODULE__, Store)}
@@ -26,7 +26,7 @@ defmodule Jido.Examples.Durability.SignalResumeTest do
     scheduled_at = ~U[2026-11-10 12:00:00Z]
 
     assert {:ok, occurrence} =
-             Scheduler.occurrence_signal(template, {jido, "reports"}, "daily", 1, scheduled_at)
+             Timer.occurrence_signal(template, {jido, "reports"}, "daily", 1, scheduled_at)
 
     assert {:ok, %Occurrence{generation: 1}} = Occurrence.from_signal(occurrence)
 

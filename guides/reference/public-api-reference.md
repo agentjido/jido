@@ -91,7 +91,7 @@ Implement these to extend Jido. An optional callback can be left out.
 | `Jido.Persistence.Store` | `c:Jido.Persistence.Store.validate_options/1`, `c:Jido.Persistence.Store.get/2`, `c:Jido.Persistence.Store.compare_and_swap/4`, `c:Jido.Persistence.Store.delete/2` | `c:Jido.Persistence.Store.put/3`, `c:Jido.Persistence.Store.scan/4` | Custom Adapters |
 | `Jido.Signal.Dispatch.Adapter` | `c:Jido.Signal.Dispatch.Adapter.options_schema/0`, `c:Jido.Signal.Dispatch.Adapter.deliver/2` | None | [Signal Dispatch Adapters](../signals/dispatch-adapters.md) |
 | `Jido.Signal.Bus.Store` | `c:Jido.Signal.Bus.Store.init/1`, `c:Jido.Signal.Bus.Store.append/2`, `c:Jido.Signal.Bus.Store.read/2`, `c:Jido.Signal.Bus.Store.latest_cursor/1`, `c:Jido.Signal.Bus.Store.put_subscription/2`, `c:Jido.Signal.Bus.Store.list_subscriptions/1`, `c:Jido.Signal.Bus.Store.delete_subscription/2` | None | [Durable Subscriptions](../signals/durable-subscriptions.md) |
-| `Jido.Plugin.Scheduler.DeliveryAdapter` | `c:Jido.Plugin.Scheduler.DeliveryAdapter.schedule/3`, `c:Jido.Plugin.Scheduler.DeliveryAdapter.reconcile/2` | None | Schedules |
+| `Jido.Plugin.Timer.DeliveryAdapter` | `c:Jido.Plugin.Timer.DeliveryAdapter.schedule/3`, `c:Jido.Plugin.Timer.DeliveryAdapter.reconcile/2` | None | [Timers](../built-in-plugins/timers.livemd) |
 | `Jido.Codec.Contract` | `c:Jido.Codec.Contract.type/0`, `c:Jido.Codec.Contract.version/0`, `c:Jido.Codec.Contract.target/0`, `c:Jido.Codec.Contract.decode/2` | `c:Jido.Codec.Contract.encode/2` | [Jido.Codec Documents](../data/versioned-documents.md) |
 | `Jido.AI.ToolSource` | `c:Jido.AI.ToolSource.list_tools/2`, `c:Jido.AI.ToolSource.run_tool/3` | None | [Tools and Toolsets](../ai/tools-skills-and-toolsets.livemd) |
 | `Jido.AI.InferenceClient` | Each model operation, 22 callbacks. Start from `c:Jido.AI.InferenceClient.generate_text/3`. | None | [Inference Clients](../ai/inference-clients.md) |
@@ -545,17 +545,21 @@ Stores bounded domain audit records in portable Agent state.
 | --- | --- |
 | `Jido.Plugin.Audit.record/3` | Creates one domain audit Directive. |
 
-### `Jido.Plugin.Scheduler`
+### `Jido.Plugin.Timer`
 
-Adds delayed and recurring Signals to an Agent.
+Adds delayed, static periodic, interval, and cron Signals to an Agent. See
+[Timers](../built-in-plugins/timers.livemd).
 
 | Function | Summary |
 | --- | --- |
-| `Jido.Plugin.Scheduler.cancel/1` | Creates one recurring schedule cancellation Directive. |
-| `Jido.Plugin.Scheduler.cron/4` | Creates one recurring Signal Directive. |
-| `Jido.Plugin.Scheduler.next_occurrence/3` | Returns the next UTC occurrence after one UTC instant. |
-| `Jido.Plugin.Scheduler.occurrence_signal/5` | Builds one fresh recurring occurrence Signal. |
-| `Jido.Plugin.Scheduler.schedule/2` | Creates one delayed Signal Directive. |
+| `Jido.Plugin.Timer.cancel/1` | Creates one recurring schedule cancellation Directive. |
+| `Jido.Plugin.Timer.cron/4` | Creates one recurring Signal Directive. |
+| `Jido.Plugin.Timer.every/4` | Creates one recurring fixed-delay Signal Directive. |
+| `Jido.Plugin.Timer.next_occurrence/3` | Returns the next UTC occurrence after one UTC instant. |
+| `Jido.Plugin.Timer.occurrence_signal/5` | Builds one fresh recurring occurrence Signal. |
+| `Jido.Plugin.Timer.pause/1` | Pauses one recurring interval without removing it. |
+| `Jido.Plugin.Timer.resume/1` | Resumes one paused recurring interval. |
+| `Jido.Plugin.Timer.schedule/2` | Creates one delayed Signal Directive. |
 
 ### `Jido.Plugin.SensorManager`
 

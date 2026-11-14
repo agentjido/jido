@@ -1,4 +1,4 @@
-defmodule Jido.Plugin.Scheduler.Schedule do
+defmodule Jido.Plugin.Timer.Schedule do
   alias Jido.Joi
   @moduledoc "Sends one delayed Signal to the Agent."
 

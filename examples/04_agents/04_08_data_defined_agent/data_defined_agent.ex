@@ -3,7 +3,7 @@ defmodule Jido.Examples.DataDefinedAgent do
 
   alias Jido.Agent
   alias Jido.Catalog
-  alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Timer
 
   defmodule Add do
     @moduledoc "Adds one validated amount to the current count."
@@ -16,14 +16,14 @@ defmodule Jido.Examples.DataDefinedAgent do
   end
 
   defmodule ScheduleTick do
-    @moduledoc "Requests a later count change through the Scheduler Plugin."
+    @moduledoc "Requests a later count change through the Timer Plugin."
     use Jido.Action,
       name: "basic_data_defined_schedule",
       schema: Jido.Joi.object(%{delay_ms: Jido.Joi.integer() |> Jido.Joi.min(0)})
 
     def run(%{delay_ms: delay_ms}, %{agent_state: state}) do
       tick = Jido.Examples.DataDefinedAgent.signal!(1)
-      {:ok, state, [Scheduler.schedule(delay_ms, tick)]}
+      {:ok, state, [Timer.schedule(delay_ms, tick)]}
     end
   end
 
@@ -46,9 +46,9 @@ defmodule Jido.Examples.DataDefinedAgent do
       plugins: [
         %{id: CountTurns.id(), provider: CountTurns, vsn: CountTurns.vsn(), data: %{}},
         %{
-          id: Scheduler.id(),
-          provider: Scheduler,
-          vsn: Scheduler.vsn(),
+          id: Timer.id(),
+          provider: Timer,
+          vsn: Timer.vsn(),
           data: %{retry_delay_ms: 25}
         }
       ],
@@ -72,10 +72,10 @@ defmodule Jido.Examples.DataDefinedAgent do
       {"actions/add", 1} => Add,
       {"actions/schedule", 1} => ScheduleTick,
       {"plugins/count-turns", 1} => CountTurns,
-      {"plugins/scheduler", 1} => Scheduler,
+      {"plugins/timer", 1} => Timer,
       {"atoms/retry-delay", 1} => :retry_delay_ms,
       {"atoms/turns", 1} => :turns,
-      {"atoms/scheduler", 1} => :scheduler
+      {"atoms/timer", 1} => :timer
     })
   end
 

@@ -46,7 +46,7 @@ Application supervisor (:rest_for_one)
 ├── Jido instance infrastructure
 └── AgentServer supervisor (:transient activation)
     ├── AgentServer worker
-    └── Scheduler Plugin root
+    └── Timer Plugin root
 ```
 
 Infrastructure starts first and stops last. `:rest_for_one` replaces the

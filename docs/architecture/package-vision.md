@@ -33,7 +33,7 @@ Developer experience is a primary product goal. OTP gives experts excellent prim
 - AI tools are ordinary Actions or Flows.
 - `Jido.Session` and `Jido.Thread` are Agent-neutral values. AI consumes them but does not own them.
 - Jido has a definite, release-specific included Plugin list. The list can evolve between releases.
-- Scheduler and Sensor Manager are on the current included Plugin list.
+- Timer and Sensor Manager are on the current included Plugin list.
 - `Jido.AI` keeps its unique top-level namespace.
 - The consolidated package keeps one Mix project and one OTP application.
 
@@ -389,14 +389,16 @@ The included list is definite for each Jido release. It is not a claim that ever
 | Capability | Primary role | Portable ownership | Runtime ownership |
 |---|---|---|---|
 | `Jido.AI` | Model-backed reasoning and tools | Reasoning Flow, defaults, tools, Session and Thread references | Inference calls and AI telemetry integration |
-| `Jido.Plugin.Scheduler` | Delayed and recurring Signals | Recurring schedule definitions and generations | Local timers or an external delivery adapter |
+| `Jido.Plugin.Timer` | Delayed and recurring Signals | Recurring schedule definitions and generations | Local timers or an external delivery adapter |
 | `Jido.Plugin.SensorManager` | Supervised input sensors | Desired sensor definitions | Sensor child lifecycle and reconciliation |
 | `Jido.Plugin.Bus.Manager` | Agent-owned Signal Bus | Bus configuration | Bus child lifecycle |
 | `Jido.Plugin.Bus.Client` | Signal Bus input | Subscription configuration | Subscription, acknowledgement, and retry lifecycle |
-| `Jido.Plugin.Heartbeat` | Periodic Agent input | Plugin options | One timer and Signal delivery |
 | `Jido.Plugin.Audit` | Committed domain audit | Bounded audit records in Agent state | No runtime process |
 
 Persistence is a Plugin facet, not a separate Plugin product. Any Plugin can define how its owned state dumps and loads. `Jido.Persistence.Plugin` executes that contract.
+
+`Jido.Plugin.Heartbeat` was removed. Use `Jido.Plugin.Timer` with static
+interval options for periodic Agent input.
 
 Catalog exposes the installed included Plugins and extension-package Plugins as definitions. Documentation and runtime inspection must be able to show the exact list for the running application.
 
@@ -619,7 +621,7 @@ flowchart TD
   AI --> Action[Jido.Action]
   AI --> Session[Jido.Session and Jido.Thread]
 
-  Included[Scheduler · Sensors · Bus · Heartbeat · Audit] --> Plugin
+  Included[Timer · Sensors · Bus · Heartbeat · Audit] --> Plugin
 
   Plugin --> Agent
   Agent --> Exec

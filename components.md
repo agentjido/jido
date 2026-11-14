@@ -89,8 +89,7 @@ sub-component checks.
 | [`Jido.Signal.Dispatch`](docs/components/signal.md#dispatch) | [x] | [x] | [x] | [x] | Reviewed (R5) |
 | [`Jido.Plugin.Audit`](docs/components/plugin.md#audit-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R13) |
 | [`Jido.Plugin.Bus`](docs/components/plugin.md#bus-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R13) |
-| [`Jido.Plugin.Heartbeat`](docs/components/plugin.md#heartbeat-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R13) |
-| [`Jido.Plugin.Scheduler`](docs/components/plugin.md#scheduler-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R13) |
+| [`Jido.Plugin.Timer`](docs/components/plugin.md#timer-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R13) |
 | [`Jido.Plugin.SensorManager`](docs/components/plugin.md#sensor-manager-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R13) |
 | [`Jido.AI.Reasoning.Adaptive`](docs/components/ai.md#adaptive-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R14) |
 | [`Jido.AI.Reasoning.AlgorithmOfThoughts`](docs/components/ai.md#algorithm-of-thoughts-sub-component) | [x] | [x] | [x] | [x] | Reviewed (R14) |
@@ -301,13 +300,13 @@ an additional public component in this checklist.
 
 - **R13 — Plugin parent and bundled capability reviews.** The review traced
   Plugin declaration, callback ownership, normalization, contexts, Agent,
-  AgentServer and Persistence consumers, and the Audit, Bus, Heartbeat,
-  Scheduler, and Sensor Manager source and focused Covenant owners.
+  AgentServer and Persistence consumers, and the Audit, Bus, Timer, and Sensor
+  Manager source and focused Covenant owners.
   - The generic Plugin contract stays one optional behavior with three owner
-    groups. The five bundled capabilities remain explicit sub-components.
+    groups. The four bundled capabilities remain explicit sub-components.
   - Bus stays one capability with Manager, Client, and DSL public entries. An
     empty `Jido.Plugin.Bus` facade is not required.
-  - The [Plugin record](docs/components/plugin.md) contains all six review
+  - The [Plugin record](docs/components/plugin.md) contains all five review
     results and proof limits. No production defect was found.
 
 - **R14 — AI parent and reasoning reviews.** The review traced AI Agent
@@ -392,7 +391,7 @@ still needs review.
 | `Jido.Durable` | Component | None | Persisted Flow execution, portable references and status, Signal wait input, continuation recovery, and host wake boundary | Confirmed |
 | `Jido.Signal` | Parent component | `Jido.Signal.Router`, `Jido.Signal.Bus`, `Jido.Signal.Dispatch` | Envelope, context, boundary rules, codec, catalog | Confirmed |
 | `Jido.Agent` | Component | None | Fixed definitions, instances, routes, runtime Directives, static topology, state validation, Codec, Plugin preparation, references, and views | Confirmed |
-| `Jido.Plugin` | Parent component | `Jido.Plugin.Audit`, `Jido.Plugin.Bus`, `Jido.Plugin.Heartbeat`, `Jido.Plugin.Scheduler`, `Jido.Plugin.SensorManager` | Plugin behavior, config, specification, manifest, normalization, contexts, runtime callbacks | Reviewed and confirmed |
+| `Jido.Plugin` | Parent component | `Jido.Plugin.Audit`, `Jido.Plugin.Bus`, `Jido.Plugin.Timer`, `Jido.Plugin.SensorManager` | Plugin behavior, config, specification, manifest, normalization, contexts, runtime callbacks | Reviewed and confirmed |
 | `Jido.AgentServer` | Component | None | Lifecycle, activation, composition, durable Turns, effects, handoff, Plugin runtime, status, topology, supervision | Reviewed and confirmed |
 | `Jido.Instance` | Internal namespace of `Jido` | None | Names, namespace registry, options, runtime store | Confirmed internal ownership |
 | `Jido.Persistence` | Component | None | Records, snapshots, checkpoints, stores, continuation storage, Plugin conversion, adapters | Proposed |
@@ -405,7 +404,7 @@ still needs review.
 
 - 22 proposed or confirmed top-level components. `Jido` replaces the former
   `Jido.Instance` component candidate.
-- 16 proposed or confirmed sub-components.
+- 15 proposed or confirmed sub-components.
 - `Jido.Application` is listed as application composition, not as a public
   component.
 - Proof surfaces remain separate from component identity.
@@ -447,8 +446,7 @@ Jido package
 ├── Jido.Plugin                              parent component, confirmed
 │   ├── Jido.Plugin.Audit                    sub-component, confirmed
 │   ├── Jido.Plugin.Bus                      sub-component, confirmed
-│   ├── Jido.Plugin.Heartbeat                sub-component, confirmed
-│   ├── Jido.Plugin.Scheduler                sub-component, confirmed
+│   ├── Jido.Plugin.Timer                    sub-component, confirmed
 │   └── Jido.Plugin.SensorManager            sub-component, confirmed
 ├── Jido.AgentServer                         component, confirmed
 ├── Jido.Persistence                         component, candidate
@@ -645,13 +643,13 @@ These are first-party capabilities built on the Plugin contract.
 | --- | --- | --- | --- | --- |
 | Audit | Keep bounded committed audit records | `jido.plugin.audit` | `jido.plugin.audit` | Sub-component reviewed and confirmed |
 | Bus Manager and Client | Own a Bus and consume Signal subscriptions | `jido.plugin.bus` | `jido.plugin.bus` | Sub-component reviewed and confirmed |
-| Heartbeat | Send periodic Agent input | `jido.plugin.heartbeat` | `jido.plugin.heartbeat` | Sub-component reviewed and confirmed |
-| Scheduler | Deliver delayed and recurring Signals | `jido.plugin.scheduler` | `jido.plugin.scheduler` | Sub-component reviewed and confirmed |
+| Timer | Deliver delayed, static periodic, interval, and cron Signals | `jido.plugin.timer` | `jido.plugin.timer` | Sub-component reviewed and confirmed |
 | Sensor Manager | Reconcile supervised input sensors | `jido.plugin.sensor_manager` | `jido.plugin.sensor_manager` | Sub-component reviewed and confirmed |
 
-Resolved boundary: These five capabilities are first-party Plugin
-sub-components in core Jido. Bus has Manager, Client, and DSL public entries;
-it does not need an empty namespace facade.
+Resolved boundary: Four capabilities are first-party Plugin sub-components in
+core Jido. `Jido.Plugin.Heartbeat` was removed; use `Jido.Plugin.Timer` for
+periodic Signals. Bus has Manager, Client, and DSL public entries; it does not
+need an empty namespace facade.
 
 ## `Jido.AgentServer`
 

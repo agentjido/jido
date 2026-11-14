@@ -417,15 +417,14 @@ Proposed lessons:
 1. Audit records.
 2. One-shot scheduling.
 3. Recurring schedules and cron.
-4. Heartbeats.
+4. Static periodic Timer Signals.
 5. SensorManager.
 6. Bus Manager and Bus Client.
 
 Primary coverage:
 
 - `Jido.Plugin.Audit`
-- `Jido.Plugin.Scheduler`
-- `Jido.Plugin.Heartbeat`
+- `Jido.Plugin.Timer`
 - `Jido.Plugin.SensorManager`
 - `Jido.Plugin.Bus.Manager`
 - `Jido.Plugin.Bus.Client`

@@ -126,7 +126,7 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   defmodule RuntimeDeliveryAdapter do
-    @behaviour Jido.Plugin.Scheduler.DeliveryAdapter
+    @behaviour Jido.Plugin.Timer.DeliveryAdapter
 
     @impl true
     def reconcile(_context, _desired), do: :ok
@@ -313,14 +313,14 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   test "runtime options change only mapped AgentServer facet options" do
-    declaration = {Jido.Plugin.Scheduler, [retry_delay_ms: 10]}
+    declaration = {Jido.Plugin.Timer, [retry_delay_ms: 10]}
 
     assert {:ok, [spec]} =
              Jido.Plugin.Normalizer.normalize_runtime(
                [declaration],
                [
                  {Empty, [ignored: true]},
-                 {Jido.Plugin.Scheduler, [delivery_adapter: RuntimeDeliveryAdapter]}
+                 {Jido.Plugin.Timer, [delivery_adapter: RuntimeDeliveryAdapter]}
                ]
              )
 

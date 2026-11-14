@@ -1,18 +1,18 @@
 defmodule Jido.Examples.ScheduledCounter do
   @moduledoc """
-  An Agent whose Actions can change Scheduler runtime state with Directives.
+  An Agent whose Actions can change Timer runtime state with Directives.
 
-  This example uses the current `Jido.Plugin.Scheduler` because the current
+  This example uses the current `Jido.Plugin.Timer` because the current
   Agent Server accepts custom Directive handlers only through Plugins. The
   Agent Actions remain in control. They return `Schedule`, `Cron`, and `Cancel`
-  Directives. The Scheduler runtime interprets those values after the Agent
+  Directives. The Timer runtime interprets those values after the Agent
   state commit.
   """
 
   use Jido.Agent,
     name: "examples_scheduled_counter",
-    description: "Changes Scheduler runtime state with Action Directives",
-    plugins: [Jido.Plugin.Scheduler]
+    description: "Changes Timer runtime state with Action Directives",
+    plugins: [Jido.Plugin.Timer]
 
   state do
     schema Jido.Joi.object(%{
@@ -36,8 +36,7 @@ defmodule Jido.Examples.ScheduledCounter do
 
         state = context.agent_state
 
-        {:ok, %{state | schedule_requests: state.schedule_requests + 1},
-         [Jido.Plugin.Scheduler.schedule(delay_ms, tick)]}
+        {:ok, %{state | schedule_requests: state.schedule_requests + 1}, [Jido.Plugin.Timer.schedule(delay_ms, tick)]}
       end
     end
 
@@ -52,7 +51,7 @@ defmodule Jido.Examples.ScheduledCounter do
             source: "/examples/runtime/scheduled_counter/cron"
           )
 
-        directive = Jido.Plugin.Scheduler.cron(job_id, expression, tick)
+        directive = Jido.Plugin.Timer.cron(job_id, expression, tick)
         {:ok, %{context.agent_state | cron_enabled: true}, [directive]}
       end
     end
@@ -61,7 +60,7 @@ defmodule Jido.Examples.ScheduledCounter do
       action %{job_id: job_id},
         schema: Jido.Joi.object(%{job_id: Jido.Joi.any()}),
         context: context do
-        directive = Jido.Plugin.Scheduler.cancel(job_id)
+        directive = Jido.Plugin.Timer.cancel(job_id)
         {:ok, %{context.agent_state | cron_enabled: false}, [directive]}
       end
     end

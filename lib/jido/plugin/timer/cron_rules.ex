@@ -1,10 +1,10 @@
-defmodule Jido.Plugin.Scheduler.CronRules do
+defmodule Jido.Plugin.Timer.CronRules do
   @moduledoc false
 
   alias Crontab.CronExpression.Parser
   alias Jido.Codec.Term
   alias Jido.Error
-  alias Jido.Plugin.Scheduler.Occurrence
+  alias Jido.Plugin.Timer.Occurrence
   alias Jido.Signal
 
   @default_timezone "Etc/UTC"

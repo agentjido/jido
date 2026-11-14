@@ -115,8 +115,7 @@
       "Jido.AI.*",
       "Jido.Plugin.Audit*",
       "Jido.Plugin.Bus.*",
-      "Jido.Plugin.Heartbeat*",
-      "Jido.Plugin.Scheduler*",
+      "Jido.Plugin.Timer*",
       "Jido.Plugin.SensorManager*",
       "Jido.Telemetry.AI",
       "Jido.Telemetry.AI.*",
@@ -236,8 +235,8 @@
       "Jido.AI.Reasoning.TreeOfThoughts.Actions.ExpandNext",
       "Jido.AI.Reasoning.TRM.Actions.ExpandNext",
       "Jido.AI.Agent.DSL",
-      "Jido.Plugin.Scheduler.Agent",
-      "Jido.Plugin.Scheduler.Server",
+      "Jido.Plugin.Timer.Agent",
+      "Jido.Plugin.Timer.Server",
       "Jido.Plugin.SensorManager.Agent",
       "Jido.Plugin.SensorManager.Server"
     ],
@@ -324,8 +323,8 @@
       "lib/jido/ai/reasoning/tree_of_thoughts/actions/expand_next.ex",
       "lib/jido/ai/reasoning/trm/actions/expand_next.ex",
       "lib/jido/ai/agent/dsl.ex",
-      "lib/jido/plugin/scheduler/agent.ex",
-      "lib/jido/plugin/scheduler/server.ex",
+      "lib/jido/plugin/timer/agent.ex",
+      "lib/jido/plugin/timer/server.ex",
       "lib/jido/plugin/sensor_manager/agent.ex",
       "lib/jido/plugin/sensor_manager/server.ex"
     ]

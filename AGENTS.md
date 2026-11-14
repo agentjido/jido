@@ -26,12 +26,12 @@ Use these major components and target Covenant IDs:
 | `execution` | Flow execution (`jido.execution`) and the Action execution boundary (`jido.execution.action_boundary`) |
 | `agent_domain` | Agent data and authoring (`jido.agent`), pure evaluation (`jido.agent_evaluation`), addresses (`jido.agent_reference`), and the generic Plugin SDK (`jido.plugin`) |
 | `live_runtime` | AgentServer (`jido.agent_server.*`), Instance (`jido.instance`), Persistence (`jido.persistence`), Signal delivery (`jido.signal.delivery`), and Telemetry (`jido.telemetry`) |
-| `capabilities` | AI (`jido.ai.*`) and the bundled Audit, Bus, Heartbeat, Scheduler, and Sensor Manager components (`jido.plugin.*`) |
+| `capabilities` | AI (`jido.ai.*`) and the bundled Audit, Bus, Timer, and Sensor Manager components (`jido.plugin.*`); Heartbeat is a deprecated Timer facade |
 | `composition` | The OTP application (`jido.application`) and Catalog discovery (`jido.catalog.discovery`) |
 
 The focused AgentServer components are `jido.agent_server`, `jido.agent_server.activation`, `jido.agent_server.effects`, `jido.agent_server.plugin_runtime`, `jido.agent_server.composition`, `jido.agent_server.durable`, `jido.agent_server.durable_turn`, and `jido.agent_server.handoff`.
 
-The focused AI components are `jido.ai.agent_authoring`, `jido.ai.conversation`, `jido.ai.model_execution`, `jido.ai.observability`, `jido.ai.react`, `jido.ai.strategies`, `jido.ai.tools`, and `jido.ai.turn`. The bundled Plugin components are `jido.plugin.audit`, `jido.plugin.bus`, `jido.plugin.heartbeat`, `jido.plugin.scheduler`, and `jido.plugin.sensor_manager`.
+The focused AI components are `jido.ai.agent_authoring`, `jido.ai.conversation`, `jido.ai.model_execution`, `jido.ai.observability`, `jido.ai.react`, `jido.ai.strategies`, `jido.ai.tools`, and `jido.ai.turn`. The bundled Plugin components are `jido.plugin.audit`, `jido.plugin.bus`, `jido.plugin.timer`, and `jido.plugin.sensor_manager`.
 
 `.reach.exs` is the source of truth for code dependency layers. Covenant is the source of truth for behavior ownership and proof. Each Covenant component owns modules from one Reach layer. Each module has no more than one primary Covenant owner. A component test can use a lower layer, but the component does not own that lower layer.
 

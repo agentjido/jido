@@ -28,9 +28,9 @@
             }
           ]
         },
-        "id": "Elixir.Jido.Plugin.Scheduler",
+        "id": "Elixir.Jido.Plugin.Timer",
         "provider": {
-          "id": "plugins/scheduler",
+          "id": "plugins/timer",
           "vsn": 1
         },
         "vsn": 1

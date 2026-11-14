@@ -195,12 +195,12 @@ defmodule Jido.Agent.DirectCommandTest do
     end
   end
 
-  test "Scheduler owns its Directives and changes schedule state, not definition data" do
-    scheduler = Jido.Plugin.Scheduler
-    contribution = %{id: scheduler.id(), provider: scheduler, vsn: scheduler.vsn(), data: %{}}
+  test "Timer owns its Directives and changes schedule state, not definition data" do
+    timer = Jido.Plugin.Timer
+    contribution = %{id: timer.id(), provider: timer, vsn: timer.vsn(), data: %{}}
     before = instance([action()], [contribution])
     tick = signal("tick")
-    add = scheduler.cron("refresh", "*/5 * * * *", tick, timezone: "Etc/UTC")
+    add = timer.cron("refresh", "*/5 * * * *", tick, timezone: "Etc/UTC")
 
     assert {:error, _} =
              Agent.cmd(instance(), signal("work", %{amount: 0, directives: [add]}))
@@ -208,20 +208,20 @@ defmodule Jido.Agent.DirectCommandTest do
     assert {:ok, added, [_]} =
              Agent.cmd(before, signal("work", %{amount: 0, directives: [add]}))
 
-    assert added.state.scheduler.cron["refresh"].cron_expression == "*/5 * * * *"
-    assert added.state.scheduler.cron["refresh"].message === tick
+    assert added.state.timer.cron["refresh"].cron_expression == "*/5 * * * *"
+    assert added.state.timer.cron["refresh"].message === tick
     assert Agent.definition(added) === Agent.definition(before)
-    assert before.state.scheduler.cron === %{}
+    assert before.state.timer.cron === %{}
 
-    replace = scheduler.cron("refresh", "0 * * * *", tick, timezone: "Etc/UTC")
+    replace = timer.cron("refresh", "0 * * * *", tick, timezone: "Etc/UTC")
 
     assert {:ok, replaced, [_]} =
              Agent.cmd(added, signal("work", %{amount: 0, directives: [replace]}))
 
-    assert replaced.state.scheduler.cron["refresh"].cron_expression == "0 * * * *"
-    assert map_size(replaced.state.scheduler.cron) == 1
+    assert replaced.state.timer.cron["refresh"].cron_expression == "0 * * * *"
+    assert map_size(replaced.state.timer.cron) == 1
 
-    cancel = scheduler.cancel("refresh")
+    cancel = timer.cancel("refresh")
 
     assert {:ok, removed, [^cancel]} =
              Agent.cmd(replaced, signal("work", %{amount: 0, directives: [cancel]}))
@@ -230,11 +230,11 @@ defmodule Jido.Agent.DirectCommandTest do
     assert removed.plugins === before.plugins
   end
 
-  test "a Scheduler one-shot is returned as runtime work and does not edit schedule state" do
-    scheduler = Jido.Plugin.Scheduler
-    contribution = %{id: scheduler.id(), provider: scheduler, vsn: scheduler.vsn(), data: %{}}
+  test "a Timer one-shot is returned as runtime work and does not edit schedule state" do
+    timer = Jido.Plugin.Timer
+    contribution = %{id: timer.id(), provider: timer, vsn: timer.vsn(), data: %{}}
     before = instance([action()], [contribution])
-    delayed = scheduler.schedule(1_000, signal("tick"))
+    delayed = timer.schedule(1_000, signal("tick"))
 
     assert {:ok, after_agent, [^delayed]} =
              Agent.cmd(before, signal("work", %{amount: 0, directives: [delayed]}))

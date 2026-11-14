@@ -1,6 +1,6 @@
 defmodule Jido.Examples.OTPSupervision.Counter do
   @moduledoc "A counter placed directly in an application supervision tree."
-  use Jido.Agent, name: "otp_supervision_counter", plugins: [Jido.Plugin.Scheduler]
+  use Jido.Agent, name: "otp_supervision_counter", plugins: [Jido.Plugin.Timer]
 
   state do
     schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})

@@ -88,7 +88,7 @@ end
 | `schema:` option | A `state` block |
 | `signal_routes:` option, `signal_routes/1` callback | A `routes` block, and `route_add/3` and related Directives at runtime |
 | `category`, `tags`, `max_state_size` options | Not V3 options. Keep descriptive data in `metadata:`. |
-| `schedules:`, `default_plugins:` options | The `Jido.Plugin.Scheduler` Plugin, and explicit `plugins` |
+| `schedules:`, `default_plugins:` options | The `Jido.Plugin.Timer` Plugin, and explicit `plugins` |
 | A struct with `id` and `state` always set | Two forms. A definition has `id: nil` and `state: nil`. An instance has a nonempty `id` and validated state. |
 
 Keep PIDs, references, connections, and timers out of Agent state. See [Define an Agent](../agents/define-and-instantiate-an-agent.livemd) and [Agent State and Schemas](../agents/agent-state-and-schemas.md).
@@ -251,9 +251,9 @@ See [Plugin Design](../plugins/plugin-design.md).
 | `stop_child(tag, reason)` | `Jido.AgentServer.Directive.agent_stop/2` |
 | `stop(reason)` | `Jido.Agent.Directive.server_stop/1` |
 | `start_sensor/3`, `stop_sensor/2` | `Jido.Plugin.SensorManager.start/3`, `Jido.Plugin.SensorManager.stop/1` |
-| `schedule(delay_ms, message)` | `Jido.Plugin.Scheduler.schedule/2` |
-| `cron(expr, message, opts)` | `Jido.Plugin.Scheduler.cron/4` |
-| `cron_cancel(job_id)` | `Jido.Plugin.Scheduler.cancel/1` |
+| `schedule(delay_ms, message)` | `Jido.Plugin.Timer.schedule/2` |
+| `cron(expr, message, opts)` | `Jido.Plugin.Timer.cron/4` |
+| `cron_cancel(job_id)` | `Jido.Plugin.Timer.cancel/1` |
 | `run_instruction/2` | Removed. Route a Signal to an Action or Flow. |
 | The Jido.AgentServer.DirectiveExec protocol | A Plugin that owns the Directive and implements `c:Jido.Plugin.dispatch/4` |
 
@@ -264,10 +264,15 @@ The Server validates the whole batch before commit and runs it after commit. A f
 | V2 | V3 |
 | --- | --- |
 | Jido.Sensor, `init/2`, `handle_event/2`, `terminate/2` | Any module with `child_spec/1`, run by `Jido.Plugin.SensorManager`. See [Managed Sensors](../built-in-plugins/managed-sensors.livemd). |
-| Jido.Sensors.Heartbeat | `Jido.Plugin.Heartbeat`. See [Agent Heartbeats](../built-in-plugins/heartbeats.livemd). |
-| Jido.Scheduler, the Agent `schedules` option | `Jido.Plugin.Scheduler`. See [Schedules](../built-in-plugins/scheduler.livemd). |
+| Jido.Sensors.Heartbeat | A static `Jido.Plugin.Timer` interval. See [Periodic Timer Signals](../built-in-plugins/heartbeats.livemd). |
+| Jido.Timer, the Agent `schedules` option | `Jido.Plugin.Timer`. See [Timers](../built-in-plugins/timers.livemd). |
 | Jido.Pod and its mutation API | The static Agent `topology` block for fixed members, or explicit AgentServer child operations for dynamic children. See [Declare Agent Topology](../composition/declare-agent-topology.livemd). |
 | Jido.Agent.WorkerPool, Jido.Agent.InstanceManager | Topology members, or your own bounded workers. V3 has no checkout pool. |
+
+If an earlier V3 beta used `Jido.Plugin.Scheduler`, rename it to
+`Jido.Plugin.Timer`. Rename the Plugin-owned Agent state key from `:scheduler`
+to `:timer`. `Jido.Plugin.Heartbeat` was removed. Use a static
+`Jido.Plugin.Timer` interval for periodic input.
 
 ## Persistence
 

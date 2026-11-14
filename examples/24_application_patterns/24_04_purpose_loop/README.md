@@ -5,7 +5,7 @@ pause, resume, restore, and drain.
 
 ## What you will learn
 
-- How Scheduler Directives continue work without a connected client.
+- How Timer Directives continue work without a connected client.
 - How generations reject stale ticks during pause, resume, and recovery.
 
 ## Read the code
@@ -19,7 +19,7 @@ mix test.examples examples/24_application_patterns/24_04_purpose_loop --warnings
 ```
 
 Expected result: scheduled work reaches idle, a restored paused Agent resumes,
-and drain rejects later work and cleans the Scheduler runtime.
+and drain rejects later work and cleans the Timer runtime.
 
 ## Important behavior
 

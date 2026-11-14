@@ -1,10 +1,10 @@
-defmodule Jido.Agent.SchedulerCodecTest do
+defmodule Jido.Agent.TimerCodecTest do
   use Jido.Test.Case, async: true
 
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
   alias Jido.Catalog
-  alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Timer
 
   defmodule QueueTick do
     use Jido.Action,
@@ -12,7 +12,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
 
     def run(_, %{agent_state: state}) do
       tick = Jido.Signal.new!("codec.tick", %{}, source: "/test/codec")
-      {:ok, state, [Scheduler.schedule(0, tick)]}
+      {:ok, state, [Timer.schedule(0, tick)]}
     end
   end
 
@@ -34,21 +34,29 @@ defmodule Jido.Agent.SchedulerCodecTest do
   end
 
   for kind <- [:action, :flow] do
-    test "an imported #{kind} route dispatches through the Scheduler Plugin", %{jido: jido} do
+    test "an imported #{kind} route dispatches through the Timer Plugin", %{jido: jido} do
       definition = definition(unquote(kind))
       registry = registry(definition)
       assert {:ok, json} = Jido.Test.AgentServer.Registry.encode_json(definition, registry)
-      assert json =~ "plugins/scheduler"
+      assert json =~ "plugins/timer"
       assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode_json(json, registry)
       assert definition.id == nil
       assert definition.state == nil
 
-      assert [{Scheduler, [retry_delay_ms: 17]}] = Agent.Plugin.declarations(definition)
-      instance = Agent.instantiate!(definition, id: unique_id("json-scheduler"))
-      assert instance.state == %{count: 0, scheduler: %{cron: %{}}}
+      assert [{Timer, [retry_delay_ms: 17]}] = Agent.Plugin.declarations(definition)
+      instance = Agent.instantiate!(definition, id: unique_id("json-timer"))
+
+      assert instance.state == %{
+               count: 0,
+               timer: %{cron: %{}, every: %{}}
+             }
 
       assert {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, instance)
-      assert Server.snapshot(server).agent.state.scheduler == %{cron: %{}}
+
+      assert Server.snapshot(server).agent.state.timer == %{
+               cron: %{},
+               every: %{}
+             }
 
       assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, effects: :pending}} =
                Server.call(server, signal("codec.queue"))
@@ -57,16 +65,16 @@ defmodule Jido.Agent.SchedulerCodecTest do
       eventually(fn -> Server.snapshot(server).agent.state.count == 1 end)
       assert Server.snapshot(server).agent_revision == 2
 
-      scheduler = Jido.Test.AgentServer.Assertions.plugin(server, Scheduler).pid
-      scheduler_monitor = Process.monitor(scheduler)
+      timer = Jido.Test.AgentServer.Assertions.plugin(server, Timer).pid
+      timer_monitor = Process.monitor(timer)
       server_monitor = Process.monitor(server)
       assert :ok = Jido.stop_agent(jido, server)
-      assert_receive {:DOWN, ^scheduler_monitor, :process, ^scheduler, _}
+      assert_receive {:DOWN, ^timer_monitor, :process, ^timer, _}
       assert_receive {:DOWN, ^server_monitor, :process, ^server, _}
     end
   end
 
-  test "import requires the trusted Scheduler reference" do
+  test "import requires the trusted Timer reference" do
     definition = definition(:action)
     registry = registry(definition)
     assert {:ok, json} = Jido.Test.AgentServer.Registry.encode_json(definition, registry)
@@ -74,13 +82,13 @@ defmodule Jido.Agent.SchedulerCodecTest do
     missing_plugin =
       registry
       |> Catalog.list()
-      |> Enum.reject(&(&1.id == "plugins/scheduler" and &1.vsn == 1))
+      |> Enum.reject(&(&1.id == "plugins/timer" and &1.vsn == 1))
       |> Catalog.new!()
 
     assert {:error,
             [
               %Jido.Codec.Issue{
-                details: %{identifier: "plugins/scheduler"}
+                details: %{identifier: "plugins/timer"}
               }
             ]} =
              Jido.Test.AgentServer.Registry.decode_json(json, missing_plugin)
@@ -95,7 +103,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
     assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode(document, registry(definition))
   end
 
-  test "import validates Scheduler options before startup" do
+  test "import validates Timer options before startup" do
     definition = definition(:action)
     registry = registry(definition)
     assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
@@ -114,7 +122,7 @@ defmodule Jido.Agent.SchedulerCodecTest do
             [
               %Jido.Codec.Issue{
                 code: :invalid_document,
-                message: "Scheduler retry_delay_ms is invalid"
+                message: "Timer retry_delay_ms is invalid"
               }
             ]} = Jido.Test.AgentServer.Registry.decode_json(Jason.encode!(document), registry)
   end
@@ -123,13 +131,13 @@ defmodule Jido.Agent.SchedulerCodecTest do
     target = if kind == :action, do: QueueTick, else: QueueFlow
 
     Agent.define!(%{
-      name: "json_scheduler",
+      name: "json_timer",
       schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
       plugins: [
         %{
-          id: Scheduler.id(),
-          provider: Scheduler,
-          vsn: Scheduler.vsn(),
+          id: Timer.id(),
+          provider: Timer,
+          vsn: Timer.vsn(),
           data: %{retry_delay_ms: 17}
         }
       ],
@@ -154,10 +162,10 @@ defmodule Jido.Agent.SchedulerCodecTest do
       {"actions/queue", 1} => QueueTick,
       {"flows/queue", 1} => QueueFlow,
       {"actions/tick", 1} => Tick,
-      {"plugins/scheduler", 1} => Scheduler,
+      {"plugins/timer", 1} => Timer,
       {"atoms/retry-delay", 1} => :retry_delay_ms,
       {"atoms/count", 1} => :count,
-      {"atoms/scheduler", 1} => :scheduler,
+      {"atoms/timer", 1} => :timer,
       {"atoms/cron", 1} => :cron
     })
   end

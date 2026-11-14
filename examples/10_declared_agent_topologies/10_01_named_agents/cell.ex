@@ -2,7 +2,7 @@ defmodule Jido.Examples.Topology.Independent.Cell do
   @moduledoc "A small Agent for topology startup, ownership, and Bus examples."
   use Jido.Agent,
     name: "topology_independent_cell",
-    plugins: [{Jido.Plugin.Scheduler, %{retry_delay_ms: 25}}]
+    plugins: [{Jido.Plugin.Timer, %{retry_delay_ms: 25}}]
 
   state do
     schema Jido.Joi.object(%{
@@ -20,7 +20,7 @@ defmodule Jido.Examples.Topology.Independent.Cell do
         schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
         context: context do
         {:ok, signal} = Jido.Examples.Topology.Independent.Cell.work_signal(%{value: value})
-        {:ok, context.agent_state, [Jido.Plugin.Scheduler.schedule(0, signal)]}
+        {:ok, context.agent_state, [Jido.Plugin.Timer.schedule(0, signal)]}
       end
     end
 

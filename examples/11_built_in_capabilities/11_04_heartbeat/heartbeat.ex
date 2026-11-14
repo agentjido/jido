@@ -1,9 +1,9 @@
 defmodule Jido.Examples.Heartbeat do
   @moduledoc """
-  Uses the Heartbeat Plugin as an owned periodic input source.
+  Uses a static Timer interval as an owned periodic input source.
   """
 
-  alias Jido.Plugin.Heartbeat
+  alias Jido.Plugin.Timer
 
   defmodule Record do
     @moduledoc false
@@ -26,7 +26,7 @@ defmodule Jido.Examples.Heartbeat do
     @moduledoc "Receives the default Heartbeat Signal."
     use Jido.Agent,
       name: "runtime_heartbeat_default_agent",
-      plugins: [{Heartbeat, %{interval: 60_000, signal_data: %{kind: "default"}}}]
+      plugins: [{Timer, %{interval: 20, signal_data: %{kind: "default"}}}]
 
     state do
       schema Jido.Joi.object(%{events: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])})
@@ -42,9 +42,9 @@ defmodule Jido.Examples.Heartbeat do
     use Jido.Agent,
       name: "runtime_heartbeat_custom_agent",
       plugins: [
-        {Heartbeat,
+        {Timer,
          %{
-           interval: 60_000,
+           interval: 20,
            signal_type: "examples.runtime.heartbeat.custom",
            signal_data: %{kind: "custom"},
            source: "/examples/runtime/heartbeat"

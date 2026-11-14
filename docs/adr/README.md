@@ -13,6 +13,7 @@ This directory records decisions that constrain the Jido V3 architecture. The [m
 | [0005](0005-activation-local-declared-subtree-removal.md) | Accepted | Remove one declared subtree from the current activation |
 | [0006](0006-local-agent-ownership-transfer.md) | Accepted | Keep dynamic Agent ownership local and activation-scoped |
 | [0007](0007-deterministic-schema-field-order.md) | Accepted | Keep object schema field order stable across builds |
+| [0008](0008-stateful-recurring-intervals.md) | Accepted | Keep static and stateful recurring intervals in Timer |
 
 ## Backlog
 

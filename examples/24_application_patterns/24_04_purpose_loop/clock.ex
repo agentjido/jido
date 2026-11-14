@@ -13,12 +13,12 @@ defmodule Jido.Examples.Applications.PurposeLoop.Signals do
 end
 
 defmodule Jido.Examples.Applications.PurposeLoop.Clock do
-  @moduledoc "Creates Scheduler Directives for the purpose loop."
+  @moduledoc "Creates Timer Directives for the purpose loop."
 
   alias Jido.Examples.Applications.PurposeLoop.Signals
-  alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Timer
 
   def schedule_tick(state, delay_ms) do
-    Scheduler.schedule(delay_ms, Signals.tick(state.generation, state.next_sequence))
+    Timer.schedule(delay_ms, Signals.tick(state.generation, state.next_sequence))
   end
 end

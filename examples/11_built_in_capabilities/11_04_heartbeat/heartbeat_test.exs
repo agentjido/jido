@@ -6,39 +6,40 @@ defmodule Jido.Examples.Runtime.HeartbeatTest do
 
   alias Jido.Agent
   alias Jido.Examples.Heartbeat.{CustomAgent, DefaultAgent}
-  alias Jido.Plugin.Heartbeat
+  alias Jido.Plugin.Timer
 
-  test "explicit ticks deliver the default and custom Signals", %{jido: jido} do
+  test "static Timer intervals deliver the default and custom Signals", %{jido: jido} do
     {:ok, default_server} =
       Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, DefaultAgent, id: unique_id("heartbeat-default"))
 
-    default_runtime = runtime(default_server)
-    send(default_runtime, :tick)
-
     eventually(fn ->
-      Jido.AgentServer.snapshot(default_server).agent.state.events == [
-        %{
-          type: "jido.agent.heartbeat",
-          source: "/plugin/heartbeat",
-          data: %{kind: "default"}
-        }
-      ]
+      case Jido.AgentServer.snapshot(default_server).agent.state.events do
+        [%{type: "jido.agent.heartbeat", source: "/plugin/heartbeat", data: %{kind: "default"}} | _rest] ->
+          true
+
+        _events ->
+          false
+      end
     end)
 
     {:ok, custom_server} =
       Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, CustomAgent, id: unique_id("heartbeat-custom"))
 
-    custom_runtime = runtime(custom_server)
-    send(custom_runtime, :tick)
-
     eventually(fn ->
-      Jido.AgentServer.snapshot(custom_server).agent.state.events == [
-        %{
-          type: "examples.runtime.heartbeat.custom",
-          source: "/examples/runtime/heartbeat",
-          data: %{kind: "custom"}
-        }
-      ]
+      case Jido.AgentServer.snapshot(custom_server).agent.state.events do
+        [
+          %{
+            type: "examples.runtime.heartbeat.custom",
+            source: "/examples/runtime/heartbeat",
+            data: %{kind: "custom"}
+          }
+          | _rest
+        ] ->
+          true
+
+        _events ->
+          false
+      end
     end)
   end
 
@@ -49,16 +50,16 @@ defmodule Jido.Examples.Runtime.HeartbeatTest do
                schema: Jido.Joi.object(%{}),
                plugins: [
                  %{
-                   id: Heartbeat.id(),
-                   provider: Heartbeat,
-                   vsn: Heartbeat.vsn(),
+                   id: Timer.id(),
+                   provider: Timer,
+                   vsn: Timer.vsn(),
                    data: %{interval: 0}
                  }
                ]
              })
 
-    assert error.message == "Heartbeat Plugin options are invalid"
-    assert error.details.reason == {:invalid_heartbeat_interval, 0}
+    assert error.message == "Timer static interval options are invalid"
+    assert error.details.reason == {:invalid_timer_interval, 0}
   end
 
   test "the owner replaces a failed runtime and stops the replacement", %{jido: jido} do
@@ -74,7 +75,7 @@ defmodule Jido.Examples.Runtime.HeartbeatTest do
 
     new_runtime =
       eventually(fn ->
-        case Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Heartbeat) do
+        case Jido.Test.AgentServer.ExampleRuntime.plugin(activation, Timer) do
           pid when is_pid(pid) and pid != old_runtime -> pid
           _pid -> false
         end
@@ -82,8 +83,7 @@ defmodule Jido.Examples.Runtime.HeartbeatTest do
 
     server = Jido.AgentServer.Supervisor.worker(activation)
     assert :ok = Jido.AgentServer.await_ready(server)
-    send(new_runtime, :tick)
-    eventually(fn -> length(Jido.AgentServer.snapshot(server).agent.state.events) == 1 end)
+    eventually(fn -> Jido.AgentServer.snapshot(server).agent.state.events != [] end)
 
     cleanup_monitor = Process.monitor(new_runtime)
     assert :ok = Jido.stop_agent(jido, server)
@@ -91,6 +91,6 @@ defmodule Jido.Examples.Runtime.HeartbeatTest do
   end
 
   defp runtime(server) do
-    Jido.Test.AgentServer.ExampleRuntime.plugin(Jido.Test.AgentServer.ExampleRuntime.activation(server), Heartbeat)
+    Jido.Test.AgentServer.ExampleRuntime.plugin(Jido.Test.AgentServer.ExampleRuntime.activation(server), Timer)
   end
 end

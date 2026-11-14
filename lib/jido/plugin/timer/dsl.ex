@@ -1,9 +1,9 @@
-defmodule Jido.Plugin.Scheduler.DSL.Schedule do
+defmodule Jido.Plugin.Timer.DSL.Schedule do
   @moduledoc false
   defstruct [:name, :every, :cron, :timezone, :signal, :__spark_metadata__]
 end
 
-defmodule Jido.Plugin.Scheduler.DSL do
+defmodule Jido.Plugin.Timer.DSL do
   @moduledoc "Static schedule authoring. This provider does not start timers."
   alias Crontab.CronExpression.Parser
   alias Jido.Agent.{Route, Schema}
@@ -12,7 +12,7 @@ defmodule Jido.Plugin.Scheduler.DSL do
 
   @schedule %Spark.Dsl.Entity{
     name: :schedule,
-    target: Jido.Plugin.Scheduler.DSL.Schedule,
+    target: Jido.Plugin.Timer.DSL.Schedule,
     args: [:name],
     schema: [
       name: [type: :atom, required: true],
@@ -22,7 +22,7 @@ defmodule Jido.Plugin.Scheduler.DSL do
       signal: [type: :any, required: true]
     ]
   }
-  Jido.Plugin.Scheduler.DSL.Schedule = @schedule.target
+  Jido.Plugin.Timer.DSL.Schedule = @schedule.target
   @section %Spark.Dsl.Section{name: :schedules, entities: [@schedule]}
   use Jido.Plugin, id: "jido.scheduling", sections: [@section]
 

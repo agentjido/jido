@@ -2,7 +2,7 @@
   {"lib/jido/action.ex", :callback_type_mismatch, 69},
   {"lib/jido/action.ex", :callback_type_mismatch, 92},
   {"lib/jido/action.ex", :callback_type_mismatch, 107},
-  {"lib/jido/catalog/discovery.ex", :pattern_match, 286},
+  {"lib/jido/catalog/discovery.ex", :pattern_match, 285},
   {"lib/jido/codec/document.ex", :pattern_match_cov, 246},
   {"lib/jido/exec/result.ex", :pattern_match, 81},
   {"lib/jido/exec/result.ex", :pattern_match, 103},

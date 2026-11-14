@@ -1,5 +1,5 @@
-defmodule Jido.Plugin.Heartbeat.Signal.Tick do
-  @moduledoc "The default periodic Signal sent by the Heartbeat Plugin."
+defmodule Jido.Plugin.Timer.Signal.Tick do
+  @moduledoc "The default periodic Signal sent by a static Timer interval."
 
   use Jido.Signal,
     type: "jido.agent.heartbeat",

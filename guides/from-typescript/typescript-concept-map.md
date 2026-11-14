@@ -91,7 +91,7 @@ Do not convert untrusted keys with `String.to_atom/1`, because the VM never free
 | `Promise.all` | `Task.await_many/2` | |
 | `Promise.allSettled` | `Task.yield_many/2` | |
 | `setTimeout` | `Process.send_after/3` | Delivers a message |
-| `setInterval` | `:timer.send_interval/2`, or a `Jido.Plugin.Scheduler` schedule | |
+| `setInterval` | `:timer.send_interval/2`, or a `Jido.Plugin.Timer` schedule | |
 | `AbortController` | `Process.exit/2`, `Task.shutdown/2` | The target needs no cooperation |
 | `EventEmitter` | `send/2`, `Registry`, `Jido.Signal.Bus` | |
 | Worker thread | Process | Start as many as the work calls for |

@@ -1,6 +1,6 @@
 - id: agent-contract-hardening
   date: 2026-10-19
-  decision: Keep the Covenant component on Agent-specific values, authoring, validation, definition mutation, logical topology, and composition data. Remove persistence, AgentServer, Scheduler provider, shared authoring, and shared Plugin ownership claims.
+  decision: Keep the Covenant component on Agent-specific values, authoring, validation, definition mutation, logical topology, and composition data. Remove persistence, AgentServer, Timer provider, shared authoring, and shared Plugin ownership claims.
   driver: The obligation set and mutation profile must follow current code ownership and current public APIs.
   approved_by: User-requested hardening pass
 

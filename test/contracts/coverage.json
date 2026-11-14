@@ -11,9 +11,9 @@
       "covered": 14
     },
     "jido.plugin": {
-      "active": 34,
+      "active": 30,
       "coverage": 1.0,
-      "covered": 34
+      "covered": 30
     },
     "jido_action": {
       "active": 53,
@@ -2692,197 +2692,6 @@
         }
       }
     },
-    "jido.plugin.heartbeat": {
-      "active": 5,
-      "app": "jido.plugin",
-      "coverage": 1.0,
-      "covered": 5,
-      "form": "light",
-      "obligations": {
-        "jido.plugin.heartbeat.I1": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 2,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test Heartbeat exposes only its Plugin option type and default Tick Signal",
-            "test configuration applies defaults and accepts all custom values"
-          ]
-        },
-        "jido.plugin.heartbeat.I2": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test configuration and runtime startup reject each invalid option"
-          ]
-        },
-        "jido.plugin.heartbeat.I3": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 2,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test Heartbeat exposes only its Plugin option type and default Tick Signal",
-            "test the Plugin declares and starts one linked runtime child"
-          ]
-        },
-        "jido.plugin.heartbeat.I4": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 2,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test Heartbeat exposes only its Plugin option type and default Tick Signal",
-            "test automatic default ticks keep data and source and use fresh IDs"
-          ]
-        },
-        "jido.plugin.heartbeat.I5": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test custom ticks keep type, data, and source and use fresh IDs"
-          ]
-        }
-      }
-    },
-    "jido.plugin.scheduler": {
-      "active": 9,
-      "app": "jido.plugin",
-      "coverage": 1.0,
-      "covered": 9,
-      "form": "light",
-      "obligations": {
-        "jido.plugin.scheduler.I1": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 2,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test Scheduler exposes its durable delivery helpers and authoring API",
-            "test Scheduler state contains recurring definitions and applies changes in order"
-          ]
-        },
-        "jido.plugin.scheduler.I2": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 4,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test Scheduler exposes its durable delivery helpers and authoring API",
-            "test cron definitions reject nested nonportable values and reserved metadata",
-            "test invalid and retired Scheduler inputs fail before state can change",
-            "test saved definitions with retired delivery fields fail validation"
-          ]
-        },
-        "jido.plugin.scheduler.I3": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 3,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test Scheduler exposes its durable delivery helpers and authoring API",
-            "test static authoring normalizes timing and verifies accepted inputs",
-            "test static authoring rejects mixed timing and live Signal template data"
-          ]
-        },
-        "jido.plugin.scheduler.I4": {
-          "failing": 0,
-          "kind": "ordering",
-          "passing": 3,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test an external delivery adapter replaces all local delivery timers",
-            "test one-shot timers deliver one fresh traced Signal and ignore stale tokens",
-            "test runtime termination cancels one-shot and recurring timers"
-          ]
-        },
-        "jido.plugin.scheduler.I5": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 5,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test an external delivery adapter replaces all local delivery timers",
-            "test plain recurring ticks stay untagged and use fresh Signal IDs",
-            "test reconciliation replaces a dead matching job before its DOWN message",
-            "test recurring reconciliation retains equal jobs and fences stale versions and ticks",
-            "test runtime termination cancels one-shot and recurring timers"
-          ]
-        },
-        "jido.plugin.scheduler.I6": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 7,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test Scheduler exposes its durable delivery helpers and authoring API",
-            "test cron rules and occurrence identity are available to durable hosts",
-            "test equal occurrence coordinates produce one stable ID and preserve Signal values",
-            "test every occurrence coordinate can change the logical ID",
-            "test missing, partial, and malformed occurrence metadata return errors",
-            "test plain recurring ticks stay untagged and use fresh Signal IDs",
-            "test recurring reconciliation retains equal jobs and fences stale versions and ticks"
-          ]
-        },
-        "jido.plugin.scheduler.I7": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 4,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test Agent restore recreates a future timer with the same generation",
-            "test Scheduler runtime and cron job replacement restore committed definitions",
-            "test initial reconciliation restores future jobs and keeps exhausted jobs dormant",
-            "test job exits become dormant, disappear, or retry from the latest definition"
-          ]
-        },
-        "jido.plugin.scheduler.I8": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 6,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test external delayed delivery contains invalid results and adapter failures",
-            "test external reconciliation retries the latest committed definitions",
-            "test failed cron activation retries, ignores stale work, and recovers",
-            "test invalid runtime clocks fail activation and own one retry timer",
-            "test job exits become dormant, disappear, or retry from the latest definition",
-            "test startup preserves state failures and server calls contain runtime loss"
-          ]
-        },
-        "jido.plugin.scheduler.I9": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 5,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test configuration accepts only bounded retry delays and valid time scales",
-            "test initial reconciliation restores future jobs and keeps exhausted jobs dormant",
-            "test startup preserves state failures and server calls contain runtime loss",
-            "test the Plugin declares one runtime child and reports readiness after reconciliation",
-            "test wall-clock waits round upward, recheck time, and permit cancellation"
-          ]
-        }
-      }
-    },
     "jido.plugin.sensor_manager": {
       "active": 8,
       "app": "jido.plugin",
@@ -2978,6 +2787,155 @@
             "test Plugin runtime callbacks contain an unavailable runtime exit",
             "test failed starts and restarts retry without a new Directive",
             "test invalid child specifications fail without damaging the runtime"
+          ]
+        }
+      }
+    },
+    "jido.plugin.timer": {
+      "active": 10,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 10,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.timer.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Timer exposes its durable delivery helpers and authoring API",
+            "test Timer state contains recurring definitions and applies changes in order",
+            "test interval definitions replace by job ID and pause, resume, and cancel in order"
+          ]
+        },
+        "jido.plugin.timer.I10": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a static interval starts automatically through the Timer runtime",
+            "test static interval options create one normal running interval definition"
+          ]
+        },
+        "jido.plugin.timer.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Timer exposes its durable delivery helpers and authoring API",
+            "test cron definitions reject nested nonportable values and reserved metadata",
+            "test invalid and retired Timer inputs fail before state can change",
+            "test saved definitions with retired delivery fields fail validation"
+          ]
+        },
+        "jido.plugin.timer.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Timer exposes its durable delivery helpers and authoring API",
+            "test static authoring normalizes timing and verifies accepted inputs",
+            "test static authoring rejects mixed timing and live Signal template data"
+          ]
+        },
+        "jido.plugin.timer.I4": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test an external delivery adapter replaces all local delivery timers",
+            "test one-shot timers deliver one fresh traced Signal and ignore stale tokens",
+            "test runtime termination cancels one-shot and recurring timers"
+          ]
+        },
+        "jido.plugin.timer.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 8,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test an external delivery adapter replaces all local delivery timers",
+            "test external delivery rejects fixed-delay intervals",
+            "test fixed-delay intervals deliver fresh occurrences and reconcile lifecycle changes",
+            "test managed interval schedules deliver repeated Agent Signals",
+            "test plain recurring ticks stay untagged and use fresh Signal IDs",
+            "test reconciliation replaces a dead matching job before its DOWN message",
+            "test recurring reconciliation retains equal jobs and fences stale versions and ticks",
+            "test runtime termination cancels one-shot and recurring timers"
+          ]
+        },
+        "jido.plugin.timer.I6": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 9,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Timer exposes its durable delivery helpers and authoring API",
+            "test cron rules and occurrence identity are available to durable hosts",
+            "test equal occurrence coordinates produce one stable ID and preserve Signal values",
+            "test every occurrence coordinate can change the logical ID",
+            "test fixed-delay intervals deliver fresh occurrences and reconcile lifecycle changes",
+            "test managed interval schedules deliver repeated Agent Signals",
+            "test missing, partial, and malformed occurrence metadata return errors",
+            "test plain recurring ticks stay untagged and use fresh Signal IDs",
+            "test recurring reconciliation retains equal jobs and fences stale versions and ticks"
+          ]
+        },
+        "jido.plugin.timer.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Agent restore recreates a future timer with the same generation",
+            "test Agent restore recreates an active interval with the same generation",
+            "test Timer runtime and cron job replacement restore committed definitions",
+            "test Timer runtime replacement restores active intervals and preserves pause",
+            "test initial reconciliation restores future jobs and keeps exhausted jobs dormant",
+            "test job exits become dormant, disappear, or retry from the latest definition"
+          ]
+        },
+        "jido.plugin.timer.I8": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 7,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test external delayed delivery contains invalid results and adapter failures",
+            "test external delivery rejects fixed-delay intervals",
+            "test external reconciliation retries the latest committed definitions",
+            "test failed cron activation retries, ignores stale work, and recovers",
+            "test invalid runtime clocks fail activation and own one retry timer",
+            "test job exits become dormant, disappear, or retry from the latest definition",
+            "test startup preserves state failures and server calls contain runtime loss"
+          ]
+        },
+        "jido.plugin.timer.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test configuration accepts only bounded retry delays and valid time scales",
+            "test initial reconciliation restores future jobs and keeps exhausted jobs dormant",
+            "test startup preserves state failures and server calls contain runtime loss",
+            "test the Plugin declares one runtime child and reports readiness after reconciliation",
+            "test wall-clock waits round upward, recheck time, and permit cancellation"
           ]
         }
       }
@@ -5700,8 +5658,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 238,
+    "active": 234,
     "coverage": 1.0,
-    "covered": 238
+    "covered": 234
   }
 }

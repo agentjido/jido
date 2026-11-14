@@ -382,12 +382,12 @@ defmodule Jido.PersistenceTest do
     start_supervised!(Clock)
     persistence = adapter(:plugin_state)
     tick = Signal.new!("cron.tick", %{}, source: "/test")
-    spec = Jido.Plugin.Scheduler.CronRules.build_spec("* * * * * * *", tick)
+    spec = Jido.Plugin.Timer.CronRules.build_spec("* * * * * * *", tick)
 
     agent =
       FastRuntimeAgent.instantiate!(
         id: unique_id("persisted"),
-        state: %{events: [:saved], ticks: 4, scheduler: %{cron: %{heartbeat: spec}}}
+        state: %{events: [:saved], ticks: 4, timer: %{cron: %{heartbeat: spec}}}
       )
 
     assert :ok = Persistence.save_agent(persistence, agent, namespace: "persistence-test")
@@ -397,7 +397,7 @@ defmodule Jido.PersistenceTest do
 
     assert restored == agent
     assert {:ok, pid} = Jido.Test.AgentServer.Assertions.start_agent(jido, restored)
-    assert Map.has_key?(Server.snapshot(pid).agent.state.scheduler.cron, :heartbeat)
+    assert Map.has_key?(Server.snapshot(pid).agent.state.timer.cron, :heartbeat)
 
     eventually(fn -> Server.snapshot(pid).agent.state.ticks > 4 end, timeout: 5_000)
   end

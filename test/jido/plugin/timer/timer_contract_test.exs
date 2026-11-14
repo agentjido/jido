@@ -1,11 +1,11 @@
-defmodule Jido.Plugin.Scheduler.ContractTest do
-  use Covenant.Case, component: "jido.plugin.scheduler", async: true
+defmodule Jido.Plugin.Timer.ContractTest do
+  use Covenant.Case, component: "jido.plugin.timer", async: true
 
   alias Jido.Agent
   alias Jido.Error.ValidationError, as: Error
-  alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.CronRules
-  alias Jido.Plugin.Scheduler.{DSL, Occurrence, WallClock}
+  alias Jido.Plugin.Timer
+  alias Jido.Plugin.Timer.CronRules
+  alias Jido.Plugin.Timer.{DSL, Occurrence, WallClock}
   alias Jido.Plugin.Normalizer
   alias Jido.Signal
   alias Jido.Test.Agent.Contract, as: F
@@ -15,7 +15,7 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
   @instant ~U[2030-01-01 00:00:01Z]
 
   defmodule DeliveryAdapter do
-    @behaviour Jido.Plugin.Scheduler.DeliveryAdapter
+    @behaviour Jido.Plugin.Timer.DeliveryAdapter
 
     @impl true
     def reconcile(_context, _desired), do: :ok
@@ -24,17 +24,17 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
     def schedule(_context, _delay_ms, _signal), do: :ok
   end
 
-  defp tick, do: Signal.new!("test.tick", %{value: 7}, source: "/test")
+  defp tick(type \\ "test.tick"), do: Signal.new!(type, %{value: 7}, source: "/test")
 
   defp reduce_state(state, directives),
-    do: Scheduler.reduce(%{plugin_state: state, directives: directives}, [])
+    do: Timer.reduce(%{plugin_state: state, directives: directives}, [])
 
   defp contribution(data) do
     %{id: DSL.id(), provider: DSL, vsn: DSL.vsn(), data: data}
   end
 
   defp define(data, routes \\ []) do
-    Agent.define(%{name: "scheduler-contract", routes: routes, plugins: [contribution(data)]})
+    Agent.define(%{name: "timer-contract", routes: routes, plugins: [contribution(data)]})
   end
 
   defp action(type),
@@ -44,34 +44,41 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
       state: %{source: :output, path: []}
     }
 
-  @tag obligation: "jido.plugin.scheduler.I1"
-  test "Scheduler state contains recurring definitions and applies changes in order" do
-    assert Scheduler.sections() == []
+  @tag obligation: "jido.plugin.timer.I1"
+  test "Timer state contains recurring definitions and applies changes in order" do
+    assert Timer.sections() == []
 
     signal = tick()
-    schedule = Scheduler.schedule(10, signal)
-    cron = Scheduler.cron(:heartbeat, "* * * * *", signal, generation: 3)
-    cancel = Scheduler.cancel(:heartbeat)
+    schedule = Timer.schedule(10, signal)
+    cron = Timer.cron(:heartbeat, "* * * * *", signal, generation: 3)
+    cancel = Timer.cancel(:heartbeat)
 
-    assert [Scheduler.Schedule, Scheduler.Cron, Scheduler.Cancel] =
-             Scheduler.directives([])
+    assert [
+             Timer.Schedule,
+             Timer.Cron,
+             Timer.Every,
+             Timer.Pause,
+             Timer.Resume,
+             Timer.Cancel
+           ] =
+             Timer.directives([])
 
     assert {:ok, ^schedule} = Agent.Directive.validate(schedule)
     assert {:ok, cron} = Agent.Directive.validate(cron)
     assert {:ok, ^cancel} = Agent.Directive.validate(cancel)
-    assert {:ok, _} = Agent.Directive.validate(Scheduler.schedule(0, signal))
+    assert {:ok, _} = Agent.Directive.validate(Timer.schedule(0, signal))
 
     for generation <- [0, 2_147_483_647] do
       assert {:ok, _} =
-               Agent.Directive.validate(Scheduler.cron(:boundary, "* * * * *", signal, generation: generation))
+               Agent.Directive.validate(Timer.cron(:boundary, "* * * * *", signal, generation: generation))
     end
 
     assert {:ok, unchanged} =
              reduce_state(%{cron: %{}}, [schedule])
 
-    assert unchanged == %{cron: %{}}
+    assert unchanged == %{cron: %{}, every: %{}}
 
-    assert {:ok, %{cron: %{heartbeat: spec}}} =
+    assert {:ok, %{cron: %{heartbeat: spec}, every: %{}}} =
              reduce_state(%{cron: %{}}, [cancel, cron])
 
     assert spec == %{
@@ -81,12 +88,98 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
              generation: 3
            }
 
-    assert {:ok, %{cron: %{}}} =
+    assert {:ok, %{cron: %{}, every: %{}}} =
              reduce_state(%{cron: %{}}, [cron, cancel])
   end
 
-  @tag obligation: "jido.plugin.scheduler.I2"
-  test "invalid and retired Scheduler inputs fail before state can change" do
+  @tag obligation: "jido.plugin.timer.I10"
+  test "static interval options create one normal running interval definition" do
+    assert %{
+             option_keys: %{
+               agent: [:interval, :signal_type, :signal_data, :source],
+               agent_server: [:delivery_adapter, :retry_delay_ms, :time_scale]
+             }
+           } = Timer.__jido_plugin__()
+
+    assert {:timer, empty_schema} = Timer.state_spec([])
+    assert {:ok, %{cron: %{}, every: %{}}} = Jido.Joi.parse(empty_schema, nil)
+
+    options = [
+      interval: 25,
+      signal_type: "system.heartbeat",
+      signal_data: %{source: :clock},
+      source: "urn:jido:clock"
+    ]
+
+    assert {:ok,
+            %{
+              interval: 25,
+              signal_type: "system.heartbeat",
+              signal_data: %{source: :clock},
+              source: "urn:jido:clock"
+            }} = Timer.static_configuration(options)
+
+    assert {:timer, schema} = Timer.state_spec(options)
+    assert {:ok, state} = Jido.Joi.parse(schema, nil)
+    assert state.cron == %{}
+    assert state.every.heartbeat.interval_ms == 25
+    assert state.every.heartbeat.generation == 0
+    assert state.every.heartbeat.status == :running
+    assert state.every.heartbeat.message.type == "system.heartbeat"
+    assert state.every.heartbeat.message.data == %{source: :clock}
+    assert state.every.heartbeat.message.source == "urn:jido:clock"
+
+    for options <- [
+          [interval: 0],
+          [signal_type: ""],
+          [signal_data: []],
+          [source: "not a URI reference"]
+        ] do
+      assert {:error, %Jido.Error.ValidationError{message: "Timer static interval options are invalid"}} =
+               Timer.state_spec(options)
+    end
+  end
+
+  @tag obligation: "jido.plugin.timer.I1"
+  test "interval definitions replace by job ID and pause, resume, and cancel in order" do
+    first = Timer.every(:review, 25, tick())
+    replacement = Timer.every(:review, 50, tick("test.replaced"))
+
+    assert {:ok, first} = Agent.Directive.validate(first)
+    assert {:ok, replacement} = Agent.Directive.validate(replacement)
+    assert {:ok, _pause} = Agent.Directive.validate(Timer.pause(:review))
+    assert {:ok, _resume} = Agent.Directive.validate(Timer.resume(:review))
+
+    assert {:ok, started} = reduce_state(%{cron: %{}}, [first])
+    assert started.every.review.interval_ms == 25
+    assert started.every.review.generation == 0
+    assert started.every.review.status == :running
+
+    assert {:ok, paused} = reduce_state(started, [Timer.pause(:review)])
+    assert paused.every.review.status == :paused
+
+    assert {:ok, resumed} = reduce_state(paused, [Timer.resume(:review)])
+    assert resumed.every.review.generation == 1
+    assert resumed.every.review.status == :running
+
+    assert {:ok, replaced} = reduce_state(resumed, [replacement])
+    assert replaced.every.review.interval_ms == 50
+    assert replaced.every.review.generation == 2
+    assert replaced.cron == %{}
+
+    cron = Timer.cron(:review, "* * * * *", tick())
+    assert {:ok, cron_state} = reduce_state(replaced, [cron])
+    assert Map.has_key?(cron_state.cron, :review)
+    assert cron_state.every == %{}
+    assert {:ok, ^cron_state} = reduce_state(cron_state, [Timer.pause(:review)])
+    assert {:ok, ^cron_state} = reduce_state(cron_state, [Timer.resume(:review)])
+
+    assert {:ok, cancelled} = reduce_state(cron_state, [Timer.cancel(:review)])
+    assert cancelled == %{cron: %{}, every: %{}}
+  end
+
+  @tag obligation: "jido.plugin.timer.I2"
+  test "invalid and retired Timer inputs fail before state can change" do
     signal = tick()
 
     assert {:ok, "Etc/UTC"} = CronRules.validate_spec("* * * * *", signal, "")
@@ -105,31 +198,48 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
              CronRules.validate_spec("* * * * *", signal, "No/SuchZone")
 
     for directive <- [
-          Scheduler.schedule(-1, signal),
-          Scheduler.schedule(1, :not_a_signal),
-          Scheduler.cron(make_ref(), "* * * * *", signal),
-          Scheduler.cron(:bad_cron, "not cron", signal),
-          Scheduler.cron(:bad_zone, "* * * * *", signal, timezone: "No/SuchZone"),
-          Scheduler.cron(:bad_generation, "* * * * *", signal, generation: -1),
-          Scheduler.cron(:large_generation, "* * * * *", signal, generation: 2_147_483_648)
+          Timer.schedule(-1, signal),
+          Timer.schedule(1, :not_a_signal),
+          Timer.every(:zero, 0, signal),
+          Timer.every(:large, 4_294_967_296, signal),
+          Timer.every(make_ref(), 10, signal),
+          Timer.every(:bad_signal, 10, :not_a_signal),
+          Timer.every(:bad_generation, 10, signal, generation: -1),
+          Timer.cron(make_ref(), "* * * * *", signal),
+          Timer.cron(:bad_cron, "not cron", signal),
+          Timer.cron(:bad_zone, "* * * * *", signal, timezone: "No/SuchZone"),
+          Timer.cron(:bad_generation, "* * * * *", signal, generation: -1),
+          Timer.cron(:large_generation, "* * * * *", signal, generation: 2_147_483_648)
         ] do
       assert {:error, _reason} = Agent.Directive.validate(directive)
     end
 
-    assert_raise ArgumentError, "Scheduler delivery is not supported", fn ->
-      Scheduler.cron(:removed, "* * * * *", signal, delivery: :durable)
+    assert_raise ArgumentError, "Timer delivery is not supported", fn ->
+      Timer.cron(:removed, "* * * * *", signal, delivery: :durable)
     end
 
-    assert_raise ArgumentError, "Scheduler cron options must be a keyword list", fn ->
-      apply(Scheduler, :cron, [:invalid_options, "* * * * *", signal, %{}])
+    assert_raise ArgumentError, "Timer cron options must be a keyword list", fn ->
+      apply(Timer, :cron, [:invalid_options, "* * * * *", signal, %{}])
     end
 
-    assert_raise ArgumentError, "Scheduler cron does not accept options [:unknown]", fn ->
-      Scheduler.cron(:invalid_options, "* * * * *", signal, unknown: true)
+    assert_raise ArgumentError, "Timer every options must be a keyword list", fn ->
+      apply(Timer, :every, [:invalid_options, 10, signal, %{}])
     end
 
-    assert_raise ArgumentError, "Scheduler cron options must be unique", fn ->
-      Scheduler.cron(:invalid_options, "* * * * *", signal,
+    assert_raise ArgumentError, "Timer every does not accept options [:unknown]", fn ->
+      Timer.every(:invalid_options, 10, signal, unknown: true)
+    end
+
+    assert_raise ArgumentError, "Timer every options must be unique", fn ->
+      Timer.every(:invalid_options, 10, signal, generation: 1, generation: 2)
+    end
+
+    assert_raise ArgumentError, "Timer cron does not accept options [:unknown]", fn ->
+      Timer.cron(:invalid_options, "* * * * *", signal, unknown: true)
+    end
+
+    assert_raise ArgumentError, "Timer cron options must be unique", fn ->
+      Timer.cron(:invalid_options, "* * * * *", signal,
         timezone: "Etc/UTC",
         timezone: "America/Chicago"
       )
@@ -142,27 +252,30 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
           [timeout: 5_000]
         ] do
       assert {:error, %Jido.Error.ValidationError{}} =
-               Normalizer.normalize_all([{Scheduler, options}])
+               Normalizer.normalize_all([{Timer, options}])
     end
 
-    refute function_exported?(Scheduler, :admit_occurrence, 2)
-    refute function_exported?(Scheduler, :acknowledge, 1)
+    refute function_exported?(Timer, :admit_occurrence, 2)
+    refute function_exported?(Timer, :acknowledge, 1)
 
     for module <- [
-          Scheduler.Acknowledge,
-          Scheduler.Delivery,
-          Scheduler.Durable,
-          Scheduler.Enqueue,
-          Scheduler.Queue,
-          Scheduler.Signal.Enqueue
+          Timer.Acknowledge,
+          Timer.Delivery,
+          Timer.Durable,
+          Timer.Enqueue,
+          Timer.Queue,
+          Timer.Signal.Enqueue
         ] do
       refute Code.ensure_loaded?(module)
     end
   end
 
-  @tag obligation: "jido.plugin.scheduler.I2"
+  @tag obligation: "jido.plugin.timer.I2"
   test "saved definitions with retired delivery fields fail validation" do
-    {:scheduler, schema} = Scheduler.state_spec([])
+    {:timer, schema} = Timer.state_spec([])
+
+    assert {:ok, %{cron: %{}, every: %{}}} =
+             Jido.Joi.parse(schema, %{cron: %{}})
 
     base = CronRules.build_spec("* * * * *", tick(), nil, 1)
 
@@ -187,19 +300,19 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
     end
   end
 
-  @tag obligation: "jido.plugin.scheduler.I2"
+  @tag obligation: "jido.plugin.timer.I2"
   test "cron definitions reject nested nonportable values and reserved metadata" do
     port = Port.open({:spawn, "cat"}, [:binary])
 
     try do
       for value <- [self(), make_ref(), port, fn -> :ok end, [1 | :tail]] do
         assert {:error, %Jido.Error.ValidationError{code: :invalid_job_id, details: %{reason: :nonportable_term}}} =
-                 Agent.Directive.validate(Scheduler.cron({:job, %{nested: value}}, "* * * * *", tick()))
+                 Agent.Directive.validate(Timer.cron({:job, %{nested: value}}, "* * * * *", tick()))
 
         invalid = %{tick() | data: %{nested: {:value, [value]}}}
 
         assert {:error, %Jido.Error.ValidationError{code: :invalid_message, details: %{reason: :nonportable_term}}} =
-                 Agent.Directive.validate(Scheduler.cron(:job, "* * * * *", invalid))
+                 Agent.Directive.validate(Timer.cron(:job, "* * * * *", invalid))
 
         assert {:error, :nonportable_occurrence_scope} =
                  CronRules.validate_occurrence_scope({ExampleJido, "agent-1", [value]})
@@ -211,10 +324,10 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
     {:ok, tagged} = Occurrence.attach(tick(), @scope, "job-1", 1, @instant)
 
     assert {:error, %Jido.Error.ValidationError{code: :reserved_occurrence_metadata}} =
-             Agent.Directive.validate(Scheduler.cron("job-1", "* * * * *", tagged, generation: 1))
+             Agent.Directive.validate(Timer.cron("job-1", "* * * * *", tagged, generation: 1))
   end
 
-  @tag obligation: "jido.plugin.scheduler.I3"
+  @tag obligation: "jido.plugin.timer.I3"
   test "static authoring normalizes timing and verifies accepted inputs" do
     assert [%Section{name: :schedules, entities: [%Entity{} = entity]}] = DSL.sections()
     assert entity.name == :schedule
@@ -310,11 +423,11 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
             %Error{
               code: :schedule_input,
               path: [:plugins, 0, 0, :schedules, :review],
-              details: %{type: "work.request", definition: "scheduler-contract"}
+              details: %{type: "work.request", definition: "timer-contract"}
             }} = define(data)
   end
 
-  @tag obligation: "jido.plugin.scheduler.I3"
+  @tag obligation: "jido.plugin.timer.I3"
   test "static authoring rejects mixed timing and live Signal template data" do
     for schedule <- [
           %DSL.Schedule{name: :missing, signal: %{type: "work.request"}},
@@ -359,7 +472,7 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
     end
   end
 
-  @tag obligation: "jido.plugin.scheduler.I6"
+  @tag obligation: "jido.plugin.timer.I6"
   test "equal occurrence coordinates produce one stable ID and preserve Signal values" do
     first = tick()
     second = tick()
@@ -378,7 +491,7 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
     assert {:ok, ^occurrence} = Occurrence.from_signal(restored)
   end
 
-  @tag obligation: "jido.plugin.scheduler.I6"
+  @tag obligation: "jido.plugin.timer.I6"
   test "every occurrence coordinate can change the logical ID" do
     coordinates = [
       {@scope, "job-1", 1, @instant},
@@ -400,7 +513,7 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
     assert length(Enum.uniq(ids)) == length(coordinates)
   end
 
-  @tag obligation: "jido.plugin.scheduler.I6"
+  @tag obligation: "jido.plugin.timer.I6"
   test "missing, partial, and malformed occurrence metadata return errors" do
     assert {:error, :not_found} = Occurrence.from_signal(tick())
     {:ok, partial} = Signal.put_context(tick(), "jidooccurrenceid", "occ_partial")
@@ -436,15 +549,15 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
     end
   end
 
-  @tag obligation: "jido.plugin.scheduler.I9"
+  @tag obligation: "jido.plugin.timer.I9"
   test "configuration accepts only bounded retry delays and valid time scales" do
-    assert {:scheduler, _schema} = Scheduler.state_spec([])
+    assert {:timer, _schema} = Timer.state_spec([])
 
     assert %{
              option_keys: %{
                agent_server: [:delivery_adapter, :retry_delay_ms, :time_scale]
              }
-           } = Scheduler.__jido_plugin__()
+           } = Timer.__jido_plugin__()
 
     for options <- [
           [],
@@ -452,20 +565,20 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
           [retry_delay_ms: 1, time_scale: SchedEx.IdentityTimeScale],
           [retry_delay_ms: 4_294_967_295, time_scale: SchedEx.IdentityTimeScale]
         ] do
-      assert :ok = Scheduler.validate_options(options)
-      assert {:ok, [_spec]} = Normalizer.normalize_all([{Scheduler, options}])
+      assert :ok = Timer.validate_options(options)
+      assert {:ok, [_spec]} = Normalizer.normalize_all([{Timer, options}])
     end
 
     for delay <- [0, -1, 1.5, :manual, 4_294_967_296] do
       assert {:error,
               %Jido.Error.ValidationError{
-                message: "Scheduler retry_delay_ms is invalid",
+                message: "Timer retry_delay_ms is invalid",
                 details: %{
                   option: :retry_delay_ms,
                   value: ^delay,
                   range: 1..4_294_967_295
                 }
-              }} = Scheduler.validate_options(retry_delay_ms: delay)
+              }} = Timer.validate_options(retry_delay_ms: delay)
     end
 
     callbacks = SchedEx.TimeScale.behaviour_info(:callbacks)
@@ -479,51 +592,51 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
         ] do
       assert {:error,
               %Jido.Error.ValidationError{
-                message: "Scheduler time_scale is invalid",
+                message: "Timer time_scale is invalid",
                 details: %{
                   option: :time_scale,
                   value: ^time_scale,
                   callbacks: ^callbacks
                 }
-              }} = Scheduler.validate_options(time_scale: time_scale)
+              }} = Timer.validate_options(time_scale: time_scale)
     end
 
     for adapter <- [nil, String, __MODULE__.MissingDeliveryAdapter] do
       assert {:error,
               %Jido.Error.ValidationError{
-                message: "Scheduler delivery_adapter is invalid",
+                message: "Timer delivery_adapter is invalid",
                 details: %{
                   option: :delivery_adapter,
                   value: ^adapter,
                   callbacks: [reconcile: 2, schedule: 3]
                 }
-              }} = Scheduler.validate_options(delivery_adapter: adapter)
+              }} = Timer.validate_options(delivery_adapter: adapter)
     end
   end
 
-  @tag obligation: "jido.plugin.scheduler.I6"
+  @tag obligation: "jido.plugin.timer.I6"
   test "cron rules and occurrence identity are available to durable hosts" do
     assert {:ok, ~U[2030-01-01 00:00:01Z]} =
-             Scheduler.next_occurrence("* * * * * * *", "Etc/UTC", ~U[2030-01-01 00:00:00Z])
+             Timer.next_occurrence("* * * * * * *", "Etc/UTC", ~U[2030-01-01 00:00:00Z])
 
     assert {:ok, ~U[2030-01-01 00:00:02Z]} =
-             Scheduler.next_occurrence(
+             Timer.next_occurrence(
                "* * * * * * *",
                "Etc/UTC",
                ~U[2030-01-01 00:00:01.000001Z]
              )
 
     assert {:error, _reason} =
-             Scheduler.next_occurrence("not cron", "Etc/UTC", ~U[2030-01-01 00:00:00Z])
+             Timer.next_occurrence("not cron", "Etc/UTC", ~U[2030-01-01 00:00:00Z])
 
     assert {:error, :invalid_cron_boundary} =
-             Scheduler.next_occurrence("@reboot", "Etc/UTC", ~U[2030-01-01 00:00:00Z])
+             Timer.next_occurrence("@reboot", "Etc/UTC", ~U[2030-01-01 00:00:00Z])
 
     assert {:error, :invalid_cron_boundary} =
-             Scheduler.next_occurrence("* * * * *", "Etc/UTC", :not_a_datetime)
+             Timer.next_occurrence("* * * * *", "Etc/UTC", :not_a_datetime)
 
     assert {:ok, first} =
-             Scheduler.occurrence_signal(
+             Timer.occurrence_signal(
                tick(),
                {ExampleJido, "agent-1", nil},
                "job-1",
@@ -532,7 +645,7 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
              )
 
     assert {:ok, second} =
-             Scheduler.occurrence_signal(
+             Timer.occurrence_signal(
                tick(),
                {ExampleJido, "agent-1", nil},
                "job-1",
@@ -546,7 +659,7 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
     refute first.id == second.id
 
     assert {:ok, default_generation} =
-             Scheduler.occurrence_signal(
+             Timer.occurrence_signal(
                tick(),
                {ExampleJido, "agent-1", nil},
                "legacy-job",
@@ -558,7 +671,7 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
 
     for invalid_generation <- [-1, 2_147_483_648, "3"] do
       assert {:error, :invalid_schedule_occurrence} =
-               Scheduler.occurrence_signal(
+               Timer.occurrence_signal(
                  tick(),
                  {ExampleJido, "agent-1", nil},
                  "job-1",
@@ -570,7 +683,7 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
     {:ok, reserved} = Signal.put_context(tick(), "jidooccurrenceid", "reserved")
 
     assert {:error, :reserved_occurrence_metadata} =
-             Scheduler.occurrence_signal(
+             Timer.occurrence_signal(
                reserved,
                {ExampleJido, "agent-1", nil},
                "job-1",
@@ -579,7 +692,7 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
              )
   end
 
-  @tag obligation: "jido.plugin.scheduler.I9"
+  @tag obligation: "jido.plugin.timer.I9"
   test "wall-clock waits round upward, recheck time, and permit cancellation" do
     slot = ~U[2030-01-01 00:00:01.000000Z]
     tag = make_ref()
@@ -608,16 +721,16 @@ defmodule Jido.Plugin.Scheduler.ContractTest do
     assert_received {:wait, 1_000}
     assert_received {:wait, 1}
 
-    Process.put(:scheduler_boundary_now, 0)
+    Process.put(:timer_boundary_now, 0)
 
     boundary_now = fn ->
-      case Process.get(:scheduler_boundary_now) do
+      case Process.get(:timer_boundary_now) do
         0 ->
-          Process.put(:scheduler_boundary_now, 1)
+          Process.put(:timer_boundary_now, 1)
           DateTime.add(slot, -1, :microsecond)
 
         1 ->
-          Process.put(:scheduler_boundary_now, 2)
+          Process.put(:timer_boundary_now, 2)
           slot
 
         _count ->

@@ -128,7 +128,7 @@ The full runtime graph reports one smaller process-internal relationship:
 1. A seven-file AgentServer relationship across its root process, Effects,
    Lifecycle, Plugin, Status, Supervisor, and Topology modules.
 
-The Action Inline, expression, Signal Router, Scheduler, Signal and Codec, Bus,
+The Action Inline, expression, Signal Router, Timer, Signal and Codec, Bus,
 Heartbeat, Sensor Manager, AI ReAct, AI telemetry, AI strategy,
 AI InferenceClient, AI Context, AI Agent authoring, Flow, Exec, Agent,
 Persistence, and cross-namespace runtime cycles are removed. Instance and root
@@ -348,7 +348,7 @@ Jido is a configurable actor runtime on OTP:
 - `Jido.AgentServer.Lifecycle` owns live Turn, wait, cancellation, commit, effect, and recovery transitions.
 - `Jido.AgentServer.Status` is the public, process-neutral runtime view used by inspection tools.
 
-The current included Plugin list is AI, Scheduler, Sensor Manager, Bus Manager, Bus Client, Heartbeat, and Audit. Publish the exact list for each release. A later release can add or remove an included Plugin through a deliberate release-design decision.
+The current included Plugin list is AI, Timer, Sensor Manager, Bus Manager, Bus Client, Heartbeat, and Audit. Publish the exact list for each release. A later release can add or remove an included Plugin through a deliberate release-design decision.
 
 ### Catalog
 
@@ -695,12 +695,12 @@ Disposition terms:
 | `Jido.Plugin.Config` | Added | Deferred Plugin option references and runtime-owner resolution in the definitions layer; does not load env files or own instance configuration |
 | `Jido.Plugin.DirectiveContext` | Removed | Directive callbacks use the explicit `:directive` phase of `Jido.Plugin.Context` |
 | `Jido.Plugin.Error` | Removed | Callback policy now belongs to `Jido.Plugin`; failures use `Jido.Error` values |
-| `Jido.Plugin.Heartbeat` | Keep | Included heartbeat Plugin |
+| `Jido.Plugin.Heartbeat` | Removed | Use `Jido.Plugin.Timer` with static interval options for periodic Signals |
 | `Jido.Plugin.Init` | Keep | Runtime child initialization value |
 | `Jido.Plugin.Input` | Keep | Separate portable prepared and transient runtime inputs |
 | `Jido.Plugin.Manifest` | Keep | Static callback ownership and option assignment metadata in the definitions layer |
 | `Jido.Plugin.Normalizer` | Keep | Real normalization boundary; split internally before adding more behavior |
-| `Jido.Plugin.Scheduler` | Keep | Included scheduler Plugin; the root owns Agent state, Plugin runtime callbacks, and public scheduling algorithms, with no Agent or Server delegate modules; `Occurrence.from_signal/1` is the only occurrence parser |
+| `Jido.Plugin.Timer` | Keep | Included timer Plugin; the root owns delayed timers, static and dynamic fixed-delay interval definitions, cron definitions, interval pause and resume state, Plugin runtime callbacks, and public scheduling algorithms, with no Agent or Server delegate modules; `Occurrence.from_signal/1` is the only occurrence parser |
 | `Jido.Plugin.SensorManager` | Keep | Included sensor supervision Plugin; the root owns Agent state and Plugin runtime callbacks, with no Agent or Server delegate modules |
 | `Jido.Plugin.SignalContext` | Removed | Outbound callbacks use the explicit `:signal` phase of `Jido.Plugin.Context` |
 | `Jido.Plugin.Context` | Added | Owns the phase-tagged Signal and Directive public context API; Admission, Commit, and Persistence remain distinct lifecycle records under this namespace |
@@ -836,7 +836,7 @@ Jido
 │   ├── Bus
 │   ├── Config
 │   ├── Heartbeat
-│   ├── Scheduler
+│   ├── Timer
 │   ├── SensorManager
 │   └── Spec
 ├── Session

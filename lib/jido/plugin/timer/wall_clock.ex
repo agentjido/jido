@@ -1,4 +1,4 @@
-defmodule Jido.Plugin.Scheduler.WallClock do
+defmodule Jido.Plugin.Timer.WallClock do
   @moduledoc false
 
   @spec wait_until(DateTime.t()) :: :ok | :cancelled

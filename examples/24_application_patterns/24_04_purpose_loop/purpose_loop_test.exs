@@ -5,7 +5,7 @@ defmodule Jido.Examples.Applications.PurposeLoopTest do
   use Jido.Test.Case, async: false
   @moduletag :integration
   alias Jido.Persistence
-  alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Timer
   alias Jido.Examples.Applications.PurposeLoop.{Agent, Signals}
 
   test "scheduled finite turns continue without client input and ignore duplicate ticks", %{
@@ -232,13 +232,13 @@ defmodule Jido.Examples.Applications.PurposeLoopTest do
     assert rejected.state.rejected_work == 1
     assert rejected.state.completed == ["one", "two", "three", "four"]
 
-    scheduler = scheduler_runtime(restarted_server)
+    timer = scheduler_runtime(restarted_server)
     agent_monitor = Process.monitor(restarted_server)
-    scheduler_ref = Process.monitor(scheduler)
+    scheduler_ref = Process.monitor(timer)
 
     assert :ok = Jido.stop_agent(jido, restarted_server)
     assert_receive {:DOWN, ^agent_monitor, :process, ^restarted_server, _reason}, 1_000
-    assert_receive {:DOWN, ^scheduler_ref, :process, ^scheduler, _reason}, 1_000
+    assert_receive {:DOWN, ^scheduler_ref, :process, ^timer, _reason}, 1_000
 
     eventually(fn -> Jido.whereis_agent(jido, id) == nil end)
     assert Jido.resident_agent_count(jido) == 0
@@ -249,7 +249,7 @@ defmodule Jido.Examples.Applications.PurposeLoopTest do
     eventually(fn ->
       case Jido.Test.AgentServer.ExampleRuntime.plugin(
              Jido.Test.AgentServer.ExampleRuntime.activation(agent_server),
-             Scheduler
+             Timer
            ) do
         pid when is_pid(pid) -> pid
         _child -> nil

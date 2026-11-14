@@ -35,7 +35,7 @@ Each namespace belongs to one layer, and a module can depend only on lower layer
 | Execution | `Jido.Exec`, `Jido.Telemetry.Exec` |
 | Agent domain | `Jido.Agent`, `Jido.Plugin`, and the Plugin context, init, and input modules |
 | Live runtime | `Jido`, `Jido.AgentServer`, `Jido.Persistence`, `Jido.Signal.Bus`, `Jido.Signal.Dispatch`, `Jido.Telemetry`, `Jido.Telemetry.AgentServer`, `Jido.Telemetry.Signal`, `Jido.Trace.Context` |
-| Capabilities | `Jido.AI`, `Jido.Telemetry.AI`, and the bundled Plugins: `Jido.Plugin.Audit`, `Jido.Plugin.Bus.Client`, `Jido.Plugin.Bus.Manager`, `Jido.Plugin.Heartbeat`, `Jido.Plugin.Scheduler`, `Jido.Plugin.SensorManager` |
+| Capabilities | `Jido.AI`, `Jido.Telemetry.AI`, and the bundled Plugins: `Jido.Plugin.Audit`, `Jido.Plugin.Bus.Client`, `Jido.Plugin.Bus.Manager`, `Jido.Plugin.Timer`, `Jido.Plugin.SensorManager` |
 | Composition | `Jido.Catalog.Discovery` and the application module |
 
 A sub-module can sit in a different layer from its parent. For example, `Jido.Signal` is in the value model while `Jido.Signal.Bus` is in the live runtime.
@@ -301,21 +301,26 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | `Jido.Plugin.Context.Admission` | Read-only input for one live Plugin admission callback. |
 | `Jido.Plugin.Context.Commit` | Read-only committed view for one Plugin notification. |
 | `Jido.Plugin.Context.Persistence` | Bounded format context for one Plugin-owned state conversion. |
-| `Jido.Plugin.Heartbeat` | Sends a periodic Signal to its Agent. |
-| `Jido.Plugin.Heartbeat.Signal.Tick` | The default periodic Signal sent by the Heartbeat Plugin. |
 | `Jido.Plugin.Init` | Input for one supervised Agent Plugin runtime generation. |
 | `Jido.Plugin.Input` | Package-owned input for one Agent Turn. |
-| `Jido.Plugin.Scheduler` | Adds delayed and recurring Signals to an Agent. |
-| `Jido.Plugin.Scheduler.Cancel` | Cancels one recurring Signal schedule. |
-| `Jido.Plugin.Scheduler.Cron` | Creates or replaces one recurring Signal schedule. |
-| `Jido.Plugin.Scheduler.DSL` | Static schedule authoring. |
-| `Jido.Plugin.Scheduler.DeliveryAdapter` | External delivery contract for durable Scheduler hosts. |
-| `Jido.Plugin.Scheduler.Occurrence` | Identity for one logical recurring schedule occurrence. |
-| `Jido.Plugin.Scheduler.Schedule` | Sends one delayed Signal to the Agent. |
+| `Jido.Plugin.Timer` | Adds delayed and recurring Signals to an Agent. |
+| `Jido.Plugin.Timer.Cancel` | Cancels one recurring Signal schedule. |
+| `Jido.Plugin.Timer.Cron` | Creates or replaces one recurring Signal schedule. |
+| `Jido.Plugin.Timer.DSL` | Static schedule authoring. |
+| `Jido.Plugin.Timer.DeliveryAdapter` | External delivery contract for durable Timer hosts. |
+| `Jido.Plugin.Timer.Every` | Creates or replaces one recurring fixed-delay Signal schedule. |
+| `Jido.Plugin.Timer.Occurrence` | Identity for one logical recurring schedule occurrence. |
+| `Jido.Plugin.Timer.Pause` | Pauses one recurring interval without removing its definition. |
+| `Jido.Plugin.Timer.Resume` | Resumes one paused recurring interval. |
+| `Jido.Plugin.Timer.Schedule` | Sends one delayed Signal to the Agent. |
+| `Jido.Plugin.Timer.Signal.Tick` | The default Signal for a static Timer interval. |
 | `Jido.Plugin.SensorManager` | Keeps supervised sensor processes aligned with portable Agent state. |
 | `Jido.Plugin.SensorManager.Init` | Input for one supervised sensor process. |
 | `Jido.Plugin.SensorManager.Start` | Declares one desired sensor process. |
 | `Jido.Plugin.SensorManager.Stop` | Removes one desired sensor process. |
+
+`Jido.Plugin.Heartbeat` was removed. Use `Jido.Plugin.Timer` with static
+interval options for periodic Signals.
 
 ### Jido.Session
 

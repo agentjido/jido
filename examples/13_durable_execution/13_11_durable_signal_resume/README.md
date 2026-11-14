@@ -6,7 +6,7 @@ durable wait.
 ## What you will learn
 
 - How scheduled Signals resume saved Flow work.
-- Why `Jido.Durable` does not own a scheduler process.
+- Why `Jido.Durable` does not own a timer process.
 
 ## Read the code
 
@@ -21,7 +21,7 @@ the Flow.
 
 ## Important behavior
 
-The example uses `Jido.Plugin.Scheduler.occurrence_signal/5`. AgentServer can
+The example uses `Jido.Plugin.Timer.occurrence_signal/5`. AgentServer can
 use the same Signal and delivery path.
 
 ## Limits
@@ -31,8 +31,8 @@ timer process lifecycle, and duplicate-delivery policy.
 
 ## Core Fit and Gaps
 
-Scheduler Signal construction and durable wait delivery compose through public
-contracts. No hidden scheduler runs inside `Jido.Durable`.
+Timer Signal construction and durable wait delivery compose through public
+contracts. No hidden timer runs inside `Jido.Durable`.
 
 ## Files
 

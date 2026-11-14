@@ -6,10 +6,10 @@ last-reviewed: 2026-11-13
 
 # Jido.Plugin component
 
-Purpose: Define one reusable Plugin contract and ship five standard Plugin
+Purpose: Define one reusable Plugin contract and ship four standard Plugin
 capabilities.
 
-Review result: The parent component and all five bundled sub-components are
+Review result: The parent component and four bundled capabilities are
 confirmed. No production defect was found in this review.
 
 ## Parent public contract
@@ -36,7 +36,7 @@ part of each Spec.
 
 Agent definition and evaluation use the Agent callbacks. AgentServer hosts
 Plugin runtimes and owns callback order. Persistence converts Plugin-owned
-state. The five bundled Plugins use the same public declaration contract as an
+state. The four bundled Plugins use the same public declaration contract as an
 application Plugin.
 
 The generic `jido.plugin` Covenant owner tests declaration identity, callback
@@ -88,29 +88,20 @@ subscription, reconnect, delivery, durable acknowledgement, and retry.
 Result: Keep one checklist sub-component with the three explicit public entry
 modules. Do not add an empty `Jido.Plugin.Bus` facade.
 
-## Heartbeat sub-component
+## Timer sub-component
 
-`Jido.Plugin.Heartbeat` validates one periodic timer and sends a fresh Signal
-for each tick. Its runtime owns only the next timer. The default Tick Signal is
-public.
-
-Result: Retain it as the small periodic-input capability. It does not replace
-Scheduler because it has no portable schedule state, cron rule, or occurrence
-identity.
-
-## Scheduler sub-component
-
-`Jido.Plugin.Scheduler` owns delayed and recurring Signal definitions. Public
-Schedule, Cron, and Cancel Directives control it. Occurrence data gives a
-stable identity to a generated tick. A DeliveryAdapter can move delivery to an
-external system.
+`Jido.Plugin.Timer` owns delayed and recurring Signal definitions. Public
+Schedule, Cron, Every, Pause, Resume, and Cancel Directives control it. Static
+Agent options can create one auto-start interval. Occurrence data gives a
+stable identity to a generated tick. A DeliveryAdapter can move cron delivery
+to an external system.
 
 The runtime reconciles committed recurring state, fences old revisions, tracks
 one-shot timers outside Agent state, retries failed reconciliation, and restores
 future jobs after replacement.
 
-Result: Retain it as one scheduling sub-component. Durable business delivery,
-acknowledgement, and queue storage stay outside it.
+Result: Retain it as the only bundled timer sub-component. Durable business
+delivery, acknowledgement, and queue storage stay outside it.
 
 ## Sensor Manager sub-component
 
@@ -126,10 +117,10 @@ Signal handling stay with the sensor and Agent.
 
 The 2026-11-13 focused command ran the complete `test/jido/plugin` tree as part
 of a 502-test command. All tests passed. The review also traced the generic
-Plugin Covenant owner and the focused Audit, Bus, Heartbeat, Scheduler, and
-Sensor Manager Covenant owners.
+Plugin Covenant owner and the focused Audit, Bus, Timer, and Sensor Manager
+Covenant owners.
 
-The review did not run real external Bus or Scheduler adapters. It made no
+The review did not run real external Bus or Timer adapters. It made no
 production change.
 
 ## Sources
@@ -139,7 +130,6 @@ production change.
 - [Audit](../../lib/jido/plugin/audit.ex)
 - [Bus Manager](../../lib/jido/plugin/bus/manager.ex)
 - [Bus Client](../../lib/jido/plugin/bus/client.ex)
-- [Heartbeat](../../lib/jido/plugin/heartbeat.ex)
-- [Scheduler](../../lib/jido/plugin/scheduler.ex)
+- [Timer](../../lib/jido/plugin/timer.ex)
 - [Sensor Manager](../../lib/jido/plugin/sensor_manager.ex)
 - [Plugin obligations](../../test/contracts/jido/plugin.obligations.md)

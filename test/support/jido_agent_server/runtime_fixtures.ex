@@ -38,7 +38,7 @@ defmodule Jido.Test.AgentServer.RuntimeFixtures.RuntimeAgent do
 
   alias Jido.Test.AgentServer.RuntimeFixtures.{Record, ReturnDirective, Tick}
 
-  use Jido.Agent, name: "runtime_agent", plugins: [Jido.Plugin.Scheduler]
+  use Jido.Agent, name: "runtime_agent", plugins: [Jido.Plugin.Timer]
 
   state do
     schema Jido.Joi.object(%{

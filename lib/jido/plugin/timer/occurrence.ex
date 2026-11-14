@@ -1,4 +1,4 @@
-defmodule Jido.Plugin.Scheduler.Occurrence do
+defmodule Jido.Plugin.Timer.Occurrence do
   alias Jido.Joi
 
   @moduledoc """

@@ -7,7 +7,7 @@ defmodule Jido.Examples.Runtime.ScheduledCounterTest do
   @moduletag group: :runtime
   @moduletag complexity: 2
   alias Jido.Examples.ScheduledCounter
-  alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Timer
 
   test "a scheduling Directive starts a later Signal and second Turn", %{jido: jido} do
     counter = start_agent!(jido, ScheduledCounter)
@@ -33,7 +33,7 @@ defmodule Jido.Examples.Runtime.ScheduledCounterTest do
            } = agent_result(counter)
   end
 
-  test "CRON Directives add and remove Scheduler runtime state", %{jido: jido} do
+  test "CRON Directives add and remove Timer runtime state", %{jido: jido} do
     counter = start_agent!(jido, ScheduledCounter)
 
     {:ok, route_signal_2} =
@@ -52,7 +52,7 @@ defmodule Jido.Examples.Runtime.ScheduledCounterTest do
 
     assert enabled.state.cron_enabled
 
-    assert {:ok, scheduler_state} = Jido.Test.AgentServer.ExampleRuntime.plugin_state(counter, Scheduler)
+    assert {:ok, scheduler_state} = Jido.Test.AgentServer.ExampleRuntime.plugin_state(counter, Timer)
     assert Map.has_key?(scheduler_state.cron, :heartbeat)
 
     {:ok, route_signal_3} = ScheduledCounter.disable_cron_signal(%{job_id: :heartbeat})
@@ -67,7 +67,7 @@ defmodule Jido.Examples.Runtime.ScheduledCounterTest do
 
     refute disabled.state.cron_enabled
 
-    assert {:ok, scheduler_state} = Jido.Test.AgentServer.ExampleRuntime.plugin_state(counter, Scheduler)
+    assert {:ok, scheduler_state} = Jido.Test.AgentServer.ExampleRuntime.plugin_state(counter, Timer)
     refute Map.has_key?(scheduler_state.cron, :heartbeat)
   end
 

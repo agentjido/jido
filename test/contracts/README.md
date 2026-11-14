@@ -35,8 +35,7 @@ tests with its obligation tags.
 | `jido.error` | Shared error taxonomy and stable common codes | `test/contracts/jido/error.*` |
 | `jido.plugin.audit` | Bundled Audit Plugin behavior | `test/contracts/jido.plugin/audit.*` |
 | `jido.plugin.bus` | Bundled Bus Plugin behavior | `test/contracts/jido.plugin/bus.*` |
-| `jido.plugin.heartbeat` | Bundled Heartbeat Plugin behavior | `test/contracts/jido.plugin/heartbeat.*` |
-| `jido.plugin.scheduler` | Bundled Scheduler Plugin behavior | `test/contracts/jido.plugin/scheduler.*` |
+| `jido.plugin.timer` | Bundled Timer Plugin behavior | `test/contracts/jido.plugin/timer.*` |
 | `jido.plugin.sensor_manager` | Bundled SensorManager Plugin behavior | `test/contracts/jido.plugin/sensor_manager.*` |
 
 ### Dependency rules
@@ -91,8 +90,7 @@ test/contracts/
   jido.plugin/
     audit.obligations.md
     bus.obligations.md
-    heartbeat.obligations.md
-    scheduler.obligations.md
+    timer.obligations.md
     sensor_manager.obligations.md
   jido.agent_server/
     activation.obligations.md
@@ -117,7 +115,7 @@ example, `jido.agent_server/effects.obligations.md` defines
 its own `jido.plugin.*` component. Agent evaluation and AgentServer runtime
 behavior have separate owners.
 
-`jido.plugin.scheduler` owns timer definitions, reconciliation, generations,
+`jido.plugin.timer` owns timer definitions, reconciliation, generations,
 occurrence identity, clock rules, and future-timer recovery. It does not own
 durable business delivery or acknowledgement.
 

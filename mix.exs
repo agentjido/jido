@@ -204,7 +204,8 @@ defmodule Jido.MixProject do
       {:"Built-In Plugins",
        [
          {"Signal Bus Plugin", "guides/built-in-plugins/signal-bus-plugin.livemd"},
-         {"Agent Heartbeats", "guides/built-in-plugins/heartbeats.livemd"}
+         {"Timers", "guides/built-in-plugins/timers.livemd"},
+         {"Periodic Timer Signals", "guides/built-in-plugins/heartbeats.livemd"}
        ]},
       {:"Run Agent Servers",
        [

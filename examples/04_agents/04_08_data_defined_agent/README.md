@@ -1,6 +1,6 @@
 # 04_08 Data-defined Agent
 
-Import an Agent from JSON with a state Plugin and the core Scheduler Plugin.
+Import an Agent from JSON with a state Plugin and the core Timer Plugin.
 
 ## What you will learn
 
@@ -14,7 +14,7 @@ Read [the definition and Action](data_defined_agent.ex), then the tests.
 `Agent.define!/1` validates data. `Agent.instantiate!/2` adds identity and state.
 `registry/0` supplies stable application identifiers for the Actions, Plugins,
 schema, and option keys. JSON import resolves only those references and creates
-no atoms. `CountTurns` owns one state field. The core `Jido.Plugin.Scheduler`
+no atoms. `CountTurns` owns one state field. The core `Jido.Plugin.Timer`
 also starts a supervised runtime when the imported Agent starts.
 
 ```elixir
@@ -28,7 +28,7 @@ request = Jido.Examples.DataDefinedAgent.schedule_signal!(0)
 ```
 
 `MyApp.Jido` must be a running Jido instance. The schedule request commits
-before the Scheduler delivers the count command in a second Turn.
+before the Timer delivers the count command in a second Turn.
 
 ## Run it
 
@@ -39,13 +39,13 @@ mix test.examples examples/04_agents/04_08_data_defined_agent --warnings-as-erro
 ## Important behavior
 
 Expected result: JSON round trips preserve the definition; direct and live
-commands produce the same state. The imported Scheduler retains its options,
+commands produce the same state. The imported Timer retains its options,
 delivers a later count command, and stops with the Agent. Import with an empty
-Registry or a missing Scheduler reference fails.
+Registry or a missing Timer reference fails.
 
 A document requires installed, trusted Plugin and Action code. It does not
 install code or start a process. This example declares the runtime Plugin in
-`plugins`; the separate authoring-only `Jido.Plugin.Scheduler.DSL` Plugin
+`plugins`; the separate authoring-only `Jido.Plugin.Timer.DSL` Plugin
 describes schedules. A one-shot timer is not durable and can be lost on restart.
 Definition JSON has no instance ID or state. Complete instance JSON can also
 store validated state and identity; the tests prove this round trip. A
@@ -56,7 +56,7 @@ pending work. Use persistence to recover execution.
 
 Parity applies only to targets and schemas that both definitions can resolve
 through the trusted Catalog. Code-only callbacks are outside the JSON parity
-claim. One-shot Scheduler timers are not durable.
+claim. One-shot Timer timers are not durable.
 
 See [Named Members](../../10_declared_agent_topologies/10_01_named_agents/README.md) for a JSON
 round trip that starts a composed Agent. The core authoring tests cover the
@@ -64,11 +64,11 @@ full DSL, data, and JSON format matrix.
 
 - [Source](data_defined_agent.ex)
 - [Tests](data_defined_agent_test.exs)
-- [Scheduler import tests](../../../test/jido/agent/scheduler_codec_test.exs)
+- [Timer import tests](../../../test/jido/agent/scheduler_codec_test.exs)
 
 Previous: [Agent Views](../04_07_agent_views/README.md) | Next: [Plugins](../../05_plugins/README.md)
 
-The [saved input document](fixtures/agent.json) is checked in. The Scheduler
+The [saved input document](fixtures/agent.json) is checked in. The Timer
 startup test reads it directly with `registry/0`; it does not first encode a
 new document. See [Plugin DSL](../../05_plugins/05_07_plugin_dsl/README.md) for
 custom syntax that lowers to the same contribution format.

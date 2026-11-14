@@ -4,7 +4,7 @@ defmodule Jido.Agent.DirectiveErrorsTest do
   alias Jido.Agent.Directive
   alias Jido.Error.ValidationError
   alias Jido.Plugin.Audit
-  alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Timer
   alias Jido.Plugin.SensorManager
 
   defmodule SchemaEffect do
@@ -69,23 +69,23 @@ defmodule Jido.Agent.DirectiveErrorsTest do
     assert {:error, :custom_reason} = Directive.validate(%ReasonEffect{})
   end
 
-  test "Scheduler validation returns Jido.Error values" do
+  test "Timer validation returns Jido.Error values" do
     assert {:error, %ValidationError{code: :invalid_cron, details: %{reason: reason}}} =
-             Directive.validate(Scheduler.cron("job", "nope", tick()))
+             Directive.validate(Timer.cron("job", "nope", tick()))
 
     assert is_binary(reason)
 
     assert {:error, %ValidationError{code: :invalid_timezone}} =
-             Directive.validate(Scheduler.cron("job", "* * * * *", tick(), timezone: "No/Zone"))
+             Directive.validate(Timer.cron("job", "* * * * *", tick(), timezone: "No/Zone"))
 
     assert {:error, %ValidationError{code: :invalid_job_id}} =
-             Directive.validate(Scheduler.cron(self(), "* * * * *", tick()))
+             Directive.validate(Timer.cron(self(), "* * * * *", tick()))
 
     assert {:error, %ValidationError{code: :invalid_job_id}} =
-             Scheduler.Cancel.validate(%Scheduler.Cancel{job_id: self()})
+             Timer.Cancel.validate(%Timer.Cancel{job_id: self()})
 
     assert {:error, %ValidationError{code: :invalid_directive} = error} =
-             Scheduler.Schedule.validate(%Scheduler.Schedule{delay_ms: -1, signal: tick()})
+             Timer.Schedule.validate(%Timer.Schedule{delay_ms: -1, signal: tick()})
 
     assert_no_raw_issue(error)
   end

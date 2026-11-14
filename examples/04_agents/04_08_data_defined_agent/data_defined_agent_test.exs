@@ -7,7 +7,7 @@ defmodule Jido.Examples.Basic.DataDefinedAgentTest do
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.DataDefinedAgent, as: Example
-  alias Jido.Plugin.Scheduler
+  alias Jido.Plugin.Timer
 
   test "data and JSON definitions use the same direct and live contract", %{jido: jido} do
     {document, registry} = Example.encode()
@@ -26,11 +26,11 @@ defmodule Jido.Examples.Basic.DataDefinedAgentTest do
              Server.call(server, Example.signal!(3))
 
     committed = Server.snapshot(server).agent
-    assert candidate.state == %{count: 3, turns: 1, scheduler: %{cron: %{}}}
+    assert candidate.state == %{count: 3, turns: 1, timer: %{cron: %{}}}
     assert committed.state == candidate.state
   end
 
-  test "an imported Scheduler declaration starts its runtime and delivers a later command", %{
+  test "an imported Timer declaration starts its runtime and delivers a later command", %{
     jido: jido
   } do
     assert %Jido.Catalog{} = Example.registry()
@@ -40,13 +40,13 @@ defmodule Jido.Examples.Basic.DataDefinedAgentTest do
 
     assert Enum.map(definition.plugins, &{&1.provider, &1.data}) == [
              {Example.CountTurns, %{}},
-             {Scheduler, %{retry_delay_ms: 25}}
+             {Timer, %{retry_delay_ms: 25}}
            ]
 
-    instance = Agent.instantiate!(definition, id: unique_id("json-scheduler"))
+    instance = Agent.instantiate!(definition, id: unique_id("json-timer"))
     assert {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, instance)
     assert :ok = Server.await_ready(server)
-    assert Server.snapshot(server).agent.state.scheduler == %{cron: %{}}
+    assert Server.snapshot(server).agent.state.timer == %{cron: %{}}
 
     assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(server, Example.schedule_signal!(0))
@@ -63,7 +63,7 @@ defmodule Jido.Examples.Basic.DataDefinedAgentTest do
     assert_receive {:DOWN, ^monitor, :process, ^activation, _}
   end
 
-  test "Scheduler configuration must have an allowed Plugin reference" do
+  test "Timer configuration must have an allowed Plugin reference" do
     {document, _registry} = Example.encode()
     missing_scheduler = Jido.Catalog.new!([])
 

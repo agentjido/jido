@@ -40,11 +40,10 @@ defmodule Jido.Catalog.Discovery do
   @option_keys [:applications, :modules]
   @included_plugins [
     Jido.AI.Agent.Plugin,
-    Jido.Plugin.Scheduler,
+    Jido.Plugin.Timer,
     Jido.Plugin.SensorManager,
     Jido.Plugin.Bus.Manager,
     Jido.Plugin.Bus.Client,
-    Jido.Plugin.Heartbeat,
     Jido.Plugin.Audit
   ]
   @bundled_codecs %{

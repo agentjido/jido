@@ -1,12 +1,12 @@
-defmodule Jido.Plugin.Scheduler.Runtime do
+defmodule Jido.Plugin.Timer.Runtime do
   @moduledoc false
 
   use GenServer
 
   alias Jido.AgentServer, as: Server
   alias Jido.Plugin.{Context, Init}
-  alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.{Cancel, Cron, CronRules, Schedule, WallClock}
+  alias Jido.Plugin.Timer
+  alias Jido.Plugin.Timer.{Cancel, Cron, CronRules, Every, Pause, Resume, Schedule, WallClock}
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext
   alias Jido.Trace
@@ -28,6 +28,8 @@ defmodule Jido.Plugin.Scheduler.Runtime do
       cron_jobs: %{},
       dormant_cron: %{},
       desired_cron: %{},
+      interval_jobs: %{},
+      desired_every: %{},
       last_reconciled_version: nil,
       timers: %{},
       retry_timer: nil,
@@ -40,15 +42,16 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   @impl true
   def handle_continue(:reconcile_agent, runtime) do
     with {:ok, desired} <- current_plugin_state(runtime),
-         {:ok, runtime} <- reconcile_delivery(runtime, Map.get(desired, :cron, %{})) do
-      notify(runtime, {:scheduler_plugin_ready, self()})
+         {desired_cron, desired_every} <- active_definitions(desired),
+         {:ok, runtime} <- reconcile_delivery(runtime, desired_cron, desired_every) do
+      notify(runtime, {:timer_plugin_ready, self()})
       {:noreply, %{runtime | last_reconciled_version: runtime.state_version}}
     else
       {:error, reason} ->
-        {:stop, {:scheduler_boot_failed, reason}, runtime}
+        {:stop, {:timer_boot_failed, reason}, runtime}
 
       {:error, reason, runtime} ->
-        {:stop, {:scheduler_boot_failed, reason}, runtime}
+        {:stop, {:timer_boot_failed, reason}, runtime}
     end
   end
 
@@ -77,14 +80,16 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   end
 
   def handle_call({:directive, directive, %Context{phase: :directive} = context}, _from, runtime)
-      when is_struct(directive, Cron) or is_struct(directive, Cancel) do
+      when is_struct(directive, Cron) or is_struct(directive, Every) or
+             is_struct(directive, Pause) or is_struct(directive, Resume) or
+             is_struct(directive, Cancel) do
     if stale_state_version?(runtime.last_reconciled_version, context.state_version) do
       {:reply, :ok, runtime}
     else
       runtime = %{runtime | state_version: context.state_version}
-      desired = Map.get(context.plugin_state, :cron, %{})
+      {desired_cron, desired_every} = active_definitions(context.plugin_state)
 
-      case reconcile_delivery(runtime, desired) do
+      case reconcile_delivery(runtime, desired_cron, desired_every) do
         {:ok, runtime} ->
           runtime =
             runtime
@@ -127,6 +132,30 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     {:noreply, runtime}
   end
 
+  def handle_info({:interval_tick, job_id, token, scheduled_at}, runtime) do
+    case Map.get(runtime.interval_jobs, job_id) do
+      {spec, _timer, ^token, ^scheduled_at} ->
+        scope = {runtime.jido, runtime.agent_id, runtime.partition}
+        tick = recurring_tick(spec.message, scope, job_id, spec.generation, scheduled_at)
+        Server.cast(runtime.agent_server, tick)
+        runtime = %{runtime | interval_jobs: Map.delete(runtime.interval_jobs, job_id)}
+
+        case Map.fetch(runtime.desired_every, job_id) do
+          {:ok, ^spec} ->
+            case start_interval(runtime, job_id, spec) do
+              {:ok, runtime} -> {:noreply, runtime}
+              {:error, reason, runtime} -> handle_interval_restart_failure(runtime, job_id, reason)
+            end
+
+          _other ->
+            {:noreply, runtime}
+        end
+
+      _stale ->
+        {:noreply, runtime}
+    end
+  end
+
   def handle_info({:DOWN, ref, :process, _pid, reason}, runtime) do
     case cron_job_by_ref(runtime.cron_jobs, ref) do
       {job_id, {tracked_spec, _job, ^ref, _token}} ->
@@ -146,13 +175,13 @@ defmodule Jido.Plugin.Scheduler.Runtime do
       ) do
     runtime = %{runtime | retry_timer: nil, retry_token: nil}
 
-    case reconcile_delivery(runtime, runtime.desired_cron) do
+    case reconcile_delivery(runtime, runtime.desired_cron, runtime.desired_every) do
       {:ok, runtime} ->
-        notify(runtime, {:scheduler_retry_succeeded, state_version})
+        notify(runtime, {:timer_retry_succeeded, state_version})
         {:noreply, %{runtime | last_reconciled_version: state_version}}
 
       {:error, reason, runtime} ->
-        notify(runtime, {:scheduler_retry_failed, state_version, reason})
+        notify(runtime, {:timer_retry_failed, state_version, reason})
         {:noreply, schedule_reconcile_retry(runtime, state_version)}
     end
   end
@@ -168,13 +197,18 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     end)
 
     Enum.each(runtime.timers, fn {_token, timer} -> :erlang.cancel_timer(timer) end)
+
+    Enum.each(runtime.interval_jobs, fn {_job_id, {_spec, timer, _token, _scheduled_at}} ->
+      :erlang.cancel_timer(timer)
+    end)
+
     _ = cancel_reconcile_retry(runtime)
     :ok
   end
 
   defp current_plugin_state(runtime) do
     case Jido.AgentServer.Worker.plugin_state(runtime.agent_server, runtime.plugin, 5_000) do
-      {:ok, state} -> {:ok, state || %{cron: %{}}}
+      {:ok, state} -> {:ok, state || %{cron: %{}, every: %{}}}
       {:error, reason} -> {:error, reason}
     end
   catch
@@ -195,15 +229,22 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     end)
   end
 
-  defp reconcile_delivery(runtime, desired) when is_map(desired) do
-    runtime = %{runtime | desired_cron: desired}
+  defp reconcile_delivery(runtime, desired_cron, desired_every)
+       when is_map(desired_cron) and is_map(desired_every) do
+    runtime = %{runtime | desired_cron: desired_cron, desired_every: desired_every}
 
     case delivery_adapter(runtime) do
       nil ->
-        reconcile_cron(runtime, desired)
+        with {:ok, runtime} <- reconcile_cron(runtime, desired_cron),
+             do: reconcile_intervals(runtime, desired_every)
 
       adapter ->
-        case adapter_call(adapter, :reconcile, [delivery_context(runtime), desired]) do
+        result =
+          if map_size(desired_every) == 0,
+            do: adapter_call(adapter, :reconcile, [delivery_context(runtime), desired_cron]),
+            else: {:error, {:interval_delivery_unsupported, adapter}}
+
+        case result do
           :ok ->
             {:ok, stop_local_delivery(runtime)}
 
@@ -214,6 +255,20 @@ defmodule Jido.Plugin.Scheduler.Runtime do
             {:error, {:external_reconcile_invalid_result, other}, runtime}
         end
     end
+  end
+
+  defp reconcile_intervals(runtime, desired) when is_map(desired) do
+    runtime = runtime |> stop_changed_intervals(desired) |> Map.put(:desired_every, desired)
+
+    Enum.reduce_while(desired, {:ok, runtime}, fn {job_id, spec}, {:ok, runtime} ->
+      case ensure_interval_job(runtime, job_id, spec) do
+        {:ok, runtime} ->
+          {:cont, {:ok, runtime}}
+
+        {:error, reason, runtime} ->
+          {:halt, {:error, {:interval_activation_failed, job_id, reason}, runtime}}
+      end
+    end)
   end
 
   defp ensure_cron_job(runtime, job_id, spec) do
@@ -268,6 +323,50 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     %{runtime | cron_jobs: jobs, dormant_cron: dormant}
   end
 
+  defp stop_changed_intervals(runtime, desired) do
+    jobs =
+      Enum.reduce(runtime.interval_jobs, %{}, fn
+        {job_id, {spec, _timer, _token, _scheduled_at} = tracked}, kept_jobs ->
+          if Map.get(desired, job_id) == spec do
+            Map.put(kept_jobs, job_id, tracked)
+          else
+            cancel_interval(tracked)
+            kept_jobs
+          end
+      end)
+
+    %{runtime | interval_jobs: jobs}
+  end
+
+  defp ensure_interval_job(runtime, job_id, spec) do
+    case Map.get(runtime.interval_jobs, job_id) do
+      {^spec, _timer, _token, _scheduled_at} -> {:ok, runtime}
+      nil -> start_interval(runtime, job_id, spec)
+    end
+  end
+
+  defp start_interval(runtime, job_id, spec) do
+    scope = {runtime.jido, runtime.agent_id, runtime.partition}
+
+    with :ok <- validate_scope(spec.generation, scope) do
+      token = make_ref()
+      scheduled_at = DateTime.add(DateTime.utc_now(), spec.interval_ms, :millisecond)
+      timer = Process.send_after(self(), {:interval_tick, job_id, token, scheduled_at}, spec.interval_ms)
+      tracked = {spec, timer, token, scheduled_at}
+      {:ok, %{runtime | interval_jobs: Map.put(runtime.interval_jobs, job_id, tracked)}}
+    else
+      {:error, reason} -> {:error, reason, runtime}
+    end
+  end
+
+  defp cancel_interval({_spec, timer, _token, _scheduled_at}),
+    do: :erlang.cancel_timer(timer)
+
+  defp handle_interval_restart_failure(runtime, job_id, reason) do
+    notify(runtime, {:timer_retry_scheduled, job_id, :interval_tick, reason})
+    {:noreply, schedule_reconcile_retry(runtime, runtime.last_reconciled_version)}
+  end
+
   defp start_tracked_cron(runtime, job_id, spec) do
     token = make_ref()
 
@@ -283,7 +382,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
          }}
 
       :ignore ->
-        notify(runtime, {:scheduler_cron_dormant, job_id})
+        notify(runtime, {:timer_cron_dormant, job_id})
         {:ok, %{runtime | dormant_cron: Map.put(runtime.dormant_cron, job_id, spec)}}
 
       {:error, reason} ->
@@ -349,7 +448,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   defp handle_cron_down(runtime, job_id, tracked_spec, reason) do
     case {reason, Map.fetch(runtime.desired_cron, job_id)} do
       {:normal, {:ok, ^tracked_spec}} ->
-        notify(runtime, {:scheduler_cron_dormant, job_id})
+        notify(runtime, {:timer_cron_dormant, job_id})
 
         {:noreply, %{runtime | dormant_cron: Map.put(runtime.dormant_cron, job_id, tracked_spec)}}
 
@@ -367,15 +466,18 @@ defmodule Jido.Plugin.Scheduler.Runtime do
         {:noreply, runtime}
 
       {:error, restart_reason, runtime} ->
-        notify(runtime, {:scheduler_retry_scheduled, job_id, reason, restart_reason})
+        notify(runtime, {:timer_retry_scheduled, job_id, reason, restart_reason})
         {:noreply, schedule_reconcile_retry(runtime, runtime.last_reconciled_version)}
     end
   end
 
-  defp cron_tick(_spec, signal, _scope, _job, nil, _time), do: fresh_signal(signal)
+  defp cron_tick(_spec, signal, scope, job, generation, time),
+    do: recurring_tick(signal, scope, job, generation, time)
 
-  defp cron_tick(_spec, signal, scope, job, generation, time) do
-    {:ok, tick} = Scheduler.occurrence_signal(signal, scope, job, generation, time)
+  defp recurring_tick(signal, _scope, _job, nil, _time), do: fresh_signal(signal)
+
+  defp recurring_tick(signal, scope, job, generation, time) do
+    {:ok, tick} = Timer.occurrence_signal(signal, scope, job, generation, time)
     tick
   end
 
@@ -440,7 +542,27 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   defp stop_local_delivery(runtime) do
     Enum.each(runtime.cron_jobs, fn {_id, tracked} -> cancel_tracked_cron(tracked) end)
     Enum.each(runtime.timers, fn {_token, timer} -> :erlang.cancel_timer(timer) end)
-    %{runtime | cron_jobs: %{}, dormant_cron: %{}, timers: %{}}
+
+    Enum.each(runtime.interval_jobs, fn {_id, tracked} -> cancel_interval(tracked) end)
+
+    %{
+      runtime
+      | cron_jobs: %{},
+        dormant_cron: %{},
+        interval_jobs: %{},
+        timers: %{}
+    }
+  end
+
+  defp active_definitions(state) when is_map(state) do
+    cron = Map.get(state, :cron, %{})
+
+    every =
+      state
+      |> Map.get(:every, %{})
+      |> Map.filter(fn {_job_id, spec} -> spec.status == :running end)
+
+    {cron, every}
   end
 
   defp delivery_context(runtime, context \\ nil) do
