@@ -39,3 +39,9 @@
   decision: Keep dynamic Agent ownership local to one child activation. Use stable Addresses, an activation-specific fence, and one idempotency request ID for adoption and transfer.
   driver: Applications need owner-linked shutdown and safe transfer without storing process ownership in Agent state or claiming a durable distributed lease.
   approved_by: EX-011 implementation
+
+- id: instance-inactive-definition-replacement
+  date: 2026-11-14
+  decision: Expose inactive durable Agent definition replacement through the Jido Address facade with explicit preserve or reset state policy.
+  driver: Data-defined Agent applications need a native lifecycle operation and must not prepare or write Jido checkpoint records themselves.
+  approved_by: Jido v3 Jidoka burn-in

@@ -122,6 +122,7 @@ Guides: [Instances and Tenants](../operations/configuration-and-tenant-isolation
 | `Jido.delete_agent/3` | Writes a durable tombstone for one inactive stable Agent Address. |
 | `Jido.list_agents/2` | Lists Agents with options in the selected Jido instance. |
 | `Jido.reconcile_agent/3` | Replaces one faulted activation from its authoritative durable record. |
+| `Jido.replace_agent/4` | Replaces one exact inactive durable Agent definition with preserve or reset state policy. |
 | `Jido.resident_agent_count/2` | Counts resident Agent activations. |
 | `Jido.resolve_agent/2` | Resolves the current local worker for one stable Agent Address. |
 | `Jido.start/1` | Start the default Jido instance for scripts and Livebook. |

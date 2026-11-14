@@ -592,6 +592,73 @@ defmodule Jido.Instance.AddressTest do
     assert Jido.AgentServer.snapshot(server).agent.state == %{count: 0}
   end
 
+  @tag obligation: "jido.instance.I11"
+  test "inactive Address replacement preserves or resets state without creating identity" do
+    namespace = unique_namespace("address-replace")
+    instance = unique_instance("address-replace")
+    start_durable_instance!(instance, namespace)
+    {:ok, address} = Jido.agent_address(instance, "counter")
+
+    original = %{Counter.definition() | initial_state: %{count: 2}}
+    preserved = %{original | description: "Preserved definition", initial_state: %{count: 10}}
+    reset = %{preserved | description: "Reset definition", initial_state: %{count: 20}}
+
+    server = create_and_activate(instance, address, original)
+    assert {:ok, _result} = Jido.call(instance, address, signal(3))
+    assert :ok = Jido.stop_agent(instance, server)
+
+    assert {:ok, ^address} =
+             Jido.replace_agent(instance, address, preserved,
+               expected: original,
+               state_policy: :preserve
+             )
+
+    assert {:ok, server} = Jido.activate_agent(instance, address)
+
+    assert %Jido.AgentServer.Snapshot{
+             agent: %{description: "Preserved definition", state: %{count: 5}},
+             agent_revision: 2,
+             persistence_revision: 3
+           } = Jido.AgentServer.snapshot(server)
+
+    assert {:error, :agent_running} =
+             Jido.replace_agent(instance, address, reset,
+               expected: preserved,
+               state_policy: :reset
+             )
+
+    assert :ok = Jido.stop_agent(instance, server)
+
+    assert {:error, {:agent_definition_conflict, "counter"}} =
+             Jido.replace_agent(instance, address, reset,
+               expected: original,
+               state_policy: :reset
+             )
+
+    assert {:ok, ^address} =
+             Jido.replace_agent(instance, address, reset,
+               expected: preserved,
+               state_policy: :reset
+             )
+
+    assert {:ok, ^address} =
+             Jido.replace_agent(instance, address, reset,
+               expected: preserved,
+               state_policy: :reset
+             )
+
+    assert {:ok, reset_server} = Jido.activate_agent(instance, address)
+
+    assert %Jido.AgentServer.Snapshot{
+             agent: %{description: "Reset definition", state: %{count: 20}},
+             agent_revision: 3,
+             persistence_revision: 4
+           } = Jido.AgentServer.snapshot(reset_server)
+
+    {:ok, missing} = Jido.agent_address(instance, "missing")
+    assert {:error, :not_found} = Jido.replace_agent(instance, missing, reset, expected: preserved)
+  end
+
   @tag obligation: "jido.instance.I8"
   test "Address controls preserve AgentServer results across passivation" do
     instance = unique_instance("address-controls")

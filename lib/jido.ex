@@ -569,6 +569,44 @@ defmodule Jido do
     end
   end
 
+  @doc "Replaces one inactive durable Agent definition at its stable Agent Address."
+  @spec replace_agent(atom(), Address.t(), module() | Jido.Agent.t(), keyword()) ::
+          {:ok, Address.t()} | {:error, term()}
+  def replace_agent(instance, %Address{} = address, agent, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         {:ok, opts} <- Address.operation_options(address, opts, "Agent Address replace options"),
+         {:ok, state_policy, expected} <- validate_replace_options(opts),
+         :ok <- ensure_reconciled(instance, address),
+         {:error, :not_found} <- resolve_address_target(instance, address),
+         {:ok, saved, persistence_revision, agent_revision, turn} <-
+           Jido.Persistence.load_agent_address(instance, address, instance: instance),
+         :ok <- replaceable_turn(turn),
+         {:ok, replacement} <- replacement_agent(agent, address.id, saved.state, state_policy),
+         :ok <-
+           replace_agent_record(
+             instance,
+             address,
+             saved,
+             replacement,
+             expected,
+             state_policy,
+             persistence_revision,
+             agent_revision,
+             turn
+           ) do
+      {:ok, address}
+    else
+      {:ok, _pid} ->
+        {:error, :agent_running}
+
+      {:error, state} when state in [:recovering, :passivating] ->
+        {:error, :agent_running}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
   defp restore_activation(instance, address, opts) do
     with {:ok, agent, _revision, _agent_revision, _turn} <-
            Jido.Persistence.load_agent_address(instance, address, instance: instance) do
@@ -919,6 +957,92 @@ defmodule Jido do
 
   defp validate_upgrade_options(opts),
     do: validate_address_operation_options(:upgrade_agent, opts, [:context])
+
+  defp validate_replace_options(opts) do
+    with :ok <-
+           validate_address_operation_options(:replace_agent, opts, [
+             :expected,
+             :id,
+             :partition,
+             :state_policy
+           ]),
+         {:ok, policy} <- replace_state_policy(opts),
+         {:ok, expected} <- replace_expected_definition(opts) do
+      {:ok, policy, expected}
+    end
+  end
+
+  defp replace_state_policy(opts) do
+    case Keyword.get(opts, :state_policy, :preserve) do
+      policy when policy in [:preserve, :reset] -> {:ok, policy}
+      policy -> invalid_runtime_input(:replace_agent, %{state_policy: policy})
+    end
+  end
+
+  defp replace_expected_definition(opts) do
+    case Keyword.fetch(opts, :expected) do
+      {:ok, %Jido.Agent{id: nil, state: nil} = expected} -> {:ok, expected}
+      {:ok, expected} -> invalid_runtime_input(:replace_agent, %{expected: expected})
+      :error -> invalid_runtime_input(:replace_agent, %{expected: :required})
+    end
+  end
+
+  defp replacement_agent(source, id, saved_state, state_policy) do
+    opts =
+      case state_policy do
+        :preserve -> [id: id, state: saved_state]
+        :reset -> [id: id]
+      end
+
+    Jido.Agent.instantiate(source, opts)
+  end
+
+  defp replaceable_turn(nil), do: :ok
+
+  defp replaceable_turn(%{status: status}) when status in [:completed, :failed, :cancelled],
+    do: :ok
+
+  defp replaceable_turn(_turn), do: {:error, :turn_in_flight}
+
+  defp replace_agent_record(
+         instance,
+         address,
+         saved,
+         replacement,
+         expected,
+         state_policy,
+         persistence_revision,
+         agent_revision,
+         turn
+       ) do
+    saved_definition = Jido.Agent.definition(saved)
+    replacement_definition = Jido.Agent.definition(replacement)
+
+    cond do
+      saved_definition == replacement_definition and
+          replacement_state_applied?(saved, replacement, state_policy) ->
+        :ok
+
+      saved_definition == expected ->
+        Jido.Persistence.replace_agent(instance, replacement, saved.module,
+          instance: instance,
+          partition: address.partition,
+          reason: :definition_update,
+          revision: persistence_revision + 1,
+          expected_revision: persistence_revision,
+          agent_revision: agent_revision + 1,
+          server_turn: turn
+        )
+
+      true ->
+        {:error, {:agent_definition_conflict, address.id}}
+    end
+  end
+
+  defp replacement_state_applied?(_saved, _replacement, :preserve), do: true
+
+  defp replacement_state_applied?(saved, replacement, :reset),
+    do: saved.state == replacement.state
 
   defp prepare_definition_upgrade(instance, address) do
     case resolve_address_target(instance, address) do

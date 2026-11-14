@@ -1,7 +1,7 @@
 ---
 title: Jido component
 status: current
-last-reviewed: 2026-11-13
+last-reviewed: 2026-11-14
 ---
 
 # Jido component
@@ -23,7 +23,7 @@ The public surface has four groups:
 - `start_agent/3`, `stop_agent/3`, `whereis_agent/3`, `list_agents/2`,
   `resident_agent_count/2`, and `thaw/4` control resident Agents by ID or PID.
 - `agent_address/3`, `resolve_agent/2`, `create_agent/4`, `activate_agent/3`,
-  `reconcile_agent/3`, `upgrade_agent/4`, `call/4`, `cast/3`, `submit/4`,
+  `reconcile_agent/3`, `upgrade_agent/4`, `replace_agent/4`, `call/4`, `cast/3`, `submit/4`,
   `delete_agent/3`, `cancel_turn/4`, and `status/3` control logical Agents by a
   stable `Jido.Agent.Address`.
 

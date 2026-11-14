@@ -97,3 +97,11 @@ downstream operation results stay with their owning components.
 - **why:** Dynamic local ownership needs a fenced, testable lifetime boundary without claiming durable or distributed supervision.
 - **kind:** ordering
 - **status:** active
+
+### jido.instance.I11 — Inactive durable definition replacement
+
+- **scope:** `Jido.replace_agent/4`
+- **must:** Replace only an inactive durable Agent at the exact stable Address and require its exact expected definition. Preserve or reset state only when the caller selects that policy. Use one compare-and-swap revision, retain the logical identity and terminal Turn receipt, advance the Agent revision, reject a conflicting definition, live activation, or nonterminal saved Turn, and never create a missing record or replace a tombstone.
+- **why:** Applications with data-defined Agents need one native definition-change boundary without reading or writing persistence records directly.
+- **kind:** ordering
+- **status:** active

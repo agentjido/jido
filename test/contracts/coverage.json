@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 93,
+      "active": 94,
       "coverage": 1.0,
-      "covered": 93
+      "covered": 94
     },
     "jido.agent_server": {
       "active": 14,
@@ -1903,10 +1903,10 @@
       }
     },
     "jido.instance": {
-      "active": 10,
+      "active": 11,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 10,
+      "covered": 11,
       "form": "light",
       "obligations": {
         "jido.instance.I1": {
@@ -1946,6 +1946,16 @@
             "test ownership survives worker recovery and is released by activation replacement",
             "test static topology ownership cannot be transferred",
             "test the current owner activation controls shutdown and cycles are rejected"
+          ]
+        },
+        "jido.instance.I11": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test inactive Address replacement preserves or resets state without creating identity"
           ]
         },
         "jido.instance.I2": {
@@ -5662,8 +5672,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 234,
+    "active": 235,
     "coverage": 1.0,
-    "covered": 234
+    "covered": 235
   }
 }
