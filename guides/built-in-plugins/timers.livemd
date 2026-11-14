@@ -266,6 +266,42 @@ apply only to intervals. `cancel/1` removes an interval or cron definition.
 An interval is fixed-delay work. It is not aligned with the wall clock. The
 Timer starts the next interval after it produces the current Signal.
 
+## Query a recurring definition
+
+Use `Jido.Plugin.Timer.status/2` with the full Agent state map and job ID.
+The query reads stored definitions and does not contact the runtime. For
+example, an Action can create an interval only when its definition is absent:
+
+```elixir
+route "review.ensure" do
+  action _input, context: context do
+    state = context.agent_state
+
+    case Jido.Plugin.Timer.status(state, :review) do
+      {:ok, _status} ->
+        {:ok, state}
+
+      {:error, :not_found} ->
+        tick = Jido.Signal.new!("review.tick", %{}, source: "/review")
+        {:ok, state, [Jido.Plugin.Timer.every(:review, 1_000, tick)]}
+    end
+  end
+end
+```
+
+An existing interval returns
+`{:ok, %{kind: :every, status: :active, generation: 0}}`, or `:paused` in
+the status field when paused. Cron returns `kind: :cron` and `status: :active`.
+Its generation is `nil` unless explicitly set. A missing Plugin or job returns
+`{:error, :not_found}`. One-shot timers are outside this query.
+
+`:active` means the stored definition permits production. It does not confirm
+a live timer or successful delivery. A dormant cron definition is still active.
+To check Signal metadata, use `Jido.Plugin.Timer.Occurrence.from_signal/1`.
+The application selects the job, compares generations, decides whether to
+accept queued work after pause, and prevents duplicate work. Equal generations
+alone do not prove job identity. The query does not track a current occurrence.
+
 ## Restarts and durability
 
 - Recurring definitions live in the `:timer` key of Agent state. When the Plugin process restarts or a durable Agent restores, future timers start again from that state.

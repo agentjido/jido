@@ -41,6 +41,7 @@ the same `every` state used by dynamic interval Directives.
 
 - **scope:** `Jido.Plugin.Timer`, `Jido.Plugin.Timer.Schedule`, `Jido.Plugin.Timer.Cron`, `Jido.Plugin.Timer.Every`, `Jido.Plugin.Timer.Pause`, `Jido.Plugin.Timer.Resume`, `Jido.Plugin.Timer.Cancel`
 - **must:** Expose constructors and validated types for Schedule, Cron, Every, Pause, Resume, and Cancel Directives. Keep only recurring definitions in owned Agent state, keep interval lifecycle status inside each interval definition, apply valid recurring Directives in list order, preserve old cron-only state through defaults, keep job IDs unique across recurring kinds, and keep one-shot timers out of Agent state. Pause and Resume apply only to interval definitions.
+- **query:** `status/2` reads the full validated Agent state map and returns recurring kind, configured lifecycle status, and generation without runtime access. Missing Plugins and jobs return `{:error, :not_found}`. Running intervals and all stored cron definitions, including dormant cron, report `:active`; paused intervals report `:paused`. Cron without a generation reports `nil`. The query does not establish delivery health or occurrence acceptance.
 - **kind:** functional
 - **status:** active
 

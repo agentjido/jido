@@ -34,9 +34,10 @@ defmodule Jido.Plugin.Timer.ApiTest do
         {:function, :occurrence_signal, 5},
         {:function, :pause, 1},
         {:function, :resume, 1},
-        {:function, :schedule, 2}
+        {:function, :schedule, 2},
+        {:function, :status, 2}
       ],
-      types: [{:type, :cron_option, 0}, {:type, :every_option, 0}, {:type, :option, 0}]
+      types: [{:type, :cron_option, 0}, {:type, :every_option, 0}, {:type, :option, 0}, {:type, :status, 0}]
     )
 
     for module <- [Schedule, Cron, Every, Pause, Resume, Cancel] do

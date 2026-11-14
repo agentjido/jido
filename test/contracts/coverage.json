@@ -2801,24 +2801,28 @@
         "jido.plugin.timer.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
             "test Timer exposes its durable delivery helpers and authoring API",
             "test Timer state contains recurring definitions and applies changes in order",
-            "test interval definitions replace by job ID and pause, resume, and cancel in order"
+            "test interval definitions replace by job ID and pause, resume, and cancel in order",
+            "test status follows interval lifecycle and replacement between recurring kinds",
+            "test status preserves absent cron generations and reports dormant definitions as active",
+            "test status reports missing definitions without a runtime"
           ]
         },
         "jido.plugin.timer.I10": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
             "test a static interval starts automatically through the Timer runtime",
-            "test static interval options create one normal running interval definition"
+            "test static interval options create one normal running interval definition",
+            "test status reads the static heartbeat interval"
           ]
         },
         "jido.plugin.timer.I2": {

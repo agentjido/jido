@@ -215,6 +215,47 @@ defmodule Jido.Plugin.Timer do
   @typedoc "One recurring interval constructor option."
   @type every_option :: {:generation, 0..2_147_483_647 | nil}
 
+  @typedoc "Stored lifecycle state for one recurring definition."
+  @type status :: %{
+          kind: :cron | :every,
+          status: :active | :paused,
+          generation: 0..2_147_483_647 | nil
+        }
+
+  @doc """
+  Reads one recurring definition from the full validated Agent state map.
+
+  Returns `{:error, :not_found}` when the Timer Plugin or job is absent.
+  `:active` means the stored definition permits Signal production. It does
+  not confirm a live timer or successful delivery. A dormant cron definition
+  is still active. Paused intervals return `:paused`.
+
+  Cron definitions without an explicit generation return `generation: nil`.
+  This function does not change state or contact the runtime. Pass Agent
+  state, such as `context.agent_state`, rather than an Agent, PID, or Timer
+  state slice. Use `Jido.Plugin.Timer.Occurrence.from_signal/1` to read Signal
+  metadata. The application owns job selection and acceptance of queued work.
+  """
+  @spec status(map(), term()) :: {:ok, status()} | {:error, :not_found}
+  def status(agent_state, job_id) when is_map(agent_state) and not is_struct(agent_state) do
+    timer = Map.get(agent_state, :timer, %{})
+
+    case Map.fetch(Map.get(timer, :every, %{}), job_id) do
+      {:ok, spec} ->
+        status = if spec.status == :paused, do: :paused, else: :active
+        {:ok, %{kind: :every, status: status, generation: spec.generation}}
+
+      :error ->
+        case Map.fetch(Map.get(timer, :cron, %{}), job_id) do
+          {:ok, spec} ->
+            {:ok, %{kind: :cron, status: :active, generation: Map.get(spec, :generation)}}
+
+          :error ->
+            {:error, :not_found}
+        end
+    end
+  end
+
   @doc "Creates one delayed Signal Directive."
   @spec schedule(non_neg_integer(), Signal.t()) :: Schedule.t()
   def schedule(delay_ms, signal), do: %Schedule{delay_ms: delay_ms, signal: signal}

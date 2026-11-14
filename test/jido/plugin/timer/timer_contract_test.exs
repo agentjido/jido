@@ -178,6 +178,74 @@ defmodule Jido.Plugin.Timer.ContractTest do
     assert cancelled == %{cron: %{}, every: %{}}
   end
 
+  @tag obligation: "jido.plugin.timer.I1"
+  test "status reports missing definitions without a runtime" do
+    for state <- [%{}, %{timer: %{cron: %{}, every: %{}}}, %{timer: %{cron: %{}}}] do
+      assert Timer.status(state, :missing) == {:error, :not_found}
+    end
+
+    {:ok, timer} = reduce_state(%{cron: %{}}, [Timer.every(:review, 25, tick())])
+    state = %{timer: timer, unrelated: %{value: 7}}
+    assert Timer.status(state, :missing) == {:error, :not_found}
+    assert {:ok, %{kind: :every, status: :active, generation: 0}} = Timer.status(state, :review)
+    assert state == %{timer: timer, unrelated: %{value: 7}}
+  end
+
+  @tag obligation: "jido.plugin.timer.I1"
+  test "status follows interval lifecycle and replacement between recurring kinds" do
+    job_id = {:review, "tenant-1"}
+    {:ok, started} = reduce_state(%{cron: %{}}, [Timer.every(job_id, 25, tick())])
+    {:ok, paused} = reduce_state(started, [Timer.pause(job_id)])
+
+    assert {:ok, %{kind: :every, status: :paused, generation: 0}} =
+             Timer.status(%{timer: paused}, job_id)
+
+    {:ok, resumed} = reduce_state(paused, [Timer.resume(job_id)])
+
+    assert {:ok, %{kind: :every, status: :active, generation: 1}} =
+             Timer.status(%{timer: resumed}, job_id)
+
+    {:ok, replaced} = reduce_state(resumed, [Timer.every(job_id, 50, tick())])
+
+    assert {:ok, %{kind: :every, status: :active, generation: 2}} =
+             Timer.status(%{timer: replaced}, job_id)
+
+    {:ok, cron} = reduce_state(replaced, [Timer.cron(job_id, "* * * * *", tick(), generation: 7)])
+
+    assert {:ok, %{kind: :cron, status: :active, generation: 7}} =
+             Timer.status(%{timer: cron}, job_id)
+
+    {:ok, interval} = reduce_state(cron, [Timer.every(job_id, 25, tick())])
+
+    assert {:ok, %{kind: :every, status: :active, generation: 8}} =
+             Timer.status(%{timer: interval}, job_id)
+
+    for timer <- [cron, interval] do
+      {:ok, cancelled} = reduce_state(timer, [Timer.cancel(job_id)])
+      assert Timer.status(%{timer: cancelled}, job_id) == {:error, :not_found}
+    end
+  end
+
+  @tag obligation: "jido.plugin.timer.I1"
+  test "status preserves absent cron generations and reports dormant definitions as active" do
+    # This finite expression has no slot after the fixed boundary.
+    expression = "0 0 0 1 1 * 2020"
+    assert {:error, _} = Timer.next_occurrence(expression, "Etc/UTC", @instant)
+    {:ok, timer} = reduce_state(%{cron: %{}}, [Timer.cron(:past, expression, tick())])
+
+    assert {:ok, %{kind: :cron, status: :active, generation: nil}} =
+             Timer.status(%{timer: timer}, :past)
+  end
+
+  @tag obligation: "jido.plugin.timer.I10"
+  test "status reads the static heartbeat interval" do
+    {:timer, schema} = Timer.state_spec(interval: 25)
+    {:ok, timer} = Jido.Joi.parse(schema, nil)
+
+    assert {:ok, %{kind: :every, status: :active, generation: 0}} =
+             Timer.status(%{timer: timer}, :heartbeat)
+  end
+
   @tag obligation: "jido.plugin.timer.I2"
   test "invalid and retired Timer inputs fail before state can change" do
     signal = tick()
