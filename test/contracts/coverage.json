@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 94,
+      "active": 95,
       "coverage": 1.0,
-      "covered": 94
+      "covered": 95
     },
     "jido.agent_server": {
       "active": 14,
@@ -563,10 +563,10 @@
       }
     },
     "jido.agent_server": {
-      "active": 11,
+      "active": 12,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 11,
+      "covered": 12,
       "form": "light",
       "obligations": {
         "jido.agent_server.I1": {
@@ -633,6 +633,17 @@
           "testable": true,
           "tests": [
             "test Address delivery activates, stays warm, passivates, and restores"
+          ]
+        },
+        "jido.agent_server.I105": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test an exact terminal result survives restart until acknowledgement",
+            "test failed and cancelled handoffs retain process-neutral results"
           ]
         },
         "jido.agent_server.I11": {
@@ -5672,8 +5683,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 235,
+    "active": 236,
     "coverage": 1.0,
-    "covered": 235
+    "covered": 236
   }
 }

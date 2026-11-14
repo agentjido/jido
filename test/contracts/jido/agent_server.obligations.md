@@ -407,3 +407,11 @@ authoring surface.
 - **why:** One logical commit can require more than one persistence record change.
 - **kind:** persisted-format
 - **status:** active
+
+### jido.agent_server.I105 — Exact terminal result handoff
+
+- **scope:** durable Address submission through `Jido.submit/4`, `Jido.turn_result/3`, and `Jido.acknowledge_turn_result/3`
+- **must:** Accept a caller-supplied nonempty turn identifier so product data can name a Turn before submission. Retain one process-neutral terminal result when an asynchronous submission requests a result handoff. Store the exact turn identifier, status, reply or safe error, revisions, and completion time with the Agent record. Reject a later Turn until exact acknowledgement clears that result. Preserve the result across passivation and Instance restart. Keep older records without a retained result valid.
+- **why:** A product server must recover a committed result after its caller or runtime process stops.
+- **kind:** persisted-format
+- **status:** active

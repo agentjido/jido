@@ -34,6 +34,14 @@ All request modes use one Turn path. Accepted terminal states are data in a
 transport failed. Cast runs the same Turn and commit path but discards its
 reply.
 
+An asynchronous stable-Address submission can supply a `turn_id` and set
+`result_handoff: true`. This lets product data record the exact Turn before it
+submits work. The durable record then retains one exact terminal `TurnResult`. Use
+`Jido.turn_result/3` to read it without a process handle and
+`Jido.acknowledge_turn_result/3` to clear it. The Agent rejects later Turns
+until acknowledgement. Records written before this optional field remain
+valid.
+
 `remove_topology_member/4` removes one declared member slot from the current
 root activation. It closes admission for the selected subtree, settles
 accepted work, and stops descendants before their parent. It keeps the root,
@@ -67,14 +75,15 @@ restart.
 
 Agent revision and persistence revision are separate public fields. A durable
 operation can change the persistence revision without changing Agent state.
+Terminal result acknowledgement is one such operation.
 
 ## Proof
 
 The focused contract suite covers stable Address delivery, warm residency,
 passivation, worker recovery, accepted failure values, durable Signal retry,
-timer wake-up after Instance restart, concurrent activation, uncertain-write
-reconciliation, definition upgrade, stable Plugin runtime, and controlled
-declared-subtree removal.
+exact result handoff across Instance restart, timer wake-up after Instance
+restart, concurrent activation, uncertain-write reconciliation, definition
+upgrade, stable Plugin runtime, and controlled declared-subtree removal.
 
 ## Sources
 

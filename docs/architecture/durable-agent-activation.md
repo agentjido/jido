@@ -141,6 +141,9 @@ The Jido Instance owns normal create and restore operations:
 - `Jido.create_agent/4` synchronously creates a new durable Agent and returns
   its Address without starting an activation.
 - `Jido.activate_agent/4` restores an existing durable Agent.
+- `Jido.turn_result/3` reads one exact retained terminal result without
+  activating the Agent.
+- `Jido.acknowledge_turn_result/3` clears only that exact retained result.
 - There is no restore-or-create operation.
 - A tombstone, conflict, missing record, or invalid record has a distinct
   result.
@@ -161,6 +164,7 @@ to delete an Agent.
   agent_activation_id: activation_id,
   agent_revision: non_neg_integer(),
   persistence_revision: non_neg_integer() | nil,
+  completed_at: non_neg_integer() | nil,
   durability: :memory | :durable
 }
 ```
@@ -199,6 +203,10 @@ The result rules are:
 - `waits` is present only for a waiting Turn.
 - `error` is present only for failure, timeout, or uncertainty.
 - `persistence_revision` is `nil` for an in-memory Agent.
+- `completed_at` is system time in milliseconds for a terminal result and is
+  `nil` while the Turn waits.
+- A durable submission with `result_handoff: true` retains one exact terminal
+  result. A new Turn is rejected until acknowledgement clears it.
 - Public values contain no PID, task, monitor, callback, Runic value, or
   internal Directive.
 

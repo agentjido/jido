@@ -592,9 +592,17 @@ defmodule Jido.Persistence do
 
   defp require_inactive_turn(record) do
     case Map.get(record, :server_turn) do
-      nil -> :ok
-      %{status: status} when status in [:completed, :failed, :cancelled] -> :ok
-      _turn -> {:error, :turn_in_flight}
+      nil ->
+        :ok
+
+      %{terminal_result: %Jido.AgentServer.TurnResult{}} ->
+        {:error, :result_acknowledgement_required}
+
+      %{status: status} when status in [:completed, :failed, :cancelled] ->
+        :ok
+
+      _turn ->
+        {:error, :turn_in_flight}
     end
   end
 

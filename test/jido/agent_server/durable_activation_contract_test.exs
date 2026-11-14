@@ -251,6 +251,106 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
     assert %Snapshot{agent: %{state: %{count: 0}}} = Jido.AgentServer.snapshot(server)
   end
 
+  @tag obligation: "jido.agent_server.I105"
+  test "an exact terminal result survives restart until acknowledgement", %{
+    instance: instance,
+    namespace: namespace,
+    path: path,
+    address: address
+  } do
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
+
+    turn_id = "product-operation-turn"
+
+    pending =
+      Jido.submit(instance, address, add(2),
+        result_handoff: true,
+        turn_id: turn_id
+      )
+
+    assert pending.turn_id == turn_id
+    assert :ok = Jido.AgentServer.abandon(pending)
+
+    result =
+      Jido.Test.Eventually.eventually(fn ->
+        case Jido.turn_result(instance, address, turn_id) do
+          {:ok, result} -> result
+          {:error, :not_found} -> false
+        end
+      end)
+
+    assert %TurnResult{
+             turn_id: ^turn_id,
+             status: :committed,
+             durability: :durable,
+             completed_at: completed_at
+           } = result
+
+    assert is_integer(completed_at)
+    assert %Status{admission: :blocked} = Jido.status(instance, address)
+    assert {:error, :result_acknowledgement_required} = Jido.call(instance, address, add(1))
+    assert {:error, :not_found} = Jido.turn_result(instance, address, "different-turn")
+
+    assert {:error, :turn_result_mismatch} =
+             Jido.acknowledge_turn_result(instance, address, "different-turn")
+
+    assert {:ok, ^result} = Jido.turn_result(instance, address, turn_id)
+
+    assert :ok = stop_supervised(instance)
+
+    start_supervised!(
+      {Jido,
+       name: instance,
+       namespace: namespace,
+       persistence: {Jido.Persistence.File, path: path},
+       activation: [idle_residency_timeout: 50]},
+      id: instance
+    )
+
+    assert {:ok, ^result} = Jido.turn_result(instance, address, turn_id)
+    assert :ok = Jido.acknowledge_turn_result(instance, address, turn_id)
+    assert :ok = Jido.acknowledge_turn_result(instance, address, turn_id)
+    assert {:error, :not_found} = Jido.turn_result(instance, address, turn_id)
+
+    assert {:ok, %TurnResult{status: :committed}} = Jido.call(instance, address, add(1))
+    assert {:ok, server} = Jido.resolve_agent(instance, address)
+    assert %Snapshot{agent: %{state: %{count: 3}}} = Jido.AgentServer.snapshot(server)
+  end
+
+  @tag obligation: "jido.agent_server.I105"
+  test "failed and cancelled handoffs retain process-neutral results", %{
+    instance: instance,
+    address: address
+  } do
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
+
+    failed = Jido.submit(instance, address, fail_signal(), result_handoff: true)
+
+    assert {:ok, %TurnResult{status: :failed} = failed_result} =
+             Jido.AgentServer.await(failed)
+
+    assert {:ok, ^failed_result} = Jido.turn_result(instance, address, failed.turn_id)
+    assert :ok = Jido.acknowledge_turn_result(instance, address, failed.turn_id)
+
+    waiting =
+      Jido.submit(instance, address, approval_request("cancel-request"), result_handoff: true)
+
+    assert {:ok, %TurnResult{status: :waiting, turn_id: turn_id}} =
+             Jido.AgentServer.await(waiting)
+
+    assert :ok = Jido.cancel_turn(instance, address, turn_id)
+
+    assert {:ok,
+            %TurnResult{
+              status: :cancelled,
+              turn_id: ^turn_id,
+              durability: :durable,
+              error: :cancelled
+            }} = Jido.turn_result(instance, address, turn_id)
+
+    assert :ok = Jido.acknowledge_turn_result(instance, address, turn_id)
+  end
+
   @tag obligation: "jido.agent_server.I95"
   test "delete uses only the Address and a tombstone prevents reactivation", %{instance: instance, address: address} do
     assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)

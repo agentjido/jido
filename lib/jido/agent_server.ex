@@ -27,7 +27,14 @@ defmodule Jido.AgentServer do
   @spec cast(server(), Signal.t(), keyword()) :: :ok | {:error, term()}
   def cast(server, signal, opts \\ []), do: Worker.cast(server, signal, opts)
 
-  @doc "Submits one Signal and returns an owner-bound pending Turn."
+  @doc """
+  Submits one Signal and returns an owner-bound pending Turn.
+
+  Set `turn_id:` when durable product data must name the Turn before
+  submission. Set `result_handoff: true` when a process-neutral result must
+  survive caller or Instance loss. Read and acknowledge that result through
+  the stable Address functions on `Jido`.
+  """
   @spec submit(server(), Signal.t(), keyword()) :: Pending.t() | {:error, term()}
   def submit(server, signal, opts \\ []), do: Worker.submit(server, signal, opts)
 

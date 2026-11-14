@@ -503,10 +503,15 @@ defmodule Jido.AgentServer.Worker do
   end
 
   @doc """
-  Submits one turn with optional `context:` and `admission_timeout:` and returns
-  a pending result handle. Admission timeout defaults to 5,000 ms. It limits
-  the wait before execution, not execution itself or a later `await` call.
-  Finite admission deadlines require a caller on the server's node.
+  Submits one turn with optional `context:`, `admission_timeout:`, `turn_id:`,
+  and `result_handoff:` and returns a pending result handle. Admission timeout
+  defaults to 5,000 ms. It limits the wait before execution, not execution
+  itself or a later `await` call. Finite admission deadlines require a caller
+  on the server's node. A supplied `turn_id:` must be a nonempty string and
+  lets durable product data name the Turn before submission. Set
+  `result_handoff: true` only for a durable Agent. The Agent retains that exact
+  terminal result and rejects later Turns until
+  `Jido.acknowledge_turn_result/3` clears it.
 
   Submission does not confirm that execution has started. Use `await/2` from
   this same process to collect the result. The handle hides the OTP request.
@@ -515,16 +520,30 @@ defmodule Jido.AgentServer.Worker do
   @spec submit(server(), Signal.t(), keyword()) :: pending() | {:error, term()}
   def submit(server, signal, opts \\ []) do
     with {:ok, signal} <- Validation.normalize_signal(signal),
-         {:ok, context} <- Lifecycle.turn_context(opts, [:context, :admission_timeout]),
+         {:ok, context} <-
+           Lifecycle.turn_context(opts, [
+             :context,
+             :admission_timeout,
+             :result_handoff,
+             :turn_id
+           ]),
+         :ok <- validate_result_handoff(opts),
+         {:ok, turn_id} <- submit_turn_id(opts),
          {:ok, deadline} <- Lifecycle.admission_deadline(opts) do
       reply_gate = ReplyGate.start(self(), server)
-      turn_id = Jido.Id.uuid7()
       public_request_id = Jido.Id.uuid7()
 
       request_id =
         :gen_statem.send_request(
           server,
-          turn_event(turn_id, signal, context, deadline, reply_gate)
+          turn_event(
+            turn_id,
+            signal,
+            context,
+            deadline,
+            reply_gate,
+            Keyword.get(opts, :result_handoff, false)
+          )
         )
 
       Process.put(
@@ -549,12 +568,40 @@ defmodule Jido.AgentServer.Worker do
   def cast(server, signal, opts \\ []) do
     with {:ok, signal} <- Validation.normalize_signal(signal),
          {:ok, context} <- Lifecycle.turn_context(opts, [:context]) do
-      :gen_statem.cast(server, turn_event(Jido.Id.uuid7(), signal, context, :infinity, nil))
+      :gen_statem.cast(
+        server,
+        turn_event(Jido.Id.uuid7(), signal, context, :infinity, nil, false)
+      )
     end
   end
 
   defp turn_event(turn_id, signal, context, deadline, reply_gate),
+    do: turn_event(turn_id, signal, context, deadline, reply_gate, false)
+
+  defp turn_event(turn_id, signal, context, deadline, reply_gate, false),
     do: {:turn, turn_id, signal, context, deadline, reply_gate}
+
+  defp turn_event(turn_id, signal, context, deadline, reply_gate, true),
+    do: {:turn, turn_id, signal, context, deadline, reply_gate, true}
+
+  defp validate_result_handoff(opts) do
+    if Keyword.get(opts, :result_handoff, false) in [true, false],
+      do: :ok,
+      else: Lifecycle.invalid_options("result_handoff must be a boolean")
+  end
+
+  defp submit_turn_id(opts) do
+    case Keyword.get(opts, :turn_id) do
+      nil -> {:ok, Jido.Id.uuid7()}
+      turn_id when is_binary(turn_id) and byte_size(turn_id) > 0 -> {:ok, turn_id}
+      _turn_id -> Lifecycle.invalid_options("turn_id must be a nonempty string")
+    end
+  end
+
+  defp result_handoff_status(true, %{persistence: persistence}) when persistence in [nil, false],
+    do: {:error, :persistence_required}
+
+  defp result_handoff_status(_result_handoff, _data), do: :ok
 
   @doc """
   Waits for a submitted turn and returns the same turn result as `call/3`.
@@ -1214,12 +1261,36 @@ defmodule Jido.AgentServer.Worker do
     {:keep_state_and_data, reply(from, result)}
   end
 
-  def handle_event(type, {:turn, _token, _signal, _context, _deadline, reply_gate}, phase, data)
+  def handle_event(
+        type,
+        {:turn, token, signal, context, deadline, reply_gate},
+        phase,
+        data
+      ),
+      do:
+        handle_event(
+          type,
+          {:turn, token, signal, context, deadline, reply_gate, false},
+          phase,
+          data
+        )
+
+  def handle_event(
+        type,
+        {:turn, _token, _signal, _context, _deadline, reply_gate, _result_handoff},
+        phase,
+        data
+      )
       when phase in [:restoring, :initializing],
       do: reject_turn(type, :not_ready, data, reply_gate)
 
-  def handle_event(type, {:turn, _token, _signal, _context, _deadline, reply_gate}, :faulted, data),
-    do: reject_turn(type, :reconciliation_required, data, reply_gate)
+  def handle_event(
+        type,
+        {:turn, _token, _signal, _context, _deadline, reply_gate, _result_handoff},
+        :faulted,
+        data
+      ),
+      do: reject_turn(type, :reconciliation_required, data, reply_gate)
 
   def handle_event({:call, from}, {:cancel, _id}, phase, _data)
       when phase in [:restoring, :initializing],
@@ -1424,7 +1495,12 @@ defmodule Jido.AgentServer.Worker do
     end
   end
 
-  def handle_event(type, {:turn, token, _signal, _context, _deadline, reply_gate}, _phase, data)
+  def handle_event(
+        type,
+        {:turn, token, _signal, _context, _deadline, reply_gate, _result_handoff},
+        _phase,
+        data
+      )
       when data.admission_mode != :open do
     queued? = MapSet.member?(data.postponed, token)
     data = %{data | postponed: MapSet.delete(data.postponed, token)}
@@ -1442,7 +1518,7 @@ defmodule Jido.AgentServer.Worker do
 
   def handle_event(
         type,
-        {:turn, token, _signal, _context, _deadline, reply_gate},
+        {:turn, token, _signal, _context, _deadline, reply_gate, _result_handoff},
         :handoff_pending,
         data
       )
@@ -1450,7 +1526,12 @@ defmodule Jido.AgentServer.Worker do
     postpone_turn(type, token, data, reply_gate)
   end
 
-  def handle_event(type, {:turn, token, signal, context, deadline, reply_gate}, :idle, data)
+  def handle_event(
+        type,
+        {:turn, token, signal, context, deadline, reply_gate, result_handoff},
+        :idle,
+        data
+      )
       when type == :cast or (is_tuple(type) and elem(type, 0) == :call) do
     data = %{
       data
@@ -1458,10 +1539,19 @@ defmodule Jido.AgentServer.Worker do
         queued_from: Map.delete(data.queued_from, token)
     }
 
-    with :ok <- Lifecycle.admission_status(deadline) do
+    with :ok <- Lifecycle.admission_status(deadline),
+         :ok <- result_handoff_status(result_handoff, data),
+         :error <- Continuation.terminal_result(data.server_turn) do
       case Continuation.retry(data.server_turn, signal) do
         :new ->
-          start_turn(type, signal, context, data, {:turn, token}, reply_gate)
+          start_turn(
+            type,
+            signal,
+            context,
+            data,
+            {:turn, token, result_handoff},
+            reply_gate
+          )
 
         {:ok, result} ->
           ReplyGate.done(reply_gate)
@@ -1484,13 +1574,14 @@ defmodule Jido.AgentServer.Worker do
           reject_turn(type, reason, data, reply_gate)
       end
     else
+      {:ok, _result} -> reject_turn(type, :result_acknowledgement_required, data, reply_gate)
       {:error, reason} -> reject_turn(type, reason, data, reply_gate)
     end
   end
 
   def handle_event(
         type,
-        {:turn, token, signal, _context, deadline, reply_gate},
+        {:turn, token, signal, _context, deadline, reply_gate, _result_handoff},
         :waiting,
         %{active: %{operation: nil}} = data
       )
@@ -1544,7 +1635,12 @@ defmodule Jido.AgentServer.Worker do
     end
   end
 
-  def handle_event(type, {:turn, token, _signal, _context, deadline, reply_gate}, phase, data)
+  def handle_event(
+        type,
+        {:turn, token, _signal, _context, deadline, reply_gate, _result_handoff},
+        phase,
+        data
+      )
       when phase in [
              :preparing,
              :starting,
@@ -1866,7 +1962,13 @@ defmodule Jido.AgentServer.Worker do
 
   defp public_status(phase, data) do
     {:message_queue_len, mailbox} = Process.info(self(), :message_queue_len)
-    Status.new(phase, data, mailbox)
+
+    status = Status.new(phase, data, mailbox)
+
+    case Continuation.terminal_result(data.server_turn) do
+      {:ok, _result} -> %{status | admission: :blocked}
+      :error -> status
+    end
   end
 
   defp durable_wake?(%Jido.Signal{type: "jido.durable.wake", data: data}) do
@@ -2054,7 +2156,7 @@ defmodule Jido.AgentServer.Worker do
       case mode do
         {:restore, receipt} -> receipt.id
         {:handoff, receipt} -> receipt.id
-        {:turn, turn_id} -> turn_id
+        {:turn, turn_id, _result_handoff} -> turn_id
       end
 
     timeout =
@@ -2125,6 +2227,12 @@ defmodule Jido.AgentServer.Worker do
       execution_id: nil,
       worker_id: turn_id,
       durable: match?({:restore, _}, mode),
+      result_handoff:
+        case mode do
+          {:restore, receipt} -> Map.get(receipt, :result_handoff, false)
+          {:handoff, receipt} -> Map.get(receipt, :result_handoff, false)
+          {:turn, _turn_id, value} -> value
+        end,
       persisted:
         match?({:restore, _}, mode) or
           (match?({:handoff, _}, mode) and data.persistence not in [nil, false]),
@@ -2172,7 +2280,7 @@ defmodule Jido.AgentServer.Worker do
           Lifecycle.restore_handoff(agent, receipt, context, data.plugin_specs)
         end)
 
-      {:turn, _turn_id} ->
+      {:turn, _turn_id, _result_handoff} ->
         operation(:prepare, %{data | active: active}, fn ->
           prepare_turn(agent, signal, context, data)
         end)
@@ -2594,8 +2702,14 @@ defmodule Jido.AgentServer.Worker do
     Process.cancel_timer(timer)
 
     case Lifecycle.write_result(result, deadline) do
-      :ok -> publish_commit(data, data.active.result)
-      {:error, reason} -> stop_durable(data, reason)
+      :ok ->
+        case data.active.result do
+          {:error, _reason} = turn_result -> publish_failed_result(data, turn_result)
+          turn_result -> publish_commit(data, turn_result)
+        end
+
+      {:error, reason} ->
+        stop_durable(data, reason)
     end
   end
 
@@ -2678,11 +2792,16 @@ defmodule Jido.AgentServer.Worker do
     if data.active.wait_from, do: :gen_statem.reply(data.active.wait_from, {:error, reason})
     data = put_in(data.active.wait_from, nil)
     status = if reason == :cancelled, do: :cancelled, else: :failed
+    result = {:error, reason}
+
+    projected =
+      projected_turn_result(data, result, data.agent_revision, data.state_version + 1)
 
     receipt =
       data.server_turn
       |> Continuation.put_status!(status)
-      |> put_resume_result(data, {:error, reason}, data.agent_revision, data.state_version + 1)
+      |> put_resume_result(data, projected)
+      |> maybe_retain_result(data, projected)
 
     data =
       data
@@ -2873,10 +2992,14 @@ defmodule Jido.AgentServer.Worker do
          %{active: %{persisted: true, durable_finalized: false}} = data,
          {:error, _} = result
        ) do
+    projected =
+      projected_turn_result(data, result, data.agent_revision, data.state_version + 1)
+
     receipt =
       data.server_turn
       |> Continuation.put_status!(:failed)
-      |> put_resume_result(data, result, data.agent_revision, data.state_version + 1)
+      |> put_resume_result(data, projected)
+      |> maybe_retain_result(data, projected)
 
     data =
       data
@@ -2950,14 +3073,18 @@ defmodule Jido.AgentServer.Worker do
         do: Continuation.put_status!(data.server_turn, :completed),
         else: data.server_turn
 
-    receipt =
-      put_resume_result(
-        receipt,
+    projected =
+      projected_turn_result(
         data,
         result,
         data.agent_revision + 1,
         data.state_version + 1
       )
+
+    receipt =
+      receipt
+      |> put_resume_result(data, projected)
+      |> maybe_retain_result(data, projected)
 
     data = %{data | server_turn: receipt}
 
@@ -2969,6 +3096,47 @@ defmodule Jido.AgentServer.Worker do
         data.state_version,
         receipt,
         agent_revision: data.agent_revision + 1
+      )
+    end)
+  end
+
+  defp finish(
+         %{
+           active: %{turn_id: turn_id, result_handoff: true},
+           server_turn: %{terminal_result: %{turn_id: turn_id}}
+         } = data,
+         {:error, _} = result
+       ),
+       do: finish_result(data, result)
+
+  defp finish(
+         %{persistence: persistence, active: %{result_handoff: true}} = data,
+         {:error, _} = result
+       )
+       when persistence not in [nil, false] do
+    cancel_timer(data.active)
+    deadline = System.monotonic_time(:millisecond) + data.persistence_timeout
+
+    timer =
+      Process.send_after(
+        self(),
+        {:persistence_timeout, data.active.turn_id},
+        data.persistence_timeout
+      )
+
+    active = Map.merge(data.active, %{result: result, storage: {timer, deadline}})
+    projected = projected_turn_result(data, result, data.agent_revision, data.state_version + 1)
+    receipt = Continuation.retain_result!(data.server_turn, projected)
+    data = %{data | server_turn: receipt, active: active}
+
+    operation(:save, data, fn ->
+      Lifecycle.save(
+        data,
+        data.agent,
+        data.state_version + 1,
+        data.state_version,
+        receipt,
+        agent_revision: data.agent_revision
       )
     end)
   end
@@ -3043,6 +3211,23 @@ defmodule Jido.AgentServer.Worker do
          ) do
       :ok ->
         finish_result(data, result)
+
+      {:error, reason} ->
+        stop_failed(data, execution_error("Local checkpoint failed", reason), :checkpoint)
+    end
+  end
+
+  defp publish_failed_result(data, result) do
+    revision = data.state_version + 1
+
+    case ServerSupervisor.publish_checkpoint(
+           data.activation_state,
+           data.agent,
+           revision,
+           data.agent_revision
+         ) do
+      :ok ->
+        finish_result(%{data | state_version: revision, persistence_revision: revision}, result)
 
       {:error, reason} ->
         stop_failed(data, execution_error("Local checkpoint failed", reason), :checkpoint)
@@ -3294,11 +3479,11 @@ defmodule Jido.AgentServer.Worker do
     do: accepted_reply(data) ++ cancel_replies(data.active, :ok)
 
   defp accepted_reply(%{active: %{from: nil}}), do: []
-  defp accepted_reply(data), do: reply(data.active.from, {:ok, turn_result(data)})
+  defp accepted_reply(data), do: reply(data.active.from, {:ok, reply_turn_result(data)})
   defp accepted_reply(%{active: %{from: nil}}, _status), do: []
   defp accepted_reply(data, status), do: reply(data.active.from, {:ok, turn_result(data, status)})
 
-  defp turn_result(data, status \\ nil) do
+  defp turn_result(data, status \\ nil, completed_at \\ nil) do
     active = data.active
     status = status || turn_status(active.result)
 
@@ -3315,11 +3500,31 @@ defmodule Jido.AgentServer.Worker do
         end,
       agent_revision: data.agent_revision,
       persistence_revision: data.persistence_revision,
+      completed_at:
+        completed_at ||
+          if(status == :waiting, do: nil, else: System.system_time(:millisecond)),
       reply: Map.get(active, :reply),
       waits: if(status == :waiting, do: active.waits, else: []),
       effects: if(active.effects == [], do: :none, else: :pending),
       error: turn_error(active.result, status)
     }
+  end
+
+  defp reply_turn_result(data) do
+    case Continuation.terminal_result(data.server_turn) do
+      {:ok, %{turn_id: turn_id} = result} when turn_id == data.active.turn_id ->
+        result
+
+      _other ->
+        case data.server_turn do
+          %{resume: %{result: %{turn_id: turn_id} = result}}
+          when turn_id == data.active.turn_id ->
+            result
+
+          _receipt ->
+            turn_result(data)
+        end
+    end
   end
 
   defp completed_retry_result(data, turn_id) do
@@ -3331,6 +3536,7 @@ defmodule Jido.AgentServer.Worker do
       durability: if(data.persistence in [nil, false], do: :memory, else: :durable),
       agent_revision: data.agent_revision,
       persistence_revision: data.persistence_revision,
+      completed_at: System.system_time(:millisecond),
       reply: nil,
       waits: [],
       effects: :none,
@@ -3338,10 +3544,19 @@ defmodule Jido.AgentServer.Worker do
     }
   end
 
-  defp put_resume_result(receipt, %{active: %{resume_input: nil}}, _result, _agent_rev, _persist_rev),
+  defp put_resume_result(receipt, %{active: %{resume_input: nil}}, _projected),
     do: receipt
 
-  defp put_resume_result(receipt, data, result, agent_revision, persistence_revision) do
+  defp put_resume_result(receipt, _data, projected) do
+    Continuation.put_resume_result!(receipt, projected)
+  end
+
+  defp maybe_retain_result(receipt, %{active: %{result_handoff: true}}, projected),
+    do: Continuation.retain_result!(receipt, projected)
+
+  defp maybe_retain_result(receipt, _data, _projected), do: receipt
+
+  defp projected_turn_result(data, result, agent_revision, persistence_revision) do
     {reply_signal, effects} =
       case result do
         result when elem(result, 0) in [:ok, :handoff] ->
@@ -3354,15 +3569,16 @@ defmodule Jido.AgentServer.Worker do
 
     active = %{data.active | result: result, reply: reply_signal, effects: effects}
 
-    projected =
-      turn_result(%{
+    turn_result(
+      %{
         data
         | active: active,
           agent_revision: agent_revision,
           persistence_revision: persistence_revision
-      })
-
-    Continuation.put_resume_result!(receipt, projected)
+      },
+      nil,
+      System.system_time(:millisecond)
+    )
   end
 
   defp turn_status({status, _candidate, _directives}) when status in [:ok, :handoff],

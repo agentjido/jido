@@ -5,6 +5,7 @@ defmodule Jido.Durable.ContinuationTest do
 
   alias Jido.Durable.Continuation
   alias Jido.Flow.Identity
+  alias Jido.AgentServer.TurnResult
   alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   defp signal, do: Jido.Signal.new!("continuation.test", %{value: 1}, source: "/test")
@@ -103,5 +104,50 @@ defmodule Jido.Durable.ContinuationTest do
                target: F.Flow,
                expires_at: 100
              })
+  end
+
+  test "one portable terminal result is retained and cleared by exact acknowledgement" do
+    address = Jido.Agent.Address.new!(namespace: "jido/test", id: "agent-1")
+
+    result = %TurnResult{
+      turn_id: "turn-4",
+      agent_address: address,
+      agent_activation_id: "activation-1",
+      status: :committed,
+      durability: :durable,
+      agent_revision: 2,
+      persistence_revision: 3,
+      completed_at: 100
+    }
+
+    receipt = Continuation.retain_result!(nil, result)
+
+    assert :ok = Continuation.validate(receipt)
+    assert :ok = Continuation.portable(receipt)
+    assert {:ok, ^result} = Continuation.terminal_result(receipt)
+
+    assert {:error, :turn_result_mismatch} =
+             Continuation.acknowledge_result(receipt, "turn-5")
+
+    assert {:ok, nil, true} = Continuation.acknowledge_result(receipt, "turn-4")
+  end
+
+  test "older continuation data stays valid without terminal handoff fields" do
+    assert {:ok, continuation} =
+             Continuation.running(%{
+               id: "turn-6",
+               signal: signal(),
+               admitted_signal: signal(),
+               context: %{},
+               plugin_inputs: %{},
+               target: F.Flow,
+               expires_at: 100
+             })
+
+    refute Map.has_key?(continuation, :result_handoff)
+    assert :ok = Continuation.validate(continuation)
+
+    assert {:ok, ^continuation, false} =
+             Continuation.acknowledge_result(continuation, "turn-6")
   end
 end

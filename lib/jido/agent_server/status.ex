@@ -7,6 +7,7 @@ defmodule Jido.AgentServer.Status do
   """
 
   alias Jido.Agent.Address
+  alias Jido.AgentServer.TurnResult
   alias Jido.Exec.Wait
 
   @type lifecycle :: :alive | :deleted
@@ -95,7 +96,7 @@ defmodule Jido.AgentServer.Status do
       durability: :durable,
       agent_revision: agent_revision,
       persistence_revision: persistence_revision,
-      admission: :quiesced,
+      admission: if(match?(%{terminal_result: %TurnResult{}}, turn), do: :blocked, else: :quiesced),
       queue_depth: 0,
       active_turn_id: if(open_turn?(turn), do: turn.id),
       waits: [],

@@ -449,7 +449,8 @@ defmodule Jido.AgentServer.Lifecycle do
                ]),
              plugin_inputs: prepared.instruction.context.plugin_inputs,
              target: instruction.target,
-             expires_at: continuation_expiry(data.active)
+             expires_at: continuation_expiry(data.active),
+             result_handoff: Map.get(data.active, :result_handoff, false)
            })
   end
 
@@ -478,7 +479,8 @@ defmodule Jido.AgentServer.Lifecycle do
              instruction: instruction,
              chain_id: data.active.chain_id,
              chain_order: data.active.chain_order + 1,
-             predecessor_id: data.active.turn_id
+             predecessor_id: data.active.turn_id,
+             result_handoff: Map.get(data.active, :result_handoff, false)
            }),
          do: validate_continuation_receipt(data, receipt)
   end

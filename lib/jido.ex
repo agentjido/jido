@@ -4,6 +4,7 @@ defmodule Jido do
   alias Jido.Agent.Address
   alias Jido.AgentOwnership
   alias Jido.AgentServer
+  alias Jido.Durable.Continuation
   alias Jido.Instance.{Names, NamespaceRegistry, Options, Ownership, RuntimeStore}
 
   @shutdown_timeout_ms 10_000
@@ -624,6 +625,67 @@ defmodule Jido do
     end
   end
 
+  defp prepare_result_acknowledgement(instance, address) do
+    case resolve_address_target(instance, address) do
+      {:ok, pid} ->
+        case AgentServer.status(pid) do
+          %{work_state: :idle, queue_depth: 0, effects: :none} ->
+            with {:ok, _snapshot} <- AgentServer.stop(pid, :result_acknowledged, 5_000),
+                 do: {:ok, true}
+
+          %{} ->
+            {:error, :agent_busy}
+
+          {:error, _reason} = error ->
+            error
+        end
+
+      {:error, :not_found} ->
+        {:ok, false}
+
+      {:error, state} when state in [:recovering, :passivating] ->
+        {:error, :agent_busy}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp acknowledge_saved_turn_result(instance, address, turn_id) do
+    with {:ok, agent, persistence_revision, agent_revision, receipt} <-
+           Jido.Persistence.load_agent_address(instance, address, instance: instance),
+         {:ok, cleared, changed?} <- Continuation.acknowledge_result(receipt, turn_id) do
+      if changed? do
+        Jido.Persistence.save_agent(instance, agent,
+          instance: instance,
+          partition: address.partition,
+          reason: :turn_result_acknowledgement,
+          revision: persistence_revision + 1,
+          expected_revision: persistence_revision,
+          agent_revision: agent_revision,
+          server_turn: cleared
+        )
+      else
+        :ok
+      end
+    end
+  end
+
+  defp restore_after_result_acknowledgement(_instance, _address, false), do: :ok
+
+  defp restore_after_result_acknowledgement(instance, address, true) do
+    case restore_activation(instance, address, []) do
+      {:ok, _pid} -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_turn_id(operation, turn_id) do
+    if byte_size(turn_id) > 0,
+      do: :ok,
+      else: invalid_runtime_input(operation, %{turn_id: turn_id})
+  end
+
   defp await_activated(pid) do
     case AgentServer.await_ready(pid, 5_000) do
       :ok -> {:ok, pid}
@@ -650,6 +712,64 @@ defmodule Jido do
   def submit(instance, %Address{} = address, signal, opts \\ []) do
     with_address_server(instance, address, &AgentServer.submit(&1, signal, opts))
   end
+
+  @doc """
+  Returns the exact retained terminal result for one durable Agent Turn.
+
+  The read does not activate a passivated Agent. A submission retains a result
+  only when `result_handoff: true` is set. The exact turn identifier is
+  required. A different or acknowledged identifier returns `:not_found`.
+  """
+  @spec turn_result(atom(), Address.t(), String.t()) ::
+          {:ok, Jido.AgentServer.TurnResult.t()} | {:error, term()}
+  def turn_result(instance, %Address{} = address, turn_id) when is_binary(turn_id) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         :ok <- validate_turn_id(:turn_result, turn_id),
+         {:ok, _agent, _persistence_revision, _agent_revision, receipt} <-
+           Jido.Persistence.load_agent_address(instance, address, instance: instance),
+         {:ok, %{turn_id: ^turn_id} = result} <- Continuation.terminal_result(receipt) do
+      {:ok, result}
+    else
+      :error -> {:error, :not_found}
+      {:ok, %Jido.AgentServer.TurnResult{}} -> {:error, :not_found}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  def turn_result(_instance, address, turn_id),
+    do: invalid_runtime_input(:turn_result, %{agent_address: address, turn_id: turn_id})
+
+  @doc """
+  Acknowledges and clears one exact retained terminal result.
+
+  The Agent must have no active work or pending effects. A resident Agent is
+  stopped before the compare-and-swap write and is restored after the write.
+  Repeating an acknowledgement after it is cleared is safe.
+  """
+  @spec acknowledge_turn_result(atom(), Address.t(), String.t()) :: :ok | {:error, term()}
+  def acknowledge_turn_result(instance, %Address{} = address, turn_id)
+      when is_binary(turn_id) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         :ok <- validate_turn_id(:acknowledge_turn_result, turn_id),
+         :ok <- ensure_reconciled(instance, address),
+         {:ok, reactivate?} <- prepare_result_acknowledgement(instance, address) do
+      result = acknowledge_saved_turn_result(instance, address, turn_id)
+      restore = restore_after_result_acknowledgement(instance, address, reactivate?)
+
+      case {result, restore} do
+        {:ok, :ok} -> :ok
+        {{:error, _reason} = error, :ok} -> error
+        {_result, {:error, _reason} = error} -> error
+      end
+    end
+  end
+
+  def acknowledge_turn_result(_instance, address, turn_id),
+    do:
+      invalid_runtime_input(:acknowledge_turn_result, %{
+        agent_address: address,
+        turn_id: turn_id
+      })
 
   @doc "Writes a durable tombstone for one inactive stable Agent Address."
   @spec delete_agent(atom(), Address.t(), keyword()) :: :ok | {:error, term()}
@@ -998,6 +1118,9 @@ defmodule Jido do
   end
 
   defp replaceable_turn(nil), do: :ok
+
+  defp replaceable_turn(%{terminal_result: %Jido.AgentServer.TurnResult{}}),
+    do: {:error, :result_acknowledgement_required}
 
   defp replaceable_turn(%{status: status}) when status in [:completed, :failed, :cancelled],
     do: :ok
