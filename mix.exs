@@ -44,6 +44,7 @@ defmodule Jido.MixProject do
         ci: :test,
         coveralls: :test,
         "coveralls.json": :test,
+        "jido_v3.recovery": :test,
         quality: :test,
         "test.authoring": :test,
         "test.all": :test,
@@ -259,7 +260,8 @@ defmodule Jido.MixProject do
          {"Instances and Tenants", "guides/operations/configuration-and-tenant-isolation.md"},
          {"Production Setup", "guides/operations/production-configuration.md"},
          {"Deployment and Sizing", "guides/operations/deployment-and-performance.md"},
-         {"Security Model", "guides/operations/security.md"}
+         {"Security Model", "guides/operations/security.md"},
+         {"Jido v3 Recovery Gate", "guides/operations/jido-v3-recovery.md"}
        ]},
       {:Reference,
        [
@@ -356,6 +358,8 @@ defmodule Jido.MixProject do
         "ex_dna --max-clones 17",
         "reach.check --arch --smells"
       ],
+      "jido_v3.recovery":
+        "test --seed 0 test/jido/agent_server/durable_activation_contract_test.exs test/jido/plugin/timer/runtime_contract_test.exs",
       "test.authoring": test_alias("test/authoring", :authoring),
       "test.all": "test.ci",
       "test.bench": test_alias("test/perf", :bench),

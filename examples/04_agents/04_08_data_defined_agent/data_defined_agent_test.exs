@@ -26,7 +26,7 @@ defmodule Jido.Examples.Basic.DataDefinedAgentTest do
              Server.call(server, Example.signal!(3))
 
     committed = Server.snapshot(server).agent
-    assert candidate.state == %{count: 3, turns: 1, timer: %{cron: %{}}}
+    assert candidate.state == %{count: 3, turns: 1, timer: %{cron: %{}, every: %{}}}
     assert committed.state == candidate.state
   end
 
@@ -46,7 +46,7 @@ defmodule Jido.Examples.Basic.DataDefinedAgentTest do
     instance = Agent.instantiate!(definition, id: unique_id("json-timer"))
     assert {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, instance)
     assert :ok = Server.await_ready(server)
-    assert Server.snapshot(server).agent.state.timer == %{cron: %{}}
+    assert Server.snapshot(server).agent.state.timer == %{cron: %{}, every: %{}}
 
     assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
              Server.call(server, Example.schedule_signal!(0))
