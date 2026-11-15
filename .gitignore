@@ -28,6 +28,10 @@ jido-*.tar
 # Elixir Language Server
 .elixir_ls/
 
+# Local environment and generated Covenant results
+/.env
+/covenant/results/
+
 # expublish
 RELEASE.md
 
