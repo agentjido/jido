@@ -36,6 +36,7 @@ defmodule Jido.AgentServer.Worker do
   alias Jido.Signal
   alias Jido.Telemetry.AgentServer, as: AgentServerTelemetry
   alias Jido.Trace.Context, as: TraceContext
+  alias Runic.Identity.CanonicalError
   alias Runic.Runner
 
   @type pending :: Pending.t()
@@ -1774,6 +1775,17 @@ defmodule Jido.AgentServer.Worker do
 
   def handle_event(
         :info,
+        {:DOWN, ref, :process, _pid, {%CanonicalError{reason: {:limit, _, _}} = error, _stack}},
+        phase,
+        %{active: %{worker_ref: ref, durable: true, persisted: true} = active} = data
+      ) do
+    data = %{data | active: %{active | worker: nil, worker_ref: nil}}
+
+    if active.durable_next, do: {:keep_state, data}, else: abort_turn(phase, data, error)
+  end
+
+  def handle_event(
+        :info,
         {:DOWN, ref, :process, _pid, reason},
         _phase,
         %{active: %{worker_ref: ref, durable: true}} = data
@@ -2384,13 +2396,23 @@ defmodule Jido.AgentServer.Worker do
     end)
   end
 
-  defp durable_advance(%{active: %{operation: nil}} = data),
-    do:
-      durable_operation(:durable_advance, data, fn ->
-        Lifecycle.advance_execution(data.runner, data.active.worker_id)
-      end)
+  defp durable_advance(%{active: %{operation: nil} = active} = data) do
+    durable_operation(:durable_advance, data, fn ->
+      advance_owned_execution(data.runner, active.worker_id, active.worker)
+    end)
+  end
 
   defp durable_advance(data), do: {:keep_state, put_in(data.active.advance_pending, true)}
+
+  defp advance_owned_execution(runner, id, worker) do
+    Lifecycle.advance_execution(runner, id)
+  catch
+    :exit, {:noproc, {GenServer, :call, [^worker | _]}} ->
+      {:error, :not_found}
+
+    :exit, {{%CanonicalError{reason: {:limit, _, _}}, _stack}, {GenServer, :call, [^worker | _]}} ->
+      {:error, :not_found}
+  end
 
   defp operation(kind, data, fun) do
     captured = TraceContext.capture()
@@ -2630,6 +2652,11 @@ defmodule Jido.AgentServer.Worker do
       {:error, reason} -> stop_durable(data, reason)
     end
   end
+
+  # The owned Worker's monitor provides the original stop reason.
+  defp operation_result(:durable_advance, {:error, :not_found}, %{active: %{worker_ref: ref}})
+       when is_reference(ref),
+       do: :keep_state_and_data
 
   defp operation_result(:durable_advance, {:error, :non_portable_flow_output}, data),
     do:

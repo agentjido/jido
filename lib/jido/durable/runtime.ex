@@ -15,7 +15,8 @@ defmodule Jido.Durable.Runtime do
     persistence = Keyword.fetch!(opts, :persistence)
     owner = Keyword.get(opts, :owner, self())
     hooks = Keyword.get(opts, :hooks, [])
-    policy = Keyword.fetch!(opts, :policy)
+    # Persist terminal runnable failures with the graph so they survive restore.
+    policy = opts |> Keyword.fetch!(:policy) |> Map.put(:execution_mode, :durable)
     now = Keyword.get(opts, :now, now())
     max_concurrency = Keyword.get(opts, :max_concurrency, 1)
     on_started = Keyword.get(opts, :on_started, fn _worker -> :ok end)
