@@ -2,7 +2,9 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
   use Covenant.Case, component: "jido.agent_server", async: false
 
   alias Jido.Agent.Address
+  alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.{Snapshot, Status, TurnResult}
+  alias Runic.Identity.CanonicalError
 
   defmodule Add do
     use Jido.Action,
@@ -22,6 +24,37 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
 
     @impl true
     def run(_params, _context), do: {:error, :expected_failure}
+  end
+
+  defmodule LargeValue do
+    use Jido.Action, name: "durable_activation_large_value"
+
+    @impl true
+    def run(%{bytes: bytes}, _context), do: {:ok, %{value: :binary.copy(<<0>>, bytes)}}
+  end
+
+  defmodule LargeStep do
+    use Jido.Flow, name: "durable_activation_large_step"
+
+    flow do
+      step "large", action: LargeValue, params: %{bytes: 17_000_000}
+      output result("large")
+    end
+  end
+
+  defmodule LargeJoin do
+    use Jido.Flow, name: "durable_activation_large_join"
+
+    flow do
+      step "left", action: LargeValue, params: %{bytes: 9_000_000}
+      step "right", action: LargeValue, params: %{bytes: 9_000_000}
+
+      step "combine", [left <- result("left", :value), right <- result("right", :value)] do
+        {:ok, %{count: byte_size(left) + byte_size(right)}}
+      end
+
+      output result("combine")
+    end
   end
 
   defmodule Approval do
@@ -128,6 +161,8 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
     routes do
       route "counter.add", Add
       route "counter.fail", Fail
+      route "counter.large_step", LargeStep
+      route "counter.large_join", LargeJoin
       route "counter.approval", Approval
       route "counter.delayed_increment", DelayedIncrement
     end
@@ -249,6 +284,29 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
 
     assert {:ok, server} = Jido.resolve_agent(instance, address)
     assert %Snapshot{agent: %{state: %{count: 0}}} = Jido.AgentServer.snapshot(server)
+  end
+
+  for {name, type} <- [step: "counter.large_step", join: "counter.large_join"] do
+    @tag obligation: "jido.agent_server.I96"
+    test "an oversized #{name} fact fails a durable Turn with its original cause", %{
+      instance: instance,
+      address: address
+    } do
+      assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
+      assert {:ok, server} = Jido.activate_agent(instance, address)
+      assert :ok = Server.await_ready(server)
+
+      signal = Jido.Signal.new!(unquote(type), %{}, source: "/test")
+      pending = Server.submit(server, signal)
+
+      assert {:ok, %TurnResult{status: :failed, error: %CanonicalError{reason: {:limit, :byte_size, size}}}} =
+               Server.await(pending, 10_000)
+
+      assert size > 16 * 1024 * 1024
+      assert %Snapshot{agent: %{state: %{count: 0}}} = Server.snapshot(server)
+      assert {:ok, %TurnResult{status: :committed}} = Server.call(server, add(1))
+      assert %Snapshot{agent: %{state: %{count: 1}}} = Server.snapshot(server)
+    end
   end
 
   @tag obligation: "jido.agent_server.I105"

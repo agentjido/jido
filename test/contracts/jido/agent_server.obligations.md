@@ -339,7 +339,7 @@ authoring surface.
 ### jido.agent_server.I96 — One accepted Turn result
 
 - **scope:** `Jido.AgentServer.call/3`, `submit/3`, `await/2`, `cast/3`, `Jido.AgentServer.TurnResult`
-- **must:** Return accepted completion, wait, failure, cancellation, timeout, and uncertainty as a `TurnResult`. Reserve `{:error, reason}` for work that was not accepted or for transport failure. Run cast through the same Turn path and discard only its reply.
+- **must:** Return accepted completion, wait, failure, cancellation, timeout, and uncertainty as a `TurnResult`. Reserve `{:error, reason}` for work that was not accepted or for transport failure. A Runic canonical identity limit that rejects a durable Turn must preserve its cause in the failed result and keep the activation available. Run cast through the same Turn path and discard only its reply.
 - **why:** All request modes need one result model and one execution path.
 - **kind:** functional
 - **status:** active
