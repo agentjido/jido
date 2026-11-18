@@ -1,7 +1,7 @@
 defmodule Jido.MixProject do
   use Mix.Project
 
-  @version "3.0.0-beta.2"
+  @version "3.0.0-beta.3"
   @description "A durable actor and agent framework for Elixir"
   @source_url "https://github.com/agentjido/jido"
   @source_ref "v#{@version}"

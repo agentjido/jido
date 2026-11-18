@@ -1964,10 +1964,11 @@
         "jido.instance.I11": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a stopped activation does not block immediate Address replacement before Registry cleanup",
             "test inactive Address replacement preserves or resets state without creating identity"
           ]
         },
@@ -2079,11 +2080,12 @@
         "jido.instance.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
             "test Address resolution distinguishes recovery and Registry loss",
+            "test a stopped activation does not block immediate Address replacement before Registry cleanup",
             "test the Address API resolves each operation and preserves direct Server results"
           ]
         },
