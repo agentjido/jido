@@ -33,12 +33,12 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
 
     before_snapshot =
       params.context
-      |> Snapshot.new(stage: :prepared, content: :none)
+      |> Snapshot.for_attempt(stage: :prepared)
       |> Snapshot.encode()
 
     after_snapshot =
       params.context
-      |> Snapshot.new(content: :none)
+      |> Snapshot.for_attempt()
       |> Snapshot.encode()
 
     attempt = %{

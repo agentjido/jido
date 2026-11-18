@@ -41,7 +41,17 @@ defmodule Jido.AI.Context.Snapshot do
   @spec new(Context.t(), keyword()) :: t()
   def new(%Context{} = context, opts \\ []) do
     content = Keyword.get(opts, :content, :redacted)
-    stage = snapshot_stage(context, Keyword.get(opts, :stage))
+    build(context, Keyword.get(opts, :stage), content, content)
+  end
+
+  @doc false
+  @spec for_attempt(Context.t(), keyword()) :: t()
+  def for_attempt(%Context{} = context, opts \\ []) do
+    build(context, Keyword.get(opts, :stage), :none, :summary)
+  end
+
+  defp build(context, requested_stage, content, detail) do
+    stage = snapshot_stage(context, requested_stage)
     req_llm_context = context.request.context
 
     %__MODULE__{
@@ -50,9 +60,9 @@ defmodule Jido.AI.Context.Snapshot do
       context_id: context.id,
       stage: stage,
       digest: context.digest,
-      request: request_summary(context.request, content),
-      response: response_summary(snapshot_result(context, stage), content, context.metadata),
-      metadata: portable(context.metadata),
+      request: request_summary(context.request, detail),
+      response: response_summary(snapshot_result(context, stage), detail, context.metadata),
+      metadata: snapshot_metadata(context.metadata, detail),
       operations: portable(context.operations),
       shape: context_shape(req_llm_context),
       content: content,
@@ -113,8 +123,9 @@ defmodule Jido.AI.Context.Snapshot do
   @doc false
   @spec identity_document(Context.t()) :: map()
   def identity_document(%Context{} = context) do
+    # Preserve the identity document used by existing Runic facts.
     context
-    |> new(content: :none)
+    |> build(nil, :none, :identity)
     |> to_map()
     |> Map.delete(:captured_at_ms)
   end
@@ -152,6 +163,15 @@ defmodule Jido.AI.Context.Snapshot do
 
   defp output_summary(output, _content), do: portable(output)
 
+  # Keep the tool definitions. Conversation history stays in the Thread.
+  defp req_llm_summary(%ReqLLM.Context{} = context, :summary) do
+    %{
+      message_count: length(context.messages),
+      tool_count: length(context.tools),
+      tools: Enum.map(context.tools, &tool_summary(&1, :summary))
+    }
+  end
+
   defp req_llm_summary(%ReqLLM.Context{} = context, content) do
     %{
       messages: Enum.map(context.messages, &message_summary(&1, content)),
@@ -164,7 +184,7 @@ defmodule Jido.AI.Context.Snapshot do
       role: message.role,
       name: message.name,
       tool_call_id: message.tool_call_id,
-      metadata: portable(message.metadata),
+      metadata: message_metadata(message.metadata, content),
       content_digest: Identity.term_digest(portable(message.content)),
       content_shape: content_shape(message.content),
       tool_calls: Enum.map(message.tool_calls || [], &tool_call_summary(&1, content)),
@@ -172,7 +192,7 @@ defmodule Jido.AI.Context.Snapshot do
     }
 
     case content do
-      :none ->
+      mode when mode in [:none, :identity] ->
         base
 
       :redacted ->
@@ -184,6 +204,34 @@ defmodule Jido.AI.Context.Snapshot do
         |> Map.put(:reasoning_details, portable(message.reasoning_details))
     end
   end
+
+  defp message_metadata(metadata, mode) when mode in [:full, :identity], do: portable(metadata)
+
+  defp message_metadata(metadata, _content) do
+    # ReqLLM also carries tool content in metadata for provider adapters.
+    key = ReqLLM.ToolResult.metadata_key()
+
+    case portable(metadata) do
+      value when is_map(value) ->
+        value
+        |> Map.replace_lazy(key, &%{digest: Identity.term_digest(&1)})
+        |> Map.replace_lazy(Atom.to_string(key), &%{digest: Identity.term_digest(&1)})
+
+      value ->
+        value
+    end
+  end
+
+  defp snapshot_metadata(metadata, :summary) do
+    metadata
+    |> Map.replace_lazy(:projection, fn
+      projection when is_map(projection) -> Map.drop(projection, [:decisions, "decisions"])
+      projection -> projection
+    end)
+    |> portable()
+  end
+
+  defp snapshot_metadata(metadata, _detail), do: portable(metadata)
 
   defp tool_call_summary(call, :full), do: portable(call)
 
