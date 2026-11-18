@@ -950,11 +950,13 @@
         "jido.agent_server.I96": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
-            "test an accepted failure is a TurnResult and does not change Agent state"
+            "test an accepted failure is a TurnResult and does not change Agent state",
+            "test an oversized join fact fails a durable Turn with its original cause",
+            "test an oversized step fact fails a durable Turn with its original cause"
           ]
         },
         "jido.agent_server.I97": {
