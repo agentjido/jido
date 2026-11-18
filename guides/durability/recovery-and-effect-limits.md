@@ -28,6 +28,8 @@ The ETS adapter loses every record when the BEAM stops. Node, disk, and power lo
 
 A step's result is saved after the step finishes. A crash between the external call and that save means the Action runs again, so a durable Flow gives at-least-once execution of each interrupted step. Earlier confirmed steps do not run again.
 
+A Flow saves an Iterate as one component. It saves no checkpoint between iterations. If a persisted ReAct Turn stops in the middle of its loop, recovery runs that loop again under the same Turn ID. This can repeat model calls and tool calls that finished before the stop. A saved Tool Review wait is a separate recovery boundary. See [ReAct Reasoning](../ai/react-reasoning.livemd#recovery).
+
 Jido cannot make external work exactly once. Use one of these patterns:
 
 - **Reuse an operation ID.** Create the ID in an earlier step, so it is saved before the external call. Then the repeated call sends the same ID, and a provider that records IDs can treat it as a repeat.

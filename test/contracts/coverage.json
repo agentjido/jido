@@ -5019,7 +5019,7 @@
         "jido_ai.react.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 37,
+          "passing": 38,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5029,6 +5029,7 @@
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
             "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
+            "test a restart inside the ReAct loop replays earlier calls on the same Turn",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
             "test a successful tool round starts a new retry budget for the next model round",
@@ -5065,7 +5066,7 @@
         "jido_ai.react.I2": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 37,
+          "passing": 38,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5075,6 +5076,7 @@
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
             "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
+            "test a restart inside the ReAct loop replays earlier calls on the same Turn",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
             "test a successful tool round starts a new retry budget for the next model round",
@@ -5111,7 +5113,7 @@
         "jido_ai.react.I3": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 37,
+          "passing": 38,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5121,6 +5123,7 @@
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
             "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
+            "test a restart inside the ReAct loop replays earlier calls on the same Turn",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
             "test a successful tool round starts a new retry budget for the next model round",
@@ -5157,7 +5160,7 @@
         "jido_ai.react.I4": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 36,
+          "passing": 37,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5167,6 +5170,7 @@
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
             "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
+            "test a restart inside the ReAct loop replays earlier calls on the same Turn",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
             "test a successful tool round starts a new retry budget for the next model round",
@@ -5202,7 +5206,7 @@
         "jido_ai.react.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 36,
+          "passing": 37,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5212,6 +5216,7 @@
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
             "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
+            "test a restart inside the ReAct loop replays earlier calls on the same Turn",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
             "test a successful tool round starts a new retry budget for the next model round",
@@ -5247,7 +5252,7 @@
         "jido_ai.react.I6": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 36,
+          "passing": 37,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5257,6 +5262,7 @@
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
             "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
+            "test a restart inside the ReAct loop replays earlier calls on the same Turn",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
             "test a successful tool round starts a new retry budget for the next model round",
@@ -5292,7 +5298,7 @@
         "jido_ai.react.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 36,
+          "passing": 37,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5302,6 +5308,7 @@
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
             "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
+            "test a restart inside the ReAct loop replays earlier calls on the same Turn",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
             "test a successful tool round starts a new retry budget for the next model round",
@@ -5337,7 +5344,7 @@
         "jido_ai.react.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 36,
+          "passing": 37,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5347,6 +5354,7 @@
             "test ReAct loads SKILL.md instructions through the dynamic tool source",
             "test a DateTime tool value completes the next ReAct model round",
             "test a Flow executes through the model tool contract",
+            "test a restart inside the ReAct loop replays earlier calls on the same Turn",
             "test a retryable provider failure can fall back without becoming a conversation message",
             "test a second request projects the complete committed conversation",
             "test a successful tool round starts a new retry budget for the next model round",
