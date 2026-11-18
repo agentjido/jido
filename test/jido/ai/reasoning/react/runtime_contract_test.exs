@@ -1257,12 +1257,13 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
         2 ->
           assert roles(llm_context) == [:system, :user, :assistant, :tool]
+          owner = Process.monitor(server)
           send(test_pid, :second_round_started)
 
           receive do
-            :finish_interrupted_round -> flunk("The first execution should stop inside the loop")
+            {:DOWN, ^owner, :process, ^server, :killed} -> exit(:shutdown)
           after
-            10_000 -> flunk("The test did not stop the first execution")
+            15_000 -> flunk("The AgentServer did not stop during the second model call")
           end
 
         4 ->
@@ -1287,8 +1288,10 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
     thread = Server.snapshot(restored).agent.state.session.thread
 
-    assert Enum.map(Jido.Thread.filter_by_kind(thread, :ai_message), & &1.payload["role"]) ==
-             ["user", "assistant", "tool", "assistant"]
+    messages = Jido.Thread.filter_by_kind(thread, :ai_message)
+    assert Enum.map(messages, & &1.payload["role"]) == ["user", "assistant", "tool", "assistant"]
+    assert List.last(messages).payload["content"] == "The result is 5."
+    assert length(Jido.Thread.filter_by_kind(thread, :ai_model_attempt)) == 2
   end
 
   @tag :tmp_dir

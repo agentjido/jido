@@ -42,7 +42,7 @@ The Iterate component allows at most 17 iterations. `limits.model_calls` has a m
 
 ## Recovery
 
-A persisted AgentServer saves the ReAct loop as one Flow component. If the server stops before that component's result is saved, recovery starts the loop again under the same Turn ID. Earlier model calls and tool calls from that loop can repeat. Use a stable operation ID for tools with external effects and have the external service deduplicate calls by that ID. A saved Tool Review wait resumes with its original wait ID and does not repeat the calls that led to the wait. See [Recovery Limits](../durability/recovery-and-effect-limits.md#work-that-can-repeat).
+A persisted AgentServer saves the result of the full ReAct loop as one checkpoint. If the server stops before that save, recovery starts the loop again under the same Turn ID. Earlier model calls and tool calls from that loop can repeat. Use a stable operation ID for tools with external effects and have the external service deduplicate calls by that ID. A saved Tool Review wait resumes with its original wait ID and does not repeat the calls that led to the wait. See [Recovery Limits](../durability/recovery-and-effect-limits.md#work-that-can-repeat).
 
 ## Script the model
 
