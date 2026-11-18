@@ -123,8 +123,9 @@ defmodule Jido.AI.Context.Snapshot do
   @doc false
   @spec identity_document(Context.t()) :: map()
   def identity_document(%Context{} = context) do
+    # Preserve the identity document used by existing Runic facts.
     context
-    |> new(content: :none)
+    |> build(nil, :none, :identity)
     |> to_map()
     |> Map.delete(:captured_at_ms)
   end
@@ -191,7 +192,7 @@ defmodule Jido.AI.Context.Snapshot do
     }
 
     case content do
-      :none ->
+      mode when mode in [:none, :identity] ->
         base
 
       :redacted ->
@@ -204,7 +205,7 @@ defmodule Jido.AI.Context.Snapshot do
     end
   end
 
-  defp message_metadata(metadata, :full), do: portable(metadata)
+  defp message_metadata(metadata, mode) when mode in [:full, :identity], do: portable(metadata)
 
   defp message_metadata(metadata, _content) do
     # ReqLLM also carries tool content in metadata for provider adapters.
