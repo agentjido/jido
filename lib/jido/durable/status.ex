@@ -8,6 +8,7 @@ defmodule Jido.Durable.Status do
   """
 
   alias Jido.Durable.Ref
+  alias Jido.Durable.Runtime, as: DurableRuntime
   alias Jido.Exec.Runtime
   alias Runic.Workflow
 
@@ -25,11 +26,12 @@ defmodule Jido.Durable.Status do
   @doc false
   @spec new(Ref.t(), Workflow.t(), boolean()) :: t()
   def new(%Ref{} = ref, %Workflow{} = workflow, active? \\ false) do
-    waits = Runtime.pending_waits(workflow)
+    halted? = DurableRuntime.halted?(workflow)
+    waits = if halted?, do: [], else: Runtime.pending_waits(workflow)
 
     %__MODULE__{
       ref: ref,
-      state: state(workflow, waits, active?),
+      state: if(halted?, do: :failed, else: state(workflow, waits, active?)),
       waits: waits,
       next_wake_at: Jido.Exec.Wait.next_deadline(waits)
     }

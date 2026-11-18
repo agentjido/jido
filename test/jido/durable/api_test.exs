@@ -81,6 +81,32 @@ defmodule Jido.Durable.ApiTest do
              Durable.start(c.jido, ReadSignal, input)
   end
 
+  @tag obligation: "jido_action.execution.I22"
+  test "a checkpointed halt closes pending waits and keeps the original failure after resume", c do
+    assert {:ok, %Status{waits: [%{id: wait_id}], ref: ref}} =
+             Durable.start(c.jido, WaitFlow, signal("durable.request", %{request_id: "r1"}), now: 100)
+
+    id = Durable.Ref.execution_id(ref)
+    error = %Runic.Identity.CanonicalError{reason: {:limit, :byte_size, 17_000_000}, path: []}
+    failure = %Runic.Workflow.RunnableFailed{failure_action: :halt, error: error}
+    store = Jido.Persistence.ContinuationStore
+
+    # A halt can reach storage while an independent branch still has a wait.
+    assert {:ok, _batch_count} = store.append(id, [failure], c.jido)
+    assert {:ok, events} = store.stream(id, c.jido)
+
+    assert {:ok, %Status{state: :failed, waits: [], next_wake_at: nil}} = Durable.status(c.jido, ref)
+    assert {:ok, %Status{state: :failed, waits: []}} = Durable.resume(c.jido, ref, now: 1_100)
+    assert Durable.result(c.jido, ref) == {:error, error}
+
+    approval = signal("durable.approved", %{request_id: "r1"})
+
+    assert {:error, %{details: %{reason: :not_waiting}}} =
+             Durable.signal(c.jido, ref, wait_id, approval, now: 1_200)
+
+    assert store.stream(id, c.jido) == {:ok, events}
+  end
+
   test "a wait Signal resumes the Flow and equal retries are inert", c do
     input = signal("durable.request", %{request_id: "r1"})
 

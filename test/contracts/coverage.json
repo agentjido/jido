@@ -3708,10 +3708,11 @@
         "jido_action.execution.I22": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a checkpointed halt closes pending waits and keeps the original failure after resume",
             "test independent waits retain partial joins through replay"
           ]
         },

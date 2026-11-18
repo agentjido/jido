@@ -6,7 +6,7 @@ defmodule Jido.Durable.Runtime do
   alias Jido.Persistence.ContinuationStore
   alias Runic.Runner
   alias Runic.Workflow
-  alias Runic.Workflow.{CausalContext, Fact, Runnable}
+  alias Runic.Workflow.{CausalContext, Fact, Runnable, RunnableFailed}
   alias Runic.Workflow.Events.FactProduced
 
   @doc false
@@ -41,7 +41,7 @@ defmodule Jido.Durable.Runtime do
            Keyword.put(options, :run_context, %{
              _global: wait_context(context, id, saved, now, max_concurrency)
            }) do
-      if saved && not Workflow.is_runnable?(saved) && Runtime.pending_waits(saved) != [] do
+      if saved && not halted?(saved) && not Workflow.is_runnable?(saved) && Runtime.pending_waits(saved) != [] do
         waiting(saved)
       else
         with {:ok, worker} <-
@@ -65,29 +65,38 @@ defmodule Jido.Durable.Runtime do
     with {:ok, workflow} <- Runner.get_workflow(runner, id),
          :ok <- portable_facts(workflow),
          :ok <- Runner.checkpoint(runner, id) do
-      case Runner.step(runner, id) do
-        :ok ->
-          :running
-
-        {:error, :busy} ->
-          :running
-
-        {:error, :not_runnable} ->
-          # Native work can finish between the read and the step. Confirm and
-          # save the settled graph instead of using the earlier active view.
-          with {:ok, settled} <- Runner.get_workflow(runner, id),
-               :ok <- portable_facts(settled),
-               :ok <- Runner.checkpoint(runner, id) do
-            if Runtime.pending_waits(settled) == [], do: :complete, else: waiting(settled)
-          end
-
-        {:error, :admission_stopped} ->
-          :complete
-
-        error ->
-          error
-      end
+      if halted?(workflow), do: :complete, else: step(runner, id)
     end
+  end
+
+  defp step(runner, id) do
+    case Runner.step(runner, id) do
+      :ok ->
+        :running
+
+      {:error, :busy} ->
+        :running
+
+      {:error, :not_runnable} ->
+        # Native work can finish between the read and the step. Confirm and
+        # save the settled graph instead of using the earlier active view.
+        with {:ok, settled} <- Runner.get_workflow(runner, id),
+             :ok <- portable_facts(settled),
+             :ok <- Runner.checkpoint(runner, id) do
+          if halted?(settled) or Runtime.pending_waits(settled) == [], do: :complete, else: waiting(settled)
+        end
+
+      {:error, :admission_stopped} ->
+        :complete
+
+      error ->
+        error
+    end
+  end
+
+  @doc false
+  def halted?(%Workflow{runnable_events: events}) do
+    Enum.any?(events, &match?(%RunnableFailed{failure_action: :halt}, &1))
   end
 
   @doc false
@@ -162,6 +171,12 @@ defmodule Jido.Durable.Runtime do
   def resolve_wait_inputs(nil, _now), do: {:ok, nil}
 
   def resolve_wait_inputs(workflow, now) when is_integer(now) and now >= 0 do
+    if halted?(workflow), do: {:ok, workflow}, else: resolve_open_wait_inputs(workflow, now)
+  end
+
+  def resolve_wait_inputs(_workflow, _now), do: wait_error(:invalid_clock)
+
+  defp resolve_open_wait_inputs(workflow, now) do
     receipts = wait_inputs(workflow)
     now = acceptance_time(workflow, now)
 
@@ -174,8 +189,6 @@ defmodule Jido.Durable.Runtime do
       end
     end)
   end
-
-  def resolve_wait_inputs(_workflow, _now), do: wait_error(:invalid_clock)
 
   @doc false
   def validate_execution_options(opts) do
@@ -273,6 +286,9 @@ defmodule Jido.Durable.Runtime do
     request = Enum.find(Runtime.pending_waits(workflow), &(&1.id == input.wait_id))
 
     cond do
+      halted?(workflow) ->
+        wait_error(:not_waiting)
+
       is_nil(request) ->
         wait_error(:stale_target)
 

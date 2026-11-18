@@ -62,7 +62,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.execution.I22 — Recovery preserves acknowledged stored progress
 - **scope:** `Jido.Durable, Jido.Durable.Runtime, Runic.Runner.Store`
-- **must:** Restore acknowledged authored component boundaries and continue remaining components with the same public value and effects. Jido Durable selects a supported Runic rehydration mode. Reject incompatible changed targets. Recovery restores runtime context and policy from the Jido durable record. Work inside an unacknowledged composite component can repeat; no exactly-once execution or effect delivery is promised.
+- **must:** Restore acknowledged authored component boundaries and continue remaining components with the same public value and effects. Jido Durable selects a supported Runic rehydration mode. Reject incompatible changed targets. Recovery restores runtime context and policy from the Jido durable record. A saved terminal failure keeps its original cause and stops dispatch and wait input on resume. Work inside an unacknowledged composite component can repeat; no exactly-once execution or effect delivery is promised.
 - **kind:** persisted-format
 - **status:** active
 
