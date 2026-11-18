@@ -592,6 +592,48 @@ defmodule Jido.Instance.AddressTest do
     assert Jido.AgentServer.snapshot(server).agent.state == %{count: 0}
   end
 
+  @tag obligation: ["jido.instance.I7", "jido.instance.I11"]
+  test "a stopped activation does not block immediate Address replacement before Registry cleanup" do
+    namespace = unique_namespace("address-stop-replace")
+    instance = unique_instance("address-stop-replace")
+    start_durable_instance!(instance, namespace)
+    {:ok, address} = Jido.agent_address(instance, "counter")
+
+    original = Counter.definition()
+    replacement = %{original | description: "Updated after stop"}
+    server = create_and_activate(instance, address, original)
+    assert {:ok, _result} = Jido.call(instance, address, signal(3))
+
+    registry = Jido.Instance.Names.registry(instance)
+    key = Jido.AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
+    [{root, {:activation, _activation_id}}] = registration = Registry.lookup(registry, key)
+    [{_id, partition, :worker, _modules}] = Supervisor.which_children(registry)
+
+    # Delay delivery of the Registry's cleanup without delaying activation shutdown.
+    assert :ok = :sys.suspend(partition)
+
+    try do
+      assert :ok = Jido.stop_agent(instance, server)
+      refute Process.alive?(root)
+      assert Registry.lookup(registry, key) == registration
+
+      assert {:ok, ^address} =
+               Jido.replace_agent(instance, address, replacement,
+                 expected: original,
+                 state_policy: :preserve
+               )
+
+      assert Jido.resolve_agent(instance, address) == {:error, :not_found}
+    after
+      :sys.resume(partition)
+    end
+
+    assert {:ok, restored} = Jido.activate_agent(instance, address)
+
+    assert %Jido.AgentServer.Snapshot{agent: %{description: "Updated after stop", state: %{count: 3}}} =
+             Jido.AgentServer.snapshot(restored)
+  end
+
   @tag obligation: "jido.instance.I11"
   test "inactive Address replacement preserves or resets state without creating identity" do
     namespace = unique_namespace("address-replace")
