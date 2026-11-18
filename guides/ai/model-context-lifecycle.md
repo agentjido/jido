@@ -124,7 +124,7 @@ Snapshots replace the values of sensitive option names, such as `api_key`, `pass
 
 ## Read what a request recorded
 
-`Jido.AI.Reasoning.Actions.RecordModelAttempt` stores two `:none` snapshots as JSON on each model attempt: `context.before` from the prepared stage and `context.after` from the completed stage. Find them on `model_attempts` in the reply or on `:ai_model_attempt` entries in the Thread. Use the request digest to compare attempts. The recorded snapshots keep message and tool counts. Use the Thread to inspect individual messages and tool results. An older attempt can contain per-message details.
+`Jido.AI.Reasoning.Actions.RecordModelAttempt` stores two `:none` snapshots as JSON on each model attempt: `context.before` from the prepared stage and `context.after` from the completed stage. Find them on `model_attempts` in the reply or on `:ai_model_attempt` entries in the Thread. Use the request digest to compare attempts. The recorded snapshots keep message and tool counts and summaries of the available tools. Use the Thread to inspect individual messages and tool results. An older attempt can contain per-message details.
 
 Run any AI request and decode them:
 

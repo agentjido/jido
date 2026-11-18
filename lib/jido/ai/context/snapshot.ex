@@ -162,9 +162,13 @@ defmodule Jido.AI.Context.Snapshot do
 
   defp output_summary(output, _content), do: portable(output)
 
-  # A model attempt keeps aggregate counts. History stays in the Thread.
+  # Keep the tool definitions. Conversation history stays in the Thread.
   defp req_llm_summary(%ReqLLM.Context{} = context, :summary) do
-    %{message_count: length(context.messages), tool_count: length(context.tools)}
+    %{
+      message_count: length(context.messages),
+      tool_count: length(context.tools),
+      tools: Enum.map(context.tools, &tool_summary(&1, :summary))
+    }
   end
 
   defp req_llm_summary(%ReqLLM.Context{} = context, content) do
