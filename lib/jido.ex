@@ -947,15 +947,20 @@ defmodule Jido do
           %{work_state: :faulted} -> {:error, :reconciliation_required}
           %{residency: :passivating} -> {:error, :passivating}
           %{ready?: true} -> {:ok, pid}
-          %{} -> {:error, :recovering}
-          {:error, _reason} -> {:error, :recovering}
+          %{} -> unresolved_activation(root)
+          {:error, _reason} -> unresolved_activation(root)
         end
 
       nil ->
-        {:error, :recovering}
+        unresolved_activation(root)
     end
   catch
-    :exit, _reason -> {:error, :recovering}
+    :exit, _reason -> unresolved_activation(root)
+  end
+
+  defp unresolved_activation(root) do
+    # Registry cleanup can follow the activation's DOWN notification.
+    if Process.alive?(root), do: {:error, :recovering}, else: {:error, :not_found}
   end
 
   defp validate_instance_address(instance, address) do
