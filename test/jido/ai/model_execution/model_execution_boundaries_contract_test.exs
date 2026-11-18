@@ -216,6 +216,9 @@ defmodule Jido.AI.ModelExecution.BoundariesContractTest do
 
     full = List.last(Snapshot.new(context, content: :full).request.context.messages)
     assert full.metadata.tool_output == output
+
+    identity = Runic.Identity.Projectable.identity_document(context)
+    assert List.last(identity.request.context.messages).metadata.tool_output == output
   end
 
   @tag obligation: ["jido_ai.model_execution.I4", "jido_ai.model_execution.I5"]
