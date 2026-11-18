@@ -411,6 +411,83 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     assert result.tool_calls == 8
   end
 
+  test "eight rounds with large tool results retain compact attempt snapshots" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+    input = "local-only-"
+
+    expect(ReqLLM, :generate_text, 9, fn model, context, _options ->
+      round = Agent.get_and_update(calls, &{&1, &1 + 1})
+
+      if round > 0 do
+        tool = context.messages |> Enum.reverse() |> Enum.find(&(&1.role == :tool))
+        assert tool.metadata.tool_output["content"] =~ input
+      end
+
+      if round < 8 do
+        call = ReqLLM.ToolCall.new("large-#{round}", "large_output", "{}")
+        {:ok, tool_response(model, context, [call], "large-#{round}")}
+      else
+        {:ok, response(model, context, "Done.", "large-final")}
+      end
+    end)
+
+    agent = LargeOutputAgent.instantiate!(id: "large-eight-rounds")
+    params = %{input: "Read eight results", limits: %{model_calls: 9, tool_rounds: 8, tool_calls: 8}}
+
+    assert {:ok, %{status: :completed, tool_rounds: 8, model_attempts: attempts}, _agent} =
+             run_as(LargeOutputAgent, agent, params)
+
+    assert length(attempts) == 9
+
+    for %{context: %{before: before, after: completed}} <- attempts,
+        snapshot <- [before, completed] do
+      refute snapshot =~ input
+      assert byte_size(snapshot) < 6_000
+    end
+  end
+
+  @tag :tmp_dir
+  test "small tool results complete across consecutive durable Turns", %{tmp_dir: path} do
+    legacy_snapshot =
+      JSON.encode!(%{
+        type: "jido.ai.context.snapshot",
+        version: 1,
+        request: %{context: %{messages: [%{metadata: %{tool_output: String.duplicate("legacy ", 10_000)}}]}}
+      })
+
+    legacy_context = %{format: "jido.ai.context.snapshot+json", before: legacy_snapshot, after: legacy_snapshot}
+    session = Projection.observe(Jido.Session.new(), :ai_model_attempt, %{context: legacy_context})
+
+    {_instance, server, _persistence, _address} =
+      start_persisted_agent(path, "attempt-growth", state: %{session: session})
+
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 32, fn model, context, _options ->
+      call = Agent.get_and_update(calls, &{&1, &1 + 1})
+      id = "small-#{call}"
+
+      if rem(call, 4) < 3 do
+        tool_call = ReqLLM.ToolCall.new(id, "add", JSON.encode!(%{left: call, right: 1}))
+        {:ok, tool_response(model, context, [tool_call], id)}
+      else
+        {:ok, response(model, context, "Done.", id)}
+      end
+    end)
+
+    for turn <- 1..8 do
+      signal = SimpleAgent.request_signal!(%{input: "Turn #{turn}"})
+
+      assert {:ok, %{status: :committed, reply: %{data: %{tool_rounds: 3}}}} =
+               server |> Server.submit(signal) |> Server.await(15_000)
+    end
+
+    session = Server.snapshot(server).agent.state.session
+    attempts = Jido.Thread.filter_by_kind(session.thread, :ai_model_attempt)
+    assert [%{payload: %{"context" => %{"before" => ^legacy_snapshot}}} | new_attempts] = attempts
+    assert length(new_attempts) == 32
+  end
+
   test "a DateTime tool value completes the next ReAct model round" do
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
@@ -1295,7 +1372,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     end
   end
 
-  defp start_persisted_agent(path, label) do
+  defp start_persisted_agent(path, label, create_opts \\ []) do
     suffix = System.unique_integer([:positive])
     instance = String.to_atom("jido_ai_runtime_#{label}_#{suffix}")
     namespace = "jido/ai/runtime/#{label}/#{suffix}"
@@ -1309,7 +1386,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
     address = Jido.Agent.Address.new!(namespace: namespace, id: id)
 
-    assert {:ok, ^address} = Jido.create_agent(instance, address, SimpleAgent)
+    assert {:ok, ^address} = Jido.create_agent(instance, address, SimpleAgent, create_opts)
     assert {:ok, server} = Jido.activate_agent(instance, address)
 
     assert :ok = Server.await_ready(server)

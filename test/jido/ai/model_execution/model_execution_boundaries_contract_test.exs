@@ -194,6 +194,30 @@ defmodule Jido.AI.ModelExecution.BoundariesContractTest do
     assert error_redacted.response.call_metadata.request_id == "request-2"
   end
 
+  @tag obligation: "jido_ai.model_execution.I5"
+  test "snapshots keep tool output only when full content is requested" do
+    output = %{"text" => String.duplicate("tool payload", 1_000)}
+    call = ReqLLM.ToolCall.new("lookup-1", "lookup", "{}")
+
+    request =
+      ReqLLM.Context.new([
+        ReqLLM.Context.user("Look up one value"),
+        ReqLLM.Context.assistant("", tool_calls: [call]),
+        ReqLLM.Context.tool_result_message("lookup", "lookup-1", output)
+      ])
+
+    assert {:ok, context} = Context.new(request)
+
+    for mode <- [:none, :redacted] do
+      tool = List.last(Snapshot.new(context, content: mode).request.context.messages)
+      assert %{digest: digest} = tool.metadata.tool_output
+      assert byte_size(digest) == 64
+    end
+
+    full = List.last(Snapshot.new(context, content: :full).request.context.messages)
+    assert full.metadata.tool_output == output
+  end
+
   @tag obligation: ["jido_ai.model_execution.I4", "jido_ai.model_execution.I5"]
   test "snapshots keep fallback request and response shapes portable" do
     request = ReqLLM.Context.new([ReqLLM.Context.user("edge")])

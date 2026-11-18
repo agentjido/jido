@@ -48,7 +48,7 @@ requests. It does not own reasoning strategy routing.
 ### jido_ai.model_execution.I5 — Portable model errors and contexts
 
 - **scope:** `Jido.AI.Context`, `Jido.AI.Context.Snapshot`, model outcomes
-- **must:** Preserve the exact prepared ReqLLM request, store safe portable snapshots, and convert provider faults into bounded retryable or terminal data without raw exception or process-local values.
+- **must:** Preserve the exact prepared ReqLLM request, store safe portable snapshots, summarize recorded attempt context without copying message content or a per-message inventory, and convert provider faults into bounded retryable or terminal data without raw exception or process-local values.
 - **kind:** security
 - **status:** active
 

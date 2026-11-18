@@ -120,11 +120,11 @@ summary = Snapshot.new(completed, content: :none)
   summary |> Snapshot.encode() |> Snapshot.decode()
 ```
 
-Snapshots replace the values of sensitive option names, such as `api_key`, `password`, or any name that ends in `_secret`, with `"[REDACTED]"`. This applies at every content level.
+Snapshots replace the values of sensitive option names, such as `api_key`, `password`, or any name that ends in `_secret`, with `"[REDACTED]"`. This applies at every content level. At `:none` and `:redacted`, snapshots also replace tool output in message metadata with a digest.
 
 ## Read what a request recorded
 
-`Jido.AI.Reasoning.Actions.RecordModelAttempt` stores two `:none` snapshots as JSON on each model attempt: `context.before` from the prepared stage and `context.after` from the completed stage. Find them on `model_attempts` in the reply or on `:ai_model_attempt` entries in the Thread. They let you compare the requests of two attempts by digest and see message counts without storing a second copy of the prompt.
+`Jido.AI.Reasoning.Actions.RecordModelAttempt` stores two `:none` snapshots as JSON on each model attempt: `context.before` from the prepared stage and `context.after` from the completed stage. Find them on `model_attempts` in the reply or on `:ai_model_attempt` entries in the Thread. Use the request digest to compare attempts. The recorded snapshots keep message and tool counts. Use the Thread to inspect individual messages and tool results. An older attempt can contain per-message details.
 
 Run any AI request and decode them:
 
