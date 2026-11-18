@@ -358,7 +358,7 @@ defmodule Jido.AgentServer.Lifecycle do
   defp open_activation(data, mode) do
     with :ok <- ServerSupervisor.close_execution(data.activation_state),
          {:ok, config} <- Jido.Persistence.resolve_agent_config(data.persistence, data.jido),
-         {:ok, agent, revision, agent_revision, turn} <-
+         {:ok, agent, revision, agent_revision, turn, handoffs} <-
            Jido.Persistence.open_agent(
              config,
              data.agent,
@@ -368,7 +368,7 @@ defmodule Jido.AgentServer.Lifecycle do
          {:ok, agent} <- Validation.validate_instance(agent),
          {:ok, revision, turn} <- settle_unreleased_handoff(data, config, agent, revision, turn),
          :ok <- validate_continuation(agent, turn) do
-      {:ok, agent, revision, agent_revision, config, turn}
+      {:ok, agent, revision, agent_revision, config, turn, handoffs}
     end
   end
 
@@ -384,7 +384,10 @@ defmodule Jido.AgentServer.Lifecycle do
           reason: if(revision == expected_revision, do: :hibernate, else: :commit)
         ]
 
-    Jido.Persistence.save_agent(data.persistence, agent, persistence_opts)
+    case Keyword.fetch(opts, :topology_handoffs) do
+      {:ok, handoffs} -> Jido.Persistence.save_agent_runtime(data.persistence, agent, persistence_opts, handoffs)
+      :error -> Jido.Persistence.save_agent(data.persistence, agent, persistence_opts)
+    end
   end
 
   def write_result(result, deadline) do
@@ -533,8 +536,16 @@ defmodule Jido.AgentServer.Lifecycle do
   def prepare_execution(data, receipt, owner) do
     id = execution_identity(data)
 
+    # A retry can find an orphaned preparation written before Agent acceptance.
+    # Keep the preparation stable across attempts. The Agent receipt holds the
+    # admitted Signal, Plugin input, and expiry for the attempt that commits.
+    preparation =
+      if data.active.topology_accept_from,
+        do: %{topology_handoff_id: receipt.id, signal: receipt.signal},
+        else: receipt
+
     with :ok <- Jido.Persistence.ContinuationStore.register(data.jido, id, data.persistence, owner),
-         do: Jido.Persistence.ContinuationStore.prepare(data.jido, id, receipt)
+         do: Jido.Persistence.ContinuationStore.prepare(data.jido, id, preparation)
   end
 
   def start_execution(data, owner, hooks, policy) do

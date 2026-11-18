@@ -21,6 +21,35 @@ defmodule Jido.AgentServer.Effects do
     end
   end
 
+  def prepare_topology_handoffs(directives, context) do
+    Enum.reduce_while(directives, {:ok, {[], []}}, fn
+      %Emit{dispatch: {:durable, target}, signal: signal}, {:ok, {effects, sends}}
+      when not is_list(target) ->
+        case prepare_topology_handoff(target, signal, context) do
+          {:ok, send} -> {:cont, {:ok, {effects, [send | sends]}}}
+          error -> {:halt, error}
+        end
+
+      directive, {:ok, {effects, sends}} ->
+        {:cont, {:ok, {[directive | effects], sends}}}
+    end)
+    |> case do
+      {:ok, {effects, sends}} -> {:ok, Enum.reverse(effects), Enum.reverse(sends)}
+      error -> error
+    end
+  end
+
+  defp prepare_topology_handoff(target, signal, context) do
+    with {:ok, address} <- Topology.durable_destination(target, context),
+         {:ok, signal} <- prepare_outbound(signal, {:durable, target}, context),
+         true <- Jido.Codec.Term.valid?(signal) do
+      {:ok, %{id: Jido.Id.uuid7(), to: address, signal: signal}}
+    else
+      false -> {:error, :non_portable_topology_signal}
+      error -> error
+    end
+  end
+
   def validate_dispatch(nil), do: :ok
   def validate_dispatch(:parent), do: :ok
   def validate_dispatch({:agent, name}) when is_atom(name) or is_binary(name), do: :ok
@@ -95,6 +124,8 @@ defmodule Jido.AgentServer.Effects do
       stage: if(active.commit_hooks == [], do: :directive, else: :after_commit)
     }
   end
+
+  defp validate(%Emit{dispatch: {:durable, target}}, _config) when not is_list(target), do: :ok
 
   defp validate(%Emit{dispatch: {:agent, name}}, config), do: validate_target(name, config)
   defp validate(%Emit{dispatch: :parent}, %{parent: nil}), do: {:error, :parent_not_found}

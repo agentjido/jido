@@ -151,11 +151,62 @@ The root's revision commits a topology change together with its state. Slot iden
 
 A retired identity's record stays in the store. Jido does not collect it and has no public listing of member records. A complete definition upgrade can replace the static topology while the activation is idle.
 
+## Send to one member with durable acceptance
+
+Return one of these directives from a Turn:
+
+```elixir
+# Root to one declared child slot
+Jido.Agent.Directive.emit(signal, {:durable, {:agent, :responders, 2}})
+
+# Declared child to its parent
+Jido.Agent.Directive.emit(signal, {:durable, :parent})
+```
+
+Both Agents must have persistence in the same named Jido instance. The
+receiver must prepare a durable Flow for the Signal. The sender can use an
+Action or a Flow. A missing slot, a slot marked for removal, an unsupported
+target, or a non-portable outbound Signal fails the sender Turn before
+commit. Dynamic children, Bus routes, and fan-out are outside this API.
+
+The sender commits its next state, the prepared Signal, the destination
+Address, and a new handoff ID in one Agent record write. The slot identity
+in the Address fixes which member can receive the send. Replacing a slot
+does not redirect an existing send to its replacement.
+
+A resident sender tries its oldest pending send when it is idle and admission
+is open. It retries a rejected, busy, or unavailable receiver after a delay.
+Each attempt has an admission deadline. An expired attempt can confirm an
+earlier acceptance, but it cannot start a new Turn. A non-durable receiver or a route that cannot prepare a durable Flow rejects
+acceptance. The oldest send stays pending and delays later sends until that
+destination can accept it. Explicit hibernation or a shutdown pauses
+delivery until the sender is resident again. A pending send prevents
+automatic idle passivation of its sender. Delivery does not start a
+passivated receiver.
+
+The receiver writes the running Flow receipt and the acceptance ID in one
+write before it acknowledges. The Flow can then finish, wait, or fail
+independently. A repeated delivery of that ID gives the same acknowledgment
+even after later Turns replace the running receipt. The sender removes the
+send from its record after acknowledgment. This removal changes the
+persistence revision but does not change the Agent revision. When the store
+confirms that it rejected the removal before writing, the sender retries
+the removal without sending the Signal again. A conflict or an uncertain
+write stops the sender until reconciliation reads its record.
+
+Send order applies to durable sends from one sender. Best-effort effects run
+through their existing path and can be lost in a crash. An acknowledgment
+does not prove that any receiver effect ran. Acceptance IDs stay in the
+receiver record for its lifetime, so the record grows with incoming sends.
+There is no expiry or automatic collection of these IDs. The new runtime
+can read older V3 records. Older runtimes reject records with the optional
+handoff field.
+
 ## Know the limits
 
 - **No family snapshot.** A root snapshot captures the logical topology, not the state of its running members. After a crash, members are each at their own last commit, and two members can reflect different points in a shared process. Keep invariants that span Agents in one Agent's state, or make your Flows tolerate this.
 - **No family upgrade.** `Jido.Persistence.upgrade_agent/5` changes one record. Upgrade the root and each member separately.
-- **No output recovery.** Member outputs and connection deliveries are post-commit effects, so they are not replayed. See [Recovery Limits](recovery-and-effect-limits.md).
+- **Best-effort output.** Ordinary member outputs and connection deliveries are post-commit effects. They are not replayed. See [Recovery Limits](recovery-and-effect-limits.md).
 - **No family delete.** `Jido.delete_agent/4` on the root leaves member records in place. The next code shows this. Do not delete one member of a family you will restore, because the root's reconciliation reads `:deleted` and fails.
 
 ```elixir

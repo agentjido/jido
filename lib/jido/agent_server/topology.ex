@@ -13,6 +13,7 @@ defmodule Jido.AgentServer.Topology do
 
   @self_emit_hops "jidoselfemithops"
   @max_self_emit_hops 32
+  @handoff_attempt_timeout 1_000
   @child_options ~w(placement on_parent_exit orphan_dispatch restart server_options meta)a
 
   def start_link(args), do: GenServer.start_link(__MODULE__, args)
@@ -448,8 +449,7 @@ defmodule Jido.AgentServer.Topology do
       if Map.get(previous, tag) == member and Map.has_key?(live, tag) do
         Server.await_ready(Map.fetch!(live, tag), data.readiness_timeout)
       else
-        id = data.agent.id <> "/" <> tag
-        id = if member.identity, do: id <> "/" <> member.identity, else: id
+        id = member_id(data.agent.id, tag, member)
 
         with {:ok, agent, persistence} <- member_agent(data, member, id),
              {:ok, worker} <-
@@ -497,6 +497,46 @@ defmodule Jido.AgentServer.Topology do
       context
     )
   end
+
+  def durable_destination(_target, %{persistence: persistence}) when persistence in [nil, false],
+    do: {:error, :persistence_required}
+
+  def durable_destination(_target, %{jido: nil}), do: {:error, :jido_instance_required}
+
+  def durable_destination(:parent, %{parent: %{tag: "$topology/" <> _, agent_id: id}} = context),
+    do: {:ok, %{context.agent_address | id: id}}
+
+  def durable_destination({:agent, name, slot}, context)
+      when (is_atom(name) or is_binary(name)) and is_integer(slot) and slot > 0 do
+    tag = tag(name, slot)
+
+    state = context.activation_state
+
+    with false <- :ets.member(state, {:topology_removed_member, tag}),
+         {:ok, %{name: ^name, identity: identity} = member} when is_binary(identity) <-
+           Map.fetch(plans(state), tag) do
+      {:ok, %{context.agent_address | id: member_id(context.agent.id, tag, member)}}
+    else
+      _other -> {:error, :durable_topology_member_not_found}
+    end
+  end
+
+  def durable_destination(_target, _context), do: {:error, :unsupported_durable_topology_target}
+
+  def deliver_handoff(instance, %{id: id, to: address, signal: signal}) do
+    with :error <- Jido.Instance.RuntimeStore.fetch(instance, :agent_reconciliation, address),
+         pid when is_pid(pid) <- Server.whereis(instance, address.id, partition: address.partition),
+         {:ok, deadline} <- Lifecycle.admission_deadline(admission_timeout: @handoff_attempt_timeout) do
+      :gen_statem.call(pid, {:accept_topology_handoff, id, address, signal, deadline}, @handoff_attempt_timeout)
+    else
+      _unavailable -> {:error, :topology_receiver_unavailable}
+    end
+  catch
+    :exit, _reason -> {:error, :topology_receiver_unavailable}
+  end
+
+  defp member_id(parent_id, tag, %{identity: nil}), do: parent_id <> "/" <> tag
+  defp member_id(parent_id, tag, %{identity: identity}), do: parent_id <> "/" <> tag <> "/" <> identity
 
   def send_agent(state, name, signal) do
     live = live_children(state)

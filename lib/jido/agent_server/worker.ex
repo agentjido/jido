@@ -3,6 +3,8 @@ defmodule Jido.AgentServer.Worker do
 
   @behaviour :gen_statem
 
+  @topology_retry_ms 250
+
   @typedoc "A local AgentServer PID or registered OTP server name."
   @type server :: :gen_statem.server_ref()
 
@@ -794,6 +796,8 @@ defmodule Jido.AgentServer.Worker do
         state_version: Keyword.get(opts, :state_version, 0),
         active: nil,
         server_turn: nil,
+        topology_handoffs: Jido.Persistence.Record.empty_topology_handoffs(),
+        topology_delivery: nil,
         pending_handoff: nil,
         postponed: MapSet.new(),
         queued_from: %{},
@@ -868,9 +872,10 @@ defmodule Jido.AgentServer.Worker do
       mark_ready(data)
       replies = Enum.flat_map(data.ready_waiters, &reply(&1, :ok))
 
-      {:ok, :idle, arm_idle(%{data | bootstrap: nil, ready_waiters: []}),
-       replies ++
-         [{:next_event, :internal, :recover_turn}, {:next_event, :internal, :control_progress}]}
+      {:next_state, :idle, next, actions} =
+        idle_transition(%{data | bootstrap: nil, ready_waiters: []}, replies)
+
+      {:ok, :idle, next, actions}
     end
   end
 
@@ -1091,7 +1096,7 @@ defmodule Jido.AgentServer.Worker do
       phase in [:restoring, :initializing] ->
         {:keep_state_and_data, reply(from, {:error, :not_ready})}
 
-      data.control != nil ->
+      data.control != nil or match?({:checkpoint, _, _, _}, data.topology_delivery) ->
         {:keep_state_and_data, reply(from, {:error, :control_in_progress})}
 
       data.admission_mode == :blocked ->
@@ -1117,7 +1122,7 @@ defmodule Jido.AgentServer.Worker do
 
     if result == :ok do
       data = data |> set_admission(:open) |> arm_idle()
-      {:keep_state, data, reply(from, {:ok, public_status(phase, data)})}
+      {:keep_state, data, reply(from, {:ok, public_status(phase, data)}) ++ topology_delivery_actions(data)}
     else
       {:keep_state_and_data, reply(from, result)}
     end
@@ -1497,6 +1502,40 @@ defmodule Jido.AgentServer.Worker do
   end
 
   def handle_event(
+        {:call, from},
+        {:accept_topology_handoff, id, %Agent.Address{} = address, %Signal{} = signal, {origin, expires} = deadline},
+        phase,
+        data
+      )
+      when is_binary(id) and byte_size(id) > 0 and is_atom(origin) and is_integer(expires) do
+    cond do
+      address != data.agent_address ->
+        {:keep_state_and_data, reply(from, {:error, :topology_address_mismatch})}
+
+      Map.has_key?(data.topology_handoffs.accepted, id) ->
+        {:keep_state_and_data, reply(from, :accepted)}
+
+      data.persistence in [nil, false] ->
+        {:keep_state_and_data, reply(from, {:error, :persistence_required})}
+
+      phase != :idle or data.admission_mode != :open or
+          match?({:ok, _}, Continuation.terminal_result(data.server_turn)) ->
+        {:keep_state_and_data, reply(from, {:error, :topology_receiver_busy})}
+
+      true ->
+        with :ok <- Lifecycle.admission_status(deadline),
+             {:ok, signal} <- Validation.normalize_signal(signal) do
+          start_turn(:cast, signal, %{}, data, {:topology, id, from})
+        else
+          {:error, reason} -> {:keep_state_and_data, reply(from, {:error, reason})}
+        end
+    end
+  end
+
+  def handle_event({:call, from}, {:accept_topology_handoff, _, _, _, _}, _phase, _data),
+    do: {:keep_state_and_data, reply(from, {:error, :invalid_topology_handoff})}
+
+  def handle_event(
         type,
         {:turn, token, _signal, _context, _deadline, reply_gate, _result_handoff},
         _phase,
@@ -1744,7 +1783,8 @@ defmodule Jido.AgentServer.Worker do
       ])
       |> Map.merge(%{requester: active.requester, durable: active.durable})
 
-    operation(:settle, data, fn -> settle_worker(runner, active, config) end)
+    context = Map.merge(effect_context(data), Map.take(data, [:persistence, :agent_address]))
+    operation(:settle, data, fn -> settle_worker(runner, active, config, context) end)
   end
 
   def handle_event(:info, {:DOWN, ref, :process, _pid, _reason}, phase, data)
@@ -1967,6 +2007,104 @@ defmodule Jido.AgentServer.Worker do
     )
   end
 
+  def handle_event({:timeout, :topology_delivery}, state, _phase, data)
+      when state in [:ready, :acknowledged] do
+    {:keep_state, %{data | topology_delivery: state}, [{:next_event, :internal, :topology_delivery}]}
+  end
+
+  def handle_event(
+        :internal,
+        :topology_delivery,
+        :idle,
+        %{admission_mode: :open, topology_delivery: :ready, topology_handoffs: %{outbox: [send | _]}} = data
+      ) do
+    task = Task.async(fn -> Topology.deliver_handoff(data.jido, send) end)
+    {:keep_state, %{data | topology_delivery: {:sending, task}}}
+  end
+
+  def handle_event(
+        :internal,
+        :topology_delivery,
+        :idle,
+        %{admission_mode: :open, topology_delivery: :acknowledged} = data
+      ) do
+    [_accepted | pending] = data.topology_handoffs.outbox
+    handoffs = %{data.topology_handoffs | outbox: pending}
+    deadline = System.monotonic_time(:millisecond) + data.persistence_timeout
+
+    task =
+      Task.async(fn ->
+        Lifecycle.save(data, data.agent, data.state_version + 1, data.state_version, data.server_turn,
+          topology_handoffs: handoffs
+        )
+      end)
+
+    next = %{data | topology_delivery: {:checkpoint, task, deadline, handoffs}}
+
+    {:next_state, :saving, next, [{{:timeout, :topology_checkpoint}, data.persistence_timeout, task.ref}]}
+  end
+
+  def handle_event(:internal, :topology_delivery, _phase, _data), do: :keep_state_and_data
+
+  def handle_event(:info, {ref, result}, phase, %{topology_delivery: {:sending, %{ref: ref} = task}} = data) do
+    complete_task(task)
+
+    case result do
+      :accepted ->
+        data = %{data | topology_delivery: :acknowledged}
+        actions = if phase == :idle, do: topology_delivery_actions(data), else: []
+        {:keep_state, data, actions}
+
+      {:error, reason} when reason in [:topology_receiver_busy, :topology_receiver_unavailable, :admission_timeout] ->
+        retry_topology_delivery(data)
+
+      _rejected ->
+        retry_topology_delivery(data, 5_000)
+    end
+  end
+
+  def handle_event(:info, {:DOWN, ref, :process, _, _}, _phase, %{topology_delivery: {:sending, %{ref: ref}}} = data),
+    do: retry_topology_delivery(data)
+
+  def handle_event(
+        :info,
+        {ref, result},
+        :saving,
+        %{topology_delivery: {:checkpoint, %{ref: ref} = task, deadline, handoffs}} = data
+      ) do
+    complete_task(task)
+
+    with :ok <- Lifecycle.write_result(result, deadline),
+         {:ok, next} <- publish_durable_revision(data) do
+      idle_transition(
+        %{next | topology_handoffs: handoffs, topology_delivery: nil},
+        [{{:timeout, :topology_checkpoint}, :cancel}]
+      )
+    else
+      {:error, reason} -> topology_checkpoint_failed(data, reason)
+    end
+  end
+
+  def handle_event(
+        {:timeout, :topology_checkpoint},
+        ref,
+        :saving,
+        %{topology_delivery: {:checkpoint, %{ref: ref} = task, _, _}} = data
+      ) do
+    Task.shutdown(task, :brutal_kill)
+    topology_checkpoint_failed(data, :indeterminate)
+  end
+
+  def handle_event(
+        :info,
+        {:DOWN, ref, :process, _, _},
+        :saving,
+        %{topology_delivery: {:checkpoint, %{ref: ref}, _, _}} = data
+      ),
+      do: topology_checkpoint_failed(data, :indeterminate)
+
+  def handle_event({:timeout, :topology_checkpoint}, _ref, _phase, _data), do: :keep_state_and_data
+
   def handle_event(:info, _message, _phase, _data), do: :keep_state_and_data
 
   # Without this clause a FunctionClauseError puts the data in the stacktrace.
@@ -2045,7 +2183,7 @@ defmodule Jido.AgentServer.Worker do
   defp bootstrap_timeout(_data), do: :readiness_timeout
 
   defp finish_bootstrap(
-         {:ok, agent, revision, agent_revision, config, turn},
+         {:ok, agent, revision, agent_revision, config, turn, handoffs},
          %{bootstrap: %{kind: :persistence}} = data
        ) do
     Lifecycle.restore(data.activation_state, agent, revision, agent_revision)
@@ -2065,6 +2203,7 @@ defmodule Jido.AgentServer.Worker do
         persistence_revision: revision,
         persistence: config,
         server_turn: turn,
+        topology_handoffs: handoffs,
         bootstrap: nil
     }
 
@@ -2127,6 +2266,12 @@ defmodule Jido.AgentServer.Worker do
       Task.shutdown(data.parent_effect.task, :brutal_kill)
     end
 
+    case data.topology_delivery do
+      {:sending, task} -> Task.shutdown(task, :brutal_kill)
+      {:checkpoint, task, _, _} -> Task.shutdown(task, :brutal_kill)
+      _ -> :ok
+    end
+
     if data.bootstrap do
       Process.cancel_timer(data.bootstrap.timer)
       Task.shutdown(data.bootstrap.task, :brutal_kill)
@@ -2169,6 +2314,7 @@ defmodule Jido.AgentServer.Worker do
         {:restore, receipt} -> receipt.id
         {:handoff, receipt} -> receipt.id
         {:turn, turn_id, _result_handoff} -> turn_id
+        {:topology, id, _from} -> id
       end
 
     timeout =
@@ -2231,6 +2377,12 @@ defmodule Jido.AgentServer.Worker do
       source_signal: signal,
       turn_context: Map.drop(context, [:turn_id, :trace_context]),
       commit_hooks: [],
+      topology_accept_from:
+        case mode do
+          {:topology, _id, from} -> from
+          _ -> nil
+        end,
+      topology_sends: [],
       start_version: data.state_version,
       prepared: nil,
       operation: nil,
@@ -2244,6 +2396,7 @@ defmodule Jido.AgentServer.Worker do
           {:restore, receipt} -> Map.get(receipt, :result_handoff, false)
           {:handoff, receipt} -> Map.get(receipt, :result_handoff, false)
           {:turn, _turn_id, value} -> value
+          {:topology, _id, _from} -> false
         end,
       persisted:
         match?({:restore, _}, mode) or
@@ -2292,7 +2445,7 @@ defmodule Jido.AgentServer.Worker do
           Lifecycle.restore_handoff(agent, receipt, context, data.plugin_specs)
         end)
 
-      {:turn, _turn_id, _result_handoff} ->
+      mode when elem(mode, 0) in [:turn, :topology] ->
         operation(:prepare, %{data | active: active}, fn ->
           prepare_turn(agent, signal, context, data)
         end)
@@ -2474,6 +2627,9 @@ defmodule Jido.AgentServer.Worker do
           end
         end
 
+      _instruction when not is_nil(data.active.topology_accept_from) ->
+        cleanup(data, {:error, :durable_topology_flow_required})
+
       _instruction ->
         owner = self()
         runner = data.runner
@@ -2519,13 +2675,24 @@ defmodule Jido.AgentServer.Worker do
 
   defp operation_result(:durable_accept, :ok, data) do
     case publish_durable_revision(data) do
-      {:ok, data} -> start_durable_worker(data)
+      {:ok, data} -> data |> acknowledge_topology_acceptance() |> start_durable_worker()
       {:error, reason} -> stop_durable(data, reason)
     end
   end
 
-  defp operation_result(:durable_prepare, :ok, data),
-    do: durable_write(:durable_accept, data, data.agent, data.server_turn)
+  defp operation_result(:durable_prepare, :ok, data) do
+    if data.active.topology_accept_from do
+      handoffs = put_in(data.topology_handoffs.accepted[data.active.turn_id], true).topology_handoffs
+
+      durable_operation(:durable_accept, data, fn ->
+        Lifecycle.save(data, data.agent, data.state_version + 1, data.state_version, data.server_turn,
+          topology_handoffs: handoffs
+        )
+      end)
+    else
+      durable_write(:durable_accept, data, data.agent, data.server_turn)
+    end
+  end
 
   defp operation_result(:durable_release, :ok, data) do
     case publish_durable_revision(data) do
@@ -2796,7 +2963,8 @@ defmodule Jido.AgentServer.Worker do
   defp operation_result(:settle, {:error, stage, reason}, data),
     do: cleanup(put_in(data.active.failure_stage, stage), {:error, reason})
 
-  defp operation_result(:settle, result, data), do: cleanup(data, result)
+  defp operation_result(:settle, {:ok, result, sends}, data),
+    do: cleanup(put_in(data.active.topology_sends, sends), result)
 
   defp operation_result(kind, {:error, reason}, data),
     do:
@@ -2804,6 +2972,16 @@ defmodule Jido.AgentServer.Worker do
         put_in(data.active.failure_stage, if(kind == :prepare, do: :preparing, else: :starting)),
         {:error, reason}
       )
+
+  defp acknowledge_topology_acceptance(%{active: %{topology_accept_from: nil}} = data), do: data
+
+  defp acknowledge_topology_acceptance(data) do
+    :gen_statem.reply(data.active.topology_accept_from, :accepted)
+
+    data
+    |> put_in([:topology_handoffs, :accepted, data.active.turn_id], true)
+    |> put_in([:active, :topology_accept_from], nil)
+  end
 
   defp expired?(%{deadline: :infinity}), do: false
   defp expired?(active), do: System.monotonic_time(:millisecond) >= active.deadline
@@ -2914,7 +3092,7 @@ defmodule Jido.AgentServer.Worker do
      Runic.Workflow.Runnable.activation_id(runnable)}
   end
 
-  defp settle_worker(runner, active, config) do
+  defp settle_worker(runner, active, config, context) do
     result =
       if active.durable do
         with {:ok, workflow} <- Runner.get_workflow(runner, active.worker_id),
@@ -2929,18 +3107,14 @@ defmodule Jido.AgentServer.Worker do
       {:error, _stage, reason} ->
         {:error, if(match?({:error, _}, result), do: :running, else: :settling), reason}
 
-      {:ok, candidate, directives} ->
-        with :ok <- immutable_definition(config.agent, candidate),
-             :ok <- Effects.validate_batch(directives, %{config | agent: candidate}) do
-          {:ok, candidate, directives}
-        else
-          {:error, reason} -> {:error, :directives, reason}
-        end
+      result when elem(result, 0) in [:ok, :handoff] ->
+        {candidate, directives} = success_candidate_and_directives(result)
+        context = %{context | agent: candidate, state_version: context.state_version + 1}
 
-      {:handoff, candidate, instruction, directives} ->
         with :ok <- immutable_definition(config.agent, candidate),
-             :ok <- Effects.validate_batch(directives, %{config | agent: candidate}) do
-          {:handoff, candidate, instruction, directives}
+             :ok <- Effects.validate_batch(directives, %{config | agent: candidate}),
+             {:ok, effects, sends} <- Effects.prepare_topology_handoffs(directives, context) do
+          {:ok, put_elem(result, tuple_size(result) - 1, effects), sends}
         else
           {:error, reason} -> {:error, :directives, reason}
         end
@@ -3076,7 +3250,7 @@ defmodule Jido.AgentServer.Worker do
         data.state_version + 1,
         data.state_version,
         receipt,
-        agent_revision: data.agent_revision + 1
+        commit_topology_options(data)
       )
     end)
   end
@@ -3122,7 +3296,7 @@ defmodule Jido.AgentServer.Worker do
         data.state_version + 1,
         data.state_version,
         receipt,
-        agent_revision: data.agent_revision + 1
+        commit_topology_options(data)
       )
     end)
   end
@@ -3171,6 +3345,17 @@ defmodule Jido.AgentServer.Worker do
   defp finish(data, {:ok, _, _} = result), do: publish_commit(data, result)
   defp finish(data, {:handoff, _, _, _} = result), do: publish_commit(data, result)
   defp finish(data, result), do: finish_result(data, result)
+
+  defp commit_topology_options(data) do
+    opts = [agent_revision: data.agent_revision + 1]
+
+    case data.active.topology_sends do
+      [] -> opts
+      sends -> Keyword.put(opts, :topology_handoffs, append_topology_sends(data.topology_handoffs, sends))
+    end
+  end
+
+  defp append_topology_sends(handoffs, sends), do: %{handoffs | outbox: handoffs.outbox ++ sends}
 
   defp stop_durable(data, reason) do
     if reconciliation_failure?(reason) do
@@ -3237,7 +3422,8 @@ defmodule Jido.AgentServer.Worker do
            data.agent_revision + 1
          ) do
       :ok ->
-        finish_result(data, result)
+        handoffs = append_topology_sends(data.topology_handoffs, data.active.topology_sends)
+        finish_result(%{data | topology_handoffs: handoffs}, result)
 
       {:error, reason} ->
         stop_failed(data, execution_error("Local checkpoint failed", reason), :checkpoint)
@@ -3262,6 +3448,10 @@ defmodule Jido.AgentServer.Worker do
   end
 
   defp finish_result(data, result) do
+    if data.active.topology_accept_from do
+      :gen_statem.reply(data.active.topology_accept_from, result)
+    end
+
     if data.active.durable and
          (data.active.durable_finalized or data.server_turn.status == :completed),
        do: ContinuationStore.collect(data.jido, data.active.worker_id)
@@ -3281,7 +3471,7 @@ defmodule Jido.AgentServer.Worker do
                    do: nil,
                    else: data.state_version + 1
                  )
-           }, :succeeded, :commit, length(directives)}
+           }, :succeeded, :commit, length(directives) + length(data.active.topology_sends)}
 
         {:error, reason} ->
           if is_nil(data.active.from),
@@ -3903,7 +4093,40 @@ defmodule Jido.AgentServer.Worker do
   defp idle_transition(data, replies \\ []) do
     {:next_state, :idle, arm_idle(data),
      replies ++
-       [{:next_event, :internal, :recover_turn}, {:next_event, :internal, :control_progress}]}
+       [{:next_event, :internal, :recover_turn}, {:next_event, :internal, :control_progress}] ++
+       topology_delivery_actions(data)}
+  end
+
+  defp topology_delivery_actions(%{
+         admission_mode: :open,
+         topology_handoffs: %{outbox: [_ | _]},
+         topology_delivery: state
+       })
+       when state in [nil, :ready, :acknowledged] do
+    case state do
+      nil -> [{{:timeout, :topology_delivery}, 0, :ready}]
+      _ready -> [{:next_event, :internal, :topology_delivery}]
+    end
+  end
+
+  defp topology_delivery_actions(_data), do: []
+
+  defp retry_topology_delivery(data, delay \\ @topology_retry_ms),
+    do: {:keep_state, %{data | topology_delivery: :scheduled}, [{{:timeout, :topology_delivery}, delay, :ready}]}
+
+  # A Store rejection guarantees that the write did not start. The receiver
+  # has already accepted this ID, so retry only the sender checkpoint.
+  defp topology_checkpoint_failed(data, {:rejected, _reason}) do
+    idle_transition(%{data | topology_delivery: :scheduled}, [
+      {{:timeout, :topology_checkpoint}, :cancel},
+      {{:timeout, :topology_delivery}, @topology_retry_ms, :acknowledged}
+    ])
+  end
+
+  defp topology_checkpoint_failed(data, reason) do
+    mark_reconciliation_required(data, reason)
+    next = data |> set_admission(:blocked) |> Map.put(:topology_delivery, nil)
+    {:next_state, :faulted, next, [{{:timeout, :topology_checkpoint}, :cancel}]}
   end
 
   defp cancel_idle(%{idle_timer: nil} = data), do: data
@@ -3918,7 +4141,7 @@ defmodule Jido.AgentServer.Worker do
     data = cancel_idle(data)
 
     if data.idle_timeout != :infinity and data.admission_mode == :open and
-         safe_residency_idle?(data) do
+         data.topology_handoffs.outbox == [] and safe_residency_idle?(data) do
       token = make_ref()
       timer = Process.send_after(self(), {:idle_timeout, token}, data.idle_timeout)
       %{data | idle_timer: {timer, token}}

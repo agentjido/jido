@@ -4,7 +4,8 @@ defmodule Jido.Persistence.Inspector do
 
   Exact inspection returns a metadata and shape projection unless `full: true`
   is set. JSONL export redacts Agent state unless `include_state: true` is set.
-  Execution data stays shape-only in normal exports.
+  Execution data stays shape-only in normal exports. Default inspection also
+  redacts topology handoff data.
   """
 
   alias Jido.Persistence.{Config, Store}
@@ -47,7 +48,7 @@ defmodule Jido.Persistence.Inspector do
 
   def redact(map) when is_map(map) do
     Map.new(map, fn
-      {key, _value} when key in [:state, "state"] -> {key, @redacted}
+      {key, _value} when key in [:state, "state", :topology_handoffs] -> {key, @redacted}
       {key, value} -> {key, redact(value)}
     end)
   end

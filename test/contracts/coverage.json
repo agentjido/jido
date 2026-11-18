@@ -6,9 +6,9 @@
       "covered": 95
     },
     "jido.agent_server": {
-      "active": 14,
+      "active": 15,
       "coverage": 1.0,
-      "covered": 14
+      "covered": 15
     },
     "jido.plugin": {
       "active": 30,
@@ -1098,10 +1098,10 @@
       }
     },
     "jido.agent_server.composition": {
-      "active": 1,
+      "active": 2,
       "app": "jido.agent_server",
       "coverage": 1.0,
-      "covered": 1,
+      "covered": 2,
       "form": "light",
       "obligations": {
         "jido.agent_server.composition.I1": {
@@ -1131,6 +1131,24 @@
             "test explicit cancellation stops an accepted pre-commit turn",
             "test removal keeps durable child state for a replacement root activation",
             "test removal stops one selected subtree and keeps the root and sibling alive"
+          ]
+        },
+        "jido.agent_server.composition.I12": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 9,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a confirmed prune rejection leaves the sender available and retries cleanup",
+            "test a quiesced receiver keeps the send recoverable",
+            "test a retry reuses its preparation after a receiver dies before accepting",
+            "test a slot marked for removal rejects new durable sends before commit",
+            "test an expired or malformed delivery does not admit a Turn",
+            "test an uncertain prune fences the sender until reconciliation reads the committed record",
+            "test receiver restart before acknowledgment recovers child-to-parent acceptance",
+            "test regular topology casts work without persistence while durable sends fail before commit",
+            "test the committed sender restarts before attempting delivery"
           ]
         },
         "jido.agent_server.composition.I2": {
@@ -5713,8 +5731,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 236,
+    "active": 237,
     "coverage": 1.0,
-    "covered": 236
+    "covered": 237
   }
 }

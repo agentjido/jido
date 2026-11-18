@@ -174,6 +174,14 @@ defmodule Jido.Agent.Directive do
 
   The type/data form uses the owning Agent's explicit Signal source when the
   command runs. The full-Signal form preserves its envelope.
+
+  To request durable acceptance by one declared topology member, use
+  `emit(signal, {:durable, {:agent, name, slot}})` or
+  `emit(signal, {:durable, :parent})`. The destination must be in the same
+  named Jido instance and the receiving route must prepare a durable Flow.
+  The sender commits its send request with its next state. Delivery and
+  receiver completion occur separately. See the durability guide for the
+  supported destinations, retry order, and retention rules.
   """
   @spec emit(Signal.t() | String.t(), term()) :: Emit.t() | map() | {:error, term()}
   def emit(signal_or_type, dispatch_or_data \\ nil)

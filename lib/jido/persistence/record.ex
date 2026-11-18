@@ -174,15 +174,10 @@ defmodule Jido.Persistence.Record do
     end
   end
 
-  defp validate_exact_shape(%{fmt: _, kind: :active} = record),
-    do:
-      exact_keys(
-        record,
-        if(Map.has_key?(record, :server_turn),
-          do: @active_keys ++ [:server_turn],
-          else: @active_keys
-        )
-      )
+  defp validate_exact_shape(%{fmt: _, kind: :active} = record) do
+    optional = Enum.filter([:server_turn, :topology_handoffs], &Map.has_key?(record, &1))
+    exact_keys(record, @active_keys ++ optional)
+  end
 
   defp validate_exact_shape(record), do: exact_keys(record, @common_keys)
 
@@ -218,8 +213,38 @@ defmodule Jido.Persistence.Record do
   defp validate_active(record) do
     with :ok <- validate_checkpoint(record),
          :ok <- validate_agent_vsn(record),
-         do: validate_server_turn(Map.get(record, :server_turn))
+         :ok <- validate_server_turn(Map.get(record, :server_turn)),
+         do: validate_topology_handoffs(topology_handoffs(record))
   end
+
+  @doc false
+  def empty_topology_handoffs, do: %{outbox: [], accepted: %{}}
+
+  @doc false
+  def topology_handoffs(record), do: Map.get(record, :topology_handoffs, empty_topology_handoffs())
+
+  @doc false
+  def put_topology_handoffs(record, %{outbox: [], accepted: accepted}) when map_size(accepted) == 0,
+    do: Map.delete(record, :topology_handoffs)
+
+  def put_topology_handoffs(record, handoffs), do: Map.put(record, :topology_handoffs, handoffs)
+
+  defp validate_topology_handoffs(%{outbox: outbox, accepted: accepted} = handoffs)
+       when map_size(handoffs) == 2 and is_list(outbox) and is_map(accepted) do
+    if Enum.all?(outbox, &valid_topology_send?/1) and
+         Enum.all?(accepted, fn {id, value} -> is_binary(id) and id != "" and value == true end),
+       do: :ok,
+       else: invalid(:topology_handoffs)
+  end
+
+  defp validate_topology_handoffs(_handoffs), do: invalid(:topology_handoffs)
+
+  defp valid_topology_send?(%{id: id, to: %Address{} = to, signal: %Jido.Signal{}} = send)
+       when is_binary(id) and id != "" and map_size(send) == 3 do
+    match?({:ok, _}, Address.validate(to)) and Jido.Codec.Term.valid?(send)
+  end
+
+  defp valid_topology_send?(_send), do: false
 
   defp validate_server_turn(nil), do: :ok
 

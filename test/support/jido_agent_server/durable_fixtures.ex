@@ -11,7 +11,7 @@ defmodule Jido.Test.AgentServer.DurableFixtures do
     def gate(kind), do: GenServer.call(__MODULE__, {:gate, kind}, :infinity)
     def records, do: GenServer.call(__MODULE__, :records)
     def checkpoint, do: GenServer.call(__MODULE__, :checkpoint)
-    def release, do: GenServer.call(__MODULE__, :release)
+    def release(result \\ :ok), do: GenServer.call(__MODULE__, {:release, result})
 
     def init(observer),
       do: {:ok, %{observer: observer, started: [], hooks: 0, mode: :pass, waiter: nil}}
@@ -49,8 +49,8 @@ defmodule Jido.Test.AgentServer.DurableFixtures do
         else: {:reply, :ok, state}
     end
 
-    def handle_call(:release, _, state) do
-      if state.waiter, do: GenServer.reply(state.waiter, :ok)
+    def handle_call({:release, result}, _, state) do
+      if state.waiter, do: GenServer.reply(state.waiter, result)
       {:reply, :ok, %{state | waiter: nil}}
     end
 

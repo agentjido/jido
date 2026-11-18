@@ -105,6 +105,7 @@ Post-commit effects run after the commit that produced them, and Jido does not s
 
 - A crash after the commit and before an effect finishes loses that effect. Recovery does not replay it.
 - A saved completion does not replay post-commit hooks or effects when it restores.
+- An explicit durable topology send is part of the sender checkpoint. Recovery can resume it through durable receiver acceptance. [Durable Topology](durable-topology.md#send-to-one-member-with-durable-acceptance) describes the acceptance and retry rules.
 - An uncertain commit runs no hooks or Directives, even if the write did land. Recovery reads that revision and does not run them later.
 
 Use a Directive for work that may be lost, such as a notification. Use a Flow step before commit for work you must not lose, and accept that the step can repeat. [Runtime Effects](../agent-servers/runtime-directives-and-effects.md) has the delivery details.
