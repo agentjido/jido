@@ -1237,6 +1237,61 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
   end
 
   @tag :tmp_dir
+  test "a restart inside the ReAct loop replays earlier calls on the same Turn", context do
+    {_instance, server, _persistence, _address} = start_persisted_agent(context.tmp_dir, "loop-replay")
+    activation = Jido.Test.AgentServer.Assertions.activation(server)
+    test_pid = self()
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(Tools.Add, :run, 2, fn %{left: 2, right: 3}, _context ->
+      send(test_pid, :tool_executed)
+      {:ok, %{value: 5}}
+    end)
+
+    expect(ReqLLM, :generate_text, 4, fn model, llm_context, _options ->
+      case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
+        round when round in [1, 3] ->
+          assert roles(llm_context) == [:system, :user]
+          call = ReqLLM.ToolCall.new("replayed-add", "add", ~s({"left":2,"right":3}))
+          {:ok, tool_response(model, llm_context, [call], "replay-tool")}
+
+        2 ->
+          assert roles(llm_context) == [:system, :user, :assistant, :tool]
+          send(test_pid, :second_round_started)
+
+          receive do
+            :finish_interrupted_round -> flunk("The first execution should stop inside the loop")
+          after
+            10_000 -> flunk("The test did not stop the first execution")
+          end
+
+        4 ->
+          assert roles(llm_context) == [:system, :user, :assistant, :tool]
+          {:ok, response(model, llm_context, "The result is 5.", "replay-final")}
+      end
+    end)
+
+    pending = Server.submit(server, SimpleAgent.request_signal!(%{input: "Add 2 and 3"}))
+    turn_id = pending.turn_id
+    assert_receive :tool_executed, 5_000
+    assert_receive :second_round_started, 5_000
+
+    Process.exit(server, :kill)
+    assert {:error, %Jido.Error.ExecutionError{}} = Server.await(pending)
+    restored = Jido.Test.AgentServer.Assertions.replacement(activation, server, timeout: 10_000)
+
+    assert_receive :tool_executed, 5_000
+
+    assert {:ok, %Jido.AgentServer.Status{last_outcome: %{turn_id: ^turn_id, committed?: true}}} =
+             Server.quiesce(restored, timeout: 10_000)
+
+    thread = Server.snapshot(restored).agent.state.session.thread
+
+    assert Enum.map(Jido.Thread.filter_by_kind(thread, :ai_message), & &1.payload["role"]) ==
+             ["user", "assistant", "tool", "assistant"]
+  end
+
+  @tag :tmp_dir
   test "a tool review wait survives restart and resumes the same graph", context do
     {instance, server, _persistence, address} = start_persisted_agent(context.tmp_dir, "review")
     {:ok, calls} = Agent.start_link(fn -> 0 end)

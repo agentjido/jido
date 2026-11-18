@@ -42,10 +42,10 @@ model-execution, conversation, and tools components.
 - **kind:** ordering
 - **status:** active
 
-### jido_ai.react.I4 — Durable resume does not duplicate work
+### jido_ai.react.I4 — Durable resume uses saved checkpoints
 
 - **scope:** ReAct Flow waits and durable AgentServer resume
-- **must:** Resume the same saved graph after restart, retain the same review wait identity, and do not repeat completed model calls or tool attempts.
+- **must:** Resume the same saved graph and Turn after restart. Retain the same review wait identity and do not repeat calls confirmed by its saved checkpoint. If the ReAct Iterate has no saved result, resume from the start of that component. Calls from its interrupted execution can repeat.
 - **kind:** persisted-format
 - **status:** active
 

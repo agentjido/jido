@@ -138,7 +138,7 @@ These references are valid in `params`, `update`, and `while`:
 
 The body must be an Action module. A Flow module raises `CompileError` with "Flow component has the wrong target kind", and inline bodies are not supported. The body Action validates its own parameters with its own schema.
 
-An Iterate is one component. Other components read only its final result, and a failed call fails the Iterate. Use `needs` and `meta` as in [Steps and Output](flow-steps.md).
+An Iterate is one component. Other components read only its final result, and a failed call fails the Iterate. A durable Flow saves the result of the whole Iterate. If the Flow stops before that save, recovery can repeat every iteration that already ran. Use `needs` and `meta` as in [Steps and Output](flow-steps.md).
 
 ## Data form
 
