@@ -54,6 +54,12 @@ defmodule Jido.Plugin do
               {:ok, term()} | {:error, term()}
   @callback select_route(Jido.Agent.Plugin.RouteSelection.t(), keyword()) ::
               :default | {:ok, atom()} | {:error, term()}
+  @doc """
+  Declares one owned state field and its Joi schema, or returns `:none`.
+
+  Return `{:error, reason}` to reject the declaration. When the second element
+  is a Joi schema, the tuple declares a field with the key `:error`.
+  """
   @callback state_spec(keyword()) :: state_spec() | {:error, term()}
   @callback directives(keyword()) :: [module()] | {:error, term()}
   @callback reduce(Jido.Agent.Plugin.Reduction.t(), keyword()) :: {:ok, term()} | {:error, term()}
@@ -70,6 +76,7 @@ defmodule Jido.Plugin do
   @callback dispatch(term() | nil, struct(), Jido.Plugin.Context.directive_t(), keyword()) ::
               :ok | {:error, term()}
   @callback child_spec(Init.t()) :: Supervisor.child_spec()
+  @doc "Checks readiness of the runtime root declared by `child_spec/1`."
   @callback await_ready(term(), keyword()) :: :ok | {:error, term()}
 
   @doc """
@@ -128,16 +135,6 @@ defmodule Jido.Plugin do
         sections: unquote(Keyword.get(opts, :sections, [])),
         imports: unquote(Keyword.get(opts, :imports, []))
 
-      def normalize(data) do
-        with :ok <- Jido.Agent.Schema.plain_map(data),
-             :ok <- Jido.Agent.Schema.static(data),
-             do: {:ok, data}
-      end
-
-      # Agent schema composition validates Plugin contracts once per boundary.
-      def verify(_data, _definition), do: :ok
-
-      defoverridable normalize: 1, verify: 2
       @behaviour Jido.Plugin
       @before_compile Jido.Plugin
       @jido_plugin_vsn unquote(Keyword.get(opts, :vsn, 1))

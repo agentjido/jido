@@ -67,7 +67,7 @@ or what a bundled Plugin does.
 ### jido.plugin.I5 — Agent callback declaration shapes
 
 - **scope:** Agent callbacks declared by `Jido.Plugin`, `Jido.Plugin.Normalizer`
-- **must:** Accept no owned state or one safe atom key with a static Joi schema. Accept a unique list of loaded Directive struct modules with Directive-owned validation. Require `reduce/2` to have owned state. Require every declared Directive type to have either reduction or runtime dispatch. Reject built-in Directive ownership and duplicate state keys or Directive owners across Plugins.
+- **must:** Accept no owned state or one safe atom key with a static Joi schema. Accept a proper list of unique, loaded Directive struct modules with Directive-owned validation. Reject nil entries. Require `reduce/2` to have owned state. Require every declared Directive type to have either reduction or runtime dispatch. Reject built-in Directive ownership and duplicate state keys or Directive owners across Plugins.
 - **why:** The generic interface must define valid ownership before Agent evaluation starts.
 - **kind:** functional
 - **status:** active
@@ -75,7 +75,7 @@ or what a bundled Plugin does.
 ### jido.plugin.I6 — Server and persistence callback declaration shapes
 
 - **scope:** AgentServer and persistence callbacks declared by `Jido.Plugin`, `Jido.Plugin.Normalizer`
-- **must:** Require one documented AgentServer capability in addition to option validation. Preserve explicit option-validation errors and reject other results. Require runtime dispatch to own Directive types. Require persistence dump and load together and require one Agent-owned state field.
+- **must:** Require one documented AgentServer capability in addition to option validation. Preserve explicit option-validation errors and reject other results. Require runtime dispatch to own Directive types. Require `child_spec/1` when a Plugin defines `await_ready/2`, including when reusing a Spec. Require persistence dump and load together and require one Agent-owned state field.
 - **why:** A valid declaration must not advertise a callback group that its consumer cannot use.
 - **kind:** functional
 - **status:** active
@@ -83,7 +83,7 @@ or what a bundled Plugin does.
 ### jido.plugin.I7 — Callback fault containment
 
 - **scope:** Plugin marker, state, Directive, and option callbacks used during normalization
-- **must:** Convert callback raises, throws, and exits to Plugin-scoped execution errors with the package, callback, and original failure data. Preserve an explicit callback error when the callback result shape is unambiguous. Treat `{:error, schema}` from `state_spec/1` as state owned under the valid `:error` key. Reject an invalid callback result with a structured Plugin error.
+- **must:** Convert callback raises, throws, and exits to Plugin-scoped execution errors with the package, callback, and original failure data. Preserve explicit callback errors. Treat `{:error, schema}` from `state_spec/1` as state owned under the valid `:error` key when the second element is a Joi schema. Preserve other `{:error, reason}` results from `state_spec/1`. Reject an invalid callback result with a structured Plugin error.
 - **why:** A declaration fault must not escape as an unrelated process failure.
 - **kind:** functional
 - **status:** active

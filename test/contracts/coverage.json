@@ -2508,11 +2508,12 @@
         "jido.plugin.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 8,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
             "test all supported use options retain their exact metadata",
+            "test authoring overrides use the shared default results through super",
             "test callbacks retain capability and pairing checks",
             "test normalization rejects mismatched metadata and invalid callback combinations",
             "test old role and facet selectors are rejected",
@@ -2576,12 +2577,14 @@
         "jido.plugin.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 7,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
             "test Agent callback declarations require safe state and Directive ownership",
             "test Directive lookup returns only the Plugin that declared the type",
+            "test Directive ownership rejects improper lists",
+            "test Directive ownership rejects nil",
             "test Directive ownership remains unique across Plugins",
             "test callbacks retain capability and pairing checks",
             "test normalization rejects mismatched metadata and invalid callback combinations",
@@ -2592,7 +2595,7 @@
         "jido.plugin.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2601,20 +2604,23 @@
             "test normalization rejects mismatched metadata and invalid callback combinations",
             "test option validation preserves explicit errors and contains faults",
             "test paired callbacks and owned values are required",
+            "test readiness requires a runtime root on both declaration paths",
             "test reused complete Specs require exact owner values"
           ]
         },
         "jido.plugin.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Directive ownership rejects improper lists",
             "test option validation preserves explicit errors and contains faults",
             "test package metadata exceptions are contained at the normalization boundary",
             "test runtime manifests are derived from Plugin callbacks",
-            "test state and Directive callbacks preserve explicit errors"
+            "test state and Directive callbacks preserve explicit errors",
+            "test state declaration preserves explicit reasons at Agent definition"
           ]
         },
         "jido.plugin.I8": {
