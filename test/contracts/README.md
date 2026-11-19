@@ -12,7 +12,8 @@ is not yet complete.
 
 The target component IDs start with `jido.`. Some active IDs still start with
 `jido_action.` or `jido_ai.`. The realignment will replace those legacy package
-names. Durable behavior stays under the `jido.agent_server` boundary.
+names. `jido.durable` covers direct Flow execution. The AgentServer contracts
+cover persisted Agent Turns.
 
 A component is active only when it has an `obligations.md` file and passing
 tests with its obligation tags.
@@ -29,6 +30,7 @@ tests with its obligation tags.
 | `jido.agent_server.composition` | Runtime child and connection resources | `test/contracts/jido.agent_server/composition.*` |
 | `jido.agent_server.durable` | Persistence-backed AgentServer state coordination | `test/contracts/jido.agent_server/durable.*` |
 | `jido.agent_server.durable_turn` | Durable Flow progress, waits, and receipts | `test/contracts/jido.agent_server/durable_turn.*` |
+| `jido.durable` | Direct durable Flow admission, deadlines, and checkpoint reads | `test/contracts/jido/durable.*` |
 | `jido.persistence` | Records, snapshots, adapters, storage operations, and revisions | `test/contracts/jido/persistence.*` |
 | `jido.plugin` | Generic Plugin SDK and callback contracts | `test/contracts/jido/plugin.*` |
 | `jido.telemetry` | Telemetry, metrics, tracing, logs, and Debug support | `test/contracts/jido/telemetry.*` |
@@ -45,6 +47,7 @@ tests with its obligation tags.
 - `jido.agent_server.activation` uses `jido.instance`.
 - `jido.agent_server.durable` and `jido.agent_server.durable_turn` use
   `jido.persistence`.
+- `jido.durable` uses the instance Runner and Persistence checkpoint store.
 - Each `jido.plugin.*` bundled component uses `jido.plugin`.
 - `jido.agent_evaluation` uses `jido.agent` and `jido.plugin`.
 - `jido.telemetry` is best effort. An observation failure must not change

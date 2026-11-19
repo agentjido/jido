@@ -16,6 +16,7 @@ This directory records decisions that constrain the Jido V3 architecture. The [m
 | [0008](0008-stateful-recurring-intervals.md) | Accepted | Keep static and stateful recurring intervals in Timer |
 | [0009](0009-durable-topology-acceptance.md) | Proposed | Commit durable topology sends and receiver acceptance in Agent records |
 | [0010](0010-exec-task-ownership-and-admission.md) | Accepted | Use Runic task ownership and bound immediate admission |
+| [0011](0011-direct-durable-operation-ownership.md) | Accepted | Admit one direct Durable operation per reference |
 
 ## Backlog
 

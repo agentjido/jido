@@ -20,7 +20,7 @@ defmodule Jido.Durable.Runtime do
     now = Keyword.get(opts, :now, now())
     max_concurrency = Keyword.get(opts, :max_concurrency, 1)
     on_started = Keyword.get(opts, :on_started, fn _worker -> :ok end)
-    notify = Keyword.get(opts, :notify, fn -> send(owner, {:jido_durable_advance, id}) end)
+    notify = Keyword.fetch!(opts, :notify)
 
     options = [
       owner: owner,
@@ -32,7 +32,7 @@ defmodule Jido.Durable.Runtime do
     ]
 
     with :ok <- validate_now(now),
-         :ok <- stop_existing_execution(runner, id),
+         :ok <- cancel(runner, id),
          {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}, []),
          :ok <- ContinuationStore.register(instance, id, persistence, owner),
          {:ok, saved} <-
@@ -60,11 +60,12 @@ defmodule Jido.Durable.Runtime do
   end
 
   @doc false
-  def advance(runner, id) do
+  def advance(runner, id, before_step \\ fn -> :ok end) do
     # No step can start before the preceding graph has a confirmed save.
     with {:ok, workflow} <- Runner.get_workflow(runner, id),
          :ok <- portable_facts(workflow),
-         :ok <- Runner.checkpoint(runner, id) do
+         :ok <- Runner.checkpoint(runner, id),
+         :ok <- before_step.() do
       if halted?(workflow), do: :complete, else: step(runner, id)
     end
   end
@@ -113,9 +114,11 @@ defmodule Jido.Durable.Runtime do
     do: ContinuationStore.register(instance, id, persistence, owner)
 
   @doc false
-  def workflow(instance, id, persistence, owner \\ self()) do
-    with :ok <- register(instance, id, persistence, owner) do
-      ContinuationStore.update_workflow(instance, id, &{:ok, &1})
+  def cancel(runner, id) do
+    case Runner.cancel(runner, id) do
+      :ok -> :ok
+      {:error, :not_found} -> :ok
+      error -> error
     end
   end
 
@@ -263,10 +266,6 @@ defmodule Jido.Durable.Runtime do
       result ->
         result
     end
-  end
-
-  defp stop_existing_execution(runner, id) do
-    if Runner.lookup(runner, id), do: Runner.cancel(runner, id), else: :ok
   end
 
   defp execution_input(%Jido.Instruction{params: params}), do: params

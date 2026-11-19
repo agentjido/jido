@@ -38,7 +38,9 @@ defmodule Jido.Durable.Status do
   end
 
   defp state(_workflow, _waits, true), do: :running
-  defp state(_workflow, [_ | _], false), do: :waiting
+
+  defp state(workflow, [_ | _], false),
+    do: if(Workflow.is_runnable?(workflow), do: :ready, else: :waiting)
 
   defp state(workflow, [], false) do
     case Jido.Exec.Result.project(workflow) do

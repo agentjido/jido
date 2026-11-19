@@ -30,7 +30,10 @@ defmodule Jido.Persistence.ContinuationStore do
   def save_fact(hash, value, {id, jido}), do: save_fact(id, hash, value, jido)
 
   @impl true
+  def load_fact(hash, {id, %Config{} = profile}), do: read_fact(profile, id, hash)
   def load_fact(hash, {id, jido}), do: load_fact(id, hash, jido)
+
+  def read_fact(%Config{} = profile, id, hash), do: load_fact_value(profile, id, hash)
 
   def register(jido, id, config, owner \\ self()) do
     with {:ok, %Config{} = profile} <- Config.open(config) do
@@ -88,8 +91,13 @@ defmodule Jido.Persistence.ContinuationStore do
   def stream(id, {id, jido}), do: stream(id, jido)
 
   def stream({:jido_execution, _, _, _, _} = id, jido) do
-    with {:ok, config} <- config(jido, id),
-         {:ok, batch_count, _condition} <- read_batch_count(config, id),
+    with {:ok, config} <- config(jido, id), do: read_events(config, id, :repair)
+  end
+
+  def stream(_id, _jido), do: {:error, :not_found}
+
+  defp read_events(config, id, mode) do
+    with {:ok, batch_count, _condition} <- read_batch_count(config, id, mode),
          true <- batch_count > 0,
          {:ok, batches} <- read_batches(config, id, 1, batch_count, []) do
       batches
@@ -102,8 +110,6 @@ defmodule Jido.Persistence.ContinuationStore do
     end
   end
 
-  def stream(_id, _jido), do: {:error, :not_found}
-
   def save_fact({:jido_execution, _, _, _, _} = id, hash, value, jido) do
     with {:ok, config} <- config(jido, id) do
       save_fact_value(config, id, hash, value)
@@ -113,10 +119,7 @@ defmodule Jido.Persistence.ContinuationStore do
   def save_fact(_id, _hash, _value, _jido), do: :ok
 
   def load_fact({:jido_execution, _, _, _, _} = id, hash, jido) do
-    with {:ok, config} <- config(jido, id),
-         {:ok, value} <- load_fact_value(config, id, hash) do
-      {:ok, value}
-    end
+    with {:ok, config} <- config(jido, id), do: read_fact(config, id, hash)
   end
 
   def load_fact(_id, _hash, _jido), do: {:error, :not_found}
@@ -149,40 +152,42 @@ defmodule Jido.Persistence.ContinuationStore do
            event
        end)}
 
+  def read_workflow(%Config{} = profile, id), do: load_workflow(profile, id, :read)
+
   def update_workflow(jido, id, transition) do
-    case stream(id, jido) do
-      {:ok, events} ->
-        with {:ok, workflow} <- rehydrate_frontier(events, id, jido) do
-          case transition.(workflow) do
-            {:ok, ^workflow} ->
-              {:ok, workflow}
+    with {:ok, profile} <- config(jido, id),
+         {:ok, workflow} <- load_workflow(profile, id, :repair) do
+      case transition.(workflow) do
+        {:ok, ^workflow} ->
+          {:ok, workflow}
 
-            {:ok, next} ->
-              events = Enum.reverse(next.uncommitted_events)
+        {:ok, next} ->
+          events = Enum.reverse(next.uncommitted_events)
 
-              with {:ok, _batch_count} <- persist_events(id, events, jido) do
-                {:ok, %{next | uncommitted_events: []}}
-              end
-
-            error ->
-              error
+          with {:ok, _batch_count} <- persist_events(id, events, jido) do
+            {:ok, %{next | uncommitted_events: []}}
           end
-        end
 
-      {:error, :not_found} ->
-        {:ok, nil}
-
-      error ->
-        error
+        error ->
+          error
+      end
+    else
+      {:error, :not_found} -> {:ok, nil}
+      error -> error
     end
   end
 
-  defp rehydrate_frontier(events, id, jido) do
+  defp load_workflow(profile, id, mode) do
+    with {:ok, events} <- read_events(profile, id, mode),
+         do: rehydrate_frontier(events, id, profile)
+  end
+
+  defp rehydrate_frontier(events, id, profile) do
     workflow = Runic.Workflow.from_events(events, nil, fact_mode: :ref)
 
     required = Rehydration.classify(workflow).hot
 
-    resolver = FactResolver.new({__MODULE__, {id, jido}})
+    resolver = FactResolver.new({__MODULE__, {id, profile}})
     {workflow, resolver} = Rehydration.resolve_hot(workflow, required, resolver)
     wait_inputs = wait_input_hashes(workflow)
     required = MapSet.union(required, wait_inputs)
@@ -365,34 +370,40 @@ defmodule Jido.Persistence.ContinuationStore do
     end
   end
 
-  defp read_batch_count(config, id) do
+  defp read_batch_count(config, id, mode \\ :repair) do
     case Store.read(config.store, key(id)) do
       {:ok, bytes, condition} ->
         with {:ok, batch_count} when is_integer(batch_count) and batch_count >= 0 <-
                decode(config, bytes) do
-          recover_tail(config, id, batch_count, condition)
+          recover_tail(config, id, batch_count, condition, mode)
         else
           _invalid -> {:error, :invalid_execution_checkpoint}
         end
 
       {:error, :not_found} ->
-        recover_tail(config, id, 0, :not_found)
+        recover_tail(config, id, 0, :not_found, mode)
 
       error ->
         error
     end
   end
 
-  # The event batch is the durable commit. Repair its count if the writer stopped
-  # between the batch write and the count update.
-  defp recover_tail(config, id, batch_count, condition) do
+  # The batch is the commit. Read-only projections follow committed batches
+  # beyond the count without repairing that count.
+  defp recover_tail(config, id, batch_count, condition, mode) do
     next = batch_count + 1
 
     case Store.read(config.store, batch_key(id, next)) do
       {:ok, bytes, _chunk_condition} ->
-        with {:ok, [_ | _]} <- decode(config, bytes),
-             :ok <- write_batch_count(config, id, condition, next) do
-          read_batch_count(config, id)
+        with {:ok, [_ | _]} <- decode(config, bytes) do
+          case mode do
+            :read ->
+              recover_tail(config, id, next, condition, mode)
+
+            :repair ->
+              with :ok <- write_batch_count(config, id, condition, next),
+                   do: read_batch_count(config, id, mode)
+          end
         end
 
       {:error, :not_found} ->

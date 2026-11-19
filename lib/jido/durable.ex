@@ -16,12 +16,19 @@ defmodule Jido.Durable do
   until its next durable stop. Equal retries are inert because the Signal ID
   identifies the input receipt.
 
+  Each execution reference admits one direct operation at a time. A competing
+  operation returns `{:error, :execution_busy}` and can retry later.
+  Set `:operation_timeout` in milliseconds to limit the operation. The
+  default is `:infinity`. An in-progress storage call and worker cleanup can
+  finish after expiry. A timeout stops the worker and leaves the last
+  confirmed checkpoint available for retry.
+
   Timed waits expose `Jido.Durable.Status.next_wake_at`. A host can call
   `resume/3` at or after that UTC Unix time. A cron host calculates an
   occurrence and delivers it as a Signal; Durable does not own a scheduler.
   """
 
-  alias Jido.Durable.{Execution, Ref, Runtime, Status}
+  alias Jido.Durable.{Execution, Operation, Ref, Runtime, Status}
   alias Jido.Exec.Runtime, as: ExecRuntime
   alias Jido.Persistence.ContinuationStore
   alias Jido.Signal
@@ -45,15 +52,19 @@ defmodule Jido.Durable do
   def start(jido, target, %Signal{} = signal, opts) do
     with :ok <- validate_options(opts, @start_option_keys),
          {:ok, config} <- persistence(jido),
-         {:ok, ref} <- Ref.new(jido, Keyword.get(opts, :id, signal.id)),
-         {:ok, params} <- signal_params(signal),
-         {:ok, context} <- durable_context(signal, Keyword.get(opts, :context, %{})),
-         {:ok, exec_opts} <- exec_options(Keyword.get(opts, :exec_opts, [])),
-         {:ok, instruction} <- durable_instruction(target, params, context),
-         {:ok, execution} <- Execution.new(ref, instruction, signal, context, exec_opts),
-         :ok <- Runtime.register(jido, Ref.execution_id(ref), config),
-         :ok <- save_execution(jido, execution),
-         do: run(jido, execution, config, opts)
+         {:ok, ref} <- Ref.new(jido, Keyword.get(opts, :id, signal.id)) do
+      Operation.with_owner(ref, opts, fn deadline ->
+        with {:ok, params} <- signal_params(signal),
+             {:ok, context} <- durable_context(signal, Keyword.get(opts, :context, %{})),
+             {:ok, exec_opts} <- exec_options(Keyword.get(opts, :exec_opts, [])),
+             {:ok, instruction} <- durable_instruction(target, params, context),
+             {:ok, execution} <- Execution.new(ref, instruction, signal, context, exec_opts),
+             :ok <- Runtime.register(jido, Ref.execution_id(ref), config),
+             :ok <- save_execution(jido, execution) do
+          Operation.execute(jido, execution, config, opts, deadline)
+        end
+      end)
+    end
   end
 
   def start(_jido, _target, _signal, _opts),
@@ -66,9 +77,12 @@ defmodule Jido.Durable do
   def resume(jido, %Ref{} = ref, opts) do
     with :ok <- validate_options(opts, @resume_option_keys),
          :ok <- validate_ref_instance(jido, ref),
-         {:ok, config} <- persistence(jido),
-         {:ok, execution} <- load_execution(jido, ref, config),
-         do: run(jido, execution, config, opts)
+         {:ok, config} <- persistence(jido) do
+      Operation.with_owner(ref, opts, fn deadline ->
+        with {:ok, execution} <- load_execution(config, ref),
+             do: Operation.execute(jido, execution, config, opts, deadline)
+      end)
+    end
   end
 
   def resume(_jido, _ref, _opts), do: invalid_ref()
@@ -81,20 +95,17 @@ defmodule Jido.Durable do
   def signal(jido, %Ref{} = ref, wait_id, %Signal{} = signal, opts) do
     with :ok <- validate_options(opts, @signal_option_keys),
          :ok <- validate_ref_instance(jido, ref),
-         {:ok, config} <- persistence(jido),
-         {:ok, execution} <- load_execution(jido, ref, config),
-         {:ok, input} <- Jido.Exec.Wait.input(wait_id, signal) do
-      case Runtime.accept_input(
-             jido,
-             Ref.execution_id(ref),
-             config,
-             input,
-             now_option(opts)
-           ) do
-        :ok -> run(jido, execution, config, opts)
-        {:rejected, reason} -> {:error, reason}
-        result -> result
-      end
+         {:ok, config} <- persistence(jido) do
+      Operation.with_owner(ref, opts, fn deadline ->
+        with {:ok, execution} <- load_execution(config, ref),
+             {:ok, input} <- Jido.Exec.Wait.input(wait_id, signal),
+             :ok <- Runtime.accept_input(jido, Ref.execution_id(ref), config, input, now_option(opts)) do
+          Operation.execute(jido, execution, config, opts, deadline)
+        else
+          {:rejected, reason} -> {:error, reason}
+          error -> error
+        end
+      end)
     end
   end
 
@@ -104,15 +115,8 @@ defmodule Jido.Durable do
   @doc "Reads the last committed durable execution status."
   @spec status(atom(), Ref.t()) :: operation_result()
   def status(jido, %Ref{} = ref) do
-    with :ok <- validate_ref_instance(jido, ref),
-         {:ok, config} <- persistence(jido),
-         {:ok, _execution} <- load_execution(jido, ref, config),
-         {:ok, workflow} <- Runtime.workflow(jido, Ref.execution_id(ref), config),
-         true <- not is_nil(workflow) do
+    with {:ok, workflow} <- read_checkpoint(jido, ref) do
       {:ok, Status.new(ref, workflow, active?(jido, ref))}
-    else
-      false -> {:error, :not_found}
-      error -> error
     end
   end
 
@@ -121,84 +125,18 @@ defmodule Jido.Durable do
   @doc "Reads the normal `Jido.Exec` result from the last committed state."
   @spec result(atom(), Ref.t()) :: Jido.Exec.exec_result()
   def result(jido, %Ref{} = ref) do
-    with :ok <- validate_ref_instance(jido, ref),
-         {:ok, config} <- persistence(jido),
-         {:ok, _execution} <- load_execution(jido, ref, config),
-         {:ok, workflow} when not is_nil(workflow) <-
-           Runtime.workflow(jido, Ref.execution_id(ref), config) do
+    with {:ok, workflow} <- read_checkpoint(jido, ref) do
       Jido.Exec.Result.project(workflow)
-    else
-      {:ok, nil} -> {:error, :not_found}
-      error -> error
     end
   end
 
   def result(_jido, _ref), do: invalid_ref()
 
-  defp run(jido, %Execution{} = execution, config, opts) do
-    runner = Jido.Instance.Names.exec_runner(jido)
-    id = Ref.execution_id(execution.ref)
-    now = Keyword.get(opts, :now, System.system_time(:millisecond))
-    timeout = Keyword.get(opts, :operation_timeout, :infinity)
-    max_concurrency = Keyword.get(execution.exec_opts, :max_concurrency, 1)
-
-    open_opts = [
-      instance: jido,
-      persistence: config,
-      owner: self(),
-      hooks: [],
-      policy: Runtime.execution_policy(execution.exec_opts),
-      max_concurrency: max_concurrency,
-      now: now
-    ]
-
-    case Runtime.open(runner, id, execution.instruction, execution.context, open_opts) do
-      {:ok, _worker, ^id} -> advance_until_stop(jido, execution.ref, config, runner, timeout)
-      {:waiting, _waits, _next_wake_at} -> committed_status(jido, execution.ref, config, runner)
-      {:error, _reason} = error -> error
-    end
-  end
-
-  defp advance_until_stop(jido, ref, config, runner, timeout) do
-    id = Ref.execution_id(ref)
-
-    case Runtime.advance(runner, id) do
-      :running ->
-        receive do
-          {:jido_durable_advance, ^id} ->
-            advance_until_stop(jido, ref, config, runner, timeout)
-        after
-          timeout_value(timeout) ->
-            {:error,
-             Jido.Error.execution_error("durable execution did not reach a stop before timeout", %{
-               execution_id: id,
-               reason: :timeout,
-               retry: true
-             })}
-        end
-
-      :complete ->
-        committed_status(jido, ref, config, runner)
-
-      {:waiting, _waits, _next_wake_at} ->
-        committed_status(jido, ref, config, runner)
-
-      {:error, _reason} = error ->
-        _ = Runtime.suspend(runner, id)
-        error
-    end
-  end
-
-  defp committed_status(jido, ref, config, runner) do
-    id = Ref.execution_id(ref)
-
-    with :ok <- Runtime.suspend(runner, id),
-         {:ok, workflow} when not is_nil(workflow) <- Runtime.workflow(jido, id, config) do
-      {:ok, Status.new(ref, workflow)}
-    else
-      {:ok, nil} -> {:error, :not_found}
-      error -> error
-    end
+  defp read_checkpoint(jido, ref) do
+    with :ok <- validate_ref_instance(jido, ref),
+         {:ok, config} <- persistence(jido),
+         {:ok, _execution} <- load_execution(config, ref),
+         do: ContinuationStore.read_workflow(config, Ref.execution_id(ref))
   end
 
   defp save_execution(jido, %Execution{ref: ref} = execution),
@@ -234,12 +172,10 @@ defmodule Jido.Durable do
 
   defp compare_execution(_stored, _requested), do: {:error, :execution_input_changed}
 
-  defp load_execution(jido, %Ref{} = ref, config) do
+  defp load_execution(config, %Ref{} = ref) do
     id = Ref.execution_id(ref)
 
-    with :ok <- Runtime.register(jido, id, config),
-         {:ok, %Execution{} = execution} <-
-           ContinuationStore.load_fact(id, @metadata_fact, jido),
+    with {:ok, %Execution{} = execution} <- ContinuationStore.read_fact(config, id, @metadata_fact),
          true <- execution.ref == ref,
          :ok <- Execution.validate(execution) do
       {:ok, execution}
@@ -321,7 +257,7 @@ defmodule Jido.Durable do
           unsupported: Keyword.keys(opts) -- allowed
         })
 
-      not valid_timeout?(Keyword.get(opts, :operation_timeout, :infinity)) ->
+      not Operation.valid_timeout?(Keyword.get(opts, :operation_timeout, :infinity)) ->
         invalid("durable operation_timeout is invalid", %{timeout: opts[:operation_timeout]})
 
       not valid_now?(Keyword.get(opts, :now, 0)) ->
@@ -332,11 +268,7 @@ defmodule Jido.Durable do
     end
   end
 
-  defp valid_timeout?(:infinity), do: true
-  defp valid_timeout?(timeout), do: is_integer(timeout) and timeout >= 0
   defp valid_now?(now), do: is_integer(now) and now >= 0
-  defp timeout_value(:infinity), do: :infinity
-  defp timeout_value(timeout), do: timeout
 
   defp now_option(opts), do: if(Keyword.has_key?(opts, :now), do: [now: opts[:now]], else: [])
 
@@ -348,6 +280,8 @@ defmodule Jido.Durable do
       {:ok, %{active_units: count}} when count > 0 -> true
       _other -> false
     end
+  catch
+    :exit, _reason -> false
   end
 
   defp invalid(message, details),

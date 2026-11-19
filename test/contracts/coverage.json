@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 96,
+      "active": 100,
       "coverage": 1.0,
-      "covered": 96
+      "covered": 100
     },
     "jido.agent_server": {
       "active": 15,
@@ -1734,6 +1734,60 @@
           "tests": [
             "test callback adapters preserve explicit errors and report invalid or raised results",
             "test runtime selection selects only a dispatch owner"
+          ]
+        }
+      }
+    },
+    "jido.durable": {
+      "active": 4,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 4,
+      "form": "light",
+      "obligations": {
+        "jido.durable.I1": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test another caller can resume after the operation owner dies",
+            "test competing start, resume, and Signal calls leave the live operation alone"
+          ]
+        },
+        "jido.durable.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test an expired operation starts no work",
+            "test progress uses one deadline and timeout stops work before another caller resumes",
+            "test timeout does not leave progress messages in a live caller's mailbox"
+          ]
+        },
+        "jido.durable.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a checkpoint reports ready work and retains the independent timer"
+          ]
+        },
+        "jido.durable.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test reads committed batches beyond a missing count without repairing it",
+            "test status and result leave the continuation registration and stream intact",
+            "test status and result return the same missing-reference error"
           ]
         }
       }
@@ -5788,8 +5842,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 240,
+    "active": 244,
     "coverage": 1.0,
-    "covered": 240
+    "covered": 244
   }
 }
