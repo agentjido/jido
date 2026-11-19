@@ -388,6 +388,25 @@ defmodule Jido.Agent.DSLAuthoringContractTest do
     assert {:error, _} = Jido.Test.AgentServer.Registry.decode_json("{}", %{})
   end
 
+  @tag obligation: ["jido.agent.I3", "jido.agent.I20", "jido.agent.I22"]
+  test "Map and Codec authoring reject an invalid explicit Signal source" do
+    assert {:ok, %{signal_source: nil}} = Agent.define(%{name: "no_source"})
+
+    for source <- ["/contract", "urn:jido:contract"] do
+      assert {:ok, %{signal_source: ^source}} = Agent.define(%{name: "source", signal_source: source})
+      assert {:ok, %{source: ^source}} = Leaf.work_signal(%{}, source: source)
+    end
+
+    assert {:error, %Jido.Error.ValidationError{path: [:signal_source]}} =
+             Agent.define(%{name: "bad_source", signal_source: "not a URI"})
+
+    registry = Jido.Test.AgentServer.Registry.for(Leaf.definition())
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(Leaf.definition(), registry)
+    invalid = put_in(document, ["definition", "signal_source"], "not a URI")
+    assert {:error, [issue]} = Jido.Test.AgentServer.Registry.decode(invalid, registry)
+    assert issue.path == ["definition", "signal_source"]
+  end
+
   @tag obligation: "jido.agent.I21"
   test "Signal helpers preserve input and give tuple and raising forms" do
     assert {:ok, first} = Leaf.work_signal(%{})
@@ -495,6 +514,18 @@ defmodule Jido.Agent.DSLAuthoringContractTest do
           restore: 2
         ] do
       refute function_exported?(Agent, name, arity)
+    end
+  end
+
+  @tag obligation: "jido.agent.I32"
+  test "generated commands share the public result type" do
+    assert {:ok, specs} = Code.Typespec.fetch_specs(Jido.Test.Agent.AuthoringDocsAgent)
+    specs = Map.new(specs)
+
+    for arity <- [2, 3] do
+      assert [
+               {:type, _, :fun, [_, {:remote_type, _, [{:atom, _, Agent}, {:atom, _, :command_result}, []]}]}
+             ] = specs[{:cmd, arity}]
     end
   end
 

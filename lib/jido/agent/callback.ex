@@ -5,11 +5,19 @@ defmodule Jido.Agent.Callback do
 
   @doc false
   def invoke(module, callback, args) do
-    apply(module, callback, args)
+    case capture(module, callback, args) do
+      {:ok, result} -> result
+      {:error, kind, reason} -> failed(module, callback, kind, reason)
+    end
+  end
+
+  @doc false
+  def capture(module, callback, args) do
+    {:ok, apply(module, callback, args)}
   rescue
-    error -> failed(module, callback, :error, error)
+    error -> {:error, :error, error}
   catch
-    kind, reason -> failed(module, callback, kind, reason)
+    kind, reason -> {:error, kind, reason}
   end
 
   defp failed(module, callback, kind, reason) do

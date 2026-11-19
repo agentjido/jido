@@ -2594,7 +2594,7 @@ defmodule Jido.AgentServer.Worker do
         runner = data.runner
         id = data.active.turn_id
         exec_opts = data.exec_opts
-        operation(:start, data, fn -> start_worker(runner, id, owner, prepared, exec_opts) end)
+        operation(:start, data, fn -> start_worker(runner, id, owner, prepared, exec_opts, kind) end)
     end
   end
 
@@ -3025,10 +3025,10 @@ defmodule Jido.AgentServer.Worker do
     end)
   end
 
-  defp start_worker(runner, id, owner, prepared, exec_opts) do
+  defp start_worker(runner, id, owner, prepared, exec_opts, kind) do
     instruction = prepared.instruction
 
-    with {:ok, input} <- execution_input(instruction),
+    with {:ok, input} <- execution_input(instruction, kind),
          {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}, []),
          :ok <- Jido.Exec.Node.Wait.validate_host(workflow),
          {:ok, worker} <-
@@ -3044,12 +3044,13 @@ defmodule Jido.AgentServer.Worker do
     end
   end
 
-  defp execution_input(%Jido.Instruction{kind: :flow} = instruction) do
+  defp execution_input(%Jido.Instruction{kind: :flow} = instruction, kind) do
+    # The Flow input node also validates. Give a Handoff the original bound value at both checks.
     with {:ok, params} <-
            Jido.Exec.Validation.input(instruction.target, instruction.params, %{
              phase: :flow_input
            }),
-         do: {:ok, params}
+         do: {:ok, if(kind == :restore_handoff, do: instruction.params, else: params)}
   end
 
   defp execution_order(runnable) do
