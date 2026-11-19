@@ -214,7 +214,32 @@ defmodule Jido.Persistence.Inspector do
     if Keyword.get(opts, :inspection_mode) == :export and
          Keyword.get(opts, :include_state, false),
        do: value,
-       else: redact(value)
+       else: project_default(value)
+  end
+
+  defp project_default(%{fmt: 3, kind: :active} = record) do
+    record
+    |> Map.update!(:checkpoint, &project_checkpoint/1)
+    |> project_field(:server_turn, &project_turn/1)
+    |> project_field(:topology_handoffs, fn _handoffs -> @redacted end)
+  end
+
+  defp project_default(value), do: redact(value)
+
+  defp project_checkpoint(%{format: 1, state_format: mode, agent: %Jido.Agent{}})
+       when mode in [:default, :custom],
+       do: %{format: 1, state_format: mode, agent: %{state: @redacted}}
+
+  defp project_checkpoint(_checkpoint), do: @redacted
+
+  defp project_turn(nil), do: nil
+  defp project_turn(turn), do: Map.take(turn, [:id, :status, :expires_at, :completed_at])
+
+  defp project_field(record, key, project) do
+    case Map.fetch(record, key) do
+      {:ok, value} -> Map.put(record, key, project.(value))
+      :error -> record
+    end
   end
 
   defp shape(%{__struct__: module} = struct) do

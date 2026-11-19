@@ -2,7 +2,7 @@ defmodule Jido.Persistence.TokenTest do
   use Covenant.Case, component: "jido.persistence", async: true
 
   alias Jido.Persistence
-  alias Jido.Persistence.Record
+  alias Jido.Persistence.{Record, Store}
   alias Jido.Test.AgentServer.Fixtures.CounterAgent
 
   defmodule TokenAdapter do
@@ -82,8 +82,9 @@ defmodule Jido.Persistence.TokenTest do
     namespace = "token-test"
     opts = [namespace: namespace]
     agent = c.agent
+    key = agent_key(c.agent, namespace)
     assert :ok = Persistence.save_agent(c.store, c.agent, opts)
-    assert_receive {:cas, key, :not_found}
+    assert_receive {:cas, ^key, :not_found}
 
     assert {:ok, bytes, first_token} = get(c.store, key)
     assert {:ok, ^agent} = Persistence.load_agent(c.store, CounterAgent, c.agent.id, opts)
@@ -107,8 +108,10 @@ defmodule Jido.Persistence.TokenTest do
 
   @tag obligation: "jido.persistence.I14"
   test "a changed token rejects the old candidate even when bytes match", c do
-    assert :ok = Persistence.save_agent(c.store, c.agent, namespace: "persistence-test")
-    assert_receive {:cas, key, :not_found}
+    namespace = "persistence-test"
+    key = agent_key(c.agent, namespace)
+    assert :ok = Persistence.save_agent(c.store, c.agent, namespace: namespace)
+    assert_receive {:cas, ^key, :not_found}
     assert {:ok, bytes, first_token} = get(c.store, key)
 
     {adapter, options} = c.store
@@ -122,6 +125,22 @@ defmodule Jido.Persistence.TokenTest do
     assert {:ok, ^bytes, new_token} = get(c.store, key)
     assert new_token != first_token
     refute_received {:cas, ^key, {:token, ^new_token}}
+  end
+
+  @tag obligation: ["jido.persistence.I13", "jido.persistence.I14"]
+  test "Address deletion uses the opaque condition from the Agent read", c do
+    address = Jido.Agent.Address.new!(namespace: "address-delete", id: c.agent.id)
+    key = Persistence.agent_key(address)
+    assert :ok = Persistence.save_agent(c.store, c.agent, namespace: address.namespace)
+    assert_receive {:cas, ^key, :not_found}
+    assert {:ok, _bytes, {:token, token}} = Store.read(c.store, key)
+    assert :ok = Persistence.delete_agent_address(c.store, address)
+    assert_receive {:cas, ^key, {:token, ^token}}
+  end
+
+  defp agent_key(agent, namespace) do
+    Jido.Agent.Address.new!(namespace: namespace, id: agent.id)
+    |> Persistence.agent_key()
   end
 
   @tag obligation: ["jido.persistence.I3", "jido.persistence.I12"]
@@ -156,7 +175,8 @@ defmodule Jido.Persistence.TokenTest do
   @tag obligation: "jido.persistence.I14"
   test "a token stays out of restore output and semantic telemetry", c do
     assert :ok = Persistence.save_agent(c.store, c.agent, namespace: "persistence-test")
-    assert_receive {:cas, key, :not_found}
+    key = agent_key(c.agent, "persistence-test")
+    assert_receive {:cas, ^key, :not_found}
     assert {:ok, _bytes, token} = get(c.store, key)
 
     handler = {:token_telemetry, make_ref()}

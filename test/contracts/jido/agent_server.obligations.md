@@ -379,7 +379,7 @@ authoring surface.
 ### jido.agent_server.I101 — Uncertain write reconciliation
 
 - **scope:** durable Agent writes and Instance reconciliation
-- **must:** Stop admission after an indeterminate durable write. Reconcile storage before the Address accepts more work. Continue from the confirmed stored revision.
+- **must:** Stop admission after an indeterminate durable write. A direct cancellation returns `{:error, :reconciliation_required}` and keeps the faulted worker available for inspection. Reconcile storage before the Address accepts more work. Continue from the confirmed stored revision.
 - **why:** The runtime must not guess whether an uncertain durable write committed.
 - **kind:** ordering
 - **status:** active
@@ -414,4 +414,20 @@ authoring surface.
 - **must:** Accept a caller-supplied nonempty turn identifier so product data can name a Turn before submission. Retain one process-neutral terminal result when an asynchronous submission requests a result handoff. Store the exact turn identifier, status, reply or safe error, revisions, and completion time with the Agent record. Reject a later Turn until exact acknowledgement clears that result. Preserve the result across passivation and Instance restart. Keep older records without a retained result valid.
 - **why:** A product server must recover a committed result after its caller or runtime process stops.
 - **kind:** persisted-format
+- **status:** active
+
+### jido.agent_server.I106 — Stop one settled activation
+
+- **scope:** `Jido.AgentServer.stop/3` and `Jido.AgentServer.resume/2`
+- **must:** Resolve the target activation once. Close admission while accepted work and its effects settle. Reject queued requests. Keep admission closed through the final snapshot and worker exit. Confirm that the activation root has exited before returning success.
+- **why:** A successful stop must report the final revision of the activation it stopped.
+- **kind:** ordering
+- **status:** active
+
+### jido.agent_server.I107 — Reply gate cleanup
+
+- **scope:** `Jido.AgentServer.call/3`, `submit/3`, `await/2`, `abandon/1`, and `quiesce/2`
+- **must:** Release reply gates after quiesce rejects queued requests and after the caller ends reply tracking on transport failure. Preserve owner-only collection. A wait timeout permits another await, and abandonment does not cancel accepted work.
+- **why:** A rejected or undelivered request must release its reply process while the caller stays alive.
+- **kind:** functional
 - **status:** active

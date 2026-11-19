@@ -167,6 +167,22 @@ defmodule Jido.AI.Agent.Plugin do
     with :ok <- Jido.AI.Toolset.validate(tools), do: {:ok, %{tools: tools, defaults: defaults}}
   end
 
+  @impl true
+  def prepare_route_input(
+        %{path: @request_type, as: :request, handler: %{kind: :flow, target: flow}} = route,
+        request,
+        params,
+        options
+      ) do
+    if Keyword.get(options, :reasoning) == flow do
+      {:ok, Jido.AI.RequestPolicy.prepare(flow, params, route.defaults, request)}
+    else
+      {:ok, params}
+    end
+  end
+
+  def prepare_route_input(_route, _request, params, _options), do: {:ok, params}
+
   @doc false
   @spec prepared_tools(map()) :: [module()]
   def prepared_tools(context) when is_map(context) do

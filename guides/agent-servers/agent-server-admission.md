@@ -72,10 +72,7 @@ Each `call`, `submit`, and `cast` becomes one Turn request. The server checks it
 7. Otherwise the request waits in the queue.
 
 Queued requests run in arrival order. The server checks a queued request again
-each time it changes phase, including when the running Turn ends. Definition
-upgrade is an administrative exception: `Jido.AgentServer.upgrade/3` requires
-an idle activation and returns `{:error, :agent_busy}` instead of entering the
-queue.
+each time the worker changes phase, including when the running Turn ends.
 
 ## Bound the queue
 
@@ -88,7 +85,7 @@ queue.
 {open, action} = open_turn.(small_dock)
 queued = Jido.AgentServer.submit(small_dock, ship.("queued"))
 
-%{postponed: 1, limit: 1} = Jido.AgentServer.status(small_dock).admission
+%Jido.AgentServer.Status{queue_depth: 1} = Jido.AgentServer.status(small_dock)
 
 {:error, {:overloaded, %{limit: 1, postponed: 1}}} =
   Jido.AgentServer.call(small_dock, ship.("excess"))
@@ -100,11 +97,12 @@ queued = Jido.AgentServer.submit(small_dock, ship.("queued"))
 :ok = Jido.AgentServer.cast(small_dock, ship.("dropped"))
 send(action, :finish)
 
-{:ok, _agent, []} = Jido.AgentServer.await(open)
-{:ok, %{state: %{shipped: ["open", "queued"]}}, []} = Jido.AgentServer.await(queued)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.await(open)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.await(queued)
+%{shipped: ["open", "queued"]} = Jido.AgentServer.snapshot(small_dock).agent.state
 ```
 
-This limit counts queued Turn requests. It does not bound the process mailbox. Read `admission.message_queue_len` from `Jido.AgentServer.status/2` to watch that.
+The limit and `queue_depth` count requests that the worker has postponed.
 
 ## Set an admission deadline
 
@@ -127,7 +125,7 @@ Process.sleep(100)
 nil = Task.yield(waiting, 0)
 
 send(action, :finish)
-{:ok, _agent, []} = Jido.AgentServer.await(open)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.await(open)
 {:error, :admission_timeout} = Task.await(waiting)
 ```
 
@@ -137,11 +135,12 @@ A finite admission deadline needs a caller on the server's node, because it uses
 
 ## Reject reentrant calls
 
-An Action or effect in a Turn cannot wait on its own server, because the server would wait on the Action. The call returns `{:error, :reentrant_turn}` right away. The same applies to tasks that the Action starts, and to the control functions such as `Jido.AgentServer.cancel/2`.
+An Action or effect in a Turn cannot wait on its own server, because the server would wait on the Action. The call returns `{:error, :reentrant_turn}` right away. The same applies to tasks that the Action starts, and to the control functions such as `Jido.AgentServer.cancel_turn/3`.
 
 ```elixir
 reenter = AdmissionGuide.Dock.reenter_signal!(%{})
-{:ok, _agent, []} = Jido.AgentServer.call(dock, reenter, context: %{server: dock, notify: self()})
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+  Jido.AgentServer.call(dock, reenter, context: %{server: dock, notify: self()})
 
 receive do
   {:inner_result, {:error, :reentrant_turn}} -> :rejected
@@ -161,12 +160,11 @@ These settings cover different waits. Stopping a wait does not always stop the w
 | `:admission_timeout` (per request) | 5,000 ms | The wait before a Turn starts. | `{:error, :admission_timeout}`. No work starts. |
 | `:timeout` or the `call/3` timeout (per request) | 5,000 ms | The caller's wait. | The caller exits. The Turn continues. |
 | `Jido.AgentServer.await/2` timeout (per request) | 5,000 ms | One wait for a submitted Turn. | `{:error, :timeout}`. Call `await/2` again. |
-| `:turn_timeout` | 60,000 ms | The Turn from start to commit. | The Turn stops with `{:error, :turn_timeout}` and no commit. |
+| `:turn_timeout` | 60,000 ms | The Turn from start to commit. | The accepted Turn returns a `TurnResult` with status `:timed_out`. |
 | `:timeout` in `:exec_opts` | `:infinity` | Execution of each step in the Turn. | The Turn fails with a `Jido.Error.TimeoutError` and no commit. |
-| `:persistence_timeout` | 5,000 ms | A durable save in a Turn. | The outcome is uncertain, and the activation stops. |
+| `:persistence_timeout` | 5,000 ms | A durable save in a Turn. | An indeterminate write closes admission until reconciliation. |
 | `:commit_timeout` | 5,000 ms | Plugin `after_commit/3` callbacks in one Turn. | The effects are recorded as timed out. The commit stands. |
 | `:directive_timeout` | 5,000 ms | The Directive batch of one Turn. | The effects are recorded as timed out. The commit stands. |
-| `:error_policy_timeout` | 5,000 ms | One error policy run. | The activation stops with `{:shutdown, :error_policy_timeout}`. |
 | `:readiness_timeout` | 5,000 ms | Plugin startup and composition changes. | The activation stops. |
 
 `:turn_timeout` accepts any non-negative integer in milliseconds or `:infinity`. The clock stops at commit, so slow effects do not cause a Turn timeout.
@@ -175,7 +173,7 @@ These settings cover different waits. Stopping a wait does not always stop the w
 {:ok, strict_dock} =
   Jido.start_agent(AdmissionGuide.Jido, AdmissionGuide.Dock, id: "strict", turn_timeout: 30)
 
-{:error, :turn_timeout} =
+{:ok, %Jido.AgentServer.TurnResult{status: :timed_out}} =
   Jido.AgentServer.call(strict_dock, ship.("slow"), context: %{notify: self()})
 
 %{status: :timed_out, committed?: false} = Jido.AgentServer.status(strict_dock).last_outcome
@@ -199,7 +197,8 @@ Set the options on one Agent when you start it, or on an instance for all its Ag
 {:ok, custom_dock} =
   Jido.start_agent(AdmissionGuide.Tenant, AdmissionGuide.Dock, id: "b", max_postponed_signals: 5)
 
-{Jido.AgentServer.status(default_dock).admission.limit, Jido.AgentServer.status(custom_dock).admission.limit}
+%Jido.AgentServer.Status{admission: :open} = Jido.AgentServer.status(default_dock)
+%Jido.AgentServer.Status{admission: :open} = Jido.AgentServer.status(custom_dock)
 ```
 
 `:turn_timeout` has one more source. When neither the start options nor the instance set it, Jido reads application config. This config accepts no other key.

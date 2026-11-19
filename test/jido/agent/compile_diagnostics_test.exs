@@ -36,6 +36,78 @@ defmodule Jido.Agent.CompileDiagnosticsTest do
 
   defp suffix, do: System.unique_integer([:positive])
 
+  test "an invalid Signal source reports its field at compile time", %{tmp_dir: tmp_dir} do
+    module = "Jido.Test.InvalidSignalSource#{suffix()}"
+
+    {file, result} =
+      compile_failure(tmp_dir, """
+      defmodule #{module} do
+        use Jido.Agent, name: "bad_signal_source"
+
+        routes do
+          signal_source "not a URI"
+        end
+      end
+      """)
+
+    {^file, line, message} = diagnostic(result)
+    assert is_integer(line) and line > 0
+    assert message =~ "signal_source"
+    assert message =~ "URI-reference"
+  end
+
+  test "DSL diagnostics include the provider and cause of a failed authoring callback", %{tmp_dir: tmp_dir} do
+    for {name, body, callback, reason} <- [
+          {"BadId", ~s|use Jido.Plugin, id: raise("ID failed")|, ":id", "ID failed"},
+          {"BadLower", ~s|use Jido.Plugin, id: "bad-lower"\ndef lower(_, _), do: throw(:bad_data)|, ":lower",
+           ":bad_data"},
+          {"BadVerify", ~s|use Jido.Plugin, id: "bad-verify"\ndef verify(_, _), do: raise("verification failed")|,
+           ":verify", "verification failed"},
+          {"InvalidVerify", ~s|use Jido.Plugin, id: "invalid-verify"\ndef verify(_, _), do: :unexpected|, ":verify",
+           ":unexpected"}
+        ] do
+      id = suffix()
+      plugin = "Jido.Test.#{name}#{id}"
+
+      {file, result} =
+        compile_failure(tmp_dir, """
+        defmodule #{plugin} do
+          #{body}
+        end
+
+        defmodule Jido.Test.FaultyAuthoring#{id} do
+          use Jido.Agent, name: "faulty_authoring", plugins: [#{plugin}]
+        end
+        """)
+
+      {^file, line, message} = diagnostic(result)
+      assert is_integer(line) and line > 0
+      assert message =~ plugin
+      assert message =~ reason
+      assert message =~ callback
+    end
+  end
+
+  defp diagnostic({:returned, {:error, [diagnostic], _info}}) do
+    line =
+      case diagnostic.position do
+        {line, _column} when line > 0 -> line
+        line when is_integer(line) and line > 0 -> line
+        _ -> diagnostic_source_line(diagnostic)
+      end
+
+    {diagnostic.file, line, diagnostic.message}
+  end
+
+  defp diagnostic({%CompileError{} = error, _stack}),
+    do: {error.file, error.line, Exception.message(error)}
+
+  defp diagnostic_source_line(diagnostic) do
+    path = Regex.escape(Path.relative_to_cwd(diagnostic.file))
+    [line] = Regex.run(~r/#{path}:(\d+)/, diagnostic.message, capture: :all_but_first)
+    String.to_integer(line)
+  end
+
   test "a module that lists itself reports recursive_membership with a location", %{tmp_dir: tmp_dir} do
     module = "Jido.Test.SelfMember#{suffix()}"
 

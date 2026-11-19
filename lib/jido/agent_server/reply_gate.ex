@@ -47,7 +47,6 @@ defmodule Jido.AgentServer.ReplyGate do
       owner_monitor: owner_monitor,
       server_monitor: server_monitor,
       open?: false,
-      abandoned?: false,
       done?: false,
       signals: []
     })
@@ -55,9 +54,6 @@ defmodule Jido.AgentServer.ReplyGate do
 
   defp loop(state) do
     receive do
-      {:deliver, _signal} when state.abandoned? ->
-        loop(state)
-
       {:deliver, signal} when state.open? ->
         send(state.owner, signal)
         loop(state)
@@ -76,11 +72,7 @@ defmodule Jido.AgentServer.ReplyGate do
       {:abandon, caller, ref} ->
         send(caller, {ref, :ok})
 
-        if state.done?,
-          do: :ok,
-          else: loop(%{state | abandoned?: true, signals: []})
-
-      :done when state.open? or state.abandoned? or state.signals == [] ->
+      :done when state.open? or state.signals == [] ->
         :ok
 
       :done ->
@@ -90,7 +82,7 @@ defmodule Jido.AgentServer.ReplyGate do
         :ok
 
       {:DOWN, ref, :process, _pid, _reason} when ref == state.server_monitor ->
-        if state.abandoned? or state.signals == [],
+        if state.signals == [],
           do: :ok,
           else: loop(%{state | done?: true})
     end

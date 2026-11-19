@@ -98,6 +98,8 @@ If the Agent does not set a field, a request can set it to any value that the sc
 
 Unknown top-level fields are errors. The other reasoning Flows share `input`, `instructions`, `model`, `options`, `prompt_cache`, `context`, and the time, token, and cost limits. [Reasoning Strategies](reasoning-strategies.md) lists what differs.
 
+Use atom keys for `options` in Elixir. JSON requests can use known ReqLLM option names, such as `"temperature"`. Jido rejects unknown string keys and duplicate spellings of the same option. Set tools with the Agent Toolset and `tool_policy`.
+
 `tool_policy` holds `visible`, `hidden`, and `review` lists of tool names, plus `requirement` and `reason`. `requirement` is one of `:optional` (the default), `:required`, or `:disabled`.
 
 ## ReAct limits

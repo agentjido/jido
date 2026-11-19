@@ -8,9 +8,11 @@ defmodule Jido.AI.Usage do
     :cache_read_tokens,
     :cache_write_tokens,
     :reasoning_tokens,
+    :tool_use_input_tokens,
     :compute_units,
     :input_cost,
     :output_cost,
+    :reasoning_cost,
     :total_cost
   ]
 

@@ -51,7 +51,12 @@ defmodule Jido.Persistence.Store do
   @doc "Physically deletes one value for explicit maintenance."
   @callback delete(key(), options()) :: :ok | {:error, term()}
 
-  @doc "Lists one page of key/value pairs for inspection and export."
+  @doc """
+  Lists one prefix-bounded page of binary key/value pairs for inspection and export.
+
+  Return at most the requested number of pairs. Return nil at the end.
+  A nonterminal cursor must differ from the cursor in the request.
+  """
   @callback scan(binary(), cursor(), pos_integer(), options()) ::
               {:ok, [{key(), value()}], cursor()} | {:error, term()}
 
@@ -92,7 +97,7 @@ defmodule Jido.Persistence.Store do
     with true <- Keyword.keyword?(opts),
          :ok <- validate_condition(expected) do
       observe(:compare_and_swap, adapter, fn ->
-        safe_compare_and_swap(adapter, key, expected, value, opts)
+        safe_write(:compare_and_swap, fn -> adapter.compare_and_swap(key, expected, value, opts) end)
       end)
     else
       false -> {:error, {:rejected, {:invalid_store_input, :options}}}
@@ -112,7 +117,7 @@ defmodule Jido.Persistence.Store do
         {:error, {:invalid_persistence_config, :options}}
 
       true ->
-        observe(:delete, adapter, fn -> safe_delete(adapter, key, opts) end)
+        observe(:delete, adapter, fn -> safe_write(:delete, fn -> adapter.delete(key, opts) end) end)
     end
   end
 
@@ -132,7 +137,10 @@ defmodule Jido.Persistence.Store do
         limit = Keyword.get(opts, :limit, 100)
 
         observe(:scan, adapter, fn ->
-          protect(:scan, fn -> adapter.scan(prefix, cursor, limit, adapter_opts) end)
+          protect(:scan, fn ->
+            adapter.scan(prefix, cursor, limit, adapter_opts)
+            |> validate_scan_page(prefix, cursor, limit)
+          end)
         end)
       else
         {:error, :scan_not_supported}
@@ -144,6 +152,22 @@ defmodule Jido.Persistence.Store do
   end
 
   def scan(_config, _prefix, _opts), do: {:error, {:invalid_store_input, :scan}}
+
+  defp validate_scan_page({:ok, entries, next_cursor} = page, prefix, cursor, limit)
+       when is_list(entries) and (is_nil(next_cursor) or (is_binary(next_cursor) and next_cursor != cursor)) do
+    if not List.improper?(entries) and length(entries) <= limit and
+         Enum.all?(entries, &scan_entry?(&1, prefix)),
+       do: page,
+       else: invalid_adapter_result(:scan, :invalid_page)
+  end
+
+  defp validate_scan_page({:error, _reason} = error, _prefix, _cursor, _limit), do: error
+  defp validate_scan_page(_reply, _prefix, _cursor, _limit), do: invalid_adapter_result(:scan, :invalid_page)
+
+  defp scan_entry?({key, value}, prefix) when is_binary(key) and is_binary(value),
+    do: String.starts_with?(key, prefix)
+
+  defp scan_entry?(_entry, _prefix), do: false
 
   @doc false
   def protect(operation, fun) do
@@ -226,10 +250,10 @@ defmodule Jido.Persistence.Store do
     end
   end
 
-  defp safe_compare_and_swap(adapter, key, expected, value, opts) do
+  defp safe_write(operation, write) do
     result =
       try do
-        adapter.compare_and_swap(key, expected, value, opts)
+        write.()
       rescue
         error -> {:callback_fault, :error, error}
       catch
@@ -256,47 +280,10 @@ defmodule Jido.Persistence.Store do
         {:error, {:indeterminate, reason}}
 
       {:callback_fault, kind, reason} ->
-        {:error, {:indeterminate, persistence_failure_value(:compare_and_swap, kind, reason)}}
+        {:error, {:indeterminate, persistence_failure_value(operation, kind, reason)}}
 
       invalid ->
-        {:error, {:indeterminate, invalid_adapter_result_value(:compare_and_swap, invalid)}}
-    end
-  end
-
-  defp safe_delete(adapter, key, opts) do
-    result =
-      try do
-        adapter.delete(key, opts)
-      rescue
-        error -> {:callback_fault, :error, error}
-      catch
-        kind, reason -> {:callback_fault, kind, reason}
-      end
-
-    case result do
-      :ok ->
-        :ok
-
-      {:error, :conflict} = error ->
-        error
-
-      {:error, {:rejected, _reason}} = error ->
-        error
-
-      {:error, :indeterminate} = error ->
-        error
-
-      {:error, {:indeterminate, _reason}} = error ->
-        error
-
-      {:error, reason} ->
-        {:error, {:indeterminate, reason}}
-
-      {:callback_fault, kind, reason} ->
-        {:error, {:indeterminate, persistence_failure_value(:delete, kind, reason)}}
-
-      invalid ->
-        {:error, {:indeterminate, invalid_adapter_result_value(:delete, invalid)}}
+        {:error, {:indeterminate, invalid_adapter_result_value(operation, invalid)}}
     end
   end
 

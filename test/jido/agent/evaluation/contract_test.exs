@@ -32,6 +32,22 @@ defmodule Jido.Agent.EvaluationContractTest do
     end
   end
 
+  defmodule PrepareFirst do
+    use Jido.Plugin
+
+    @impl true
+    def prepare_route_input(%{path: "test.run"}, %{amount: 2}, %{amount: 2}, _opts),
+      do: {:ok, %{amount: 3}}
+  end
+
+  defmodule PrepareLast do
+    use Jido.Plugin
+
+    @impl true
+    def prepare_route_input(%{path: "test.run"}, %{amount: 2}, %{amount: 3}, _opts),
+      do: {:ok, %{amount: 4}}
+  end
+
   defp route(path, target, opts \\ []),
     do:
       Map.merge(
@@ -128,6 +144,23 @@ defmodule Jido.Agent.EvaluationContractTest do
     end
 
     refute_received {:executed, _, _}
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I2", "jido.agent_evaluation.I6"]
+  test "route input callbacks receive the original request and run in Plugin order" do
+    source =
+      F.instance(
+        routes: [route("test.run", F.Add, defaults: %{amount: 1})],
+        plugins: Enum.map([PrepareFirst, PrepareLast], &F.contribution/1)
+      )
+
+    signal = F.signal(%{amount: 2})
+
+    assert {:ok, %Runner.Prepared{source_signal: ^signal, instruction: %{params: %{amount: 4}}}} =
+             Runner.prepare(source, signal, [])
+
+    assert {:ok, candidate, []} = Agent.cmd(source, signal)
+    assert candidate.state.count == source.state.count + 4
   end
 
   @tag obligation: "jido.agent_evaluation.I3"
@@ -437,6 +470,37 @@ defmodule Jido.Agent.EvaluationContractTest do
 
     assert {:handoff, ^source, %Jido.Instruction{target: HandoffTarget, kind: :action, params: %{count: 5}}, []} =
              Agent.cmd(source, F.signal(%{count: 4}))
+  end
+
+  @tag obligation: "jido.agent_evaluation.I9"
+  test "generated commands return success, errors, and the Handoff" do
+    module = Module.concat(__MODULE__, GeneratedCommand)
+
+    {:module, ^module, _beam, _} =
+      Module.create(
+        module,
+        quote do
+          use Jido.Agent, name: "generated_command_contract"
+
+          routes do
+            route "test.run", unquote(HandoffFlow) do
+              state(:unchanged)
+            end
+
+            route "test.ok", unquote(F.Return) do
+              state(:unchanged)
+            end
+          end
+        end,
+        Macro.Env.location(__ENV__)
+      )
+
+    assert {:ok, source} = module.instantiate(id: "typed-command")
+    assert {:ok, ^source, []} = module.cmd(source, F.signal(%{}, "test.ok"))
+    assert {:error, _} = module.cmd(source, F.signal(%{}, "test.missing"))
+
+    assert {:handoff, ^source, %Jido.Instruction{target: HandoffTarget, params: %{count: 5}}, []} =
+             module.cmd(source, F.signal(%{count: 4}), [])
   end
 
   @tag obligation: "jido.agent_evaluation.I10"

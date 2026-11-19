@@ -330,7 +330,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
       case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
         1 ->
           tool_calls = [ReqLLM.ToolCall.new("add-round", "add", ~s({"left":2,"right":3}))]
-          {:ok, tool_response(model, context, tool_calls, "round-one", usage(10, 2, 3, 0))}
+          usage = Map.merge(usage(10, 2, 3, 0), %{tool_use_input_tokens: 2, reasoning_cost: 0.03})
+          {:ok, tool_response(model, context, tool_calls, "round-one", usage)}
 
         2 ->
           assert roles(context) == [:system, :user, :assistant, :tool]
@@ -351,7 +352,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
                    :tool
                  ]
 
-          {:ok, response(model, context, "The result is 20.", "round-final", usage(30, 4, 2, 0))}
+          usage = Map.merge(usage(30, 4, 2, 0), %{tool_use_input_tokens: 3, reasoning_cost: 0.02})
+          {:ok, response(model, context, "The result is 20.", "round-final", usage)}
       end
     end)
 
@@ -370,6 +372,15 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     assert length(result.model_attempts) == 3
     assert Enum.map(result.model_attempts, & &1.prompt_cache.read_tokens) == [3, 0, 2]
     assert Enum.all?(result.model_attempts, &(not &1.prompt_cache.requested))
+
+    assert Enum.map(result.model_attempts, & &1.outcome.usage.tool_use_input_tokens) == [2, 0, 3]
+    assert Enum.map(result.model_attempts, &Map.get(&1.outcome.usage, :reasoning_cost, 0)) == [0.03, 0, 0.02]
+    assert result.usage.tool_use_input_tokens == 5
+    assert_in_delta result.usage.reasoning_cost, 0.05, 1.0e-9
+
+    assert [outcome] = Jido.Thread.filter_by_kind(agent.state.session.thread, :ai_request_outcome)
+    assert outcome.payload["usage"]["tool_use_input_tokens"] == 5
+    assert_in_delta outcome.payload["usage"]["reasoning_cost"], 0.05, 1.0e-9
 
     messages =
       agent.state.session.thread.entries

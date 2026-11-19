@@ -219,31 +219,41 @@ defmodule Jido.Persistence.Codec.JSON do
     with {:ok, _module} <- Jido.Persistence.Codec.load_module(name), do: :ok
   end
 
-  defp preload_modules(value, depth) when is_map(value) do
-    with :ok <- collection_size(map_size(value)) do
-      value
-      |> Map.values()
-      |> Enum.reduce_while(:ok, fn item, :ok ->
-        case preload_modules(item, depth + 1) do
-          :ok -> {:cont, :ok}
-          {:error, _reason} = error -> {:halt, error}
-        end
-      end)
-    end
-  end
+  defp preload_modules(%{@tag => "tuple", "items" => items}, depth) when is_list(items),
+    do: preload_modules(items, depth)
+
+  defp preload_modules(%{@tag => "map", "entries" => entries}, depth) when is_list(entries),
+    do: preload_entries(entries, depth + 1)
+
+  defp preload_modules(%{@tag => "struct", "fields" => entries}, depth) when is_list(entries),
+    do: preload_entries(entries, depth + 1)
 
   defp preload_modules(value, depth) when is_list(value) do
-    with :ok <- collection_size(length(value)) do
-      Enum.reduce_while(value, :ok, fn item, :ok ->
-        case preload_modules(item, depth + 1) do
-          :ok -> {:cont, :ok}
-          {:error, _reason} = error -> {:halt, error}
-        end
-      end)
-    end
+    preload_each(value, &preload_modules(&1, depth + 1))
   end
 
   defp preload_modules(_value, _depth), do: :ok
+
+  defp preload_entries(entries, depth) do
+    preload_each(entries, fn
+      %{"key" => key, "value" => value} ->
+        with :ok <- preload_modules(key, depth), do: preload_modules(value, depth)
+
+      _entry ->
+        {:error, {:invalid_persistence_json, :map_entry}}
+    end)
+  end
+
+  defp preload_each(values, preload) do
+    with :ok <- collection_size(length(values)) do
+      Enum.reduce_while(values, :ok, fn item, :ok ->
+        case preload.(item) do
+          :ok -> {:cont, :ok}
+          {:error, _reason} = error -> {:halt, error}
+        end
+      end)
+    end
+  end
 
   defp map_values(values, depth, mapper) do
     Enum.reduce_while(values, {:ok, []}, fn value, {:ok, decoded} ->

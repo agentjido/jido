@@ -12,7 +12,7 @@ defmodule Jido.AI.Tools.RequestPolicyContractTest do
 
     @impl true
     def generate_text(model, context, _options) do
-      called? = Enum.any?(ReqLLM.Context.to_list(context), &(&1.role == :tool))
+      called? = context.tools == [] or Enum.any?(ReqLLM.Context.to_list(context), &(&1.role == :tool))
 
       message =
         if called? do
@@ -91,6 +91,43 @@ defmodule Jido.AI.Tools.RequestPolicyContractTest do
     end
   end
 
+  defmodule PolicyFlow do
+    alias Jido.Joi
+
+    use Jido.Flow,
+      id: "test/ai-policy-flow",
+      name: "ai_policy_flow",
+      schema:
+        Joi.object(%{
+          input: Joi.string(),
+          instructions: Joi.string(),
+          limits: Joi.map(),
+          tool_policy:
+            Joi.object(%{requirement: Joi.enum([:optional, :required, :disabled])}, unrecognized_keys: :error)
+        }),
+      output_schema: Joi.object(%{state: Joi.map(), response: Joi.map()})
+
+    flow do
+      step "reply", params <- input(), inline: [context: context] do
+        {:ok, %{state: context.agent_state, response: params}}
+      end
+
+      output result("reply")
+    end
+  end
+
+  defmodule CustomAgent do
+    use Jido.AI.Agent, name: "request_policy_custom"
+
+    ai do
+      reasoning PolicyFlow do
+        instructions "Agent instructions."
+        limits %{model_calls: 6, tool_rounds: 4}
+        tool_policy(%{requirement: :disabled})
+      end
+    end
+  end
+
   defmodule OpenAgent do
     @moduledoc false
     use Jido.AI.Agent, name: "request_policy_open"
@@ -109,7 +146,71 @@ defmodule Jido.AI.Tools.RequestPolicyContractTest do
     reply.data
   end
 
+  @tag obligation: "jido_ai.tools.I3"
+  test "the selected custom Flow receives protected input in direct and live requests" do
+    data = %{
+      input: "go",
+      instructions: "Request instructions.",
+      limits: %{model_calls: 2, tool_rounds: 8},
+      tool_policy: %{requirement: :required}
+    }
+
+    expected = %{
+      input: "go",
+      instructions: "Agent instructions.",
+      limits: %{model_calls: 2, tool_rounds: 4},
+      tool_policy: %{requirement: :disabled}
+    }
+
+    request = CustomAgent.request_signal!(data)
+
+    assert {:ok, %{params: ^expected}} = CustomAgent.preflight(data)
+
+    assert {:ok, _, [%{signal: %{data: direct}}]} =
+             CustomAgent.cmd(CustomAgent.instantiate!(id: "direct-policy"), request)
+
+    assert {:ok, %{status: :committed, reply: %{data: live}}} = live_request(request)
+    assert direct == expected
+    assert live == expected
+
+    assert {:ok, %{response: ^data}} = Jido.Exec.run(PolicyFlow, data, %{agent_state: %{}})
+  end
+
+  @tag obligation: "jido_ai.tools.I3"
+  test "Agent policy preserves validation errors on request fields" do
+    data = %{input: "go", instructions: 42, tool_policy: %{requirement: :optional}}
+
+    assert {:error, _reason} = CustomAgent.preflight(data)
+
+    assert {:error, %{details: %{phase: :flow_input}}} =
+             CustomAgent.cmd(CustomAgent.instantiate!(id: "invalid-policy"), CustomAgent.request_signal!(data))
+  end
+
+  defp live_request(request) do
+    instance = :ai_custom_request_policy_test
+    start_supervised!({Jido, name: instance, namespace: Atom.to_string(instance)})
+    {:ok, server} = Jido.start_agent(instance, CustomAgent, id: "policy")
+    :ok = Jido.AgentServer.await_ready(server)
+    Jido.AgentServer.call(server, request)
+  end
+
   describe "a request against Agent review" do
+    @tag obligation: "jido_ai.tools.I3"
+    test "can disable optional tools with inherited review" do
+      policy = %{requirement: :disabled}
+
+      assert {:ok, %{params: %{tool_policy: %{requirement: :disabled, review: []}}}} =
+               ReviewedAgent.preflight(%{input: "go", tool_policy: policy})
+
+      effective = Toolset.narrow_policy(%{review: ["add"]}, policy)
+      assert {:ok, %{tools: [], review: []}} = Toolset.select([Tools.Add], effective)
+
+      invalid = Toolset.narrow_policy(%{review: ["add"]}, %{requirement: :disabled, review: ["multiply"]})
+      assert {:error, {:review_tool_not_visible, "multiply"}} = Toolset.select([Tools.Add, Tools.Multiply], invalid)
+
+      assert %{status: :completed, tool_calls: 0} = ask(ReviewedAgent, %{input: "go", tool_policy: policy})
+    end
+
     @tag obligation: "jido_ai.tools.I3"
     test "keeps review through an empty or unrelated tool_policy" do
       assert %{status: :blocked, reason_code: :review, tool_rounds: 0} = ask(ReviewedAgent, %{input: "go"})
@@ -216,6 +317,27 @@ defmodule Jido.AI.Tools.RequestPolicyContractTest do
     test "can set them when the Agent sets none" do
       assert {:ok, %{params: %{instructions: "Request instructions."}}} =
                OpenAgent.preflight(%{input: "go", instructions: "Request instructions."})
+    end
+  end
+
+  @tag obligation: "jido_ai.tools.I3"
+  test "model option keys are checked before reasoning for generation and streaming" do
+    for stream <- [false, true] do
+      for options <- [%{"unrecognized_model_option" => true}, %{:temperature => 0.1, "temperature" => 0.2}] do
+        data = %{input: "go", options: options, stream: stream}
+        assert {:error, preflight_error} = OpenAgent.preflight(data)
+        assert Exception.message(preflight_error) =~ "options"
+
+        assert {:error, %{details: %{phase: :flow_input}} = runtime_error} =
+                 OpenAgent.cmd(OpenAgent.instantiate!(id: "options"), OpenAgent.request_signal!(data))
+
+        assert Exception.message(runtime_error) =~ "options"
+      end
+
+      data = %{input: "go", options: %{"temperature" => 0.2, "provider_options" => %{"custom" => true}}, stream: stream}
+
+      assert {:ok, %{params: %{options: %{temperature: 0.2, provider_options: %{"custom" => true}}}}} =
+               OpenAgent.preflight(data)
     end
   end
 

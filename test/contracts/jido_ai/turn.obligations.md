@@ -60,3 +60,10 @@ outcome observation. It does not own strategy-specific routing.
 - **must:** Reject a final answer longer than `limits.output_chars`, name the limit in the rejection reason, and emit `[:jido, :ai, :limit, :exceeded]` without model output.
 - **kind:** functional
 - **status:** active
+
+### jido_ai.turn.I7 — Admit Sessions before Turn creation
+
+- **scope:** `Jido.AI.Reasoning.Actions.StartRequest`
+- **must:** Require a valid open Session for either owner. Return a tagged error when a Session in the Turn cannot cross the Runic identity boundary.
+- **kind:** functional
+- **status:** active

@@ -395,7 +395,7 @@ defmodule Jido.Persistence.ContinuationStore do
 
     case Store.read(config.store, batch_key(id, next)) do
       {:ok, bytes, _chunk_condition} ->
-        with {:ok, [_ | _]} <- decode(config, bytes) do
+        with {:ok, _events} <- decode_batch(config, bytes) do
           case mode do
             :read ->
               recover_tail(config, id, next, condition, mode)
@@ -419,8 +419,17 @@ defmodule Jido.Persistence.ContinuationStore do
 
   defp read_batches(config, id, index, last, batches) do
     with {:ok, bytes, _condition} <- Store.read(config.store, batch_key(id, index)),
-         {:ok, [_ | _] = events} <- decode(config, bytes) do
+         {:ok, events} <- decode_batch(config, bytes) do
       read_batches(config, id, index + 1, last, [events | batches])
+    end
+  end
+
+  defp decode_batch(config, bytes) do
+    with {:ok, [_ | _] = events} <- decode(config, bytes),
+         false <- List.improper?(events) do
+      {:ok, events}
+    else
+      _invalid -> {:error, :invalid_execution_checkpoint}
     end
   end
 

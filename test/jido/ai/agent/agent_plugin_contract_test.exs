@@ -34,6 +34,17 @@ defmodule Jido.AI.Agent.PluginContractTest do
              Plugin.encode_authoring_data(%{data | defaults: %{mode: "safe"}}, catalog)
   end
 
+  @tag obligation: "jido_ai.agent_authoring.I4"
+  test "portable model option keys keep the same values across the Agent codec" do
+    catalog = Catalog.from_targets!(__MODULE__, :jido, %{{"contract/react", 1} => ReAct})
+    options = %{temperature: 0.2, provider_options: %{"custom" => true}}
+    data = %{reasoning: ReAct, tools: [], defaults: %{options: options}}
+
+    assert {:ok, document} = Plugin.encode_authoring_data(data, catalog)
+    assert document["config"]["options"]["temperature"] == 0.2
+    assert {:ok, ^data} = Plugin.decode_authoring_data(document, catalog)
+  end
+
   @tag obligation: ["jido_ai.agent_authoring.I1", "jido_ai.agent_authoring.I3"]
   test "the Plugin normalizes one route and rejects invalid provider data" do
     assert %Jido.Plugin.Manifest{
