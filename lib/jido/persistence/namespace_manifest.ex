@@ -15,12 +15,35 @@ defmodule Jido.Persistence.NamespaceManifest do
     do: {:error, :stable_namespace_required}
 
   def open(%Config{} = config, namespace) do
-    manifest = build(config, namespace)
+    with {:ok, status} <- check(config, namespace) do
+      confirm(config, namespace, status)
+    end
+  end
 
-    with {:ok, bytes} <- Codec.JSON.encode(manifest) do
-      case Store.read(config.store, key(namespace)) do
-        {:ok, stored, _condition} -> compare(stored, manifest)
-        {:error, :not_found} -> create(config, namespace, bytes)
+  def check(%Config{} = config, namespace) do
+    case read(config, namespace) do
+      {:ok, actual} ->
+        expected = build(config, namespace)
+
+        if actual === expected,
+          do: {:ok, :pinned},
+          else: {:error, {:persistence_namespace_mismatch, expected, actual}}
+
+      {:error, :not_found} ->
+        {:ok, :missing}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  def confirm(_config, _namespace, :pinned), do: :ok
+
+  def confirm(%Config{} = config, namespace, :missing) do
+    with {:ok, bytes} <- Codec.JSON.encode(build(config, namespace)) do
+      case Store.compare_and_swap(config.store, key(namespace), :not_found, bytes) do
+        :ok -> :ok
+        {:error, :conflict} -> confirm_after_conflict(config, namespace)
         {:error, _reason} = error -> error
       end
     end
@@ -34,19 +57,11 @@ defmodule Jido.Persistence.NamespaceManifest do
     end
   end
 
-  defp create(config, namespace, bytes) do
-    case Store.compare_and_swap(config.store, key(namespace), :not_found, bytes) do
-      :ok -> :ok
-      {:error, :conflict} -> open(config, namespace)
+  defp confirm_after_conflict(config, namespace) do
+    case check(config, namespace) do
+      {:ok, :pinned} -> :ok
+      {:ok, :missing} -> {:error, :conflict}
       {:error, _reason} = error -> error
-    end
-  end
-
-  defp compare(bytes, expected) do
-    with {:ok, actual} <- decode(bytes) do
-      if actual == expected,
-        do: :ok,
-        else: {:error, {:persistence_namespace_mismatch, expected, actual}}
     end
   end
 

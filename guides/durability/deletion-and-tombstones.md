@@ -6,7 +6,10 @@ This guide shows how to delete a durable Agent, what a tombstone blocks, and whi
 
 Removing bytes would make a deleted Agent look like one that never existed. A delayed writer holding an old revision or a later `Jido.create_agent/4` call could then create a fresh Agent with the same ID.
 
-So a normal delete replaces the active record with a compact tombstone, using compare-and-swap. The tombstone keeps the identity, the Agent module, and the last revision. It keeps no state or definition.
+Normal deletion replaces the active record with a compact tombstone. The
+tombstone keeps the identity, Agent module, and Agent revision. Its record
+revision is one more than the active record revision. The compare-and-swap
+condition comes from the read of that active record.
 
 ## Delete a stopped Agent
 
@@ -50,9 +53,13 @@ store_path =
 {:error, :deleted} = Jido.Persistence.load_agent(TombstonesGuide.Jido, Order, "order-1")
 ```
 
-The `:persistence` option selects another adapter. The Address supplies the namespace and partition.
+The Address supplies the namespace and partition. The instance supplies the
+Store and codec.
 
-Deleting again returns `:ok`. Deleting an ID that never had a record also returns `:ok` and writes a tombstone at revision zero, so you can reserve an ID against later creation.
+Deleting again returns `:ok`. Deleting by Address returns
+`{:error, :not_found}` when the ID has no record. To reserve an unused ID,
+call the module-qualified Persistence operation. It writes a tombstone at
+revision zero.
 
 ```elixir
 alias TombstonesGuide.Order
@@ -60,7 +67,8 @@ alias TombstonesGuide.Order
 :ok = Jido.delete_agent(TombstonesGuide.Jido, address)
 
 {:ok, unused} = Jido.agent_address(TombstonesGuide.Jido, "order-never-created")
-:ok = Jido.delete_agent(TombstonesGuide.Jido, unused)
+{:error, :not_found} = Jido.delete_agent(TombstonesGuide.Jido, unused)
+:ok = Jido.Persistence.delete_agent(TombstonesGuide.Jido, Order, unused.id)
 {:error, :deleted} = Jido.Persistence.load_agent(TombstonesGuide.Jido, Order, "order-never-created")
 ```
 

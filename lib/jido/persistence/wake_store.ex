@@ -178,10 +178,16 @@ defmodule Jido.Persistence.WakeStore do
   end
 
   defp read_shards(config, namespace, bucket, shards) do
-    Enum.reduce_while(Map.keys(shards), {:ok, []}, fn shard, {:ok, entries} ->
+    Enum.reduce_while(shards, {:ok, []}, fn {shard, indexed_generation}, {:ok, entries} ->
       case read_shard(config, namespace, bucket, shard) do
-        {:ok, found, _generation, _condition} -> {:cont, {:ok, found ++ entries}}
-        {:error, _reason} = error -> {:halt, error}
+        {:ok, found, generation, _condition} when generation >= indexed_generation ->
+          {:cont, {:ok, found ++ entries}}
+
+        {:ok, _found, generation, _condition} ->
+          {:halt, {:error, {:wake_shard_behind_index, bucket, shard, indexed_generation, generation}}}
+
+        {:error, _reason} = error ->
+          {:halt, error}
       end
     end)
   end
