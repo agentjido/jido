@@ -245,7 +245,7 @@ defmodule Jido.PersistenceTest do
     end
 
     @impl true
-    def get(key, opts) do
+    def get("jido:agent:v3:" <> _ = key, opts) do
       result = ETS.get(key, Keyword.delete(opts, :observer))
       send(Keyword.fetch!(opts, :observer), {:read, self(), result})
 
@@ -255,6 +255,8 @@ defmodule Jido.PersistenceTest do
         5_000 -> {:error, :barrier_timeout}
       end
     end
+
+    def get(key, opts), do: ETS.get(key, Keyword.delete(opts, :observer))
 
     @impl true
     def put(key, value, opts), do: ETS.put(key, value, Keyword.delete(opts, :observer))

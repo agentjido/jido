@@ -396,10 +396,8 @@ defmodule Jido.AgentServer.Lifecycle do
           reason: if(revision == expected_revision, do: :hibernate, else: :commit)
         ]
 
-    case Keyword.fetch(opts, :topology_handoffs) do
-      {:ok, handoffs} -> Jido.Persistence.save_agent_runtime(data.persistence, agent, persistence_opts, handoffs)
-      :error -> Jido.Persistence.save_agent(data.persistence, agent, persistence_opts)
-    end
+    handoffs = Keyword.get(opts, :topology_handoffs, :preserve)
+    Jido.Persistence.save_agent_runtime(data.persistence, agent, persistence_opts, handoffs)
   end
 
   def write_result(result, deadline) do

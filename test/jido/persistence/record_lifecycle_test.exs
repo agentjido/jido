@@ -18,7 +18,7 @@ defmodule Jido.Persistence.RecordLifecycleTest do
     end
 
     @impl true
-    def get(key, opts) do
+    def get("jido:agent:v3:" <> _ = key, opts) do
       result = ETS.get(key, Keyword.delete(opts, :observer))
       send(Keyword.fetch!(opts, :observer), {:persistence_read, self(), result})
 
@@ -28,6 +28,8 @@ defmodule Jido.Persistence.RecordLifecycleTest do
         5_000 -> {:error, {:rejected, :barrier_timeout}}
       end
     end
+
+    def get(key, opts), do: ETS.get(key, Keyword.delete(opts, :observer))
 
     @impl true
     def compare_and_swap(key, expected, value, opts),

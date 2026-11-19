@@ -391,7 +391,8 @@ defmodule Jido.Persistence.BoundaryTest do
       |> Map.merge(%{kind: :tombstone, rev: 2, agent_rev: 1})
 
     {:ok, deleted} = Jido.Persistence.Codec.Term.encode(tombstone)
-    prefix = [:validate_options]
+    manifest_key = "jido:namespace:v3:" <> Base.url_encode64(namespace, padding: false)
+    prefix = [:validate_options, {:get, manifest_key}]
 
     # Initial revision validation precedes storage access.
     assert {:error, {:invalid_initial_revision, 1}} =
@@ -400,7 +401,13 @@ defmodule Jido.Persistence.BoundaryTest do
     assert adapter_calls() == [:validate_options]
 
     assert :ok = Persistence.create_agent(store, c.agent, opts)
-    assert adapter_calls() == prefix ++ [{:cas, key, :not_found, created}]
+
+    assert [
+             :validate_options,
+             {:get, ^manifest_key},
+             {:cas, ^manifest_key, :not_found, _bytes},
+             {:cas, ^key, :not_found, ^created}
+           ] = adapter_calls()
 
     assert :ok =
              Persistence.save_agent(store, c.agent, opts ++ [revision: 1, expected_revision: 0])
@@ -411,7 +418,7 @@ defmodule Jido.Persistence.BoundaryTest do
              Persistence.load_agent_with_revision(store, Basic, c.agent.id, opts)
 
     assert restored == c.agent
-    assert adapter_calls() == prefix ++ [{:get, key}]
+    assert adapter_calls() == [:validate_options, {:get, key}]
 
     assert :ok = Persistence.delete_agent(store, Basic, c.agent.id, opts)
     assert adapter_calls() == prefix ++ [{:get, key}, {:cas, key, updated, deleted}]
