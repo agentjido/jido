@@ -17,6 +17,21 @@ defmodule Jido.Persistence.SnapshotTest do
     def run(%{snapshot: _snapshot}, %{mode: :error}), do: {:error, :upgrade_rejected}
   end
 
+  defmodule RenameRoutingAction do
+    use Jido.Action, name: "persistence_rename_routing_action"
+
+    def run(%{snapshot: snapshot}, %{legacy: legacy}) do
+      routes =
+        Enum.map(snapshot.agent.routes, fn
+          %{handler: %{target: ^legacy}} = route -> put_in(route.handler.target, F.Work)
+          route -> route
+        end)
+
+      agent = %{snapshot.agent | routes: routes, vsn: snapshot.agent.vsn + 1}
+      with {:ok, next} <- Persistence.snapshot(agent), do: {:ok, %{snapshot: next}}
+    end
+  end
+
   defmodule RuntimePlugin do
     use Jido.Plugin
 
@@ -461,6 +476,62 @@ defmodule Jido.Persistence.SnapshotTest do
 
     assert {:ok, ^upgraded, 1} =
              Persistence.load_agent_with_revision(store, agent.module, agent.id, opts)
+  end
+
+  @tag obligation: "jido.persistence.I16"
+  test "an explicit legacy module permits an offline rename without losing Session history" do
+    module = Jido.Test.AI.SimpleAgent
+    legacy = __MODULE__.RemovedRoutingAction
+    Module.create(legacy, quote(do: def(old?, do: true)), Macro.Env.location(__ENV__))
+    on_exit(fn -> :code.purge(legacy) end)
+
+    {:ok, session} =
+      Jido.AI.Thread.Projection.append(Jido.Session.new(), %{role: :user, content: "Keep this ticket history"}, %{}, 1)
+
+    agent = module.instantiate!(id: "rename-routing-action", state: %{session: session})
+    store = {Persistence.ETS, table: __MODULE__}
+    opts = [namespace: "rename-routing-action"]
+    :ok = Persistence.create_agent(store, agent, opts)
+    address = Agent.Address.new!(namespace: opts[:namespace], id: agent.id)
+    key = Persistence.agent_key(address)
+    {:ok, bytes, condition} = Store.read(store, key)
+    {:ok, record} = Record.decode(bytes)
+    snapshot = record.checkpoint
+    {:ok, canonical} = Jido.Agent.Route.normalize(route("ticket.legacy", :action, F.Work))
+    routes = [put_in(canonical.handler.target, legacy) | snapshot.agent.routes]
+
+    snapshot = %{
+      snapshot
+      | agent: %{snapshot.agent | routes: routes},
+        references: Map.put(snapshot.references, legacy, <<0::128>>)
+    }
+
+    {:ok, old_bytes} = Record.encode(%{record | checkpoint: snapshot})
+    :ok = Store.compare_and_swap(store, key, condition, old_bytes)
+    assert :code.delete(legacy)
+    :code.purge(legacy)
+
+    name = Atom.to_string(legacy)
+
+    assert {:error, {:unavailable_persistence_module, ^name}} =
+             Persistence.load_agent(store, module, agent.id, opts)
+
+    assert {:error, {:unavailable_persistence_module, ^name}} =
+             Persistence.upgrade_agent(store, module, agent.id, RenameRoutingAction, opts)
+
+    assert {:ok, upgraded, 1} =
+             Persistence.upgrade_agent(
+               store,
+               module,
+               agent.id,
+               RenameRoutingAction,
+               opts ++ [legacy_modules: [legacy], context: %{legacy: legacy}]
+             )
+
+    assert upgraded.id == agent.id
+    assert upgraded.state.session == session
+    assert Enum.any?(upgraded.routes, &(&1.path == "ticket.legacy" and &1.handler.target == F.Work))
+    assert {:ok, ^upgraded} = Persistence.load_agent(store, module, agent.id, opts)
   end
 
   @tag obligation: "jido.persistence.I16"

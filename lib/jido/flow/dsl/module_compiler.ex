@@ -50,7 +50,12 @@ defmodule Jido.Flow.DSL.ModuleCompiler do
       @spec __jido_flow_source_map__() :: Jido.Flow.source_map()
       def __jido_flow_source_map__()
 
-      @doc "Returns the derived execution plan for this module's canonical Flow."
+      @doc """
+      Returns this Flow module's execution plan with its validation callbacks.
+
+      To compile the canonical Flow value with schema-based validation, call
+      `Jido.Exec.compile(flow(), [])`.
+      """
       @spec compiled() :: Runic.Workflow.t()
       def compiled()
 
@@ -162,8 +167,7 @@ defmodule Jido.Flow.DSL.ModuleCompiler do
 
       Module.delete_attribute(__MODULE__, :__jido_inline_generated__)
 
-      def compiled,
-        do: Jido.Exec.Compiler.compile!(flow(), source_map: __jido_flow_source_map__())
+      def compiled, do: Jido.Exec.Compiler.compile!(__MODULE__)
 
       def run(params, context), do: Jido.Exec.run(__MODULE__, params, context)
     end
@@ -172,7 +176,7 @@ defmodule Jido.Flow.DSL.ModuleCompiler do
   defp compile_flow!(env, config) do
     case Lowerer.lower(env.module, config, env.file) do
       {:ok, attrs, source_map} ->
-        case Preparation.prepare(attrs, [], %{}) do
+        case Preparation.prepare(attrs, [env.module], %{}) do
           {:ok, attrs, _analysis, _children} ->
             {struct!(@flow_module, attrs), source_map}
 

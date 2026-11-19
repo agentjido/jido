@@ -100,7 +100,7 @@ runtime component has no separate DSL.
 ### jido.agent_server.composition.I11 — Controlled declared-subtree removal
 
 - **scope:** `Jido.AgentServer.remove_topology_member/4`
-- **must:** Remove one selected declared member slot only from the current root activation. Close admission for the selected member and all owned descendants before shutdown. Finish accepted Turns by default, support explicit pre-commit cancellation, and stop descendants before their parent. Keep the root and sibling subtrees active. Keep the static declaration and durable child records unchanged. Preserve removal through root-worker recovery in the same activation. Return success for a repeated removal. On a timeout or partial shutdown, keep removal intent and closed admission so a repeated call can continue cleanup without restoring the subtree.
+- **must:** Remove one selected declared member slot only from the current root activation. Close admission for the selected member and all owned descendants before shutdown. Finish accepted Turns by default, support explicit pre-commit cancellation, and stop descendants before their parent. Keep the root and sibling subtrees active. Keep the static declaration and durable child records. Addressed activation of a saved member requires its owner and current slot. Preserve removal through root-worker recovery in the same activation. Return success for a repeated removal. On a timeout or partial shutdown, keep removal intent and closed admission so a repeated call can continue cleanup without restoring the subtree.
 - **why:** Applications need one bounded lifecycle operation for a selected static subtree without private topology access or a mutable Agent definition.
 - **kind:** ordering
 - **status:** active
@@ -108,7 +108,7 @@ runtime component has no separate DSL.
 ### jido.agent_server.composition.I12 — Durable topology handoff
 
 - **scope:** `Jido.Agent.Directive.emit/2` with durable parent or declared member dispatch
-- **must:** Store a stable destination, Signal, and handoff ID in the sender's state commit. Retry with the same ID when the local receiver is unavailable or cannot accept a new Turn. Acknowledge only after the receiver saves its running Flow receipt and acceptance ID together. Recognize the ID after recovery and after later Turns. Reject expired attempts before new admission and reject slots marked for removal before sender commit. Retry a confirmed sender cleanup rejection without redelivery. Require reconciliation for an uncertain cleanup. Keep ordinary topology casts available without persistence.
+- **must:** Store a stable destination, Signal, and handoff ID in the sender's state commit. Retry with the same ID when the local receiver is unavailable or cannot accept a new Turn. Acknowledge only after the receiver saves its running Flow receipt and acceptance ID together. Recognize the ID after recovery and after later Turns. Reject expired attempts before new admission and reject slots marked for removal before sender commit. Retry a confirmed sender cleanup rejection without redelivery. Require reconciliation for an uncertain cleanup. Drop sends to a removed, retired, or deleted destination and continue with the next send. Report pending count, age, and last failure. Keep existing acceptance IDs and reject new IDs at the receipt limit. Keep ordinary topology casts available without persistence.
 - **why:** A committed sender needs a recoverable send, and an interrupted acknowledgment must not admit the Signal twice.
 - **kind:** ordering
 - **status:** active

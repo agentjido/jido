@@ -90,6 +90,7 @@ defmodule Jido.Flow.GraphTest do
              remaining: [],
              ordered: [],
              dependencies: %{},
+             dependency_info: %{},
              terminals: []
            }
 

@@ -167,6 +167,9 @@ defmodule Jido.Flow.Component do
 
   @doc false
   @spec authoring(map()) :: map() | ValidationError.t()
+  def authoring(%{kind: kind, options: _}) when kind in [:timer, :await],
+    do: field_error(unknown_fields(%{options: nil}, []))
+
   def authoring(%{kind: kind} = attrs) when kind in [:timer, :await] do
     case wait_option(Map.take(attrs, [:kind, :name, :event, :match, :after_ms])) do
       %ValidationError{details: %{flow_field_errors: _errors}} = error ->
@@ -505,10 +508,12 @@ defmodule Jido.Flow.Component do
 
   defp validate(:event, nil, _mode), do: {:ok, nil}
 
-  defp validate(:event, value, _mode) when is_binary(value) and byte_size(value) > 0,
-    do: {:ok, value}
+  defp validate(:event, value, _mode) do
+    if is_binary(value) and byte_size(value) > 0 and String.valid?(value),
+      do: {:ok, value},
+      else: failure("wait event must be a non-empty UTF-8 string")
+  end
 
-  defp validate(:event, _value, _mode), do: failure("wait event must be a non-empty string")
   defp validate(:delay, nil, _mode), do: {:ok, nil}
 
   defp validate(:delay, value, _mode) when is_integer(value) and value >= 0,

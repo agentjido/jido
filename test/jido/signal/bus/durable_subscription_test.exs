@@ -114,6 +114,10 @@ defmodule Jido.Signal.Bus.DurableSubscriptionTest do
               {:error, reason} -> {{:error, reason}, %{state | failures: failures}}
             end
 
+          {{:committed, reason}, failures} ->
+            {:ok, memory} = function.(state.memory)
+            {{:error, reason}, %{state | memory: memory, failures: failures}}
+
           {reason, failures} ->
             {{:error, reason}, %{state | failures: failures}}
         end
@@ -433,6 +437,44 @@ defmodule Jido.Signal.Bus.DurableSubscriptionTest do
 
     assert {:error, :durable_subscription_conflict} =
              Bus.subscribe(bus, "other.*", durable: "single-owner", target: other)
+  end
+
+  test "reloads the saved cursor after an append with an unknown outcome" do
+    {bus, store} = start_controlled_bus()
+    first = signal("uncertain.first")
+    second = signal("uncertain.second")
+    assert {:ok, "recover"} = Bus.subscribe(bus, "uncertain.*", durable: "recover")
+    assert {:ok, _id} = Bus.subscribe(bus, "uncertain.*")
+
+    ControlledStore.fail_next(store, :append, {:committed, :timeout})
+    assert {:error, {:store_error, :append, :timeout}} = Bus.publish(bus, [first])
+
+    ControlledStore.fail_next(store, :latest_cursor, :unavailable)
+    assert {:error, {:store_recovery_failed, _}} = Bus.publish(bus, [second])
+
+    assert {:ok, [%RecordedSignal{cursor: 2, signal: ^second}]} = Bus.publish(bus, [second])
+    assert_receive {:signal, %Jido.Signal{} = first_live}
+    assert first_live == first
+    assert_receive {:signal, ^second}
+    assert_receive {:signal, "recover", %RecordedSignal{cursor: 1, signal: ^first}}
+    assert :ok = Bus.ack(bus, "recover", 1)
+    assert_receive {:signal, "recover", %RecordedSignal{cursor: 2, signal: ^second}}
+  end
+
+  test "recovers a committed acknowledgment before the next write" do
+    {bus, store} = start_controlled_bus()
+    assert {:ok, "recover"} = Bus.subscribe(bus, "uncertain.*", durable: "recover")
+    assert {:ok, [_, _]} = Bus.publish(bus, [signal("uncertain.first"), signal("uncertain.second")])
+    assert_receive {:signal, "recover", %RecordedSignal{cursor: 1}}
+
+    reason = {:outcome_unknown, :connection_lost}
+    ControlledStore.fail_next(store, :put_subscription, {:committed, reason})
+    assert {:error, {:store_error, :put_subscription, ^reason}} = Bus.ack(bus, "recover", 1)
+
+    assert {:ok, [%RecordedSignal{cursor: 3}]} = Bus.publish(bus, [signal("uncertain.third")])
+    assert_receive {:signal, "recover", %RecordedSignal{cursor: 2}}
+    assert :ok = Bus.ack(bus, "recover", 2)
+    assert_receive {:signal, "recover", %RecordedSignal{cursor: 3}}
   end
 
   test "permanently deletes a durable subscription" do

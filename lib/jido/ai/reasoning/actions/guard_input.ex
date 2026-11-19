@@ -2,6 +2,8 @@ defmodule Jido.AI.Reasoning.Actions.GuardInput do
   alias Jido.Joi
   @moduledoc "Checks one request before its reasoning graph starts."
 
+  alias Jido.AI.Reasoning.ReAct.Guards
+
   @blocked_fragments ["ignore previous instructions", "reveal your system prompt"]
 
   use Jido.Action,
@@ -13,7 +15,13 @@ defmodule Jido.AI.Reasoning.Actions.GuardInput do
     output_schema: Joi.map()
 
   @impl Jido.Action
-  def run(%{turn: turn}, context) do
+  def run(%{turn: turn} = params, context) do
+    turn
+    |> built_in(context)
+    |> Guards.check(:input, params, context)
+  end
+
+  defp built_in(turn, context) do
     cond do
       reason = rejection_reason(turn.input) ->
         {:ok, blocked(:input, reason)}

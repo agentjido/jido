@@ -37,10 +37,11 @@ defmodule Jido.Persistence.Codec.Term do
          <<header::binary-size(^header_size), payload::binary>> <- rest,
          {:ok, %{"modules" => module_names} = decoded_header} <- JSON.decode(header),
          true <- map_size(decoded_header) == 1 and is_list(module_names),
-         :ok <- load_modules(module_names) do
+         :ok <- load_modules(module_names, Keyword.get(opts, :legacy_modules, [])) do
       options = if Keyword.get(opts, :trusted, false), do: [], else: [:safe]
       {:ok, :erlang.binary_to_term(payload, options)}
     else
+      {:error, {:unavailable_persistence_module, _name}} = error -> error
       _ -> {:error, {:invalid_persistence_term, :envelope}}
     end
   rescue
@@ -49,13 +50,18 @@ defmodule Jido.Persistence.Codec.Term do
 
   def decode(value, _opts), do: {:error, {:invalid_persistence_bytes, value}}
 
-  defp load_modules(names) do
+  defp load_modules(names, legacy_modules) do
+    legacy_names = MapSet.new(legacy_modules, &Atom.to_string/1)
+
     if length(names) <= @max_modules and length(names) == length(Enum.uniq(names)) and
          Enum.all?(names, &is_binary/1) do
       Enum.reduce_while(names, :ok, fn name, :ok ->
         case Jido.Persistence.Codec.load_module(name) do
-          {:ok, _module} -> {:cont, :ok}
-          {:error, _reason} = error -> {:halt, error}
+          {:ok, _module} ->
+            {:cont, :ok}
+
+          {:error, _reason} = error ->
+            if MapSet.member?(legacy_names, name), do: {:cont, :ok}, else: {:halt, error}
         end
       end)
     else

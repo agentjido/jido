@@ -9,11 +9,8 @@ defmodule Jido.Flow.Defaults do
           {:ok, map()} | {:error, Error.ValidationError.t()}
   def normalize(defaults, target) do
     with :ok <- map(defaults),
-         {:ok, schema} <- flow_schema(target),
-         {:ok, fields} <- schema_fields(schema),
-         {:ok, defaults} <- normalize_fields(defaults, fields),
-         :ok <- portable(defaults, []) do
-      {:ok, defaults}
+         {:ok, fields} <- flow_fields(target) do
+      normalize_fields(defaults, fields)
     end
   end
 
@@ -21,8 +18,13 @@ defmodule Jido.Flow.Defaults do
   @spec encode(term(), module()) ::
           {:ok, map()} | {:error, Error.ValidationError.t()}
   def encode(defaults, target) do
-    with {:ok, defaults} <- normalize(defaults, target) do
-      json(defaults, [])
+    with :ok <- map(defaults),
+         {:ok, fields} <- flow_fields(target),
+         {:ok, defaults} <- normalize_fields(defaults, fields),
+         {:ok, encoded} <- json(defaults, []),
+         {:ok, decoded} <- decode_fields(encoded, fields),
+         :ok <- check_round_trip(defaults, decoded, []) do
+      {:ok, encoded}
     end
   end
 
@@ -31,10 +33,8 @@ defmodule Jido.Flow.Defaults do
           {:ok, map()} | {:error, Error.ValidationError.t()}
   def decode(defaults, target) do
     with :ok <- map(defaults),
-         {:ok, schema} <- flow_schema(target),
-         {:ok, fields} <- schema_fields(schema),
-         {:ok, defaults} <- decode_fields(defaults, fields) do
-      normalize(defaults, target)
+         {:ok, fields} <- flow_fields(target) do
+      decode_fields(defaults, fields)
     end
   end
 
@@ -55,21 +55,24 @@ defmodule Jido.Flow.Defaults do
   defp flow_schema(_target),
     do: failure(:invalid_target, [], "Flow defaults require a Flow module")
 
+  defp flow_fields(target) do
+    with {:ok, schema} <- flow_schema(target),
+         do: schema_fields(schema)
+  end
+
   defp schema_fields(schema) do
     case {Joi.Schema.kind(schema), Joi.Schema.fields(schema)} do
-      {:map, {:ok, fields}} when is_list(fields) and fields != [] -> {:ok, fields}
+      {:map, {:ok, fields}} when is_list(fields) and fields != [] -> index_fields(fields)
       {:map, {:ok, fields}} when fields in [nil, []] -> {:ok, :open}
       _ -> failure(:invalid_schema, [], "Flow defaults require an object input schema")
     end
   end
 
-  defp normalize_fields(defaults, :open), do: {:ok, defaults}
-
-  defp normalize_fields(defaults, fields) do
+  defp index_fields(fields) do
     names = Map.new(fields, fn {key, schema} -> {to_string(key), {key, schema}} end)
 
     if map_size(names) == length(fields) do
-      Enum.reduce_while(defaults, {:ok, %{}}, &normalize_field(&1, &2, names))
+      {:ok, names}
     else
       failure(
         :ambiguous_schema,
@@ -78,6 +81,18 @@ defmodule Jido.Flow.Defaults do
       )
     end
   end
+
+  defp normalize_fields(defaults, fields) do
+    with {:ok, defaults} <- collect_fields(defaults, fields),
+         :ok <- portable(defaults, []) do
+      {:ok, defaults}
+    end
+  end
+
+  defp collect_fields(defaults, :open), do: {:ok, defaults}
+
+  defp collect_fields(defaults, fields),
+    do: Enum.reduce_while(defaults, {:ok, %{}}, &normalize_field(&1, &2, fields))
 
   defp normalize_field({key, value}, {:ok, normalized}, fields) do
     name = if is_atom(key) or is_binary(key), do: to_string(key)
@@ -102,17 +117,59 @@ defmodule Jido.Flow.Defaults do
     end
   end
 
-  defp decode_fields(defaults, :open), do: {:ok, defaults}
+  defp decode_fields(defaults, :open), do: normalize_fields(defaults, :open)
 
   defp decode_fields(defaults, fields) do
-    schemas = Map.new(fields, fn {key, schema} -> {to_string(key), schema} end)
+    defaults
+    |> Map.new(fn {key, value} ->
+      name = if is_atom(key) or is_binary(key), do: to_string(key)
 
-    {:ok,
-     Map.new(defaults, fn {key, value} ->
-       schema = if is_atom(key) or is_binary(key), do: Map.get(schemas, to_string(key))
-       {key, restore_schema_atoms(schema, value)}
-     end)}
+      case Map.fetch(fields, name) do
+        {:ok, {_canonical, schema}} -> {key, restore_schema_atoms(schema, value)}
+        :error -> {key, value}
+      end
+    end)
+    |> normalize_fields(fields)
   end
+
+  defp check_round_trip(value, decoded, _path) when value === decoded, do: :ok
+
+  defp check_round_trip(value, decoded, path)
+       when is_map(value) and is_map(decoded) and map_size(value) == map_size(decoded) do
+    Enum.reduce_while(value, :ok, fn {key, child}, :ok ->
+      result =
+        case Map.fetch(decoded, key) do
+          {:ok, item} -> check_round_trip(child, item, [key | path])
+          :error -> ambiguous_default([key | path])
+        end
+
+      case result do
+        :ok -> {:cont, :ok}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp check_round_trip(value, decoded, path) when is_list(value) and is_list(decoded) do
+    if length(value) == length(decoded) do
+      value
+      |> Enum.zip(decoded)
+      |> Enum.with_index()
+      |> Enum.reduce_while(:ok, fn {{left, right}, index}, :ok ->
+        case check_round_trip(left, right, [index | path]) do
+          :ok -> {:cont, :ok}
+          error -> {:halt, error}
+        end
+      end)
+    else
+      ambiguous_default(path)
+    end
+  end
+
+  defp check_round_trip(_value, _decoded, path), do: ambiguous_default(path)
+
+  defp ambiguous_default(path),
+    do: failure(:ambiguous_default, Enum.reverse(path), "Flow default changes value after storage")
 
   defp restore_schema_atoms(schema, value) do
     case Joi.Schema.kind(schema) do

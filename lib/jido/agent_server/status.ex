@@ -42,6 +42,7 @@ defmodule Jido.AgentServer.Status do
     :active_turn_id,
     :last_outcome,
     :effects,
+    :topology_handoffs,
     waits: []
   ]
 
@@ -60,7 +61,14 @@ defmodule Jido.AgentServer.Status do
           active_turn_id: String.t() | nil,
           waits: [Wait.t()],
           last_outcome: map() | nil,
-          effects: :none | :pending
+          effects: :none | :pending,
+          topology_handoffs:
+            %{
+              pending: non_neg_integer(),
+              oldest_age_ms: non_neg_integer() | nil,
+              last_failure: atom() | nil
+            }
+            | nil
         }
 
   @doc false
@@ -80,7 +88,8 @@ defmodule Jido.AgentServer.Status do
       active_turn_id: if(data.active, do: data.active.turn_id),
       waits: if(data.active, do: data.active.waits, else: []),
       last_outcome: safe_outcome(data.last_outcome),
-      effects: effects(data.active)
+      effects: effects(data.active),
+      topology_handoffs: handoffs(data.topology_handoffs.outbox, data.topology_last_failure)
     }
   end
 
@@ -130,6 +139,19 @@ defmodule Jido.AgentServer.Status do
   defp residency(phase) when phase in [:restoring, :initializing], do: :activating
   defp residency(:passivating), do: :passivating
   defp residency(_phase), do: :active
+
+  defp handoffs(outbox, failure) do
+    oldest_age =
+      case outbox do
+        [%{id: id} | _] ->
+          if Jido.Id.uuid7?(id), do: max(0, System.system_time(:millisecond) - Jido.Id.uuid7_timestamp(id))
+
+        [] ->
+          nil
+      end
+
+    %{pending: length(outbox), oldest_age_ms: oldest_age, last_failure: failure}
+  end
 
   defp effects(%{effects: effects}) when effects != [], do: :pending
   defp effects(_active), do: :none

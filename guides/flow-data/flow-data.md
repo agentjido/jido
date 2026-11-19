@@ -63,7 +63,7 @@ ticket_flow =
 
 Any other key is an error. There is no `:id` or `:vsn` key. Those options belong to Flow modules, as [Flow Identity](flow-identity-and-versioning.md) explains.
 
-Construction accepts any non-nil `:output` value, but Flow output must be a map at run time. A literal such as `42` builds and then fails when the Flow runs.
+Construction checks that the output is a non-nil Flow value. Execution preparation rejects a scalar literal such as `42` for a map output schema. Runtime validation checks evaluated outputs, including ordinary maps and explicit Action output envelopes.
 
 ## Common component fields
 

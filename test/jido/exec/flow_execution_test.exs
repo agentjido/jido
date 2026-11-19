@@ -105,7 +105,7 @@ defmodule Jido.Exec.FlowExecutionTest do
 
     flow do
       step "add", action: Add, params: %{value: input(:value), amount: 1}
-      output [result("add")]
+      output input(:output)
     end
   end
 
@@ -121,9 +121,8 @@ defmodule Jido.Exec.FlowExecutionTest do
     add = step("add", Add, %{value: Ref.input(:value), amount: 1})
     data = flow!("list_output", [add], [Ref.result("add")])
 
-    for target <- [data, ListOutputFlow] do
-      assert {:error, %Jido.Error.ValidationError{} = error} =
-               Exec.run(target, %{value: 1})
+    for {target, params} <- [{data, %{value: 1}}, {ListOutputFlow, %{value: 1, output: [1]}}] do
+      assert {:error, %Jido.Error.ValidationError{} = error} = Exec.run(target, params)
 
       assert error.details.phase == :flow_output
     end

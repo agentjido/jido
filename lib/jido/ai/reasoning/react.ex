@@ -7,6 +7,7 @@ defmodule Jido.AI.Reasoning.ReAct do
   The root Flow starts the request, applies the default input guard, runs one
   fixed Iterate graph, and finalizes the terminal outcome. Model rounds, tool
   review, and all recipe Actions are public modules under this namespace.
+  See `Jido.AI.Reasoning.ReAct.Guards` to add Agent guard Actions.
   """
 
   alias Jido.AI.Reasoning.Actions.{GuardInput, StartRequest}

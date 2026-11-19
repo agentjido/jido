@@ -170,7 +170,7 @@ defmodule Jido.Catalog.Discovery do
          entries = [base_entry | entries],
          {:ok, catalog} <- Catalog.new(entries),
          {:ok, index} <- Index.new(codecs) do
-      {:ok, %{catalog: catalog, codecs: index}}
+      {:ok, %{catalog: catalog, codecs: index, publication: make_ref()}}
     end
   end
 

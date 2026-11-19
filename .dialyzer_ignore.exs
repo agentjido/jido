@@ -8,7 +8,6 @@
   {"lib/jido/exec/result.ex", :pattern_match, 103},
   {"lib/jido/exec/result.ex", :pattern_match, 108},
   {"lib/jido/exec/result.ex", :unused_fun, 123},
-  {"lib/jido/flow/codec.ex", :unknown_type, 52},
   {"lib/jido/telemetry/open_telemetry.ex", :pattern_match_cov, 364},
   {"test/support/jido_action/fixtures/failures.ex", :invalid_contract, 65},
   {"test/support/jido_action/fixtures/failures.ex", :invalid_contract, 90},

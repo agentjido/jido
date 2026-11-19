@@ -160,19 +160,17 @@ defmodule Jido.Test.AgentServer.DurableFixtures do
     def get(key, opts), do: Jido.Persistence.File.get(key, opts)
 
     def compare_and_swap(key, expected, value, opts) do
-      {:ok, record} = Jido.Persistence.Codec.Term.decode(value, trusted: true)
-
-      kind =
-        case record do
-          %{server_turn: %{status: :completed}} -> :completion_write
-          %{rev: 1} -> :intent_write
-          [_ | _] = events -> event_write(events)
-          _ -> :other
+      {kind, module} =
+        case Jido.Persistence.Codec.Term.decode(value, trusted: true) do
+          {:ok, %{server_turn: %{status: :completed}} = record} -> {:completion_write, record[:agent_module]}
+          {:ok, %{rev: 1} = record} -> {:intent_write, record[:agent_module]}
+          {:ok, [_ | _] = events} -> {event_write(events), nil}
+          _ -> {:other, nil}
         end
 
       with :ok <- Probe.checkpoint(),
            :ok <- Jido.Persistence.File.compare_and_swap(key, expected, value, opts) do
-        Probe.gate({kind, if(is_map(record), do: Map.get(record, :agent_module))})
+        Probe.gate({kind, module})
       end
     end
 

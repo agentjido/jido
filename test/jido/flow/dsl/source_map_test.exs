@@ -133,4 +133,61 @@ defmodule Jido.Flow.DSL.SourceMapTest do
       assert error.line == 5
     end
   end
+
+  defmodule HookedFlow do
+    use Jido.Flow,
+      name: "compiled_contract_hook",
+      schema: Jido.Joi.object(%{label: Jido.Joi.string()}),
+      output_schema: Jido.Joi.object(%{"label" => Jido.Joi.string()})
+
+    @impl Jido.Action
+    def on_before_validate_params(%{label: label} = input) do
+      send(__MODULE__, :flow_input_hook)
+      {:ok, %{input | label: String.upcase(label)}}
+    end
+
+    flow do
+      step "echo", label <- input(:label) do
+        {:ok, %{"label" => if(label == "INVALID", do: 5, else: label)}}
+      end
+
+      output result("echo")
+    end
+  end
+
+  @tag obligation: ["jido_action.flow.I7", "jido_action.flow.I8"]
+  test "generated Flow plans use module validation and preserve input source locations" do
+    Process.register(self(), HookedFlow)
+    input = %{label: "lower"}
+
+    for run <- [
+          &HookedFlow.run(&1, %{}),
+          &execute_compiled(HookedFlow, &1),
+          &execute_workflow(HookedFlow.compiled(), &1)
+        ] do
+      assert run.(input) == {:ok, %{"label" => "LOWER"}}
+      assert_received :flow_input_hook
+      refute_received :flow_input_hook
+    end
+
+    assert execute_compiled(HookedFlow.flow(), input) == {:ok, %{"label" => "lower"}}
+    refute_received :flow_input_hook
+
+    assert {:error, %{details: %{source: source, phase: :flow_output}}} =
+             execute_workflow(HookedFlow.compiled(), %{input | label: "invalid"})
+
+    assert %{file: file, line: line} = source
+    assert file == __ENV__.file
+    assert line == Map.fetch!(HookedFlow.__jido_flow_source_map__(), [:output]).line
+  end
+
+  defp execute_compiled(target, input) do
+    {:ok, workflow} = Jido.Exec.compile(target, [])
+    execute_workflow(workflow, input)
+  end
+
+  defp execute_workflow(workflow, input) do
+    {workflow, observation} = Runic.Workflow.execute(workflow, input)
+    Jido.Exec.result(workflow, observation)
+  end
 end

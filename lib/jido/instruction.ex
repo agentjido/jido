@@ -30,11 +30,8 @@ defmodule Jido.Instruction do
   no meaning to the target or to Exec.
 
   Bound Instructions can be direct Exec targets or Invoke continuation
-  targets.
-  Public constructors accept map parameters. Flow can resolve any portable
-  value before Action input validation, so an internal bound call can hold a
-  non-map value long enough for the target validator to return its normal
-  input error.
+  targets. The map constructor accepts map parameters. A bound call can
+  deliver raw parameters to the target's input validator.
 
   `template/3` creates an inert module reference with a declared target kind.
   It does not load or inspect the module. `bind/4` turns a template into a
@@ -161,7 +158,9 @@ defmodule Jido.Instruction do
   @doc """
   Resolves a target or Instruction and applies call-site data.
 
-  Call-site parameters and context replace equal keys from a bound Instruction.
+  Call-site parameters and context replace equal map keys from a bound
+  Instruction. Empty call-site parameters keep a raw bound value. Non-empty
+  call-site parameters replace the complete raw value.
   Resolution refreshes `kind` from the current target module.
   """
   @spec resolve(target() | t() | term(), map() | keyword() | nil, map() | keyword() | nil) ::
@@ -169,15 +168,14 @@ defmodule Jido.Instruction do
   def resolve(target_or_instruction, params \\ %{}, context \\ %{}) do
     with {:ok, params} <- normalize_map_field(params, :params),
          {:ok, context} <- normalize_map_field(context, :context),
-         {:ok, instruction} <- flatten(target_or_instruction),
+         {:ok, instruction} <- flatten(target_or_instruction, :resolve),
          {:ok, kind} <- classify(instruction.target) do
       {:ok,
-       %__MODULE__{
-         kind: kind,
-         target: instruction.target,
-         params: Map.merge(instruction.params, params),
-         context: Map.merge(instruction.context, context),
-         metadata: instruction.metadata
+       %{
+         instruction
+         | kind: kind,
+           params: override_params(instruction.params, params),
+           context: Map.merge(instruction.context, context)
        }}
     end
   end
@@ -253,7 +251,7 @@ defmodule Jido.Instruction do
          {:ok, params} <- normalize_map_field(Map.get(attrs, :params, %{}), :params),
          {:ok, context} <- normalize_map_field(Map.get(attrs, :context, %{}), :context),
          {:ok, metadata} <- normalize_map_field(Map.get(attrs, :metadata, %{}), :metadata),
-         {:ok, instruction} <- flatten(target),
+         {:ok, instruction} <- flatten(target, :new),
          {:ok, kind} <- classify(instruction.target),
          :ok <- validate_declared_kind(Map.get(attrs, :kind), kind) do
       {:ok,
@@ -284,20 +282,26 @@ defmodule Jido.Instruction do
     end
   end
 
-  defp flatten(%__MODULE__{} = instruction) do
-    with {:ok, params} <- normalize_map_field(instruction.params, :params),
+  defp flatten(%__MODULE__{} = instruction, mode) do
+    raw? =
+      mode == :resolve and instruction.kind in [:action, :flow] and
+        (not is_map(instruction.params) or is_struct(instruction.params)) and
+        not Keyword.keyword?(instruction.params)
+
+    params = if raw?, do: {:ok, instruction.params}, else: normalize_map_field(instruction.params, :params)
+
+    with {:ok, params} <- params,
          {:ok, context} <- normalize_map_field(instruction.context, :context),
          {:ok, metadata} <- normalize_map_field(instruction.metadata, :metadata) do
       case instruction.target do
         %__MODULE__{} = inner ->
-          with {:ok, inner} <- flatten(inner) do
+          with {:ok, inner} <- flatten(inner, mode) do
             {:ok,
-             %__MODULE__{
-               kind: nil,
-               target: inner.target,
-               params: Map.merge(inner.params, params),
-               context: Map.merge(inner.context, context),
-               metadata: Map.merge(inner.metadata, metadata)
+             %{
+               inner
+               | params: if(raw?, do: params, else: override_params(inner.params, params)),
+                 context: Map.merge(inner.context, context),
+                 metadata: Map.merge(inner.metadata, metadata)
              }}
           end
 
@@ -314,9 +318,16 @@ defmodule Jido.Instruction do
     end
   end
 
-  defp flatten(target) do
+  defp flatten(target, _mode) do
     {:ok, %__MODULE__{kind: nil, target: target, params: %{}, context: %{}, metadata: %{}}}
   end
+
+  defp override_params(bound, overrides) when map_size(overrides) == 0, do: bound
+
+  defp override_params(bound, overrides) when is_map(bound) and not is_struct(bound),
+    do: Map.merge(bound, overrides)
+
+  defp override_params(_bound, overrides), do: overrides
 
   @doc false
   @spec target_kind(target() | term()) :: {:ok, kind()} | {:error, Exception.t()}

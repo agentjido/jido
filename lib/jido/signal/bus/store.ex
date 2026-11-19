@@ -10,6 +10,12 @@ defmodule Jido.Signal.Bus.Store do
   must accept all records or none. The Bus stores the returned state and passes
   it to the next callback.
 
+  Return `{:error, {:outcome_unknown, reason}}` if a write can have committed
+  without an acknowledgment. The Bus also treats `{:error, :timeout}` as
+  uncertain. Reads with the last acknowledged adapter state must report the
+  authoritative records and subscription cursors before the Bus can write
+  again. Other error returns mean the write did not commit.
+
   Only `Jido.Signal.Bus.Store.Memory` is included. A custom adapter can keep an
   external resource in its state when records must survive a Bus restart.
   A custom adapter must set a finite timeout on each external operation. Store
@@ -74,6 +80,12 @@ defmodule Jido.Signal.Bus.Store do
       other -> {:error, {:store_error, callback, {:invalid_return, other}}}
     end
   end
+
+  @doc false
+  def unknown_outcome?({:store_error, _callback, {:outcome_unknown, _reason}}), do: true
+  def unknown_outcome?({:store_error, _callback, :timeout}), do: true
+  def unknown_outcome?({:store_error, _callback, {:exit, {:timeout, _call}}}), do: true
+  def unknown_outcome?(_reason), do: false
 
   defp safe_apply(module, callback, args) do
     apply(module, callback, args)

@@ -25,7 +25,8 @@ defmodule Jido.Flow.Codec do
   @impl true
   @spec encode(term(), term()) :: {:ok, document()} | {:error, Exception.t()}
   def encode(%Flow{} = flow, catalog) when is_struct(catalog, Catalog) or catalog == :current do
-    with {:ok, flow} <- Flow.validate(flow), do: Writer.encode(flow, catalog)
+    with {:ok, flow, analysis} <- Definition.prepare_canonical(Map.from_struct(flow)),
+         do: Writer.encode(flow, analysis.ordered, catalog)
   end
 
   def encode(value, catalog) when is_struct(catalog, Catalog) or catalog == :current,
@@ -49,7 +50,7 @@ defmodule Jido.Flow.Codec do
 
   @doc false
   @spec diagnose(document(), Catalog.source()) ::
-          {:ok, Flow.t()} | {:error, Error.Invalid.t()}
+          {:ok, Flow.t()} | {:error, Exception.t()}
   def diagnose(document, catalog) when is_struct(catalog, Catalog) or catalog == :current do
     case Reader.decode(document, catalog) do
       {:ok, attrs, paths} ->

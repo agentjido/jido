@@ -128,10 +128,10 @@ authoring surface.
 ### jido.agent_server.I14 — Queue capacity
 
 - **scope:** `Jido.AgentServer.start_link/1`, `Jido.AgentServer.call/3`, `Jido.AgentServer.submit/3`, `Jido.AgentServer.cast/3`
-- **must:** Bound postponed turns separately from the active turn and mailbox. Reject excess requests with limit and count; drop excess casts. Support zero and infinity.
+- **must:** Bound postponed requests separately from the active turn and mailbox. Count each submission even when Turn IDs match. Reject excess requests with limit and count. Drop excess casts. Support zero and infinity.
 - **why:** Admission must have a clear capacity limit.
 - **kind:** functional
-- **status:** retired
+- **status:** active
 
 ### jido.agent_server.I15 — Admission expiry
 

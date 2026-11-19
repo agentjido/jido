@@ -32,6 +32,7 @@ modules:
   - Jido.Flow.Graph
   - Jido.Flow.Validation
   - Jido.Flow.Identity
+  - Jido.Flow.Inspection
   - Jido.Flow.Ref
   - Jido.Flow.Value
 ---
@@ -43,19 +44,19 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.flow.I7 — Authoring forms preserve one Flow meaning
 - **scope:** `Jido.Flow.new/1, Jido.Flow.__using__/1, Jido.Flow.Codec`
-- **must:** DSL, public data definitions, and stored documents produce equivalent validated Flow meaning for supported components, references, schemas, and outputs. Resolve literal module aliases in the declaration scope. Reject duplicate literal map keys after key conversion. Generated names and source locations need not be equal.
+- **must:** DSL, public data definitions, and stored documents produce equivalent validated Flow meaning for supported components, references, schemas, and outputs. Resolve literal module aliases in the declaration scope. Reject duplicate literal map keys after key conversion. Generated module plans use the module input callback and keep DSL source locations. Direct Flow structs use their data schemas.
 - **kind:** functional
 - **status:** active
 
 ### jido_action.flow.I8 — Dependencies and explicit output define valid graphs
 - **scope:** `Jido.Flow.new/1, Jido.Flow.validate/1, Jido.Flow.dependencies/1`
-- **must:** References and needs create dependencies; source order does not. Require explicit non-nil output, unique component names, valid reference scopes, and acyclic dependencies. Invoke is composable, can have downstream nodes, and can occur more than once. Handoff is the sole graph terminal and its complete result is the Flow output. Invalid graphs retain structured errors and defined diagnostic order. Nested Selection diagnostics use the failing child's source location.
+- **must:** References and needs create dependencies; source order does not. Require explicit non-nil output, unique component names, valid reference scopes, and acyclic dependencies. Invoke is composable, can have downstream nodes, and can occur more than once. Handoff is the sole graph terminal and its complete result is the Flow output. Invalid graphs retain structured errors and defined diagnostic order. Standalone Await and Timer reject Selection options. Await events use valid UTF-8. Nested Selection diagnostics use the failing child's source location.
 - **kind:** ordering
 - **status:** active
 
 ### jido_action.flow.I9 — Validation and inspection do not run Action work
 - **scope:** `Jido.Flow.validate/1, Jido.Flow.dependencies/1, Jido.Flow.explain/1, Jido.Exec.compile/2`
-- **must:** Structural validation, inspection, encoding, and compilation do not call Action run/2. Structural checks do not validate target callbacks; Exec compilation checks trusted targets. Trusted module, schema, and Flow builders can run during compilation.
+- **must:** Structural validation, inspection, encoding, and compilation do not call Action run/2. Structural checks do not validate target callbacks; Exec compilation checks trusted targets. Trusted module, schema, and Flow builders can run during compilation. Preparation rejects provably invalid map output. Inspection reports known wait requirements and missing fields on closed result schemas without resolving dynamic output.
 - **kind:** functional
 - **status:** active
 
@@ -73,6 +74,6 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.flow.I12 — Partial defaults retain the validation error boundary
 - **scope:** `Jido.Flow.normalize_defaults/2, Jido.Flow.encode_defaults/2, Jido.Flow.decode_defaults/2`
-- **must:** Validate supplied defaults against the selected Flow's object schema without requiring omitted fields. Schema-based atom restoration preserves valid enum arrays. Direct, nested, and union array inputs with improper lists return structured validation errors instead of raising during restoration.
+- **must:** Validate supplied defaults against the selected Flow's object schema without requiring omitted fields. Schema-based atom restoration preserves valid enum arrays. Direct, nested, and union array inputs with improper lists return structured validation errors instead of raising during restoration. Reject a default when storage would change its type or value.
 - **kind:** functional
 - **status:** active

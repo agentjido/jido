@@ -63,7 +63,7 @@ defmodule Jido.Persistence do
   @identity_options [:instance, :namespace, :partition]
   @create_options @identity_options ++ [:agent_revision, :reason, :revision, :server_turn]
   @save_options @create_options ++ [:expected_revision]
-  @upgrade_options @identity_options ++ [:context]
+  @upgrade_options @identity_options ++ [:context, :legacy_modules]
   @operation_options [
     :agent_revision,
     :expected_revision,
@@ -278,7 +278,10 @@ defmodule Jido.Persistence do
   @doc false
   @spec create_agent(adapter_config() | atom(), Agent.t(), keyword()) ::
           :ok | {:error, term()}
-  def create_agent(source, %Agent{} = agent, opts \\ []) do
+  def create_agent(source, %Agent{} = agent, opts \\ []),
+    do: create_agent_record(source, agent, opts, nil)
+
+  defp create_agent_record(source, agent, opts, owner) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
       Store.protect(:compare_and_swap, fn ->
         with :ok <- validate_operation_options(opts, @create_options),
@@ -287,6 +290,8 @@ defmodule Jido.Persistence do
              {:ok, address} <- resolve_address(instance, agent.id, opts),
              {:ok, record} <-
                build_record(agent, instance, Keyword.put(opts, :revision, 0), address),
+             record = Record.put_topology_owner(record, owner),
+             :ok <- Record.validate(record, address, agent.module),
              {:ok, value} <- Record.encode(record, config),
              :ok <-
                Store.compare_and_swap(
@@ -355,7 +360,30 @@ defmodule Jido.Persistence do
           | {:error, term()}
   def load_agent_address(source, address, opts \\ [])
 
-  def load_agent_address(source, %Address{} = address, opts) do
+  def load_agent_address(source, %Address{} = address, opts),
+    do: load_address(source, address, opts, false)
+
+  def load_agent_address(_source, address, _opts),
+    do: invalid_public_input(:load_agent_address, %{agent_address: address})
+
+  @doc false
+  def load_agent_for_activation(source, %Address{} = address, opts),
+    do: load_address(source, address, opts, true)
+
+  @doc false
+  def topology_destination_owner(instance, %Address{} = address) do
+    Store.protect(:get, fn ->
+      with {:ok, %Config{} = config, ^instance} <- resolve_source(instance, []),
+           :ok <- validate_address_instance(address, instance),
+           {:ok, value, _condition} <- Store.read(config.store, Record.agent_key(address)),
+           {:ok, record} <- Record.decode(value, config),
+           :ok <- Record.require_active(record) do
+        saved_topology_owner(config, address, record)
+      end
+    end)
+  end
+
+  defp load_address(source, address, opts, check_owner?) do
     Store.protect(:get, fn ->
       with :ok <- validate_operation_options(opts, [:instance]),
            {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
@@ -366,14 +394,60 @@ defmodule Jido.Persistence do
            {:ok, agent_module} <- record_agent_module(record),
            :ok <- Record.validate(record, address, agent_module),
            :ok <- Record.require_active(record),
+           :ok <- check_address_owner(check_owner?, config, address, record),
            {:ok, agent} <- Checkpoint.restore_agent(record, agent_module, address.id, instance) do
         {:ok, agent, Record.revision(record), Record.agent_revision(record), Map.get(record, :server_turn)}
       end
     end)
   end
 
-  def load_agent_address(_source, address, _opts),
-    do: invalid_public_input(:load_agent_address, %{agent_address: address})
+  defp check_address_owner(false, _config, _address, _record), do: :ok
+
+  defp check_address_owner(true, config, address, record) do
+    case saved_topology_owner(config, address, record) do
+      {:ok, nil} -> :ok
+      {:ok, owner} -> {:error, {:topology_owned, owner}}
+      error -> error
+    end
+  end
+
+  defp saved_topology_owner(_config, _address, %{topology_owner: owner}), do: {:ok, owner}
+
+  defp saved_topology_owner(config, address, _record) do
+    # Older records have only the generated member ID. The owning record
+    # must also declare that member name before we treat the ID as reserved.
+    address.id
+    |> :binary.matches("/$topology/")
+    |> Enum.reverse()
+    |> Enum.reduce_while({:ok, nil}, fn {offset, size}, none ->
+      id = binary_part(address.id, 0, offset)
+      suffix = binary_part(address.id, offset + size, byte_size(address.id) - offset - size)
+
+      case legacy_owner(config, %{address | id: id}, String.split(suffix, "/") |> Enum.reverse()) do
+        {:ok, nil} -> {:cont, none}
+        result -> {:halt, result}
+      end
+    end)
+  end
+
+  defp legacy_owner(config, owner, [identity, slot | named]) when owner.id != "" and named != [] do
+    name = named |> Enum.reverse() |> Enum.join("/")
+
+    with {index, ""} when index > 0 <- Integer.parse(slot),
+         true <- identity == "initial" or Jido.Id.uuid7?(identity),
+         {:ok, bytes, _condition} <- Store.read(config.store, Record.agent_key(owner)),
+         {:ok, record} <- Record.decode(bytes, config),
+         %{agent: %{topology: %{agents: members}}} <- Record.checkpoint(record),
+         true <- Enum.any?(members, &(Atom.to_string(&1.name) == name)) do
+      {:ok, %{address: owner, slot: "$topology/#{name}/#{slot}"}}
+    else
+      {:error, :not_found} -> {:ok, nil}
+      {:error, _} = error -> error
+      _ -> {:ok, nil}
+    end
+  end
+
+  defp legacy_owner(_config, _owner, _suffix), do: {:ok, nil}
 
   @doc """
   Atomically upgrades one inactive saved Agent.
@@ -385,6 +459,12 @@ defmodule Jido.Persistence do
   Use `:instance`, `:namespace`, and `:partition` to select durable identity.
   Use `:context` to pass Action context. Jido adds the durable identity,
   current revision, and `:stored_upgrade` reason to that context.
+
+  If the Term codec reports `{:unavailable_persistence_module, name}`,
+  pass the old module atom in `:legacy_modules`. The upgrade Action must
+  replace its references before Jido validates and writes the new snapshot.
+  Use a compatibility module if the snapshot also contains old struct fields
+  or other atoms that the current release does not define.
   """
   @spec upgrade_agent(adapter_config() | atom(), module(), String.t(), term(), keyword()) ::
           {:ok, Agent.t(), non_neg_integer()} | {:error, term()}
@@ -404,13 +484,14 @@ defmodule Jido.Persistence do
       fn ->
         Store.protect(:compare_and_swap, fn ->
           with :ok <- validate_operation_options(opts, @upgrade_options),
+               {:ok, legacy_modules} <- legacy_modules(opts),
                context = Keyword.get(opts, :context, %{}),
                :ok <- Jido.Agent.Schema.plain_map(context),
                {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
                {:ok, address} <- resolve_address(instance, agent_id, opts),
                key = Record.agent_key(address),
                {:ok, value, condition} <- Store.read(config.store, key),
-               {:ok, record} <- decode_record(value, agent_module, config),
+               {:ok, record} <- decode_record(value, agent_module, config, legacy_modules: legacy_modules),
                :ok <- Record.validate(record, address, agent_module),
                :ok <- Record.require_active(record),
                :ok <- require_inactive_turn(record),
@@ -434,7 +515,7 @@ defmodule Jido.Persistence do
                    ],
                    address
                  ),
-               next_record = Record.put_topology_handoffs(next_record, Record.topology_handoffs(record)),
+               next_record = with_runtime_record(next_record, :preserve, record),
                {:ok, next_value} <- Record.encode(next_record, config),
                :ok <-
                  Store.compare_and_swap(
@@ -456,6 +537,15 @@ defmodule Jido.Persistence do
         agent_module: agent_module,
         agent_id: agent_id
       })
+
+  defp legacy_modules(opts) do
+    modules = Keyword.get(opts, :legacy_modules, [])
+
+    if is_list(modules) and
+         Enum.all?(modules, &(is_atom(&1) and String.starts_with?(Atom.to_string(&1), "Elixir."))),
+       do: {:ok, modules},
+       else: {:error, {:invalid_persistence_option, :legacy_modules}}
+  end
 
   defp validate_definition_upgrade(record, %Agent{vsn: next_vsn}) do
     if is_integer(next_vsn) and next_vsn > Record.agent_vsn(record),
@@ -564,7 +654,7 @@ defmodule Jido.Persistence do
 
   # An activation reports :reason on its load. Public load options do not accept it.
   defp open_load(source, agent, opts) do
-    observed_load(source, agent.module, agent.id, Keyword.delete(opts, :reason), opts, true)
+    observed_load(source, agent.module, agent.id, Keyword.drop(opts, [:reason, :topology_owner]), opts, true)
   end
 
   defp observed_load(source, agent_module, agent_id, opts, telemetry_opts, runtime? \\ false) do
@@ -578,6 +668,7 @@ defmodule Jido.Persistence do
              {:ok, record} <- decode_record(value, agent_module, config),
              :ok <- Record.validate(record, address, agent_module),
              :ok <- Record.require_active(record),
+             :ok <- check_runtime_owner(runtime?, config, address, record, telemetry_opts),
              {:ok, agent} <- Checkpoint.restore_agent(record, agent_module, agent_id, instance) do
           result = {:ok, agent, Record.revision(record), Record.agent_revision(record), Map.get(record, :server_turn)}
           if runtime?, do: :erlang.append_element(result, Record.topology_handoffs(record)), else: result
@@ -586,13 +677,27 @@ defmodule Jido.Persistence do
     end)
   end
 
+  defp check_runtime_owner(false, _config, _address, _record, _opts), do: :ok
+
+  defp check_runtime_owner(true, config, address, record, opts) do
+    requested = Keyword.get(opts, :topology_owner)
+
+    case saved_topology_owner(config, address, record) do
+      {:ok, owner} when owner == requested or is_nil(owner) -> :ok
+      {:ok, _owner} -> {:error, :topology_owner_required}
+      error -> error
+    end
+  end
+
   @doc false
   def open_agent(source, %Agent{} = agent, :create, opts) do
+    {owner, opts} = Keyword.pop(opts, :topology_owner)
+
     with {:ok, _members} <-
            Jido.Agent.Topology.bind(agent, agent.state, &Jido.Agent.Validation.resolve/2),
          {:ok, agent} <-
            Jido.Agent.Topology.identify(nil, agent, &Jido.Agent.Validation.resolve/2),
-         :ok <- create_agent(source, agent, opts),
+         :ok <- create_agent_record(source, agent, opts, owner),
          do: {:ok, agent, 0, 0, nil, Record.empty_topology_handoffs()}
   end
 
@@ -643,7 +748,7 @@ defmodule Jido.Persistence do
   defp current_value(%Config{} = config, record, address, expected_revision, current_module, handoffs) do
     case Store.read(config.store, Record.agent_key(address)) do
       {:error, :not_found} when expected_revision in [:any, 0] ->
-        {:ok, :not_found, with_topology_handoffs(record, handoffs, %{})}
+        {:ok, :not_found, with_runtime_record(record, handoffs, %{})}
 
       {:error, :not_found} ->
         {:error, :conflict}
@@ -652,7 +757,7 @@ defmodule Jido.Persistence do
         with {:ok, current} <- decode_record(value, current_module, config),
              :ok <- Record.validate(current, address, current_module),
              :ok <- Record.require_active_for_write(current),
-             record = with_topology_handoffs(record, handoffs, current),
+             record = with_runtime_record(record, handoffs, current),
              :ok <- check_revision(current, record, expected_revision) do
           {:ok, condition, record}
         end
@@ -662,11 +767,13 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp with_topology_handoffs(record, :preserve, current),
-    do: Record.put_topology_handoffs(record, Record.topology_handoffs(current))
+  defp with_runtime_record(record, handoffs, current) do
+    handoffs = if handoffs == :preserve, do: Record.topology_handoffs(current), else: handoffs
 
-  defp with_topology_handoffs(record, handoffs, _current),
-    do: Record.put_topology_handoffs(record, handoffs)
+    record
+    |> Record.put_topology_handoffs(handoffs)
+    |> Record.put_topology_owner(Map.get(current, :topology_owner))
+  end
 
   defp check_revision(current, record, expected_revision) do
     cond do
@@ -810,10 +917,10 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp decode_record(value, agent_module, %Config{} = config) do
+  defp decode_record(value, agent_module, %Config{} = config, opts \\ []) do
     # The caller module supplies domain atoms; Record loads trusted envelope fields.
     _ = Code.ensure_loaded?(agent_module)
-    Record.decode(value, config)
+    Record.decode(value, config, opts)
   end
 
   defp read_for_delete(config, key) do

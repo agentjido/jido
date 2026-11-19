@@ -7,6 +7,33 @@ defmodule Jido.AI.Agent.PluginContractTest do
   alias Jido.Catalog
   alias Jido.Catalog.Error, as: CatalogError
 
+  defmodule AmbiguousReasoning do
+    use Jido.Flow,
+      name: "ambiguous_reasoning",
+      schema: Jido.Joi.object(%{mode: Jido.Joi.union([Jido.Joi.any(), Jido.Joi.enum([:safe])])})
+
+    flow do
+      step "reply", value <- input(:mode) do
+        {:ok, %{mode: value}}
+      end
+
+      output result("reply")
+    end
+  end
+
+  @tag obligation: "jido_ai.agent_authoring.I4"
+  test "stored reasoning defaults preserve the type seen by the reasoning Flow" do
+    catalog = Catalog.from_targets!(__MODULE__, :jido, %{{"ambiguous", 1} => AmbiguousReasoning})
+    data = %{reasoning: AmbiguousReasoning, tools: [], defaults: %{mode: :safe}}
+
+    assert {:ok, document} = Plugin.encode_authoring_data(data, catalog)
+    assert {:ok, ^data} = Plugin.decode_authoring_data(document, catalog)
+    assert Jido.Exec.run(AmbiguousReasoning, data.defaults) == {:ok, %{mode: :safe}}
+
+    assert {:error, %{path: ["config", "mode"]}} =
+             Plugin.encode_authoring_data(%{data | defaults: %{mode: "safe"}}, catalog)
+  end
+
   @tag obligation: ["jido_ai.agent_authoring.I1", "jido_ai.agent_authoring.I3"]
   test "the Plugin normalizes one route and rejects invalid provider data" do
     assert %Jido.Plugin.Manifest{

@@ -211,6 +211,14 @@ back, but the definition history continues from version 2 to version 3.
 
 `Jido.Persistence.upgrade_agent/5` returns `{:error, :turn_in_flight}` when the record has a nonterminal durable Turn. A terminal receipt is fine and is kept in the new revision.
 
+If the Term codec returns `{:unavailable_persistence_module, name}`, include
+the old module atom in `legacy_modules: [MyApp.OldAction]` when you call
+`upgrade_agent/5`. The Upgrade Action receives a saved snapshot. Replace
+the old routing references, keep the Agent ID and Session, and return
+a new snapshot from `Jido.Persistence.snapshot/2`. If the saved data also
+uses atoms or struct fields from the old module, keep a compatibility
+module that defines those values until the upgrade finishes.
+
 The pending Turn cannot resume on changed code either. A changed Flow or Action makes the activation stop with `:changed_reference`, so a Turn left running across a deploy blocks both paths until the old code runs again. The only other exits are `Jido.Persistence.save_agent/3` with a fresh instance at the next revision or `Jido.Persistence.delete_agent/4`, and both discard saved state. Follow this order:
 
 1. On the old release, finish or cancel durable Turns. `Jido.AgentServer.quiesce/2` closes admission and waits, and `active: :cancel` cancels the current Turn. `Jido.AgentServer.cancel/2` also works.

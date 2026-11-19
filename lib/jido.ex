@@ -610,7 +610,7 @@ defmodule Jido do
 
   defp restore_activation(instance, address, opts) do
     with {:ok, agent, _revision, _agent_revision, _turn} <-
-           Jido.Persistence.load_agent_address(instance, address, instance: instance) do
+           Jido.Persistence.load_agent_for_activation(instance, address, instance: instance) do
       opts =
         opts
         |> Keyword.put(:id, address.id)
@@ -622,6 +622,12 @@ defmodule Jido do
         {:ok, pid} when is_pid(pid) -> await_activated(pid)
         result -> result
       end
+    else
+      {:error, {:topology_owned, owner}} ->
+        {:error, AgentServer.Topology.inactive_member_reason(instance, address, owner)}
+
+      error ->
+        error
     end
   end
 

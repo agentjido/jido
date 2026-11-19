@@ -6,7 +6,8 @@ defmodule Jido.Test.Property.Config do
       module_prefixes: ["Jido.AgentServer.Property."],
       fuzz_ids: ["agent_server_lifecycle"],
       required_observations: %{
-        "agent_server_lifecycle" => ~w(cleanup failure hibernate invalid_directive invalid_state restore success)
+        "agent_server_lifecycle" =>
+          ~w(cleanup crash failure hibernate invalid_directive invalid_state remove restore retry submit success)
       }
     },
     "jido_expr" => %{

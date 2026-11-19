@@ -25,6 +25,9 @@ defmodule Jido.AgentServer.Supervisor do
     end
   end
 
+  defp finish_start({:error, {:shutdown, {:activation_registration_failed, reason}}}, _parent),
+    do: {:error, reason}
+
   defp finish_start(error, _parent), do: error
 
   @impl true
@@ -67,7 +70,7 @@ defmodule Jido.AgentServer.Supervisor do
         max_seconds: 5
       )
     else
-      {:error, reason} -> {:stop, reason}
+      {:error, reason} -> exit({:shutdown, {:activation_registration_failed, reason}})
     end
   end
 

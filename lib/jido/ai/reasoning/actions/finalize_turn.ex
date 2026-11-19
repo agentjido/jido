@@ -3,6 +3,7 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
   @moduledoc "Finalizes one graph request and returns the Agent commit envelope."
 
   alias Jido.AI.{Budget, Thread.Projection}
+  alias Jido.AI.Reasoning.ReAct.Guards
   alias Jido.Telemetry.AI, as: Telemetry
 
   use Jido.Action,
@@ -86,6 +87,6 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
       usage: turn.usage
     })
 
-    {:ok, %{state: state, response: response}}
+    Guards.release(%{state: state, response: response}, turn, result, context)
   end
 end

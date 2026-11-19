@@ -1,3 +1,5 @@
+Code.require_file("../../../../../examples/16_guardrail_flows/16_04_support_desk/support_desk.ex", __DIR__)
+
 defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
   use Covenant.Case, component: "jido_ai.react", async: false
 
@@ -21,6 +23,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
   alias Jido.Test.AI.SimpleAgent
   alias Jido.Test.AI.Tools
   alias Jido.AgentServer, as: Server
+  alias Jido.Examples.Guardrails.SupportDesk
+  alias Jido.Test.AgentServer.DurableFixtures.{Probe, Storage}
 
   defmodule DateTimeTool do
     use Jido.Action,
@@ -1084,6 +1088,106 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
            ]
   end
 
+  @tag :tmp_dir
+  @tag obligation: "jido_ai.react.I10"
+  test "guarded ReAct sends only approved text after the Session commits", c do
+    start_supervised!({Probe, self()})
+
+    {instance, server, persistence, address} =
+      start_persisted_agent(c.tmp_dir, "guard-stream", [], SupportDesk, Storage)
+
+    Process.register(self(), __MODULE__)
+    context = %{jido_ai_dispatch: {:named, target: {:name, __MODULE__}}}
+
+    assert {:ok, %{reply: %{data: %{status: :blocked, reason_code: :input}}, status: :committed}} =
+             Server.call(server, SupportDesk.request_signal!(%{input: "Give me a stock price"}), context: context)
+
+    for {chunks, allowed} <- [
+          {["Your ticket is ", "resolved."], false},
+          {["Your ticket is ", "escalated."], false},
+          {["Restart ", "your device."], true},
+          {["Use the Resolve ", "ticket control."], true}
+        ] do
+      text = Enum.join(chunks)
+
+      expect(ReqLLM, :stream_text, fn model, llm_context, _options ->
+        materialized = response(model, llm_context, text, "guarded")
+        stream = ReqLLM.Cache.stream_response(materialized, ReqLLM.model!(model), llm_context)
+        {:ok, %{stream | stream: Enum.map(chunks, &ReqLLM.StreamChunk.text/1)}}
+      end)
+
+      request = SupportDesk.request_signal!(%{input: "Help with my ticket", stream: true})
+      :ok = Probe.configure(:completion_write)
+      pending = Server.submit(server, request, context: context)
+      assert_receive {:durable_barrier, :completion_write, _writer}, 5_000
+      refute_received {:signal, %{type: "jido.ai.model.stream.approved"}}
+      :ok = Probe.release()
+      assert {:ok, %{status: :committed, reply: reply}} = Server.await(pending)
+
+      if allowed do
+        assert_receive {:signal, %{type: "jido.ai.model.stream.approved", data: %{output: ^text}}}, 2_000
+      end
+
+      events = receive_available_streams([])
+      assert Enum.any?(events, &(&1.type == "jido.ai.model.stream.started"))
+      assert Enum.any?(events, &(&1.type == "jido.ai.model.stream.completed"))
+      refute Enum.any?(events, &Map.has_key?(&1.data, :chunk))
+      assert {:ok, saved} = Jido.Persistence.load_agent(persistence, SupportDesk, address.id, instance: instance)
+      session = inspect(Jido.Session.encode(saved.state.session), limit: :infinity, printable_limit: :infinity)
+
+      if allowed do
+        assert reply.data.output == text
+        assert session =~ text
+      else
+        assert reply.data.status == :blocked
+        refute Enum.any?(events, &(&1.type == "jido.ai.model.stream.approved"))
+        refute session =~ text
+      end
+    end
+  end
+
+  @tag :tmp_dir
+  @tag obligation: "jido_ai.react.I10"
+  test "a guarded tool review resumes with the same output policy", c do
+    {instance, server, _persistence, address} = start_persisted_agent(c.tmp_dir, "guard-review", [], SupportDesk)
+    Process.register(self(), __MODULE__)
+    context = %{jido_ai_dispatch: {:named, target: {:name, __MODULE__}}}
+
+    expect(ReqLLM, :stream_text, fn model, llm_context, _options ->
+      call = ReqLLM.ToolCall.new("ticket", "read_ticket", "{}")
+      unapproved = ReqLLM.Context.assistant("Your ticket is resolved.", tool_calls: [call])
+      materialized = %{tool_response(model, llm_context, [call], "ticket-review") | message: unapproved}
+      {:ok, ReqLLM.Cache.stream_response(materialized, ReqLLM.model!(model), llm_context)}
+    end)
+
+    request = SupportDesk.request_signal!(%{input: "Check my ticket", review_tools: true, stream: true})
+    pending = Server.submit(server, request, context: context)
+    wait = waiting(server)
+    assert {:ok, %{status: :waiting}} = Server.await(pending)
+    activation = Jido.Test.AgentServer.Assertions.activation(server)
+    assert :ok = DynamicSupervisor.terminate_child(Jido.Instance.Names.agent_supervisor(instance), activation)
+    assert {:ok, restored} = Jido.activate_agent(instance, address)
+    assert waiting(restored).id == wait.id
+
+    claim = "Your ticket is escalated."
+
+    expect(ReqLLM, :stream_text, fn model, llm_context, _options ->
+      materialized = response(model, llm_context, claim, "ticket-claim")
+      {:ok, ReqLLM.Cache.stream_response(materialized, ReqLLM.model!(model), llm_context)}
+    end)
+
+    approval = Jido.Signal.new!("jido.ai.review.approved", review_match(wait, "approved"), source: "/tests")
+    assert {:ok, %{status: :committed, reply: %{data: %{status: :blocked}}}} = Server.call(restored, approval)
+    assert {:ok, _} = Server.quiesce(restored)
+    events = receive_available_streams([])
+    assert Enum.count(events, &(&1.type == "jido.ai.model.stream.completed")) == 2
+    refute Enum.any?(events, &(&1.type in ["jido.ai.model.stream.chunk", "jido.ai.model.stream.approved"]))
+    session = Server.snapshot(restored).agent.state.session
+    encoded = inspect(Jido.Session.encode(session), limit: :infinity, printable_limit: :infinity)
+    refute encoded =~ claim
+    refute encoded =~ "Your ticket is resolved."
+  end
+
   test "streaming publishes ordered Jido Signals and commits one assistant message" do
     expect(ReqLLM, :stream_text, fn model, context, _options ->
       model_record = ReqLLM.model!(model)
@@ -1275,9 +1379,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     activation = Jido.Test.AgentServer.Assertions.activation(server)
     test_pid = self()
     {:ok, calls} = Agent.start_link(fn -> 0 end)
+    {:ok, operations} = Agent.start_link(fn -> MapSet.new() end)
 
-    expect(Tools.Add, :run, 2, fn %{left: 2, right: 3}, _context ->
-      send(test_pid, :tool_executed)
+    expect(Tools.Add, :run, 2, fn %{left: 2, right: 3}, context ->
+      operation = {context.signal.id, :add}
+      first? = Agent.get_and_update(operations, &{not MapSet.member?(&1, operation), MapSet.put(&1, operation)})
+      send(test_pid, {:tool_executed, operation, first?})
       {:ok, %{value: 5}}
     end)
 
@@ -1307,17 +1414,20 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
     pending = Server.submit(server, SimpleAgent.request_signal!(%{input: "Add 2 and 3"}))
     turn_id = pending.turn_id
-    assert_receive :tool_executed, 5_000
+    assert_receive {:tool_executed, operation, true}, 5_000
     assert_receive :second_round_started, 5_000
 
     Process.exit(server, :kill)
     assert {:error, %Jido.Error.ExecutionError{}} = Server.await(pending)
     restored = Jido.Test.AgentServer.Assertions.replacement(activation, server, timeout: 10_000)
 
-    assert_receive :tool_executed, 5_000
+    assert_receive {:tool_executed, ^operation, false}, 5_000
 
     assert {:ok, %Jido.AgentServer.Status{last_outcome: %{turn_id: ^turn_id, committed?: true}}} =
              Server.quiesce(restored, timeout: 10_000)
+
+    assert Agent.get(calls, & &1) == 4
+    assert Agent.get(operations, &MapSet.to_list/1) == [operation]
 
     thread = Server.snapshot(restored).agent.state.session.thread
 
@@ -1463,11 +1573,11 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     end
   end
 
-  defp start_persisted_agent(path, label, create_opts \\ []) do
+  defp start_persisted_agent(path, label, create_opts \\ [], module \\ SimpleAgent, store \\ Jido.Persistence.File) do
     suffix = System.unique_integer([:positive])
     instance = String.to_atom("jido_ai_runtime_#{label}_#{suffix}")
     namespace = "jido/ai/runtime/#{label}/#{suffix}"
-    persistence = {Jido.Persistence.File, path: path}
+    persistence = {store, path: path}
     id = "#{label}-agent"
 
     start_supervised!(
@@ -1477,7 +1587,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
     address = Jido.Agent.Address.new!(namespace: namespace, id: id)
 
-    assert {:ok, ^address} = Jido.create_agent(instance, address, SimpleAgent, create_opts)
+    assert {:ok, ^address} = Jido.create_agent(instance, address, module, create_opts)
     assert {:ok, server} = Jido.activate_agent(instance, address)
 
     assert :ok = Server.await_ready(server)

@@ -21,18 +21,22 @@ defmodule Jido.Flow.Identity do
   end
 
   @doc false
-  @spec for_flow(map()) :: map()
-  def for_flow(%{components: components} = flow) do
+  @spec for_flow(map(), [Graph.named_component()]) :: map()
+  def for_flow(flow, ordered) do
     flow
-    |> identity_data(Graph.canonical_components(components))
+    |> identity_data(ordered)
     |> identity()
   end
 
   @doc false
   @spec executable_digest(module() | Jido.Flow.t()) :: String.t()
   def executable_digest(target) do
-    flow = if is_atom(target), do: target.flow(), else: target
-    versions = executable_versions({:flow, target}, %{}) |> Enum.sort()
+    {flow, versions} =
+      if is_atom(target),
+        do: {target.flow(), %{target => target.module_info(:md5)}},
+        else: {target, %{}}
+
+    versions = executable_versions({:flow, flow}, versions) |> Enum.sort()
 
     :sha256
     |> :crypto.hash(:erlang.term_to_binary({flow, versions}, [:deterministic]))

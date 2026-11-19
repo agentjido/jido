@@ -31,6 +31,24 @@ defmodule Jido.JoiTest do
     assert {:ok, ^input} = Joi.parse(schema, input)
   end
 
+  test "initialization defaults absent fields and preserves explicit nullable values" do
+    schema =
+      Joi.object(%{
+        mode: Joi.nullable(Joi.string()) |> Joi.default("standard"),
+        required_mode: Joi.string() |> Joi.default("standard")
+      })
+
+    assert {:ok, %{mode: "standard", required_mode: "standard"}} = Joi.initialize(schema, %{})
+
+    assert {:ok, %{mode: nil, required_mode: "standard"}} =
+             Joi.initialize(schema, %{mode: nil})
+
+    assert {:ok, %{mode: "standard", required_mode: "standard"}} =
+             Joi.initialize(schema, %{required_mode: nil})
+
+    assert {:error, [_]} = Joi.initialize(Joi.string(), nil)
+  end
+
   test "stored schemas reject key stripping" do
     schema = Joi.object(%{count: Joi.integer()}, unrecognized_keys: :strip)
 
