@@ -165,6 +165,17 @@ alias Jido.AI.Thread.Projection
 nil = Projection.breakpoint(Jido.Session.new(id: "session:empty"))
 ```
 
+## Run a long conversation
+
+A durable Agent can use a caller-owned Session. Archive the committed
+`session_entries`, then build a bounded Session for the next Turn. Keep each
+tool exchange intact and keep the outcome markers for the retained messages.
+The model can use an application tool to find an older message in the archive.
+
+The [long-running ReAct example](../../examples/20_context_and_memory_flows/20_05_long_running_agent/README.md)
+shows deterministic trimming, optional model summaries, and reply recovery.
+It includes an offline 1,000-Turn runner.
+
 ## Related
 
 - [AI Requests and Sessions](requests-responses-and-sessions.livemd)

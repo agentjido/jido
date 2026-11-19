@@ -375,6 +375,39 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     assert messages == ["user", "assistant", "tool", "assistant", "tool", "assistant"]
   end
 
+  @tag obligation: "jido_ai.react.I9"
+  @tag :tmp_dir
+  test "a large caller-owned Session fits when a terminal decision carries the Turn once", %{tmp_dir: path} do
+    {_instance, server, _persistence, _address} = start_persisted_agent(path, "terminal-payload")
+
+    session =
+      Jido.Session.new()
+      |> Projection.observe(:ai_tool_attempt, %{items: List.duplicate(0, 18_000)})
+
+    expect(ReqLLM, :generate_text, fn model, context, _options ->
+      assert List.last(context.messages).role == :user
+      {:ok, response(model, context, "Completed.", "terminal-payload")}
+    end)
+
+    signal = SimpleAgent.request_signal!(%{input: "Complete the request"})
+    context = %{jido_ai_session: Jido.Session.encode(session)}
+
+    assert {:ok, %{status: :committed, reply: %{data: data}}} =
+             Server.call(server, signal, context: context, timeout: 30_000)
+
+    assert %{status: :completed, output: "Completed.", session_entries: entries} = data
+
+    kinds =
+      Enum.map(entries, fn entry ->
+        assert {:ok, decoded} = Jido.Thread.Entry.decode(entry)
+        decoded.kind
+      end)
+
+    assert kinds == [:ai_message, :ai_model_attempt, :ai_message, :ai_request_outcome]
+
+    assert Server.snapshot(server).agent.state.session == nil
+  end
+
   test "eight sequential tool rounds keep bounded Runic identity state" do
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 

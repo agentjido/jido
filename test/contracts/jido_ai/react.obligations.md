@@ -1,6 +1,8 @@
 ---
 modules:
   - Jido.AI.Reasoning.ReAct
+  - Jido.AI.Reasoning.ReAct.Actions.Advance
+  - Jido.AI.Reasoning.ReAct.Actions.Initialize
   - Jido.AI.Reasoning.ReAct.Actions.DecideNext
   - Jido.AI.Reasoning.ReAct.Actions.DetectToolCycle
   - Jido.AI.Reasoning.ReAct.Actions.ExecuteTool
@@ -74,5 +76,12 @@ model-execution, conversation, and tools components.
 
 - **scope:** `Jido.AI.Reasoning.ReAct`
 - **must:** Keep omitted provider options empty. Preserve a supplied partial options Map without adding a hidden token, timeout, or temperature value. Runtime budgets remain separate from provider generation options.
+- **kind:** functional
+- **status:** active
+
+### jido_ai.react.I9 — Terminal loop state carries one Turn
+
+- **scope:** ReAct loop initialization, completion, and review
+- **must:** Keep the Turn in the terminal decision and omit the redundant top-level Turn. Preserve the Session, outcome, and effects used by the continuation.
 - **kind:** functional
 - **status:** active

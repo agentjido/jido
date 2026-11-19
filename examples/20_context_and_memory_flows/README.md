@@ -10,6 +10,7 @@ Memory or Retriever API.
 2. [Trim and compact](20_02_trim_and_compact/README.md).
 3. [Working memory and recall](20_03_working_memory_and_recall/README.md).
 4. [Session rollover](20_04_session_rollover/README.md).
+5. [Long-running ReAct Agent](20_05_long_running_agent/README.md).
 
 All model and embedding operations use deterministic offline inference. The
 examples name the owner and provenance of every context layer.

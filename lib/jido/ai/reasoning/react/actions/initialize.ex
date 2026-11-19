@@ -26,6 +26,6 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Initialize do
       output: %{turn: turn, result: Result.blocked(reason_code, reason)}
     }
 
-    {:ok, %{decision: decision, done: true, turn: turn}}
+    {:ok, %{decision: decision, done: true}}
   end
 end

@@ -58,8 +58,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Advance do
 
   def run(%{state: %{done: true} = state}, _context), do: {:ok, state}
 
-  defp transition(%{kind: :complete, output: outcome} = decision, _context, effects) do
-    result(%{decision: decision, done: true, turn: outcome.turn}, effects)
+  defp transition(%{kind: kind} = decision, _context, effects) when kind in [:complete, :review] do
+    result(%{decision: decision, done: true}, effects)
   end
 
   defp transition(%{kind: :model, input: %{turn: turn}}, _context, effects) do
@@ -70,10 +70,6 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Advance do
     with {:ok, next_turn, tool_effects} <- ToolRound.run(turn, context) do
       result(%{decision: nil, done: false, turn: next_turn}, effects ++ tool_effects)
     end
-  end
-
-  defp transition(%{kind: :review, input: %{turn: turn}} = decision, _context, effects) do
-    result(%{decision: decision, done: true, turn: turn}, effects)
   end
 
   defp call(action, params, context) do

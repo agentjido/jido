@@ -58,3 +58,5 @@ creates a coordinated checkpoint of other Agents or resources.
 - [Tests](session_rollover_test.exs)
 
 [Previous: Working memory and recall](../20_03_working_memory_and_recall/README.md)
+
+[Next example](../20_05_long_running_agent/README.md)
