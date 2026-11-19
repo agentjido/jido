@@ -70,21 +70,21 @@ The server runs one Turn at a time. Every request mode below enters the same que
 
 ## Call and wait for the result
 
-`Jido.AgentServer.call/3` waits for the commit and returns the committed Agent with the Turn's Directives.
+`Jido.AgentServer.call/3` waits for an accepted Turn result. Use `snapshot/2` to read committed state.
 
 ```elixir
-{:ok, agent, []} =
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
   Jido.AgentServer.call(desk, CallGuide.OrderDesk.pack_signal!(%{order_id: "o-1"}))
 
-agent.state
+Jido.AgentServer.snapshot(desk).agent.state
 # The cell returns %{packed: ["o-1"]}
 ```
 
-A failed Turn returns `{:error, reason}` and leaves the committed state as it was. A Signal with no matching route is one such failure.
+An accepted failure returns a `TurnResult` with status `:failed` and preserves the committed state. A Signal with no matching route is one such failure.
 
 ```elixir
 unknown = Jido.Signal.new!("order.teleport", %{}, source: "/orders/api")
-{:error, %Jido.Error.ValidationError{code: :unmatched_input}} = Jido.AgentServer.call(desk, unknown)
+{:ok, %Jido.AgentServer.TurnResult{status: :failed}} = Jido.AgentServer.call(desk, unknown)
 
 Jido.AgentServer.snapshot(desk).agent.state
 # The cell returns %{packed: ["o-1"]}
@@ -113,24 +113,24 @@ action =
     {:packing, pid} -> pid
   end
 
-active_stage = Jido.AgentServer.status(desk).active.stage
+work_state = Jido.AgentServer.status(desk).work_state
 send(action, :finish)
 
-{outcome, active_stage}
+{outcome, work_state}
 # The cell returns {:caller_stopped_waiting, :running}
 ```
 
 The Action finished after the caller gave up, and its Turn committed. A later `call` runs after that Turn, so it sees `o-2`.
 
 ```elixir
-{:ok, agent, []} =
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
   Jido.AgentServer.call(desk, CallGuide.OrderDesk.pack_signal!(%{order_id: "o-3"}))
 
-agent.state.packed
+Jido.AgentServer.snapshot(desk).agent.state.packed
 # The cell returns ["o-1", "o-2", "o-3"]
 ```
 
-Use `Jido.AgentServer.cancel/2` to stop a Turn. See [Cancel Turns](cancel-turns.livemd).
+Use `Jido.AgentServer.cancel_turn/3` with the active Turn ID to stop it. See [Cancel Turns](cancel-turns.livemd).
 
 ## Cast without a reply
 
@@ -141,10 +141,10 @@ Use `Jido.AgentServer.cancel/2` to stop a Turn. See [Cancel Turns](cancel-turns.
 :ok = Jido.AgentServer.cast(desk, unknown)
 
 # A later call runs after both casts.
-{:ok, agent, []} =
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
   Jido.AgentServer.call(desk, CallGuide.OrderDesk.pack_signal!(%{order_id: "o-5"}))
 
-{agent.state.packed, Jido.AgentServer.status(desk).agent_revision}
+{Jido.AgentServer.snapshot(desk).agent.state.packed, Jido.AgentServer.status(desk).agent_revision}
 # The cell returns {["o-1", "o-2", "o-3", "o-4", "o-5"], 5}
 ```
 
@@ -167,13 +167,13 @@ action =
 
 first_wait = Jido.AgentServer.await(pending, 0)
 send(action, :finish)
-{:ok, agent, []} = Jido.AgentServer.await(pending)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.await(pending)
 
-{first_wait, List.last(agent.state.packed)}
+{first_wait, List.last(Jido.AgentServer.snapshot(desk).agent.state.packed)}
 # The cell returns {{:error, :timeout}, "o-6"}
 ```
 
-Submit several requests to run them in order while your process does other work. Each result shows the state after its own Turn.
+Submit several requests to run them in order while your process does other work. Each result reports the revision committed by its Turn.
 
 ```elixir
 handles =
@@ -183,8 +183,8 @@ handles =
 
 handles
 |> Enum.map(&Jido.AgentServer.await/1)
-|> Enum.map(fn {:ok, agent, []} -> List.last(agent.state.packed) end)
-# The cell returns ["o-7", "o-8"]
+|> Enum.map(fn {:ok, %Jido.AgentServer.TurnResult{agent_revision: revision}} -> revision end)
+# The cell returns [7, 8]
 ```
 
 A handle has these limits:
@@ -199,10 +199,10 @@ Call `Jido.AgentServer.abandon/1` when you no longer want the reply. The Turn st
 abandoned = Jido.AgentServer.submit(desk, CallGuide.OrderDesk.pack_signal!(%{order_id: "o-9"}))
 :ok = Jido.AgentServer.abandon(abandoned)
 
-{:ok, agent, []} =
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
   Jido.AgentServer.call(desk, CallGuide.OrderDesk.pack_signal!(%{order_id: "o-10"}))
 
-Enum.take(agent.state.packed, -2)
+Enum.take(Jido.AgentServer.snapshot(desk).agent.state.packed, -2)
 # The cell returns ["o-9", "o-10"]
 ```
 
@@ -210,21 +210,17 @@ If the server stops before it replies, `await/2` returns `{:error, %Jido.Error.E
 
 ## Receive a reply Signal
 
-A reply is a separate Signal that answers the request. It reaches the calling process as a plain message after the Turn commits. The return value of `call/3` still holds the Agent and the Directives.
+A reply Signal is available in the accepted Turn's `reply` field.
 
 ```elixir
-{:ok, _agent, [%Jido.Agent.Directive.Reply{}]} =
+{:ok, %Jido.AgentServer.TurnResult{reply: %Jido.Signal{type: "order.confirmed", data: data}}} =
   Jido.AgentServer.call(desk, CallGuide.OrderDesk.confirm_signal!(%{order_id: "o-10"}))
 
-receive do
-  %Jido.Signal{type: "order.confirmed", data: data} -> data
-after
-  1_000 -> :no_reply
-end
+data
 # The cell returns %{order_id: "o-10"}
 ```
 
-A cast has no caller to answer, so a cast that produces a reply fails before commit. See [Agent Turns and Replies](../agents/turns-state-and-replies.md).
+A cast discards its Turn result, including the reply Signal. See [Agent Turns and Replies](../agents/turns-state-and-replies.md).
 
 ## Read without a Turn
 
@@ -232,13 +228,11 @@ Reads answer while a Turn runs, and they do not join the Turn queue. They see co
 
 | Function | Returns |
 | --- | --- |
-| `Jido.AgentServer.agent/2` | The committed Agent. |
-| `Jido.AgentServer.snapshot/2` | The committed Agent and its `state_version`, read in the same server event. |
-| `Jido.AgentServer.plugin_state/3` | One committed Plugin-owned field. |
-| `Jido.AgentServer.status/2` | A runtime view. See [Status and Turn History](status-and-history.md). |
+| `Jido.AgentServer.snapshot/2` | The committed Agent and its `agent_revision`, read in the same server event. |
+| `Jido.AgentServer.status/2` | A semantic runtime view. See [Status and Snapshots](status-and-history.md). |
 
 ```elixir
-%{agent: %{id: "desk-1"}, state_version: version} = Jido.AgentServer.snapshot(desk)
+%{agent: %{id: "desk-1"}, agent_revision: version} = Jido.AgentServer.snapshot(desk)
 is_integer(version)
 # The cell returns true
 ```
@@ -247,7 +241,7 @@ is_integer(version)
 
 | You need | Use | Result |
 | --- | --- | --- |
-| The result before you continue | `Jido.AgentServer.call/3` | `{:ok, agent, directives}` or `{:error, reason}`. A timeout exits the caller. |
+| The result before you continue | `Jido.AgentServer.call/3` | `{:ok, %Jido.AgentServer.TurnResult{}}` or `{:error, reason}`. A timeout exits the caller. |
 | The result later, from the same process | `Jido.AgentServer.submit/3`, then `Jido.AgentServer.await/2` | The same result. A timeout returns `{:error, :timeout}`. |
 | No result | `Jido.AgentServer.cast/3` | `:ok` when the Signal is sent. Delivery is best effort. |
 
