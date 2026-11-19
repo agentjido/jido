@@ -1,7 +1,7 @@
 ---
 title: Jido.Signal component and sub-components
 status: current
-last-reviewed: 2026-11-10
+last-reviewed: 2026-11-19
 ---
 
 # Jido.Signal component and sub-components
@@ -9,6 +9,90 @@ last-reviewed: 2026-11-10
 Purpose: Record the envelope, Router, Bus, and Dispatch contracts.
 Review result: All four checks have evidence for each owner (R5).
 Findings and boundary decisions remain open. No source change is approved.
+
+## 2026-11-19 top-level review
+
+Reviewed [`release/v3` at `6fdc009a`](https://github.com/agentjido/jido/commit/6fdc009a1edd6261f3e26509fa2905bb9192faa5)
+for [tracker #453](https://github.com/agentjido/jido/issues/453). This section
+records the pinned review. The R5 records below describe the earlier review.
+
+### Four checks
+
+| Check | Evidence |
+| --- | --- |
+| Public surface | `Signal.new/1,2,3` returns a Signal or an envelope error string. The bang forms raise. `use Jido.Signal` exposes static metadata, schema, data validation, and typed constructors. Typed constructors fix `type`, `dataschema`, and validated `data`. Joi data errors stay distinct from envelope errors. Construction generates UUIDv7 only for a missing ID and defaults specversion to `"1.0"`. The sender supplies source and optional time. Context helpers read and update flat extensions and attach W3C Trace data. Codec handles the canonical map, JSON, and trusted Erlang terms, including batches and a byte limit. Catalog checks one Signal against an exact `{type, dataschema}` registration and reports structured validation errors. Boundary supplies bounded diagnostic views. [Envelope](../../lib/jido/signal.ex) · [Context](../../lib/jido/signal/context.ex) · [Codec](../../lib/jido/signal/codec.ex) · [Catalog](../../lib/jido/signal/catalog.ex) · [Boundary](../../lib/jido/signal/boundary.ex) |
+| API contract usage | Agent admission and Directives check existing Signals. AgentServer Plugin callbacks use the struct schema for outbound Signals. Router reads the type from a recognized Signal module. Bus checks a Signal and uses the canonical map for records. HTTP Dispatch sends codec JSON. Timer uses the canonical map as input to its fingerprint. Trace.Context and telemetry use the Signal carrier. The public examples exercise construction, context, serialization, and causation. [Agent validation](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/agent/validation.ex#L180) · [Directive](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/agent/directive.ex#L75) · [Plugin callback](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/agent_server/plugin/callbacks.ex#L198) · [Router](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/router.ex#L115) · [Bus record](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/bus/recorded_signal.ex#L110) · [HTTP Dispatch](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/dispatch/http.ex#L212) · [Timer](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/plugin/timer/runtime.ex#L525) · [Trace carrier](../../lib/jido/trace/context.ex) · [Examples](../../examples/08_signals_and_messaging/README.md) |
+| Duplication and code quality | The constructor and wire decoder repeat key, version, time, payload, and struct validation rules. Typed and positional constructors normalize keys twice. Catalog repeats envelope work after a data transform. Consumers of existing structs use different combinations of schema and context checks. The guides use both sets of extension helpers. The hidden Codec transport diagnostic forwarders and Context name forwarder have direct test coverage. Keep those compatibility surfaces in this review. [Constructor path](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal.ex#L509) · [Wire path](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/codec.ex#L101) · [Catalog data path](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/catalog.ex#L249) · [Context guide](../../guides/signals/cloudevents-envelope-and-context.md) · [Boundary tests](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/test/jido/codec/signal/boundary_test.exs#L23) · [Error tests](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/test/jido/signal/public_boundary_errors_test.exs#L66) |
+| Elixir and OTP design | Keep Signal an immutable value and Catalog an immutable index of trusted definitions. Joi, ID generation, Trace values, and JSON or term conversion can run in the caller. Signal needs no process, registry, or supervision. Keep these responsibilities distinct from routing, delivery, and process-local trace propagation. Reach places the envelope, Codec, Context, and Boundary in `value_model`, and Catalog in `definitions`. Telemetry proof covers the Trace carrier. The core has direct tests and no dedicated active Covenant record. [Reach](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/.reach.exs#L24) · [Telemetry proof](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/test/contracts/jido/telemetry.obligations.md#L56) · [Generated checks](../../test/property/jido_signal) |
+
+Event identity uses `{source, id}`. Codec and Catalog preserve both. Bus
+records have their own IDs, and Durable uses its own operation identity.
+Router, Bus, and Dispatch remain separate review subjects. Their interfaces
+serve as evidence for the top-level contract. [CloudEvents identity](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md#id) ·
+[Bus record identity](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/bus/recorded_signal.ex#L115) ·
+[Durable start](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/durable.ex#L48)
+
+### Published findings
+
+| Issue | Severity | Pinned evidence and impact |
+| --- | --- | --- |
+| [#454](https://github.com/agentjido/jido/issues/454) Validate existing envelopes before encoding | P2 | JSON encoding accepted a Signal with an invalid ID, version, or time. Decode rejected the result. An invalid presence flag changed absent data to null. [Map writer](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/codec.ex#L60) |
+| [#455](https://github.com/agentjido/jido/issues/455) Reject duplicate envelope attributes before map conversion | P2 | JSON retained the first repeated ID. A constructor keyword list retained the last. The selected member can change event identity. [JSON decode](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/codec.ex#L325) · [Constructor](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal.ex#L312) |
+| [#456](https://github.com/agentjido/jido/issues/456) Honor `datacontenttype` in structured JSON | P2 | The codec emitted an object for `text/plain` data. Structured CloudEvents consumers expect text or Base64 for this media type. [JSON writer](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/codec.ex#L313) · [CloudEvents JSON section 3.1](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/formats/json-format.md#31-handling-of-data) |
+| [#457](https://github.com/agentjido/jido/issues/457) Reject trailing bytes in Erlang term payloads | P3 | A valid term envelope with one trailing byte decoded successfully. The codec discarded part of the payload. [Term reader](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/codec.ex#L332) |
+| [#458](https://github.com/agentjido/jido/issues/458) Apply the absolute URI rule to `dataschema` | P3 | A URI with a fragment passed typed construction, catalog registration, and decode. An interoperability change must preserve exact schema identity and account for existing records. [URI refinement](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal.ex#L462) · [RFC 3986 section 4.3](https://www.rfc-editor.org/rfc/rfc3986#section-4.3) |
+| [#459](https://github.com/agentjido/jido/issues/459) Keep diagnostics safe for invalid struct fields | P3 | Preview raised `FunctionClauseError` for an invalid URI struct that Signal permits as data. Keep valid formatting and profile limits. [Special formatters](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/boundary.ex#L59) |
+| [#460](https://github.com/agentjido/jido/issues/460) Share constructor and wire parsing rules | P3 | Consolidate identical rules. Preserve constructor defaults, strict wire requirements, extension policies, legacy markers, data flags, and current errors. This supersedes the core F1 reduction question below. [Construction](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal.ex#L509) · [Wire parse](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/codec.ex#L101) |
+| [#461](https://github.com/agentjido/jido/issues/461) Update Catalog data without a wire round trip | P3 | Replace the full envelope write and parse after a Joi transform. A probe confirmed that transforming explicit Base64 bytes into other valid UTF-8 bytes preserves Base64. Keep that result, exact numeric updates, and null versus absent data. [Catalog](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/lib/jido/signal/catalog.ex#L249) · [Catalog tests](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/test/jido/signal/catalog_test.exs#L451) |
+
+### Verification
+
+- Elixir 1.20.4 and OTP 29. Focused Signal, Codec, Trace, and telemetry tests
+  passed 175 cases. Focused Agent, Directive, Bus record, and Timer consumer
+  tests passed 43 cases. Four example files passed five cases. Public
+  authoring passed eight cases.
+- The selected Signal property and fuzz targets each passed four checks and
+  skipped one deferred diagnostics check. Local probes confirmed the
+  findings in the table. Repository searches for Signal, CloudEvents, and
+  codec issues found no matching issue. Closed #374, #375, #425, and #436
+  cover different contracts.
+- Format passed. Reach passed the architecture policy and reported 273
+  advisory findings across the project.
+- The full Covenant command failed on the pinned commit. Of 2,924 tests,
+  2,918 passed and six failed. The failures occurred in AgentServer durable
+  activation and AI ReAct runtime tests. Covenant reported coverage for
+  242 of 244 active obligations. [Activation tests](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/test/jido/agent_server/durable_activation_contract_test.exs#L490) ·
+  [ReAct tests](https://github.com/agentjido/jido/blob/6fdc009a1edd6261f3e26509fa2905bb9192faa5/test/jido/ai/reasoning/react/runtime_contract_test.exs#L1093)
+
+## Implementation for tracker #453
+
+The fixes cover the Signal envelope, codec, diagnostics, and Catalog
+integration. Agent, AgentServer, and Plugin continue to own their checks
+and error wrappers.
+
+- The map and binary writers validate the envelope and extensions. A direct
+  struct can still supply a DateTime or non-null data with the default
+  presence flag. Catalog uses the same core check for an existing Signal.
+- Construction and wire decode share the key, version, time, payload, and
+  struct validation rules. Construction adds defaults and accepts nested
+  extensions. Wire decode requires stored identity and uses flat extensions.
+- JSON decode rejects repeated envelope keys. Constructors reject repeated
+  keyword attributes. JSON payload data retains its former key behavior.
+  Erlang term decode requires one complete term.
+- Structured JSON encode checks the declared media type. JSON decode keeps
+  reading older events with nonconforming `data`.
+- Creation and Catalog registration require a fragment-free absolute
+  `dataschema` URI. Raw codec reads and writes preserve a legacy fragment
+  byte for byte. Catalog matching uses the exact URI.
+- Catalog applies data transforms directly to the Signal and its data flags.
+  Unit checks cover absent data, explicit null, numeric type changes, and
+  explicit Base64. Diagnostic formatting uses a fixed summary if URI or
+  calendar formatting fails.
+
+Eleven added regression tests failed before the fixes. The existing
+constructor and codec tests and the added Catalog data checks established
+the expected behavior for the refactors. The focused check with warnings as
+errors passed 213 tests, including Agent, Bus record, and Timer consumers.
 
 ## Coverage and ownership
 

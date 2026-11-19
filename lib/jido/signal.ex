@@ -87,6 +87,10 @@ defmodule Jido.Signal do
     schema: @default_data_schema
   }
 
+  @definition_dataschema Joi.string()
+                         |> Joi.min(1)
+                         |> Joi.refine({__MODULE__, :validate_absolute_uri, []})
+
   @definition_schema Joi.keyword(
                        [
                          type:
@@ -102,10 +106,7 @@ defmodule Jido.Signal do
                            Joi.string()
                            |> Joi.min(1)
                            |> Joi.refine({__MODULE__, :validate_media_type, []}),
-                         dataschema:
-                           Joi.string()
-                           |> Joi.min(1)
-                           |> Joi.refine({__MODULE__, :validate_absolute_uri, []}),
+                         dataschema: @definition_dataschema,
                          schema:
                            Joi.any()
                            |> Joi.refine({__MODULE__, :validate_definition_schema, []})
@@ -114,50 +115,60 @@ defmodule Jido.Signal do
                        unrecognized_keys: :error
                      )
 
-  @signal_schema Joi.struct(
-                   __MODULE__,
-                   %{
-                     id:
-                       Joi.string()
-                       |> Joi.min(1)
-                       |> Joi.refine({__MODULE__, :validate_utf8_string, []}),
-                     source:
-                       Joi.string()
-                       |> Joi.min(1)
-                       |> Joi.refine({__MODULE__, :validate_uri_reference, []}),
-                     type:
-                       Joi.string()
-                       |> Joi.min(1)
-                       |> Joi.refine({__MODULE__, :validate_utf8_string, []}),
-                     specversion: Joi.default(Joi.literal("1.0"), "1.0") |> Joi.optional(),
-                     subject:
-                       Joi.string()
-                       |> Joi.min(1)
-                       |> Joi.refine({__MODULE__, :validate_utf8_string, []})
-                       |> Joi.nullable()
-                       |> Joi.optional(),
-                     time:
-                       Joi.string()
-                       |> Joi.refine({__MODULE__, :validate_rfc3339, []})
-                       |> Joi.nullable()
-                       |> Joi.optional(),
-                     datacontenttype:
-                       Joi.string()
-                       |> Joi.min(1)
-                       |> Joi.refine({__MODULE__, :validate_media_type, []})
-                       |> Joi.nullable()
-                       |> Joi.optional(),
-                     dataschema:
-                       Joi.string()
-                       |> Joi.refine({__MODULE__, :validate_absolute_uri, []})
-                       |> Joi.nullable()
-                       |> Joi.optional(),
-                     data: Joi.any() |> Joi.optional(),
-                     data_present?: Joi.boolean() |> Joi.default(false) |> Joi.optional(),
-                     data_base64?: Joi.boolean() |> Joi.default(false) |> Joi.optional(),
-                     extensions: Joi.default(Joi.map(), %{}) |> Joi.optional()
-                   }
-                 )
+  @envelope_fields %{
+    id:
+      Joi.string()
+      |> Joi.min(1)
+      |> Joi.refine({__MODULE__, :validate_utf8_string, []}),
+    source:
+      Joi.string()
+      |> Joi.min(1)
+      |> Joi.refine({__MODULE__, :validate_uri_reference, []}),
+    type:
+      Joi.string()
+      |> Joi.min(1)
+      |> Joi.refine({__MODULE__, :validate_utf8_string, []}),
+    specversion: Joi.default(Joi.literal("1.0"), "1.0") |> Joi.optional(),
+    subject:
+      Joi.string()
+      |> Joi.min(1)
+      |> Joi.refine({__MODULE__, :validate_utf8_string, []})
+      |> Joi.nullable()
+      |> Joi.optional(),
+    time:
+      Joi.string()
+      |> Joi.refine({__MODULE__, :validate_rfc3339, []})
+      |> Joi.nullable()
+      |> Joi.optional(),
+    datacontenttype:
+      Joi.string()
+      |> Joi.min(1)
+      |> Joi.refine({__MODULE__, :validate_media_type, []})
+      |> Joi.nullable()
+      |> Joi.optional(),
+    dataschema:
+      Joi.string()
+      |> Joi.refine({__MODULE__, :validate_existing_schema_uri, []})
+      |> Joi.nullable()
+      |> Joi.optional(),
+    data: Joi.any() |> Joi.optional(),
+    data_present?: Joi.boolean() |> Joi.default(false) |> Joi.optional(),
+    data_base64?: Joi.boolean() |> Joi.default(false) |> Joi.optional(),
+    extensions: Joi.default(Joi.map(), %{}) |> Joi.optional()
+  }
+
+  @signal_schema Joi.struct(__MODULE__, @envelope_fields)
+  @constructor_schema Joi.struct(
+                        __MODULE__,
+                        %{
+                          @envelope_fields
+                          | dataschema:
+                              Joi.string()
+                              |> Joi.refine({__MODULE__, :validate_absolute_uri, []})
+                              |> Joi.nullable()
+                              |> Joi.optional()
+                        }
+                      )
 
   @type t :: unquote(Joi.type_spec(@signal_schema))
   @enforce_keys Joi.enforce_keys(@signal_schema)
@@ -237,7 +248,7 @@ defmodule Jido.Signal do
           |> Map.put("type", type())
           |> Map.put("dataschema", dataschema())
           |> Map.put("data", validated_data)
-          |> Jido.Signal.new()
+          |> Jido.Signal.__new_from_normalized_attrs__()
         end
       end
 
@@ -282,20 +293,24 @@ defmodule Jido.Signal do
           {:ok, map()} | {:error, String.t()}
   def __normalize_definition_attrs__(opts, defaults) when is_list(opts) do
     if Keyword.keyword?(opts) do
-      __normalize_definition_attrs__(Map.new(opts), defaults)
+      merge_definition_attrs(opts, defaults)
     else
       {:error, "expected Signal options to be a map or keyword list"}
     end
   end
 
   def __normalize_definition_attrs__(opts, defaults) when is_map(opts) do
-    with {:ok, attrs} <- normalize_attribute_keys(opts) do
-      {:ok, Map.merge(defaults, attrs)}
-    end
+    merge_definition_attrs(Map.to_list(opts), defaults)
   end
 
   def __normalize_definition_attrs__(_opts, _defaults),
     do: {:error, "expected Signal options to be a map or keyword list"}
+
+  defp merge_definition_attrs(entries, defaults) do
+    with {:ok, attrs} <- normalize_attribute_keys(entries) do
+      {:ok, Map.merge(defaults, attrs)}
+    end
+  end
 
   @doc false
   @spec validate_definition_schema(term(), keyword()) :: :ok | {:error, String.t()}
@@ -311,20 +326,25 @@ defmodule Jido.Signal do
   @spec new(map() | keyword()) :: {:ok, t()} | {:error, String.t()}
   def new(attrs) when is_list(attrs) do
     if Keyword.keyword?(attrs),
-      do: attrs |> Map.new() |> new(),
+      do: new_from_entries(attrs),
       else: {:error, "parse error: expected a map or keyword list"}
   end
 
-  def new(attrs) when is_map(attrs) do
-    with {:ok, attrs} <- normalize_attribute_keys(attrs) do
-      attrs
-      |> Map.put_new_lazy("id", &Jido.Id.uuid7/0)
-      |> Map.put_new("specversion", "1.0")
-      |> from_constructor_attrs()
-    end
-  end
+  def new(attrs) when is_map(attrs), do: new_from_entries(Map.to_list(attrs))
 
   def new(_attrs), do: {:error, "parse error: expected a map or keyword list"}
+
+  defp new_from_entries(entries) do
+    with {:ok, attrs} <- normalize_attribute_keys(entries), do: __new_from_normalized_attrs__(attrs)
+  end
+
+  @doc false
+  def __new_from_normalized_attrs__(attrs) do
+    attrs
+    |> Map.put_new_lazy("id", &Jido.Id.uuid7/0)
+    |> Map.put_new("specversion", "1.0")
+    |> parse_attrs(:constructor)
+  end
 
   @doc "Creates a Signal with an explicit type, data value, and attributes."
   @spec new(String.t(), term(), map() | keyword()) :: {:ok, t()} | {:error, String.t()}
@@ -332,24 +352,28 @@ defmodule Jido.Signal do
 
   def new(type, data, attrs) when is_binary(type) and is_list(attrs) do
     if Keyword.keyword?(attrs),
-      do: new(type, data, Map.new(attrs)),
+      do: new_with_data(type, data, attrs),
       else: {:error, "expected new/3 (type :: String.t(), data :: any(), attrs :: map/keyword)"}
   end
 
   def new(type, data, attrs) when is_binary(type) and is_map(attrs) do
-    with {:ok, attrs} <- normalize_attribute_keys(attrs) do
+    new_with_data(type, data, Map.to_list(attrs))
+  end
+
+  def new(_type, _data, _attrs) do
+    {:error, "expected new/3 (type :: String.t(), data :: any(), attrs :: map/keyword)"}
+  end
+
+  defp new_with_data(type, data, entries) do
+    with {:ok, attrs} <- normalize_attribute_keys(entries) do
       case Enum.find(["type", "data", "data_base64"], &Map.has_key?(attrs, &1)) do
         nil ->
-          attrs |> Map.put("type", type) |> Map.put("data", data) |> new()
+          attrs |> Map.put("type", type) |> Map.put("data", data) |> __new_from_normalized_attrs__()
 
         key ->
           {:error, "attribute #{inspect(key)} must not be passed in attrs when calling new/3"}
       end
     end
-  end
-
-  def new(_type, _data, _attrs) do
-    {:error, "expected new/3 (type :: String.t(), data :: any(), attrs :: map/keyword)"}
   end
 
   @doc "Creates a Signal and raises when its envelope is invalid."
@@ -459,18 +483,30 @@ defmodule Jido.Signal do
   def validate_uri_reference(_value, _opts), do: {:error, "must be a URI-reference"}
 
   @doc false
-  def validate_absolute_uri(value, _opts) when is_binary(value) do
-    if valid_uri_text?(value) do
-      case URI.new(value) do
-        {:ok, %URI{scheme: scheme}} when is_binary(scheme) and scheme != "" -> :ok
-        _result -> {:error, "must be an absolute URI"}
-      end
+  def validate_absolute_uri(value, opts) when is_binary(value) do
+    if :binary.match(value, "#") == :nomatch do
+      validate_existing_schema_uri(value, opts)
     else
       {:error, "must be an absolute URI"}
     end
   end
 
   def validate_absolute_uri(_value, _opts), do: {:error, "must be an absolute URI"}
+
+  @doc false
+  def validate_existing_schema_uri(value, _opts) when is_binary(value) do
+    with true <- valid_uri_text?(value),
+         {:ok, %URI{scheme: scheme}} when is_binary(scheme) and scheme != "" <- URI.new(value) do
+      :ok
+    else
+      _invalid -> {:error, "must be an absolute URI"}
+    end
+  end
+
+  def validate_existing_schema_uri(_value, _opts), do: {:error, "must be an absolute URI"}
+
+  @doc false
+  def __definition_dataschema_schema__, do: @definition_dataschema |> Joi.nullable() |> Joi.optional()
 
   @doc false
   def validate_rfc3339(value, _opts) when is_binary(value) do
@@ -506,16 +542,53 @@ defmodule Jido.Signal do
 
   def validate_utf8_string(_value, _opts), do: {:error, "must be valid UTF-8"}
 
-  defp from_constructor_attrs(attrs) do
-    with :ok <- validate_specversion(attrs),
-         :ok <- validate_legacy_wire_version(attrs),
-         {:ok, data, data_present?, data_base64?} <- extract_data(attrs),
-         {:ok, extensions} <- extract_extensions(attrs) do
-      parse_signal(attrs, data, data_present?, data_base64?, extensions)
+  @doc false
+  def __from_wire_map__(map) when is_map(map) do
+    with {:ok, attrs} <- normalize_attribute_keys(Map.to_list(map)), do: parse_attrs(attrs, :wire)
+  end
+
+  @doc false
+  def __validate_envelope__(%__MODULE__{} = signal) do
+    with {:ok, extensions} <- normalize_extensions(signal.extensions),
+         :ok <- validate_existing_presence(signal) do
+      Joi.parse(@signal_schema, %{signal | extensions: extensions})
     end
   end
 
-  defp extract_extensions(attrs) do
+  defp validate_existing_presence(%__MODULE__{specversion: nil}),
+    do: {:error, "specversion is required"}
+
+  defp validate_existing_presence(%__MODULE__{data_present?: nil}),
+    do: {:error, "data_present? must be a boolean"}
+
+  defp validate_existing_presence(%__MODULE__{data_base64?: nil}),
+    do: {:error, "data_base64? must be a boolean"}
+
+  defp validate_existing_presence(%__MODULE__{}), do: :ok
+
+  @doc false
+  def __replace_data__(%__MODULE__{data: data} = signal, data), do: signal
+
+  def __replace_data__(%__MODULE__{} = signal, data) do
+    %{
+      signal
+      | data: data,
+        data_present?: not is_nil(data) or signal.data_present?,
+        data_base64?: base64_data?(data, signal.data_base64?)
+    }
+  end
+
+  defp parse_attrs(attrs, origin) do
+    with :ok <- validate_specversion(attrs),
+         :ok <- validate_legacy_wire_version(attrs),
+         {:ok, data, data_present?, data_base64?} <- extract_data(attrs),
+         {:ok, extensions} <- extract_extensions(attrs, origin) do
+      schema = if origin == :constructor, do: @constructor_schema, else: @signal_schema
+      parse_signal(schema, attrs, data, data_present?, data_base64?, extensions)
+    end
+  end
+
+  defp extract_extensions(attrs, :constructor) do
     explicit = Map.get(attrs, "extensions", %{})
     unknown = Map.drop(attrs, @constructor_names ++ [@legacy_wire_version_key])
 
@@ -528,6 +601,17 @@ defmodule Jido.Signal do
     end
   end
 
+  defp extract_extensions(attrs, :wire) do
+    attrs
+    |> Map.drop(@core_names ++ [@legacy_wire_version_key])
+    |> Map.reject(fn {_name, value} -> is_nil(value) end)
+    |> normalize_extensions()
+    |> case do
+      {:ok, extensions} -> {:ok, extensions}
+      {:error, reason} -> {:error, "parse error: #{reason}"}
+    end
+  end
+
   defp reject_duplicate_extensions(explicit, unknown) do
     case Enum.find(Map.keys(explicit), &Map.has_key?(unknown, &1)) do
       nil -> :ok
@@ -535,7 +619,7 @@ defmodule Jido.Signal do
     end
   end
 
-  defp parse_signal(attrs, data, data_present?, data_base64?, extensions) do
+  defp parse_signal(schema, attrs, data, data_present?, data_base64?, extensions) do
     signal =
       struct(__MODULE__,
         data: data,
@@ -548,11 +632,11 @@ defmodule Jido.Signal do
         source: Map.get(attrs, "source"),
         specversion: normalize_specversion(Map.get(attrs, "specversion")),
         subject: Map.get(attrs, "subject"),
-        time: normalize_time(Map.get(attrs, "time")),
+        time: __normalize_time__(Map.get(attrs, "time")),
         type: Map.get(attrs, "type")
       )
 
-    case Joi.parse(schema(), signal) do
+    case Joi.parse(schema, signal) do
       {:ok, validated} -> {:ok, validated}
       {:error, errors} -> {:error, "parse error: #{Joi.prettify_errors(errors)}"}
     end
@@ -564,7 +648,7 @@ defmodule Jido.Signal do
         {:error, "parse error: data and data_base64 are mutually exclusive"}
 
       {{:ok, data}, :error} ->
-        {:ok, data, true, is_binary(data) and not String.valid?(data)}
+        {:ok, data, true, base64_data?(data, false)}
 
       {:error, {:ok, encoded}} ->
         decode_data_base64(encoded)
@@ -573,6 +657,8 @@ defmodule Jido.Signal do
         {:ok, nil, false, false}
     end
   end
+
+  defp base64_data?(data, force?), do: is_binary(data) and (force? or not String.valid?(data))
 
   defp decode_data_base64(encoded) when is_binary(encoded) do
     case Base.decode64(encoded) do
@@ -584,8 +670,8 @@ defmodule Jido.Signal do
   defp decode_data_base64(_encoded),
     do: {:error, "parse error: data_base64 must be a Base64 string"}
 
-  defp normalize_attribute_keys(map) when is_map(map) do
-    Enum.reduce_while(Map.to_list(map), {:ok, %{}}, fn {key, value}, {:ok, normalized} ->
+  defp normalize_attribute_keys(entries) do
+    Enum.reduce_while(entries, {:ok, %{}}, fn {key, value}, {:ok, normalized} ->
       with {:ok, key} <- normalize_attribute_key(key),
            false <- Map.has_key?(normalized, key) do
         {:cont, {:ok, Map.put(normalized, key, value)}}
@@ -610,8 +696,9 @@ defmodule Jido.Signal do
   defp normalize_specversion("1.0.2"), do: "1.0"
   defp normalize_specversion(value), do: value
 
-  defp normalize_time(%DateTime{} = time), do: DateTime.to_iso8601(time)
-  defp normalize_time(time), do: time
+  @doc false
+  def __normalize_time__(%DateTime{} = time), do: DateTime.to_iso8601(time)
+  def __normalize_time__(time), do: time
 
   defp validate_specversion(%{"specversion" => value}) when not is_nil(value), do: :ok
   defp validate_specversion(_attrs), do: {:error, "parse error: specversion is required"}
