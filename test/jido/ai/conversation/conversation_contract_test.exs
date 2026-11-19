@@ -191,10 +191,16 @@ defmodule Jido.AI.Conversation.ContractTest do
   test "a small window keeps the latest complete exchange in a long Thread" do
     history_size = 1_024
 
-    session =
-      Enum.reduce(1..history_size, Session.new(id: "contract-long-window", now: 1), fn index, session ->
-        append!(session, %{role: :user, content: "Earlier question #{index}"}, index + 1)
-      end)
+    history =
+      for index <- 1..history_size do
+        %{
+          at: index + 1,
+          kind: :ai_message,
+          payload: %{"version" => 1, "role" => "user", "content" => "Earlier question #{index}"}
+        }
+      end
+
+    session = Session.new(id: "contract-long-window", now: 1) |> Session.append(history)
 
     call = ReqLLM.ToolCall.new("lookup-1", "lookup", ~s({"id":42}))
     latest = history_size + 2

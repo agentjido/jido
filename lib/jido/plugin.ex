@@ -52,6 +52,12 @@ defmodule Jido.Plugin do
 
   @callback prepare(Jido.Agent.Plugin.Preparation.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
+  @callback select_route(Jido.Agent.Plugin.RouteSelection.t(), keyword()) ::
+              :default | {:ok, atom()} | {:error, term()}
+  @callback state_spec(keyword()) :: state_spec() | {:error, term()}
+  @callback directives(keyword()) :: [module()] | {:error, term()}
+  @callback reduce(Jido.Agent.Plugin.Reduction.t(), keyword()) :: {:ok, term()} | {:error, term()}
+
   @doc """
   Prepares parameters for the selected Action or Flow route.
 
@@ -63,11 +69,6 @@ defmodule Jido.Plugin do
   outside this callback's control.
   """
   @callback prepare_route_input(map(), map(), map(), keyword()) :: {:ok, map()} | {:error, term()}
-  @callback select_route(Jido.Agent.Plugin.RouteSelection.t(), keyword()) ::
-              :default | {:ok, atom()} | {:error, term()}
-  @callback state_spec(keyword()) :: state_spec() | {:error, term()}
-  @callback directives(keyword()) :: [module()] | {:error, term()}
-  @callback reduce(Jido.Agent.Plugin.Reduction.t(), keyword()) :: {:ok, term()} | {:error, term()}
   @callback validate_options(keyword()) :: :ok | {:error, term()}
   @callback admit(term() | nil, Jido.Plugin.Context.Admission.t(), keyword()) ::
               {:ok, term()} | {:error, term()}

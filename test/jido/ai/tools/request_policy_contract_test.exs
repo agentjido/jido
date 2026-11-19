@@ -205,6 +205,9 @@ defmodule Jido.AI.Tools.RequestPolicyContractTest do
       effective = Toolset.narrow_policy(%{review: ["add"]}, policy)
       assert {:ok, %{tools: [], review: []}} = Toolset.select([Tools.Add], effective)
 
+      invalid = Toolset.narrow_policy(%{review: ["add"]}, %{requirement: :disabled, review: ["multiply"]})
+      assert {:error, {:review_tool_not_visible, "multiply"}} = Toolset.select([Tools.Add, Tools.Multiply], invalid)
+
       assert %{status: :completed, tool_calls: 0} = ask(ReviewedAgent, %{input: "go", tool_policy: policy})
     end
 
