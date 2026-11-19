@@ -31,8 +31,7 @@ Plugin declarations that `jido.agent` produces.
 ### jido.agent_evaluation.I2 — Normalized route input
 
 - **scope:** `Jido.Agent.cmd/3`, `Jido.Agent.Runner`
-- **must:** Accept map, keyword-last-value, and nil Signal data. Shallow-merge route defaults with Signal data taking precedence. Reject other data before executable work.
-- **must:** For an Action or Flow route, pass the original request and the merged parameters through declared route input callbacks in Plugin order. The executable validates the resulting map.
+- **must:** Accept map, keyword-last-value, and nil Signal data. Shallow-merge route defaults with Signal data taking precedence. Reject other data before executable work. For an Action or Flow route, pass the original request and the merged parameters through declared route input callbacks in Plugin order. The executable validates the resulting map.
 - **kind:** functional
 - **status:** active
 
