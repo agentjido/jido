@@ -795,6 +795,7 @@ Disposition terms:
 | `Jido.AI.ToolSource` | Keep | Dynamic tool source behavior |
 | `Jido.AI.Toolset` | Keep | Owns selected tool validation, policy, model definitions, and call resolution; it does not read Plugin storage |
 | `Jido.AI.Usage` | Keep | Normalized model usage aggregation |
+| `Jido.AI.ModelOptions` | Internal | Normalizes option keys at the model execution boundary |
 
 ## Target namespace summary
 

@@ -65,6 +65,7 @@ Each callback has one owner. The owner decides where the callback runs and what 
 |---|---|---|---|
 | Agent | `prepare/2` | Derive portable input for this Turn. | Plugin Routing |
 | Agent | `select_route/2` | Choose among matching routes. | Plugin Routing |
+| Agent | `prepare_route_input/4` | Prepare parameters for the selected Action or Flow. | Plugin Routing |
 | Agent | `state_spec/1` | Declare one owned state field and its schema. | Plugin State |
 | Agent | `directives/1` | Declare owned Directive types. | Custom Directives |
 | Agent | `reduce/2` | Compute the next value of the owned field. | Plugin State |
@@ -86,7 +87,7 @@ On the live path, one Turn calls Plugin callbacks in this order:
 1. `prepare/2` for each Plugin, in declaration order.
 2. `admit/3` for each Plugin, in declaration order.
 3. `select_route/2` on the one Plugin that defines it, if any.
-4. The route handler runs. Jido rejects the result if the handler changed a Plugin-owned field.
+4. `prepare_route_input/4` for each Plugin in declaration order. Jido then validates and runs the selected Action or Flow. Jido rejects the result if the handler changed a Plugin-owned field.
 5. Jido validates every Directive, and then runs `reduce/2` for each Plugin in declaration order.
 6. `dump/3` when the server has persistence configured.
 7. Commit. The caller of `Jido.AgentServer.call/3` receives its result.

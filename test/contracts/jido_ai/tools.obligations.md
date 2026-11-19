@@ -19,7 +19,7 @@ model-visible results. It does not own ReAct routing or approval waits.
 ### jido_ai.tools.I1 — Protected static allowlist
 
 - **scope:** `Jido.AI.Toolset`
-- **must:** Accept ordered Jido Action and Flow modules in an Agent definition and reject duplicate modules or model tool names.
+- **must:** Accept ordered Jido Action and Flow modules in an Agent definition. Return a tagged error for malformed lists, duplicate modules, or duplicate model tool names.
 - **kind:** security
 - **status:** active
 
@@ -33,7 +33,7 @@ model-visible results. It does not own ReAct routing or approval waits.
 ### jido_ai.tools.I3 — Request policy only reduces capability
 
 - **scope:** `Jido.AI.Toolset.select/2`, `narrow_policy/2`, `Jido.AI.RequestPolicy`
-- **must:** Apply visible, hidden, review, and requirement policy only to known static or trusted dynamic tools. Reject unknown names and never create a new tool. A request can narrow Agent-level AI policy but cannot widen or remove it: it cannot drop Agent review, replace instructions set on the Agent, raise a limit above the Agent's value, or lose a limit it leaves out.
+- **must:** Apply Agent policy before the selected root Flow reads the request in direct and live commands. Preserve Agent instructions and limits, and keep review for Agent-reviewed tools that remain visible. Disabling optional tools removes their inherited review. Use the selected Toolset for the model context and provider options. Reject unknown tool names.
 - **kind:** security
 - **status:** active
 

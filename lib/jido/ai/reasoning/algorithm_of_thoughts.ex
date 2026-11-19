@@ -20,7 +20,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts do
           input: Joi.union([Joi.string(), Joi.list(Joi.map())]),
           instructions: Joi.string() |> Joi.default(@default_instructions),
           model: Joi.string() |> Joi.default("openai:gpt-4o-mini"),
-          options: Joi.map() |> Joi.default(%{max_tokens: 1024, temperature: 0.0}),
+          options: Jido.AI.ModelOptions.schema() |> Joi.default(%{max_tokens: 1024, temperature: 0.0}),
           prompt_cache:
             Joi.object(
               %{

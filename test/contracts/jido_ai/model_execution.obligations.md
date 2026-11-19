@@ -4,6 +4,7 @@ modules:
   - Jido.AI.Budget
   - Jido.AI.Context
   - Jido.AI.Context.Snapshot
+  - Jido.AI.ModelOptions
   - Jido.AI.Reasoning.Actions.CallModel
   - Jido.AI.Usage
 ---
@@ -34,21 +35,21 @@ requests. It does not own reasoning strategy routing.
 ### jido_ai.model_execution.I3 — Usage and cache accounting
 
 - **scope:** `Jido.AI.Usage`, recorded model attempts
-- **must:** Normalize and add provider usage, including cache read, write, creation, and cached-token values, without losing a provider-reported total cost.
+- **must:** Normalize and add provider usage, including tool-use input tokens, reasoning cost, and cache read, write, creation, and cached-token values. Preserve provider-reported totals.
 - **kind:** functional
 - **status:** active
 
 ### jido_ai.model_execution.I4 — Streaming and non-streaming parity
 
 - **scope:** `Jido.AI.Reasoning.Actions.CallModel`
-- **must:** Produce the same normalized final outcome and usage for streaming and non-streaming calls. Publish ordered stream events without adding partial assistant messages to conversation history.
+- **must:** Produce the same normalized final outcome and usage for streaming and non-streaming calls. Publish ordered stream events without adding partial assistant messages to conversation history. Decode the Session once per model attempt and reuse the correlation data for each chunk.
 - **kind:** ordering
 - **status:** active
 
 ### jido_ai.model_execution.I5 — Portable model errors and contexts
 
 - **scope:** `Jido.AI.Context`, `Jido.AI.Context.Snapshot`, model outcomes
-- **must:** Preserve the exact prepared ReqLLM request, store safe portable snapshots, summarize recorded attempt context without copying message content or a per-message inventory, and convert provider faults into bounded retryable or terminal data without raw exception or process-local values.
+- **must:** Preserve the exact prepared ReqLLM request, store safe portable snapshots, summarize recorded attempt context without copying message content or a per-message inventory, and convert provider faults into bounded retryable or terminal data without raw exception or process-local values. Model options accept atom keys and known string names. Reject unknown string names and duplicate spellings.
 - **kind:** security
 - **status:** active
 

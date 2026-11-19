@@ -32,6 +32,7 @@ Plugin declarations that `jido.agent` produces.
 
 - **scope:** `Jido.Agent.cmd/3`, `Jido.Agent.Runner`
 - **must:** Accept map, keyword-last-value, and nil Signal data. Shallow-merge route defaults with Signal data taking precedence. Reject other data before executable work.
+- **must:** For an Action or Flow route, pass the original request and the merged parameters through declared route input callbacks in Plugin order. The executable validates the resulting map.
 - **kind:** functional
 - **status:** active
 
@@ -58,7 +59,7 @@ Plugin declarations that `jido.agent` produces.
 
 ### jido.agent_evaluation.I6 — Ordered Plugin preparation
 
-- **scope:** `Jido.Agent.Plugin.prepare/3`
+- **scope:** `Jido.Agent.Plugin.prepare/3`, `Jido.Agent.Plugin.prepare_route_input/4`
 - **must:** Prepare Agent Plugins in declaration order and keep portable package inputs separate. Preserve application rejection reasons and contain callback faults.
 - **kind:** ordering
 - **status:** active

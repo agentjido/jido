@@ -25,7 +25,7 @@ selection. It does not own durable storage or model calls.
 ### jido_ai.conversation.I2 — Complete exchanges only
 
 - **scope:** `Jido.AI.Thread.Projection.context/2`, `project/2`, `explain/2`
-- **must:** Include an assistant tool request only when every call has one matching tool result. Exclude incomplete exchanges without changing stored Thread entries.
+- **must:** Include an assistant tool request only when every call has one matching tool result. Assemble complete exchanges in chronological order with a linear list pass. Exclude incomplete exchanges without changing stored Thread entries.
 - **kind:** functional
 - **status:** active
 

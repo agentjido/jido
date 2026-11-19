@@ -1,5 +1,5 @@
 defmodule Jido.Plugin.RouteSelectionTest do
-  use ExUnit.Case, async: true
+  use Covenant.Case, component: "jido.agent_evaluation", async: true
 
   alias Jido.Agent
   alias Jido.Agent.Plugin.{Preparation, RouteSelection}
@@ -55,6 +55,24 @@ defmodule Jido.Plugin.RouteSelectionTest do
     def select_route(%RouteSelection{}, _opts), do: :default
   end
 
+  defmodule PrepareFirst do
+    use Jido.Plugin
+
+    @impl true
+    def prepare_route_input(%{as: :left}, %{selected: :requested}, %{selected: :requested}, _opts) do
+      {:ok, %{selected: :first}}
+    end
+  end
+
+  defmodule PrepareLast do
+    use Jido.Plugin
+
+    @impl true
+    def prepare_route_input(%{as: :left}, %{selected: :requested}, %{selected: :first}, _opts) do
+      {:ok, %{selected: :last}}
+    end
+  end
+
   defmodule MissingSelector do
     use Jido.Plugin
 
@@ -100,6 +118,19 @@ defmodule Jido.Plugin.RouteSelectionTest do
 
       route "select", Select, as: :left, defaults: %{selected: :left}
       route "select", Select, as: :right, defaults: %{selected: :right}
+    end
+  end
+
+  defmodule PreparedAgent do
+    use Jido.Agent, name: "plugin_prepare_route_input", plugins: [PrepareFirst, PrepareLast]
+
+    state do
+      schema Jido.Joi.object(%{selected: Jido.Joi.atom() |> Jido.Joi.default(:none)})
+    end
+
+    routes do
+      signal_source "/plugin/route_selection/prepare"
+      route "select", Select, as: :left, defaults: %{selected: :left}
     end
   end
 
@@ -163,6 +194,18 @@ defmodule Jido.Plugin.RouteSelectionTest do
     assert {:ok, selected, []} = Agent.cmd(agent, signal)
     assert selected.state.selected == :right
     assert selected.state.selector == %{route: :right}
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I2", "jido.agent_evaluation.I6"]
+  test "input callbacks receive the original request and run in Plugin order" do
+    agent = PreparedAgent.instantiate!(id: "route-input")
+    request = PreparedAgent.left_signal!(%{selected: :requested})
+
+    assert {:ok, prepared} = Jido.Agent.Runner.prepare(agent, request, [])
+    assert prepared.source_signal.id == request.id
+    assert prepared.instruction.params == %{selected: :last}
+    assert {:ok, selected, []} = Agent.cmd(agent, request)
+    assert selected.state.selected == :last
   end
 
   test "default preserves ordered selection when no selector Plugin exists" do

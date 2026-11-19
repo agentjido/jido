@@ -255,21 +255,21 @@ defmodule Jido.AI.Thread.Projection do
           message.role == :tool and Map.has_key?(open, message.tool_call_id) and
               message.name in [nil, open[message.tool_call_id]] ->
             next_open = Map.delete(open, message.tool_call_id)
-            next_pending = pending ++ [{entry, message}]
+            next_pending = [{entry, message} | pending]
 
             if map_size(next_open) == 0,
-              do: {completed ++ next_pending, [], next_open},
+              do: {next_pending ++ completed, [], next_open},
               else: {completed, next_pending, next_open}
 
           message.role == :tool ->
             {completed, pending, open}
 
           true ->
-            {completed ++ [pair], [], %{}}
+            {[pair | completed], [], %{}}
         end
       end)
 
-    completed
+    Enum.reverse(completed)
   end
 
   defp select_turns(pairs, config) do

@@ -28,7 +28,7 @@ defmodule Jido.AI.Reasoning.ReAct do
           model: Joi.string() |> Joi.default("openai:gpt-4o-mini"),
           fallback_models: Joi.list(Joi.string()) |> Joi.default([]),
           options:
-            Joi.map()
+            Jido.AI.ModelOptions.schema()
             |> Joi.default(%{}),
           prompt_cache:
             Joi.object(
