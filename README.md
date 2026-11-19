@@ -18,9 +18,6 @@ Release-readiness work includes:
 - a complete public API and compatibility review; and
 - final performance baselines across the supported runtime matrix.
 
-Do not treat this branch as a released Hex package. The current focus is
-architecture, quality, and release preparation.
-
 The main work is:
 
 - organize code by `Jido.*` ownership instead of old package boundaries;
@@ -35,10 +32,18 @@ The repository keeps its architecture and consolidation decisions in
 Use the [documentation index](docs/README.md) for project documents, required
 fixed paths, and material that still needs review.
 
-## Use the release branch
+## Install the beta
 
-Until the consolidated package has a beta release, point Mix at the official
-release branch:
+Add this dependency to try the consolidated Jido package:
+
+```elixir
+{:jido, "== 3.0.0-beta.3"}
+```
+
+See the [beta.3 release notes](https://github.com/agentjido/jido/releases/tag/v3.0.0-beta.3)
+and the [v2-to-v3 migration guide](https://github.com/agentjido/jido/blob/v3.0.0-beta.3/guides/reference/v2-to-v3-migration.md).
+
+Use the Git dependency to test the current release branch:
 
 ```elixir
 {:jido, github: "agentjido/jido", branch: "release/v3"}

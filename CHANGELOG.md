@@ -2,6 +2,33 @@
 
 <!-- changelog -->
 
+## [v3.0.0-beta.3](https://github.com/agentjido/jido/compare/v3.0.0-beta.2...v3.0.0-beta.3) (2026-11-19)
+
+### Upgrade from beta.2
+
+- Use `Jido.Agent.Address` for durable Agent identity and replace `ref:` with
+  `address:` where you pass that identity. Update callers of the affected Agent
+  and AgentServer APIs.
+- Replace `Jido.Plugin.Scheduler` with `Jido.Plugin.Timer`. If you use its saved
+  Plugin state, rename the state key from `:scheduler` to `:timer`.
+- Use `Jido.Exec.run/4` for local execution and `Jido.Durable` for checkpointed
+  execution. For step-by-step control, compile the Flow with
+  `Jido.Exec.compile/2` and use `Runic.Runner` directly.
+
+See the [v2-to-v3 migration guide](https://github.com/agentjido/jido/blob/v3.0.0-beta.3/guides/reference/v2-to-v3-migration.md)
+for API replacements and examples.
+
+### Changes
+
+- Added durable topology handoffs, retained durable Agent Turn results, and
+  added support for replacing inactive durable Agent definitions.
+- Reduced stored ReAct model context and removed duplicate terminal Turn data.
+  Documented when model and tool calls can repeat during recovery.
+- Hardened Exec task cleanup and Durable start, status, and result handling.
+- Applied the v3 component review fixes across Signal, Agent, Plugin,
+  AgentServer, Persistence, Session, Thread, AI, and Telemetry.
+- Updated JSV to 0.28.0 and IDNA to 8.0.0 for CVE-2026-117678.
+
 ## [v2.4.0](https://github.com/agentjido/jido/compare/v2.3.3...v2.4.0) (2026-10-08)
 
 

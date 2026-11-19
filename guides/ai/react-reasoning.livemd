@@ -42,14 +42,14 @@ The Iterate component allows at most 17 iterations. `limits.model_calls` has a m
 
 ## Recovery
 
-A persisted AgentServer saves the result of the full ReAct loop as one checkpoint. If the server stops before that save, recovery starts the loop again under the same Turn ID. Earlier model calls and tool calls from that loop can repeat. Use a stable operation ID for tools with external effects and have the external service deduplicate calls by that ID. A saved Tool Review wait resumes with its original wait ID and does not repeat the calls that led to the wait. See [Recovery Limits](../durability/recovery-and-effect-limits.md#work-that-can-repeat).
+A persisted AgentServer saves the result of the full ReAct loop as one checkpoint. If the server stops before that save, recovery starts the loop again under the same Turn ID. Earlier model calls and tool calls from that loop can repeat. Use a stable operation ID for tools with external effects and have the external service deduplicate calls by that ID. A saved Tool Review wait resumes with its original wait ID and does not repeat the calls that led to the wait. See [Recovery Limits](https://github.com/agentjido/jido/blob/release/v3/guides/durability/recovery-and-effect-limits.md#work-that-can-repeat).
 
 The [offline recovery test](../../test/jido/ai/reasoning/react/runtime_contract_test.exs)
 stops the server after a tool has run and before the loop checkpoint.
 It observes four model calls, two tool calls, and one unique tool operation
 in the recorder. For customer-facing streams, see
 `Jido.AI.Reasoning.ReAct.Guards` and the
-[Support Desk example](../../examples/16_guardrail_flows/16_04_support_desk/README.md).
+[Support Desk example](https://github.com/agentjido/jido/blob/release/v3/examples/16_guardrail_flows/16_04_support_desk/README.md).
 
 ## Script the model
 
@@ -322,7 +322,7 @@ with a `Jido.Error.ValidationError` that names the context key. For a hosted
 web client, subscribe the client to a topic and use the portable `:pubsub`
 dispatch target. Use PID dispatch only for pure or transient local runs. See
 [Dispatch Adapters](../signals/dispatch-adapters.md#phoenix-pubsub) and the
-[Phoenix LiveView chat example](../../examples/24_application_patterns/24_06_phoenix_liveview_chat/README.md).
+[Phoenix LiveView chat example](https://github.com/agentjido/jido/blob/release/v3/examples/24_application_patterns/24_06_phoenix_liveview_chat/README.md).
 
 ## Next steps
 
