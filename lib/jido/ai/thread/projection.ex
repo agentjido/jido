@@ -85,8 +85,9 @@ defmodule Jido.AI.Thread.Projection do
   @spec explain(Session.t(), map()) :: {:ok, map()} | {:error, :invalid_context}
   def explain(%Session{thread: thread}, config) when is_map(config) do
     with {:ok, _thread} <- Thread.validate(thread) do
-      outcomes = request_outcomes(thread.entries)
-      message_entries = Enum.filter(thread.entries, &message_entry?/1)
+      entries = Thread.to_list(thread)
+      outcomes = request_outcomes(entries)
+      message_entries = Enum.filter(entries, &message_entry?/1)
       eligible_entries = Enum.filter(message_entries, &context_entry?(&1, outcomes))
 
       eligible_entries
@@ -100,8 +101,8 @@ defmodule Jido.AI.Thread.Projection do
         {:ok, pairs} ->
           completed = pairs |> Enum.reverse() |> complete_exchanges()
           selected = select_turns(completed, config)
-          completed_ids = entry_ids(completed)
-          selected_ids = entry_ids(selected)
+          completed_sequences = entry_sequences(completed)
+          selected_sequences = entry_sequences(selected)
 
           {:ok,
            %{
@@ -111,8 +112,8 @@ defmodule Jido.AI.Thread.Projection do
                projection_decisions(
                  message_entries,
                  eligible_entries,
-                 completed_ids,
-                 selected_ids,
+                 completed_sequences,
+                 selected_sequences,
                  outcomes
                ),
              available_messages: length(completed),
@@ -135,7 +136,8 @@ defmodule Jido.AI.Thread.Projection do
   @doc "Returns the final included Thread sequence for one projection."
   @spec breakpoint(Session.t()) :: non_neg_integer() | nil
   def breakpoint(%Session{thread: thread}) do
-    thread.entries
+    thread
+    |> Thread.to_list()
     |> context_entries()
     |> complete_exchange_entries()
     |> List.last()
@@ -169,7 +171,7 @@ defmodule Jido.AI.Thread.Projection do
 
   defp message_entry?(entry), do: entry.kind in [:ai_message, "ai_message"]
 
-  defp entry_ids(pairs), do: MapSet.new(pairs, fn {entry, _message} -> entry.id end)
+  defp entry_sequences(pairs), do: MapSet.new(pairs, fn {entry, _message} -> entry.seq end)
 
   defp portable_pair({entry, message}) do
     %{
@@ -181,18 +183,18 @@ defmodule Jido.AI.Thread.Projection do
     }
   end
 
-  defp projection_decisions(entries, eligible, completed_ids, selected_ids, outcomes) do
-    eligible_ids = MapSet.new(eligible, & &1.id)
+  defp projection_decisions(entries, eligible, completed_sequences, selected_sequences, outcomes) do
+    eligible_sequences = MapSet.new(eligible, & &1.seq)
 
     Enum.map(entries, fn entry ->
       cond do
-        not MapSet.member?(eligible_ids, entry.id) ->
+        not MapSet.member?(eligible_sequences, entry.seq) ->
           decision(entry, :excluded, request_outcome_reason(entry, outcomes))
 
-        not MapSet.member?(completed_ids, entry.id) ->
+        not MapSet.member?(completed_sequences, entry.seq) ->
           decision(entry, :excluded, :incomplete_tool_exchange)
 
-        not MapSet.member?(selected_ids, entry.id) ->
+        not MapSet.member?(selected_sequences, entry.seq) ->
           decision(entry, :excluded, :outside_context_window)
 
         true ->

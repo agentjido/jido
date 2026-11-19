@@ -5,6 +5,7 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
   alias Jido.AI.{Budget, Thread.Projection}
   alias Jido.AI.Reasoning.ReAct.Guards
   alias Jido.Telemetry.AI, as: Telemetry
+  alias Jido.Thread
 
   use Jido.Action,
     id: "jido.ai/reasoning/actions/finalize-turn",
@@ -52,7 +53,8 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
         else: Map.put(turn.agent_state, :session, session)
 
     session_entries =
-      session.thread.entries
+      session.thread
+      |> Thread.to_list()
       |> Enum.drop(Map.get(turn, :session_entry_count, 0))
       |> Enum.map(&Jido.Thread.Entry.encode/1)
 

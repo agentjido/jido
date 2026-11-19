@@ -36,6 +36,8 @@ thread =
 
 The Thread always assigns `:seq`, and replaces any value you pass. `Jido.Thread.Entry.new/1` builds an entry before you append it.
 
+`Jido.Thread.to_list/1` reads entries in append order. A later entry can have an earlier timestamp.
+
 `:kind` has no fixed list. Each feature defines its own kinds. For example, the AI layer records `:ai_message` entries, as [Thread Projection](../ai/thread-projection.md) describes.
 
 ### Read entries
@@ -143,6 +145,8 @@ document = Session.encode(record)
 ```
 
 `Jido.Thread.encode/1` and `Jido.Thread.decode/1` do the same for a Thread. `Jido.Session.decode!/1` raises instead of returning an error.
+
+Thread and Entry decoders accept either an atom key or a string key for a field. If both forms occur for the same field, decode returns an error.
 
 These maps use a `"version"` field and are not routed by `Jido.Codec`. Call `Jido.Session.encode/1` and `Jido.Session.decode/1` directly. Only version 1 can be read.
 

@@ -35,6 +35,7 @@ tests with its obligation tags.
 | `jido.plugin` | Generic Plugin SDK and callback contracts | `test/contracts/jido/plugin.*` |
 | `jido.telemetry` | Telemetry, metrics, tracing, logs, and Debug support | `test/contracts/jido/telemetry.*` |
 | `jido.error` | Shared error taxonomy and stable common codes | `test/contracts/jido/error.*` |
+| `jido.thread` | Thread and Entry sequence rules and portable maps | `test/contracts/jido/thread.*` |
 | `jido.plugin.audit` | Bundled Audit Plugin behavior | `test/contracts/jido.plugin/audit.*` |
 | `jido.plugin.bus` | Bundled Bus Plugin behavior | `test/contracts/jido.plugin/bus.*` |
 | `jido.plugin.timer` | Bundled Timer Plugin behavior | `test/contracts/jido.plugin/timer.*` |
