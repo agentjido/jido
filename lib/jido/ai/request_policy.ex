@@ -17,6 +17,10 @@ defmodule Jido.AI.RequestPolicy do
 
   alias Jido.AI.Agent.Plugin
   alias Jido.AI.Toolset
+  alias Jido.Joi
+
+  @policy_fields [:instructions, :review_tools, :tool_policy, :limits]
+  @neutral_tool_policy %{visible: [], hidden: [], review: [], requirement: :optional, reason: nil}
 
   @limit_params %{
     model_calls: :max_model_calls,
@@ -31,6 +35,49 @@ defmodule Jido.AI.RequestPolicy do
     tool_output_bytes: :max_tool_output_bytes,
     output_chars: :max_output_chars
   }
+
+  @doc false
+  @spec prepare(module(), map(), map(), map()) :: map()
+  def prepare(flow, params, defaults, request) do
+    case Map.take(defaults, @policy_fields) do
+      policy when map_size(policy) == 0 -> params
+      policy -> apply_policy(flow.schema(), params, policy, request)
+    end
+  end
+
+  defp apply_policy(schema, params, policy, request) do
+    fields =
+      case Joi.Schema.fields(schema) do
+        {:ok, fields} when is_list(fields) -> fields
+        _other -> []
+      end
+
+    # Leave invalid input for normal Flow validation, even when policy could replace it.
+    policy = Map.reject(policy, fn {key, _value} -> invalid_policy_field?(fields, request, key) end)
+    effective = narrow(params, policy, request)
+
+    with %{tool_policy: _agent_policy} <- policy,
+         {:ok, schema} <- Keyword.fetch(fields, :tool_policy),
+         {:ok, policy_fields} when is_list(policy_fields) <- Joi.Schema.fields(schema) do
+      # A custom Flow can omit standard fields when they have no policy effect.
+      Map.update!(effective, :tool_policy, fn tool_policy ->
+        Map.reject(tool_policy, fn {key, value} ->
+          not Keyword.has_key?(policy_fields, key) and Map.fetch!(@neutral_tool_policy, key) == value
+        end)
+      end)
+    else
+      _other -> effective
+    end
+  end
+
+  defp invalid_policy_field?(fields, request, key) do
+    with {:ok, schema} <- Keyword.fetch(fields, key),
+         {:ok, value} <- Map.fetch(request, key) do
+      not match?({:ok, _value}, Joi.parse(schema, value))
+    else
+      _other -> false
+    end
+  end
 
   @doc "Applies Agent defaults to validated Flow input, given the raw request data."
   @spec narrow(map(), map(), map()) :: map()
@@ -71,14 +118,14 @@ defmodule Jido.AI.RequestPolicy do
   defp keep_review(params, _defaults), do: params
 
   defp narrow_tool_policy(params, %{tool_policy: agent_policy}) do
-    Map.put(params, :tool_policy, Toolset.narrow_policy(agent_policy, Map.get(params, :tool_policy, %{})))
+    Map.put(params, :tool_policy, Toolset.narrow_policy(agent_policy, map_field(params, :tool_policy)))
   end
 
   defp narrow_tool_policy(params, _defaults), do: params
 
   defp narrow_limits(params, %{limits: agent_limits}, request) when is_map(agent_limits) do
-    limits = Map.get(params, :limits) || %{}
-    requested = Map.get(request, :limits, %{})
+    limits = map_field(params, :limits)
+    requested = map_field(request, :limits)
 
     narrowed =
       Enum.reduce(agent_limits, limits, fn {key, agent_value}, result ->
@@ -90,6 +137,13 @@ defmodule Jido.AI.RequestPolicy do
   end
 
   defp narrow_limits(params, _defaults, _request), do: params
+
+  defp map_field(map, key) do
+    case Map.get(map, key) do
+      value when is_map(value) -> value
+      _other -> %{}
+    end
+  end
 
   defp tighter(nil, value), do: value
   defp tighter(agent_value, nil), do: agent_value

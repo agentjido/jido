@@ -271,15 +271,17 @@ defmodule Jido.Agent.Topology do
   end
 
   defp endpoint(%{} = value, _agents, plugins) do
-    if value in Extension.endpoints(plugins),
-      do: {:ok, value},
-      else:
-        Error.validation_result(
-          :unknown_endpoint,
-          [],
-          "Endpoint is not declared by a selected provider",
-          value
-        )
+    with {:ok, endpoints} <- Extension.endpoints(plugins) do
+      if value in endpoints,
+        do: {:ok, value},
+        else:
+          Error.validation_result(
+            :unknown_endpoint,
+            [],
+            "Endpoint is not declared by a selected provider",
+            value
+          )
+    end
   end
 
   defp endpoint(_, _, _), do: Error.validation_result(:invalid_endpoint, [], "Expected a typed endpoint Map")

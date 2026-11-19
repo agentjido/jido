@@ -58,6 +58,46 @@ defmodule Jido.Agent.AuthoringExtensionTest do
     def run(params, _context), do: {:ok, params}
   end
 
+  defmodule FaultyAuthoring do
+    use Jido.Plugin, id: "test.faulty_authoring"
+
+    def normalize(%{normalize: :throw}), do: throw(:bad_data)
+    def normalize(%{normalize: :exit}), do: exit(:bad_data)
+    def normalize(%{normalize: :invalid}), do: :unexpected
+    def normalize(data), do: {:ok, data}
+
+    def derive_routes(%{derive: true}), do: raise("route failed")
+    def derive_routes(_data), do: []
+
+    def verify(%{verify: :invalid}, _definition), do: :unexpected
+    def verify(%{verify: :raise}, _definition), do: raise("verification failed")
+
+    def verify(_data, _definition) do
+      if observer = Process.get({__MODULE__, :observer}), do: send(observer, :verified_authoring)
+
+      case Process.get({__MODULE__, :fail}) do
+        :raise -> raise("verification failed")
+        :invalid -> :unexpected
+        nil -> :ok
+      end
+    end
+  end
+
+  defmodule FaultyId do
+    use Jido.Plugin, id: raise("ID failed")
+  end
+
+  defmodule FaultyManifest do
+    use Jido.Plugin, id: "test.faulty_manifest", vsn: 1
+
+    defoverridable __jido_catalog_manifest__: 0
+    def __jido_catalog_manifest__, do: exit(:bad_manifest)
+  end
+
+  defmodule VerifiedHost do
+    use Jido.Agent, name: "verified_host", plugins: [FaultyAuthoring]
+  end
+
   defmodule Routed do
     use Jido.Plugin, id: "test.routed"
 
@@ -116,6 +156,80 @@ defmodule Jido.Agent.AuthoringExtensionTest do
 
   defp contribution(provider, data),
     do: %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}
+
+  @tag obligation: "jido.agent.I22"
+  test "Map authoring reports provider failures and malformed callback returns" do
+    for {plugin, data, callback, kind, reason} <- [
+          {FaultyId, %{}, :id, :error, %RuntimeError{message: "ID failed"}},
+          {FaultyManifest, %{}, :__jido_catalog_manifest__, :exit, :bad_manifest},
+          {FaultyAuthoring, %{normalize: :throw}, :normalize, :throw, :bad_data},
+          {FaultyAuthoring, %{normalize: :exit}, :normalize, :exit, :bad_data},
+          {FaultyAuthoring, %{normalize: :invalid}, :normalize, :return, :unexpected},
+          {FaultyAuthoring, %{derive: true}, :derive_routes, :error, %RuntimeError{message: "route failed"}},
+          {FaultyAuthoring, %{verify: :invalid}, :verify, :return, :unexpected},
+          {FaultyAuthoring, %{verify: :raise}, :verify, :error, %RuntimeError{message: "verification failed"}}
+        ] do
+      id = if plugin == FaultyId, do: "unused", else: plugin.id()
+      attrs = %{name: "provider fault", plugins: [%{provider: plugin, id: id, vsn: 1, data: data}]}
+
+      assert {:error,
+              %Jido.Error.ValidationError{
+                path: [:plugins, 0 | _callback_path],
+                details: %{provider: ^plugin, callback: ^callback, failure_kind: ^kind, reason: ^reason}
+              } = error} = Agent.define(attrs)
+
+      assert_raise Jido.Error.ValidationError, error.message, fn -> Agent.define!(attrs) end
+    end
+  end
+
+  @tag obligation: "jido.agent.I22"
+  test "a provider fault returns an error at every Agent value boundary" do
+    definition = VerifiedHost.definition()
+    agent = VerifiedHost.instantiate!(id: "verified")
+    signal = Jido.Signal.new!("test.run", %{}, source: "/test")
+
+    for {fault, kind, reason} <- [
+          {:raise, :error, %RuntimeError{message: "verification failed"}},
+          {:invalid, :return, :unexpected}
+        ] do
+      Process.put({FaultyAuthoring, :fail}, fault)
+
+      for result <- [
+            Agent.validate(definition),
+            Agent.validate(agent),
+            Agent.instantiate(definition, id: "probe"),
+            VerifiedHost.instantiate(id: "probe"),
+            Agent.set(agent, %{}),
+            Agent.cmd(agent, signal)
+          ] do
+        assert {:error,
+                %Jido.Error.ValidationError{
+                  path: [:plugins, 0],
+                  details: %{provider: FaultyAuthoring, callback: :verify, failure_kind: ^kind, reason: ^reason}
+                }} = result
+      end
+    end
+  end
+
+  @tag obligation: "jido.agent.I1"
+  test "compiled and value authoring verify the current provider and return equal definitions" do
+    Process.put({FaultyAuthoring, :observer}, self())
+    definition = VerifiedHost.definition()
+    assert_received :verified_authoring
+    refute_received :verified_authoring
+
+    assert Agent.definition(VerifiedHost) === definition
+    assert_received :verified_authoring
+    refute_received :verified_authoring
+    assert {:ok, agent} = VerifiedHost.instantiate(id: "verified-once")
+    assert Agent.definition(agent) === definition
+    assert_received :verified_authoring
+    refute_received :verified_authoring
+
+    assert {:ok, ^agent} = Agent.instantiate(definition, id: "verified-once")
+    assert_received :verified_authoring
+    refute_received :verified_authoring
+  end
 
   @tag obligation: ["jido.agent.I1", "jido.agent.I10"]
   test "DSL lowering and Map data produce the same contribution once" do
@@ -207,7 +321,7 @@ defmodule Jido.Agent.AuthoringExtensionTest do
              Extension.lower([%{provider: Boundary, config: config}], dsl)
 
     endpoint = %{kind: :boundary, name: :output}
-    assert Extension.endpoints([contribution(Boundary, %{endpoint: endpoint})]) === [endpoint]
+    assert Extension.endpoints([contribution(Boundary, %{endpoint: endpoint})]) === {:ok, [endpoint]}
   end
 
   @tag obligation: ["jido.agent.I10", "jido.agent.I22"]

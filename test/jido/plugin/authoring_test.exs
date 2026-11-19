@@ -7,6 +7,22 @@ defmodule Jido.Plugin.AuthoringTest do
     use Jido.Plugin
   end
 
+  defmodule AuthoringOverrides do
+    use Jido.Plugin
+
+    @impl true
+    def normalize(data) do
+      with {:ok, normalized} <- super(data), do: {:ok, Map.put(normalized, :normalized, true)}
+    end
+
+    @impl true
+    def verify(data, definition) do
+      with :ok <- super(data, definition) do
+        if data[:normalized], do: :ok, else: {:error, :not_normalized}
+      end
+    end
+  end
+
   defmodule Combined do
     use Jido.Plugin
     def state_spec(_opts), do: :none
@@ -176,6 +192,23 @@ defmodule Jido.Plugin.AuthoringTest do
     assert module.id() == "contract.dynamic-supported"
     assert module.vsn() == 2
     assert %{option_keys: %{agent: [:limit]}} = module.__jido_plugin__()
+  end
+
+  @tag obligation: "jido.plugin.I1"
+  test "authoring overrides use the shared default results through super" do
+    data = %{limit: 3}
+    assert Empty.normalize(data) == {:ok, data}
+    assert AuthoringOverrides.normalize(data) == {:ok, %{limit: 3, normalized: true}}
+    assert Empty.verify(data, %{}) == :ok
+    assert AuthoringOverrides.verify(data, %{}) == {:error, :not_normalized}
+    assert AuthoringOverrides.verify(%{normalized: true}, %{}) == :ok
+
+    for invalid <- [[:invalid], %{invalid: self()}] do
+      assert {:error, reason} = Empty.normalize(invalid)
+      assert AuthoringOverrides.normalize(invalid) == {:error, reason}
+    end
+
+    refute function_exported?(AuthoringOverrides, :__jido_plugin__, 0)
   end
 
   @tag obligation: ["jido.plugin.I1", "jido.plugin.I7"]

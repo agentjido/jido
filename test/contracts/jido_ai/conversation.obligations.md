@@ -24,7 +24,7 @@ exchanges, and bounded context selection. It uses the ordered history from
 ### jido_ai.conversation.I2 — Complete exchanges only
 
 - **scope:** `Jido.AI.Thread.Projection.context/2`, `project/2`, `explain/2`
-- **must:** Include an assistant tool request only when every call has one matching tool result. Exclude incomplete exchanges without changing stored Thread entries.
+- **must:** Include an assistant tool request only when every call has one matching tool result. Assemble complete exchanges in chronological order with a linear list pass. Exclude incomplete exchanges without changing stored Thread entries.
 - **kind:** functional
 - **status:** active
 
@@ -46,5 +46,12 @@ exchanges, and bounded context selection. It uses the ordered history from
 
 - **scope:** tool message encoding and ReqLLM restoration
 - **must:** Preserve valid text, image, and file content parts, structured tool output metadata, tool call identity, and reasoning details through Thread storage and context restoration.
+- **kind:** persisted-format
+- **status:** active
+
+### jido_ai.conversation.I6 — Validate the portable Session boundary
+
+- **scope:** `Jido.Session`
+- **must:** Enforce portable Session invariants in Agent state. Read supported version 1 fields and defaults. Return a tagged error for conflicting fields and malformed nested data.
 - **kind:** persisted-format
 - **status:** active

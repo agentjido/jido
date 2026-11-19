@@ -5,6 +5,7 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
   alias Jido.AI.Agent.Plugin
   alias Jido.AI.Reasoning.ReAct.Guards
   alias Jido.AI.{RequestPolicy, Thread.Projection, Toolset, ToolSource, Usage}
+  alias Jido.Session
 
   use Jido.Action,
     id: "jido.ai/reasoning/actions/start-request",
@@ -26,11 +27,13 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
 
     with {:ok, guards} <- Guards.capture(Map.get(params, :flow), context),
          {:ok, session, session_owner} <- session(agent_state, context, now),
+         :ok <- validate_retained_session(agent_state, session_owner),
          {:ok, dynamic_tools} <- ToolSource.load(context),
          {:ok, selection} <-
            Toolset.select(static_tools ++ dynamic_tools, Map.get(params, :tool_policy, %{})),
          {:ok, session} <-
-           Projection.append(session, %{role: :user, content: params.input}, refs, now) do
+           Projection.append(session, %{role: :user, content: params.input}, refs, now),
+         {:ok, document} <- Session.encode_for_runic(session) do
       review_tools =
         if Map.get(params, :review_tools, false), do: selection.visible, else: selection.review
 
@@ -38,7 +41,7 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
 
       turn = %{
         agent_state: turn_agent_state(agent_state, session_owner),
-        session: Jido.Session.encode(session),
+        session: document,
         session_owner: session_owner,
         session_entry_count: session.thread.rev - 1,
         request_id: request_id,
@@ -93,23 +96,35 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
     end
   end
 
-  defp session(_agent_state, %{jido_ai_session: value}, _now) do
-    with {:ok, session} <- Jido.Session.decode(value),
-         true <- Jido.Session.open?(session) do
-      {:ok, session, :caller}
+  defp session(_agent_state, %{jido_ai_session: value}, _now),
+    do: open_session(value, :caller)
+
+  defp session(%{session: %Session{} = session}, _context, _now),
+    do: open_session(session, :agent)
+
+  defp session(%{session: value}, _context, _now) when not is_nil(value),
+    do: {:error, :invalid_session}
+
+  defp session(_state, context, now) do
+    agent_id = Map.get(context, :agent_id, Jido.Id.uuid7())
+    {:ok, Session.new(id: "session:#{agent_id}", now: now), :agent}
+  end
+
+  defp open_session(value, owner) do
+    with {:ok, session} <- Session.decode(value),
+         true <- Session.open?(session) do
+      {:ok, session, owner}
     else
       false -> {:error, :closed_session}
       {:error, _reason} -> {:error, :invalid_session}
     end
   end
 
-  defp session(%{session: %Jido.Session{} = session}, _context, _now),
-    do: {:ok, session, :agent}
-
-  defp session(_state, context, now) do
-    agent_id = Map.get(context, :agent_id, Jido.Id.uuid7())
-    {:ok, Jido.Session.new(id: "session:#{agent_id}", now: now), :agent}
+  defp validate_retained_session(%{session: %Session{} = session}, :caller) do
+    with {:ok, _document} <- Session.encode_for_runic(session), do: :ok
   end
+
+  defp validate_retained_session(_agent_state, _owner), do: :ok
 
   defp turn_agent_state(agent_state, :agent), do: Map.delete(agent_state, :session)
   defp turn_agent_state(agent_state, :caller), do: agent_state

@@ -38,7 +38,11 @@ defmodule Jido.Plugin.NormalizerTest do
     @impl true
     def directives(opts) do
       send(self(), {:callback, :directives, opts})
-      Keyword.get(opts, :directives, [Effect])
+
+      case Keyword.get(opts, :directives, [Effect]) do
+        :improper -> [Effect | :invalid_tail]
+        result -> result
+      end
     end
 
     @impl true
@@ -153,6 +157,11 @@ defmodule Jido.Plugin.NormalizerTest do
     def admit(_runtime, _admission, _opts), do: {:ok, nil}
   end
 
+  defmodule ReadinessOnly do
+    use Jido.Plugin
+    def await_ready(_runtime, _opts), do: {:error, :still_starting}
+  end
+
   @tag obligation: ["jido.plugin.I1", "jido.plugin.I2"]
   test "one declaration exposes stable identity and exact callback owners" do
     assert Configurable.id() == "contract.configurable"
@@ -165,7 +174,7 @@ defmodule Jido.Plugin.NormalizerTest do
     assert manifest.persistence == nil
 
     assert Plugin.owner_callbacks() == [
-             agent: [prepare: 2, select_route: 2, state_spec: 1, directives: 1, reduce: 2],
+             agent: [prepare: 2, prepare_route_input: 4, select_route: 2, state_spec: 1, directives: 1, reduce: 2],
              agent_server: [
                validate_options: 1,
                admit: 3,
@@ -400,6 +409,30 @@ defmodule Jido.Plugin.NormalizerTest do
              Normalizer.normalize_all([UnhandledDirective])
   end
 
+  @tag obligation: "jido.plugin.I6"
+  test "readiness requires a runtime root on both declaration paths" do
+    spec = %Plugin.Spec{
+      module: ReadinessOnly,
+      options: [],
+      manifest: ReadinessOnly.__jido_plugin__(),
+      agent_server: %Plugin.Spec.Runtime{module: ReadinessOnly, package: ReadinessOnly, options: []}
+    }
+
+    for result <- [
+          Normalizer.normalize_all([ReadinessOnly]),
+          Normalizer.normalize_all([spec]),
+          define_with_plugin(ReadinessOnly, %{})
+        ] do
+      assert {:error,
+              %Jido.Error.ValidationError{
+                details: %{plugin: ReadinessOnly, callback: {:await_ready, 2}, requires: {:child_spec, 1}}
+              }} = result
+    end
+
+    assert {:ok, [%{agent_server: %{runtime?: false}}]} = Normalizer.normalize_all([ServerOnly])
+    assert {:ok, [%{agent_server: %{runtime?: true}}]} = Normalizer.normalize_all([Full])
+  end
+
   @tag obligation: "jido.plugin.I5"
   test "removed callback forms and dynamic state schemas are rejected" do
     assert {:error, %{details: %{plugin: LegacyDirectiveValidation, callback: {:validate_directive, 2}}}} =
@@ -466,6 +499,35 @@ defmodule Jido.Plugin.NormalizerTest do
              ])
   end
 
+  @tag obligation: "jido.plugin.I5"
+  test "Directive ownership rejects nil" do
+    assert {:ok, [spec]} = Normalizer.normalize_all([Configurable])
+    invalid_spec = %{spec | agent: %{spec.agent | directive_modules: [nil]}}
+
+    for result <- [
+          Normalizer.normalize_all([{Configurable, directives: [nil]}]),
+          Normalizer.normalize_all([invalid_spec]),
+          define_with_plugin(Configurable, %{directives: [nil]})
+        ] do
+      assert {:error, %Jido.Error.ValidationError{details: %{plugin: Configurable, directive: nil}}} = result
+    end
+  end
+
+  @tag obligation: ["jido.plugin.I5", "jido.plugin.I7"]
+  test "Directive ownership rejects improper lists" do
+    assert {:ok, [spec]} = Normalizer.normalize_all([Configurable])
+    improper = [Effect | :invalid_tail]
+    invalid_spec = %{spec | agent: %{spec.agent | directive_modules: improper}}
+
+    for result <- [
+          Normalizer.normalize_all([{Configurable, directives: :improper}]),
+          Normalizer.normalize_all([invalid_spec]),
+          define_with_plugin(Configurable, %{directives: :improper})
+        ] do
+      assert {:error, %Jido.Error.ValidationError{details: %{plugin: Configurable, directives: ^improper}}} = result
+    end
+  end
+
   @tag obligation: ["jido.plugin.I6", "jido.plugin.I7"]
   test "option validation preserves explicit errors and contains faults" do
     expected = Jido.Error.validation_error("rejected")
@@ -516,6 +578,23 @@ defmodule Jido.Plugin.NormalizerTest do
              ])
   end
 
+  @tag obligation: "jido.plugin.I7"
+  test "state declaration preserves explicit reasons at Agent definition" do
+    for reason <- [:rejected, %{code: :rejected}, %URI{}] do
+      result = {:error, reason}
+      assert Normalizer.normalize_all([{StateResult, result: result}]) === result
+      assert define_with_plugin(StateResult, %{result: result}) === result
+    end
+
+    schema = Jido.Joi.integer() |> Jido.Joi.default(0)
+    assert {:ok, definition} = define_with_plugin(StateResult, %{result: {:error, schema}})
+    assert {:ok, %{state: %{error: 0}}} = Jido.Agent.instantiate(definition, id: "state-owner")
+
+    assert {:ok, [spec]} = Normalizer.normalize_all([{StateResult, result: {:error, schema}}])
+    invalid = %{spec | agent: %{spec.agent | state_schema: :invalid}}
+    assert {:error, %Jido.Error.ValidationError{}} = Normalizer.normalize_all([invalid])
+  end
+
   @tag obligation: "jido.plugin.I5"
   test "Directive lookup returns only the Plugin that declared the type" do
     assert {:ok, [spec]} = Normalizer.normalize_all([{Configurable, validation: :ok}])
@@ -524,5 +603,12 @@ defmodule Jido.Plugin.NormalizerTest do
     assert Plugin.directive_owner([server, spec], %Effect{}) == spec
     assert Plugin.directive_owner([spec], %PlainStruct{}) == nil
     assert Plugin.directive_owner(:invalid, %Effect{}) == nil
+  end
+
+  defp define_with_plugin(module, data) do
+    Jido.Agent.define(%{
+      name: "plugin_contract",
+      plugins: [%{provider: module, id: module.id(), vsn: module.vsn(), data: data}]
+    })
   end
 end

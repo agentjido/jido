@@ -87,7 +87,7 @@ Implement these to extend Jido. An optional callback can be left out.
 | --- | --- | --- | --- |
 | `Jido.Action` | `c:Jido.Action.run/2` | `c:Jido.Action.on_before_validate_params/1` | [Actions](../actions/actions.md) |
 | `Jido.Agent` | None | `c:Jido.Agent.initialize/2`, `c:Jido.Agent.checkpoint/2`, `c:Jido.Agent.restore/2` | [Agent Callbacks](../agents/agent-callbacks.md) |
-| `Jido.Plugin` | None | `c:Jido.Plugin.state_spec/1`, `c:Jido.Plugin.validate_options/1`, `c:Jido.Plugin.directives/1`, `c:Jido.Plugin.select_route/2`, `c:Jido.Plugin.prepare/2`, `c:Jido.Plugin.reduce/2`, `c:Jido.Plugin.admit/3`, `c:Jido.Plugin.prepare_outbound/4`, `c:Jido.Plugin.dispatch/4`, `c:Jido.Plugin.after_commit/3`, `c:Jido.Plugin.child_spec/1`, `c:Jido.Plugin.await_ready/2`, `c:Jido.Plugin.dump/3`, `c:Jido.Plugin.load/3` | [Plugin Design](../plugins/plugin-design.md) |
+| `Jido.Plugin` | None | `c:Jido.Plugin.state_spec/1`, `c:Jido.Plugin.validate_options/1`, `c:Jido.Plugin.directives/1`, `c:Jido.Plugin.select_route/2`, `c:Jido.Plugin.prepare/2`, `c:Jido.Plugin.prepare_route_input/4`, `c:Jido.Plugin.reduce/2`, `c:Jido.Plugin.admit/3`, `c:Jido.Plugin.prepare_outbound/4`, `c:Jido.Plugin.dispatch/4`, `c:Jido.Plugin.after_commit/3`, `c:Jido.Plugin.child_spec/1`, `c:Jido.Plugin.await_ready/2`, `c:Jido.Plugin.dump/3`, `c:Jido.Plugin.load/3` | [Plugin Design](../plugins/plugin-design.md) |
 | `Jido.Persistence.Store` | `c:Jido.Persistence.Store.validate_options/1`, `c:Jido.Persistence.Store.get/2`, `c:Jido.Persistence.Store.compare_and_swap/4`, `c:Jido.Persistence.Store.delete/2` | `c:Jido.Persistence.Store.put/3`, `c:Jido.Persistence.Store.scan/4` | Custom Adapters |
 | `Jido.Signal.Dispatch.Adapter` | `c:Jido.Signal.Dispatch.Adapter.options_schema/0`, `c:Jido.Signal.Dispatch.Adapter.deliver/2` | None | [Signal Dispatch Adapters](../signals/dispatch-adapters.md) |
 | `Jido.Signal.Bus.Store` | `c:Jido.Signal.Bus.Store.init/1`, `c:Jido.Signal.Bus.Store.append/2`, `c:Jido.Signal.Bus.Store.read/2`, `c:Jido.Signal.Bus.Store.latest_cursor/1`, `c:Jido.Signal.Bus.Store.put_subscription/2`, `c:Jido.Signal.Bus.Store.list_subscriptions/1`, `c:Jido.Signal.Bus.Store.delete_subscription/2` | None | [Durable Subscriptions](../signals/durable-subscriptions.md) |
@@ -151,10 +151,11 @@ Runs one serialized Agent Turn at a time.
 | `Jido.AgentServer.await/2` | Waits for a submitted Turn and returns its `TurnResult`. |
 | `Jido.AgentServer.await_ready/2` | Waits for Plugin startup and readiness. |
 | `Jido.AgentServer.call/3` | Runs one Signal and waits for its accepted `TurnResult`. |
-| `Jido.AgentServer.cancel_turn/3` | Cancels one exact queued, running, or waiting Turn. |
+| `Jido.AgentServer.cancel_turn/3` | Cancels the matching active or waiting Turn, including a pending Handoff in its chain. |
 | `Jido.AgentServer.cast/3` | Sends one Signal through the same Turn path and discards its reply. |
 | `Jido.AgentServer.child_spec/1` | Returns a child specification for one complete activation. |
 | `Jido.AgentServer.quiesce/2` | Closes admission and returns a stable `Status`. |
+| `Jido.AgentServer.remove_topology_member/4` | Drains and removes one declared member slot from this activation. |
 | `Jido.AgentServer.resume/2` | Reopens admission when the activation is safe. |
 | `Jido.AgentServer.snapshot/2` | Returns the complete committed `Snapshot`. |
 | `Jido.AgentServer.status/2` | Returns the process-neutral semantic `Status`. |
@@ -773,11 +774,11 @@ A portable Agent Session that owns one `Jido.Thread`.
 | `Jido.Session.decode!/1` | Decodes and validates a portable Session map or raises on invalid data. |
 | `Jido.Session.encode/1` | Returns a versioned portable map. |
 | `Jido.Session.from_thread/2` | Builds an open Session around an existing Thread. |
-| `Jido.Session.new/1` | Creates an open Session with one empty Thread. |
+| `Jido.Session.new/1` | Creates an open Session with an empty Thread or a supplied Thread. |
 | `Jido.Session.open?/1` | Returns true when the Session accepts entries. |
 | `Jido.Session.put_metadata/2` | Replaces the portable Session metadata. |
-| `Jido.Session.schema/0` | Returns the portable Session schema. |
-| `Jido.Session.state_schema/0` | Returns the strict schema used when a Session is in Agent state. |
+| `Jido.Session.schema/0` | Returns the schema for the shape of a portable Session. |
+| `Jido.Session.state_schema/0` | Returns the schema that validates a portable Session in Agent state. |
 
 ### `Jido.Thread`
 

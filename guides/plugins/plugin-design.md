@@ -65,6 +65,7 @@ Each callback has one owner. The owner decides where the callback runs and what 
 |---|---|---|---|
 | Agent | `prepare/2` | Derive portable input for this Turn. | Plugin Routing |
 | Agent | `select_route/2` | Choose among matching routes. | Plugin Routing |
+| Agent | `prepare_route_input/4` | Prepare parameters for the selected Action or Flow. | Plugin Routing |
 | Agent | `state_spec/1` | Declare one owned state field and its schema. | Plugin State |
 | Agent | `directives/1` | Declare owned Directive types. | Custom Directives |
 | Agent | `reduce/2` | Compute the next value of the owned field. | Plugin State |
@@ -86,7 +87,7 @@ On the live path, one Turn calls Plugin callbacks in this order:
 1. `prepare/2` for each Plugin, in declaration order.
 2. `admit/3` for each Plugin, in declaration order.
 3. `select_route/2` on the one Plugin that defines it, if any.
-4. The route handler runs. Jido rejects the result if the handler changed a Plugin-owned field.
+4. `prepare_route_input/4` for each Plugin in declaration order. Jido then validates and runs the selected Action or Flow. Jido rejects the result if the handler changed a Plugin-owned field.
 5. Jido validates every Directive, and then runs `reduce/2` for each Plugin in declaration order.
 6. `dump/3` when the server has persistence configured.
 7. Commit. The caller of `Jido.AgentServer.call/3` receives its result.
@@ -179,6 +180,7 @@ The map above is the form a plugin takes in a data-defined Agent. `use Jido.Agen
 |---|---|
 | `reduce/2` requires `state_spec/1`. | A reducer needs a field to own. |
 | `dump/3` and `load/3` come as a pair and require `state_spec/1`. | Conversion applies only to an owned value. |
+| `await_ready/2` requires `child_spec/1`. | A readiness check needs a runtime root. |
 | `dispatch/4` requires `directives/1` with at least one type. | Dispatch handles only owned types. |
 | An owned Directive needs `reduce/2` or `dispatch/4`. | Something must consume it. |
 | Each owned Directive module defines a struct and `validate/1`. | Jido validates every Directive before commit. |

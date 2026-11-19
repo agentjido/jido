@@ -72,7 +72,7 @@ defmodule Jido.AgentServer.Status do
         }
 
   @doc false
-  def new(runtime_phase, data, _mailbox) do
+  def new(runtime_phase, data) do
     %__MODULE__{
       agent_address: data.agent_address,
       agent_activation_id: data.agent_activation_id,
@@ -84,7 +84,7 @@ defmodule Jido.AgentServer.Status do
       agent_revision: data.agent_revision,
       persistence_revision: data.persistence_revision,
       admission: data.admission_mode,
-      queue_depth: MapSet.size(data.postponed),
+      queue_depth: map_size(data.postponed),
       active_turn_id: if(data.active, do: data.active.turn_id),
       waits: if(data.active, do: data.active.waits, else: []),
       last_outcome: safe_outcome(data.last_outcome),

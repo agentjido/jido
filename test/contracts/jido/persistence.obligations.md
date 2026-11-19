@@ -36,7 +36,7 @@ wake record layout and wake recovery health, but not wait semantics.
 ### jido.persistence.I1 — Explicit adapter configuration
 
 - **scope:** `Jido.Persistence.resolve_config/2`, `Jido.Persistence.Store.open/1`
-- **must:** Accept a module or `{module, keyword}` Store declaration as shorthand for the Term codec. Accept one unique `store:` and `codec:` profile. Treat nil and false as disabled. Resolve inheritance only from the selected Jido instance. Use that one profile for Agent, Flow, and wake records. Reject a per-Agent Store replacement. Require a stable namespace and create or validate its exact codec and record-layout manifest before durable work starts.
+- **must:** Accept a module or `{module, keyword}` Store declaration as shorthand for the Term codec. Accept one unique `store:` and `codec:` profile. Treat nil and false as disabled. Resolve inheritance only from the selected Jido instance. Use that one profile for Agent, Flow, and wake records. Reject a per-Agent Store replacement. Require a stable namespace and create or validate its exact codec and record-layout manifest before durable work starts. Direct Agent writes must validate an existing manifest or confirm its creation before writing the Agent record. AgentServer uses the profile confirmed at instance startup.
 - **why:** A storage operation needs one valid and explicit storage authority.
 - **kind:** functional
 - **status:** active
@@ -100,7 +100,7 @@ wake record layout and wake recovery health, but not wait semantics.
 ### jido.persistence.I9 — Portable term boundary
 
 - **scope:** snapshots, records, and converted Plugin state
-- **must:** Use the compact Term persistence codec by default and the bounded tagged JSON codec only when selected by the instance profile. Accept nested portable values. Reject processes, ports, references, functions, improper lists, non-byte-aligned bitstrings, and other local runtime values. Restore atoms only when they exist in the compatible application release. Return a bounded path to a rejected checkpoint value and do not write invalid data.
+- **must:** Use the compact Term persistence codec by default and the bounded tagged JSON codec only when selected by the instance profile. Accept nested portable values. Count the same logical depth in JSON encoding, module loading, and decoding. Reject processes, ports, references, functions, improper lists, non-byte-aligned bitstrings, and other local runtime values. Restore atoms only when they exist in the compatible application release. Return a bounded path to a rejected checkpoint value and do not write invalid data.
 - **why:** Durable data must be safe to move to another BEAM instance.
 - **kind:** persisted-format
 - **status:** active
@@ -135,8 +135,8 @@ the expected predecessor; a stale write leaves the newer record unchanged.
 
 ### jido.persistence.I13 — Tombstone deletion
 
-- **scope:** `Jido.Persistence.delete_agent/4`
-- **must:** Replace an active record with a compact tombstone through compare-and-swap. Keep its last revision. Create revision zero when deletion finds no record. Treat repeat deletion as success without another write. A tombstone fences later saves, and a delete race cannot replace a newer active record.
+- **scope:** module-qualified and Address-only Agent deletion
+- **must:** Replace an active record with a compact tombstone through compare-and-swap using the condition from the same read as the validated record. Advance the record revision by one and retain the Agent revision. For a missing record, a module-qualified delete creates revision zero and an Address-only delete returns `{:error, :not_found}`. Treat repeat deletion as success without another write. A tombstone fences later saves, and a delete race cannot replace a newer active record.
 - **why:** Deletion must remain visible to stale writers and later restores.
 - **kind:** ordering
 - **status:** active
@@ -152,7 +152,7 @@ the expected predecessor; a stale write leaves the newer record unchanged.
 ### jido.persistence.I15 — Built-in adapter conformance and inspection
 
 - **scope:** built-in persistence adapters
-- **must:** Each active built-in adapter obeys the shared binary read, atomic compare-and-swap, mandatory delete, and strict unique-option contract. Redis does not accept automatic TTL. Ecto rejects writes inside an outer Repo transaction. Optional scans are paged, prefix-bounded, and use bounded page work. Runtime recovery never uses scan. Inspection tasks load configuration without starting the application or Agents. They safely decode only V3 records and produce JSON. Exact inspection needs explicit full mode for saved values. JSONL export redacts Agent state and projects prepared values, fact values, and execution batches to metadata and shape by default.
+- **must:** Each active built-in adapter obeys the shared binary read, atomic compare-and-swap, mandatory delete, and strict unique-option contract. Redis does not accept automatic TTL. Ecto rejects writes inside an outer Repo transaction. Optional scans are paged, prefix-bounded, and use bounded page work. Store rejects invalid pages and unchanged nonterminal cursors. Runtime recovery never uses scan. Inspection tasks load configuration without starting the application or Agents. They safely decode only V3 records and produce JSON. Default exact inspection and JSONL export omit saved Agent definition values, state, Turn payloads, and topology handoff data. Show those values only with an explicit sensitive-output option. Keep prepared values, fact values, and execution batches projected to metadata and shape in exports.
 - **why:** All bundled adapters must implement the same durability boundary while developer inspection stays above the byte Store.
 - **kind:** functional
 - **status:** active
@@ -168,7 +168,7 @@ the expected predecessor; a stale write leaves the newer record unchanged.
 ### jido.persistence.I17 — Sharded wake durability and recovery health
 
 - **scope:** `Jido.Persistence.WakeStore`, `Jido.Instance.Wake`
-- **must:** Store timed wakes in deterministic one-minute buckets and 64 shards. Keep a small active index that records each shard generation. Confirm the shard and index before the Agent wait record commits. Do not remove a newer generation during concurrent cleanup. Retry failed startup reads before readiness. Retry failed cleanup with an observable warning. Delete a delivered or stale wake without delivering it again. Do not use Store scan for runtime recovery.
+- **must:** Store timed wakes in deterministic one-minute buckets and 64 shards. Keep a small active index that records each shard generation. Confirm the shard and index before the Agent wait record commits. Return a recovery error if an indexed shard is missing or older than the index entry. Accept a newer shard during recovery. Do not remove a newer generation during concurrent cleanup. Retry failed startup reads before readiness. Retry failed cleanup with an observable warning. Delete a delivered or stale wake without delivering it again. Do not use Store scan for runtime recovery.
 - **why:** A committed timed wait must remain reachable across crashes, cleanup races, and temporary Store failures.
 - **kind:** ordering
 - **status:** active

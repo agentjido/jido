@@ -38,6 +38,20 @@ defmodule Jido.AI.Tools.BoundariesContractTest do
     def run_tool(_call, %{run: :throw}, _context), do: throw(:source_run_failed)
   end
 
+  @tag obligation: "jido_ai.tools.I1"
+  test "nil entries and improper tool lists return errors" do
+    assert {:error, {:invalid_tool, nil}} = Toolset.validate([nil])
+    assert {:error, {:invalid_runtime_tool, nil}} = Toolset.select([nil])
+    assert {:error, {:invalid_runtime_tool, nil}} = Toolset.definitions([nil])
+
+    for validate <- [&Toolset.validate/1, &Toolset.select/1, &Toolset.definitions/1] do
+      assert {:error, _reason} = validate.([Tools.Add | :tail])
+    end
+
+    assert {:error, %{code: :invalid_tools, path: [:tools]}} =
+             Jido.AI.Agent.Plugin.normalize(%{reasoning: Jido.AI.Reasoning.ReAct, tools: [nil]})
+  end
+
   @tag obligation: "jido_ai.tools.I6"
   test "tool result normalization handles content, truncation, and invalid local values" do
     result = %ReqLLM.ToolResult{

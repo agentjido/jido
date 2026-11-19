@@ -5,6 +5,27 @@ defmodule Jido.SignalTest do
   alias Jido.Id
 
   describe "new/1" do
+    test "rejects repeated attributes in both keyword constructor forms" do
+      assert {:error, "parse error: duplicate attribute :id"} =
+               Signal.new(id: "first", id: "second", type: "test.created", source: "/test")
+
+      assert {:error, "parse error: duplicate attribute :id"} =
+               Signal.new("test.created", nil, source: "/test", id: "first", id: "second")
+    end
+
+    test "requires an absolute dataschema URI without a fragment for new Signals" do
+      for uri <- ["https://example.com/schema#v1", "https://example.com/schema#", "/schema"] do
+        assert {:error, reason} = Signal.new(type: "test.created", source: "/test#source", dataschema: uri)
+        assert reason =~ "dataschema"
+      end
+
+      for uri <- ["https://example.com/schema%23v1?version=1", "urn:example:schema:v1"] do
+        assert {:ok, signal} = Signal.new(type: "test.created", source: "/test#source", dataschema: uri)
+        assert signal.dataschema == uri
+        assert signal.source == "/test#source"
+      end
+    end
+
     test "generates a UUID7 and CloudEvents 1.0 specversion" do
       assert {:ok, signal} = Signal.new(type: "example.event", source: "/example")
 

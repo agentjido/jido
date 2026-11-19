@@ -46,6 +46,54 @@ defmodule Jido.Signal.CodecTest do
       assert {:error, {:json_decode_failed, message}} = Jido.Signal.Codec.deserialize("{invalid")
       assert is_binary(message)
     end
+
+    test "rejects repeated envelope keys but preserves nested data key handling" do
+      envelope = ~S("specversion":"1.0","id":"first","source":"/test","type":"test.created")
+
+      for extra <- [~S("i\u0064":"second"), ~S("tenantid":"one","tenantid":"two")] do
+        duplicate = "{" <> envelope <> "," <> extra <> "}"
+
+        assert {:error, {:json_decode_failed, reason}} = SignalCodec.deserialize(duplicate)
+        assert reason =~ "duplicate attribute"
+        assert {:error, {:json_decode_failed, ^reason}} = SignalCodec.deserialize("[" <> duplicate <> "]")
+      end
+
+      data = ~S({"id":"first","id":"second","nested":[{"id":"inner"}]})
+      json = "{" <> envelope <> ",\"data\":" <> data <> "}"
+
+      assert {:ok, decoded} = SignalCodec.deserialize(json <> " \n")
+      assert decoded.data == JSON.decode!(data)
+    end
+
+    test "requires text or raw bytes for non-JSON media types" do
+      signal = Signal.new!("test.text", %{"count" => 2}, source: "/test", datacontenttype: "text/plain")
+
+      for input <- [signal, [%{signal | data: "text"}, signal], %{signal | data: nil}] do
+        assert {:error, {:json_encode_failed, _message}} = SignalCodec.serialize(input)
+      end
+
+      assert {:ok, term} = SignalCodec.serialize(signal, format: :erlang_term)
+      assert {:ok, ^signal} = SignalCodec.deserialize(term, format: :erlang_term)
+      assert {:ok, ^signal} = SignalCodec.deserialize(JSON.encode!(SignalCodec.to_map(signal)))
+
+      text = %{signal | data: "hello", datacontenttype: "TEXT/PLAIN; charset=utf-8"}
+      binary = %{signal | data: <<255>>}
+      absent = %{signal | data: nil, data_present?: false}
+      json = %{signal | datacontenttype: "Application/Problem+JSON; charset=utf-8"}
+      null = %{signal | data: nil, datacontenttype: "APPLICATION/JSON"}
+
+      assert {:ok, encoded} = SignalCodec.serialize([text, binary, absent, json, null])
+
+      assert [
+               %{"data" => "hello"},
+               %{"data_base64" => "/w=="},
+               absent_wire,
+               %{"data" => %{"count" => 2}},
+               %{"data" => nil}
+             ] = JSON.decode!(encoded)
+
+      refute Map.has_key?(absent_wire, "data")
+    end
   end
 
   describe "Erlang term format" do
@@ -63,6 +111,21 @@ defmodule Jido.Signal.CodecTest do
                Jido.Signal.Codec.deserialize(<<1, 2, 3>>, format: :erlang_term)
 
       assert is_binary(message)
+    end
+
+    test "requires the complete Erlang term input to contain one event or batch" do
+      signal = Signal.new!(type: "test.created", source: "/test")
+      opts = [format: :erlang_term]
+
+      for input <- [signal, [signal]] do
+        encoded = SignalCodec.serialize!(input, opts)
+        assert {:ok, ^input} = SignalCodec.deserialize(encoded, opts)
+
+        for extra <- [<<0>>, :erlang.term_to_binary(:ok)] do
+          assert {:error, {:erlang_term_decode_failed, _message}} =
+                   SignalCodec.deserialize(encoded <> extra, opts)
+        end
+      end
     end
 
     test "rejects a decoded value that is not a Signal envelope" do
@@ -191,6 +254,34 @@ defmodule Jido.Signal.CodecTest do
 
       assert {:error, error} = Jido.Signal.Codec.deserialize(json)
       assert error =~ "source"
+    end
+
+    test "validates existing Signals before writing a map or binary" do
+      signal = Signal.new!(type: "test.created", source: "/test")
+
+      for {field, value} <- [
+            id: nil,
+            specversion: nil,
+            specversion: "2.0",
+            time: "bad",
+            extensions: %{invalid: %{}},
+            data_present?: nil,
+            data_base64?: nil
+          ] do
+        invalid = Map.replace!(signal, field, value)
+        assert_raise ArgumentError, fn -> SignalCodec.to_map(invalid) end
+        assert_raise RuntimeError, fn -> SignalCodec.serialize!(invalid) end
+
+        for format <- [:json, :erlang_term], input <- [invalid, [signal, invalid]] do
+          assert {:error, {:serialization_failed, _message}} = SignalCodec.serialize(input, format: format)
+        end
+      end
+
+      datetime = ~U[2026-11-19 12:00:00Z]
+      direct = %Signal{id: signal.id, type: signal.type, source: signal.source, time: datetime, data: "present"}
+
+      assert %{"id" => id, "time" => "2026-11-19T12:00:00Z", "data" => "present"} = SignalCodec.to_map(direct)
+      assert id == signal.id
     end
 
     test "rejects non-Signal input and unsupported formats" do

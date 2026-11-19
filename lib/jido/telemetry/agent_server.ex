@@ -53,22 +53,24 @@ defmodule Jido.Telemetry.AgentServer do
   def start_turn(metadata), do: Semantic.start(@turn_prefix, metadata)
 
   @doc false
-  @spec start_effects(map(), non_neg_integer()) :: :ok
-  def start_effects(metadata, directive_count) do
+  @spec start_effects(Semantic.span(), non_neg_integer()) :: :ok
+  def start_effects(span, directive_count) do
     Semantic.point(
       [:jido, :agent_server, :effects, :start],
-      metadata,
-      %{directive_count: directive_count}
+      span.metadata,
+      %{directive_count: directive_count},
+      parent_span: span.otel
     )
   end
 
   @doc false
-  @spec finish_effects(map(), atom(), atom(), non_neg_integer(), non_neg_integer()) :: :ok
-  def finish_effects(metadata, status, stage, completed, count) do
+  @spec finish_effects(Semantic.span(), atom(), atom(), non_neg_integer(), non_neg_integer()) :: :ok
+  def finish_effects(span, status, stage, completed, count) do
     Semantic.point(
       [:jido, :agent_server, :effects, :stop],
-      Map.merge(metadata, %{committed?: true, stage: stage, status: status(status)}),
-      %{directive_completed: completed, directive_count: count}
+      Map.merge(span.metadata, %{committed?: true, stage: stage, status: status(status)}),
+      %{directive_completed: completed, directive_count: count},
+      parent_span: span.otel
     )
   end
 
@@ -88,7 +90,13 @@ defmodule Jido.Telemetry.AgentServer do
     end
 
     Semantic.finish(span, metadata, measurements)
-    Semantic.point([:jido, :agent_server, :turn, :settled], Map.merge(span.metadata, metadata), measurements)
+
+    Semantic.point(
+      [:jido, :agent_server, :turn, :settled],
+      Map.merge(span.metadata, metadata),
+      measurements,
+      parent_span: span.otel
+    )
   end
 
   @doc false

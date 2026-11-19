@@ -8,6 +8,9 @@ defmodule Jido.Agent.Plugin do
   reject a Signal, or prepare one portable package-owned input for execution.
   It cannot change the Signal, caller context, route, or Agent state.
 
+  After route selection, the route input callbacks can prepare the parameters
+  that the selected Action or Flow will validate.
+
   An Agent Plugin can also own one field in the complete Agent state map and
   one or more Directive types. After executable success, it can inspect the
   current candidate state and validated Directives. It can reduce only its
@@ -130,6 +133,42 @@ defmodule Jido.Agent.Plugin do
           plugins: Enum.map(selectors, & &1.package)
         })
     end
+  end
+
+  @doc false
+  @spec prepare_route_input(map(), map(), map(), [Spec.t()]) :: {:ok, map()} | {:error, term()}
+  def prepare_route_input(route, request, params, specs) do
+    Enum.reduce_while(specs, {:ok, params}, fn spec, {:ok, current} ->
+      if function_exported?(spec.module, :prepare_route_input, 4) do
+        result =
+          PluginBoundary.invoke(
+            spec.package,
+            spec.module,
+            :prepare_route_input,
+            [route, request, current, spec.options],
+            "Agent Plugin route input preparation failed"
+          )
+
+        case result do
+          {:ok, params} when is_map(params) and not is_struct(params) ->
+            {:cont, {:ok, params}}
+
+          {:error, _reason} = error ->
+            {:halt, error}
+
+          other ->
+            {:halt,
+             PluginBoundary.invalid_callback(
+               "Agent Plugin prepare_route_input/4 returned an invalid result",
+               spec.package,
+               spec.module,
+               %{result: other}
+             )}
+        end
+      else
+        {:cont, {:ok, current}}
+      end
+    end)
   end
 
   @doc false

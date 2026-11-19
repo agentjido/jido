@@ -8,7 +8,7 @@ A Plugin can own one field in the complete Agent state. This guide gives the rul
 
 - `{key, schema}` to own the field `key`, validated by a `Jido.Joi` schema.
 - `:none` to own nothing.
-- `{:error, reason}` to reject the declaration.
+- `{:error, reason}` to reject the declaration. When the second element is a Joi schema, the tuple declares the field `:error`.
 
 Jido merges the field into the Agent's schema, so domain fields and Plugin fields share one Map and one validation pass. Give the schema a default so that the Agent can instantiate without a value.
 

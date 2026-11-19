@@ -168,7 +168,11 @@ end
 | `Jido.AgentServer.hibernate/2` | Saves, then stops. See [Hibernate and Thaw](hibernate-thaw-and-activate.md). |
 | `Jido.stop/1` | Stops the instance and all its Agents. |
 
-`stop` returns after the activation has exited. A wait that expires exits the caller, and an Action in a Turn gets `{:error, :reentrant_turn}` from `stop`. Stopping does not wait for the active Turn. To let it finish first, call `Jido.AgentServer.quiesce/2`.
+`Jido.AgentServer.stop/3` closes admission, rejects queued requests, and lets
+accepted work finish. It captures the final committed snapshot and returns it
+after the activation exits. If the drain budget expires, stop returns
+`{:error, :quiesce_timeout}` and admission stays closed. An Action in a Turn
+gets `{:error, :reentrant_turn}` from `stop/3`.
 
 ## Why a worker stopped
 

@@ -170,6 +170,25 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "read and repair return an error for an invalid saved batch", c do
+    assert {:ok, 1} = Store.append(c.id, [:first], c.jido)
+    {:ok, config} = Jido.Persistence.Config.open(c.config)
+    {:ok, invalid_batch} = Jido.Persistence.Config.encode(config, 1)
+    records = Agent.get(c.store, & &1)
+    batch_key = Enum.find(Map.keys(records), &String.ends_with?(&1, ":batches:1"))
+    count_key = Enum.find(Map.keys(records), &(&1 != batch_key))
+    committed = Map.put(records, batch_key, invalid_batch)
+    tail = Map.delete(committed, count_key)
+
+    for invalid <- [committed, tail] do
+      Agent.update(c.store, fn _records -> invalid end)
+      assert {:error, :invalid_execution_checkpoint} = Store.read_workflow(config, c.id)
+      assert {:error, :invalid_execution_checkpoint} = Store.stream(c.id, c.jido)
+      assert Agent.get(c.store, & &1) == invalid
+    end
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
   test "stores and restores one complete fact value", c do
     value = %{input: %{session: large_session()}, results: %{}}
 

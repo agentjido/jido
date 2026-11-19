@@ -15,7 +15,7 @@ defmodule Jido.AI.Reasoning.Adaptive do
           input: Joi.union([Joi.string(), Joi.list(Joi.map())]),
           instructions: Joi.string() |> Joi.optional(),
           model: Joi.string() |> Joi.optional(),
-          options: Joi.map() |> Joi.optional(),
+          options: Jido.AI.ModelOptions.schema() |> Joi.optional(),
           prompt_cache:
             Joi.object(
               %{

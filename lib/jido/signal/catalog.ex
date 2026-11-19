@@ -60,14 +60,13 @@ defmodule Jido.Signal.Catalog do
   """
 
   alias Jido.Signal
-  alias Jido.Signal.Context
   alias Jido.Error
   alias Jido.Error.ValidationError
   alias Jido.Signal.Codec, as: SignalCodec
 
   @definitions_schema Joi.list(Joi.atom() |> Joi.refine({__MODULE__, :validate_definition, []}))
   @type_schema Keyword.fetch!(Signal.schema().fields, :type)
-  @dataschema_schema Keyword.fetch!(Signal.schema().fields, :dataschema)
+  @dataschema_schema Signal.__definition_dataschema_schema__()
   @data_schema Joi.any() |> Joi.refine({Signal, :validate_definition_schema, []})
   @definition_schema Joi.object(%{
                        type: @type_schema,
@@ -249,26 +248,13 @@ defmodule Jido.Signal.Catalog do
   defp validate_definition_data(catalog, signal) do
     with {:ok, {module, schema}} <- lookup(catalog, signal),
          {:ok, data} <- validate_data(schema, signal, module) do
-      normalize_data(signal, data)
-    end
-  end
-
-  defp normalize_data(%Signal{data: data} = signal, data), do: {:ok, signal}
-
-  defp normalize_data(signal, data) do
-    # The codec owns data presence and Base64 flags. Reuse it after a Joi
-    # default or transform changes data, without generating a new fact ID.
-    case signal |> Map.put(:data, data) |> SignalCodec.to_map() |> SignalCodec.from_map() do
-      {:ok, signal} -> {:ok, signal}
-      {:error, reason} -> error(:invalid_envelope, %{reason: reason})
+      {:ok, Signal.__replace_data__(signal, data)}
     end
   end
 
   defp validate_envelope(signal) do
-    with {:ok, context} <- Context.normalize(signal.extensions),
-         {:ok, signal} <- Joi.parse(Signal.schema(), %{signal | extensions: context}) do
-      {:ok, signal}
-    else
+    case Signal.__validate_envelope__(signal) do
+      {:ok, signal} -> {:ok, signal}
       {:error, reason} -> error(:invalid_envelope, %{reason: reason})
     end
   end

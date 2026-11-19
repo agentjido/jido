@@ -13,7 +13,7 @@ defmodule Jido.Telemetry.Semantic do
   @status_values ~w(ok error cancelled timed_out conflict indeterminate not_found rejected)a
   @stage_values ~w(evaluate commit after_commit directive)a
   @kind_values ~w(error throw exit)a
-  @operation_values ~w(activate stop hibernate thaw load compare_and_swap delete)a
+  @operation_values ~w(activate stop hibernate thaw load compare_and_swap delete scan)a
   @admission_values ~w(deadline_expired overloaded)a
   @persistence_values ~w(commit activate stop hibernate thaw manual topology stored_upgrade)a
   @topology_values ~w(activate repair update place cleanup)a
@@ -37,7 +37,7 @@ defmodule Jido.Telemetry.Semantic do
           required(:at) => integer(),
           optional(:terminal_guard) => :atomics.atomics_ref(),
           optional(:log_scope) => atom() | nil,
-          optional(:otel) => OpenTelemetry.Span.t() | nil
+          required(:otel) => OpenTelemetry.Span.t() | nil
         }
 
   @doc false
@@ -114,6 +114,7 @@ defmodule Jido.Telemetry.Semantic do
   @doc false
   def point(event, metadata, measurements \\ %{}, opts \\ []) do
     at = System.monotonic_time()
+    metadata = safe_metadata(metadata)
 
     measurements =
       measurements
@@ -164,22 +165,19 @@ defmodule Jido.Telemetry.Semantic do
 
   @doc false
   def error_metadata(reason) do
-    public = Error.to_map(reason)
-
-    %{error_type: public.type, retryable?: public.retryable?}
+    %{error_type: Error.type(reason), retryable?: Error.retryable?(reason)}
     |> maybe_put(:error_code, Error.code(reason))
   end
 
   @doc false
-  def normalize_metadata(metadata) when is_map(metadata) do
+  def normalize_metadata(metadata) do
     metadata
+    |> safe_metadata()
     |> Enum.reduce(%{schema_version: @schema_version}, &normalize_field/2)
   end
 
-  def normalize_metadata(_metadata), do: %{schema_version: @schema_version}
-
   @doc false
-  def normalize_measurements(measurements) when is_map(measurements) do
+  def normalize_measurements(measurements) when is_map(measurements) and not is_struct(measurements) do
     Enum.reduce(measurements, %{}, fn
       {key, value}, acc when key in @signed_measurements and is_integer(value) ->
         Map.put(acc, key, value)
@@ -256,7 +254,7 @@ defmodule Jido.Telemetry.Semantic do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  defp safe_metadata(metadata) when is_map(metadata), do: metadata
+  defp safe_metadata(metadata) when is_map(metadata) and not is_struct(metadata), do: metadata
   defp safe_metadata(_metadata), do: %{}
 
   defp put_option(opts, key, value) do

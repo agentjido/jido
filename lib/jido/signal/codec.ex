@@ -17,12 +17,6 @@ defmodule Jido.Signal.Codec do
   alias Jido.Signal
 
   @default_max_payload_bytes 10_000_000
-  @core_names ~w[
-    specversion id source type subject time
-    datacontenttype dataschema data data_base64
-  ]
-  @legacy_wire_version_key "jido_schema_version"
-  @legacy_wire_versions [1, 2]
 
   @type format :: :json | :erlang_term
 
@@ -43,30 +37,25 @@ defmodule Jido.Signal.Codec do
 
   @doc "Parses a complete CloudEvents structured-mode map."
   @spec from_map(map()) :: {:ok, Signal.t()} | {:error, String.t()}
-  def from_map(map) when is_map(map) do
-    with {:ok, attrs} <- normalize_attribute_keys(map),
-         :ok <- validate_specversion(attrs),
-         :ok <- validate_legacy_wire_version(attrs),
-         {:ok, data, data_present?, data_base64?} <- extract_data(attrs),
-         {:ok, extensions} <- extract_extensions(attrs) do
-      parse_signal(attrs, data, data_present?, data_base64?, extensions)
-    end
-  end
+  def from_map(map) when is_map(map), do: Signal.__from_wire_map__(map)
 
   def from_map(_map), do: {:error, "parse error: expected a map"}
 
-  @doc "Returns the canonical CloudEvents structured-mode map."
+  @doc "Returns the canonical CloudEvents structured-mode map. Raises for an invalid envelope."
   @spec to_map(Signal.t()) :: map()
   def to_map(%Signal{} = signal) do
-    extensions =
-      case Signal.normalize_extensions(signal.extensions) do
-        {:ok, extensions} -> extensions
-        {:error, reason} -> raise ArgumentError, "invalid Signal extensions: #{reason}"
-      end
+    signal = %{signal | time: Signal.__normalize_time__(signal.time)}
 
-    signal
-    |> core_map()
-    |> Map.merge(extensions)
+    case Signal.__validate_envelope__(signal) do
+      {:ok, validated} ->
+        Map.merge(core_map(validated), validated.extensions)
+
+      {:error, errors} when is_list(errors) ->
+        raise ArgumentError, "invalid Signal envelope: #{Joi.prettify_errors(errors)}"
+
+      {:error, reason} ->
+        raise ArgumentError, "invalid Signal envelope: #{reason}"
+    end
   end
 
   defp core_map(signal) do
@@ -76,7 +65,7 @@ defmodule Jido.Signal.Codec do
       "source" => signal.source,
       "type" => signal.type,
       "subject" => signal.subject,
-      "time" => normalize_time(signal.time),
+      "time" => signal.time,
       "datacontenttype" => signal.datacontenttype,
       "dataschema" => signal.dataschema
     }
@@ -94,112 +83,6 @@ defmodule Jido.Signal.Codec do
   end
 
   defp encode_data(data, _present?, _base64?), do: %{"data" => data}
-
-  defp normalize_time(%DateTime{} = time), do: DateTime.to_iso8601(time)
-  defp normalize_time(time), do: time
-
-  defp normalize_attribute_keys(map) do
-    Enum.reduce_while(Map.to_list(map), {:ok, %{}}, fn {key, value}, {:ok, normalized} ->
-      with {:ok, key} <- normalize_attribute_key(key),
-           false <- Map.has_key?(normalized, key) do
-        {:cont, {:ok, Map.put(normalized, key, value)}}
-      else
-        true -> {:halt, {:error, "parse error: duplicate attribute #{inspect(key)}"}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-  end
-
-  defp normalize_attribute_key(key) when is_atom(key), do: {:ok, Atom.to_string(key)}
-
-  defp normalize_attribute_key(key) when is_binary(key) do
-    if String.valid?(key),
-      do: {:ok, key},
-      else: {:error, "parse error: attribute names must be valid UTF-8 strings"}
-  end
-
-  defp normalize_attribute_key(key),
-    do: {:error, "parse error: attribute keys must be atoms or strings, got: #{inspect(key)}"}
-
-  defp extract_data(attrs) do
-    case {Map.fetch(attrs, "data"), Map.fetch(attrs, "data_base64")} do
-      {{:ok, _data}, {:ok, _encoded}} ->
-        {:error, "parse error: data and data_base64 are mutually exclusive"}
-
-      {{:ok, data}, :error} ->
-        {:ok, data, true, is_binary(data) and not String.valid?(data)}
-
-      {:error, {:ok, encoded}} ->
-        decode_data_base64(encoded)
-
-      {:error, :error} ->
-        {:ok, nil, false, false}
-    end
-  end
-
-  defp decode_data_base64(encoded) when is_binary(encoded) do
-    case Base.decode64(encoded) do
-      {:ok, binary} -> {:ok, binary, true, true}
-      :error -> {:error, "parse error: data_base64 must be valid Base64"}
-    end
-  end
-
-  defp decode_data_base64(_encoded),
-    do: {:error, "parse error: data_base64 must be a Base64 string"}
-
-  defp extract_extensions(attrs) do
-    attrs
-    |> Map.drop(@core_names ++ [@legacy_wire_version_key])
-    |> Map.reject(fn {_name, value} -> is_nil(value) end)
-    |> Signal.normalize_extensions()
-    |> case do
-      {:ok, extensions} -> {:ok, extensions}
-      {:error, reason} -> {:error, "parse error: #{reason}"}
-    end
-  end
-
-  defp parse_signal(attrs, data, data_present?, data_base64?, extensions) do
-    signal =
-      struct(Signal,
-        data: data,
-        data_present?: data_present?,
-        data_base64?: data_base64?,
-        datacontenttype: Map.get(attrs, "datacontenttype"),
-        dataschema: Map.get(attrs, "dataschema"),
-        extensions: extensions,
-        id: Map.get(attrs, "id"),
-        source: Map.get(attrs, "source"),
-        specversion: normalize_specversion(Map.get(attrs, "specversion")),
-        subject: Map.get(attrs, "subject"),
-        time: normalize_time(Map.get(attrs, "time")),
-        type: Map.get(attrs, "type")
-      )
-
-    case Joi.parse(Signal.schema(), signal) do
-      {:ok, validated} -> {:ok, validated}
-      {:error, errors} -> {:error, "parse error: #{Joi.prettify_errors(errors)}"}
-    end
-  end
-
-  defp normalize_specversion("1.0.2"), do: "1.0"
-  defp normalize_specversion(value), do: value
-
-  defp validate_specversion(%{"specversion" => value}) when not is_nil(value), do: :ok
-  defp validate_specversion(_attrs), do: {:error, "parse error: specversion is required"}
-
-  defp validate_legacy_wire_version(%{@legacy_wire_version_key => version})
-       when version in @legacy_wire_versions,
-       do: :ok
-
-  defp validate_legacy_wire_version(%{@legacy_wire_version_key => nil}), do: :ok
-
-  defp validate_legacy_wire_version(map)
-       when not is_map_key(map, @legacy_wire_version_key),
-       do: :ok
-
-  defp validate_legacy_wire_version(%{@legacy_wire_version_key => version}) do
-    {:error, "parse error: unsupported jido_schema_version #{inspect(version)}"}
-  end
 
   @doc "Encodes one Signal or a list of Signals."
   @spec serialize(Signal.t() | [Signal.t()], keyword()) ::
@@ -311,10 +194,15 @@ defmodule Jido.Signal.Codec do
   end
 
   defp encode(data, :json) do
-    if json_value?(data) do
-      {:ok, JSON.encode!(data)}
-    else
-      {:error, {:json_encode_failed, "Signal data must contain JSON values or binary data"}}
+    cond do
+      not Enum.all?(List.wrap(data), &json_media_type_compatible?/1) ->
+        {:error, {:json_encode_failed, "a non-JSON media type requires text or Base64 data"}}
+
+      json_value?(data) ->
+        {:ok, JSON.encode!(data)}
+
+      true ->
+        {:error, {:json_encode_failed, "Signal data must contain JSON values or binary data"}}
     end
   rescue
     error -> {:error, {:json_encode_failed, Exception.message(error)}}
@@ -322,11 +210,33 @@ defmodule Jido.Signal.Codec do
 
   defp encode(data, :erlang_term), do: {:ok, :erlang.term_to_binary(data)}
 
+  defp json_media_type_compatible?(%{"data" => data, "datacontenttype" => type})
+       when not is_binary(data) do
+    [media | _params] = String.split(type, ";", parts: 2)
+    media |> String.trim_trailing() |> String.downcase() |> String.ends_with?(["/json", "+json"])
+  end
+
+  defp json_media_type_compatible?(_wire), do: true
+
   defp decode(binary, :json) do
-    case JSON.decode(binary) do
-      {:ok, data} -> {:ok, data}
+    # Only a root object or an immediate object in a root batch is an envelope.
+    decoders = [
+      object_start: &json_object_start/1,
+      object_push: &json_object_push/3,
+      object_finish: fn {_kind, object}, parent -> {object, parent} end,
+      array_start: &json_array_start/1,
+      array_push: fn item, {kind, items} -> {kind, [item | items]} end,
+      array_finish: fn {_kind, items}, parent -> {Enum.reverse(items), parent} end
+    ]
+
+    case JSON.decode(binary, :root, decoders) do
+      {data, :root, ""} -> {:ok, data}
+      {_data, :root, _rest} -> {:error, {:json_decode_failed, "unexpected bytes after the JSON value"}}
       {:error, reason} -> {:error, {:json_decode_failed, inspect(reason)}}
     end
+  catch
+    {:duplicate_signal_attribute, key} ->
+      {:error, {:json_decode_failed, "duplicate attribute #{inspect(key)}"}}
   end
 
   defp decode(binary, :erlang_term) do
@@ -335,13 +245,31 @@ defmodule Jido.Signal.Codec do
         {:error, {:erlang_term_decode_failed, "compressed Erlang terms are not accepted"}}
 
       _uncompressed ->
-        binary
-        |> :erlang.binary_to_term([:safe])
-        |> validate_wire_shape()
+        case :erlang.binary_to_term(binary, [:safe, :used]) do
+          {data, used} when used == byte_size(binary) ->
+            validate_wire_shape(data)
+
+          {_data, _used} ->
+            {:error, {:erlang_term_decode_failed, "unexpected bytes after the Erlang term"}}
+        end
     end
   rescue
     error in ArgumentError -> {:error, {:erlang_term_decode_failed, Exception.message(error)}}
   end
+
+  defp json_object_start(:root), do: {:envelope, %{}}
+  defp json_object_start({:batch, _items}), do: {:envelope, %{}}
+  defp json_object_start(_parent), do: {:object, %{}}
+
+  defp json_object_push(key, value, {:envelope, object}) do
+    if Map.has_key?(object, key), do: throw({:duplicate_signal_attribute, key})
+    {:envelope, Map.put(object, key, value)}
+  end
+
+  defp json_object_push(key, value, {:object, object}), do: {:object, Map.put_new(object, key, value)}
+
+  defp json_array_start(:root), do: {:batch, []}
+  defp json_array_start(_parent), do: {:array, []}
 
   defp validate_wire_shape(data) when is_map(data), do: {:ok, data}
 

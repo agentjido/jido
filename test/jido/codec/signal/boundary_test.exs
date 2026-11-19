@@ -30,6 +30,21 @@ defmodule Jido.Signal.BoundaryTest do
   end
 
   describe "sanitize/2" do
+    test "summarizes values with invalid formatter fields in both profiles" do
+      marker = "invalid-formatter-field"
+
+      for value <- [%URI{scheme: 42, query: marker}, %{~D[2026-11-19] | year: marker}],
+          profile <- [:telemetry, :transport] do
+        summary = Sanitizer.sanitize(value, profile)
+        assert is_map(summary)
+        assert Sanitizer.preview(value, profile) =~ "invalid_struct"
+        refute Sanitizer.preview(%{nested: value}, profile) =~ marker
+
+        signal = Signal.new!("test.created", %{nested: value}, source: "/test")
+        refute Sanitizer.preview(signal, profile) =~ marker
+      end
+    end
+
     test "uses map fields for malformed struct-valued Signal extensions" do
       secret = "extension-struct-secret-47ca"
       original = Signal.new!("test.event", %{}, source: "/test")

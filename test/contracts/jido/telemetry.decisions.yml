@@ -51,3 +51,9 @@
   decision: Fold per-instance semantic log control into Jido.Telemetry and remove the internal Jido.Debug module while retaining the Jido and generated instance debug facades.
   driver: Debug now changes only semantic Telemetry log mode. A separate state module no longer owns an independent observation concern.
   approved_by: Jido V3 API review
+
+- id: telemetry-proof-ownership
+  date: 2026-11-19
+  decision: Keep the live-runtime profile in jido.telemetry. Assign W3C values to jido.trace, runtime context to jido.trace.context, and bridge proof to jido.telemetry.open_telemetry.
+  driver: D13 assigns Trace values and propagation to Jido.Trace. The proof split follows Reach layers and supersedes the combined ownership in the earlier records.
+  approved_by: Jido V3 component review

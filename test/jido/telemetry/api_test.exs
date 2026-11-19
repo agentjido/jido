@@ -23,7 +23,7 @@ defmodule Jido.Telemetry.ApiTest do
     :ok
   end
 
-  @tag obligation: ["jido.telemetry.I1", "jido.telemetry.I7"]
+  @tag obligation: "jido.telemetry.I1"
   test "the public API is metrics and OpenTelemetry status" do
     assert function_exported?(Telemetry, :metrics, 0)
     assert function_exported?(Telemetry, :open_telemetry?, 0)

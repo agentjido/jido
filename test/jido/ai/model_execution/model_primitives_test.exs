@@ -124,6 +124,7 @@ defmodule Jido.AI.ModelExecution.PrimitivesTest do
     expect(ReqLLM, :embed, 2, fn model, input, options ->
       assert model == "openai:text-embedding-3-small"
       assert options[:return_usage]
+      assert options[:dimensions] == 2
 
       case input do
         "one" ->
@@ -138,11 +139,11 @@ defmodule Jido.AI.ModelExecution.PrimitivesTest do
       end
     end)
 
-    assert {:ok, single} = Jido.Exec.run(Embed, %{input: "one"})
+    assert {:ok, single} = Jido.Exec.run(Embed, %{input: "one", options: %{"dimensions" => 2}})
     assert single.embedding == [0.1, 0.2]
     assert single.usage.input_tokens == 1
 
-    assert {:ok, result} = Jido.Exec.run(Embed, %{input: ["one", "two"]})
+    assert {:ok, result} = Jido.Exec.run(Embed, %{input: ["one", "two"], options: %{dimensions: 2}})
     assert result.embedding == [[0.1, 0.2], [0.3, 0.4]]
     assert result.usage.input_tokens == 2
   end

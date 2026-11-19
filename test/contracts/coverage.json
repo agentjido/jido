@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 100,
+      "active": 102,
       "coverage": 1.0,
-      "covered": 100
+      "covered": 102
     },
     "jido.agent_server": {
       "active": 15,
@@ -15,15 +15,25 @@
       "coverage": 1.0,
       "covered": 30
     },
+    "jido.telemetry": {
+      "active": 2,
+      "coverage": 1.0,
+      "covered": 2
+    },
+    "jido.trace": {
+      "active": 1,
+      "coverage": 1.0,
+      "covered": 1
+    },
     "jido_action": {
       "active": 53,
       "coverage": 1.0,
       "covered": 53
     },
     "jido_ai": {
-      "active": 46,
+      "active": 48,
       "coverage": 1.0,
-      "covered": 46
+      "covered": 48
     }
   },
   "components": {
@@ -37,7 +47,7 @@
         "jido.agent.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 11,
+          "passing": 12,
           "status": "active",
           "testable": true,
           "tests": [
@@ -45,6 +55,7 @@
             "test a string route requires a handler and forward lowers to portable data",
             "test compiled Agents canonicalize string reply selectors against atom output fields",
             "test compiled Agents canonicalize string state selectors against atom output fields",
+            "test compiled and value authoring verify the current provider and return equal definitions",
             "test independent Map and DSL declarations produce the same canonical Agent",
             "test inline routes accept guarded callback clauses",
             "test inline routes compile ordinary Actions with access to private helpers",
@@ -116,7 +127,7 @@
         "jido.agent.I20": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 14,
+          "passing": 15,
           "status": "active",
           "testable": true,
           "tests": [
@@ -130,6 +141,7 @@
             "test Codec retains route defaults and writes definitions only",
             "test Codec validates the current executable kind",
             "test Codec version 1 encodes selectors and rejects other versions",
+            "test Map and Codec authoring reject an invalid explicit Signal source",
             "test hydration fails when a registered Agent provenance module is absent",
             "test portable definitions reject arbitrary values and obsolete Registry kinds",
             "test the trusted JSON codec returns the portable definition",
@@ -159,15 +171,18 @@
         "jido.agent.I22": {
           "failing": 0,
           "kind": "functional",
-          "passing": 36,
+          "passing": 40,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Map and Codec authoring reject an invalid explicit Signal source",
+            "test Map authoring reports provider failures and malformed callback returns",
             "test Signal paths reject malformed values with their source",
             "test Spark rejects invalid schema and identity options with a field path",
             "test a Plugin can contribute only exact routes",
             "test a Plugin contributes one exact route through Map authoring",
             "test a Plugin route cannot conflict with a stored route",
+            "test a provider fault returns an error at every Agent value boundary",
             "test a provider must implement the current contribution contract",
             "test an unchanged Agent checks a reloaded Action contract",
             "test authoring containers normalize keys and reject ambiguous input",
@@ -179,6 +194,7 @@
             "test constructors reject non-map input and invalid envelope options",
             "test definition and instance resolution preserve configuration exceptions",
             "test field validation follows one fixed order",
+            "test handwritten definitions must already be canonical",
             "test initialization preserves open Map keys but cannot convert list values",
             "test invalid configuration retains its validation error",
             "test invalid definitions return structured paths and bang forms raise the same error",
@@ -268,10 +284,11 @@
         "jido.agent.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 13,
+          "passing": 14,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Map and Codec authoring reject an invalid explicit Signal source",
             "test Spark rejects invalid schema and identity options with a field path",
             "test authoring containers normalize keys and reject ambiguous input",
             "test authoring traversal preserves order and stops at one structured error",
@@ -319,13 +336,14 @@
         "jido.agent.I32": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
             "test all route body forms lower to the canonical Map contract",
             "test an inline Flow route returns its exact projected state and directives",
             "test generated Agent modules expose one documented facade",
+            "test generated commands share the public result type",
             "test route bodies reject invalid role combinations",
             "test route_executable rejects terminal handlers and unknown paths",
             "test route_executable returns referenced and inline Action and Flow targets"
@@ -468,11 +486,12 @@
         "jido.agent_evaluation.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
             "test map, duplicate keyword and nil input use the original source Signal",
+            "test route input callbacks receive the original request and run in Plugin order",
             "test the first declared matching route selects one target and merges defaults shallowly"
           ]
         },
@@ -513,12 +532,13 @@
         "jido.agent_evaluation.I6": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
             "test Plugin preparation and reduction preserve declaration order and state ownership",
-            "test Plugin rejections retain application reasons and callback faults retain causes"
+            "test Plugin rejections retain application reasons and callback faults retain causes",
+            "test route input callbacks receive the original request and run in Plugin order"
           ]
         },
         "jido.agent_evaluation.I7": {
@@ -549,13 +569,14 @@
         "jido.agent_evaluation.I9": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
             "test Agent.cmd returns a terminal Handoff without running its successor",
             "test emission requests normalize once without a route output contract",
             "test failure does not undo Action work and malformed routing remains structured",
+            "test generated commands return success, errors, and the Handoff",
             "test the AgentServer Handoff boundary keeps the successor instruction and candidate complete",
             "test the complete Directive batch builds one candidate without dispatch"
           ]
@@ -563,10 +584,10 @@
       }
     },
     "jido.agent_server": {
-      "active": 13,
+      "active": 15,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 13,
+      "covered": 15,
       "form": "light",
       "obligations": {
         "jido.agent_server.I1": {
@@ -644,6 +665,29 @@
           "tests": [
             "test an exact terminal result survives restart until acknowledgement",
             "test failed and cancelled handoffs retain process-neutral results"
+          ]
+        },
+        "jido.agent_server.I106": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test stop finishes the accepted Turn while admission stays closed",
+            "test stop keeps its original activation when a registered name changes"
+          ]
+        },
+        "jido.agent_server.I107": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a call to an absent registered name leaves no reply gate",
+            "test a submission to an absent registered name leaves no reply gate",
+            "test quiesce closes the reply gates for a queued call and submission"
           ]
         },
         "jido.agent_server.I11": {
@@ -1382,7 +1426,7 @@
         "jido.agent_server.durable_turn.I2": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 16,
+          "passing": 17,
           "status": "active",
           "testable": true,
           "tests": [
@@ -1393,6 +1437,7 @@
             "test execution identity isolates partitions, Agents, and command IDs",
             "test old runtime cleanup cannot remove or collect a replacement owner's checkpoint",
             "test ordinary IDs have no execution store",
+            "test read and repair return an error for an invalid saved batch",
             "test rejects a conflicting value for one fact identity",
             "test rejects a fact value that does not match its stored digest",
             "test rejects an invalid batch count",
@@ -2215,13 +2260,15 @@
         "jido.persistence.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 12,
+          "passing": 15,
           "status": "active",
           "testable": true,
           "tests": [
             "test Store entry points reject malformed configurations, keys, options, and bytes",
             "test contains all adapter validator failure modes",
+            "test direct Agent writes honor an existing namespace pin",
             "test disabled, missing, and malformed sources fail at the configuration boundary",
+            "test instance startup and a direct write agree on one codec",
             "test missing namespaces and removed write gates fail before storage access",
             "test module and live instance sources resolve one selected adapter",
             "test normalizes module, tuple, and disabled adapter declarations",
@@ -2230,6 +2277,7 @@
             "test requires keyword options, validation, and delete",
             "test the Store behavior has one required read and atomic write contract",
             "test the documented public API excludes persistence implementation helpers",
+            "test the first direct write pins a new namespace before later instance startup",
             "test validates adapter declarations"
           ]
         },
@@ -2299,10 +2347,12 @@
         "jido.persistence.I13": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 5,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Address delete preserves a concurrent revision written after its first read",
+            "test Address deletion uses the opaque condition from the Agent read",
             "test a delete race preserves a newer active revision",
             "test failed storage reads cannot become writes",
             "test identity setup preserves adapter call order and exact stored bytes",
@@ -2313,10 +2363,11 @@
         "jido.persistence.I14": {
           "failing": 0,
           "kind": "security",
-          "passing": 5,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Address deletion uses the opaque condition from the Agent read",
             "test a changed token rejects the old candidate even when bytes match",
             "test a token stays out of restore output and semantic telemetry",
             "test opaque tokens are not replaced with equal bytes",
@@ -2327,11 +2378,13 @@
         "jido.persistence.I15": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Store rejects malformed scan pages",
             "test built-in adapters obey the required binary get and CAS contract",
+            "test default inspection and export keep saved Turn values behind explicit options",
             "test scan is optional and its facade options are strict"
           ]
         },
@@ -2350,13 +2403,14 @@
         "jido.persistence.I17": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test instance readiness waits for a retried wake recovery read",
             "test wake cleanup preserves index membership for a concurrent shard write",
-            "test wake cleanup retries a temporary Store failure"
+            "test wake cleanup retries a temporary Store failure",
+            "test wake recovery reports a missing or stale indexed shard"
           ]
         },
         "jido.persistence.I2": {
@@ -2483,10 +2537,11 @@
         "jido.persistence.I9": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 7,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
+            "test JSON saves remain readable at the logical depth limit",
             "test default persistence rejects a nested improper list without raising",
             "test default persistence rejects a process handle accepted by live state",
             "test dump callback faults and invalid values cannot write a record",
@@ -2508,11 +2563,12 @@
         "jido.plugin.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 8,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
             "test all supported use options retain their exact metadata",
+            "test authoring overrides use the shared default results through super",
             "test callbacks retain capability and pairing checks",
             "test normalization rejects mismatched metadata and invalid callback combinations",
             "test old role and facet selectors are rejected",
@@ -2576,12 +2632,14 @@
         "jido.plugin.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 7,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
             "test Agent callback declarations require safe state and Directive ownership",
             "test Directive lookup returns only the Plugin that declared the type",
+            "test Directive ownership rejects improper lists",
+            "test Directive ownership rejects nil",
             "test Directive ownership remains unique across Plugins",
             "test callbacks retain capability and pairing checks",
             "test normalization rejects mismatched metadata and invalid callback combinations",
@@ -2592,7 +2650,7 @@
         "jido.plugin.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2601,20 +2659,23 @@
             "test normalization rejects mismatched metadata and invalid callback combinations",
             "test option validation preserves explicit errors and contains faults",
             "test paired callbacks and owned values are required",
+            "test readiness requires a runtime root on both declaration paths",
             "test reused complete Specs require exact owner values"
           ]
         },
         "jido.plugin.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Directive ownership rejects improper lists",
             "test option validation preserves explicit errors and contains faults",
             "test package metadata exceptions are contained at the normalization boundary",
             "test runtime manifests are derived from Plugin callbacks",
-            "test state and Directive callbacks preserve explicit errors"
+            "test state and Directive callbacks preserve explicit errors",
+            "test state declaration preserves explicit reasons at Agent definition"
           ]
         },
         "jido.plugin.I8": {
@@ -3056,10 +3117,10 @@
       }
     },
     "jido.telemetry": {
-      "active": 8,
+      "active": 5,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 8,
+      "covered": 5,
       "form": "light",
       "obligations": {
         "jido.telemetry.I1": {
@@ -3079,7 +3140,7 @@
         "jido.telemetry.I2": {
           "failing": 0,
           "kind": "security",
-          "passing": 21,
+          "passing": 22,
           "status": "active",
           "testable": true,
           "tests": [
@@ -3088,6 +3149,7 @@
             "test a returned failure stops a span and an escaping fault reports an exception",
             "test classifies load and default write revisions without result payloads",
             "test competing finishes emit one terminal semantic event",
+            "test error classification uses no exception message callback",
             "test every load function reports revision_after",
             "test measurement normalization keeps only approved integers",
             "test metadata normalization keeps only bounded semantic fields",
@@ -3109,7 +3171,7 @@
         "jido.telemetry.I3": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 23,
+          "passing": 24,
           "status": "active",
           "testable": true,
           "tests": [
@@ -3120,6 +3182,7 @@
             "test an inferred instance source applies only its own debug override",
             "test classifies load and default write revisions without result payloads",
             "test competing finishes emit one terminal semantic event",
+            "test error classification uses no exception message callback",
             "test every load function reports revision_after",
             "test malformed observation inputs and measurement callbacks cannot change work",
             "test measurement normalization keeps only approved integers",
@@ -3181,30 +3244,169 @@
             "test the default semantic handler attaches once and handles its catalog"
           ]
         },
-        "jido.telemetry.I5": {
+        "jido.telemetry.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 14,
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test malformed observation inputs and measurement callbacks cannot change work",
+            "test returns failures and re-raises faults after one terminal event",
+            "test semantic log configuration and formatting fail closed at exact bounds",
+            "test semantic log strings stay on one line and within the byte limit"
+          ]
+        }
+      }
+    },
+    "jido.telemetry.open_telemetry": {
+      "active": 2,
+      "app": "jido.telemetry",
+      "coverage": 1.0,
+      "covered": 2,
+      "form": "light",
+      "obligations": {
+        "jido.telemetry.open_telemetry.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 26,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test OpenTelemetry carrier conversion retains validated tracestate",
+            "test W3C context crosses Signal and task boundaries",
+            "test a direct bridge span ends once",
+            "test a new Turn removes the previous Turn parent context",
+            "test a struct result measurement preserves the return and restores the caller context",
+            "test a tracer callback failure does not stop semantic emission or leak context",
+            "test an end-span failure restores the caller context",
+            "test an untraced Signal lets the SDK make the root sampling decision",
+            "test bad event names do not interrupt the caller or alter its context",
+            "test cancelled spans do not set OpenTelemetry error status",
+            "test configuration can disable OpenTelemetry without disabling semantic events",
+            "test configuration maps disable tracing and malformed configuration fails closed",
+            "test direct bridge spans accept explicit parents and links",
+            "test exception event and status failures still end spans and restore context",
+            "test exceptions set error status without recording raw exception data",
+            "test finishing a foreign span does not replace the task context",
+            "test invalid error fields cannot become OpenTelemetry attributes or status",
+            "test malformed semantic bridge options retain exact event times",
+            "test missing carriers do not install context and callback faults restore the caller context",
+            "test operation names are bounded by the semantic vocabulary",
+            "test semantic spans use bounded names and attributes",
+            "test settlement and effects spans share the completed Turn as parent",
+            "test settlement is a zero-duration span linked to its completed Turn",
+            "test store scan events and spans identify the operation without scan data",
+            "test the API no-op tracer leaves semantic spans active",
+            "test the bridge normalizes scalar attributes and drops unsupported values"
+          ]
+        },
+        "jido.telemetry.open_telemetry.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 26,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test OpenTelemetry carrier conversion retains validated tracestate",
+            "test W3C context crosses Signal and task boundaries",
+            "test a direct bridge span ends once",
+            "test a new Turn removes the previous Turn parent context",
+            "test a struct result measurement preserves the return and restores the caller context",
+            "test a tracer callback failure does not stop semantic emission or leak context",
+            "test an end-span failure restores the caller context",
+            "test an untraced Signal lets the SDK make the root sampling decision",
+            "test bad event names do not interrupt the caller or alter its context",
+            "test cancelled spans do not set OpenTelemetry error status",
+            "test configuration can disable OpenTelemetry without disabling semantic events",
+            "test configuration maps disable tracing and malformed configuration fails closed",
+            "test direct bridge spans accept explicit parents and links",
+            "test exception event and status failures still end spans and restore context",
+            "test exceptions set error status without recording raw exception data",
+            "test finishing a foreign span does not replace the task context",
+            "test invalid error fields cannot become OpenTelemetry attributes or status",
+            "test malformed semantic bridge options retain exact event times",
+            "test missing carriers do not install context and callback faults restore the caller context",
+            "test operation names are bounded by the semantic vocabulary",
+            "test semantic spans use bounded names and attributes",
+            "test settlement and effects spans share the completed Turn as parent",
+            "test settlement is a zero-duration span linked to its completed Turn",
+            "test store scan events and spans identify the operation without scan data",
+            "test the API no-op tracer leaves semantic spans active",
+            "test the bridge normalizes scalar attributes and drops unsupported values"
+          ]
+        }
+      }
+    },
+    "jido.thread": {
+      "active": 2,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 2,
+      "form": "light",
+      "obligations": {
+        "jido.thread.I1": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Entry construction, normalization, and encoding keep the exact portable value",
+            "test Thread construction, append, encoding, and decoding keep exact invariants",
+            "test preserves the false atom kind through construction, decoding, and append",
+            "test round-trips portable Thread and Entry values without feature modules",
+            "test stores feature-neutral Agent interactions in append order"
+          ]
+        },
+        "jido.thread.I2": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test rejects conflicting Thread and Entry wire keys",
+            "test rejects false in fields that take typed defaults",
+            "test rejects process-local data at the Thread value boundary",
+            "test returns decode errors for improper entry lists and incomplete Thread structs",
+            "test validates stored entries on append, encode, and decode"
+          ]
+        }
+      }
+    },
+    "jido.trace": {
+      "active": 1,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 1,
+      "form": "light",
+      "obligations": {
+        "jido.trace.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
             "test Signal context uses the canonical Trace and removes old private fields",
-            "test an incoming carrier becomes the parent of the local Turn",
-            "test an untraced Signal starts one local root context",
-            "test captured task context is restored after success and failure",
             "test children require the canonical Trace value",
             "test children retain W3C sampling data and explicit causal data",
-            "test clear removes the current context",
-            "test context input functions reject unsupported values",
             "test invalid and legacy-only values are rejected",
             "test new roots use one valid W3C representation",
-            "test old or malformed context does not become a parent",
-            "test propagation carries the active Turn span and cause",
-            "test propagation validates its boundary",
             "test telemetry context contains only validated trace and causation identifiers"
           ]
-        },
-        "jido.telemetry.I6": {
+        }
+      }
+    },
+    "jido.trace.context": {
+      "active": 1,
+      "app": "jido.trace",
+      "coverage": 1.0,
+      "covered": 1,
+      "form": "light",
+      "obligations": {
+        "jido.trace.context.I1": {
           "failing": 0,
           "kind": "ordering",
           "passing": 8,
@@ -3219,75 +3421,6 @@
             "test old or malformed context does not become a parent",
             "test propagation carries the active Turn span and cause",
             "test propagation validates its boundary"
-          ]
-        },
-        "jido.telemetry.I7": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 24,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test OpenTelemetry carrier conversion retains validated tracestate",
-            "test W3C context crosses Signal and task boundaries",
-            "test a direct bridge span ends once",
-            "test a new Turn removes the previous Turn parent context",
-            "test a tracer callback failure does not stop semantic emission or leak context",
-            "test an end-span failure restores the caller context",
-            "test an untraced Signal lets the SDK make the root sampling decision",
-            "test bad event names do not interrupt the caller or alter its context",
-            "test cancelled spans do not set OpenTelemetry error status",
-            "test configuration can disable OpenTelemetry without disabling semantic events",
-            "test configuration maps disable tracing and malformed configuration fails closed",
-            "test direct bridge spans accept explicit parents and links",
-            "test exception event and status failures still end spans and restore context",
-            "test exceptions set error status without recording raw exception data",
-            "test finishing a foreign span does not replace the task context",
-            "test invalid error fields cannot become OpenTelemetry attributes or status",
-            "test malformed semantic bridge options retain exact event times",
-            "test missing carriers do not install context and callback faults restore the caller context",
-            "test operation names are bounded by the semantic vocabulary",
-            "test semantic spans use bounded names and attributes",
-            "test settlement is a zero-duration span linked to its completed Turn",
-            "test the API no-op tracer leaves semantic spans active",
-            "test the bridge normalizes scalar attributes and drops unsupported values",
-            "test the public API is metrics and OpenTelemetry status"
-          ]
-        },
-        "jido.telemetry.I8": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 27,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test OpenTelemetry carrier conversion retains validated tracestate",
-            "test W3C context crosses Signal and task boundaries",
-            "test a direct bridge span ends once",
-            "test a new Turn removes the previous Turn parent context",
-            "test a tracer callback failure does not stop semantic emission or leak context",
-            "test an end-span failure restores the caller context",
-            "test an untraced Signal lets the SDK make the root sampling decision",
-            "test bad event names do not interrupt the caller or alter its context",
-            "test cancelled spans do not set OpenTelemetry error status",
-            "test configuration can disable OpenTelemetry without disabling semantic events",
-            "test configuration maps disable tracing and malformed configuration fails closed",
-            "test direct bridge spans accept explicit parents and links",
-            "test exception event and status failures still end spans and restore context",
-            "test exceptions set error status without recording raw exception data",
-            "test finishing a foreign span does not replace the task context",
-            "test invalid error fields cannot become OpenTelemetry attributes or status",
-            "test malformed observation inputs and measurement callbacks cannot change work",
-            "test malformed semantic bridge options retain exact event times",
-            "test missing carriers do not install context and callback faults restore the caller context",
-            "test operation names are bounded by the semantic vocabulary",
-            "test returns failures and re-raises faults after one terminal event",
-            "test semantic log configuration and formatting fail closed at exact bounds",
-            "test semantic log strings stay on one line and within the byte limit",
-            "test semantic spans use bounded names and attributes",
-            "test settlement is a zero-duration span linked to its completed Turn",
-            "test the API no-op tracer leaves semantic spans active",
-            "test the bridge normalizes scalar attributes and drops unsupported values"
           ]
         }
       }
@@ -4742,7 +4875,7 @@
         "jido_ai.agent_authoring.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 30,
+          "passing": 31,
           "status": "active",
           "testable": true,
           "tests": [
@@ -4763,6 +4896,7 @@
             "test configured reasoning defaults round-trip through Jido Authoring",
             "test inspection and preflight expose portable graph data",
             "test one model round executes multiple tool calls in one Parallel component",
+            "test portable model option keys keep the same values across the Agent codec",
             "test reasoning configuration accepts only its explicit data DSL",
             "test reasoning configuration is checked against the selected Flow schema",
             "test stored reasoning defaults preserve the type seen by the reasoning Flow",
@@ -4781,34 +4915,37 @@
       }
     },
     "jido_ai.conversation": {
-      "active": 5,
+      "active": 6,
       "app": "jido_ai",
       "coverage": 1.0,
-      "covered": 5,
+      "covered": 6,
       "form": "light",
       "obligations": {
         "jido_ai.conversation.I1": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 6,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Entry construction, normalization, and encoding keep the exact portable value",
             "test Session and Thread revisions survive versioned encoding",
             "test Session construction, encoding, and decoding keep exact ownership values",
             "test Session, Thread, and Entry expose complete immutable value operations",
-            "test Thread construction, append, encoding, and decoding keep exact invariants",
-            "test portable codecs reject unknown versions, fields, shapes, and unsafe values"
+            "test builds from an existing Thread and keeps lifecycle immutable",
+            "test constructors keep their identity and time defaults",
+            "test owns one Agent Thread without an AI or runtime owner",
+            "test portable codecs reject unknown versions, fields, shapes, and unsafe values",
+            "test round-trips a portable Session without runtime state"
           ]
         },
         "jido_ai.conversation.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 7,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a small window keeps the latest complete exchange in a long Thread",
             "test builtin tool calls and simple tool outputs restore to ReqLLM values",
             "test projection completes multi-call exchanges and preserves tool-call metadata",
             "test projection keeps a complete latest turn when a limit is smaller than that turn",
@@ -4833,10 +4970,12 @@
         "jido_ai.conversation.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a small window keeps the latest complete exchange in a long Thread",
+            "test projection distinguishes stored entries with the same ID by sequence",
             "test projection keeps a complete latest turn when a limit is smaller than that turn",
             "test projection keeps recent complete exchanges and excludes observations"
           ]
@@ -4852,6 +4991,19 @@
             "test projection completes multi-call exchanges and preserves tool-call metadata",
             "test projection restores rich content, reasoning, and thread source metadata",
             "test tool content parts and metadata survive context restoration"
+          ]
+        },
+        "jido_ai.conversation.I6": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Agent state enforces portable Session and Thread invariants",
+            "test decode returns tagged errors for malformed Threads and unsupported versions",
+            "test version 1 accepts both field key forms and equal duplicates",
+            "test version 1 rejects conflicting keys, false defaults, and document struct markers"
           ]
         }
       }
@@ -4898,7 +5050,7 @@
         "jido_ai.model_execution.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 12,
+          "passing": 13,
           "status": "active",
           "testable": true,
           "tests": [
@@ -4912,6 +5064,7 @@
             "test structured objects do not hide actionable agent tool calls",
             "test the embedding Action returns provider errors",
             "test the output guard applies the size limit to structured objects",
+            "test usage adds tool-use tokens and reasoning cost to an older aggregate",
             "test usage combines cache semantics and records cache write expiry for every TTL form",
             "test usage keeps cache counters and provider-reported cost"
           ]
@@ -4919,23 +5072,26 @@
         "jido_ai.model_execution.I4": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 19,
+          "passing": 22,
           "status": "active",
           "testable": true,
           "tests": [
             "test Context enforces an idempotent open, prepared, and completed lifecycle",
             "test ReAct returns a provider-validated structured object",
             "test applies a generic transformation once and sends the exact ReqLLM request",
+            "test known portable options reach generation and streaming as keyword entries",
             "test multimodal input reaches ReqLLM as content parts",
             "test multimodal input validates existing content part structs",
             "test multimodal support preserves the plain-text input limit",
             "test one embedding Action accepts one value or a batch",
+            "test only selected tools reach generation and streaming",
             "test prepared contexts have a safe portable snapshot for either call mode",
             "test projection explains exclusions and returns a canonical ReqLLM context",
             "test snapshots expose ReqLLM shape, safe options, response context, and call metadata",
             "test snapshots hash tool schemas and expose full schemas on request",
             "test snapshots keep fallback request and response shapes portable",
             "test snapshots safely expose full, redacted, and invalid result shapes",
+            "test stream events reuse one Session decode across chunks",
             "test stream setup returns one normal error outcome when the provider cannot start",
             "test the embedding Action returns provider errors",
             "test the output guard applies the size limit to structured objects",
@@ -5651,11 +5807,12 @@
         "jido_ai.tools.I1": {
           "failing": 0,
           "kind": "security",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test Toolset policy, definitions, and call resolution share one boundary",
+            "test nil entries and improper tool lists return errors",
             "test static tools form a protected allowlist and calls validate before use",
             "test tool selection can only narrow the Agent allowlist"
           ]
@@ -5679,10 +5836,11 @@
         "jido_ai.tools.I3": {
           "failing": 0,
           "kind": "security",
-          "passing": 20,
+          "passing": 24,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Agent policy preserves validation errors on request fields",
             "test Toolset policy, definitions, and call resolution share one boundary",
             "test a request against Agent instructions can set them when the Agent sets none",
             "test a request against Agent instructions cannot replace them",
@@ -5691,16 +5849,19 @@
             "test a request against Agent limits reaches the running request",
             "test a request against Agent limits stays free when the Agent sets none",
             "test a request against Agent review can add review, and preflight reports the result",
+            "test a request against Agent review can disable optional tools with inherited review",
             "test a request against Agent review can hide a reviewed tool",
             "test a request against Agent review cannot use string keys to get around the policy",
             "test a request against Agent review keeps review through an empty or unrelated tool_policy",
             "test a request against Agent review keeps review_tools set on the Agent",
             "test an Agent's output_chars is an upper bound for its requests",
+            "test model option keys are checked before reasoning for generation and streaming",
             "test narrow_policy/2 is unchanged by narrowing a policy with itself",
             "test narrow_policy/2 keeps a requirement that the Agent sets",
             "test narrow_policy/2 never widens visibility",
             "test requirement values reject :per_turn with the normal invalid-option error",
             "test static tools form a protected allowlist and calls validate before use",
+            "test the selected custom Flow receives protected input in direct and live requests",
             "test tool selection and call resolution return complete canonical records",
             "test tool selection can only narrow the Agent allowlist"
           ]
@@ -5755,21 +5916,20 @@
       }
     },
     "jido_ai.turn": {
-      "active": 6,
+      "active": 7,
       "app": "jido_ai",
       "coverage": 1.0,
-      "covered": 6,
+      "covered": 7,
       "form": "light",
       "obligations": {
         "jido_ai.turn.I1": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 5,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test a blocked turn returns and stores one versioned terminal outcome",
-            "test a caller-selected session must be valid and open",
             "test a caller-selected session returns an entry delta without changing Agent state",
             "test input guards accept media references and reject unsafe request shapes",
             "test request setup and finalization preserve the common response fields"
@@ -5836,14 +5996,26 @@
           "tests": [
             "test every core strategy accepts limits.output_chars with one default"
           ]
+        },
+        "jido_ai.turn.I7": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test an AI Agent command reports a Session identity error before model work",
+            "test request start rejects Sessions that Runic cannot hash and keeps their storage format",
+            "test request start requires a valid open Session from either owner"
+          ]
         }
       }
     }
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 244,
+    "active": 251,
     "coverage": 1.0,
-    "covered": 244
+    "covered": 251
   }
 }

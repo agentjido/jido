@@ -31,7 +31,7 @@ Plugin declarations that `jido.agent` produces.
 ### jido.agent_evaluation.I2 — Normalized route input
 
 - **scope:** `Jido.Agent.cmd/3`, `Jido.Agent.Runner`
-- **must:** Accept map, keyword-last-value, and nil Signal data. Shallow-merge route defaults with Signal data taking precedence. Reject other data before executable work.
+- **must:** Accept map, keyword-last-value, and nil Signal data. Shallow-merge route defaults with Signal data taking precedence. Reject other data before executable work. For an Action or Flow route, pass the original request and the merged parameters through declared route input callbacks in Plugin order. The executable validates the resulting map.
 - **kind:** functional
 - **status:** active
 
@@ -58,7 +58,7 @@ Plugin declarations that `jido.agent` produces.
 
 ### jido.agent_evaluation.I6 — Ordered Plugin preparation
 
-- **scope:** `Jido.Agent.Plugin.prepare/3`
+- **scope:** `Jido.Agent.Plugin.prepare/3`, `Jido.Agent.Plugin.prepare_route_input/4`
 - **must:** Prepare Agent Plugins in declaration order and keep portable package inputs separate. Preserve application rejection reasons and contain callback faults.
 - **kind:** ordering
 - **status:** active
@@ -86,7 +86,7 @@ Plugin declarations that `jido.agent` produces.
 
 ### jido.agent_evaluation.I10 — Closed AgentServer evaluation
 
-- **scope:** `Jido.Agent.Runner.prepare_for_server/4`, `Jido.Agent.Runner.finish_for_server/2`
-- **must:** Prepare and finish the same pure evaluation for an accepted AgentServer Command. Prepare a Handoff successor from its exact Instruction with empty input, the unchanged source Signal, and explicit output-state projection. Return route, input, composition, and candidate validation failures with their closed stage and do not run live process behavior.
+- **scope:** `Jido.Agent.Runner.prepare_admitted/4`, `Jido.Agent.Runner.prepare_admitted_handoff/5`, `Jido.Agent.Runner.finish_for_server/2`
+- **must:** Prepare and finish the same pure evaluation for an accepted AgentServer Command. Prepare a Handoff successor from its exact Instruction with empty caller input, the unchanged source Signal, and explicit output-state projection. This preserves the bound input, including portable values other than Maps, for live execution and durable restore. Return route, input, composition, and candidate validation failures with their closed stage and do not run live process behavior.
 - **kind:** functional
 - **status:** active

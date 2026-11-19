@@ -74,6 +74,7 @@ defmodule Jido.Plugin.ApiTest do
         {:load, 3},
         {:prepare, 2},
         {:prepare_outbound, 4},
+        {:prepare_route_input, 4},
         {:reduce, 2},
         {:select_route, 2},
         {:state_spec, 1},
