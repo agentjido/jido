@@ -32,6 +32,8 @@ defmodule Jido.Exec.Compile.MapTest do
   defmodule ReportItem do
     use Jido.Action, name: "compiled_map_report_item"
 
+    def run(%{item: :crash}, _context), do: Process.exit(self(), :kill)
+
     def run(%{item: item}, %{observer: observer}) do
       send(observer, {:item_started, item, self()})
 
@@ -135,6 +137,18 @@ defmodule Jido.Exec.Compile.MapTest do
     assert error.details.reason == :missing_key
     refute Map.has_key?(error.details, :item_index)
     refute Map.has_key?(error.details, :item_id)
+  end
+
+  @tag obligation: "jido_action.execution.I18"
+  test "Map collects an abrupt item exit in serial and concurrent execution" do
+    flow = map_flow("compiled_map_item_exit", [:crash, 1], ReportItem, %{item: Ref.item()}, :collect_errors)
+
+    for limit <- [1, 2] do
+      assert {:ok, %{items: [%{status: :error, error: error}, %{status: :ok, value: %{item: 1}}]}} =
+               Exec.run(flow, %{}, %{observer: self()}, max_concurrency: limit)
+
+      assert error.details.reason == :killed
+    end
   end
 
   test "Map fail-fast errors identify the failed item" do

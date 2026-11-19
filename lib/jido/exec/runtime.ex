@@ -5,11 +5,14 @@ defmodule Jido.Exec.Runtime do
   alias Jido.Exec.{Validation, Wait}
   alias Jido.Flow.Preparation
   alias Jido.Instruction
+  alias Runic.TaskScope
   alias Runic.Workflow
   alias Runic.Workflow.{Fact, Invokable, Runnable, SchedulerPolicy}
   alias Runic.Workflow.Events.{ActivationConsumed, FactProduced}
 
   @typep local_type :: :pid | :port | :reference | :function
+  @type deadline :: :infinity | {integer(), non_neg_integer()}
+  @max_receive_timeout 4_294_967_295
 
   @reserved [
     :__jido_exec_max_concurrency__,
@@ -103,6 +106,43 @@ defmodule Jido.Exec.Runtime do
       {:ok, policy |> Map.from_struct() |> Map.take(@policy_keys)}
     end
   end
+
+  @doc false
+  @spec immediate_options(keyword(), pos_integer()) ::
+          {:ok, SchedulerPolicy.t(), pos_integer(), deadline(), GenServer.server()}
+          | {:error, Exception.t()}
+  def immediate_options(opts, default_concurrency) do
+    started = System.monotonic_time(:millisecond)
+
+    if Keyword.keyword?(opts) do
+      {deadline_ms, opts} = Keyword.pop_first(opts, :deadline_ms, :infinity)
+      {supervisor, opts} = Keyword.pop_first(opts, :task_supervisor, Jido.Exec.TaskSupervisor)
+
+      with {:ok, deadline} <- deadline(deadline_ms, started),
+           :ok <- validate_supervisor(supervisor),
+           {:ok, policy, limit} <- execution_options(opts, max_concurrency: default_concurrency) do
+        {:ok, policy, limit, deadline, supervisor}
+      end
+    else
+      option_error("execution options must be a keyword list")
+    end
+  end
+
+  defp deadline(:infinity, _started), do: {:ok, :infinity}
+
+  defp deadline(ms, started) when is_integer(ms) and ms in 0..@max_receive_timeout,
+    do: {:ok, {started + ms, ms}}
+
+  defp deadline(_ms, _started),
+    do: option_error("deadline_ms must be a non-negative receive timeout or :infinity")
+
+  defp validate_supervisor(name) when is_atom(name) and not is_nil(name), do: :ok
+  defp validate_supervisor(pid) when is_pid(pid) and node(pid) == node(), do: :ok
+  defp validate_supervisor(_), do: option_error("task_supervisor must be a local name or PID")
+
+  @doc false
+  def deadline_options(:infinity), do: []
+  def deadline_options({at, _ms}), do: [deadline_at: at]
 
   defp option(opts, defaults, key, fallback) do
     if Keyword.keyword?(opts),
@@ -199,26 +239,21 @@ defmodule Jido.Exec.Runtime do
   end
 
   @doc false
-  @spec run(GenServer.server(), pid(), (-> term())) :: term()
-  def run(task_supervisor, group_leader, work) do
-    caller = self()
+  @spec run(GenServer.server(), deadline(), (-> term())) :: term()
+  def run(task_supervisor, deadline, work) do
     trace_context = Jido.Trace.Context.capture()
+    supervisor = if TaskScope.current(), do: nil, else: task_supervisor
 
-    task =
-      Task.Supervisor.async_nolink(task_supervisor, fn ->
-        Process.group_leader(self(), group_leader)
-
+    if remaining(deadline) == 0 do
+      deadline_error(deadline)
+    else
+      work = fn ->
         Jido.Trace.Context.with_context(trace_context, fn ->
-          watcher = watch_caller(caller, self())
-          result = work.()
-          stop_watcher(watcher)
-          result
+          if remaining(deadline) == 0, do: deadline_error(deadline), else: work.()
         end)
-      end)
+      end
 
-    case Task.yield(task, :infinity) do
-      {:ok, result} -> result
-      {:exit, reason} -> {:error, execution_task_error(reason)}
+      TaskScope.with_scope(&run_scoped(&1, supervisor, deadline, work))
     end
   rescue
     exception ->
@@ -228,24 +263,81 @@ defmodule Jido.Exec.Runtime do
       {:error, execution_task_error({kind, reason})}
   end
 
-  # The execution task is not linked to the caller, so a killed Action cannot
-  # exit the caller. The linked watcher kills the task, and the processes
-  # linked to it, when the caller exits.
-  defp watch_caller(caller, task) do
-    spawn_link(fn ->
-      caller_monitor = Process.monitor(caller)
-      task_monitor = Process.monitor(task)
-
-      receive do
-        {:DOWN, ^caller_monitor, :process, ^caller, _reason} -> Process.exit(task, :kill)
-        {:DOWN, ^task_monitor, :process, ^task, _reason} -> :ok
-      end
-    end)
+  defp run_scoped(scope, supervisor, deadline, work)
+       when not is_nil(supervisor) and deadline != :infinity do
+    # Waiting on an external supervisor must also be cancellable.
+    run_task(scope, nil, deadline, fn -> run_task(scope, supervisor, deadline, work) end)
   end
 
-  defp stop_watcher(watcher) do
-    Process.unlink(watcher)
-    Process.exit(watcher, :kill)
+  defp run_scoped(scope, supervisor, deadline, work), do: run_task(scope, supervisor, deadline, work)
+
+  defp run_task(scope, supervisor, deadline, work) do
+    monitor = Process.monitor(scope)
+
+    try do
+      {handle, _pid} = TaskScope.dispatch(scope, work, supervisor)
+      await(scope, monitor, handle, deadline)
+    catch
+      :exit, {:task_dispatch_failed, :max_children} ->
+        {:error, Error.execution_error("Exec has reached its admission limit", %{reason: :exec_overloaded})}
+    after
+      Process.demonitor(monitor, [:flush])
+    end
+  end
+
+  defp await(scope, monitor, handle, deadline) do
+    receive do
+      {^handle, result} ->
+        if remaining(deadline) == 0, do: deadline_error(deadline), else: result
+
+      {:DOWN, ^handle, :process, _pid, reason} ->
+        {:error, execution_task_error(reason)}
+
+      {:DOWN, ^monitor, :process, ^scope, reason} ->
+        {:error, execution_task_error({:scope_exited, reason})}
+    after
+      remaining(deadline) ->
+        :ok = TaskScope.cancel(scope, handle)
+
+        # A result or exit can reach the mailbox just before the cancellation reply.
+        receive do
+          {^handle, _result} -> :ok
+          {:DOWN, ^handle, :process, _pid, _reason} -> :ok
+        after
+          0 -> :ok
+        end
+
+        deadline_error(deadline)
+    end
+  end
+
+  defp remaining(:infinity), do: :infinity
+  defp remaining({at, _ms}), do: max(at - System.monotonic_time(:millisecond), 0)
+
+  defp deadline_error({_at, ms}) do
+    {:error, Error.timeout_error("Exec deadline exceeded", %{timeout: ms, phase: :exec_deadline, retry: false})}
+  end
+
+  @doc false
+  @spec map_items(list(), pos_integer(), (term() -> tuple())) :: [tuple()]
+  def map_items(items, limit, work) do
+    trace_context = Jido.Trace.Context.capture()
+
+    results =
+      TaskScope.async_reduce(
+        items,
+        fn item -> Jido.Trace.Context.with_context(trace_context, fn -> work.(item) end) end,
+        [],
+        fn
+          {:ok, outcome}, acc -> [outcome | acc]
+          {:exit, {item, reason}}, acc -> [{:task_exit, item, reason} | acc]
+        end,
+        max_concurrency: limit,
+        timeout: :infinity,
+        zip_input_on_exit: true
+      )
+
+    Enum.reverse(results)
   end
 
   defp execution_task_error(reason) do

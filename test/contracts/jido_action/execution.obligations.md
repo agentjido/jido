@@ -39,7 +39,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.execution.I18 — Policy bounds attempts and preserves outcome order
 - **scope:** `Jido.Exec.run/4, Jido.Durable, Runic.Runner`
-- **must:** Timeout applies to each authored component attempt; max_attempts counts the first attempt and retries only eligible errors. Map and Parallel can use bounded concurrency inside one component while Reduce and Iterate remain serial. In fail-fast mode, Map and Parallel let started items finish and stop admitting new work after a failure. A composite retry repeats the complete component. Defined result and failure order do not depend on completion order.
+- **must:** Timeout applies to each authored component attempt. An optional immediate-call deadline covers admission, resolution, execution, and retries and cancels owned work on expiry. Max attempts counts the first attempt and retries only eligible errors. Map and Parallel can use bounded concurrency inside one component while Reduce and Iterate remain serial. In fail-fast mode, Map and Parallel let started items finish and stop admitting new work after a failure. Collect-errors mode reports abnormal item exits as item errors. A composite retry repeats the complete component. Defined result and failure order do not depend on completion order.
 - **kind:** ordering
 - **status:** active
 
@@ -51,7 +51,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.execution.I20 — Execution follows caller and Runner process ownership
 - **scope:** `Jido.Exec.run/4, Jido.Durable, Runic.Runner`
-- **must:** Immediate Action failures cannot exit a live caller. Caller exit stops immediate work. Release owned tasks on completion, timeout, and termination. Keep the caller group leader and honor the selected local Task Supervisor. Managed work survives caller exit; successful Runner stop or cancel waits for owned tasks to exit, while failed persistent stop keeps its worker running. Unlinked user processes and custom executors require caller-owned cleanup.
+- **must:** Immediate Action failures cannot exit a live caller. Caller exit stops immediate work. Release owned tasks on completion, timeout, and termination, including collection items that trap exits. Keep the caller group leader and honor the selected local Task Supervisor. Reject new top-level work when that supervisor is full. Nested work in an active scope shares its admission. Managed work survives caller exit. Successful Runner stop or cancel waits for owned tasks to exit, while failed persistent stop keeps its worker running. Untracked user processes and custom executors require caller-owned cleanup.
 - **kind:** functional
 - **status:** active
 
@@ -69,7 +69,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.execution.I23 — Telemetry retains bounded documented event shapes
 - **scope:** `Jido.Telemetry.Exec, Jido.Exec.run/4, Jido.Durable, Runic.Runner`
-- **must:** Emit documented Action-attempt and immediate-Flow events with measurements, outcome, and correlation fields. Start and stop metadata omit params, context, results, and full errors. Retries have separate attempt identities. Runner events belong to Runic. Timeout or process death can prevent Action stop events; caller death can prevent Flow stop.
+- **must:** Emit documented Action-attempt and immediate-Flow events with measurements, outcome, and correlation fields. Start and stop metadata omit params, context, results, and full errors. Retries have separate attempt identities. Runner events belong to Runic. Timeout or process death can prevent Action stop events. Caller death or a whole-call deadline can prevent Flow stop.
 - **kind:** functional
 - **status:** active
 
