@@ -19,6 +19,13 @@ defmodule Jido.Agent.ValidationResolutionTest do
     def definition, do: nil
   end
 
+  defmodule NoncanonicalConfig do
+    def definition do
+      definition = Jido.Agent.define!(%{name: "handwritten"})
+      %{definition | topology: %{}}
+    end
+  end
+
   @tag obligation: "jido.agent.I22"
   test "definition and instance resolution preserve configuration exceptions" do
     for resolve <- [&Validation.resolve/1, &Jido.Agent.instantiate(&1, [])] do
@@ -45,6 +52,12 @@ defmodule Jido.Agent.ValidationResolutionTest do
   test "invalid configuration retains its validation error" do
     assert {:error, error} = Validation.resolve(InvalidConfig)
     assert error.code == :definition_required
+  end
+
+  @tag obligation: "jido.agent.I22"
+  test "handwritten definitions must already be canonical" do
+    assert {:error, %Jido.Error.ValidationError{code: :not_canonical}} =
+             Jido.Agent.instantiate(NoncanonicalConfig, id: "handwritten")
   end
 
   @tag obligation: "jido.agent.I22"

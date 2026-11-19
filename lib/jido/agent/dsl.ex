@@ -91,9 +91,10 @@ defmodule Jido.Agent.DSL do
         end
       end
 
-      @doc "Runs one pure Agent Turn. It does not commit state or dispatch Directives."
+      @doc "Evaluates one Signal against an Agent value. See `Jido.Agent.cmd/3`."
+      @spec cmd(Jido.Agent.instance(), Jido.Signal.t()) :: Jido.Agent.command_result()
       @spec cmd(Jido.Agent.instance(), Jido.Signal.t(), keyword()) ::
-              {:ok, Jido.Agent.instance(), [struct()]} | {:error, term()}
+              Jido.Agent.command_result()
       def cmd(agent, signal, opts \\ []), do: Jido.Agent.cmd(agent, signal, opts)
 
       @doc "Returns this module's validated neutral Agent definition."
@@ -175,7 +176,7 @@ defmodule Jido.Agent.DSL do
   def verify(_module, _opts), do: :ok
 
   def verify!(module) do
-    case Jido.Agent.validate(module.definition()) do
+    case module.__jido_definition__(related?: true) do
       {:ok, _} -> :ok
       {:error, error} -> compile_error!(module, error)
     end

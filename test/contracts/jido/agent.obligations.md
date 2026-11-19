@@ -45,7 +45,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I1 — Canonical DSL parity
 
 - **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
-- **must:** The optional, single-use `state`, `plugins`, `routes`, and `topology` sections lower state schema, declared initial state, provider configuration, ordered routes, logical members, and connections into the same canonical Agent definition as an equivalent Map declaration. `use Jido.Agent` owns static metadata. Selected providers can add non-core sections without replacing a core section.
+- **must:** The optional, single-use `state`, `plugins`, `routes`, and `topology` sections lower state schema, declared initial state, provider configuration, ordered routes, logical members, and connections into the same canonical Agent definition as an equivalent Map declaration. `use Jido.Agent` owns static metadata. Selected providers can add non-core sections without replacing a core section. Each resolution of a generated module validates its current definition once.
 - **kind:** functional
 - **status:** active
 
@@ -59,7 +59,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I3 — Declaration guards
 
 - **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
-- **must:** Definition construction rejects unknown fields or use options, invalid stable authoring IDs, non-positive versions, invalid schemas, and repeated core sections or fields.
+- **must:** Definition construction rejects unknown fields or use options, invalid stable authoring IDs, non-positive versions, invalid schemas, and repeated core sections or fields. A Signal source can be nil. An explicit source must satisfy the Signal URI-reference rule.
 - **kind:** functional
 - **status:** active
 
@@ -137,8 +137,8 @@ not restore or claim the retired standalone `jido.topology` component.
 
 ### jido.agent.I22 — Structured supported-input errors
 
-- **scope:** `Jido.Agent.define/1`, `Jido.Agent.instantiate/2`
-- **must:** Invalid supported authoring inputs return structured errors with nonempty messages.
+- **scope:** `Jido.Agent.define/1`, `Jido.Agent.validate/1`, `Jido.Agent.instantiate/2`, `Jido.Agent.set/2`, `Jido.Agent.cmd/3`
+- **must:** Invalid supported authoring inputs return structured errors with nonempty messages. When a provider callback raises, throws, exits, or returns an invalid result, report the provider, callback, cause, and relevant path. DSL diagnostics retain the provider, callback, cause, and source location. Preserve explicit provider validation errors.
 - **kind:** functional
 - **status:** active
 
@@ -166,7 +166,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I32 — Generated Agent module facade
 
 - **scope:** `Jido.Agent.__using__/1`, generated Agent modules
-- **must:** Generate documented `vsn/0`, `schema/0`, `definition/0`, `instantiate/0,1`, `instantiate!/0,1`, `cmd/2,3`, and `route_executable!/1` functions that delegate to the canonical Agent boundaries. Keep compiler authoring metadata hidden. `route_executable!/1` returns the Action or Flow target for an exact executable route. It raises `ArgumentError` for a terminal handler or unknown path.
+- **must:** Generate documented `vsn/0`, `schema/0`, `definition/0`, `instantiate/0,1`, `instantiate!/0,1`, `cmd/2,3`, and `route_executable!/1` functions that delegate to the canonical Agent boundaries. Generated commands use the public command result type, which includes a Handoff. Keep compiler authoring metadata hidden. `route_executable!/1` returns the Action or Flow target for an exact executable route. It raises `ArgumentError` for a terminal handler or unknown path.
 - **kind:** functional
 - **status:** active
 

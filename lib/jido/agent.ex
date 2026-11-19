@@ -44,6 +44,12 @@ defmodule Jido.Agent do
   @type definition :: %__MODULE__{id: nil, state: nil, initial_state: map()}
   @type instance :: %__MODULE__{id: String.t(), state: map(), initial_state: map()}
 
+  @typedoc "The result of evaluating one Agent command."
+  @type command_result ::
+          {:ok, instance(), [struct()]}
+          | {:handoff, instance(), Jido.Instruction.t(), [struct()]}
+          | {:error, term()}
+
   @doc """
   Defines a compiled Agent module with the Agent DSL.
 
@@ -247,10 +253,8 @@ defmodule Jido.Agent do
   preparation. The evaluation boundary is pure, but the selected Action or
   Flow still runs its own application code and can cause its own side effects.
   """
-  @spec cmd(instance(), Signal.t(), keyword()) ::
-          {:ok, instance(), [struct()]}
-          | {:handoff, instance(), Jido.Instruction.t(), [struct()]}
-          | {:error, term()}
+  @spec cmd(instance(), Signal.t()) :: command_result()
+  @spec cmd(instance(), Signal.t(), keyword()) :: command_result()
   def cmd(agent, signal, opts \\ [])
 
   def cmd(%__MODULE__{} = agent, %Signal{} = signal, opts) when is_list(opts) do

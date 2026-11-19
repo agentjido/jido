@@ -439,6 +439,37 @@ defmodule Jido.Agent.EvaluationContractTest do
              Agent.cmd(source, F.signal(%{count: 4}))
   end
 
+  @tag obligation: "jido.agent_evaluation.I9"
+  test "generated commands return success, errors, and the Handoff" do
+    module = Module.concat(__MODULE__, GeneratedCommand)
+
+    {:module, ^module, _beam, _} =
+      Module.create(
+        module,
+        quote do
+          use Jido.Agent, name: "generated_command_contract"
+
+          routes do
+            route "test.run", unquote(HandoffFlow) do
+              state(:unchanged)
+            end
+
+            route "test.ok", unquote(F.Return) do
+              state(:unchanged)
+            end
+          end
+        end,
+        Macro.Env.location(__ENV__)
+      )
+
+    assert {:ok, source} = module.instantiate(id: "typed-command")
+    assert {:ok, ^source, []} = module.cmd(source, F.signal(%{}, "test.ok"))
+    assert {:error, _} = module.cmd(source, F.signal(%{}, "test.missing"))
+
+    assert {:handoff, ^source, %Jido.Instruction{target: HandoffTarget, params: %{count: 5}}, []} =
+             module.cmd(source, F.signal(%{count: 4}), [])
+  end
+
   @tag obligation: "jido.agent_evaluation.I10"
   test "the AgentServer evaluation boundary keeps stages closed" do
     source = F.signal()
