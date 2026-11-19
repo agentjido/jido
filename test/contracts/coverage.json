@@ -21,9 +21,9 @@
       "covered": 53
     },
     "jido_ai": {
-      "active": 44,
+      "active": 45,
       "coverage": 1.0,
-      "covered": 44
+      "covered": 45
     }
   },
   "components": {
@@ -5028,10 +5028,10 @@
       }
     },
     "jido_ai.react": {
-      "active": 8,
+      "active": 9,
       "app": "jido_ai",
       "coverage": 1.0,
-      "covered": 8,
+      "covered": 9,
       "form": "light",
       "obligations": {
         "jido_ai.react.I1": {
@@ -5404,6 +5404,16 @@
             "test tool results preserve model-visible content parts",
             "test two sequential tool rounds keep a valid model conversation"
           ]
+        },
+        "jido_ai.react.I9": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a large caller-owned Session fits when a terminal decision carries the Turn once"
+          ]
         }
       }
     },
@@ -5731,8 +5741,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 237,
+    "active": 238,
     "coverage": 1.0,
-    "covered": 237
+    "covered": 238
   }
 }

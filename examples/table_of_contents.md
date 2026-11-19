@@ -694,6 +694,7 @@ Proposed lessons:
 12. Long-running Session rollover and archival.
 13. Persistence and concurrent update behavior.
 14. Provenance, replay, and compaction limits.
+15. Long-running ReAct with a bounded Session, archived transcript, and tool recall.
 
 These examples must make ownership and scope explicit. A context window limits
 what one model call sees. It does not delete the full Session history. Prompt
