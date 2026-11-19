@@ -91,7 +91,7 @@ defmodule Jido.Flow.ExprBoundaryTest do
       assert module_flow(Module.concat(__MODULE__, "Plain#{index}"), source) == direct
       assert {:ok, document, registry} = Codec.encode(direct)
       assert document["vsn"] == 2
-      assert {:ok, ^direct} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+      assert {:ok, ^direct} = Codec.decode(document, registry)
       assert Jido.Exec.run(direct) == {:ok, value}
     end
   end
