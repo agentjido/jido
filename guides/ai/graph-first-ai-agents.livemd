@@ -75,7 +75,7 @@ The cell returns `Jido.AI.Reasoning.ReAct`, the `GraphFirstGuide.LookupInvoice` 
 Use `explain/0` and `preflight/1` to inspect the public graph. Do not call a
 reasoning Action callback such as `run/2` directly. A direct callback call
 bypasses input validation, execution context, instrumentation, and later
-contract changes. Run the complete request through `Agent.cmd/3`, or run a
+contract changes. Run the complete request through `Jido.Agent.cmd/3`, or run a
 standalone public Action through `Jido.Exec`.
 
 ```elixir
