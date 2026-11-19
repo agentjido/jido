@@ -796,7 +796,7 @@ A portable append-only Agent Thread.
 | `Jido.Thread.new/1` | Creates an empty Thread. |
 | `Jido.Thread.schema/0` | Returns the Thread schema. |
 | `Jido.Thread.slice/3` | Returns entries in an inclusive sequence range. |
-| `Jido.Thread.to_list/1` | Returns entries in chronological order. |
+| `Jido.Thread.to_list/1` | Returns entries in append order, from the lowest sequence number to the highest. |
 
 ### `Jido.Id`
 

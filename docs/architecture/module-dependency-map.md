@@ -345,6 +345,9 @@ These modules stay outside `Jido.AI`:
 
 Reach assigns these modules to `value_model`. Their only allowed Jido dependencies are primitives and other modules in the same value-model layer. `Jido.Codec.Term` defines the general process-free storage-term policy used by these and other values.
 
+`jido.thread` owns the Covenant proof for Thread and Entry. Session and AI
+projection use this history and keep separate obligations for their own behavior.
+
 ### Actor, Flow, and Plugin capability model
 
 Jido is a configurable actor runtime on OTP:

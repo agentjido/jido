@@ -8,9 +8,21 @@ defmodule Jido.Thread do
   adapter. Feature layers can project its entries for their own use.
   """
 
-  alias __MODULE__.Entry
+  alias __MODULE__.{Document, Entry}
 
   @version 1
+  @field_aliases Document.aliases([
+                   :type,
+                   :version,
+                   :id,
+                   :rev,
+                   :entries,
+                   :created_at,
+                   :updated_at,
+                   :metadata,
+                   :stats,
+                   :__struct__
+                 ])
   @schema Joi.struct(
             __MODULE__,
             %{
@@ -49,7 +61,8 @@ defmodule Jido.Thread do
       metadata: Keyword.get(opts, :metadata, %{}),
       stats: %{entry_count: 0}
     }
-    |> validate!()
+    |> validate()
+    |> unwrap!()
   end
 
   @doc "Appends entries and returns the complete next Thread."
@@ -58,24 +71,26 @@ defmodule Jido.Thread do
 
   def append(%__MODULE__{} = thread, entries) do
     now = max(System.system_time(:millisecond), thread.updated_at)
-    base_seq = length(thread.entries)
 
-    appended =
-      entries
-      |> List.wrap()
-      |> Enum.with_index(base_seq)
-      |> Enum.map(fn {entry, seq} -> Entry.normalize(entry, seq, now) end)
+    with {:ok, [], base_seq} <- scan_entries(thread.entries, &validate_entry/3) do
+      {appended, next_seq} =
+        entries
+        |> List.wrap()
+        |> Enum.map_reduce(base_seq, fn entry, seq -> {Entry.normalize(entry, seq, now), seq + 1} end)
 
-    count = length(appended)
+      added = next_seq - base_seq
 
-    %{
-      thread
-      | entries: thread.entries ++ appended,
-        rev: thread.rev + count,
-        updated_at: now,
-        stats: %{entry_count: thread.stats.entry_count + count}
-    }
-    |> validate!()
+      updated = %{
+        thread
+        | entries: thread.entries ++ appended,
+          rev: thread.rev + added,
+          updated_at: now,
+          stats: %{entry_count: thread.stats.entry_count + added}
+      }
+
+      validate_header(updated, next_seq)
+    end
+    |> unwrap!()
   end
 
   @doc "Returns the number of entries."
@@ -91,7 +106,7 @@ defmodule Jido.Thread do
   @spec get_entry(t(), non_neg_integer()) :: Entry.t() | nil
   def get_entry(%__MODULE__{entries: entries}, seq), do: Enum.find(entries, &(&1.seq == seq))
 
-  @doc "Returns entries in chronological order."
+  @doc "Returns entries in append order, from the lowest sequence number to the highest."
   @spec to_list(t()) :: [Entry.t()]
   def to_list(%__MODULE__{entries: entries}), do: entries
 
@@ -114,19 +129,22 @@ defmodule Jido.Thread do
 
   @doc "Returns a versioned portable map."
   @spec encode(t()) :: map()
-  def encode(%__MODULE__{} = thread) do
-    validate!(thread)
-
-    %{
-      "type" => "jido.thread",
-      "version" => @version,
-      "id" => thread.id,
-      "rev" => thread.rev,
-      "entries" => Enum.map(thread.entries, &Entry.encode/1),
-      "created_at" => thread.created_at,
-      "updated_at" => thread.updated_at,
-      "metadata" => thread.metadata
-    }
+  def encode(%__MODULE__{entries: entries} = thread) do
+    with {:ok, encoded, count} <- scan_entries(entries, &encode_entry/3),
+         {:ok, thread} <- validate_header(thread, count) do
+      {:ok,
+       %{
+         "type" => "jido.thread",
+         "version" => @version,
+         "id" => thread.id,
+         "rev" => thread.rev,
+         "entries" => encoded,
+         "created_at" => thread.created_at,
+         "updated_at" => thread.updated_at,
+         "metadata" => thread.metadata
+       }}
+    end
+    |> unwrap!()
   end
 
   @doc "Decodes and validates a portable Thread map."
@@ -135,20 +153,19 @@ defmodule Jido.Thread do
 
   def decode(map) when is_map(map) do
     with :ok <- document_version(map),
-         true <- known_keys?(map),
-         {:ok, entries} <- decode_entries(field(map, :entries) || []),
+         {:ok, fields} <- Document.normalize_fields(map, @field_aliases),
+         {:ok, entries, count} <- scan_entries(Document.default(fields[:entries], []), &decode_entry/3),
          thread = %__MODULE__{
            version: @version,
-           id: field(map, :id),
-           rev: field(map, :rev) || length(entries),
+           id: fields[:id],
+           rev: Document.default(fields[:rev], count),
            entries: entries,
-           created_at: field(map, :created_at),
-           updated_at: field(map, :updated_at),
-           metadata: field(map, :metadata) || %{},
-           stats: %{entry_count: length(entries)}
-         },
-         {:ok, thread} <- validate(thread) do
-      {:ok, thread}
+           created_at: fields[:created_at],
+           updated_at: fields[:updated_at],
+           metadata: Document.default(fields[:metadata], %{}),
+           stats: %{entry_count: count}
+         } do
+      validate_header(thread, count)
     else
       {:error, :unsupported_version} = error -> error
       _other -> {:error, :invalid_thread}
@@ -159,19 +176,20 @@ defmodule Jido.Thread do
 
   @doc false
   @spec validate(t()) :: {:ok, t()} | {:error, :invalid_thread}
-  def validate(%__MODULE__{} = thread) do
-    valid_entries? =
-      is_list(thread.entries) and
-        Enum.all?(Enum.with_index(thread.entries), fn {entry, index} ->
-          match?({:ok, _value}, Entry.validate(entry)) and entry.seq == index
-        end)
+  def validate(%__MODULE__{entries: entries} = thread) do
+    with {:ok, [], count} <- scan_entries(entries, &validate_entry/3),
+         do: validate_header(thread, count)
+  end
 
-    with :ok <- Joi.validate(@schema, thread),
+  def validate(_value), do: {:error, :invalid_thread}
+
+  defp validate_header(thread, count) do
+    # The entry scan already checked the list and every Entry.
+    with :ok <- Joi.validate(@schema, %{thread | entries: []}),
          true <- thread.version == @version,
-         true <- thread.rev == length(thread.entries),
-         true <- thread.stats == %{entry_count: length(thread.entries)},
+         true <- thread.rev == count,
+         true <- thread.stats == %{entry_count: count},
          true <- thread.updated_at >= thread.created_at,
-         true <- valid_entries?,
          :ok <- Jido.Codec.Term.validate(thread.metadata, :thread_metadata) do
       {:ok, thread}
     else
@@ -179,44 +197,54 @@ defmodule Jido.Thread do
     end
   end
 
-  def validate(_value), do: {:error, :invalid_thread}
+  defp unwrap!({:ok, value}), do: value
+  defp unwrap!({:error, :invalid_thread}), do: raise(ArgumentError, "invalid thread")
 
-  defp validate!(thread) do
-    case validate(thread) do
-      {:ok, valid} -> valid
-      {:error, :invalid_thread} -> raise ArgumentError, "invalid thread"
+  defp scan_entries(entries, step), do: scan_entries(entries, step, 0, [])
+
+  defp scan_entries([], _step, seq, acc), do: {:ok, Enum.reverse(acc), seq}
+
+  defp scan_entries([entry | tail], step, seq, acc) do
+    case step.(entry, seq, acc) do
+      {:ok, acc} -> scan_entries(tail, step, seq + 1, acc)
+      _invalid -> {:error, :invalid_thread}
     end
   end
 
-  defp decode_entries(entries) when is_list(entries) do
-    Enum.reduce_while(entries, {:ok, []}, fn entry, {:ok, decoded} ->
-      case Entry.decode(entry) do
-        {:ok, value} -> {:cont, {:ok, [value | decoded]}}
-        {:error, _reason} -> {:halt, {:error, :invalid_thread}}
-      end
-    end)
-    |> case do
-      {:ok, decoded} -> {:ok, Enum.reverse(decoded)}
-      error -> error
+  defp scan_entries(_improper, _step, _seq, _acc), do: {:error, :invalid_thread}
+
+  defp validate_entry(%Entry{seq: seq} = entry, seq, acc) do
+    with {:ok, _entry} <- Entry.validate(entry),
+         do: {:ok, acc}
+  end
+
+  defp validate_entry(_entry, _seq, _acc), do: :error
+
+  defp encode_entry(%Entry{seq: seq} = entry, seq, acc) do
+    with {:ok, document} <- Entry.encode_document(entry),
+         do: {:ok, [document | acc]}
+  end
+
+  defp encode_entry(_entry, _seq, _acc), do: :error
+
+  defp decode_entry(document, seq, acc) do
+    case Entry.decode(document) do
+      {:ok, %Entry{seq: ^seq} = entry} -> {:ok, [entry | acc]}
+      _invalid -> :error
     end
   end
 
-  defp decode_entries(_entries), do: {:error, :invalid_thread}
+  defp document_version(map)
+       when (is_map_key(map, :type) and is_map_key(map, "type")) or
+              (is_map_key(map, :version) and is_map_key(map, "version")),
+       do: {:error, :invalid_thread}
 
   defp document_version(map) do
-    case {field(map, :type), field(map, :version)} do
+    case {Document.field(map, :type), Document.field(map, :version)} do
       {"jido.thread", @version} -> :ok
       _other -> {:error, :unsupported_version}
     end
   end
-
-  defp known_keys?(map) do
-    keys = ~w(type version id rev entries created_at updated_at metadata stats __struct__)
-    allowed = keys ++ Enum.map(keys, &String.to_atom/1)
-    Map.keys(map) -- allowed == []
-  end
-
-  defp field(map, key), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
 end
 
 defimpl Runic.Identity.Projectable, for: Jido.Thread do

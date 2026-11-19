@@ -1,6 +1,9 @@
 defmodule Jido.Thread.Entry do
   alias Jido.Joi
+  alias Jido.Thread.Document
   @moduledoc "One portable entry in a `Jido.Thread`."
+
+  @field_aliases Document.aliases([:id, :seq, :at, :kind, :payload, :refs, :__struct__])
 
   @schema Joi.struct(
             __MODULE__,
@@ -29,30 +32,33 @@ defmodule Jido.Thread.Entry do
   def new(attrs) when is_list(attrs), do: new(Map.new(attrs))
 
   def new(attrs) when is_map(attrs) do
-    %__MODULE__{
-      id: field(attrs, :id) || entry_id(),
-      seq: field(attrs, :seq) || 0,
-      at: field(attrs, :at) || System.system_time(:millisecond),
-      kind: field(attrs, :kind) || :note,
-      payload: field(attrs, :payload) || %{},
-      refs: field(attrs, :refs) || %{}
-    }
-    |> validate!()
+    seq = Document.default(Document.field(attrs, :seq), 0)
+    normalize(attrs, seq, System.system_time(:millisecond))
   end
 
   @doc "Returns a portable encoded Entry map."
   @spec encode(t()) :: map()
   def encode(%__MODULE__{} = entry) do
-    validate!(entry)
+    case encode_document(entry) do
+      {:ok, document} -> document
+      {:error, :invalid_entry} -> raise ArgumentError, "invalid thread entry"
+    end
+  end
 
-    %{
-      "id" => entry.id,
-      "seq" => entry.seq,
-      "at" => entry.at,
-      "kind" => encode_kind(entry.kind),
-      "payload" => entry.payload,
-      "refs" => entry.refs
-    }
+  @doc false
+  @spec encode_document(t()) :: {:ok, map()} | {:error, :invalid_entry}
+  def encode_document(entry) do
+    with {:ok, entry} <- validate(entry) do
+      {:ok,
+       %{
+         "id" => entry.id,
+         "seq" => entry.seq,
+         "at" => entry.at,
+         "kind" => encode_kind(entry.kind),
+         "payload" => entry.payload,
+         "refs" => entry.refs
+       }}
+    end
   end
 
   @doc "Decodes an Entry without creating atoms from input."
@@ -60,18 +66,18 @@ defmodule Jido.Thread.Entry do
   def decode(%__MODULE__{} = entry), do: validate(entry)
 
   def decode(attrs) when is_map(attrs) do
-    if known_keys?(attrs, ~w(id seq at kind payload refs __struct__)) do
+    with {:ok, fields} <- Document.normalize_fields(attrs, @field_aliases) do
       %__MODULE__{
-        id: field(attrs, :id),
-        seq: field(attrs, :seq),
-        at: field(attrs, :at),
-        kind: decode_kind(field(attrs, :kind)),
-        payload: field(attrs, :payload) || %{},
-        refs: field(attrs, :refs) || %{}
+        id: fields[:id],
+        seq: fields[:seq],
+        at: fields[:at],
+        kind: decode_kind(fields[:kind]),
+        payload: Document.default(fields[:payload], %{}),
+        refs: Document.default(fields[:refs], %{})
       }
       |> validate()
     else
-      {:error, :invalid_entry}
+      :error -> {:error, :invalid_entry}
     end
   end
 
@@ -94,26 +100,16 @@ defmodule Jido.Thread.Entry do
 
   @doc false
   @spec normalize(t() | map(), non_neg_integer(), integer()) :: t()
-  def normalize(%__MODULE__{} = entry, seq, now) do
-    %__MODULE__{
-      id: entry.id || entry_id(),
-      seq: seq,
-      at: entry.at || now,
-      kind: entry.kind || :note,
-      payload: entry.payload || %{},
-      refs: entry.refs || %{}
-    }
-    |> validate!()
-  end
-
   def normalize(attrs, seq, now) when is_map(attrs) do
+    id = Document.field(attrs, :id)
+
     %__MODULE__{
-      id: field(attrs, :id) || entry_id(),
+      id: if(is_nil(id), do: entry_id(), else: id),
       seq: seq,
-      at: field(attrs, :at) || now,
-      kind: field(attrs, :kind) || :note,
-      payload: field(attrs, :payload) || %{},
-      refs: field(attrs, :refs) || %{}
+      at: Document.default(Document.field(attrs, :at), now),
+      kind: Document.default(Document.field(attrs, :kind), :note),
+      payload: Document.default(Document.field(attrs, :payload), %{}),
+      refs: Document.default(Document.field(attrs, :refs), %{})
     }
     |> validate!()
   end
@@ -125,19 +121,12 @@ defmodule Jido.Thread.Entry do
     end
   end
 
-  defp known_keys?(map, keys) do
-    allowed = keys ++ Enum.map(keys, &String.to_atom/1)
-    Map.keys(map) -- allowed == []
-  end
-
-  defp field(map, key), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
   defp nonempty?(value), do: is_binary(value) and value != ""
 
   defp encode_kind(kind) when is_atom(kind),
     do: %{"type" => "atom", "value" => Atom.to_string(kind)}
 
   defp encode_kind(kind), do: %{"type" => "string", "value" => kind}
-  defp decode_kind(kind) when is_atom(kind), do: kind
 
   defp decode_kind(%{"type" => "atom", "value" => kind}) when is_binary(kind) do
     String.to_existing_atom(kind)
@@ -146,7 +135,6 @@ defmodule Jido.Thread.Entry do
   end
 
   defp decode_kind(%{"type" => "string", "value" => kind}) when is_binary(kind), do: kind
-  defp decode_kind(kind) when is_binary(kind), do: kind
   defp decode_kind(kind), do: kind
   defp entry_id, do: "entry_#{Jido.Id.uuid7()}"
 end

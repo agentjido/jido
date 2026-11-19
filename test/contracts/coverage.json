@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 100,
+      "active": 102,
       "coverage": 1.0,
-      "covered": 100
+      "covered": 102
     },
     "jido.agent_server": {
       "active": 15,
@@ -3338,6 +3338,43 @@
         }
       }
     },
+    "jido.thread": {
+      "active": 2,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 2,
+      "form": "light",
+      "obligations": {
+        "jido.thread.I1": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Entry construction, normalization, and encoding keep the exact portable value",
+            "test Thread construction, append, encoding, and decoding keep exact invariants",
+            "test preserves the false atom kind through construction, decoding, and append",
+            "test round-trips portable Thread and Entry values without feature modules",
+            "test stores feature-neutral Agent interactions in append order"
+          ]
+        },
+        "jido.thread.I2": {
+          "failing": 0,
+          "kind": "persisted_format",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test rejects conflicting Thread and Entry wire keys",
+            "test rejects false in fields that take typed defaults",
+            "test rejects process-local data at the Thread value boundary",
+            "test returns decode errors for improper entry lists and incomplete Thread structs",
+            "test validates stored entries on append, encode, and decode"
+          ]
+        }
+      }
+    },
     "jido.trace": {
       "active": 1,
       "app": "jido",
@@ -4887,15 +4924,13 @@
         "jido_ai.conversation.I1": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 10,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
-            "test Entry construction, normalization, and encoding keep the exact portable value",
             "test Session and Thread revisions survive versioned encoding",
             "test Session construction, encoding, and decoding keep exact ownership values",
             "test Session, Thread, and Entry expose complete immutable value operations",
-            "test Thread construction, append, encoding, and decoding keep exact invariants",
             "test builds from an existing Thread and keeps lifecycle immutable",
             "test constructors keep their identity and time defaults",
             "test owns one Agent Thread without an AI or runtime owner",
@@ -4935,11 +4970,12 @@
         "jido_ai.conversation.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test a small window keeps the latest complete exchange in a long Thread",
+            "test projection distinguishes stored entries with the same ID by sequence",
             "test projection keeps a complete latest turn when a limit is smaller than that turn",
             "test projection keeps recent complete exchanges and excludes observations"
           ]
@@ -5978,8 +6014,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 249,
+    "active": 251,
     "coverage": 1.0,
-    "covered": 249
+    "covered": 251
   }
 }

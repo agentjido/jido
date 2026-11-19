@@ -38,6 +38,7 @@ tests with its obligation tags.
 | `jido.trace` | Primitive W3C Trace values | `test/contracts/jido/trace.*` |
 | `jido.trace.context` | Process and task Trace propagation | `test/contracts/jido.trace/context.*` |
 | `jido.error` | Shared error taxonomy and stable common codes | `test/contracts/jido/error.*` |
+| `jido.thread` | Thread and Entry sequence rules and portable maps | `test/contracts/jido/thread.*` |
 | `jido.plugin.audit` | Bundled Audit Plugin behavior | `test/contracts/jido.plugin/audit.*` |
 | `jido.plugin.bus` | Bundled Bus Plugin behavior | `test/contracts/jido.plugin/bus.*` |
 | `jido.plugin.timer` | Bundled Timer Plugin behavior | `test/contracts/jido.plugin/timer.*` |

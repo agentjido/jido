@@ -84,6 +84,29 @@ defmodule Jido.AI.Conversation.ContractTest do
            ]
   end
 
+  @tag obligation: "jido_ai.conversation.I4"
+  test "projection distinguishes stored entries with the same ID by sequence" do
+    empty = Session.new(id: "repeated-entry-id", now: 1)
+
+    [old, new] =
+      empty
+      |> append!(%{role: :user, content: "Old"}, 9)
+      |> append!(%{role: :user, content: "New"}, 3)
+      |> then(&Thread.to_list(&1.thread))
+
+    session = Session.append(empty, [old, %{new | id: old.id}])
+    assert {:ok, ^session} = session |> Session.encode() |> Session.decode()
+    assert {:ok, result} = Projection.explain(session, %{max_messages: 1})
+    assert [%{id: id, seq: 1}] = result.entries
+    assert id == old.id
+    assert [%{role: :user, content: "New"}] = result.messages
+
+    assert [
+             %{entry_id: ^id, seq: 0, state: :excluded, reason: :outside_context_window},
+             %{entry_id: ^id, seq: 1, state: :included, reason: :projected}
+           ] = result.decisions
+  end
+
   @tag obligation: ["jido_ai.conversation.I2", "jido_ai.conversation.I5"]
   test "projection restores rich content, reasoning, and thread source metadata" do
     session = Session.new(id: "contract-rich-context", now: 1)

@@ -1,24 +1,23 @@
 ---
 modules:
   - Jido.Session
-  - Jido.Thread
-  - Jido.Thread.Entry
   - Jido.AI.Thread.Projection
 ---
 
 ## Purpose
 
-Protect the portable conversation record and its projection into ReqLLM
-messages. This component owns Session and Thread values, append-only revision
-rules, message encoding, complete tool exchanges, and bounded context
-selection. It does not own durable storage or model calls.
+Protect the portable Session and its projection into ReqLLM messages. This
+component owns Session revision rules, message encoding, complete tool
+exchanges, and bounded context selection. It uses the ordered history from
+`jido.thread`.
 
 ## Obligations
 
-### jido_ai.conversation.I1 — Portable revisioned conversation
+### jido_ai.conversation.I1 — Portable revisioned Session
 
-- **scope:** `Jido.Session`, `Jido.Thread`, `Jido.Thread.Entry`
-- **must:** Append entries in sequence order, advance Session and Thread revisions consistently, and preserve valid values through versioned encode and decode operations.
+- **scope:** `Jido.Session`
+- **must:** Advance the Session revision consistently with changes to its
+  Thread and preserve the nested history through Session encode and decode.
 - **kind:** persisted-format
 - **status:** active
 

@@ -19,6 +19,7 @@ This directory records decisions that constrain the Jido V3 architecture. The [m
 | [0011](0011-direct-durable-operation-ownership.md) | Accepted | Admit one direct Durable operation per reference |
 | [0012](0012-agent-route-input-preparation.md) | Accepted | Apply Plugin policy before executable input validation |
 | [0013](0013-telemetry-proof-ownership.md) | Accepted | Align Telemetry and Trace proof with Reach |
+| [0014](0014-thread-proof-ownership.md) | Accepted | Give Thread and Entry their own Covenant proof |
 
 ## Backlog
 
