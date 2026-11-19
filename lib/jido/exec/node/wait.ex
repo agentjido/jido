@@ -138,21 +138,11 @@ defimpl Runic.Workflow.Invokable, for: Jido.Exec.Node.Wait do
 end
 
 defimpl Runic.Component, for: Jido.Exec.Node.Wait do
-  alias Runic.Workflow
+  alias Jido.Exec.Node.Lifecycle
+
   def connectable?(_node, _other), do: true
 
-  def connect(node, parents, workflow) when is_list(parents) do
-    join = Runic.Workflow.Join.new(Enum.map(parents, & &1.hash))
-    workflow = Enum.reduce(parents, workflow, &Workflow.add_step(&2, &1, join))
-    connect(node, join, workflow)
-  end
-
-  def connect(node, parent, workflow) do
-    workflow
-    |> Workflow.add_step(parent, node)
-    |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: :wait})
-    |> Workflow.register_component(node)
-  end
+  def connect(node, parent, workflow), do: Lifecycle.connect(node, parent, workflow, :wait)
 
   def source(node) do
     opts = node |> Map.from_struct() |> Map.delete(:hash) |> Map.to_list()

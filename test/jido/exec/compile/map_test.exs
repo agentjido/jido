@@ -29,6 +29,22 @@ defmodule Jido.Exec.Compile.MapTest do
     def run(%{item: item}, _context), do: {:ok, %{item: item}, [item]}
   end
 
+  defmodule ReportItem do
+    use Jido.Action, name: "compiled_map_report_item"
+
+    def run(%{item: item}, %{observer: observer}) do
+      send(observer, {:item_started, item, self()})
+
+      if item < 0 do
+        receive do
+          :fail -> {:error, :item_failed}
+        end
+      else
+        {:ok, %{item: item}}
+      end
+    end
+  end
+
   test "compile lowers one Map to one dedicated Runic Map component" do
     flow = map_flow("compiled_map_shape", Ref.input(:items), EchoParamsAction, %{item: Ref.item()})
 
@@ -128,6 +144,24 @@ defmodule Jido.Exec.Compile.MapTest do
     assert error.details.node == "items"
     assert error.details.item_index == 1
     assert is_binary(error.details.item_id)
+  end
+
+  @tag obligation: "jido_action.execution.I18"
+  test "Map leaves queued items unstarted and selects the first input failure" do
+    flow = map_flow("compiled_map_stop_admission", [-1, -2, 3, 4], ReportItem, %{item: Ref.item()})
+    observer = self()
+    task = Task.async(fn -> Exec.run(flow, %{}, %{observer: observer}, max_concurrency: 2) end)
+
+    assert_receive {:item_started, -1, first}, 1_000
+    assert_receive {:item_started, -2, second}, 1_000
+    monitor = Process.monitor(second)
+    send(second, :fail)
+    assert_receive {:DOWN, ^monitor, :process, ^second, :normal}, 1_000
+    send(first, :fail)
+
+    assert {:error, %{details: %{item_index: 0}}} = Task.await(task)
+    refute_received {:item_started, 3, _pid}
+    refute_received {:item_started, 4, _pid}
   end
 
   test "Map rejects a non-enumerable collection" do

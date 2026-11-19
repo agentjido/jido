@@ -182,8 +182,9 @@ defmodule Jido.Action do
   - `{:error, reason}` where `reason` describes why the Action failed.
   - `{:error, reason, effects}` is accepted, but Exec discards the effects.
 
-  - `{:handoff, successor_input, successor_target}` only from a terminal Handoff
-    selector. Every execution host must handle the handoff result.
+  - `{:handoff, successor_input, successor_target}` from a Handoff selector or
+    an Invoke expander. The Flow must return the complete result of that sole
+    terminal component. Every execution host must handle the handoff result.
     See [Dynamic Flows](dynamic-flows.md).
 
   Effects are optional for both maps and Output values. An empty list returns

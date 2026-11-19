@@ -193,10 +193,10 @@ The compiler rejects these shapes:
 
 At runtime:
 
-- Only a `handoff` selector can return `{:handoff, input, target}`. Other Actions fail with "only a Handoff selector can hand off".
+- A `handoff` selector or an eligible Invoke expander can return `{:handoff, input, target}`. An eligible Invoke must be the only final component and the Flow must return its complete result. This rule applies when the expander actually returns a Handoff. Other Actions fail with "only a Handoff selector can hand off".
 - A child Flow cannot hand off for its parent. It fails with "handoff must finish the root Flow".
-- The target can be an Action or Flow. Exec validates `input` against its schema before returning.
-- The input must be portable data. A process-local value, such as a pid, fails with "durable execution data contains a process-local value".
+- The target can be an Action or Flow. Exec checks its input before returning. The Instruction carries the original input so the successor can apply its validator to that value. Validation hooks can run during both checks. Keep them free of side effects.
+- Both original and validated input must be portable data. A process-local value, such as a pid, fails with "durable execution data contains a process-local value".
 - The returned Instruction has fresh, empty context and metadata.
 
 Jido does not run the successor for you here. A host can pass the returned Instruction to `Jido.Exec.run/4`, `Jido.Durable`, or an Agent Turn.

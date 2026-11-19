@@ -281,9 +281,10 @@ defmodule Jido.Exec.Runtime do
     with {:ok, instruction} <- Instruction.resolve(target, params),
          :ok <- unbound_handoff(instruction),
          :ok <- validate_handoff_target(instruction),
-         {:ok, params} <- Validation.input(instruction.target, instruction.params),
-         :ok <- validate_local(params, :handoff_input) do
-      {:ok, %{instruction | params: params}}
+         :ok <- validate_local(instruction.params, :handoff_input),
+         {:ok, validated} <- Validation.input(instruction.target, instruction.params),
+         :ok <- validate_local(validated, :handoff_input) do
+      {:ok, instruction}
     end
   end
 

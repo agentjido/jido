@@ -159,6 +159,30 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
     test "stops concurrent Flow Actions" do
       assert_caller_exit_stops_actions(parallel_flow(), [max_concurrency: 2], 2)
     end
+
+    test "stops concurrent items owned by a Parallel component" do
+      assert_caller_exit_stops_actions(parallel_collection(), [max_concurrency: 2], 2)
+      refute_received {:action_started, _pid, _group_leader}
+    end
+  end
+
+  @tag obligation: "jido_action.execution.I18"
+  test "a Parallel component timeout stops its active items" do
+    caller = run_blocking(parallel_collection(), max_concurrency: 2, timeout: 400)
+
+    monitors =
+      for _index <- 1..2 do
+        assert_receive {:action_started, pid, _group_leader}, 1_000
+        Process.monitor(pid)
+      end
+
+    assert_caller_result(caller, &match?({:error, %Jido.Error.TimeoutError{timeout: 400}}, &1))
+
+    for monitor <- monitors do
+      assert_receive {:DOWN, ^monitor, :process, _pid, _reason}, 1_000
+    end
+
+    refute_received {:action_started, _pid, _group_leader}
   end
 
   test "run/4 leaves no linked helper process after completion" do
@@ -270,6 +294,20 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
         %{kind: :step, name: "right", action: BlockingAction, params: %{}}
       ],
       output: %{left: Ref.result("left"), right: Ref.result("right")}
+    })
+  end
+
+  defp parallel_collection do
+    Flow.new!(%{
+      name: "exec_immediate_parallel_collection",
+      components: [
+        %{
+          kind: :parallel,
+          name: "work",
+          actions: Enum.map(~w(left right queued), &%{name: &1, action: BlockingAction, params: %{}})
+        }
+      ],
+      output: %{work: Ref.result("work")}
     })
   end
 

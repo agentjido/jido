@@ -6,7 +6,7 @@ defmodule Jido.Exec.Node.Parallel do
   alias Jido.Error
   alias Jido.Exec.{ActionBoundary, ValueResolver}
   alias Jido.Exec.Result, as: ExecResult
-  alias Jido.Exec.Node.{Lifecycle, Targets}
+  alias Jido.Exec.Node.{Collection, Lifecycle, Targets}
   alias Runic.Identity
   alias Runic.Workflow.SingleOutput.{Context, Result}
 
@@ -59,7 +59,7 @@ defmodule Jido.Exec.Node.Parallel do
       with :ok <- Targets.compatible(node.target_versions) do
         node.definition.actions
         |> Enum.with_index()
-        |> concurrent_map(context.runtime, fn {action, index} ->
+        |> Collection.run(node.definition.on_error, fn {action, index} ->
           run_action(action, index, state, node, context)
         end)
         |> Enum.map(fn
@@ -113,26 +113,6 @@ defmodule Jido.Exec.Node.Parallel do
     {:ok, values, effect_groups |> Enum.reverse() |> Enum.concat()}
   end
 
-  defp concurrent_map(items, runtime, fun) do
-    max_concurrency = Map.get(runtime, :__jido_exec_max_concurrency__, 1)
-
-    if max_concurrency > 1 and match?([_, _ | _], items) do
-      items
-      |> Task.async_stream(fun,
-        ordered: true,
-        max_concurrency: max_concurrency,
-        timeout: :infinity
-      )
-      |> Enum.zip(items)
-      |> Enum.map(fn
-        {{:ok, value}, _item} -> value
-        {{:exit, reason}, item} -> {:task_exit, item, reason}
-      end)
-    else
-      Enum.map(items, fun)
-    end
-  end
-
   defp parallel_error(error, node, action, index) do
     position_error(error, node, %{
       action_index: index,
@@ -161,23 +141,12 @@ defimpl Runic.Identity.Projectable, for: Jido.Exec.Node.Parallel do
 end
 
 defimpl Runic.Component, for: Jido.Exec.Node.Parallel do
+  alias Jido.Exec.Node.Lifecycle
   alias Jido.Exec.Node.Parallel
-  alias Runic.Workflow
 
   def connectable?(_node, _other), do: true
 
-  def connect(%Parallel{} = node, parents, workflow) when is_list(parents) do
-    join = parents |> Enum.map(& &1.hash) |> Workflow.Join.new()
-    workflow = Enum.reduce(parents, workflow, &Workflow.add_step(&2, &1, join))
-    connect(node, join, workflow)
-  end
-
-  def connect(%Parallel{} = node, parent, workflow) do
-    workflow
-    |> Workflow.add_step(parent, node)
-    |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: :parallel})
-    |> Workflow.register_component(node)
-  end
+  def connect(%Parallel{} = node, parent, workflow), do: Lifecycle.connect(node, parent, workflow, :parallel)
 
   def source(%Parallel{} = node) do
     quote do

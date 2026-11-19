@@ -37,6 +37,11 @@ defmodule Jido.Exec.Compile.InvokeTest do
     def run(params, _context), do: {:continue, params, Child}
   end
 
+  defmodule HandOff do
+    use Jido.Action, name: "compiled_invoke_handoff"
+    def run(params, _context), do: {:handoff, params, Finish}
+  end
+
   defmodule RawInput do
     use Jido.Action, name: "compiled_invoke_raw"
 
@@ -72,6 +77,36 @@ defmodule Jido.Exec.Compile.InvokeTest do
   test "Invoke can continue to an Action and preserves effect order" do
     assert Exec.run(invoke_flow("compiled_invoke_action", ContinueAction), %{value: 4}) ==
              {:ok, %{value: 5}, [:decision, :finish]}
+  end
+
+  @tag obligation: "jido_action.boundary.I8"
+  test "an Invoke may hand off only through the complete result of the sole terminal" do
+    flow = invoke_flow("compiled_invoke_handoff_shape", HandOff)
+
+    assert {:handoff, %Instruction{target: Finish, params: %{value: 4}}, [:decision]} =
+             Exec.run(flow, %{value: 4})
+
+    sibling = %{kind: :step, name: "side", action: Finish, params: %{value: 7}}
+    sibling_flow = Flow.new!(%{name: flow.name, components: [sibling], output: Ref.result("side")})
+    sibling_flow = %{sibling_flow | components: Map.merge(flow.components, sibling_flow.components)}
+
+    for invalid <- [sibling_flow, %{flow | output: %{wrapped: Ref.result("next")}}] do
+      assert {:error, %{details: %{node: "next", reason: :nested_handoff}}} = Exec.run(invalid, %{value: 4})
+      assert {:ok, compiled} = Exec.compile(invalid, [])
+      invoke = Workflow.get_component!(compiled, "next")
+      closure = Runic.Closure.new(Runic.Component.source(%{invoke | terminal?: true}), %{}, __ENV__)
+
+      old_log =
+        Enum.map(Workflow.build_log(compiled), fn
+          %Workflow.ComponentAdded{name: "next"} = event -> %{event | closure: closure}
+          event -> event
+        end)
+
+      {rebuilt, observation} = old_log |> Workflow.from_log() |> Workflow.execute(%{value: 4})
+
+      assert {:error, %{details: %{phase: :flow_output, reason: :nested_handoff}}} =
+               Exec.result(rebuilt, observation)
+    end
   end
 
   test "Invoke can compile and run a dynamic Flow target" do

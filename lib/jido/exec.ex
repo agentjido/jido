@@ -87,14 +87,15 @@ defmodule Jido.Exec do
   defp reject_waits(workflow), do: Jido.Exec.Node.Wait.validate_host(workflow)
 
   defp do_run_instruction(%Instruction{} = instruction, opts) do
-    with {:ok, workflow} <- compile(instruction, []),
+    with {:ok, workflow, parallel?} <- Compiler.compile_for_run(instruction, []),
          :ok <- reject_waits(workflow),
          {:ok, workflow, observation} <-
            run_workflow(
              workflow,
              execution_input(instruction),
              instruction.context,
-             opts
+             opts,
+             parallel?
            ) do
       result(workflow, observation)
     else
@@ -107,17 +108,17 @@ defmodule Jido.Exec do
 
   With a workflow and observation from `Runic.Workflow.execute/3` or
   `Runic.Runner.execution/3`, selects that input occurrence. Active work,
-  stopped admission, failures, and uncertain work return errors. Store
-  acknowledgement remains a separate Runic persistence status.
+  stopped admission, foreign observations, failures, and uncertain work return
+  errors. Store acknowledgement remains a separate Runic persistence status.
   """
   @spec result(Workflow.t(), Execution.t()) :: exec_result()
   def result(%Workflow{} = workflow, %Execution{} = observation),
     do: Result.project(workflow, observation)
 
-  defp run_workflow(workflow, input, context, opts) do
+  defp run_workflow(workflow, input, context, opts, parallel?) do
     with {:ok, policy, max_concurrency} <-
            Runtime.execution_options(opts, max_concurrency: default_max_concurrency()) do
-      runic_concurrency? = max_concurrency > 1 and concurrent_graph?(workflow)
+      runic_concurrency? = max_concurrency > 1 and parallel?
 
       react_opts =
         if runic_concurrency?,
@@ -155,32 +156,6 @@ defmodule Jido.Exec do
       :max_concurrency,
       min(System.schedulers_online(), @default_max_concurrency_ceiling)
     )
-  end
-
-  defp concurrent_graph?(workflow) do
-    graph = Workflow.component_graph(workflow)
-
-    components =
-      workflow
-      |> Workflow.components()
-      |> Map.values()
-      |> Enum.reject(fn component ->
-        is_struct(component, Jido.Exec.Node.Input) or
-          is_struct(component, Jido.Exec.Node.Output)
-      end)
-
-    components
-    |> Enum.with_index()
-    |> Enum.any?(fn {left, index} ->
-      components
-      |> Enum.drop(index + 1)
-      |> Enum.any?(fn right -> independent?(graph, left, right) end)
-    end)
-  end
-
-  defp independent?(graph, left, right) do
-    right not in Multigraph.reachable(graph, [left]) and
-      left not in Multigraph.reachable(graph, [right])
   end
 
   defp execution_input(%Instruction{params: params}), do: params

@@ -19,7 +19,7 @@ defmodule Jido.Exec.Compiler do
 
   alias Jido.Exec.Node.Map, as: MapNode
   alias Jido.Flow
-  alias Jido.Flow.{Identity, Preparation, Value}
+  alias Jido.Flow.{Identity, Preparation, Ref, Value}
   alias Jido.Flow.DSL.SourceMap
   alias Jido.Instruction
   alias Runic.Workflow
@@ -27,6 +27,13 @@ defmodule Jido.Exec.Compiler do
   @doc false
   @spec compile(term(), keyword()) :: {:ok, Workflow.t()} | {:error, Exception.t()}
   def compile(target, opts \\ []) do
+    with {:ok, workflow, _parallel?} <- compile_for_run(target, opts), do: {:ok, workflow}
+  end
+
+  @doc false
+  @spec compile_for_run(term(), keyword()) ::
+          {:ok, Workflow.t(), boolean()} | {:error, Exception.t()}
+  def compile_for_run(target, opts) do
     with {:ok, opts} <- validate_options(opts),
          {:ok, instruction} <- Instruction.resolve(target),
          :ok <- Instruction.validate_resolved(instruction),
@@ -34,16 +41,19 @@ defmodule Jido.Exec.Compiler do
          {:ok, instruction} <- Jido.Exec.Runtime.flow_instruction(instruction),
          {:ok, flow} <- Preparation.from_instruction(instruction),
          sources = source_map(opts, instruction.target),
-         {:ok, flow, analysis, children} <- prepare_flow(flow, sources, validator),
-         :ok <- reject_nested_waits(analysis, children) do
-      {:ok,
-       compile_flow(flow, analysis, children,
-         source_map: sources,
-         validator: validator
-       )}
+         {:ok, flow, analysis, children} <- prepare_flow(flow, sources, validator) do
+      compiled_children = compile_children(analysis, children, %{})
+      workflow = compile_flow(flow, analysis, compiled_children, sources, validator)
+      {:ok, workflow, parallel?(analysis.levels)}
     end
   rescue
     error -> {:error, error}
+  end
+
+  # A DAG is a chain if each longest-path level contains exactly one node.
+  defp parallel?(levels) do
+    distinct_levels = levels |> Map.values() |> MapSet.new()
+    map_size(levels) > MapSet.size(distinct_levels)
   end
 
   @doc false
@@ -65,47 +75,8 @@ defmodule Jido.Exec.Compiler do
     end
   end
 
-  defp reject_nested_waits(analysis, children) do
-    Enum.reduce_while(analysis.ordered, :ok, fn
-      {_name, %{kind: :call, call: %{kind: :flow, target: target}}}, :ok ->
-        with {:ok, child_analysis} <- child_analysis(target, children),
-             :ok <- reject_waits(child_analysis),
-             :ok <- reject_nested_waits(child_analysis, children) do
-          {:cont, :ok}
-        else
-          {:error, error} -> {:halt, {:error, error}}
-        end
-
-      _component, :ok ->
-        {:cont, :ok}
-    end)
-  end
-
-  defp child_analysis(target, children) when is_atom(target) do
-    case Map.fetch(children, target) do
-      {:ok, {_attrs, analysis}} -> {:ok, analysis}
-      :error -> {:error, Error.config_error("prepared child Flow is missing", %{target: target})}
-    end
-  end
-
-  defp reject_waits(analysis) do
-    case Enum.find(analysis.ordered, fn {_name, definition} -> definition.kind == :wait end) do
-      nil ->
-        :ok
-
-      {name, _definition} ->
-        {:error,
-         Error.config_error("a nested Flow cannot suspend inside an authored component", %{
-           node: name,
-           reason: :nested_wait
-         })}
-    end
-  end
-
-  defp compile_flow(flow, analysis, children, opts) do
+  defp compile_flow(flow, analysis, children, source_map, validator) do
     digest = Identity.semantic_digest(flow, analysis.ordered)
-    source_map = Keyword.fetch!(opts, :source_map)
-    validator = Keyword.fetch!(opts, :validator)
     output_name = "__jido_output__/#{flow.name}/#{binary_part(digest, 0, 12)}"
 
     input =
@@ -134,7 +105,7 @@ defmodule Jido.Exec.Compiler do
               location: Map.get(source_map, [:components, name]),
               node_path: [name]
             ],
-            name in analysis.terminals,
+            analysis.terminals == [name] and match?(%Ref{source: :result, component: ^name, path: []}, flow.output),
             children
           )
 
@@ -207,7 +178,7 @@ defmodule Jido.Exec.Compiler do
       opts ++
         [
           definition: definition,
-          child_workflow: compile_child!(target, children)
+          child_workflow: Map.fetch!(children, target)
         ]
     )
   end
@@ -220,19 +191,31 @@ defmodule Jido.Exec.Compiler do
           })
   end
 
-  defp compile_child!(target, children) do
-    {flow, analysis} = prepared_child!(target, children)
+  defp compile_children(analysis, prepared, compiled) do
+    Enum.reduce(analysis.ordered, compiled, fn
+      {_name, %{kind: :call, call: %{kind: :flow, target: target}}}, acc
+      when not is_map_key(acc, target) ->
+        {attrs, child_analysis} = Map.fetch!(prepared, target)
+        reject_child_wait!(child_analysis)
+        acc = compile_children(child_analysis, prepared, acc)
+        child = compile_flow(struct!(Flow, attrs), child_analysis, acc, module_source_map(target), target)
+        Map.put(acc, target, child)
 
-    compile_flow(flow, analysis, children,
-      source_map: module_source_map(target),
-      validator: target
-    )
+      _component, acc ->
+        acc
+    end)
   end
 
-  defp prepared_child!(target, children) when is_atom(target) do
-    case Map.fetch(children, target) do
-      {:ok, {attrs, analysis}} -> {struct!(Flow, attrs), analysis}
-      :error -> raise Error.config_error("prepared child Flow is missing", %{target: target})
+  defp reject_child_wait!(analysis) do
+    case Enum.find(analysis.ordered, fn {_name, definition} -> definition.kind == :wait end) do
+      nil ->
+        :ok
+
+      {name, _definition} ->
+        raise Error.config_error("a nested Flow cannot suspend inside an authored component", %{
+                node: name,
+                reason: :nested_wait
+              })
     end
   end
 

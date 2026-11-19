@@ -10,6 +10,7 @@ defmodule Jido.Exec.ObservationTest do
     use Jido.Action, name: "observation_effects"
 
     @impl true
+    def run(params, %{effect: effect}), do: {:ok, params, [effect]}
     def run(params, _context), do: {:ok, params, [:saved]}
   end
 
@@ -62,6 +63,36 @@ defmodule Jido.Exec.ObservationTest do
              Exec.result(workflow, observation)
 
     assert details.reason == :foreign_execution
+  end
+
+  test "a foreign failure is rejected before its error is read" do
+    {workflow, _first} = Workflow.execute(Jido.Exec.Compiler.compile!(WithEffects), %{value: 1})
+    {_other, observation} = Workflow.execute(Jido.Exec.Compiler.compile!(SometimesFails), %{fail: true})
+
+    assert {:error, %{details: %{reason: :foreign_execution}}} = Exec.result(workflow, observation)
+  end
+
+  test "reusing the explicit execution ID and input across workflows cannot select a foreign result" do
+    id = Runic.Identity.derive(:execution, [:shared])
+    {workflow, first} = Workflow.execute(Jido.Exec.Compiler.compile!(WithEffects), %{value: 1}, execution_id: id)
+    {_other, second} = Workflow.execute(Jido.Exec.Compiler.compile!(SometimesFails), %{value: 1}, execution_id: id)
+
+    assert first.input_fact_id == second.input_fact_id
+    assert {:error, %{details: %{reason: :foreign_execution}}} = Exec.result(workflow, second)
+    assert {:ok, %{value: 1}, [:saved]} = Exec.result(workflow, first)
+  end
+
+  test "the same explicit ID and definition can still produce different results" do
+    id = Runic.Identity.derive(:execution, [:shared])
+    compiled = Jido.Exec.Compiler.compile!(WithEffects)
+    {workflow, first} = Workflow.execute(compiled, %{value: 1}, execution_id: id)
+
+    {_other, second} =
+      Workflow.execute(compiled, %{value: 1}, execution_id: id, run_context: %{_global: %{effect: :other}})
+
+    assert first.input_fact_id == second.input_fact_id
+    assert {:error, %{details: %{reason: :foreign_execution}}} = Exec.result(workflow, second)
+    assert {:ok, %{value: 1}, [:saved]} = Exec.result(workflow, first)
   end
 
   test "stopped admission cannot return a successful output" do

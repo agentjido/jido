@@ -17,8 +17,29 @@ defmodule Jido.Exec.Result do
 
   @doc false
   @spec project(Workflow.t(), Execution.t()) :: Jido.Exec.exec_result()
-  def project(%Workflow{} = workflow, %Execution{} = observation),
-    do: project_result(workflow, result_error(observation, workflow), observation)
+  def project(%Workflow{} = workflow, %Execution{} = observation) do
+    if in_workflow?(observation, workflow) do
+      project_result(workflow, result_error(observation, workflow), observation.input_fact_id)
+    else
+      {:error, incomplete_error(observation.id, :foreign_execution)}
+    end
+  end
+
+  defp in_workflow?(observation, workflow) do
+    vertices = workflow.graph.vertices
+
+    # An explicit execution ID can give different workflows the same input Fact ID.
+    Map.has_key?(vertices, observation.input_fact_id) and
+      Enum.all?(observation.outcomes, fn outcome ->
+        Map.has_key?(vertices, outcome.node_hash) and recorded_fact?(outcome, vertices)
+      end) and
+      Enum.all?(observation.ready, &Map.has_key?(vertices, &1.node_hash))
+  end
+
+  defp recorded_fact?(%{result: %Fact{hash: hash, payload_digest: digest, meta: meta}}, vertices),
+    do: match?(%{payload_digest: ^digest, meta: ^meta}, Map.get(vertices, hash))
+
+  defp recorded_fact?(_outcome, _vertices), do: true
 
   @doc false
   def runnable_order(runnable) do
@@ -57,75 +78,22 @@ defmodule Jido.Exec.Result do
     {depth, failure.node_name, activation, workflow.name}
   end
 
-  defp result_fact(workflow, nil, resolver) do
-    case Workflow.results(workflow, nil, facts: true) do
-      %{result: fact} -> resolve_result_fact(fact, resolver)
-      _ports -> nil
-    end
-  end
+  defp result_fact(workflow, nil), do: Workflow.results(workflow, nil, facts: true)[:result]
 
-  defp result_fact(workflow, input_fact_id, resolver) do
+  defp result_fact(workflow, input_fact_id) do
     case Workflow.results(workflow, nil, facts: true, all: true) do
       %{result: facts} when is_list(facts) ->
-        facts
-        |> Enum.find(&(Workflow.root_ancestor_hash(workflow, &1) == input_fact_id))
-        |> resolve_result_fact(resolver)
+        Enum.find(facts, &(Workflow.root_ancestor_hash(workflow, &1) == input_fact_id))
 
       _ports ->
         nil
     end
   end
 
-  defp resolve_result_fact(%Fact{} = fact, _resolver), do: fact
+  defp project_result(workflow, nil, input_fact_id),
+    do: project_fact(result_fact(workflow, input_fact_id))
 
-  defp resolve_result_fact(
-         %Runic.Workflow.FactRef{} = fact,
-         %Runic.Workflow.FactResolver{} = resolver
-       ) do
-    case Runic.Workflow.FactResolver.resolve(fact, resolver) do
-      {:ok, fact} -> fact
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp resolve_result_fact(_fact, _resolver), do: nil
-
-  defp project_result(workflow, error, observation),
-    do: project_result(workflow, error, observation, nil)
-
-  defp project_result(workflow, nil, observation, resolver) do
-    fact = result_fact(workflow, if(observation, do: observation.input_fact_id), resolver)
-
-    case fact do
-      %Fact{} ->
-        project_fact(fact)
-
-      {:error, reason} ->
-        {:error, result_load_error(reason)}
-
-      nil ->
-        case result_fact(workflow, nil, resolver) do
-          {:error, reason} ->
-            {:error, result_load_error(reason)}
-
-          result when not is_nil(observation) and not is_nil(result) ->
-            {:error, incomplete_error(observation.id, :foreign_execution)}
-
-          _missing ->
-            project_fact(nil)
-        end
-    end
-  end
-
-  defp project_result(_workflow, error, _observation, _resolver),
-    do: {:error, normalize(error)}
-
-  defp result_load_error(reason) do
-    Jido.Error.execution_error("Exec result could not be loaded", %{
-      phase: :rehydration,
-      reason: reason
-    })
-  end
+  defp project_result(_workflow, error, _input_fact_id), do: {:error, normalize(error)}
 
   defp project_fact(%Fact{meta: meta} = fact) do
     value = Jido.Exec.Fact.value(fact)

@@ -7,6 +7,7 @@ modules:
   - Jido.Exec.Fact.LocalValue
   - Jido.Exec.Node.Action
   - Jido.Exec.Node.Choice
+  - Jido.Exec.Node.Collection
   - Jido.Exec.Node.FlowTarget
   - Jido.Exec.Node.Handoff
   - Jido.Exec.Node.Input
@@ -38,7 +39,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.execution.I18 — Policy bounds attempts and preserves outcome order
 - **scope:** `Jido.Exec.run/4, Jido.Durable, Runic.Runner`
-- **must:** Timeout applies to each authored component attempt; max_attempts counts the first attempt and retries only eligible errors. Map and Parallel can use bounded concurrency inside one component while Reduce and Iterate remain serial. A composite retry repeats the complete component. Defined result and failure order do not depend on completion order.
+- **must:** Timeout applies to each authored component attempt; max_attempts counts the first attempt and retries only eligible errors. Map and Parallel can use bounded concurrency inside one component while Reduce and Iterate remain serial. In fail-fast mode, Map and Parallel let started items finish and stop admitting new work after a failure. A composite retry repeats the complete component. Defined result and failure order do not depend on completion order.
 - **kind:** ordering
 - **status:** active
 

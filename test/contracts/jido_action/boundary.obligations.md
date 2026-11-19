@@ -55,7 +55,7 @@ callers. This does not establish complete Flow contract coverage.
 
 ### jido_action.boundary.I8 — Invoke and Handoff Action calls preserve control and effect rules
 - **scope:** `Jido.Exec.Node.Invoke`, `Jido.Exec.Node.Handoff`, `Jido.Exec.Node.FlowTarget`
-- **must:** An Invoke expander can select a valid Action or Flow target through a continuation. Reject invalid targets with the Invoke node detail. Invoke cannot hand off. Handoff validates one successor Instruction and cannot continue the current graph. Returned callback errors keep their reason and expose no effects. Successful effects must form a proper list. Reconstructed Invoke and Handoff components retain equivalent behavior.
+- **must:** An Invoke expander can select a valid Action or Flow target through a continuation. Reject invalid targets with the Invoke node detail. Permit an Invoke Handoff only at the sole terminal whose complete result is the Flow output. Handoff checks one successor and preserves its original portable input for execution. The current graph cannot continue after a Handoff. Returned callback errors keep their reason and expose no effects. Successful effects must form a proper list. Reconstructed Invoke and Handoff components retain equivalent behavior.
 - **kind:** functional
 - **status:** active
 

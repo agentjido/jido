@@ -104,7 +104,7 @@ A direct `run/2` call skips schema defaults, so validate first:
 | `{:error, reason}` | `{:error, %Jido.Error.ExecutionError{}}` |
 | `{:error, reason, effects}` | The same error, with the effects discarded |
 
-An Invoke expander can also return `{:continue, input, target}`, and a Handoff selector can return `{:handoff, input, target}`. A root Action that returns either one gets an error. See [Dynamic Flows](../flows/dynamic-flows.md).
+An Invoke expander can also return `{:continue, input, target}`. A Handoff selector or a terminal Invoke expander can return `{:handoff, input, target}`. The Flow must return the complete result of that sole terminal component. A root Action that returns either control result gets an error. See [Dynamic Flows](../flows/dynamic-flows.md).
 
 ## Handle failures
 

@@ -112,7 +112,7 @@ end
 
 ## Control dynamic targets
 
-An Invoke expander returns `{:continue, input, target}`, and a Handoff selector returns `{:handoff, input, target}`. Whatever module that Action returns will be resolved and, for Invoke, run. Jido checks the target contract. It does not check a Catalog here. If model output or user input influences the choice, map it through a fixed table, as below, and never convert a string to a module.
+An Invoke expander can return `{:continue, input, target}` to run the target in the current Turn. A Handoff selector or a terminal Invoke expander can return `{:handoff, input, target}` for the host to run in a new Turn. Jido resolves these targets and checks their contracts outside the Catalog. If model output or user input influences the choice, use a fixed table as shown below. Never convert an input string to a module.
 
 ```elixir
 defmodule FlowSecurityGuide.ChooseTool do
