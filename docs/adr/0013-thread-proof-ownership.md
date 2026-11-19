@@ -1,4 +1,4 @@
-# ADR 0012 Thread proof ownership
+# ADR 0013 Thread proof ownership
 
 - Status: Accepted
 - Date: 2026-11-19
