@@ -49,3 +49,10 @@ selection. It does not own durable storage or model calls.
 - **must:** Preserve valid text, image, and file content parts, structured tool output metadata, tool call identity, and reasoning details through Thread storage and context restoration.
 - **kind:** persisted-format
 - **status:** active
+
+### jido_ai.conversation.I6 — Validate the portable Session boundary
+
+- **scope:** `Jido.Session`
+- **must:** Enforce portable Session invariants in Agent state. Read supported version 1 fields and defaults. Return a tagged error for conflicting fields and malformed nested data.
+- **kind:** persisted-format
+- **status:** active

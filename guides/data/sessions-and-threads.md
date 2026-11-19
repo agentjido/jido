@@ -144,7 +144,22 @@ document = Session.encode(record)
 
 `Jido.Thread.encode/1` and `Jido.Thread.decode/1` do the same for a Thread. `Jido.Session.decode!/1` raises instead of returning an error.
 
+Session document fields accept atom and string keys. If both forms occur for
+one field, their values must be exactly equal. A document with a struct
+marker or a conflicting field returns `{:error, :invalid_session}`. An
+absent or nil revision defaults to zero. Absent or nil metadata defaults to
+an empty map.
+
 These maps use a `"version"` field and are not routed by `Jido.Codec`. Call `Jido.Session.encode/1` and `Jido.Session.decode/1` directly. Only version 1 can be read.
+
+### Use a Session in a Runic Turn
+
+Runic hashes the complete Session document, including the Thread, entry
+payloads, refs, and metadata. A struct in those fields needs a Runic identity
+projection. For example, BEAM storage accepts a `Date`. Use an ISO date
+string when that value must enter a Runic Turn. AI request start returns
+`{:error, :invalid_session_identity}` when the Session document fails the
+Runic canonical codec.
 
 ### Choose string kinds for stored data
 
@@ -152,7 +167,10 @@ An atom `:kind` encodes as `%{"type" => "atom", "value" => "note"}`. Decoding ne
 
 ## Keep a Session in Agent state
 
-`Jido.Session.state_schema/0` returns the schema for a Session field in Agent state. It is the same as `Jido.Session.schema/0`, a closed struct schema.
+`Jido.Session.state_schema/0` checks a Session field in Agent state. It
+checks the shape and portable value rules, including Session and Thread
+revisions, time order, and metadata. It accepts open and closed Sessions.
+`Jido.Session.schema/0` describes the struct shape.
 
 ```elixir
 defmodule SessionGuide.SupportDesk do

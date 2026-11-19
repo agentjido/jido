@@ -773,11 +773,11 @@ A portable Agent Session that owns one `Jido.Thread`.
 | `Jido.Session.decode!/1` | Decodes and validates a portable Session map or raises on invalid data. |
 | `Jido.Session.encode/1` | Returns a versioned portable map. |
 | `Jido.Session.from_thread/2` | Builds an open Session around an existing Thread. |
-| `Jido.Session.new/1` | Creates an open Session with one empty Thread. |
+| `Jido.Session.new/1` | Creates an open Session with an empty Thread or a supplied Thread. |
 | `Jido.Session.open?/1` | Returns true when the Session accepts entries. |
 | `Jido.Session.put_metadata/2` | Replaces the portable Session metadata. |
-| `Jido.Session.schema/0` | Returns the portable Session schema. |
-| `Jido.Session.state_schema/0` | Returns the strict schema used when a Session is in Agent state. |
+| `Jido.Session.schema/0` | Returns the schema for the shape of a portable Session. |
+| `Jido.Session.state_schema/0` | Returns the schema that validates a portable Session in Agent state. |
 
 ### `Jido.Thread`
 
