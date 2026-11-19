@@ -3,7 +3,7 @@ defmodule Jido.AI.Actions.Embed do
   @moduledoc "Generates one embedding or a batch of embeddings."
 
   alias Jido.AI.InferenceClient.Selection
-  alias Jido.AI.Usage
+  alias Jido.AI.{ModelOptions, Usage}
 
   use Jido.Action,
     id: "jido.ai/actions/embed",
@@ -14,7 +14,7 @@ defmodule Jido.AI.Actions.Embed do
       Joi.object(%{
         model: Joi.string() |> Joi.default("openai:text-embedding-3-small"),
         input: Joi.union([Joi.string(), Joi.list(Joi.string())]),
-        options: Joi.map() |> Joi.default(%{})
+        options: ModelOptions.schema() |> Joi.default(%{})
       }),
     output_schema: Joi.map()
 

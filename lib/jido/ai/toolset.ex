@@ -14,7 +14,7 @@ defmodule Jido.AI.Toolset do
   @doc "Validates an ordered Agent Toolset."
   @spec validate(term()) :: :ok | {:error, term()}
   def validate(tools) when is_list(tools) do
-    with :ok <- validate_modules(tools),
+    with :ok <- validate_entries(tools, &module_tool?/1, :invalid_tool),
          :ok <- unique(tools, & &1) do
       unique(tools, & &1.name())
     end
@@ -88,16 +88,18 @@ defmodule Jido.AI.Toolset do
     {visible, unavailable} = narrow_visible(agent_visible, request_visible)
     hidden = add_names(agent_hidden, field(request, :hidden) || []) ++ unavailable
 
+    requirement = narrow_requirement(field(agent, :requirement), field(request, :requirement))
+
     kept_review =
       Enum.filter(field(agent, :review) || [], fn name ->
-        name not in hidden and (visible == [] or name in visible)
+        requirement != :disabled and name not in hidden and (visible == [] or name in visible)
       end)
 
     %{
       visible: visible,
       hidden: hidden,
       review: add_names(kept_review, (field(request, :review) || []) -- (field(agent, :review) || [])),
-      requirement: narrow_requirement(field(agent, :requirement), field(request, :requirement)),
+      requirement: requirement,
       reason: field(request, :reason) || field(agent, :reason)
     }
   end
@@ -170,12 +172,13 @@ defmodule Jido.AI.Toolset do
   @spec execution_boundary(map()) :: {:error, atom()}
   def execution_boundary(_arguments), do: {:error, :tool_must_run_in_agent_graph}
 
-  defp validate_modules(tools) do
-    case Enum.find(tools, &(not module_tool?(&1))) do
-      nil -> :ok
-      tool -> {:error, {:invalid_tool, tool}}
-    end
+  defp validate_entries([], _valid?, _code), do: :ok
+
+  defp validate_entries([tool | rest], valid?, code) do
+    if valid?.(tool), do: validate_entries(rest, valid?, code), else: {:error, {code, tool}}
   end
+
+  defp validate_entries(_tail, _valid?, _code), do: {:error, :invalid_toolset}
 
   defp module_tool?(target) when is_atom(target) and target not in [nil, true, false] do
     match?({:ok, _kind}, tool_kind(target))
@@ -277,10 +280,8 @@ defmodule Jido.AI.Toolset do
   end
 
   defp validate_runtime_tools(tools) do
-    case Enum.find(tools, &(not runtime_tool?(&1))) do
-      nil -> unique(tools, &tool_name/1)
-      tool -> {:error, {:invalid_runtime_tool, tool}}
-    end
+    with :ok <- validate_entries(tools, &runtime_tool?/1, :invalid_runtime_tool),
+         do: unique(tools, &tool_name/1)
   end
 
   defp runtime_tool?(%{kind: :source, source: %{module: module}} = tool)

@@ -188,6 +188,46 @@ defmodule Jido.AI.Conversation.ContractTest do
   end
 
   @tag obligation: ["jido_ai.conversation.I2", "jido_ai.conversation.I4"]
+  test "a small window keeps the latest complete exchange in a long Thread" do
+    history_size = 1_024
+
+    history =
+      for index <- 1..history_size do
+        %{
+          at: index + 1,
+          kind: :ai_message,
+          payload: %{"version" => 1, "role" => "user", "content" => "Earlier question #{index}"}
+        }
+      end
+
+    session = Session.new(id: "contract-long-window", now: 1) |> Session.append(history)
+
+    call = ReqLLM.ToolCall.new("lookup-1", "lookup", ~s({"id":42}))
+    latest = history_size + 2
+    session = append!(session, %{role: :user, content: "Current question"}, latest)
+    session = append_req!(session, ReqLLM.Context.assistant("", tool_calls: [call]), latest + 1)
+    session = append_req!(session, ReqLLM.Context.tool_result("lookup-1", "wrong_name", %{}), latest + 2)
+    session = append_req!(session, ReqLLM.Context.tool_result("lookup-1", "lookup", %{ok: true}), latest + 3)
+    session = append_req!(session, ReqLLM.Context.assistant("Complete"), latest + 4)
+
+    assert {:ok, projection} = Projection.explain(session, %{max_messages: 1, max_bytes: 1})
+    assert Enum.map(projection.messages, & &1.role) == [:user, :assistant, :tool, :assistant]
+    assert projection.available_messages == history_size + 4
+    assert projection.included_messages == 4
+    assert projection.dropped_messages == history_size
+    assert projection.first_seq == history_size
+    assert projection.last_seq == history_size + 4
+    assert Projection.breakpoint(session) == projection.last_seq
+
+    {older, current} = Enum.split(projection.decisions, history_size)
+    assert Enum.map(older, & &1.seq) == Enum.to_list(0..(history_size - 1))
+    assert Enum.all?(older, &(&1.reason == :outside_context_window))
+
+    assert Enum.map(current, & &1.reason) ==
+             [:projected, :projected, :incomplete_tool_exchange, :projected, :projected]
+  end
+
+  @tag obligation: ["jido_ai.conversation.I2", "jido_ai.conversation.I4"]
   test "projection keeps a complete latest turn when a limit is smaller than that turn" do
     session = Session.new(id: "contract-window", now: 1)
     session = append!(session, %{role: :user, content: "Old question"}, 2)

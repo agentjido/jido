@@ -130,6 +130,117 @@ defmodule Jido.AI.ModelExecution.CallModelContractTest do
   end
 
   @tag obligation: "jido_ai.model_execution.I4"
+  test "known portable options reach generation and streaming as keyword entries" do
+    owner = self()
+
+    for operation <- [:generate_text, :stream_text] do
+      stub(ReqLLM, operation, fn _model, _context, options ->
+        send(owner, {:options, options})
+        {:error, :closed}
+      end)
+    end
+
+    for stream <- [false, true] do
+      turn = turn("contract:options", stream: stream, options: %{"temperature" => 0.2})
+      assert {:ok, _result} = CallModel.run(%{turn: turn, context: model_context()}, %{})
+      assert_receive {:options, options}
+      assert Keyword.keyword?(options)
+      assert options[:temperature] == 0.2
+    end
+  end
+
+  @tag obligation: "jido_ai.model_execution.I4"
+  test "only selected tools reach generation and streaming" do
+    owner = self()
+
+    for operation <- [:generate_text, :stream_text] do
+      stub(ReqLLM, operation, fn _model, context, options ->
+        send(owner, {:tools, context.tools, options})
+        {:error, :closed}
+      end)
+    end
+
+    cases = [
+      {[], :optional, true, []},
+      {[], :disabled, true, []},
+      {[Jido.Test.AI.Tools.Add], :required, false, []},
+      {[Jido.Test.AI.Tools.Add], :required, true, ["add"]}
+    ]
+
+    for stream <- [false, true], {tools, requirement, expose?, names} <- cases do
+      turn =
+        turn("contract:tools",
+          stream: stream,
+          options: %{tools: [%{name: "test_tool"}], tool_choice: :required, temperature: 0.2},
+          tools: tools,
+          tool_requirement: requirement
+        )
+
+      assert {:ok, _result} = CallModel.run(%{turn: turn, context: model_context(), tools: expose?}, %{})
+      assert_receive {:tools, context_tools, options}
+      assert Enum.map(context_tools, & &1.name) == names
+      assert Keyword.get(options, :tools, []) == context_tools
+      assert options[:temperature] == 0.2
+
+      expected_choice =
+        case {requirement, names} do
+          {:disabled, _} -> :none
+          {:required, [_ | _]} -> :required
+          _ -> nil
+        end
+
+      assert options[:tool_choice] == expected_choice
+    end
+  end
+
+  @tag obligation: "jido_ai.model_execution.I4"
+  test "stream events reuse one Session decode across chunks" do
+    model = "openai:gpt-4o-mini"
+    trace_target = {Jido.Session, :decode!, 1}
+    Code.ensure_loaded!(Jido.Session)
+    assert :erlang.trace_pattern(trace_target, true, [:call_count]) == 1
+    on_exit(fn -> :erlang.trace_pattern(trace_target, false, [:call_count]) end)
+
+    for chunk_count <- [1, 32] do
+      expect(ReqLLM, :stream_text, fn ^model, context, options ->
+        assert options[:telemetry][:conversation_id] == "session:call-model:thread"
+        stream = ReqLLM.Cache.stream_response(response(model, context), ReqLLM.model!(model), context)
+        {:ok, %{stream | stream: List.duplicate(ReqLLM.StreamChunk.text("x"), chunk_count)}}
+      end)
+
+      source = Jido.Signal.new!("jido.ai.request", %{}, source: "urn:test:call-model")
+
+      context = %{
+        signal: source,
+        agent_signal_source: source.source,
+        jido_ai_dispatch: {:pid, target: self()}
+      }
+
+      {:call_count, before_count} = :erlang.trace_info(trace_target, :call_count)
+
+      assert {:ok, %{outcome: %{status: :ok}}} =
+               CallModel.run(%{turn: turn(model, stream: true), context: model_context()}, context)
+
+      assert :erlang.trace_info(trace_target, :call_count) == {:call_count, before_count + 1}
+
+      assert_receive {:signal, %{type: "jido.ai.model.stream.started", data: started}}
+      stable_keys = [:stream_id, :session_id, :thread_id, :request_id, :run_id]
+      assert started.sequence == 0
+
+      for sequence <- 1..chunk_count do
+        assert_receive {:signal, %{type: "jido.ai.model.stream.chunk", data: chunk}}
+        assert chunk.sequence == sequence
+        assert chunk.timestamp_ms >= started.timestamp_ms
+        assert Map.take(chunk, stable_keys) == Map.take(started, stable_keys)
+      end
+
+      assert_receive {:signal, %{type: "jido.ai.model.stream.completed", data: completed}}
+      assert completed.sequence == chunk_count + 1
+      assert Map.take(completed, stable_keys) == Map.take(started, stable_keys)
+    end
+  end
+
+  @tag obligation: "jido_ai.model_execution.I4"
   test "stream setup returns one normal error outcome when the provider cannot start" do
     expect(ReqLLM, :stream_text, fn _model, _context, _options -> {:error, :closed} end)
 

@@ -212,6 +212,10 @@ A selector returns only an alias, so it cannot supply a handler, a new Signal, o
 
 Only one Plugin on an Agent can define `select_route/2`. A Signal that matches no route fails with code `:unmatched_input`, and the selector does not run. See [Routes and Handlers](../agents/build-agent-routes.livemd) for route matching.
 
+## Prepare parameters for the selected route
+
+Use `prepare_route_input/4` to apply policy to the parameters of a selected Action or Flow. The callback receives the route, the normalized request, the parameters with route defaults, and the Plugin options. Return `{:ok, params}` with a plain map or `{:error, reason}` to reject the request. Jido calls each Plugin in declaration order and validates the final map with the selected executable.
+
 ## Contribute routes
 
 A Plugin adds routes by returning them from `derive_routes/1`, which receives the Plugin's data. A derived route needs an exact path, and the Agent keeps it alongside its own routes. An Agent can then handle a Signal that its definition never names.

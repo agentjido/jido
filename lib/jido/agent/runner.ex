@@ -192,8 +192,8 @@ defmodule Jido.Agent.Runner do
         signal: signal
       })
 
-    with {:ok, instruction} <-
-           Jido.Instruction.resolve(selection.executable, selection.input, context),
+    with {:ok, input} <- prepare_route_input(selection, plugin_specs),
+         {:ok, instruction} <- Jido.Instruction.resolve(selection.executable, input, context),
          :ok <- Jido.Instruction.validate_resolved(instruction),
          {:ok, instruction} <- Jido.Exec.Runtime.flow_instruction(instruction) do
       {:ok,
@@ -257,11 +257,12 @@ defmodule Jido.Agent.Runner do
 
   defp select(agent, signal, plugin_inputs, plugin_specs) do
     with {:ok, route} <- Plugin.select_route(agent, signal, plugin_inputs, plugin_specs),
-         {:ok, executable, input} <- selection(route, signal) do
+         {:ok, executable, input, request} <- selection(route, signal) do
       {:ok,
        %{
          executable: executable,
          input: input,
+         request: request,
          route: route,
          source_signal: signal
        }}
@@ -270,11 +271,18 @@ defmodule Jido.Agent.Runner do
 
   defp selection(%{handler: %{kind: kind, target: target}} = route, signal)
        when kind in [:action, :flow] do
-    with {:ok, input} <- merge_route_input(route, signal), do: {:ok, target, input}
+    with {:ok, request, input} <- merge_route_input(route, signal), do: {:ok, target, input, request}
   end
 
   defp selection(%{handler: handler}, _signal),
-    do: {:ok, Jido.Agent.Runner.SignalHandler, %{handler: handler}}
+    do: {:ok, Jido.Agent.Runner.SignalHandler, %{handler: handler}, nil}
+
+  defp prepare_route_input(%{executable: target, request: request} = selection, plugin_specs)
+       when is_atom(target) and is_map(request) do
+    Plugin.prepare_route_input(selection.route, request, selection.input, plugin_specs)
+  end
+
+  defp prepare_route_input(selection, _plugin_specs), do: {:ok, selection.input}
 
   defp normalize_exec_result({:ok, output}), do: normalize_exec_result({:ok, output, []})
 
@@ -371,7 +379,7 @@ defmodule Jido.Agent.Runner do
   defp merge_route_input(route, %Signal{} = signal) do
     case normalize_input(signal.data) do
       {:ok, input} ->
-        Jido.Agent.Route.params(route, input)
+        with {:ok, params} <- Jido.Agent.Route.params(route, input), do: {:ok, input, params}
 
       {:error, _error} ->
         {:error,

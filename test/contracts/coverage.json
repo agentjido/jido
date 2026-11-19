@@ -468,11 +468,12 @@
         "jido.agent_evaluation.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
             "test map, duplicate keyword and nil input use the original source Signal",
+            "test route input callbacks receive the original request and run in Plugin order",
             "test the first declared matching route selects one target and merges defaults shallowly"
           ]
         },
@@ -513,12 +514,13 @@
         "jido.agent_evaluation.I6": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
             "test Plugin preparation and reduction preserve declaration order and state ownership",
-            "test Plugin rejections retain application reasons and callback faults retain causes"
+            "test Plugin rejections retain application reasons and callback faults retain causes",
+            "test route input callbacks receive the original request and run in Plugin order"
           ]
         },
         "jido.agent_evaluation.I7": {
@@ -4771,7 +4773,7 @@
         "jido_ai.agent_authoring.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 30,
+          "passing": 31,
           "status": "active",
           "testable": true,
           "tests": [
@@ -4792,6 +4794,7 @@
             "test configured reasoning defaults round-trip through Jido Authoring",
             "test inspection and preflight expose portable graph data",
             "test one model round executes multiple tool calls in one Parallel component",
+            "test portable model option keys keep the same values across the Agent codec",
             "test reasoning configuration accepts only its explicit data DSL",
             "test reasoning configuration is checked against the selected Flow schema",
             "test stored reasoning defaults preserve the type seen by the reasoning Flow",
@@ -4834,10 +4837,11 @@
         "jido_ai.conversation.I2": {
           "failing": 0,
           "kind": "functional",
-          "passing": 7,
+          "passing": 8,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a small window keeps the latest complete exchange in a long Thread",
             "test builtin tool calls and simple tool outputs restore to ReqLLM values",
             "test projection completes multi-call exchanges and preserves tool-call metadata",
             "test projection keeps a complete latest turn when a limit is smaller than that turn",
@@ -4862,10 +4866,11 @@
         "jido_ai.conversation.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a small window keeps the latest complete exchange in a long Thread",
             "test projection keeps a complete latest turn when a limit is smaller than that turn",
             "test projection keeps recent complete exchanges and excludes observations"
           ]
@@ -4927,7 +4932,7 @@
         "jido_ai.model_execution.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 12,
+          "passing": 13,
           "status": "active",
           "testable": true,
           "tests": [
@@ -4941,6 +4946,7 @@
             "test structured objects do not hide actionable agent tool calls",
             "test the embedding Action returns provider errors",
             "test the output guard applies the size limit to structured objects",
+            "test usage adds tool-use tokens and reasoning cost to an older aggregate",
             "test usage combines cache semantics and records cache write expiry for every TTL form",
             "test usage keeps cache counters and provider-reported cost"
           ]
@@ -4948,23 +4954,26 @@
         "jido_ai.model_execution.I4": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 19,
+          "passing": 22,
           "status": "active",
           "testable": true,
           "tests": [
             "test Context enforces an idempotent open, prepared, and completed lifecycle",
             "test ReAct returns a provider-validated structured object",
             "test applies a generic transformation once and sends the exact ReqLLM request",
+            "test known portable options reach generation and streaming as keyword entries",
             "test multimodal input reaches ReqLLM as content parts",
             "test multimodal input validates existing content part structs",
             "test multimodal support preserves the plain-text input limit",
             "test one embedding Action accepts one value or a batch",
+            "test only selected tools reach generation and streaming",
             "test prepared contexts have a safe portable snapshot for either call mode",
             "test projection explains exclusions and returns a canonical ReqLLM context",
             "test snapshots expose ReqLLM shape, safe options, response context, and call metadata",
             "test snapshots hash tool schemas and expose full schemas on request",
             "test snapshots keep fallback request and response shapes portable",
             "test snapshots safely expose full, redacted, and invalid result shapes",
+            "test stream events reuse one Session decode across chunks",
             "test stream setup returns one normal error outcome when the provider cannot start",
             "test the embedding Action returns provider errors",
             "test the output guard applies the size limit to structured objects",
@@ -5680,11 +5689,12 @@
         "jido_ai.tools.I1": {
           "failing": 0,
           "kind": "security",
-          "passing": 3,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test Toolset policy, definitions, and call resolution share one boundary",
+            "test nil entries and improper tool lists return errors",
             "test static tools form a protected allowlist and calls validate before use",
             "test tool selection can only narrow the Agent allowlist"
           ]
@@ -5708,10 +5718,11 @@
         "jido_ai.tools.I3": {
           "failing": 0,
           "kind": "security",
-          "passing": 20,
+          "passing": 24,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Agent policy preserves validation errors on request fields",
             "test Toolset policy, definitions, and call resolution share one boundary",
             "test a request against Agent instructions can set them when the Agent sets none",
             "test a request against Agent instructions cannot replace them",
@@ -5720,16 +5731,19 @@
             "test a request against Agent limits reaches the running request",
             "test a request against Agent limits stays free when the Agent sets none",
             "test a request against Agent review can add review, and preflight reports the result",
+            "test a request against Agent review can disable optional tools with inherited review",
             "test a request against Agent review can hide a reviewed tool",
             "test a request against Agent review cannot use string keys to get around the policy",
             "test a request against Agent review keeps review through an empty or unrelated tool_policy",
             "test a request against Agent review keeps review_tools set on the Agent",
             "test an Agent's output_chars is an upper bound for its requests",
+            "test model option keys are checked before reasoning for generation and streaming",
             "test narrow_policy/2 is unchanged by narrowing a policy with itself",
             "test narrow_policy/2 keeps a requirement that the Agent sets",
             "test narrow_policy/2 never widens visibility",
             "test requirement values reject :per_turn with the normal invalid-option error",
             "test static tools form a protected allowlist and calls validate before use",
+            "test the selected custom Flow receives protected input in direct and live requests",
             "test tool selection and call resolution return complete canonical records",
             "test tool selection can only narrow the Agent allowlist"
           ]

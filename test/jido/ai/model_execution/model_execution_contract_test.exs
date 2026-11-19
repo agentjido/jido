@@ -50,6 +50,18 @@ defmodule Jido.AI.ModelExecution.ContractTest do
     assert usage.total_cost == 0.25
   end
 
+  @tag obligation: "jido_ai.model_execution.I3"
+  test "usage adds tool-use tokens and reasoning cost to an older aggregate" do
+    older = Map.drop(Usage.zero(), [:tool_use_input_tokens, :reasoning_cost])
+    attempt = %{input_tokens: 10, output_tokens: 5, tool_use_input_tokens: 2, reasoning_cost: 0.04, total_cost: 0.10}
+    usage = older |> Usage.add(attempt) |> Usage.add(attempt) |> Usage.add(%{})
+
+    assert usage.tool_use_input_tokens == 4
+    assert usage.reasoning_cost == 0.08
+    assert usage.total_tokens == 34
+    assert usage.total_cost == 0.20
+  end
+
   @tag obligation: ["jido_ai.model_execution.I4", "jido_ai.model_execution.I5"]
   test "prepared contexts have a safe portable snapshot for either call mode" do
     request = ReqLLM.Context.new([ReqLLM.Context.user("Secret input")])
@@ -73,6 +85,8 @@ defmodule Jido.AI.ModelExecution.ContractTest do
   @tag obligation: "jido_ai.model_execution.I6"
   test "embedding action accepts one input or an ordered input batch" do
     assert {:ok, %{input: "one"}} = Embed.validate_params(%{input: "one"})
+    assert {:ok, %{options: %{dimensions: 16}}} = Embed.validate_params(%{input: "one", options: %{"dimensions" => 16}})
+    assert {:error, _reason} = Embed.validate_params(%{input: "one", options: %{"unrecognized_model_option" => true}})
     assert {:ok, %{input: ["one", "two"]}} = Embed.validate_params(%{input: ["one", "two"]})
     assert {:error, _reason} = Embed.validate_params(%{input: ["one", 2]})
   end

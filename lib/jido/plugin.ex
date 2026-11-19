@@ -63,6 +63,18 @@ defmodule Jido.Plugin do
   @callback state_spec(keyword()) :: state_spec() | {:error, term()}
   @callback directives(keyword()) :: [module()] | {:error, term()}
   @callback reduce(Jido.Agent.Plugin.Reduction.t(), keyword()) :: {:ok, term()} | {:error, term()}
+
+  @doc """
+  Prepares parameters for the selected Action or Flow route.
+
+  Receives the selected route, the original request map, the parameters
+  with route defaults applied, and the Plugin options. Return
+  `{:ok, params}` to pass a parameter map to normal executable validation.
+  The callback runs during direct and live Agent commands in Plugin
+  declaration order. The Signal, target, state, and caller context stay
+  outside this callback's control.
+  """
+  @callback prepare_route_input(map(), map(), map(), keyword()) :: {:ok, map()} | {:error, term()}
   @callback validate_options(keyword()) :: :ok | {:error, term()}
   @callback admit(term() | nil, Jido.Plugin.Context.Admission.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
@@ -105,7 +117,7 @@ defmodule Jido.Plugin do
               {:ok, term()} | {:error, term()}
 
   @owner_callbacks [
-    agent: [prepare: 2, select_route: 2, state_spec: 1, directives: 1, reduce: 2],
+    agent: [prepare: 2, prepare_route_input: 4, select_route: 2, state_spec: 1, directives: 1, reduce: 2],
     agent_server: [
       validate_options: 1,
       admit: 3,
