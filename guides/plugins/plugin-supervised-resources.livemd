@@ -12,7 +12,7 @@ Mix.install([
 
 ## Write the runtime process
 
-The process starts from a `Jido.Plugin.Init`. This value carries the owning server, the Agent id, the Plugin's options, and the committed value of its field. It is everything a replacement process needs to rebuild itself.
+The process starts from a `Jido.Plugin.Init`. This value supplies the owning server, the Agent ID, the Plugin's options, and the committed field value and revision. The allocator registers its PID under the Agent ID so the tutorial can find it during recovery.
 
 ```elixir
 defmodule ResourceGuide.Allocator do
@@ -20,7 +20,12 @@ defmodule ResourceGuide.Allocator do
 
   alias Jido.Plugin.Init
 
-  def start_link(%Init{} = init), do: GenServer.start_link(__MODULE__, init)
+  def start_link(%Init{} = init) do
+    name = {:via, Registry, {ResourceGuide.Runtimes, init.agent_id}}
+    GenServer.start_link(__MODULE__, init, name: name)
+  end
+
+  def bootstrap(runtime), do: GenServer.call(runtime, :bootstrap)
   def next(runtime), do: GenServer.call(runtime, :next)
   def committed(runtime), do: GenServer.call(runtime, :committed)
 
@@ -36,6 +41,10 @@ defmodule ResourceGuide.Allocator do
     {:reply, {:ok, "#{state.prefix}-#{number}", number}, %{state | last: number}}
   end
 
+  def handle_call(:bootstrap, _from, state) do
+    {:reply, {state.init.plugin_state, state.init.state_version}, state}
+  end
+
   def handle_call(:committed, _from, state) do
     {:reply, Jido.AgentServer.Plugin.state(state.init), state}
   end
@@ -46,7 +55,7 @@ end
 
 ## Write the Plugin
 
-`child_spec/1` tells the Activation how to start the process. `await_ready/2` runs after every Plugin's process has started. `validate_options/1` rejects bad options before anything starts. `admit/3` receives the running process as its first argument.
+`child_spec/1` tells the Activation how to start the process. A Plugin that defines `await_ready/2` must also define `child_spec/1`. Readiness checks run after the Plugin roots start. `validate_options/1` rejects bad options before anything starts. `admit/3` receives the running process as its first argument.
 
 ```elixir
 defmodule ResourceGuide.TicketNumbers do
@@ -136,54 +145,62 @@ The cell returns `"Ticket prefix is required"`.
 An AgentServer starts the process under its Activation. `Jido.AgentServer.await_ready/2` returns after every Plugin process has started and every `await_ready/2` has returned `:ok`, which must happen within `readiness_timeout`, 5,000 milliseconds by default.
 
 ```elixir
+{:ok, _registry} = Registry.start_link(keys: :unique, name: ResourceGuide.Runtimes)
 {:ok, _instance} = Jido.start(name: ResourceGuide.Jido)
 {:ok, server} = Jido.start_agent(ResourceGuide.Jido, ResourceGuide.Ticket, id: "desk-1")
 :ok = Jido.AgentServer.await_ready(server)
 
-{:ok, %{state: first}, []} = Jido.AgentServer.call(server, ResourceGuide.Ticket.open_signal!(%{}))
-{:ok, %{state: second}, []} = Jido.AgentServer.call(server, ResourceGuide.Ticket.open_signal!(%{}))
+{:ok, %{status: :committed}} = Jido.AgentServer.call(server, ResourceGuide.Ticket.open_signal!(%{}))
+%{agent: %{state: first}} = Jido.AgentServer.snapshot(server)
+
+{:ok, %{status: :committed}} = Jido.AgentServer.call(server, ResourceGuide.Ticket.open_signal!(%{}))
+%{agent: %{state: second}} = Jido.AgentServer.snapshot(server)
 
 {first.label, second.label, second.last_number}
 ```
 
 The cell returns `{"TCK-1", "TCK-2", 2}`.
 
-A Plugin with `child_spec/1` needs an Activation. `Jido.start_agent/3`, `Jido.AgentServer.start/1`, and `Jido.AgentServer.child_spec/1` provide one. `Jido.AgentServer.start_link/1` returns an error for such an Agent.
+A Plugin with `child_spec/1` needs an Activation. `Jido.start_agent/3` starts one for an instance. Use `Jido.AgentServer.child_spec/1` to start an Activation under your own Supervisor.
 
 A startup failure stops the Activation. That covers an invalid child specification, a failed start, an `await_ready/2` that returns anything other than `:ok`, and a readiness timeout. `Jido.start_agent/3` can return `{:ok, pid}` first, and `Jido.AgentServer.await_ready/2` then returns `{:error, reason}`, so always call it before relying on a new server. The runtime root must use the default `:permanent` restart. Any other value is an invalid specification.
 
 ## See it recover
 
-The Plugin's process and the AgentServer belong to one Activation, and the Activation restarts them as a group. When the process dies, a new server starts from the last commit, and the Plugin starts from a new `Jido.Plugin.Init`.
+If the Plugin root stops, the Activation restarts the Plugin roots and the AgentServer. The new server uses the last commit. The replacement Plugin starts from a new `Jido.Plugin.Init`.
 
-The child id `{:plugin, module}` identifies the Plugin's process under `Jido.AgentServer.activation/1`.
+Use the Registry to find the current allocator. Stop that process and wait
+for the replacement. Check the value and revision in its Init before the
+next request.
 
 ```elixir
-activation = Jido.AgentServer.activation(server)
-
-{{:plugin, ResourceGuide.TicketNumbers}, allocator, _kind, _modules} =
-  activation
-  |> Supervisor.which_children()
-  |> List.keyfind({:plugin, ResourceGuide.TicketNumbers}, 0)
-
+[{allocator, _value}] = Registry.lookup(ResourceGuide.Runtimes, "desk-1")
 Process.exit(allocator, :kill)
 
 replacement =
   Enum.find_value(1..200, fn _attempt ->
     Process.sleep(10)
     pid = Jido.whereis_agent(ResourceGuide.Jido, "desk-1")
-    if pid not in [nil, server], do: pid
+    if is_pid(pid) and pid != server, do: pid
   end)
 
 :ok = Jido.AgentServer.await_ready(replacement)
+[{new_allocator, _value}] = Registry.lookup(ResourceGuide.Runtimes, "desk-1")
+{2, 2} = ResourceGuide.Allocator.bootstrap(new_allocator)
 
-{:ok, %{state: third}, []} = Jido.AgentServer.call(replacement, ResourceGuide.Ticket.open_signal!(%{}))
+{:ok, %{status: :committed}} =
+  Jido.AgentServer.call(replacement, ResourceGuide.Ticket.open_signal!(%{}))
+
+%{agent: %{state: third}} = Jido.AgentServer.snapshot(replacement)
 :ok = Jido.stop_agent(ResourceGuide.Jido, replacement)
 
-{replacement != server, third.label}
+{new_allocator != allocator, third.label}
 ```
 
-The cell returns `{true, "TCK-3"}`. The number continued because the new process read `last_number` from its `Jido.Plugin.Init`. A number that the old process handed out without a commit would be issued again, so keep anything you cannot lose in the owned field.
+The cell returns `{true, "TCK-3"}`. The replacement starts from ticket number
+2 at revision 2. A replacement can issue a number again if a Turn ended
+before the number was committed. Use the owned field to recover the last
+committed number.
 
 The Activation allows 3 restarts in 5 seconds, then stops. To keep a failing leaf from restarting the Agent, return a `Supervisor` as the root and supervise the leaf under it. The root stays up while the leaf restarts, and the Agent is not disturbed.
 
@@ -256,7 +273,8 @@ false = inspect(snapshot) =~ "private-key"
   )
 
 :ok = Jido.AgentServer.await_ready(gateway)
-{:ok, %{state: %{seen: seen}}, []} = Jido.AgentServer.call(gateway, ResourceGuide.Gateway.ping_signal!(%{}))
+{:ok, %{status: :committed}} = Jido.AgentServer.call(gateway, ResourceGuide.Gateway.ping_signal!(%{}))
+%{agent: %{state: %{seen: seen}}} = Jido.AgentServer.snapshot(gateway)
 :ok = Jido.stop_agent(ResourceGuide.Jido, gateway)
 seen
 ```

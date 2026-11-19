@@ -151,10 +151,11 @@ Runs one serialized Agent Turn at a time.
 | `Jido.AgentServer.await/2` | Waits for a submitted Turn and returns its `TurnResult`. |
 | `Jido.AgentServer.await_ready/2` | Waits for Plugin startup and readiness. |
 | `Jido.AgentServer.call/3` | Runs one Signal and waits for its accepted `TurnResult`. |
-| `Jido.AgentServer.cancel_turn/3` | Cancels one exact queued, running, or waiting Turn. |
+| `Jido.AgentServer.cancel_turn/3` | Cancels the matching active or waiting Turn, including a pending Handoff in its chain. |
 | `Jido.AgentServer.cast/3` | Sends one Signal through the same Turn path and discards its reply. |
 | `Jido.AgentServer.child_spec/1` | Returns a child specification for one complete activation. |
 | `Jido.AgentServer.quiesce/2` | Closes admission and returns a stable `Status`. |
+| `Jido.AgentServer.remove_topology_member/4` | Drains and removes one declared member slot from this activation. |
 | `Jido.AgentServer.resume/2` | Reopens admission when the activation is safe. |
 | `Jido.AgentServer.snapshot/2` | Returns the complete committed `Snapshot`. |
 | `Jido.AgentServer.status/2` | Returns the process-neutral semantic `Status`. |
@@ -773,11 +774,11 @@ A portable Agent Session that owns one `Jido.Thread`.
 | `Jido.Session.decode!/1` | Decodes and validates a portable Session map or raises on invalid data. |
 | `Jido.Session.encode/1` | Returns a versioned portable map. |
 | `Jido.Session.from_thread/2` | Builds an open Session around an existing Thread. |
-| `Jido.Session.new/1` | Creates an open Session with one empty Thread. |
+| `Jido.Session.new/1` | Creates an open Session with an empty Thread or a supplied Thread. |
 | `Jido.Session.open?/1` | Returns true when the Session accepts entries. |
 | `Jido.Session.put_metadata/2` | Replaces the portable Session metadata. |
-| `Jido.Session.schema/0` | Returns the portable Session schema. |
-| `Jido.Session.state_schema/0` | Returns the strict schema used when a Session is in Agent state. |
+| `Jido.Session.schema/0` | Returns the schema for the shape of a portable Session. |
+| `Jido.Session.state_schema/0` | Returns the schema that validates a portable Session in Agent state. |
 
 ### `Jido.Thread`
 

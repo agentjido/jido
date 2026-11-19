@@ -180,6 +180,7 @@ The map above is the form a plugin takes in a data-defined Agent. `use Jido.Agen
 |---|---|
 | `reduce/2` requires `state_spec/1`. | A reducer needs a field to own. |
 | `dump/3` and `load/3` come as a pair and require `state_spec/1`. | Conversion applies only to an owned value. |
+| `await_ready/2` requires `child_spec/1`. | A readiness check needs a runtime root. |
 | `dispatch/4` requires `directives/1` with at least one type. | Dispatch handles only owned types. |
 | An owned Directive needs `reduce/2` or `dispatch/4`. | Something must consume it. |
 | Each owned Directive module defines a struct and `validate/1`. | Jido validates every Directive before commit. |

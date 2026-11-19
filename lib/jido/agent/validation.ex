@@ -243,8 +243,13 @@ defmodule Jido.Agent.Validation do
   end
 
   def transition(agent, next_state) do
-    with {:ok, agent, _specs, schema} <- validate_instance_with_plugins(agent),
-         :ok <- Error.prefix_result_path(complete(schema, next_state), :state) do
+    with {:ok, agent, _specs, schema} <- validate_instance_with_plugins(agent) do
+      replace_state(agent, next_state, schema)
+    end
+  end
+
+  def replace_state(agent, next_state, schema) do
+    with :ok <- Error.prefix_result_path(complete(schema, next_state), :state) do
       {:ok, %{agent | state: next_state}}
     end
   end
@@ -300,7 +305,7 @@ defmodule Jido.Agent.Validation do
   end
 
   def resolve(module, opts) when is_atom(module) and module not in [nil, true, false] do
-    if Code.ensure_loaded?(module) and function_exported?(module, :definition, 0),
+    if loaded_agent_module?(module),
       do: resolve_module(module, opts),
       else:
         Error.validation_result(:unresolved_definition, [], "Agent definition module is not available", %{
@@ -312,7 +317,9 @@ defmodule Jido.Agent.Validation do
     do: Error.validation_result(:definition_required, [], "Expected an Agent definition or module")
 
   defp resolve_module(module, opts) do
-    validate_definition(module.definition(), opts)
+    if function_exported?(module, :__jido_definition__, 1),
+      do: module.__jido_definition__(opts),
+      else: validate_definition(module.definition(), opts)
   rescue
     reason -> definition_failed(module, :error, reason)
   catch
@@ -381,7 +388,15 @@ defmodule Jido.Agent.Validation do
     do: Error.validation_result(:invalid_description, :description, "Expected a description string or nil")
 
   defp source(nil), do: :ok
-  defp source(value), do: Error.prefix_result_path(nonempty(value), :signal_source)
+
+  defp source(value) do
+    with :ok <- Error.prefix_result_path(nonempty(value), :signal_source) do
+      case Signal.validate_uri_reference(value, []) do
+        :ok -> :ok
+        {:error, reason} -> Error.validation_result(:invalid_signal_source, [:signal_source], reason)
+      end
+    end
+  end
 
   defp forward_targets(definition) do
     names = MapSet.new(definition.topology.agents, & &1.name)

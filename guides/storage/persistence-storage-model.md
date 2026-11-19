@@ -49,6 +49,13 @@ Agent, execution, and wake formats, and the wake layout. A mismatch stops the
 instance before it accepts Agent work. This V3 format does not read older
 persistence keys or records.
 
+Direct Agent writes also check the namespace manifest. When none exists, the
+first validated write pins its profile with compare-and-swap before it writes
+the Agent record. If startup or another writer pins the namespace first, the
+direct write uses that result to confirm its profile. For a Store that already
+contains V3 data without a manifest, select the codec used for those records
+before the first write or instance startup.
+
 The examples below use this Agent and the in-memory ETS adapter:
 
 ```elixir
@@ -190,7 +197,9 @@ Saving the identical record at the same revision succeeds, so a retry of a confi
 
 ## Tombstones
 
-`Jido.Persistence.delete_agent/4` does not remove the key. It writes a compact tombstone that keeps the last revision, so a delayed writer cannot bring the record back.
+`Jido.Persistence.delete_agent/4` replaces the active record with a compact
+tombstone. It advances the record revision by one and retains the last Agent
+revision. A delayed writer cannot bring the record back.
 
 ```elixir
 :ok = Jido.Persistence.delete_agent(store, StorageModelGuide.Invoice, "inv-1001", namespace: "billing")
@@ -268,9 +277,13 @@ mix jido.persistence.export \
   --output jido-records.jsonl
 ```
 
-The export refuses to replace an existing file. Pass `--force` to replace it,
-and pass `--include-state` only when the output location is safe for full
-application state.
+Default inspection and export show Agent record metadata, including identity,
+revision, and Turn status. Agent definition values, state, Turn payloads, and
+topology handoff data require explicit output options.
+
+The export refuses to replace an existing file. Pass `--force` to replace it.
+Use `--include-state` only when the output location is safe for full Agent
+records. Exports still use metadata and shape for execution values.
 
 ## Telemetry
 

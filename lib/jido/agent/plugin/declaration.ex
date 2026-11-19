@@ -11,7 +11,7 @@ defmodule Jido.Agent.Plugin.Declaration do
   def normalize(value) do
     with {:ok, declarations} <- Schema.list(value, &declaration/1),
          :ok <- Schema.unique(declarations, & &1.provider),
-         :ok <- Schema.unique(declarations, & &1.provider.id()) do
+         :ok <- Extension.unique_ids(Enum.map(declarations, & &1.provider)) do
       {:ok, declarations}
     end
   end

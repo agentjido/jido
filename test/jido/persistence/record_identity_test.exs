@@ -3,7 +3,7 @@ defmodule Jido.Persistence.RecordIdentityTest do
 
   alias Jido.Agent.Address
   alias Jido.Persistence
-  alias Jido.Persistence.{ETS, File}
+  alias Jido.Persistence.{ETS, File, Store}
   alias Jido.Test.AgentServer.Fixtures.CounterAgent, as: Basic
   alias Jido.Test.AgentServer.RuntimeFixtures.RuntimeAgent
 
@@ -19,7 +19,7 @@ defmodule Jido.Persistence.RecordIdentityTest do
 
     def get(key, opts), do: ETS.get(key, Keyword.delete(opts, :observer))
 
-    def compare_and_swap(key, expected, value, opts) do
+    def compare_and_swap("jido:agent:v3:" <> _ = key, expected, value, opts) do
       send(Keyword.fetch!(opts, :observer), {:identity_cas, self(), key})
 
       receive do
@@ -28,6 +28,9 @@ defmodule Jido.Persistence.RecordIdentityTest do
         5_000 -> {:error, {:rejected, :barrier_timeout}}
       end
     end
+
+    def compare_and_swap(key, expected, value, opts),
+      do: ETS.compare_and_swap(key, expected, value, Keyword.delete(opts, :observer))
 
     def delete(key, opts), do: ETS.delete(key, Keyword.delete(opts, :observer))
   end
@@ -56,7 +59,7 @@ defmodule Jido.Persistence.RecordIdentityTest do
     send(second, :write)
     assert Enum.sort(Enum.map(writers, &Task.await/1)) == [:ok, {:error, :conflict}]
 
-    assert :ets.info(:"#{opts[:table]}_records", :size) == 1
+    assert {:ok, [{^key, _bytes}], nil} = Store.scan(c.store, "jido:agent:v3:")
 
     assert {:ok, restored} =
              Persistence.load_agent(c.store, Basic, c.agent.id, namespace: address.namespace)
@@ -127,6 +130,6 @@ defmodule Jido.Persistence.RecordIdentityTest do
              )
 
     assert restored == c.agent
-    assert length(Path.wildcard(Path.join(path, "**/*.bin"))) == 1
+    assert {:ok, [{_key, _bytes}], nil} = Store.scan(store, "jido:agent:v3:")
   end
 end

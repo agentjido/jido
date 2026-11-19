@@ -360,52 +360,28 @@ defmodule Jido.AgentServer.Worker do
   @doc false
   @spec stop(server(), term(), timeout()) :: {:ok, Snapshot.t()} | {:error, term()}
   def stop(server, reason \\ :shutdown, timeout \\ 5_000) do
-    with {:ok, _status} <- quiesce(server, active: :finish, timeout: timeout),
-         %Snapshot{} = snapshot <- snapshot(server, timeout),
-         :ok <- stop_activation(server, reason, timeout) do
-      {:ok, snapshot}
-    end
-  end
+    with :ok <- Lifecycle.validate_timeout([timeout: timeout], :timeout),
+         {:ok, worker, root} <- :gen_statem.call(server, :stop_target, Lifecycle.control_wait(timeout)) do
+      reason = shutdown_reason(reason)
+      ref = Process.monitor(root)
 
-  defp stop_activation(server, reason, timeout) do
-    deadline =
-      if timeout == :infinity, do: :infinity, else: System.monotonic_time(:millisecond) + timeout
-
-    reason =
-      case reason do
-        :normal -> :normal
-        :shutdown -> :shutdown
-        {:shutdown, _} -> reason
-        other -> {:shutdown, other}
-      end
-
-    case :gen_statem.call(server, :stop_target, remaining_wait(deadline)) do
-      {:error, _} = error ->
-        error
-
-      nil ->
-        :gen_statem.stop(server, reason, remaining_wait(deadline))
-
-      root ->
-        ref = Process.monitor(root)
-
-        try do
-          :gen_statem.stop(server, reason, remaining_wait(deadline))
-          await_activation_down(root, ref, deadline, {:stop, [server, reason, timeout]})
-          :ok
-        after
-          Process.demonitor(ref, [:flush])
+      try do
+        with {:ok, %Snapshot{} = snapshot} <- request_control(worker, {:stop, reason}, :finish, timeout) do
+          receive do
+            {:DOWN, ^ref, :process, ^root, _} -> {:ok, snapshot}
+          after
+            timeout -> exit({:timeout, {__MODULE__, :stop, [server, reason, timeout]}})
+          end
         end
+      after
+        Process.demonitor(ref, [:flush])
+      end
     end
   end
 
-  defp await_activation_down(root, ref, deadline, {operation, args}) do
-    receive do
-      {:DOWN, ^ref, :process, ^root, _} -> :ok
-    after
-      remaining_wait(deadline) -> exit({:timeout, {__MODULE__, operation, args}})
-    end
-  end
+  defp shutdown_reason(reason) when reason in [:normal, :shutdown], do: reason
+  defp shutdown_reason({:shutdown, _} = reason), do: reason
+  defp shutdown_reason(reason), do: {:shutdown, reason}
 
   defp remaining_wait(:infinity), do: :infinity
   defp remaining_wait(deadline), do: max(0, deadline - System.monotonic_time(:millisecond))
@@ -443,17 +419,13 @@ defmodule Jido.AgentServer.Worker do
   end
 
   defp control_request(server, kind, opts) do
-    with {:ok, active, timeout} <- Lifecycle.control_options(opts) do
-      # Allow the server to report its control deadline. The caller still has
-      # a finite OTP wait if delivery or the server itself cannot progress.
-      wait = Lifecycle.control_wait(timeout)
+    with {:ok, active, timeout} <- Lifecycle.control_options(opts),
+         do: request_control(server, kind, active, timeout)
+  end
 
-      :gen_statem.call(
-        server,
-        {:control, kind, active, timeout},
-        wait
-      )
-    end
+  defp request_control(server, kind, active, timeout) do
+    # Give the worker time to report its deadline and bound the caller's wait.
+    :gen_statem.call(server, {:control, kind, active, timeout}, Lifecycle.control_wait(timeout))
   end
 
   @doc "Returns one committed Plugin-owned state field."
@@ -793,7 +765,6 @@ defmodule Jido.AgentServer.Worker do
         child_monitors: monitor_children(opts[:activation_state]),
         bootstrap: nil,
         ready_waiters: [],
-        last_effect_outcome: nil,
         runner_ref: Process.monitor(Process.whereis(runner)),
         state_version: Keyword.get(opts, :state_version, 0),
         active: nil,
@@ -802,8 +773,7 @@ defmodule Jido.AgentServer.Worker do
         topology_delivery: nil,
         topology_last_failure: nil,
         pending_handoff: nil,
-        postponed: MapSet.new(),
-        queued_from: %{},
+        postponed: %{},
         admission_mode: runtime_value(opts[:activation_state], :admission, :open),
         control: nil,
         idle_timer: nil,
@@ -1087,7 +1057,7 @@ defmodule Jido.AgentServer.Worker do
     result =
       if control_caller?(from, data),
         do: {:error, :reentrant_turn},
-        else: data.activation
+        else: {:ok, self(), data.activation || self()}
 
     {:keep_state_and_data, reply(from, result)}
   end
@@ -1296,11 +1266,11 @@ defmodule Jido.AgentServer.Worker do
 
   def handle_event(
         type,
-        {:turn, _token, _signal, _context, _deadline, reply_gate, _result_handoff},
+        {:turn, token, _signal, _context, _deadline, reply_gate, _result_handoff},
         :faulted,
         data
       ),
-      do: reject_turn(type, :reconciliation_required, data, reply_gate)
+      do: reject_postponed_turn(type, token, :reconciliation_required, data, reply_gate)
 
   def handle_event({:call, from}, {:cancel, _id}, phase, _data)
       when phase in [:restoring, :initializing],
@@ -1391,6 +1361,9 @@ defmodule Jido.AgentServer.Worker do
 
   def handle_event({:call, from}, {:cancel, _id}, :idle, _data),
     do: {:keep_state_and_data, reply(from, {:error, :not_running})}
+
+  def handle_event({:call, from}, {:cancel, _id}, :faulted, _data),
+    do: {:keep_state_and_data, reply(from, {:error, :reconciliation_required})}
 
   def handle_event({:call, from}, {:cancel, _id}, :waiting, %{admission_mode: :blocked}),
     do: {:keep_state_and_data, reply(from, {:error, :unsafe_resume})}
@@ -1553,17 +1526,7 @@ defmodule Jido.AgentServer.Worker do
         data
       )
       when data.admission_mode != :open do
-    queued? = MapSet.member?(data.postponed, token)
-    data = %{data | postponed: MapSet.delete(data.postponed, token)}
-
-    replies =
-      if queued? do
-        []
-      else
-        ReplyGate.done(reply_gate)
-        turn_rejection(type, :quiesced, data)
-      end
-
+    {:keep_state, data, replies} = reject_postponed_turn(type, token, :quiesced, data, reply_gate)
     {:keep_state, data, replies ++ [{:next_event, :internal, :control_progress}]}
   end
 
@@ -1584,11 +1547,7 @@ defmodule Jido.AgentServer.Worker do
         data
       )
       when type == :cast or (is_tuple(type) and elem(type, 0) == :call) do
-    data = %{
-      data
-      | postponed: MapSet.delete(data.postponed, token),
-        queued_from: Map.delete(data.queued_from, token)
-    }
+    data = %{data | postponed: Map.delete(data.postponed, token)}
 
     with :ok <- Lifecycle.admission_status(deadline),
          :ok <- result_handoff_status(result_handoff, data),
@@ -1637,11 +1596,7 @@ defmodule Jido.AgentServer.Worker do
         %{active: %{operation: nil}} = data
       )
       when type == :cast or (is_tuple(type) and elem(type, 0) == :call) do
-    data = %{
-      data
-      | postponed: MapSet.delete(data.postponed, token),
-        queued_from: Map.delete(data.queued_from, token)
-    }
+    data = %{data | postponed: Map.delete(data.postponed, token)}
 
     with :ok <- Lifecycle.admission_status(deadline),
          false <- durable_wake?(signal),
@@ -1712,16 +1667,7 @@ defmodule Jido.AgentServer.Worker do
 
     case admission do
       {:error, reason} ->
-        reject_turn(
-          type,
-          reason,
-          %{
-            data
-            | postponed: MapSet.delete(data.postponed, token),
-              queued_from: Map.delete(data.queued_from, token)
-          },
-          reply_gate
-        )
+        reject_postponed_turn(type, token, reason, data, reply_gate)
 
       :ok ->
         postpone_turn(type, token, data, reply_gate)
@@ -2126,9 +2072,7 @@ defmodule Jido.AgentServer.Worker do
   def handle_event(_type, _event, phase, _data), do: {:stop, {:unexpected_event, phase}}
 
   defp public_status(phase, data) do
-    {:message_queue_len, mailbox} = Process.info(self(), :message_queue_len)
-
-    status = Status.new(phase, data, mailbox)
+    status = Status.new(phase, data)
 
     case Continuation.terminal_result(data.server_turn) do
       {:ok, _result} -> %{status | admission: :blocked}
@@ -2650,7 +2594,7 @@ defmodule Jido.AgentServer.Worker do
         runner = data.runner
         id = data.active.turn_id
         exec_opts = data.exec_opts
-        operation(:start, data, fn -> start_worker(runner, id, owner, prepared, exec_opts) end)
+        operation(:start, data, fn -> start_worker(runner, id, owner, prepared, exec_opts, kind) end)
     end
   end
 
@@ -3081,10 +3025,10 @@ defmodule Jido.AgentServer.Worker do
     end)
   end
 
-  defp start_worker(runner, id, owner, prepared, exec_opts) do
+  defp start_worker(runner, id, owner, prepared, exec_opts, kind) do
     instruction = prepared.instruction
 
-    with {:ok, input} <- execution_input(instruction),
+    with {:ok, input} <- execution_input(instruction, kind),
          {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}, []),
          :ok <- Jido.Exec.Node.Wait.validate_host(workflow),
          {:ok, worker} <-
@@ -3100,12 +3044,13 @@ defmodule Jido.AgentServer.Worker do
     end
   end
 
-  defp execution_input(%Jido.Instruction{kind: :flow} = instruction) do
+  defp execution_input(%Jido.Instruction{kind: :flow} = instruction, kind) do
+    # The Flow input node also validates. Give a Handoff the original bound value at both checks.
     with {:ok, params} <-
            Jido.Exec.Validation.input(instruction.target, instruction.params, %{
              phase: :flow_input
            }),
-         do: {:ok, params}
+         do: {:ok, if(kind == :restore_handoff, do: instruction.params, else: params)}
   end
 
   defp execution_order(runnable) do
@@ -3194,12 +3139,7 @@ defmodule Jido.AgentServer.Worker do
         )
 
       :accept ->
-        next = %{
-          data
-          | postponed: MapSet.put(data.postponed, token),
-            queued_from: Map.put(data.queued_from, token, type)
-        }
-
+        next = put_in(data.postponed[token], {type, reply_gate})
         {:keep_state, next, [:postpone]}
     end
   end
@@ -3207,6 +3147,16 @@ defmodule Jido.AgentServer.Worker do
   defp reject_turn(type, reason, data, reply_gate) do
     ReplyGate.done(reply_gate)
     {:keep_state, data, turn_rejection(type, reason, data)}
+  end
+
+  defp reject_postponed_turn(type, token, reason, data, reply_gate) do
+    {request, postponed} = Map.pop(data.postponed, token)
+    data = %{data | postponed: postponed}
+
+    case request do
+      :rejected -> {:keep_state, data, []}
+      _ -> reject_turn(type, reason, data, reply_gate)
+    end
   end
 
   defp turn_rejection(:cast, reason, data) do
@@ -3620,11 +3570,11 @@ defmodule Jido.AgentServer.Worker do
       length(active.effects)
     )
 
-    data |> Map.put(:last_effect_outcome, outcome) |> put_in([:active, :effect_outcome], outcome)
+    put_in(data.active.effect_outcome, outcome)
   end
 
   # A connection destination can be mid-restart. Treat this as a failed effect,
-  # as a root output does. No Turn owns this delivery, so turn_id is nil.
+  # as a root output does. No Turn owns this delivery.
   defp topology_delivery_failed(data, signal, reason) do
     Logger.warning(
       "AgentServer topology delivery failed: signal type #{signal.type}, " <>
@@ -3632,17 +3582,7 @@ defmodule Jido.AgentServer.Worker do
       agent_id: data.agent.id
     )
 
-    %{
-      data
-      | last_effect_outcome: %{
-          turn_id: nil,
-          status: :failed,
-          completed: 0,
-          total: 1,
-          committed_version: data.state_version,
-          stage: :directive
-        }
-    }
+    data
   end
 
   # Logs name a failure without carrying the values inside its reason.
@@ -3980,7 +3920,7 @@ defmodule Jido.AgentServer.Worker do
   defp settled?(data),
     do:
       data.active == nil and data.pending_handoff == nil and data.parent_effect == nil and
-        MapSet.size(data.postponed) == 0
+        map_size(data.postponed) == 0
 
   defp begin_control(phase, data, kind, from, policy, timeout) do
     token = make_ref()
@@ -3997,12 +3937,17 @@ defmodule Jido.AgentServer.Worker do
 
     data = data |> cancel_idle() |> set_admission(:quiescing) |> Map.put(:control, control)
 
-    replies =
-      Enum.flat_map(data.queued_from, fn {_token, type} ->
-        turn_rejection(type, :quiesced, data)
+    {postponed, replies} =
+      Enum.reduce(data.postponed, {data.postponed, []}, fn
+        {_token, :rejected}, acc ->
+          acc
+
+        {token, {type, gate}}, {postponed, replies} ->
+          ReplyGate.done(gate)
+          {Map.put(postponed, token, :rejected), turn_rejection(type, :quiesced, data) ++ replies}
       end)
 
-    data = %{data | queued_from: %{}}
+    data = %{data | postponed: postponed}
     progress = replies ++ [{:next_event, :internal, :control_progress}]
 
     if policy == :cancel and data.active != nil and phase not in [:saving, :effects] do
@@ -4035,6 +3980,11 @@ defmodule Jido.AgentServer.Worker do
             data = data |> set_admission(:quiesced) |> Map.put(:control, nil)
 
             {:keep_state, data, reply(control.from, {:ok, public_status(:quiesced, data)})}
+
+          %{kind: {:stop, reason}} = control ->
+            Process.cancel_timer(control.timer)
+            replies = reply(control.from, {:ok, Snapshot.new(data)})
+            {:stop_and_reply, reason, replies, %{data | control: nil}}
 
           %{task: nil} ->
             # Recovery must not reopen an interrupted writer. Keep this marker

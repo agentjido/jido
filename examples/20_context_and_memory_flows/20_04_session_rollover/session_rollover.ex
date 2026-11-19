@@ -41,7 +41,7 @@ defmodule Jido.Examples.ContextMemory.SessionRollover.RollOver do
          }
        }}
     else
-      {:error, :invalid_session} ->
+      {:error, reason} when reason in [:invalid_session, :unsupported_version] ->
         {:error, Jido.Error.validation_error("session document is invalid")}
 
       {:error, :stale_revision} ->

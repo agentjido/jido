@@ -86,7 +86,7 @@ Plugin declarations that `jido.agent` produces.
 
 ### jido.agent_evaluation.I10 — Closed AgentServer evaluation
 
-- **scope:** `Jido.Agent.Runner.prepare_for_server/4`, `Jido.Agent.Runner.finish_for_server/2`
-- **must:** Prepare and finish the same pure evaluation for an accepted AgentServer Command. Prepare a Handoff successor from its exact Instruction with empty input, the unchanged source Signal, and explicit output-state projection. Return route, input, composition, and candidate validation failures with their closed stage and do not run live process behavior.
+- **scope:** `Jido.Agent.Runner.prepare_admitted/4`, `Jido.Agent.Runner.prepare_admitted_handoff/5`, `Jido.Agent.Runner.finish_for_server/2`
+- **must:** Prepare and finish the same pure evaluation for an accepted AgentServer Command. Prepare a Handoff successor from its exact Instruction with empty caller input, the unchanged source Signal, and explicit output-state projection. This preserves the bound input, including portable values other than Maps, for live execution and durable restore. Return route, input, composition, and candidate validation failures with their closed stage and do not run live process behavior.
 - **kind:** functional
 - **status:** active

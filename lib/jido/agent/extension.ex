@@ -1,6 +1,6 @@
 defmodule Jido.Agent.Extension do
   @moduledoc false
-  alias Jido.Agent.{Route, Schema}
+  alias Jido.Agent.{Callback, Route, Schema}
   alias Jido.Error
   alias Jido.Catalog
   alias Jido.Codec.Value
@@ -108,10 +108,16 @@ defmodule Jido.Agent.Extension do
   def providers(providers) do
     with {:ok, providers} <- Schema.list(providers, &provider/1),
          :ok <- Schema.unique(providers, & &1),
-         :ok <- Schema.unique(providers, & &1.id()),
+         :ok <- unique_ids(providers),
          :ok <- namespaces(providers) do
       {:ok, providers}
     end
+  end
+
+  @doc false
+  def unique_ids(providers) do
+    with {:ok, ids} <- Schema.list(providers, &invoke(&1, :id, [], :id)),
+         do: Schema.unique(ids, & &1)
   end
 
   @doc false
@@ -123,8 +129,7 @@ defmodule Jido.Agent.Extension do
 
     if match?({:module, _}, Code.ensure_compiled(module)) and
          Enum.all?(callbacks, fn {f, a} -> function_exported?(module, f, a) end) do
-      with :ok <- Schema.nonempty(module.id()),
-           :ok <- Schema.positive(module.vsn()),
+      with {:ok, _identity} <- identity(module),
            :ok <- plugin(module),
            do: {:ok, module}
     else
@@ -141,18 +146,18 @@ defmodule Jido.Agent.Extension do
     do: Error.validation_result(:invalid_provider, [], "Expected a provider module", %{provider: value})
 
   defp plugin(module) do
-    authoring = module.__jido_catalog_manifest__()
-    expected = %{id: module.id(), target: module, vsn: module.vsn()}
-
-    if Jido.Plugin in behaviours(module) and authoring === expected do
-      :ok
-    else
-      Error.validation_result(
-        :invalid_plugin,
-        [],
-        "Agent plugins must use Jido.Plugin",
-        %{plugin: module}
-      )
+    with {:ok, manifest} <- invoke(module, :__jido_catalog_manifest__, [], :value),
+         {:ok, %{id: id, vsn: vsn}} <- identity(module) do
+      if Jido.Plugin in behaviours(module) and manifest === %{id: id, target: module, vsn: vsn} do
+        :ok
+      else
+        Error.validation_result(
+          :invalid_plugin,
+          [],
+          "Agent plugins must use Jido.Plugin",
+          %{plugin: module}
+        )
+      end
     end
   end
 
@@ -172,19 +177,31 @@ defmodule Jido.Agent.Extension do
   defp entry(value) do
     with {:ok, value} <- Schema.fields(value, [:id, :provider, :vsn, :data]),
          {:ok, provider} <- provider(value[:provider]),
-         :ok <- identity(value, provider),
+         :ok <- match_identity(value, provider),
          :ok <- Schema.plain_map(value[:data]),
-         {:ok, data} <- result(provider.normalize(value.data)),
-         :ok <- Schema.plain_map(data),
-         :ok <- Schema.static(data) do
-      {:ok, %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}}
+         {:ok, data} <- invoke(provider, :normalize, [value.data], :data),
+         :ok <- Schema.static(data),
+         {:ok, identity} <- identity(provider) do
+      {:ok, Map.put(identity, :data, data)}
     end
   end
 
-  defp identity(value, provider) do
-    if value[:id] === provider.id() and value[:vsn] === provider.vsn(),
-      do: :ok,
-      else: Error.validation_result(:provider_identity, [], "Provider ID or version does not match its contract")
+  defp identity(provider) do
+    with {:ok, id} <- invoke(provider, :id, [], :id),
+         {:ok, vsn} <- invoke(provider, :vsn, [], :vsn),
+         do: {:ok, %{id: id, provider: provider, vsn: vsn}}
+  end
+
+  defp match_identity(value, provider) do
+    with {:ok, id} <- invoke(provider, :id, [], :id),
+         true <- value[:id] === id,
+         {:ok, vsn} <- invoke(provider, :vsn, [], :vsn),
+         true <- value[:vsn] === vsn do
+      :ok
+    else
+      false -> Error.validation_result(:provider_identity, [], "Provider ID or version does not match its contract")
+      error -> error
+    end
   end
 
   @doc false
@@ -199,9 +216,9 @@ defmodule Jido.Agent.Extension do
              end
            end) do
       Schema.list(declarations, fn %{provider: provider, config: config} ->
-        with :ok <- Schema.plain_map(config),
-             {:ok, data} <- result(provider.lower(dsl, config)) do
-          {:ok, %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}}
+        with {:ok, data} <- invoke(provider, :lower, [dsl, config], :data),
+             {:ok, identity} <- identity(provider) do
+          {:ok, Map.put(identity, :data, data)}
         end
       end)
     end
@@ -211,7 +228,8 @@ defmodule Jido.Agent.Extension do
   def verify(entries, definition) do
     with {:ok, _} <-
            Schema.list(entries, fn entry ->
-             with :ok <- result(entry.provider.verify(entry.data, definition)), do: {:ok, entry}
+             with :ok <- invoke(entry.provider, :verify, [entry.data, definition], :check),
+                  do: {:ok, entry}
            end),
          do: :ok
   end
@@ -220,20 +238,7 @@ defmodule Jido.Agent.Extension do
   def route_contributions(entries) do
     with {:ok, groups} <-
            Schema.list(entries, fn entry ->
-             routes =
-               if function_exported?(entry.provider, :derive_routes, 1),
-                 do: entry.provider.derive_routes(entry.data),
-                 else: []
-
-             with {:ok, routes} <-
-                    Error.prefix_result_path(
-                      Schema.list(routes, fn route ->
-                        with :ok <- Schema.plain_map(route),
-                             :ok <- Error.prefix_result_path(Schema.exact(Map.get(route, :path)), :path),
-                             do: {:ok, route}
-                      end),
-                      :routes
-                    ) do
+             with {:ok, routes} <- Error.prefix_result_path(derived_routes(entry), :routes) do
                {:ok,
                 routes
                 |> Enum.with_index()
@@ -248,6 +253,20 @@ defmodule Jido.Agent.Extension do
        |> Enum.flat_map(fn {routes, plugin_index} ->
          Enum.map(routes, &Map.put(&1, :plugin_index, plugin_index))
        end)}
+    end
+  end
+
+  defp derived_routes(%{provider: provider, data: data}) do
+    if function_exported?(provider, :derive_routes, 1) do
+      with {:ok, routes} <- invoke(provider, :derive_routes, [data], :list) do
+        Schema.list(routes, fn route ->
+          with :ok <- Schema.plain_map(route),
+               :ok <- Error.prefix_result_path(Schema.exact(Map.get(route, :path)), :path),
+               do: {:ok, route}
+        end)
+      end
+    else
+      {:ok, []}
     end
   end
 
@@ -289,24 +308,31 @@ defmodule Jido.Agent.Extension do
   end
 
   @doc false
-  def endpoints(entries), do: Enum.flat_map(entries, & &1.provider.endpoints(&1.data))
+  def endpoints(entries) do
+    with {:ok, groups} <-
+           Schema.list(entries, &invoke(&1.provider, :endpoints, [&1.data], :list)),
+         do: {:ok, Enum.concat(groups)}
+  end
 
   @doc false
   def verify_connection(entries, connection) do
     with {:ok, _} <-
            Schema.list(entries, fn entry ->
-             with :ok <- result(entry.provider.verify_connection(entry.data, connection)),
+             with :ok <- invoke(entry.provider, :verify_connection, [entry.data, connection], :check),
                   do: {:ok, entry}
            end),
          do: :ok
   end
 
   defp namespaces(providers) do
-    sections =
-      Enum.flat_map(providers, fn provider -> Enum.map(provider.sections(), & &1.name) end)
+    with {:ok, sections} <- Schema.list(providers, &invoke(&1, :sections, [], :sections)),
+         {:ok, kinds} <- Schema.list(providers, &invoke(&1, :endpoint_kinds, [], :list)) do
+      names = sections |> Enum.concat() |> Enum.map(& &1.name)
+      unique_namespaces(names, Enum.concat(kinds))
+    end
+  end
 
-    kinds = Enum.flat_map(providers, & &1.endpoint_kinds())
-
+  defp unique_namespaces(sections, kinds) do
     cond do
       Enum.any?(
         sections,
@@ -320,6 +346,64 @@ defmodule Jido.Agent.Extension do
       true ->
         with :ok <- Schema.unique(sections, & &1), do: Schema.unique(kinds, & &1)
     end
+  end
+
+  defp invoke(provider, callback, args, expected) do
+    case Callback.capture(provider, callback, args) do
+      {:ok, result} ->
+        callback_result(result, expected, provider, callback)
+
+      {:error, kind, reason} ->
+        callback_error(provider, callback, kind, reason, Exception.format_banner(kind, reason))
+    end
+  end
+
+  defp callback_result(:ok, :check, _provider, _callback), do: :ok
+
+  defp callback_result({:ok, data}, :data, _provider, _callback)
+       when is_map(data) and not is_struct(data),
+       do: {:ok, data}
+
+  defp callback_result({:error, _reason} = error, expected, _provider, _callback)
+       when expected in [:data, :check],
+       do: result(error)
+
+  defp callback_result(id, :id, _provider, _callback) when is_binary(id) and byte_size(id) > 0,
+    do: {:ok, id}
+
+  defp callback_result(vsn, :vsn, _provider, _callback) when is_integer(vsn) and vsn > 0,
+    do: {:ok, vsn}
+
+  defp callback_result(value, :value, _provider, _callback), do: {:ok, value}
+
+  defp callback_result(values, :list, provider, callback) when is_list(values) do
+    if List.improper?(values),
+      do: invalid_result(provider, callback, values),
+      else: {:ok, values}
+  end
+
+  defp callback_result(sections, :sections, provider, callback) do
+    with {:ok, sections} <- callback_result(sections, :list, provider, callback) do
+      if Enum.all?(sections, &match?(%{name: name} when is_atom(name), &1)),
+        do: {:ok, sections},
+        else: invalid_result(provider, callback, sections)
+    end
+  end
+
+  defp callback_result(result, _expected, provider, callback), do: invalid_result(provider, callback, result)
+
+  defp invalid_result(provider, callback, result),
+    do: callback_error(provider, callback, :return, result, "Invalid return value #{inspect(result)}")
+
+  defp callback_error(provider, callback, kind, reason, cause) do
+    code = if kind == :return, do: :invalid_provider_callback_result, else: :provider_callback_failed
+
+    Error.validation_result(code, [], "Provider #{inspect(provider)} callback #{inspect(callback)}. #{cause}", %{
+      provider: provider,
+      callback: callback,
+      failure_kind: kind,
+      reason: reason
+    })
   end
 
   defp authoring_data(provider, callback, data, registry, fallback) do
@@ -368,6 +452,4 @@ defmodule Jido.Agent.Extension do
       Error.validation_result(:provider_error, [], "Provider rejected its data: #{inspect(reason)}", %{
         reason: reason
       })
-
-  defp result(result), do: result
 end

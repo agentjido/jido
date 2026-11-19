@@ -56,23 +56,11 @@ defmodule Jido.Signal.Boundary do
     end
   end
 
-  defp sanitize(%Date{} = value, _profile, opts, _depth),
-    do: truncate(Date.to_iso8601(value), opts.max_binary)
-
-  defp sanitize(%DateTime{} = value, _profile, opts, _depth),
-    do: truncate(DateTime.to_iso8601(value), opts.max_binary)
-
-  defp sanitize(%NaiveDateTime{} = value, _profile, opts, _depth),
-    do: truncate(NaiveDateTime.to_iso8601(value), opts.max_binary)
-
-  defp sanitize(%Time{} = value, _profile, opts, _depth),
-    do: truncate(Time.to_iso8601(value), opts.max_binary)
-
-  defp sanitize(%URI{} = value, _profile, opts, _depth) do
-    value
-    |> Map.merge(%{userinfo: nil, query: nil, fragment: nil})
-    |> URI.to_string()
-    |> truncate(opts.max_binary)
+  defp sanitize(%{__struct__: module} = value, profile, opts, _depth)
+       when module in [Date, DateTime, NaiveDateTime, Time, URI] do
+    value |> format_struct(module) |> truncate(opts.max_binary)
+  rescue
+    _error -> boundary_map(profile, __type__: :invalid_struct)
   end
 
   defp sanitize(%Signal{} = value, profile, opts, depth) when depth >= opts.max_depth,
@@ -234,6 +222,14 @@ defmodule Jido.Signal.Boundary do
        }
 
   defp sanitize(value, _profile, opts, _depth), do: truncate(inspect(value), opts.max_binary)
+
+  defp format_struct(uri, URI) do
+    uri
+    |> Map.merge(%{userinfo: nil, query: nil, fragment: nil})
+    |> URI.to_string()
+  end
+
+  defp format_struct(value, module), do: module.to_iso8601(value)
 
   defp binary_summary(value, :telemetry, max_binary) do
     %{

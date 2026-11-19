@@ -531,6 +531,7 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
 
     assert {:ok,
             %TurnResult{
+              turn_id: turn_id,
               status: :uncertain,
               durability: :unknown,
               agent_revision: 0,
@@ -538,6 +539,12 @@ defmodule Jido.AgentServer.DurableActivationContractTest do
             }} = Jido.call(instance, address, add(1))
 
     assert %Status{work_state: :faulted, admission: :blocked} = Jido.status(instance, address)
+    server = Jido.whereis_agent(instance, address.id)
+    assert {:error, :reconciliation_required} = Server.cancel_turn(server, turn_id)
+    assert {:error, :reconciliation_required} = Server.cancel_turn(server, "unrelated")
+    assert Jido.whereis_agent(instance, address.id) == server
+    assert %Status{work_state: :faulted, admission: :blocked} = Server.status(server)
+    assert %Snapshot{agent_revision: 0, agent: %{state: %{count: 0}}} = Server.snapshot(server)
     assert {:error, :reconciliation_required} = Jido.call(instance, address, add(1))
     assert {:error, :reconciliation_required} = Jido.resolve_agent(instance, address)
 

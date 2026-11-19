@@ -118,6 +118,10 @@ end
 
 Each schema version gets its own module with the same `type` and a different `:dataschema` URI. The definition sets `dataschema` on each Signal it builds, so the Signal names its own version.
 
+Use an absolute URI with no fragment for new definitions and Catalog
+registrations. Read old envelopes with `Jido.Signal.Codec` to retain a legacy
+fragment. The Catalog always uses an exact match on the full schema URI.
+
 `Jido.Signal.Catalog` selects a definition from that pair. A catalog is an immutable value that you build from an explicit list of modules. It never selects a module from input or creates a module name from text.
 
 ```elixir

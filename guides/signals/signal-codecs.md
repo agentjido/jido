@@ -2,7 +2,9 @@
 
 Encode Signals for transport, decode them back, and handle each failure. `Jido.Signal.Codec` converts between a `Jido.Signal`, the canonical CloudEvents map, and a binary in JSON or Erlang term format.
 
-The codec checks the envelope and the payload size. It does not check `data` against a schema. Use `Jido.Signal.Catalog.decode/3` for that, as shown in [Signal Boundaries](signal-boundaries.md).
+The codec checks the envelope and the payload size. Use
+`Jido.Signal.Catalog.decode/3` to also check the data schema. See
+[Signal Boundaries](signal-boundaries.md).
 
 ## Encode and decode JSON
 
@@ -39,7 +41,9 @@ This is CloudEvents structured mode. The `Jido.Signal.Dispatch.Http` adapter sen
 
 ## Work with the canonical map
 
-`Jido.Signal.Codec.to_map/1` returns the map with string keys. Attributes with a `nil` value are left out, and extensions sit at the top level.
+`Jido.Signal.Codec.to_map/1` validates an existing Signal and returns the map
+with string keys. It raises `ArgumentError` for an invalid envelope. It omits
+unset attributes and puts extensions at the top level.
 
 `Jido.Signal.Codec.from_map/1` parses a complete map. It adds no defaults, so `specversion` and `id` must be present. Use `Jido.Signal.new/1` when you want a generated ID.
 
@@ -65,6 +69,10 @@ false = Map.has_key?(wire, "subject")
 
 `from_map/1` treats any unknown member as an extension, so it applies the extension naming rules from [CloudEvents Context](cloudevents-envelope-and-context.md). A member with a `nil` value is dropped.
 
+JSON decode rejects repeated keys in an event envelope, including events in a
+batch. Signal constructors also reject repeated attributes in a keyword list
+and keys in a map that normalize to the same name.
+
 ## How `data` encodes
 
 | Signal `data` | Canonical map |
@@ -76,6 +84,13 @@ false = Map.has_key?(wire, "subject")
 | Any other term | `"data" => term` |
 
 A decoded `data_base64` value returns as raw bytes in `data`. Input with both `data` and `data_base64` is rejected.
+
+JSON encode accepts JSON values when `datacontenttype` is absent or declares
+JSON. A media subtype of `json` or with the suffix `+json` declares JSON.
+For other media types, supply text or raw bytes. For example, a Signal with
+`text/plain` can carry a string, but it cannot encode a map as JSON. JSON
+decode can still read older payloads that used a JSON value with a non-JSON
+media type.
 
 ```elixir
 alias Jido.Signal
@@ -187,9 +202,9 @@ size = byte_size(json)
 
 | Reason | Cause |
 | --- | --- |
-| `{:json_encode_failed, message}` | `data` holds a value JSON cannot carry. |
+| `{:json_encode_failed, message}` | JSON cannot encode the value, or the value is incompatible with the declared media type. |
 | `{:json_decode_failed, message}` | The binary is not valid JSON. |
-| `{:erlang_term_decode_failed, message}` | The binary is compressed, unsafe, or not a valid term. |
+| `{:erlang_term_decode_failed, message}` | The binary is compressed or unsafe, or has an invalid term or extra bytes after the term. |
 | `{:invalid_signal, message}` | A value passed to `serialize/2` is not a Signal. |
 | `{:invalid_wire_data, message}` | A decoded item is not a map. |
 | `{:unsupported_format, format}` | `:format` is not `:json` or `:erlang_term`. |
@@ -203,6 +218,10 @@ size = byte_size(json)
 ## Older wire input
 
 `from_map/1` accepts `"specversion": "1.0.2"` and normalizes it to `"1.0"`. It also accepts a `jido_schema_version` member with the value `1`, `2`, or `null` and drops it. Other values of that member are rejected.
+
+The codec can read and write an existing Signal whose `dataschema` URI has a
+fragment. It preserves the full URI. New Signals and Catalog registrations
+require a fragment-free absolute URI.
 
 ## Related
 

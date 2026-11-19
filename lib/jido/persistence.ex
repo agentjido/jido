@@ -56,7 +56,7 @@ defmodule Jido.Persistence do
   alias Jido.Agent
   alias Jido.Agent.Address
   alias Jido.Error
-  alias Jido.Persistence.{Checkpoint, Config, Record, Store}
+  alias Jido.Persistence.{Checkpoint, Config, NamespaceManifest, Record, Store}
   alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
   alias Jido.Codec.Term
 
@@ -232,7 +232,7 @@ defmodule Jido.Persistence do
 
   def save_agent(source, %Agent{} = agent, opts) do
     with :ok <- validate_operation_options(opts, @save_options),
-         do: save_record(source, agent, agent.module, opts)
+         do: save_record(source, agent, agent.module, opts, :preserve, :direct)
   end
 
   def save_agent(_source, agent, _opts),
@@ -242,33 +242,29 @@ defmodule Jido.Persistence do
   def replace_agent(source, %Agent{} = agent, previous_module, opts)
       when is_atom(previous_module) do
     with :ok <- validate_operation_options(opts, @save_options),
-         do: save_record(source, agent, previous_module, opts)
+         do: save_record(source, agent, previous_module, opts, :preserve, :direct)
   end
 
   @doc false
   def save_agent_runtime(source, %Agent{} = agent, opts, topology_handoffs) do
     with :ok <- validate_operation_options(opts, @save_options),
-         do: save_record(source, agent, agent.module, opts, topology_handoffs)
+         do: save_record(source, agent, agent.module, opts, topology_handoffs, :runtime)
   end
 
-  defp save_record(source, agent, previous_module, opts, topology_handoffs \\ :preserve) do
+  defp save_record(source, agent, previous_module, opts, topology_handoffs, scope) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
       Store.protect(:compare_and_swap, fn ->
         with {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
              {:ok, address} <- resolve_address(instance, agent.id, opts),
              {:ok, record} <- build_record(agent, instance, opts, address),
              {:ok, expected_revision} <- expected_revision(opts),
+             {:ok, manifest} <- check_write_manifest(config, address, scope),
              {:ok, expected_value, record} <-
                current_value(config, record, address, expected_revision, previous_module, topology_handoffs),
              :ok <- Record.validate(record, address, agent.module),
              {:ok, value} <- Record.encode(record, config),
              :ok <-
-               Store.compare_and_swap(
-                 config.store,
-                 Record.agent_key(address),
-                 expected_value,
-                 value
-               ) do
+               write_agent_record(config, address, manifest, expected_value, value) do
           :ok
         end
       end)
@@ -279,9 +275,9 @@ defmodule Jido.Persistence do
   @spec create_agent(adapter_config() | atom(), Agent.t(), keyword()) ::
           :ok | {:error, term()}
   def create_agent(source, %Agent{} = agent, opts \\ []),
-    do: create_agent_record(source, agent, opts, nil)
+    do: create_agent_record(source, agent, opts, nil, :direct)
 
-  defp create_agent_record(source, agent, opts, owner) do
+  defp create_agent_record(source, agent, opts, owner, scope) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
       Store.protect(:compare_and_swap, fn ->
         with :ok <- validate_operation_options(opts, @create_options),
@@ -293,13 +289,8 @@ defmodule Jido.Persistence do
              record = Record.put_topology_owner(record, owner),
              :ok <- Record.validate(record, address, agent.module),
              {:ok, value} <- Record.encode(record, config),
-             :ok <-
-               Store.compare_and_swap(
-                 config.store,
-                 Record.agent_key(address),
-                 :not_found,
-                 value
-               ) do
+             {:ok, manifest} <- check_write_manifest(config, address, scope),
+             :ok <- write_agent_record(config, address, manifest, :not_found, value) do
           :ok
         end
       end)
@@ -499,6 +490,7 @@ defmodule Jido.Persistence do
                :ok <- Jido.Agent.Schema.plain_map(context),
                {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
                {:ok, address} <- resolve_address(instance, agent_id, opts),
+               {:ok, manifest} <- check_write_manifest(config, address, :direct),
                key = Record.agent_key(address),
                {:ok, value, condition} <- Store.read(config.store, key),
                {:ok, record} <- decode_record(value, agent_module, config, legacy_modules: legacy_modules),
@@ -527,13 +519,7 @@ defmodule Jido.Persistence do
                  ),
                next_record = with_runtime_record(next_record, :preserve, record),
                {:ok, next_value} <- Record.encode(next_record, config),
-               :ok <-
-                 Store.compare_and_swap(
-                   config.store,
-                   key,
-                   condition,
-                   next_value
-                 ) do
+               :ok <- write_agent_record(config, address, manifest, condition, next_value) do
             {:ok, upgraded, next_revision}
           end
         end)
@@ -579,10 +565,12 @@ defmodule Jido.Persistence do
       Store.protect(:delete, fn ->
         with :ok <- validate_operation_options(opts, @identity_options),
              {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
-             {:ok, address} <- resolve_address(instance, agent_id, opts) do
-          delete_current(config, address, agent_module)
+             {:ok, address} <- resolve_address(instance, agent_id, opts),
+             {:ok, manifest} <- check_write_manifest(config, address, :direct) do
+          delete_current(config, address, agent_module, manifest)
         end
       end)
+      |> delete_result()
     end)
   end
 
@@ -598,10 +586,11 @@ defmodule Jido.Persistence do
       with :ok <- validate_operation_options(opts, [:instance]),
            {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
            :ok <- validate_address_instance(address, instance),
-           {:ok, value, _condition} <- Store.read(config.store, Record.agent_key(address)),
+           {:ok, manifest} <- check_write_manifest(config, address, :direct),
+           {:ok, value, condition} <- Store.read(config.store, Record.agent_key(address)),
            {:ok, record} <- Record.decode(value, config),
            {:ok, agent_module} <- record_agent_module(record) do
-        delete_current(config, address, agent_module)
+        delete_stored(config, address, agent_module, manifest, record, condition)
       end
     end)
   end
@@ -707,7 +696,7 @@ defmodule Jido.Persistence do
            Jido.Agent.Topology.bind(agent, agent.state, &Jido.Agent.Validation.resolve/2),
          {:ok, agent} <-
            Jido.Agent.Topology.identify(nil, agent, &Jido.Agent.Validation.resolve/2),
-         :ok <- create_agent_record(source, agent, opts, owner),
+         :ok <- create_agent_record(source, agent, opts, owner, :runtime),
          do: {:ok, agent, 0, 0, nil, Record.empty_topology_handoffs()}
   end
 
@@ -883,47 +872,58 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp delete_current(%Config{} = config, address, agent_module) do
-    case read_for_delete(config.store, Record.agent_key(address)) do
+  defp check_write_manifest(_config, _address, :runtime), do: {:ok, :pinned}
+
+  defp check_write_manifest(config, address, :direct) do
+    NamespaceManifest.check(config, address.namespace)
+  end
+
+  defp write_agent_record(config, address, manifest, condition, value) do
+    with :ok <- NamespaceManifest.confirm(config, address.namespace, manifest) do
+      Store.compare_and_swap(config.store, Record.agent_key(address), condition, value)
+    end
+  end
+
+  defp delete_current(%Config{} = config, address, agent_module, manifest) do
+    case Store.read(config.store, Record.agent_key(address)) do
       {:error, :not_found} ->
-        with {:ok, tombstone} <- Record.build_tombstone(address, agent_module, 0, 0),
-             {:ok, value} <- Record.encode(tombstone, config) do
-          Store.compare_and_swap(
-            config.store,
-            Record.agent_key(address),
-            :not_found,
-            value
-          )
+        with {:ok, tombstone} <- Record.build_tombstone(address, agent_module, 0, 0) do
+          write_tombstone(config, address, manifest, :not_found, tombstone)
         end
 
       {:ok, expected_value, condition} ->
-        with {:ok, current} <- decode_record(expected_value, agent_module, config),
-             :ok <- Record.validate(current, address, agent_module) do
-          case Record.kind(current) do
-            :tombstone ->
-              :ok
-
-            :active ->
-              with {:ok, tombstone} <-
-                     Record.build_tombstone(
-                       address,
-                       agent_module,
-                       Record.revision(current) + 1,
-                       Record.agent_revision(current)
-                     ),
-                   {:ok, value} <- Record.encode(tombstone, config) do
-                Store.compare_and_swap(
-                  config.store,
-                  Record.agent_key(address),
-                  condition,
-                  value
-                )
-              end
-          end
+        with {:ok, current} <- decode_record(expected_value, agent_module, config) do
+          delete_stored(config, address, agent_module, manifest, current, condition)
         end
 
       {:error, _reason} = error ->
         error
+    end
+  end
+
+  defp delete_stored(config, address, agent_module, manifest, record, condition) do
+    with :ok <- Record.validate(record, address, agent_module) do
+      case Record.kind(record) do
+        :tombstone ->
+          :ok
+
+        :active ->
+          with {:ok, tombstone} <-
+                 Record.build_tombstone(
+                   address,
+                   agent_module,
+                   Record.revision(record) + 1,
+                   Record.agent_revision(record)
+                 ) do
+            write_tombstone(config, address, manifest, condition, tombstone)
+          end
+      end
+    end
+  end
+
+  defp write_tombstone(config, address, manifest, condition, tombstone) do
+    with {:ok, value} <- Record.encode(tombstone, config) do
+      write_agent_record(config, address, manifest, condition, value)
     end
   end
 
@@ -933,15 +933,10 @@ defmodule Jido.Persistence do
     Record.decode(value, config, opts)
   end
 
-  defp read_for_delete(config, key) do
-    case Store.read(config, key) do
-      {:error, %Error.ExecutionError{details: %{code: :persistence_callback_failed} = details} = error} ->
-        {:error, %{error | details: Map.put(details, :operation, :delete)}}
+  defp delete_result({:error, %Error.ExecutionError{details: %{code: :persistence_callback_failed} = details} = error}),
+    do: {:error, %{error | details: Map.put(details, :operation, :delete)}}
 
-      result ->
-        result
-    end
-  end
+  defp delete_result(result), do: result
 
   @doc false
   @spec portable_term?(term()) :: boolean()

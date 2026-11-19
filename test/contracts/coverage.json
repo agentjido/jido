@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 100,
+      "active": 102,
       "coverage": 1.0,
-      "covered": 100
+      "covered": 102
     },
     "jido.agent_server": {
       "active": 15,
@@ -565,10 +565,10 @@
       }
     },
     "jido.agent_server": {
-      "active": 13,
+      "active": 15,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 13,
+      "covered": 15,
       "form": "light",
       "obligations": {
         "jido.agent_server.I1": {
@@ -646,6 +646,29 @@
           "tests": [
             "test an exact terminal result survives restart until acknowledgement",
             "test failed and cancelled handoffs retain process-neutral results"
+          ]
+        },
+        "jido.agent_server.I106": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test stop finishes the accepted Turn while admission stays closed",
+            "test stop keeps its original activation when a registered name changes"
+          ]
+        },
+        "jido.agent_server.I107": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a call to an absent registered name leaves no reply gate",
+            "test a submission to an absent registered name leaves no reply gate",
+            "test quiesce closes the reply gates for a queued call and submission"
           ]
         },
         "jido.agent_server.I11": {
@@ -2510,11 +2533,12 @@
         "jido.plugin.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 8,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
             "test all supported use options retain their exact metadata",
+            "test authoring overrides use the shared default results through super",
             "test callbacks retain capability and pairing checks",
             "test normalization rejects mismatched metadata and invalid callback combinations",
             "test old role and facet selectors are rejected",
@@ -2578,12 +2602,14 @@
         "jido.plugin.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 7,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
             "test Agent callback declarations require safe state and Directive ownership",
             "test Directive lookup returns only the Plugin that declared the type",
+            "test Directive ownership rejects improper lists",
+            "test Directive ownership rejects nil",
             "test Directive ownership remains unique across Plugins",
             "test callbacks retain capability and pairing checks",
             "test normalization rejects mismatched metadata and invalid callback combinations",
@@ -2594,7 +2620,7 @@
         "jido.plugin.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 6,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
@@ -2603,20 +2629,23 @@
             "test normalization rejects mismatched metadata and invalid callback combinations",
             "test option validation preserves explicit errors and contains faults",
             "test paired callbacks and owned values are required",
+            "test readiness requires a runtime root on both declaration paths",
             "test reused complete Specs require exact owner values"
           ]
         },
         "jido.plugin.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 4,
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Directive ownership rejects improper lists",
             "test option validation preserves explicit errors and contains faults",
             "test package metadata exceptions are contained at the normalization boundary",
             "test runtime manifests are derived from Plugin callbacks",
-            "test state and Directive callbacks preserve explicit errors"
+            "test state and Directive callbacks preserve explicit errors",
+            "test state declaration preserves explicit reasons at Agent definition"
           ]
         },
         "jido.plugin.I8": {
@@ -5856,8 +5885,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 244,
+    "active": 246,
     "coverage": 1.0,
-    "covered": 244
+    "covered": 246
   }
 }

@@ -216,7 +216,7 @@ defmodule Jido.Plugin.Normalizer do
          true <- agent.options === expected_options,
          true <- agent.route_selector? === function_exported?(facet, :select_route, 2),
          {:ok, {_state_key, _state_schema}} <-
-           validate_state_spec(declared_state, manifest.module, facet),
+           validate_state_spec(declared_state, manifest.module),
          {:ok, _directive_modules} <-
            validate_directive_modules(agent.directive_modules, manifest.module, facet),
          :ok <-
@@ -250,7 +250,7 @@ defmodule Jido.Plugin.Normalizer do
          true <- server.options === expected_options,
          true <- server.dispatch? === function_exported?(facet, :dispatch, 4),
          true <- server.runtime? === function_exported?(facet, :child_spec, 1),
-         :ok <- facet_has_capability(facet, :agent_server) do
+         :ok <- validate_server_capabilities(facet) do
       :ok
     else
       false -> invalid_normalized_owner(manifest.module, :agent_server, server)
@@ -398,7 +398,7 @@ defmodule Jido.Plugin.Normalizer do
     facet = manifest.agent_server
     facet_options = Manifest.options_for(manifest, :agent_server, options)
 
-    with :ok <- facet_has_capability(facet, :agent_server),
+    with :ok <- validate_server_capabilities(facet),
          :ok <- validate_server_options(manifest.module, facet, facet_options) do
       {:ok,
        %ServerSpec{
@@ -541,8 +541,25 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp facet_has_capability(module, :agent_server),
-    do: require_capability(module, :agent_server, @server_capabilities)
+  defp validate_server_capabilities(module) do
+    cond do
+      not has_any?(module, @server_capabilities) ->
+        PluginBoundary.validation_error("Plugin facet defines no capability", %{
+          plugin: module,
+          owner: :agent_server
+        })
+
+      function_exported?(module, :await_ready, 2) and not function_exported?(module, :child_spec, 1) ->
+        PluginBoundary.validation_error("Agent Server Plugin await_ready/2 requires child_spec/1", %{
+          plugin: module,
+          callback: {:await_ready, 2},
+          requires: {:child_spec, 1}
+        })
+
+      true ->
+        :ok
+    end
+  end
 
   defp validate_server_options(package, facet, options) do
     if function_exported?(facet, :validate_options, 1) do
@@ -572,17 +589,6 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp require_capability(module, owner, callbacks) do
-    if has_any?(module, callbacks) do
-      :ok
-    else
-      PluginBoundary.validation_error("Plugin facet defines no capability", %{
-        plugin: module,
-        owner: owner
-      })
-    end
-  end
-
   defp read_state_spec(package, facet, options) do
     if function_exported?(facet, :state_spec, 1) do
       PluginBoundary.invoke(
@@ -592,35 +598,37 @@ defmodule Jido.Plugin.Normalizer do
         [options],
         "Agent Plugin state_spec/1 failed"
       )
-      |> validate_state_spec(package, facet)
+      |> validate_state_result(package)
     else
       {:ok, {nil, nil}}
     end
   end
 
-  defp validate_state_spec(:none, _package, _facet), do: {:ok, {nil, nil}}
+  defp validate_state_result({:error, reason} = result, package) do
+    if Joi.Schema.schema?(reason), do: validate_state_spec(result, package), else: result
+  end
 
-  defp validate_state_spec({:error, reason} = error, _package, _facet)
-       when is_exception(reason),
-       do: error
+  defp validate_state_result(result, package), do: validate_state_spec(result, package)
 
-  defp validate_state_spec({nil, _schema}, package, _facet) do
+  defp validate_state_spec(:none, _package), do: {:ok, {nil, nil}}
+
+  defp validate_state_spec({nil, _schema}, package) do
     PluginBoundary.validation_error("Plugin-owned Agent state key must not be nil", %{
       plugin: package,
       state_key: nil
     })
   end
 
-  defp validate_state_spec({:__struct__, _schema}, package, _facet) do
+  defp validate_state_spec({:__struct__, _schema}, package) do
     PluginBoundary.validation_error("Plugin-owned Agent state key is reserved", %{
       plugin: package,
       state_key: :__struct__
     })
   end
 
-  defp validate_state_spec({key, schema}, package, _facet)
+  defp validate_state_spec({key, schema}, package)
        when is_atom(key) and not is_nil(key) and key != :__struct__ and is_struct(schema) do
-    if not Jido.Joi.Schema.schema?(schema) do
+    if not Joi.Schema.schema?(schema) do
       PluginBoundary.validation_error("Plugin-owned Agent state schema must be a Joi schema", %{
         plugin: package,
         schema: schema
@@ -640,7 +648,7 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp validate_state_spec(value, package, _facet) do
+  defp validate_state_spec(value, package) do
     PluginBoundary.validation_error("Agent Plugin state_spec/1 returned an invalid value", %{
       plugin: package,
       value: value
@@ -666,12 +674,16 @@ defmodule Jido.Plugin.Normalizer do
 
   defp validate_directive_modules({:error, _reason} = error, _package, _facet), do: error
 
-  defp validate_directive_modules(directives, package, _facet) when is_list(directives) do
+  defp validate_directive_modules(directives, package, _facet)
+       when is_list(directives) and length(directives) >= 0 do
     atom_modules? = Enum.all?(directives, &is_atom/1)
-    unloaded = if atom_modules?, do: Enum.find(directives, &(not Code.ensure_loaded?(&1)))
+
+    unloaded_index =
+      if atom_modules?,
+        do: Enum.find_index(directives, &(is_nil(&1) or not Code.ensure_loaded?(&1)))
 
     not_struct =
-      if atom_modules? and unloaded == nil,
+      if atom_modules? and is_nil(unloaded_index),
         do: Enum.find(directives, &(not function_exported?(&1, :__struct__, 0)))
 
     cond do
@@ -687,10 +699,10 @@ defmodule Jido.Plugin.Normalizer do
           directives: directives
         })
 
-      unloaded != nil ->
+      not is_nil(unloaded_index) ->
         PluginBoundary.validation_error("Agent Plugin Directive modules must be loaded", %{
           plugin: package,
-          directive: unloaded
+          directive: Enum.at(directives, unloaded_index)
         })
 
       not_struct != nil ->

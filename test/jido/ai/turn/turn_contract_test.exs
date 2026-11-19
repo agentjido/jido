@@ -17,6 +17,7 @@ defmodule Jido.AI.Turn.ContractTest do
 
   alias Jido.AI.Thread.Projection
   alias Jido.Test.AI.DynamicToolSource
+  alias Jido.Test.AI.SimpleAgent
   alias Jido.Test.AI.Tools.Add
   alias Jido.{Session, Thread}
 
@@ -394,8 +395,8 @@ defmodule Jido.AI.Turn.ContractTest do
     assert outcome_entry.payload["status"] == "completed"
   end
 
-  @tag obligation: "jido_ai.turn.I1"
-  test "a caller-selected session must be valid and open" do
+  @tag obligation: "jido_ai.turn.I7"
+  test "request start requires a valid open Session from either owner" do
     assert {:error, :invalid_session} =
              StartRequest.run(request_params(), %{jido_ai_session: %{id: "invalid"}})
 
@@ -403,6 +404,69 @@ defmodule Jido.AI.Turn.ContractTest do
 
     assert {:error, :closed_session} =
              StartRequest.run(request_params(), %{jido_ai_session: closed})
+
+    assert {:error, :closed_session} =
+             StartRequest.run(request_params(), %{agent_state: %{session: closed}})
+
+    invalid = %{closed | status: :open, rev: -1}
+
+    assert {:error, :invalid_session} =
+             StartRequest.run(request_params(), %{agent_state: %{session: invalid}})
+
+    assert {:error, :invalid_session} =
+             StartRequest.run(request_params(), %{agent_state: %{session: :invalid}})
+
+    invalid_document = put_in(Session.encode(closed), ["thread", "entries"], [%{} | :invalid])
+
+    assert {:error, :invalid_session} =
+             StartRequest.run(request_params(), %{jido_ai_session: invalid_document})
+  end
+
+  @tag obligation: "jido_ai.turn.I7"
+  test "request start rejects Sessions that Runic cannot hash and keeps their storage format" do
+    session = Session.new(id: "session", now: 10)
+    date = ~D[2026-11-19]
+
+    for portable <- [
+          Session.put_metadata(session, %{day: date}),
+          Session.from_thread(Thread.new(id: "history", now: 10, metadata: %{day: date})),
+          Session.append(session, %{kind: :note, payload: %{day: date}}),
+          Session.append(session, %{kind: :note, refs: %{day: date}})
+        ] do
+      document = Session.encode(portable)
+      assert {:ok, ^portable} = Session.decode(document)
+
+      for context <- [
+            %{jido_ai_session: document},
+            %{agent_state: %{session: portable}},
+            %{jido_ai_session: session, agent_state: %{session: portable}}
+          ] do
+        assert {:error, :invalid_session_identity} = StartRequest.run(request_params(), context)
+      end
+    end
+
+    assert {:ok, %{session: document}} = StartRequest.run(request_params(), %{jido_ai_session: session})
+    hashed = Session.decode!(document)
+    assert Runic.Identity.project(:payload, hashed) == Runic.Identity.digest(:payload, document)
+    refute Runic.Identity.project(:payload, hashed) == Runic.Identity.project(:payload, session)
+  end
+
+  @tag obligation: "jido_ai.turn.I7"
+  test "an AI Agent command reports a Session identity error before model work" do
+    session = Session.new(id: "session", metadata: %{day: ~D[2026-11-19]})
+    signal = SimpleAgent.request_signal!(%{input: "question"})
+    agent = SimpleAgent.instantiate!(id: "agent")
+    agent_with_session = SimpleAgent.instantiate!(id: "agent", state: %{session: session})
+
+    for {instance, context} <- [
+          {agent, %{jido_ai_session: Session.encode(session)}},
+          {agent_with_session, %{}}
+        ] do
+      context = Map.put(context, :jido_ai_inference_client, nil)
+
+      assert {:error, %Jido.Error.ExecutionError{details: %{reason: :invalid_session_identity}}} =
+               SimpleAgent.cmd(instance, signal, context: context)
+    end
   end
 
   @tag obligation: "jido_ai.turn.I2"
