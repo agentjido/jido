@@ -10,69 +10,70 @@ defmodule Jido.Session do
   """
 
   alias Jido.Thread
+  alias Runic.Identity.{Canonical, CanonicalError}
 
   @version 1
-  @schema Joi.struct(
-            __MODULE__,
-            %{
-              version: Joi.integer() |> Joi.default(@version),
-              id: Joi.string() |> Joi.min(1),
-              rev: Joi.integer() |> Joi.min(0) |> Joi.default(0),
-              thread: Thread.schema(),
-              status: Joi.enum([:open, :closed]) |> Joi.default(:open),
-              created_at: Joi.integer(),
-              updated_at: Joi.integer(),
-              metadata: Joi.map() |> Joi.default(%{})
-            },
-            unrecognized_keys: :error
-          )
+  @fields %{
+    version: Joi.integer() |> Joi.default(@version),
+    id: Joi.string() |> Joi.min(1),
+    rev: Joi.integer() |> Joi.min(0) |> Joi.default(0),
+    thread: Joi.struct(Thread),
+    status: Joi.enum([:open, :closed]) |> Joi.default(:open),
+    created_at: Joi.integer(),
+    updated_at: Joi.integer(),
+    metadata: Joi.map() |> Joi.default(%{})
+  }
+  @schema Joi.struct(__MODULE__, %{@fields | thread: Thread.schema()})
+  @value_schema Joi.struct(__MODULE__, @fields)
+  @state_schema Joi.refine(@value_schema, {__MODULE__, :validate_state, []})
+
+  @document_fields ~w(type version id rev thread status created_at updated_at metadata)a
+  @string_fields Map.new(@document_fields, &{Atom.to_string(&1), &1})
 
   @type t :: unquote(Joi.type_spec(@schema))
   @enforce_keys Joi.enforce_keys(@schema)
   defstruct Joi.struct_fields(@schema)
 
-  @state_schema @schema
-
-  @doc "Returns the portable Session schema."
+  @doc "Returns the schema for the shape of a portable Session."
   @spec schema() :: Joi.schema()
   def schema, do: @schema
 
-  @doc "Returns the strict schema used when a Session is in Agent state."
+  @doc "Returns the schema that validates a portable Session in Agent state."
   @spec state_schema() :: Joi.schema()
   def state_schema, do: @state_schema
 
-  @doc "Creates an open Session with one empty Thread."
+  @doc "Creates an open Session with an empty Thread or a supplied Thread."
   @spec new(keyword()) :: t()
   def new(opts \\ []) when is_list(opts) do
     now = Keyword.get(opts, :now, System.system_time(:millisecond))
-    id = Keyword.get(opts, :id, "session_#{Jido.Id.uuid7()}")
+    id = Keyword.get_lazy(opts, :id, fn -> "session_#{Jido.Id.uuid7()}" end)
     thread = Keyword.get_lazy(opts, :thread, fn -> Thread.new(id: "#{id}:thread", now: now) end)
 
+    build(thread, id, now, now, Keyword.get(opts, :metadata, %{}))
+  end
+
+  @doc "Builds an open Session around an existing Thread."
+  @spec from_thread(Thread.t(), keyword()) :: t()
+  def from_thread(%Thread{} = thread, opts \\ []) do
+    build(
+      thread,
+      Keyword.get_lazy(opts, :id, fn -> "session:#{thread.id}" end),
+      Keyword.get(opts, :created_at, thread.created_at),
+      Keyword.get(opts, :updated_at, thread.updated_at),
+      Keyword.get(opts, :metadata, %{})
+    )
+  end
+
+  defp build(thread, id, created_at, updated_at, metadata) do
     %__MODULE__{
       version: @version,
       id: id,
       rev: thread.rev,
       thread: thread,
       status: :open,
-      created_at: now,
-      updated_at: now,
-      metadata: Keyword.get(opts, :metadata, %{})
-    }
-    |> validate!()
-  end
-
-  @doc "Builds an open Session around an existing Thread."
-  @spec from_thread(Thread.t(), keyword()) :: t()
-  def from_thread(%Thread{} = thread, opts \\ []) do
-    %__MODULE__{
-      version: @version,
-      id: Keyword.get(opts, :id, "session:#{thread.id}"),
-      rev: thread.rev,
-      thread: thread,
-      status: :open,
-      created_at: Keyword.get(opts, :created_at, thread.created_at),
-      updated_at: Keyword.get(opts, :updated_at, thread.updated_at),
-      metadata: Keyword.get(opts, :metadata, %{})
+      created_at: created_at,
+      updated_at: updated_at,
+      metadata: metadata
     }
     |> validate!()
   end
@@ -93,7 +94,7 @@ defmodule Jido.Session do
         thread: thread,
         updated_at: max(session.updated_at, thread.updated_at)
     }
-    |> validate!()
+    |> validate!(:thread)
   end
 
   @doc "Replaces the portable Session metadata."
@@ -102,7 +103,7 @@ defmodule Jido.Session do
     case Jido.Codec.Term.validate(metadata, :session_metadata) do
       :ok ->
         %{session | rev: session.rev + 1, metadata: metadata, updated_at: now_after(session.updated_at)}
-        |> validate!()
+        |> validate!(:metadata)
 
       {:error, _reason} ->
         raise ArgumentError, "invalid session metadata"
@@ -125,14 +126,15 @@ defmodule Jido.Session do
   @doc "Returns a versioned portable map."
   @spec encode(t()) :: map()
   def encode(%__MODULE__{} = session) do
-    validate!(session)
+    validate!(session, :thread)
+    thread = encode_thread!(session.thread)
 
     %{
       "type" => "jido.session",
       "version" => @version,
       "id" => session.id,
       "rev" => session.rev,
-      "thread" => Thread.encode(session.thread),
+      "thread" => thread,
       "status" => Atom.to_string(session.status),
       "created_at" => session.created_at,
       "updated_at" => session.updated_at,
@@ -140,27 +142,46 @@ defmodule Jido.Session do
     }
   end
 
+  @doc false
+  @spec encode_for_runic(t()) :: {:ok, map()} | {:error, :invalid_session | :invalid_session_identity}
+  def encode_for_runic(%__MODULE__{} = session) do
+    document = encode(session)
+    _canonical = Canonical.encode!(document)
+    {:ok, document}
+  rescue
+    CanonicalError -> {:error, :invalid_session_identity}
+    ArgumentError -> {:error, :invalid_session}
+  end
+
+  defp encode_thread!(thread) do
+    if thread_entries_valid?(thread), do: Thread.encode(thread), else: raise(ArgumentError, "invalid thread")
+  rescue
+    ArgumentError -> raise ArgumentError, "invalid session"
+  end
+
   @doc "Decodes and validates a portable Session map."
   @spec decode(t() | map()) :: {:ok, t()} | {:error, :invalid_session | :unsupported_version}
   def decode(%__MODULE__{} = session), do: validate(session)
 
   def decode(map) when is_map(map) do
-    with :ok <- document_version(map),
-         true <- known_keys?(map),
-         {:ok, thread} <- Thread.decode(field(map, :thread)),
-         status when status in [:open, :closed] <- decode_status(field(map, :status)),
+    with {:ok, fields} <- document_fields(map),
+         :ok <- document_version(fields),
+         true <- Map.keys(fields) -- @document_fields == [],
+         thread = Map.get(fields, :thread),
+         true <- thread_entries_valid?(thread),
+         {:ok, thread} <- Thread.decode(thread),
+         status when status in [:open, :closed] <- decode_status(Map.get(fields, :status)),
          session = %__MODULE__{
            version: @version,
-           id: field(map, :id),
-           rev: field(map, :rev) || 0,
+           id: Map.get(fields, :id),
+           rev: default(Map.get(fields, :rev), 0),
            thread: thread,
            status: status,
-           created_at: field(map, :created_at),
-           updated_at: field(map, :updated_at),
-           metadata: field(map, :metadata) || %{}
-         },
-         {:ok, session} <- validate(session) do
-      {:ok, session}
+           created_at: Map.get(fields, :created_at),
+           updated_at: Map.get(fields, :updated_at),
+           metadata: default(Map.get(fields, :metadata), %{})
+         } do
+      validate_checked(session, :thread)
     else
       {:error, :unsupported_version} = error -> error
       _other -> {:error, :invalid_session}
@@ -180,47 +201,76 @@ defmodule Jido.Session do
 
   @doc false
   @spec validate(t()) :: {:ok, t()} | {:error, :invalid_session}
-  def validate(%__MODULE__{} = session) do
-    with :ok <- Joi.validate(@schema, session),
-         true <- session.version == @version,
-         true <- session.rev >= session.thread.rev,
-         true <- session.updated_at >= session.created_at,
-         {:ok, _thread} <- Thread.validate(session.thread),
-         :ok <- Jido.Codec.Term.validate(session.metadata, :session_metadata) do
+  def validate(%__MODULE__{} = session), do: validate_checked(session, nil)
+  def validate(_value), do: {:error, :invalid_session}
+
+  @doc false
+  def validate_state(session, _opts) do
+    if valid_invariants?(session, nil), do: :ok, else: {:error, "invalid session"}
+  end
+
+  defp validate_checked(session, checked) do
+    if Joi.validate(@value_schema, session) == :ok and valid_invariants?(session, checked) do
       {:ok, session}
     else
-      _other -> {:error, :invalid_session}
+      {:error, :invalid_session}
     end
   end
 
-  def validate(_value), do: {:error, :invalid_session}
+  defp valid_invariants?(%__MODULE__{thread: %Thread{rev: thread_rev}} = session, checked) do
+    session.version == @version and session.rev >= thread_rev and session.updated_at >= session.created_at and
+      (checked == :thread or valid_thread?(session.thread)) and
+      (checked == :metadata or Jido.Codec.Term.validate(session.metadata, :session_metadata) == :ok)
+  end
 
-  defp validate!(session) do
-    case validate(session) do
+  defp valid_invariants?(_session, _checked), do: false
+
+  defp valid_thread?(thread) do
+    thread_entries_valid?(thread) and match?({:ok, _}, Thread.validate(thread))
+  end
+
+  # Thread enumerates entries after an is_list/1 check, which also accepts improper lists.
+  defp thread_entries_valid?(%Thread{} = thread) do
+    entries = Map.get(thread, :entries)
+    is_list(entries) and not List.improper?(entries)
+  end
+
+  defp thread_entries_valid?(document) when is_map(document) do
+    entries = Map.get(document, :entries, Map.get(document, "entries"))
+    not (is_list(entries) and List.improper?(entries))
+  end
+
+  defp thread_entries_valid?(_value), do: false
+
+  defp validate!(session, checked \\ nil) do
+    case validate_checked(session, checked) do
       {:ok, valid} -> valid
       {:error, :invalid_session} -> raise ArgumentError, "invalid session"
     end
   end
 
-  defp document_version(map) do
-    case {field(map, :type), field(map, :version)} do
-      {"jido.session", @version} -> :ok
-      _other -> {:error, :unsupported_version}
-    end
+  defp document_version(%{type: "jido.session", version: @version}), do: :ok
+  defp document_version(_fields), do: {:error, :unsupported_version}
+
+  defp document_fields(map) do
+    Enum.reduce_while(Map.to_list(map), {:ok, %{}}, fn {spelling, value}, {:ok, fields} ->
+      key = Map.get(@string_fields, spelling, spelling)
+
+      if Map.get(fields, key, value) === value do
+        {:cont, {:ok, Map.put(fields, key, value)}}
+      else
+        {:halt, {:error, :invalid_session}}
+      end
+    end)
   end
 
-  defp known_keys?(map) do
-    keys = ~w(type version id rev thread status created_at updated_at metadata __struct__)
-    allowed = keys ++ Enum.map(keys, &String.to_atom/1)
-    Map.keys(map) -- allowed == []
-  end
-
+  defp default(nil, value), do: value
+  defp default(value, _default), do: value
   defp decode_status(:open), do: :open
   defp decode_status(:closed), do: :closed
   defp decode_status("open"), do: :open
   defp decode_status("closed"), do: :closed
   defp decode_status(_status), do: nil
-  defp field(map, key), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
   defp now_after(previous), do: max(System.system_time(:millisecond), previous)
 end
 

@@ -44,4 +44,16 @@ defmodule Jido.Examples.ContextMemory.SessionRolloverTest do
                summary: "stale"
              })
   end
+
+  test "rejects a Session document with an unsupported version" do
+    document = Jido.Session.new(id: "session-current", now: 1_000) |> Jido.Session.encode() |> Map.put("version", 2)
+
+    assert {:error, %Jido.Error.ValidationError{message: "session document is invalid"}} =
+             Jido.Exec.run(SessionRollover, %{
+               session: document,
+               expected_rev: 0,
+               new_session_id: "session-never-created",
+               summary: "unsupported"
+             })
+  end
 end
