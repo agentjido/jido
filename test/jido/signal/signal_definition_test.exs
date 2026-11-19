@@ -43,6 +43,11 @@ defmodule Jido.Signal.DefinitionTest do
   end
 
   describe "typed Signal construction" do
+    test "rejects repeated keyword options before applying definition values" do
+      assert {:error, "parse error: duplicate attribute :id"} =
+               OpaqueMessage.new(nil, id: "first", id: "second")
+    end
+
     test "uses configured envelope values and validates data" do
       assert {:ok, signal} =
                UserCreated.new(%{user_id: "123", email: "user@example.com"})
@@ -143,6 +148,19 @@ defmodule Jido.Signal.DefinitionTest do
   end
 
   describe "static Joi schema checks" do
+    test "rejects a fragment in a new definition's dataschema" do
+      module = unique_module("FragmentDataschema")
+
+      assert_raise CompileError, ~r/absolute URI.*dataschema/s, fn ->
+        create_module(
+          module,
+          quote do
+            use Jido.Signal, type: "test.created", dataschema: "https://example.com/schema#v1"
+          end
+        )
+      end
+    end
+
     test "accepts named MFA effects" do
       assert {:ok, data} =
                UserCreated.validate_data(%{user_id: "123", email: "user@example.com"})

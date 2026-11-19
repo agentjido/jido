@@ -13,7 +13,7 @@ Look up what each Signal attribute means, what values it accepts, and how to car
 | `subject` | No | Non-empty UTF-8 text, or `nil`. | No. |
 | `time` | No | RFC 3339 string, `DateTime`, or `nil`. | No. A `DateTime` becomes an ISO 8601 string. |
 | `datacontenttype` | No | Media type, or `nil`. | No. |
-| `dataschema` | No | Absolute URI, or `nil`. | No. |
+| `dataschema` | No | Absolute URI with no fragment, or `nil`. | No. |
 | `data` | No | Any term. | No. |
 
 An input of `"1.0.2"` for `specversion` is accepted and normalized to `"1.0"`. Other versions are rejected.
@@ -49,6 +49,10 @@ Use each field for its CloudEvents purpose:
 - `source` names the producer. `source` plus `id` should identify one event.
 - `subject` names the thing the event is about, such as one ticket. Bus selectors can match it.
 - `dataschema` names the data version. `Jido.Signal.Catalog` selects a definition with it.
+
+New Signals and definitions require a fragment-free `dataschema` URI. The
+codec preserves a fragment on older wire records as part of the original
+schema identity. A `source` URI reference can still include a fragment.
 
 ## Absent data and null data
 

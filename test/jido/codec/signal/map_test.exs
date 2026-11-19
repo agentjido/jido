@@ -48,6 +48,18 @@ defmodule Jido.Signal.Codec.MapTest do
     end
   end
 
+  test "preserves each pre-existing dataschema fragment as part of the wire identity" do
+    signal = Signal.new!(type: "legacy.schema", source: "/test")
+    wire = Signal.Codec.to_map(signal)
+
+    for uri <- ["https://example.com/schema#one", "https://example.com/schema#two", "https://example.com/schema#"] do
+      input = Map.put(wire, "dataschema", uri)
+      assert {:ok, decoded} = Signal.Codec.from_map(input)
+      assert decoded.dataschema == uri
+      assert Signal.Codec.to_map(decoded) == input
+    end
+  end
+
   test "normalizes the supported legacy spec version" do
     assert {:ok, signal} =
              Jido.Signal.Codec.from_map(%{

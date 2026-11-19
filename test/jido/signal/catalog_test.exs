@@ -93,6 +93,12 @@ defmodule Jido.Signal.CatalogTest do
         |> Jido.Joi.transform({Jido.Signal.CatalogTest, :normalize_text, []})
   end
 
+  defmodule ChangesData do
+    use Jido.Signal,
+      type: "example.changed",
+      schema: Jido.Joi.any() |> Jido.Joi.transform({Jido.Signal.CatalogTest, :change_data, []})
+  end
+
   defmodule IncompleteDefinition do
     def __signal_definition__, do: %{}
     def type, do: "incomplete.definition"
@@ -103,6 +109,15 @@ defmodule Jido.Signal.CatalogTest do
     def type, do: ""
     def dataschema, do: "/relative"
     def schema, do: :invalid
+  end
+
+  defmodule FragmentMetadata do
+    def __signal_definition__, do: %{type: type(), dataschema: "https://example.com/schema#v1", schema: Jido.Joi.any()}
+    def type, do: "legacy.fragment"
+  end
+
+  test "requires absolute dataschema URIs without fragments when registering definitions" do
+    assert_error(Catalog.new([FragmentMetadata]), :invalid_definitions)
   end
 
   defmodule NonMapMetadata do
@@ -448,6 +463,13 @@ defmodule Jido.Signal.CatalogTest do
   end
 
   describe "decode/3" do
+    test "wraps duplicate JSON envelope keys as a decode failure" do
+      catalog = Catalog.new!([MessageReceived])
+      json = ~S({"specversion":"1.0","id":"first","id":"second","source":"/test","type":"ignored"})
+      error = assert_error(Catalog.decode(catalog, json), :decode_failed)
+      assert {:json_decode_failed, _message} = error.details.reason
+    end
+
     test "keeps normalized data and its wire representation consistent" do
       catalog = Catalog.new!([DefaultedData, NormalizedData, NumberData])
 
@@ -478,6 +500,28 @@ defmodule Jido.Signal.CatalogTest do
         assert Jason.decode!(json) == expected
         assert {:ok, ^signal} = Jido.Signal.Codec.deserialize(json)
         assert {:ok, ^signal} = Catalog.validate(catalog, signal)
+      end
+    end
+
+    test "retains data presence and the binary representation when a schema changes data" do
+      catalog = Catalog.new!([ChangesData])
+      original = Signal.new!(type: ChangesData.type(), source: "/test", subject: "record", tenantid: "one")
+      wire = Signal.Codec.to_map(original)
+
+      for {member, input, data, base64?} <- [
+            {"data", "null", nil, false},
+            {"data", "binary", <<255>>, true},
+            {"data_base64", Base.encode64("text"), "TEXT", true}
+          ] do
+        assert {:ok, signal} = Catalog.decode(catalog, Map.put(wire, member, input))
+        assert signal == %{original | data: data, data_present?: true, data_base64?: base64?}
+
+        expected =
+          if base64?,
+            do: Map.put(wire, "data_base64", Base.encode64(data)),
+            else: Map.put(wire, "data", data)
+
+        assert Signal.Codec.to_map(signal) == expected
       end
     end
 
@@ -667,6 +711,10 @@ defmodule Jido.Signal.CatalogTest do
 
   def normalize_text(text, _opts) when is_binary(text), do: %{"text" => text}
   def normalize_text(data, _opts), do: data
+
+  def change_data("null", _opts), do: nil
+  def change_data("binary", _opts), do: <<255>>
+  def change_data("text", _opts), do: "TEXT"
   def float_value(value, _opts), do: value / 1
 
   defp message do
