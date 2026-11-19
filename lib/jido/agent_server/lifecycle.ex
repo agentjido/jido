@@ -194,10 +194,10 @@ defmodule Jido.AgentServer.Lifecycle do
   end
 
   def queue_decision(postponed, token, limit) do
-    count = MapSet.size(postponed)
+    count = map_size(postponed)
 
     cond do
-      MapSet.member?(postponed, token) -> :duplicate
+      Map.has_key?(postponed, token) -> :duplicate
       limit != :infinity and count >= limit -> {:overloaded, count}
       true -> :accept
     end

@@ -1,6 +1,6 @@
 # Control Activations
 
-This tutorial finds the processes behind a running Agent, drains it with `Jido.AgentServer.quiesce/2`, reopens it, and controls its idle timer.
+This tutorial reads the status of a running Agent, drains its active work, reopens admission, and sets an idle timeout.
 
 ## Install Jido
 
@@ -67,15 +67,13 @@ start_count = fn aisle ->
 end
 ```
 
-## Find the activation
+## Read the resident status
 
-An Agent started through an instance runs in an activation: a supervisor that owns the worker and everything tied to its lifetime. `Jido.AgentServer.activation/1` returns that supervisor, and `Jido.AgentServer.worker/1` goes the other way.
+Use the worker returned by `Jido.start_agent/3` to read the activation status.
 
 ```elixir
-activation = Jido.AgentServer.activation(warehouse)
-
-{is_pid(activation), Jido.AgentServer.worker(activation) == warehouse, Jido.AgentServer.alive?(warehouse)}
-# The cell returns {true, true, true}
+%Jido.AgentServer.Status{residency: :active, work_state: :idle, admission: :open} =
+  Jido.AgentServer.status(warehouse)
 ```
 
 [Agent Lifecycle](agent-activation-control.md) describes what the activation owns.
@@ -86,7 +84,7 @@ activation = Jido.AgentServer.activation(warehouse)
 
 1. It closes admission. New Turns get `{:error, :quiesced}`.
 2. It rejects every queued Turn with `{:error, :quiesced}`.
-3. It waits for the active Turn and its effects to finish, then returns `:ok`.
+3. It waits for the active Turn and its effects to finish, then returns `{:ok, status}`.
 
 ```elixir
 {active, action} = start_count.("a1")
@@ -96,7 +94,7 @@ control = Task.async(fn -> Jido.AgentServer.quiesce(warehouse) end)
 
 closing =
   Enum.find_value(1..100, fn _attempt ->
-    case Jido.AgentServer.status(warehouse).admission.mode do
+    case Jido.AgentServer.status(warehouse).admission do
       :open ->
         Process.sleep(5)
         nil
@@ -117,10 +115,10 @@ Reads keep working during the drain. The active Turn is still allowed to commit,
 
 ```elixir
 send(action, :finish)
-{:ok, _agent, []} = Jido.AgentServer.await(active)
-:ok = Task.await(control)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.await(active)
+{:ok, %Jido.AgentServer.Status{admission: :quiesced}} = Task.await(control)
 
-{Jido.AgentServer.status(warehouse).admission.mode, Jido.AgentServer.snapshot(warehouse).agent.state.counted}
+{Jido.AgentServer.status(warehouse).admission, Jido.AgentServer.snapshot(warehouse).agent.state.counted}
 # The cell returns {:quiesced, ["a1"]}
 ```
 
@@ -129,12 +127,12 @@ send(action, :finish)
 `Jido.AgentServer.resume/2` opens admission. Rejected requests do not come back, so their callers must send them again.
 
 ```elixir
-:ok = Jido.AgentServer.resume(warehouse)
+{:ok, %Jido.AgentServer.Status{admission: :open}} = Jido.AgentServer.resume(warehouse)
 
-{:ok, agent, []} =
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
   Jido.AgentServer.call(warehouse, ControlGuide.Warehouse.note_signal!(%{aisle: "a2"}))
 
-agent.state.counted
+Jido.AgentServer.snapshot(warehouse).agent.state.counted
 # The cell returns ["a1", "a2"]
 ```
 
@@ -151,12 +149,12 @@ timed_out = Jido.AgentServer.quiesce(warehouse, timeout: 20)
 still_draining = Jido.AgentServer.resume(warehouse)
 
 send(action, :finish)
-{:ok, _agent, []} = Jido.AgentServer.await(active)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.await(active)
 
 settled =
   Enum.find_value(1..100, fn _attempt ->
     case Jido.AgentServer.resume(warehouse) do
-      :ok ->
+      {:ok, %Jido.AgentServer.Status{admission: :open}} ->
         :reopened
 
       {:error, :not_quiescent} ->
@@ -177,20 +175,23 @@ A second control request during a drain returns `{:error, :control_in_progress}`
 
 ```elixir
 {active, _action} = start_count.("a5")
-:ok = Jido.AgentServer.quiesce(warehouse, active: :cancel)
-result = Jido.AgentServer.await(active)
-:ok = Jido.AgentServer.resume(warehouse)
+{:ok, %Jido.AgentServer.Status{admission: :quiesced}} =
+  Jido.AgentServer.quiesce(warehouse, active: :cancel)
+
+{:ok, %Jido.AgentServer.TurnResult{status: result}} = Jido.AgentServer.await(active)
+{:ok, %Jido.AgentServer.Status{admission: :open}} = Jido.AgentServer.resume(warehouse)
 
 result
-# The cell returns {:error, :cancelled}
+# The cell returns :cancelled
 ```
 
 ## Stop an idle Agent
 
-Set `:idle_timeout` to stop an Agent that has no work. The default is `:infinity`, which disables the timer. The budget starts when the server is settled, admission is open, and no owner is attached.
+Set `:idle_residency_timeout` in the instance's `:activation` options. The timer starts when the worker is settled and admission is open.
 
 ```elixir
-{:ok, kiosk} = Jido.start_agent(ControlGuide.Jido, ControlGuide.Warehouse, id: "kiosk", idle_timeout: 50)
+{:ok, _instance} = Jido.start(name: ControlGuide.Kiosk, activation: [idle_residency_timeout: 50])
+{:ok, kiosk} = Jido.start_agent(ControlGuide.Kiosk, ControlGuide.Warehouse, id: "kiosk")
 monitor = Process.monitor(kiosk)
 
 receive do
@@ -202,42 +203,6 @@ end
 ```
 
 The worker exits with a shutdown reason, so the activation stops and does not restart. With `idle_policy: :hibernate`, it saves before it stops. That policy needs persistence.
-
-## Keep an Agent alive
-
-These functions change the idle timer:
-
-- `Jido.AgentServer.attach/3` adds an owner process, which prevents idle expiry. Attaching twice has the same effect as once.
-- `Jido.AgentServer.detach/3` removes an owner. The last detach starts a new idle budget. An owner that exits counts as a detach.
-- `Jido.AgentServer.touch/1` restarts the idle budget. It does not open closed admission.
-
-Attach a process that represents a user session, such as a LiveView, and let its exit release the Agent.
-
-```elixir
-{:ok, session} = Jido.start_agent(ControlGuide.Jido, ControlGuide.Warehouse, id: "session", idle_timeout: 50)
-monitor = Process.monitor(session)
-
-:ok = Jido.AgentServer.attach(session)
-:ok = Jido.AgentServer.attach(session)
-owners = Jido.AgentServer.status(session).owner_count
-
-Process.sleep(100)
-alive_while_attached = Process.alive?(session)
-
-:ok = Jido.AgentServer.detach(session)
-
-stopped =
-  receive do
-    {:DOWN, ^monitor, :process, ^session, reason} -> reason
-  after
-    1_000 -> :still_running
-  end
-
-{owners, alive_while_attached, stopped}
-# The cell returns {1, true, {:shutdown, :idle_timeout}}
-```
-
-Owners and closed admission both survive a worker restart inside the activation, so a recovered worker does not reopen an Agent you closed.
 
 ## Next steps
 
