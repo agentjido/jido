@@ -234,6 +234,8 @@ defmodule Jido.Codec.Document do
     end
   end
 
+  # Elixir versions can return different sets of JSON error reasons.
+  @dialyzer {:no_match, json_error_message: 1}
   defp json_error_message({:unexpected_end, offset}),
     do: "unexpected end of JSON at offset #{offset}"
 
