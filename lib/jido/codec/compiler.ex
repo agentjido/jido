@@ -100,7 +100,7 @@ defmodule Jido.Codec.Compiler do
         )
       end
 
-      @doc "Projects a codec value to JSON-shaped data."
+      @doc "Projects a codec value to JSON-shaped data. Raises if wire keys collide."
       @spec dump(term()) :: map()
       def dump(value) do
         Jido.Codec.Compiler.dump(value, unquote(Macro.escape(plan)), __MODULE__)
@@ -497,11 +497,16 @@ defmodule Jido.Codec.Compiler do
 
     if unknown == :preserve do
       known = MapSet.new(fields, &elem(&1, 0))
+      wire_keys = MapSet.new(fields, &elem(&1, 1))
 
       Enum.reduce(value, encoded, fn {key, child}, acc ->
-        if MapSet.member?(known, key),
-          do: acc,
-          else: Map.put(acc, encode_map_key(key), encode_value(child, :value, owner))
+        if MapSet.member?(known, key) do
+          acc
+        else
+          wire_key = encode_map_key(key)
+          if MapSet.member?(wire_keys, wire_key), do: duplicate_wire_key!(wire_key)
+          put_wire_key!(acc, wire_key, encode_value(child, :value, owner))
+        end
       end)
     else
       encoded
@@ -509,9 +514,9 @@ defmodule Jido.Codec.Compiler do
   end
 
   defp encode_value(value, {:map, key_plan, value_plan}, owner) when is_map(value) do
-    Map.new(value, fn {key, child} ->
+    Enum.reduce(value, %{}, fn {key, child}, acc ->
       encoded_key = key |> encode_value(key_plan, owner) |> encode_map_key()
-      {encoded_key, encode_value(child, value_plan, owner)}
+      put_wire_key!(acc, encoded_key, encode_value(child, value_plan, owner))
     end)
   end
 
@@ -563,6 +568,13 @@ defmodule Jido.Codec.Compiler do
   end
 
   defp fetch_field(value, field) when is_map(value), do: Map.fetch(value, field)
+
+  defp put_wire_key!(map, key, value) do
+    if Map.has_key?(map, key), do: duplicate_wire_key!(key)
+    Map.put(map, key, value)
+  end
+
+  defp duplicate_wire_key!(key), do: raise(ArgumentError, "duplicate JSON key #{inspect(key)}")
 
   defp run_callback(value, nil, _owner), do: value
   defp run_callback(value, function, owner) when is_atom(function), do: apply(owner, function, [value])

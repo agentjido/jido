@@ -207,9 +207,20 @@ version is not greater than the saved version with
 version 2 state into that shape. This is a forward rollback: behavior goes
 back, but the definition history continues from version 2 to version 3.
 
+For a Jido deployment that changes the saved topology record shape, follow
+[Deploy across the topology record change](durable-topology.md#deploy-across-the-topology-record-change).
+
 ## Settle Turns before you deploy
 
 `Jido.Persistence.upgrade_agent/5` returns `{:error, :turn_in_flight}` when the record has a nonterminal durable Turn. A terminal receipt is fine and is kept in the new revision.
+
+If the Term codec returns `{:unavailable_persistence_module, name}`, include
+the old module atom in `legacy_modules: [MyApp.OldAction]` when you call
+`upgrade_agent/5`. The Upgrade Action receives a saved snapshot. Replace
+the old routing references, keep the Agent ID and Session, and return
+a new snapshot from `Jido.Persistence.snapshot/2`. If the saved data also
+uses atoms or struct fields from the old module, keep a compatibility
+module that defines those values until the upgrade finishes.
 
 The pending Turn cannot resume on changed code either. A changed Flow or Action makes the activation stop with `:changed_reference`, so a Turn left running across a deploy blocks both paths until the old code runs again. The only other exits are `Jido.Persistence.save_agent/3` with a fresh instance at the next revision or `Jido.Persistence.delete_agent/4`, and both discard saved state. Follow this order:
 

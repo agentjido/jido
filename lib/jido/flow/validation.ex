@@ -12,11 +12,12 @@ defmodule Jido.Flow.Validation do
           {:ok, Graph.analysis()} | {:error, [issue()]}
   def validate_graph(named_components, output) do
     {known, duplicates} = duplicate_name_issues(named_components)
-    references = unknown_dependency_issues(named_components, output, known)
+    dependencies = Enum.map(named_components, fn {name, node} -> {name, Graph.dependency_info(node)} end)
+    references = unknown_dependency_issues(dependencies, output, known)
 
     case duplicates ++ references do
       [] ->
-        analysis = Graph.analyze(Map.new(named_components))
+        analysis = Graph.analyze({Map.new(named_components), Map.new(dependencies)})
 
         issues =
           case analysis do
@@ -184,15 +185,15 @@ defmodule Jido.Flow.Validation do
     {known, Enum.reverse(issues)}
   end
 
-  defp unknown_dependency_issues(named_components, output, known) do
+  defp unknown_dependency_issues(dependencies, output, known) do
     output_issues = unknown_refs(Value.result_refs(output), known, :output, [:output])
 
     component_issues =
-      named_components
+      dependencies
       |> Enum.with_index()
-      |> Enum.flat_map(fn {{name, node}, index} ->
+      |> Enum.flat_map(fn {{name, deps}, index} ->
         unknown_refs(
-          Graph.needs(node) ++ Graph.reference_dependencies(node),
+          deps.needs ++ deps.references,
           known,
           name,
           [

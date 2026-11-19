@@ -36,6 +36,7 @@ Flow wait and recovery contracts without an Agent domain owner.
 12. [Timed Resume](13_12_durable_timed_resume/README.md) resumes at a reported wake time.
 13. [Pending Job Recovery](13_13_pending_job_recovery/README.md) retries
     accepted post-commit work after runtime loss.
+14. [Topology Handoff](13_14_topology_handoff/README.md) restores a pending send and accepts it once.
 
 ## Recovery rule
 

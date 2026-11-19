@@ -3,6 +3,7 @@ defmodule Jido.AgentServer.Worker do
 
   @behaviour :gen_statem
 
+  @topology_receipt_limit 16_384
   @topology_retry_ms 250
 
   @typedoc "A local AgentServer PID or registered OTP server name."
@@ -67,9 +68,6 @@ defmodule Jido.AgentServer.Worker do
                child_spec(opts)
              ) do
           {:error, {:shutdown, {:failed_to_start_child, __MODULE__, {:already_started, pid}}}} ->
-            {:error, {:already_started, pid}}
-
-          {:error, {:bad_return, {Jido.AgentServer.Supervisor, :init, {:stop, {:already_started, pid}}}}} ->
             {:error, {:already_started, pid}}
 
           result ->
@@ -516,6 +514,10 @@ defmodule Jido.AgentServer.Worker do
   terminal result and rejects later Turns until
   `Jido.acknowledge_turn_result/3` clears it.
 
+  Each submission uses its own admission slot, including submissions that reuse
+  a Turn ID. Cancellation by ID addresses only the active Turn. Durable result
+  lookup addresses the retained terminal result until acknowledgment.
+
   Submission does not confirm that execution has started. Use `await/2` from
   this same process to collect the result. The handle hides the OTP request.
   Invalid options return an error before submission.
@@ -582,10 +584,10 @@ defmodule Jido.AgentServer.Worker do
     do: turn_event(turn_id, signal, context, deadline, reply_gate, false)
 
   defp turn_event(turn_id, signal, context, deadline, reply_gate, false),
-    do: {:turn, turn_id, signal, context, deadline, reply_gate}
+    do: {:turn, {turn_id, make_ref()}, signal, context, deadline, reply_gate}
 
   defp turn_event(turn_id, signal, context, deadline, reply_gate, true),
-    do: {:turn, turn_id, signal, context, deadline, reply_gate, true}
+    do: {:turn, {turn_id, make_ref()}, signal, context, deadline, reply_gate, true}
 
   defp validate_result_handoff(opts) do
     if Keyword.get(opts, :result_handoff, false) in [true, false],
@@ -798,6 +800,7 @@ defmodule Jido.AgentServer.Worker do
         server_turn: nil,
         topology_handoffs: Jido.Persistence.Record.empty_topology_handoffs(),
         topology_delivery: nil,
+        topology_last_failure: nil,
         pending_handoff: nil,
         postponed: MapSet.new(),
         queued_from: %{},
@@ -1037,8 +1040,9 @@ defmodule Jido.AgentServer.Worker do
   end
 
   @impl true
-  def handle_event({:call, from}, :child_context, _phase, data) do
+  def handle_event({:call, from}, :child_context, phase, data) do
     context = %{
+      ready?: phase not in [:restoring, :initializing],
       activation: data.activation,
       state: data.activation_state,
       agent_id: data.agent.id,
@@ -1501,13 +1505,19 @@ defmodule Jido.AgentServer.Worker do
     end
   end
 
+  def handle_event({:call, _from} = type, {:accept_topology_handoff, id, address, signal, deadline}, phase, data) do
+    handle_event(type, {:accept_topology_handoff, id, address, signal, deadline, true}, phase, data)
+  end
+
   def handle_event(
         {:call, from},
-        {:accept_topology_handoff, id, %Agent.Address{} = address, %Signal{} = signal, {origin, expires} = deadline},
+        {:accept_topology_handoff, id, %Agent.Address{} = address, %Signal{} = signal, {origin, expires} = deadline,
+         sender},
         phase,
         data
       )
-      when is_binary(id) and byte_size(id) > 0 and is_atom(origin) and is_integer(expires) do
+      when is_binary(id) and byte_size(id) > 0 and is_atom(origin) and is_integer(expires) and
+             (sender == true or is_struct(sender, Agent.Address)) do
     cond do
       address != data.agent_address ->
         {:keep_state_and_data, reply(from, {:error, :topology_address_mismatch})}
@@ -1524,15 +1534,16 @@ defmodule Jido.AgentServer.Worker do
 
       true ->
         with :ok <- Lifecycle.admission_status(deadline),
-             {:ok, signal} <- Validation.normalize_signal(signal) do
-          start_turn(:cast, signal, %{}, data, {:topology, id, from})
+             {:ok, signal} <- Validation.normalize_signal(signal),
+             {:ok, accepted} <- topology_acceptance(data.topology_handoffs.accepted, id, sender) do
+          start_turn(:cast, signal, %{}, data, {:topology, id, {from, accepted}})
         else
           {:error, reason} -> {:keep_state_and_data, reply(from, {:error, reason})}
         end
     end
   end
 
-  def handle_event({:call, from}, {:accept_topology_handoff, _, _, _, _}, _phase, _data),
+  def handle_event({:call, from}, {:accept_topology_handoff, _, _, _, _, _}, _phase, _data),
     do: {:keep_state_and_data, reply(from, {:error, :invalid_topology_handoff})}
 
   def handle_event(
@@ -1568,7 +1579,7 @@ defmodule Jido.AgentServer.Worker do
 
   def handle_event(
         type,
-        {:turn, token, signal, context, deadline, reply_gate, result_handoff},
+        {:turn, {turn_id, _request} = token, signal, context, deadline, reply_gate, result_handoff},
         :idle,
         data
       )
@@ -1589,7 +1600,7 @@ defmodule Jido.AgentServer.Worker do
             signal,
             context,
             data,
-            {:turn, token, result_handoff},
+            {:turn, turn_id, result_handoff},
             reply_gate
           )
 
@@ -2018,7 +2029,7 @@ defmodule Jido.AgentServer.Worker do
         :idle,
         %{admission_mode: :open, topology_delivery: :ready, topology_handoffs: %{outbox: [send | _]}} = data
       ) do
-    task = Task.async(fn -> Topology.deliver_handoff(data.jido, send) end)
+    task = Task.async(fn -> Topology.deliver_handoff(data.jido, data.agent_address, send) end)
     {:keep_state, %{data | topology_delivery: {:sending, task}}}
   end
 
@@ -2051,20 +2062,24 @@ defmodule Jido.AgentServer.Worker do
 
     case result do
       :accepted ->
-        data = %{data | topology_delivery: :acknowledged}
-        actions = if phase == :idle, do: topology_delivery_actions(data), else: []
-        {:keep_state, data, actions}
+        settle_topology_delivery(phase, data)
+
+      {:discard, reason} ->
+        settle_topology_delivery(phase, %{data | topology_last_failure: reason})
 
       {:error, reason} when reason in [:topology_receiver_busy, :topology_receiver_unavailable, :admission_timeout] ->
-        retry_topology_delivery(data)
+        retry_topology_delivery(data, reason)
+
+      {:error, :topology_receipt_capacity} ->
+        retry_topology_delivery(data, :topology_receipt_capacity, 5_000)
 
       _rejected ->
-        retry_topology_delivery(data, 5_000)
+        retry_topology_delivery(data, :topology_receiver_rejected, 5_000)
     end
   end
 
   def handle_event(:info, {:DOWN, ref, :process, _, _}, _phase, %{topology_delivery: {:sending, %{ref: ref}}} = data),
-    do: retry_topology_delivery(data)
+    do: retry_topology_delivery(data, :topology_receiver_unavailable)
 
   def handle_event(
         :info,
@@ -2377,9 +2392,9 @@ defmodule Jido.AgentServer.Worker do
       source_signal: signal,
       turn_context: Map.drop(context, [:turn_id, :trace_context]),
       commit_hooks: [],
-      topology_accept_from:
+      topology_acceptance:
         case mode do
-          {:topology, _id, from} -> from
+          {:topology, _id, acceptance} -> acceptance
           _ -> nil
         end,
       topology_sends: [],
@@ -2627,7 +2642,7 @@ defmodule Jido.AgentServer.Worker do
           end
         end
 
-      _instruction when not is_nil(data.active.topology_accept_from) ->
+      _instruction when not is_nil(data.active.topology_acceptance) ->
         cleanup(data, {:error, :durable_topology_flow_required})
 
       _instruction ->
@@ -2681,8 +2696,9 @@ defmodule Jido.AgentServer.Worker do
   end
 
   defp operation_result(:durable_prepare, :ok, data) do
-    if data.active.topology_accept_from do
-      handoffs = put_in(data.topology_handoffs.accepted[data.active.turn_id], true).topology_handoffs
+    if data.active.topology_acceptance do
+      {_from, accepted} = data.active.topology_acceptance
+      handoffs = %{data.topology_handoffs | accepted: accepted}
 
       durable_operation(:durable_accept, data, fn ->
         Lifecycle.save(data, data.agent, data.state_version + 1, data.state_version, data.server_turn,
@@ -2973,14 +2989,25 @@ defmodule Jido.AgentServer.Worker do
         {:error, reason}
       )
 
-  defp acknowledge_topology_acceptance(%{active: %{topology_accept_from: nil}} = data), do: data
+  defp topology_acceptance(accepted, id, sender) do
+    # A sender advances its durable outbox before sending a new ID. Any
+    # delayed attempt for the previous ID has already passed its admission deadline.
+    remaining = if sender == true, do: accepted, else: Map.reject(accepted, fn {_id, value} -> value == sender end)
+
+    if map_size(remaining) < @topology_receipt_limit,
+      do: {:ok, Map.put(remaining, id, sender)},
+      else: {:error, :topology_receipt_capacity}
+  end
+
+  defp acknowledge_topology_acceptance(%{active: %{topology_acceptance: nil}} = data), do: data
 
   defp acknowledge_topology_acceptance(data) do
-    :gen_statem.reply(data.active.topology_accept_from, :accepted)
+    {from, accepted} = data.active.topology_acceptance
+    :gen_statem.reply(from, :accepted)
 
     data
-    |> put_in([:topology_handoffs, :accepted, data.active.turn_id], true)
-    |> put_in([:active, :topology_accept_from], nil)
+    |> put_in([:topology_handoffs, :accepted], accepted)
+    |> put_in([:active, :topology_acceptance], nil)
   end
 
   defp expired?(%{deadline: :infinity}), do: false
@@ -3448,8 +3475,9 @@ defmodule Jido.AgentServer.Worker do
   end
 
   defp finish_result(data, result) do
-    if data.active.topology_accept_from do
-      :gen_statem.reply(data.active.topology_accept_from, result)
+    if data.active.topology_acceptance do
+      {from, _accepted} = data.active.topology_acceptance
+      :gen_statem.reply(from, result)
     end
 
     if data.active.durable and
@@ -4111,8 +4139,16 @@ defmodule Jido.AgentServer.Worker do
 
   defp topology_delivery_actions(_data), do: []
 
-  defp retry_topology_delivery(data, delay \\ @topology_retry_ms),
-    do: {:keep_state, %{data | topology_delivery: :scheduled}, [{{:timeout, :topology_delivery}, delay, :ready}]}
+  defp settle_topology_delivery(phase, data) do
+    data = %{data | topology_delivery: :acknowledged}
+    actions = if phase == :idle, do: topology_delivery_actions(data), else: []
+    {:keep_state, data, actions}
+  end
+
+  defp retry_topology_delivery(data, reason, delay \\ @topology_retry_ms),
+    do:
+      {:keep_state, %{data | topology_delivery: :scheduled, topology_last_failure: reason},
+       [{{:timeout, :topology_delivery}, delay, :ready}]}
 
   # A Store rejection guarantees that the write did not start. The receiver
   # has already accepted this ID, so retry only the sender checkpoint.

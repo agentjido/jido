@@ -7,13 +7,24 @@ defmodule Jido.Signal.Bus.Store do
   `format_version: 1`. Records also use `format_version: 1`.
 
   `list_subscriptions/1` must return definitions in creation order. `append/2`
-  must accept all records or none. The Bus stores the returned state and passes
-  it to the next callback.
+  must check the expected next cursor in the same atomic operation that
+  appends the full batch. Return `{:error, :invalid_record_cursors}` if the
+  assigned cursors are stale.
+  The Bus stores the returned state and passes it to the next callback.
+
+  Return `{:error, {:outcome_unknown, reason}}` if a write can have committed
+  without an acknowledgment. The Bus also treats `{:error, :timeout}` as
+  uncertain. Implement `settle/1` if a write can still commit after its callback
+  returns. Before the next operation, the Bus settles the write and reads the
+  authoritative records and subscription cursors with the last acknowledged
+  adapter state. An adapter without `settle/1` must ensure writes have finished
+  before those reads succeed. Other error returns mean the write did not commit.
 
   Only `Jido.Signal.Bus.Store.Memory` is included. A custom adapter can keep an
   external resource in its state when records must survive a Bus restart.
-  A custom adapter must set a finite timeout on each external operation. Store
-  callbacks run in the Bus process and must not wait without a bound.
+  When a store survives a restart, its `init/1` must settle writes from earlier
+  Bus processes. Set a finite timeout on each external operation. Store callbacks
+  run in the Bus process and must not wait without a bound.
   """
 
   @type state :: term()
@@ -34,6 +45,28 @@ defmodule Jido.Signal.Bus.Store do
   @callback list_subscriptions(state()) :: {:ok, [subscription()]} | {:error, term()}
   @callback put_subscription(subscription(), state()) :: {:ok, state()} | {:error, term()}
   @callback delete_subscription(subscription_id(), state()) :: {:ok, state()} | {:error, term()}
+
+  @doc """
+  Returns `:ok` when every earlier write has committed or can no longer commit.
+
+  The Bus retries recovery on a later call if settlement returns an error.
+  """
+  @callback settle(state()) :: :ok | {:error, term()}
+  @optional_callbacks settle: 1
+
+  @doc false
+  @spec settle(map()) :: :ok | {:error, term()}
+  def settle(%{store_module: module, store_state: state}) do
+    if function_exported?(module, :settle, 1) do
+      case safe_apply(module, :settle, [state]) do
+        :ok -> :ok
+        {:error, reason} -> {:error, {:store_error, :settle, reason}}
+        other -> {:error, {:store_error, :settle, {:invalid_return, other}}}
+      end
+    else
+      :ok
+    end
+  end
 
   @doc false
   @spec init_adapter(module(), keyword()) :: {:ok, state()} | {:error, term()}
@@ -74,6 +107,13 @@ defmodule Jido.Signal.Bus.Store do
       other -> {:error, {:store_error, callback, {:invalid_return, other}}}
     end
   end
+
+  @doc false
+  def recovery_required?({:store_error, :append, :invalid_record_cursors}), do: true
+  def recovery_required?({:store_error, _callback, {:outcome_unknown, _reason}}), do: true
+  def recovery_required?({:store_error, _callback, :timeout}), do: true
+  def recovery_required?({:store_error, _callback, {:exit, {:timeout, _call}}}), do: true
+  def recovery_required?(_reason), do: false
 
   defp safe_apply(module, callback, args) do
     apply(module, callback, args)

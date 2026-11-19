@@ -37,6 +37,21 @@ defmodule Jido.Error.TransportTest do
     def run(params, _context), do: {:ok, params}
   end
 
+  test "bounds projected groups and the child messages they render" do
+    errors = for i <- 1..25, do: Error.validation_error("child #{i}")
+    group = Error.to_class(errors)
+
+    assert %{details: %{errors: projected}, message: message} = Error.to_map(group)
+    assert length(projected) == 20
+    assert List.last(projected).message == "child 20"
+    refute message =~ "child 21"
+
+    assert %{details: %{errors: "[IMPROPER LIST]"}, message: fallback} =
+             Error.to_map(%{group | errors: [hd(errors) | :malformed]})
+
+    assert is_binary(fallback)
+  end
+
   describe "transport key policy" do
     test "bounds long string keys after applying the full key policy" do
       for {suffix, expected} <- [

@@ -19,7 +19,8 @@ defmodule Jido.Exec.Compiler do
 
   alias Jido.Exec.Node.Map, as: MapNode
   alias Jido.Flow
-  alias Jido.Flow.{Graph, Identity, Preparation, Value}
+  alias Jido.Flow.{Identity, Preparation, Value}
+  alias Jido.Flow.DSL.SourceMap
   alias Jido.Instruction
   alias Runic.Workflow
 
@@ -29,14 +30,16 @@ defmodule Jido.Exec.Compiler do
     with {:ok, opts} <- validate_options(opts),
          {:ok, instruction} <- Instruction.resolve(target),
          :ok <- Instruction.validate_resolved(instruction),
+         validator = if(instruction.kind == :flow, do: instruction.target),
          {:ok, instruction} <- Jido.Exec.Runtime.flow_instruction(instruction),
          {:ok, flow} <- Preparation.from_instruction(instruction),
-         {:ok, flow, analysis, children} <- prepare_flow(flow),
+         sources = source_map(opts, instruction.target),
+         {:ok, flow, analysis, children} <- prepare_flow(flow, sources, validator),
          :ok <- reject_nested_waits(analysis, children) do
       {:ok,
        compile_flow(flow, analysis, children,
-         source_map: source_map(opts, instruction.target),
-         validator: instruction.target
+         source_map: sources,
+         validator: validator
        )}
     end
   rescue
@@ -53,9 +56,12 @@ defmodule Jido.Exec.Compiler do
     end
   end
 
-  defp prepare_flow(flow) do
-    with {:ok, attrs, analysis, children} <- Preparation.prepare(flow, [], %{}) do
-      {:ok, struct!(Flow, attrs), analysis, children}
+  defp prepare_flow(flow, sources, validator) do
+    stack = if is_atom(validator) and not is_nil(validator), do: [validator], else: []
+
+    case Preparation.prepare(flow, stack, %{}) do
+      {:ok, attrs, analysis, children} -> {:ok, struct!(Flow, attrs), analysis, children}
+      {:error, error} -> {:error, SourceMap.attach_error(error, sources)}
     end
   end
 
@@ -80,11 +86,6 @@ defmodule Jido.Exec.Compiler do
       {:ok, {_attrs, analysis}} -> {:ok, analysis}
       :error -> {:error, Error.config_error("prepared child Flow is missing", %{target: target})}
     end
-  end
-
-  defp child_analysis(%Flow{} = flow, children) do
-    with {:ok, _attrs, analysis, _children} <- Preparation.prepare(flow, [], children),
-         do: {:ok, analysis}
   end
 
   defp reject_waits(analysis) do
@@ -138,7 +139,7 @@ defmodule Jido.Exec.Compiler do
           )
 
         Workflow.add(current, node,
-          connections: component_connections(input.name, definition),
+          connections: component_connections(input.name, Map.fetch!(analysis.dependency_info, name)),
           input_mode: :all
         )
       end)
@@ -235,16 +236,8 @@ defmodule Jido.Exec.Compiler do
     end
   end
 
-  defp prepared_child!(%Flow{} = flow, children) do
-    case Preparation.prepare(flow, [], children) do
-      {:ok, attrs, analysis, _children} -> {struct!(Flow, attrs), analysis}
-      {:error, error} when is_exception(error) -> raise error
-    end
-  end
-
-  defp component_connections(input, definition) do
-    references = Graph.reference_dependencies(definition)
-    needs = Graph.needs(definition) -- references
+  defp component_connections(input, %{needs: needs, references: references}) do
+    needs = needs -- references
 
     [[from: {input, :input}, to: :bindings, target_path: [:input]]] ++
       Enum.map(references, fn dependency ->

@@ -16,8 +16,10 @@ end
 defmodule ShippingInspection.Definition do
   alias Jido.Flow.Ref
 
-  def flow do
-    Jido.Flow.new!(%{
+  def flow, do: Jido.Flow.new!(attrs())
+
+  def attrs do
+    %{
       name: "ship_order",
       description: "Reserve stock, buy a label, and notify the customer",
       components: [
@@ -49,7 +51,7 @@ defmodule ShippingInspection.Definition do
         }
       ],
       output: Ref.result("notify")
-    })
+    }
   end
 end
 ```
@@ -90,7 +92,7 @@ See [Flow Dependencies](../flows/flow-dependencies.livemd) for how dependencies 
 
 ## Read the canonical form
 
-`Jido.Flow.to_map/1` returns a plain map of the Flow. Its `components` list is in canonical order: dependency level first, then component name. Source order does not matter.
+`Jido.Flow.to_map/1` returns canonical inspection data. It orders components by dependency level, then by name. An authored `:step` becomes a `:call` with a nested Action target and parameters. Timer, Await, and Selection all become `:wait`.
 
 ```elixir
 map = Jido.Flow.to_map(ShippingInspection.Definition.flow())
@@ -99,7 +101,29 @@ map = Jido.Flow.to_map(ShippingInspection.Definition.flow())
 %{kind: :call, needs: ["audit"], meta: %{team: "fulfillment"}} = List.last(map.components)
 ```
 
-The map is for Elixir code. References stay `Jido.Flow.Ref` structs and schemas stay Joi values, so a literal map cannot look like a reference. To get JSON, use [Store Flows as JSON](flow-storage.md).
+References stay `Jido.Flow.Ref` structs and schemas stay Joi values. For database storage, use the versioned JSON document. [Store Flows as JSON](flow-storage.md)
+
+## Edit an authoring map
+
+Keep the authoring map as the source for `Jido.Flow.new/1`. Update one Step, rebuild the Flow, and check its new dependencies.
+
+```elixir
+attrs = ShippingInspection.Definition.attrs()
+
+edited =
+  update_in(attrs.components, fn components ->
+    Enum.map(components, fn
+      %{name: "notify"} = step -> %{step | needs: ["reserve"]}
+      step -> step
+    end)
+  end)
+
+{:ok, revised} = Jido.Flow.new(edited)
+{:ok, %{dependencies: dependencies}} = Jido.Flow.explain(revised)
+%{needs: ["reserve"], references: ["label"]} = dependencies["notify"]
+```
+
+A reverse projection would need an editor use case with a defined source format. For example, an editor that must retain a single-option Selection needs its original declaration because a lowered Wait does not record which syntax produced it.
 
 ## Get everything at once
 
@@ -115,6 +139,8 @@ The map is for Elixir code. References stay `Jido.Flow.Ref` structs and schemas 
   description: "Reserve stock, buy a label, and notify the customer",
   components: [%{name: "audit"} | _],
   dependencies: %{"notify" => %{effective: ["audit", "label"]}},
+  requirements: [],
+  advisories: [],
   output: %Jido.Flow.Ref{source: :result, component: "notify"},
   identity: %{algorithm: :sha256}
 } = explanation
@@ -140,6 +166,10 @@ edited = put_in(flow.components["audit"].needs, ["notify"])
 `Jido.Flow.dependencies/1`, `Jido.Flow.explain/1`, and `Jido.Flow.semantic_identity/1` run the same check.
 
 These checks are inert, so they do not load a target. `Jido.Exec.compile/2` checks that each target is a usable Action or Flow and returns a Runic workflow. It also runs no Action.
+
+- Structural validation checks graph shape and references. Inspection reports `:waits` for authored Wait components. It can warn about a result field excluded by a loaded Action's closed output schema.
+- Preparation checks target callbacks, statically invalid outputs, and nested Wait restrictions. It leaves dynamic output expressions for execution.
+- The execution host checks support for suspension. Invoke can select a target at runtime, so inspect the selected target and use a host that supports its requirements. Runtime validation checks resolved result paths.
 
 ```elixir
 {:ok, %Runic.Workflow{}} = Jido.Exec.compile(ShippingInspection.Definition.flow(), [])

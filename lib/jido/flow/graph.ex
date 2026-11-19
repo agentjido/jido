@@ -5,12 +5,18 @@ defmodule Jido.Flow.Graph do
 
   @type named_component :: {String.t(), Component.component_node()}
   @type components :: %{optional(String.t()) => Component.component_node()}
+  @type dependency_info :: %{
+          needs: [String.t()],
+          references: [String.t()],
+          effective: [String.t()]
+        }
 
   @type analysis :: %{
           levels: %{optional(String.t()) => non_neg_integer()},
           remaining: [String.t()],
           ordered: [named_component()] | nil,
           dependencies: %{optional(String.t()) => [String.t()]},
+          dependency_info: %{optional(String.t()) => dependency_info()},
           terminals: [String.t()]
         }
 
@@ -22,10 +28,10 @@ defmodule Jido.Flow.Graph do
   end
 
   @doc false
-  @spec analyze(components()) :: analysis()
-  def analyze(components) when is_map(components) do
-    dependencies =
-      Map.new(components, fn {name, node} -> {name, effective_dependencies(node)} end)
+  @spec analyze(components() | {components(), %{String.t() => dependency_info()}}) :: analysis()
+  def analyze(input) do
+    {components, info} = dependency_input(input)
+    dependencies = Map.new(info, fn {name, deps} -> {name, deps.effective} end)
 
     graph = dependency_graph(dependencies)
     blocked = blocked_vertices(graph, components)
@@ -63,9 +69,15 @@ defmodule Jido.Flow.Graph do
       remaining: remaining,
       ordered: ordered,
       dependencies: dependencies,
+      dependency_info: info,
       terminals: terminals
     }
   end
+
+  defp dependency_input({components, info}), do: {components, info}
+
+  defp dependency_input(components),
+    do: {components, Map.new(components, fn {name, node} -> {name, dependency_info(node)} end)}
 
   @doc false
   @spec needs(Component.component_node()) :: [String.t()]
@@ -83,8 +95,15 @@ defmodule Jido.Flow.Graph do
 
   @doc false
   @spec effective_dependencies(Component.component_node()) :: [String.t()]
-  def effective_dependencies(node),
-    do: (needs(node) ++ reference_dependencies(node)) |> Enum.uniq() |> Enum.sort()
+  def effective_dependencies(node), do: dependency_info(node).effective
+
+  @doc false
+  @spec dependency_info(Component.component_node()) :: dependency_info()
+  def dependency_info(node) do
+    needs = needs(node)
+    references = reference_dependencies(node)
+    %{needs: needs, references: references, effective: Enum.sort(Enum.uniq(needs ++ references))}
+  end
 
   defp dependency_graph(dependencies) do
     graph =

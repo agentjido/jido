@@ -4,6 +4,7 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
 
   alias Jido.AI.{Context, Thread.Projection}
   alias Jido.AI.Context.Snapshot
+  alias Jido.AI.Reasoning.ReAct.Guards
 
   use Jido.Action,
     id: "jido.ai/reasoning/actions/record-model-attempt",
@@ -27,7 +28,9 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
 
   def run(params, _context) do
     turn = params.turn
-    outcome = params.outcome
+    guarded? = Guards.output?(turn)
+    rejected? = guarded? and not params.output_allowed
+    outcome = guarded_outcome(params.outcome, guarded?, rejected?)
     at = System.system_time(:millisecond)
     refs = %{request_id: turn.request_id, run_id: turn.run_id}
 
@@ -37,9 +40,9 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
       |> Snapshot.encode()
 
     after_snapshot =
-      params.context
-      |> Snapshot.for_attempt()
-      |> Snapshot.encode()
+      unless rejected? do
+        params.context |> Snapshot.for_attempt() |> Snapshot.encode()
+      end
 
     attempt = %{
       version: 1,
@@ -73,7 +76,7 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
            maybe_append_assistant(
              session,
              outcome,
-             params.context,
+             assistant_context(params.context, outcome, guarded?),
              params.output_allowed and persist_message,
              refs,
              at
@@ -90,6 +93,20 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
        }}
     end
   end
+
+  defp guarded_outcome(%{status: :ok} = outcome, true, true),
+    do: %{outcome | text: "", output: nil, tool_calls: []}
+
+  defp guarded_outcome(%{status: :error} = outcome, true, true),
+    do: %{outcome | reason: "model request failed"}
+
+  defp guarded_outcome(%{kind: :tool_calls} = outcome, true, false),
+    do: %{outcome | text: "", output: nil}
+
+  defp guarded_outcome(outcome, _guarded?, _rejected?), do: outcome
+
+  defp assistant_context(_context, _outcome, true), do: nil
+  defp assistant_context(context, _outcome, false), do: context
 
   defp maybe_append_assistant(
          session,

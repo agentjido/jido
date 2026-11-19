@@ -62,6 +62,20 @@ defmodule Jido.Signal.Bus.DurableSubscriptionTest do
       end)
     end
 
+    def commit_pending(agent) do
+      Agent.update(agent, fn state ->
+        {:ok, memory} = state.pending.(state.memory)
+        %{state | pending: nil, memory: memory}
+      end)
+    end
+
+    @impl true
+    def settle(agent) do
+      Agent.get(agent, fn state ->
+        if state.pending, do: {:error, :write_pending}, else: :ok
+      end)
+    end
+
     @impl true
     def init(opts) do
       case Keyword.fetch(opts, :agent) do
@@ -113,6 +127,13 @@ defmodule Jido.Signal.Bus.DurableSubscriptionTest do
               {:ok, memory} -> {{:ok, agent}, %{state | memory: memory, failures: failures}}
               {:error, reason} -> {{:error, reason}, %{state | failures: failures}}
             end
+
+          {{:committed, reason}, failures} ->
+            {:ok, memory} = function.(state.memory)
+            {{:error, reason}, %{state | memory: memory, failures: failures}}
+
+          {:pending, failures} ->
+            {{:error, :timeout}, %{state | pending: function, failures: failures}}
 
           {reason, failures} ->
             {{:error, reason}, %{state | failures: failures}}
@@ -435,6 +456,76 @@ defmodule Jido.Signal.Bus.DurableSubscriptionTest do
              Bus.subscribe(bus, "other.*", durable: "single-owner", target: other)
   end
 
+  test "reloads the saved cursor after an append with an unknown outcome" do
+    {bus, store} = start_controlled_bus()
+    first = signal("uncertain.first")
+    second = signal("uncertain.second")
+    assert {:ok, "recover"} = Bus.subscribe(bus, "uncertain.*", durable: "recover")
+    assert {:ok, _id} = Bus.subscribe(bus, "uncertain.*")
+
+    ControlledStore.fail_next(store, :append, {:committed, :timeout})
+    assert {:error, {:store_error, :append, :timeout}} = Bus.publish(bus, [first])
+
+    ControlledStore.fail_next(store, :latest_cursor, :unavailable)
+    assert {:error, {:store_recovery_failed, _}} = Bus.publish(bus, [second])
+
+    assert {:ok, [%RecordedSignal{cursor: 2, signal: ^second}]} = Bus.publish(bus, [second])
+    assert_receive {:signal, %Jido.Signal{} = first_live}
+    assert first_live == first
+    assert_receive {:signal, ^second}
+    assert_receive {:signal, "recover", %RecordedSignal{cursor: 1, signal: ^first}}
+    assert :ok = Bus.ack(bus, "recover", 1)
+    assert_receive {:signal, "recover", %RecordedSignal{cursor: 2, signal: ^second}}
+  end
+
+  test "waits for an outstanding append to settle before publishing again" do
+    {bus, store} = start_controlled_bus()
+    first = signal("pending.first")
+    second = signal("pending.second")
+    assert {:ok, _id} = Bus.subscribe(bus, "pending.*")
+
+    ControlledStore.fail_next(store, :append, :pending)
+    assert {:error, {:store_error, :append, :timeout}} = Bus.publish(bus, [first])
+
+    assert {:error, {:store_recovery_failed, {:store_error, :settle, :write_pending}}} =
+             Bus.publish(bus, [second])
+
+    refute_received {:signal, _}
+    ControlledStore.commit_pending(store)
+
+    assert {:ok, [%RecordedSignal{cursor: 2, signal: ^second}]} = Bus.publish(bus, [second])
+    assert_received {:signal, ^first}
+    assert_received {:signal, ^second}
+  end
+
+  test "reloads the store on the next call after an append cursor conflict" do
+    {bus, store} = start_controlled_bus()
+    first = signal("stale.first")
+    second = signal("stale.second")
+
+    assert {:ok, records, _, 2} = RecordedSignal.build([first], 1)
+    assert {:ok, ^store} = ControlledStore.append(records, store)
+
+    assert {:error, {:store_error, :append, :invalid_record_cursors}} = Bus.publish(bus, [second])
+    assert {:ok, [%RecordedSignal{cursor: 2, signal: ^second}]} = Bus.publish(bus, [second])
+  end
+
+  test "recovers a committed acknowledgment before the next write" do
+    {bus, store} = start_controlled_bus()
+    assert {:ok, "recover"} = Bus.subscribe(bus, "uncertain.*", durable: "recover")
+    assert {:ok, [_, _]} = Bus.publish(bus, [signal("uncertain.first"), signal("uncertain.second")])
+    assert_receive {:signal, "recover", %RecordedSignal{cursor: 1}}
+
+    reason = {:outcome_unknown, :connection_lost}
+    ControlledStore.fail_next(store, :put_subscription, {:committed, reason})
+    assert {:error, {:store_error, :put_subscription, ^reason}} = Bus.ack(bus, "recover", 1)
+
+    assert {:ok, [%RecordedSignal{cursor: 3}]} = Bus.publish(bus, [signal("uncertain.third")])
+    assert_receive {:signal, "recover", %RecordedSignal{cursor: 2}}
+    assert :ok = Bus.ack(bus, "recover", 2)
+    assert_receive {:signal, "recover", %RecordedSignal{cursor: 3}}
+  end
+
   test "permanently deletes a durable subscription" do
     bus = start_bus()
     assert {:ok, "old-agent"} = Bus.subscribe(bus, "old.*", durable: "old-agent")
@@ -568,7 +659,7 @@ defmodule Jido.Signal.Bus.DurableSubscriptionTest do
     {:ok, memory} = Jido.Signal.Bus.Store.Memory.init([])
 
     store =
-      start_supervised!({Agent, fn -> %{memory: memory, failures: %{}} end})
+      start_supervised!({Agent, fn -> %{memory: memory, failures: %{}, pending: nil} end})
 
     bus = start_bus(store: ControlledStore, store_opts: [agent: store])
     {bus, store}

@@ -152,8 +152,8 @@ defmodule Jido.Flow do
   alias Jido.Error
   alias Jido.Flow.DSL.ModuleCompiler
   alias Jido.Flow.Definition
-  alias Jido.Flow.Graph
   alias Jido.Flow.Identity
+  alias Jido.Flow.Inspection
 
   @schema Joi.struct(
             __MODULE__,
@@ -269,8 +269,8 @@ defmodule Jido.Flow do
   """
   @spec from_action(module()) :: {:ok, t()} | {:error, Exception.t()}
   def from_action(action) when is_atom(action) and action not in [nil, true, false] do
-    with {:ok, %Jido.Instruction{kind: :action}} <- Jido.Instruction.resolve(action),
-         :ok <- Jido.Instruction.validate(action) do
+    with {:ok, %Jido.Instruction{kind: :action} = instruction} <- Jido.Instruction.resolve(action),
+         :ok <- Jido.Instruction.validate_resolved(instruction) do
       new(%{
         name: "one_step_#{action_name(action)}",
         output_schema: Jido.Joi.any(),
@@ -324,10 +324,12 @@ defmodule Jido.Flow do
   end
 
   @doc """
-  Converts a Flow artifact to its deterministic semantic map.
+  Projects a Flow artifact as canonical inspection data.
 
-  Components use deterministic dependency order, then component name. Use
-  `Jido.Codec` for database storage.
+  Components use dependency order, then component name. A Step appears as a
+  `:call`, with its Action target and parameters in `:call`. Keep the authored
+  `:step` record for editing and rebuild it with `new/1`. Use `Jido.Codec` for
+  database storage.
   """
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = flow) do
@@ -352,8 +354,8 @@ defmodule Jido.Flow do
           {:ok, %{String.t() => dependency_info()}}
           | {:error, Error.ValidationError.t()}
   def dependencies(%__MODULE__{} = flow) do
-    with {:ok, flow} <- validate(flow) do
-      {:ok, dependency_map(flow)}
+    with {:ok, _attrs, analysis} <- Definition.prepare_canonical(Map.from_struct(flow)) do
+      {:ok, analysis.dependency_info}
     end
   end
 
@@ -361,10 +363,14 @@ defmodule Jido.Flow do
 
   @doc """
   Returns the versioned canonical inspection data for a Flow.
+
+  Reports requirements for authored components and advisory reference checks
+  based on available producer schemas. Dynamic targets can add requirements
+  at runtime. Exec still checks the actual values and the selected host.
   """
   @spec explain(t()) :: {:ok, map()} | {:error, Error.ValidationError.t()}
   def explain(%__MODULE__{} = flow) do
-    with {:ok, flow} <- validate(flow) do
+    with {:ok, flow, analysis} <- Definition.prepare_canonical(Map.from_struct(flow)) do
       {:ok,
        %{
          version: 1,
@@ -373,10 +379,12 @@ defmodule Jido.Flow do
          description: flow.description,
          schema: flow.schema,
          output_schema: flow.output_schema,
-         components: Definition.to_map(flow.components),
-         dependencies: dependency_map(flow),
+         components: Enum.map(analysis.ordered, &Definition.component_to_definition/1),
+         dependencies: analysis.dependency_info,
          output: flow.output,
-         identity: Identity.for_flow(flow)
+         requirements: Inspection.requirements(analysis.ordered),
+         advisories: Inspection.advisories(flow.output, analysis.ordered),
+         identity: Identity.for_flow(flow, analysis.ordered)
        }}
     end
   end
@@ -389,8 +397,8 @@ defmodule Jido.Flow do
   @spec semantic_identity(t()) ::
           {:ok, map()} | {:error, Error.ValidationError.t()}
   def semantic_identity(%__MODULE__{} = flow) do
-    with {:ok, flow} <- validate(flow) do
-      {:ok, Identity.for_flow(flow)}
+    with {:ok, flow, analysis} <- Definition.prepare_canonical(Map.from_struct(flow)) do
+      {:ok, Identity.for_flow(flow, analysis.ordered)}
     end
   end
 
@@ -415,20 +423,6 @@ defmodule Jido.Flow do
   @doc false
   @spec __validate_config__(map()) :: {:ok, map()} | {:error, Exception.t()}
   def __validate_config__(attrs), do: Jido.Instruction.Config.validate_flow(attrs)
-
-  defp dependency_map(flow) do
-    Map.new(flow.components, fn {name, node} ->
-      needs = Graph.needs(node)
-      references = Graph.reference_dependencies(node)
-
-      {name,
-       %{
-         needs: needs,
-         references: references,
-         effective: Enum.sort(Enum.uniq(needs ++ references))
-       }}
-    end)
-  end
 end
 
 defimpl Runic.Identity.Projectable, for: Jido.Flow do

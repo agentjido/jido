@@ -12,6 +12,7 @@ defmodule Jido.Flow.Preparation do
           {:ok, map(), Graph.analysis(), map()} | {:error, Exception.t()}
   def prepare(flow, module_stack, children) when is_map(flow) do
     with {:ok, attrs, analysis} <- Definition.prepare_canonical(flow_attrs(flow)),
+         :ok <- validate_output(attrs, module_stack != []),
          {:ok, children} <-
            Validation.validate_component_targets(
              analysis.ordered,
@@ -22,6 +23,23 @@ defmodule Jido.Flow.Preparation do
       {:ok, attrs, analysis, children}
     end
   end
+
+  defp validate_output(%{output: value, output_schema: schema}, module?)
+       when is_number(value) or is_binary(value) or is_atom(value) or is_list(value) do
+    plain_map? = Jido.Joi.Schema.kind(schema) == :map and Map.get(schema, :coerce) != true
+
+    if module? or plain_map? do
+      {:error,
+       Error.validation_error("Flow output must be a map", %{
+         path: [:output],
+         phase: :flow_output
+       })}
+    else
+      :ok
+    end
+  end
+
+  defp validate_output(_attrs, _module?), do: :ok
 
   @doc false
   @spec from_instruction(Instruction.t()) :: {:ok, map()} | {:error, Exception.t()}
@@ -52,16 +70,6 @@ defmodule Jido.Flow.Preparation do
            kind: kind,
            reason: reason
          })}
-    end
-  end
-
-  defp prepare_child(child, module_stack, children) when is_map(child) do
-    if flow?(child) do
-      with {:ok, _attrs, _analysis, children} <-
-             prepare(child, [child | module_stack], children),
-           do: {:ok, children}
-    else
-      {:error, Error.config_error("nested Flow target contains invalid data", %{value: child})}
     end
   end
 

@@ -100,13 +100,16 @@ defmodule Jido.Persistence.Record do
   end
 
   @doc false
-  @spec decode(term(), Config.t()) :: {:ok, term()} | {:error, :invalid_persistence_record}
-  def decode(value, %Config{} = config) do
+  @spec decode(term(), Config.t(), keyword()) :: {:ok, term()} | {:error, term()}
+  def decode(value, config, opts \\ [])
+
+  def decode(value, %Config{} = config, opts) do
     _ = Code.ensure_loaded?(Jido.Persistence.Snapshot)
     _ = Code.ensure_loaded?(Jido.Signal)
 
-    case Config.decode(config, value) do
+    case Config.decode(config, value, opts) do
       {:ok, record} -> {:ok, record}
+      {:error, {:unavailable_persistence_module, _name}} = error -> error
       {:error, _reason} -> {:error, :invalid_persistence_record}
     end
   end
@@ -175,7 +178,7 @@ defmodule Jido.Persistence.Record do
   end
 
   defp validate_exact_shape(%{fmt: _, kind: :active} = record) do
-    optional = Enum.filter([:server_turn, :topology_handoffs], &Map.has_key?(record, &1))
+    optional = Enum.filter([:server_turn, :topology_handoffs, :topology_owner], &Map.has_key?(record, &1))
     exact_keys(record, @active_keys ++ optional)
   end
 
@@ -214,8 +217,26 @@ defmodule Jido.Persistence.Record do
     with :ok <- validate_checkpoint(record),
          :ok <- validate_agent_vsn(record),
          :ok <- validate_server_turn(Map.get(record, :server_turn)),
+         :ok <- validate_topology_owner(record),
          do: validate_topology_handoffs(topology_handoffs(record))
   end
+
+  @doc false
+  def put_topology_owner(record, nil), do: record
+  def put_topology_owner(record, owner), do: Map.put(record, :topology_owner, owner)
+
+  defp validate_topology_owner(%{topology_owner: %{address: %Address{} = owner, slot: slot} = placement} = record)
+       when is_binary(slot) and map_size(placement) == 2 do
+    if match?({:ok, _}, Address.validate(owner)) and
+         owner.namespace == record.namespace and owner.partition == record.partition and
+         String.starts_with?(slot, "$topology/") and
+         String.starts_with?(record.agent_id, owner.id <> "/" <> slot <> "/"),
+       do: :ok,
+       else: invalid(:topology_owner)
+  end
+
+  defp validate_topology_owner(%{topology_owner: _}), do: invalid(:topology_owner)
+  defp validate_topology_owner(_record), do: :ok
 
   @doc false
   def empty_topology_handoffs, do: %{outbox: [], accepted: %{}}
@@ -232,12 +253,17 @@ defmodule Jido.Persistence.Record do
   defp validate_topology_handoffs(%{outbox: outbox, accepted: accepted} = handoffs)
        when map_size(handoffs) == 2 and is_list(outbox) and is_map(accepted) do
     if Enum.all?(outbox, &valid_topology_send?/1) and
-         Enum.all?(accepted, fn {id, value} -> is_binary(id) and id != "" and value == true end),
+         Enum.all?(accepted, &valid_topology_receipt?/1),
        do: :ok,
        else: invalid(:topology_handoffs)
   end
 
   defp validate_topology_handoffs(_handoffs), do: invalid(:topology_handoffs)
+
+  defp valid_topology_receipt?({id, sender}) when is_binary(id) and id != "",
+    do: sender == true or match?({:ok, _}, Address.validate(sender))
+
+  defp valid_topology_receipt?(_receipt), do: false
 
   defp valid_topology_send?(%{id: id, to: %Address{} = to, signal: %Jido.Signal{}} = send)
        when is_binary(id) and id != "" and map_size(send) == 3 do

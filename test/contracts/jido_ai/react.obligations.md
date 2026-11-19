@@ -1,6 +1,7 @@
 ---
 modules:
   - Jido.AI.Reasoning.ReAct
+  - Jido.AI.Reasoning.ReAct.Guards
   - Jido.AI.Reasoning.ReAct.Actions.Advance
   - Jido.AI.Reasoning.ReAct.Actions.Initialize
   - Jido.AI.Reasoning.ReAct.Actions.DecideNext
@@ -84,4 +85,11 @@ model-execution, conversation, and tools components.
 - **scope:** ReAct loop initialization, completion, and review
 - **must:** Keep the Turn in the terminal decision and omit the redundant top-level Turn. Preserve the Session, outcome, and effects used by the continuation.
 - **kind:** functional
+- **status:** active
+
+### jido_ai.react.I10 — Agent guard Actions apply through durable resume
+
+- **scope:** `Jido.AI.Reasoning.ReAct.Guards` and stock ReAct
+- **must:** Apply an Agent input guard before model work and an Agent output guard before saving or publishing final reply content. Retain both targets across a tool-review wait. Send progress without provider chunks when there is an output guard. Dispatch approved output after the hosted Agent commits. Exclude rejected reply content from the committed Session.
+- **kind:** ordering
 - **status:** active

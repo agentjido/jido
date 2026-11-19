@@ -4,6 +4,7 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
 
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.InferenceClient.Selection
+  alias Jido.AI.Reasoning.ReAct.Guards
   alias Jido.AI.{Budget, Toolset, Usage}
   alias Jido.Telemetry.AI, as: Telemetry
 
@@ -190,10 +191,15 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
 
     sequence_counter = :atomics.new(1, [])
 
-    on_chunk = fn chunk ->
-      sequence = :atomics.add_get(sequence_counter, 1, 1)
-      publish_chunk(chunk, sequence, turn, stream_id, context)
-    end
+    on_chunk =
+      if Guards.output?(turn) do
+        fn _chunk -> :ok end
+      else
+        fn chunk ->
+          sequence = :atomics.add_get(sequence_counter, 1, 1)
+          publish_chunk(chunk, sequence, turn, stream_id, context)
+        end
+      end
 
     result =
       with {:ok, client} <- selected_client(context),
@@ -237,9 +243,11 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
   end
 
   defp publish_stream_failure(reason, turn, stream_id, sequence, context) do
+    reason = if Guards.output?(turn), do: "model request failed", else: error_message(reason)
+
     data =
       correlation(turn, stream_id, sequence, System.system_time(:millisecond))
-      |> Map.put(:reason, error_message(reason))
+      |> Map.put(:reason, reason)
 
     _result = dispatch_stream_signal(context, "jido.ai.model.stream.failed", data)
     :ok

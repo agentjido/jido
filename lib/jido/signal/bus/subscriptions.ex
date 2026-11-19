@@ -102,6 +102,9 @@ defmodule Jido.Signal.Bus.Subscriptions do
   @spec validate_loaded_cursors(map(), non_neg_integer()) :: :ok | {:error, atom()}
   defdelegate validate_loaded_cursors(subscriptions, latest_cursor), to: DurableSubscription
 
+  @doc false
+  defdelegate recover(state, subscriptions), to: DurableSubscription
+
   defp validate_options(opts) do
     case Enum.find(Keyword.keys(opts), &(&1 not in @subscription_options)) do
       nil ->

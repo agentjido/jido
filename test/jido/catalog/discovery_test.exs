@@ -241,6 +241,25 @@ defmodule Jido.Catalog.DiscoveryTest do
     assert Discovery.get("discovery_test/scanned", 1) == nil
   end
 
+  test "a refresh with equal contents still takes precedence over an in-progress scan" do
+    opts = [applications: [], modules: [{AlphaAction, :jido}]]
+    assert :ok = Discovery.refresh(opts)
+    Process.register(self(), __MODULE__)
+
+    scan =
+      Task.async(fn ->
+        Discovery.initialize(applications: [], modules: [{BlockingManifest, :jido}])
+      end)
+
+    assert_receive {:scan_started, scanner}, 5_000
+    assert :ok = Discovery.refresh(opts)
+    send(scanner, :continue)
+    assert :ok = Task.await(scan, 5_000)
+
+    assert %{target: AlphaAction} = Discovery.get_by_target(AlphaAction)
+    assert Discovery.get("discovery_test/scanned", 1) == nil
+  end
+
   test "a scan with no competing refresh replaces the published Catalog" do
     assert :ok = Discovery.refresh(applications: [], modules: [{AlphaAction, :jido}])
     Process.register(self(), __MODULE__)

@@ -2,6 +2,7 @@ defmodule Jido.AI.Reasoning.Actions.GuardOutput do
   alias Jido.Joi
   @moduledoc "Applies final-answer guards to one model outcome."
 
+  alias Jido.AI.Reasoning.ReAct.Guards
   alias Jido.AI.Toolset
   alias Jido.Telemetry.AI, as: Telemetry
 
@@ -33,7 +34,7 @@ defmodule Jido.AI.Reasoning.Actions.GuardOutput do
     {:ok, decision(reason)}
   end
 
-  def run(%{turn: turn, outcome: %{kind: :final_answer, text: text} = outcome}, context) do
+  def run(%{turn: turn, outcome: %{kind: :final_answer, text: text} = outcome} = params, context) do
     observe_token_limit(turn, outcome, context)
 
     output = Map.get(outcome, :output)
@@ -64,7 +65,7 @@ defmodule Jido.AI.Reasoning.Actions.GuardOutput do
             nil
         end
 
-    {:ok, decision(reason)}
+    Guards.check({:ok, decision(reason)}, :output, params, context)
   end
 
   defp tool_call_reason([], _turn, _outcome, _context),

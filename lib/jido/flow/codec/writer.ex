@@ -9,10 +9,10 @@ defmodule Jido.Flow.Codec.Writer do
   alias Jido.Flow.Codec.{Limits, Value}
 
   @doc false
-  @spec encode(Jido.Flow.t(), Catalog.source()) ::
+  @spec encode(map(), [Graph.named_component()], Catalog.source()) ::
           {:ok, map()} | {:error, Exception.t()}
-  def encode(flow, registry) do
-    case do_encode(flow, registry) do
+  def encode(flow, ordered, registry) do
+    case do_encode(flow, ordered, registry) do
       {:error, %CatalogError{} = error} ->
         {:error, Value.catalog_error(error)}
 
@@ -21,11 +21,11 @@ defmodule Jido.Flow.Codec.Writer do
     end
   end
 
-  defp do_encode(flow, registry) do
+  defp do_encode(flow, ordered, registry) do
     with {:ok, schema} <- encode_schema(flow.schema, registry),
          {:ok, output_schema} <- encode_schema(flow.output_schema, registry),
          {:ok, components} <-
-           sequence(Graph.canonical_components(flow.components), fn {name, node} ->
+           sequence(ordered, fn {name, node} ->
              record = Map.put(node, :name, name)
 
              case record(

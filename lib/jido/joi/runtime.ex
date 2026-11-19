@@ -32,12 +32,21 @@ defmodule Jido.Joi.Runtime do
     end
   end
 
-  def parse(schema, input, mode) do
-    input =
-      if mode == :initialize and is_nil(input) and Meta.default?(schema.meta),
-        do: Meta.default(schema.meta),
-        else: input
+  def parse(schema, nil, :initialize) do
+    case parse_value(schema, nil, :initialize) do
+      {:error, _} = error ->
+        if Meta.default?(schema.meta),
+          do: parse_value(schema, Meta.default(schema.meta), :initialize),
+          else: error
 
+      valid ->
+        valid
+    end
+  end
+
+  def parse(schema, input, mode), do: parse_value(schema, input, mode)
+
+  defp parse_value(schema, input, mode) do
     with {:ok, value} <- parse_type(schema, input, mode),
          do: refine(schema, value)
   end
@@ -101,14 +110,9 @@ defmodule Jido.Joi.Runtime do
 
   defp children(value, _mode), do: value
 
-  defp defaults(%{fields: fields} = schema, input, :initialize)
+  defp defaults(%{fields: fields}, input, :initialize)
        when is_list(fields) and is_map(input) do
     Enum.reduce(fields, input, fn {key, child}, acc ->
-      acc =
-        if Map.get(acc, key) in Map.get(schema, :empty_values, []),
-          do: Map.delete(acc, key),
-          else: acc
-
       if not Map.has_key?(acc, key) and child.meta.required != false and
            Meta.default?(child.meta),
          do: Map.put(acc, key, Meta.default(child.meta)),

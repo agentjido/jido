@@ -661,7 +661,7 @@ defmodule Jido.Error do
 
   defp public_details(%struct{errors: errors}, remaining_causes)
        when struct in [Invalid, Execution, Routing, Timeout, Internal] and is_list(errors) do
-    %{errors: Enum.map(errors, &maybe_error_map(&1, remaining_causes))}
+    %{errors: project_group(errors, &maybe_error_map(&1, remaining_causes))}
   end
 
   defp public_details(%{details: details}, _remaining_causes), do: sanitize_details(details)
@@ -813,14 +813,20 @@ defmodule Jido.Error do
   defp transport_string(%{"message" => message}, depth), do: transport_string(message, depth - 1)
   defp transport_string(value, _depth), do: value |> sanitize_transport() |> safe_inspect()
 
-  defp safe_exception_message(%{class: _class, errors: errors} = error)
+  defp safe_exception_message(error, depth \\ @transport_max_causes)
+  defp safe_exception_message(_error, 0), do: @depth_limit
+
+  defp safe_exception_message(%{class: _class, errors: errors} = error, depth)
        when is_exception(error) and is_list(errors) do
     errors
-    |> Enum.map_join("; ", &safe_exception_message/1)
-    |> truncate_string()
+    |> project_group(&safe_exception_message(&1, depth - 1))
+    |> case do
+      messages when is_list(messages) -> messages |> Enum.join("; ") |> truncate_string()
+      fallback -> fallback
+    end
   end
 
-  defp safe_exception_message(error) do
+  defp safe_exception_message(error, _depth) do
     error
     |> Exception.message()
     |> truncate_string()
@@ -829,6 +835,21 @@ defmodule Jido.Error do
   catch
     _kind, _reason -> safe_inspect(error)
   end
+
+  defp project_group(errors, project) do
+    case group_prefix(errors, @transport_max_items, []) do
+      items when is_list(items) -> Enum.map(items, project)
+      fallback -> fallback
+    end
+  end
+
+  defp group_prefix(_errors, 0, acc), do: Enum.reverse(acc)
+  defp group_prefix([], _remaining, acc), do: Enum.reverse(acc)
+
+  defp group_prefix([error | rest], remaining, acc),
+    do: group_prefix(rest, remaining - 1, [error | acc])
+
+  defp group_prefix(_tail, _remaining, _acc), do: "[IMPROPER LIST]"
 
   defp sanitize_utf8(value), do: String.replace_invalid(value)
 

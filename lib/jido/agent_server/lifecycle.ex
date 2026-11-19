@@ -363,14 +363,26 @@ defmodule Jido.AgentServer.Lifecycle do
              config,
              data.agent,
              mode,
-             [reason: :activate] ++ persistence_options(data)
+             [reason: :activate, topology_owner: topology_owner(data)] ++ persistence_options(data)
            ),
          {:ok, agent} <- Validation.validate_instance(agent),
          {:ok, revision, turn} <- settle_unreleased_handoff(data, config, agent, revision, turn),
-         :ok <- validate_continuation(agent, turn) do
+         :ok <- validate_continuation(agent, turn),
+         :ok <- reconcile_owned_member(data) do
       {:ok, agent, revision, agent_revision, config, turn, handoffs}
     end
   end
+
+  defp reconcile_owned_member(%{jido: instance, agent_address: address, parent: %{tag: "$topology/" <> _}})
+       when is_atom(instance) and not is_nil(instance),
+       do: Jido.Instance.RuntimeStore.delete(instance, :agent_reconciliation, address)
+
+  defp reconcile_owned_member(_data), do: :ok
+
+  defp topology_owner(%{parent: %{tag: "$topology/" <> _ = slot, agent_id: id}, agent_address: address}),
+    do: %{address: %{address | id: id}, slot: slot}
+
+  defp topology_owner(_data), do: nil
 
   def save(data, agent, revision, expected_revision, server_turn, opts \\ []) do
     persistence_opts =
@@ -540,7 +552,7 @@ defmodule Jido.AgentServer.Lifecycle do
     # Keep the preparation stable across attempts. The Agent receipt holds the
     # admitted Signal, Plugin input, and expiry for the attempt that commits.
     preparation =
-      if data.active.topology_accept_from,
+      if data.active.topology_acceptance,
         do: %{topology_handoff_id: receipt.id, signal: receipt.signal},
         else: receipt
 

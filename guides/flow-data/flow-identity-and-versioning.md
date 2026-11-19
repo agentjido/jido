@@ -180,6 +180,20 @@ Jido has several version numbers, and each one answers a different question. A d
 
 A Flow module's `id:` defaults to its module name, such as `"Elixir.MyApp.Refunds"`. Set an explicit `id:` for any module that a stored document references, so that renaming the module does not break those documents. A module's `id:` and `vsn:` are not part of the Flow identity.
 
+## Resume durable work after a deployment
+
+Durable execution also stores an executable fingerprint. It covers the complete root Flow value and the loaded code version of its referenced Actions and Subflows. For a module-backed root, it also covers the loaded root module version.
+
+| Change | Module-backed root | Direct Flow value |
+| --- | --- | --- |
+| Root description or component metadata | Rejects resume with changed code | Saved value resumes. Reusing its ID with the edited value fails. |
+| Root input or output schema | Rejects resume | Saved value resumes. Reusing its ID with the edited value fails. |
+| Root graph behavior or parameters | Rejects resume | Saved value resumes. Reusing its ID with the edited value fails. |
+| Loaded Action or Subflow version | Rejects resume | Rejects resume |
+| Catalog registration for the same loaded target | Compatible | Compatible |
+
+Keep the exact executable definitions available until pending work completes. Before you replace them, drain the pending runs or keep the old modules available under their existing names and route new work to versioned targets. A mismatch returns `:execution_definition_changed`. Restore the compatible code to resume the saved work. Keep any new execution separate from the old execution ID.
+
 ## Change an Action behind stored documents
 
 Stored documents pin each target to a Catalog ID and version. To change an Action's behavior without changing old documents, add a new module under the next version and keep both in the Catalog.

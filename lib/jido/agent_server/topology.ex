@@ -523,16 +523,59 @@ defmodule Jido.AgentServer.Topology do
 
   def durable_destination(_target, _context), do: {:error, :unsupported_durable_topology_target}
 
-  def deliver_handoff(instance, %{id: id, to: address, signal: signal}) do
+  @doc false
+  def inactive_member_reason(instance, member, %{address: owner, slot: slot}) do
+    with pid when is_pid(pid) <- Server.whereis(instance, owner.id, partition: owner.partition),
+         {:ok, context} <- child_context(pid, System.monotonic_time(:millisecond) + @handoff_attempt_timeout) do
+      plan = Map.get(plans(context.state), slot)
+
+      cond do
+        :ets.member(context.state, {:topology_removed_member, slot}) ->
+          :topology_member_removed
+
+        plan != nil and member_id(owner.id, slot, plan) != member.id ->
+          :topology_member_retired
+
+        plan == nil and context.ready? ->
+          :topology_member_retired
+
+        true ->
+          :topology_member_unavailable
+      end
+    else
+      _ -> :topology_owner_required
+    end
+  rescue
+    ArgumentError -> :topology_owner_required
+  end
+
+  def deliver_handoff(instance, sender, %{id: id, to: address, signal: signal}) do
     with :error <- Jido.Instance.RuntimeStore.fetch(instance, :agent_reconciliation, address),
          pid when is_pid(pid) <- Server.whereis(instance, address.id, partition: address.partition),
          {:ok, deadline} <- Lifecycle.admission_deadline(admission_timeout: @handoff_attempt_timeout) do
-      :gen_statem.call(pid, {:accept_topology_handoff, id, address, signal, deadline}, @handoff_attempt_timeout)
+      :gen_statem.call(pid, {:accept_topology_handoff, id, address, signal, deadline, sender}, @handoff_attempt_timeout)
     else
+      nil -> unavailable_handoff(instance, address)
       _unavailable -> {:error, :topology_receiver_unavailable}
     end
   catch
     :exit, _reason -> {:error, :topology_receiver_unavailable}
+  end
+
+  defp unavailable_handoff(instance, address) do
+    case Jido.Persistence.topology_destination_owner(instance, address) do
+      {:ok, owner} when not is_nil(owner) ->
+        case inactive_member_reason(instance, address, owner) do
+          reason when reason in [:topology_member_removed, :topology_member_retired] -> {:discard, reason}
+          _ -> {:error, :topology_receiver_unavailable}
+        end
+
+      {:error, :deleted} ->
+        {:discard, :topology_receiver_deleted}
+
+      _ ->
+        {:error, :topology_receiver_unavailable}
+    end
   end
 
   defp member_id(parent_id, tag, %{identity: nil}), do: parent_id <> "/" <> tag

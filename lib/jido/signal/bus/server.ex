@@ -13,11 +13,8 @@ defmodule Jido.Signal.Bus.Server do
   @impl GenServer
   def init({name, opts}) do
     with {:ok, store_module, store_state} <- init_store(opts),
-         {:ok, definitions} <- Store.read(store_module, store_state, :list_subscriptions, []),
-         {:ok, latest_cursor} <- Store.read(store_module, store_state, :latest_cursor, []),
-         :ok <- validate_latest_cursor(latest_cursor),
-         {:ok, subscriptions, router} <- Subscriptions.load(definitions),
-         :ok <- Subscriptions.validate_loaded_cursors(subscriptions, latest_cursor) do
+         {:ok, latest_cursor, subscriptions, router} <-
+           load_store(%{store_module: store_module, store_state: store_state}) do
       {:ok,
        %{
          name: name,
@@ -28,6 +25,7 @@ defmodule Jido.Signal.Bus.Server do
          monitors: %{},
          store_module: store_module,
          store_state: store_state,
+         store_dirty?: false,
          next_cursor: latest_cursor + 1
        }}
     else
@@ -40,10 +38,24 @@ defmodule Jido.Signal.Bus.Server do
   end
 
   @impl GenServer
+  def handle_call(request, from, %{store_dirty?: true} = state) do
+    with :ok <- Store.settle(state),
+         {:ok, latest_cursor, subscriptions, _router} <- load_store(state),
+         {:ok, recovered} <- recover_publications(state, latest_cursor) do
+      state = %{state | next_cursor: latest_cursor + 1, store_dirty?: false}
+      state = Subscriptions.recover(state, subscriptions)
+      state = Enum.reduce(recovered, state, &Subscriptions.deliver_published(&2, &1.signal))
+      handle_call(request, from, state)
+    else
+      {:error, reason} ->
+        {:reply, {:error, {:store_recovery_failed, reason}}, state}
+    end
+  end
+
   def handle_call({:subscribe, path, opts}, _from, state) do
     case Subscriptions.subscribe(state, path, opts) do
       {:ok, id, state} -> {:reply, {:ok, id}, state}
-      {:error, reason, state} -> {:reply, {:error, reason}, state}
+      {:error, reason, state} -> reply_error(reason, state)
     end
   end
 
@@ -57,7 +69,7 @@ defmodule Jido.Signal.Bus.Server do
   def handle_call({:delete_subscription, subscription_id}, _from, state) do
     case Subscriptions.delete(state, subscription_id) do
       {:ok, state} -> {:reply, :ok, state}
-      {:error, reason} -> {:reply, {:error, reason}, state}
+      {:error, reason} -> reply_error(reason, state)
     end
   end
 
@@ -79,7 +91,7 @@ defmodule Jido.Signal.Bus.Server do
         {:reply, {:ok, records}, state}
 
       {:error, reason, state} ->
-        {:reply, {:error, reason}, state}
+        reply_error(reason, state)
     end
   end
 
@@ -90,7 +102,7 @@ defmodule Jido.Signal.Bus.Server do
   def handle_call({:ack, durable_id, cursor}, {caller, _tag}, state) do
     case Subscriptions.acknowledge(state, durable_id, cursor, caller) do
       {:ok, state} -> {:reply, :ok, state}
-      {:error, reason, state} -> {:reply, {:error, reason}, state}
+      {:error, reason, state} -> reply_error(reason, state)
     end
   end
 
@@ -107,6 +119,25 @@ defmodule Jido.Signal.Bus.Server do
   end
 
   def format_status(status), do: status
+
+  defp reply_error(reason, state),
+    do: {:reply, {:error, reason}, %{state | store_dirty?: Store.recovery_required?(reason)}}
+
+  defp recover_publications(%{next_cursor: next} = state, latest) when latest >= next,
+    do: replay(state, "**", after: next - 1, limit: latest - next + 1)
+
+  defp recover_publications(%{next_cursor: next}, latest) when latest == next - 1, do: {:ok, []}
+  defp recover_publications(_state, _latest), do: {:error, :invalid_store_cursor}
+
+  defp load_store(state) do
+    with {:ok, definitions} <- Store.read(state, :list_subscriptions, []),
+         {:ok, latest_cursor} <- Store.read(state, :latest_cursor, []),
+         :ok <- validate_latest_cursor(latest_cursor),
+         {:ok, subscriptions, router} <- Subscriptions.load(definitions),
+         :ok <- Subscriptions.validate_loaded_cursors(subscriptions, latest_cursor) do
+      {:ok, latest_cursor, subscriptions, router}
+    end
+  end
 
   defp publish(state, signals) do
     with {:ok, stored_records, entries, next_cursor} <-

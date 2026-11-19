@@ -5,6 +5,7 @@ defmodule Jido.Exec.Compile.InvokeTest do
   alias Jido.Exec.Node.Invoke
   alias Jido.Flow
   alias Jido.Flow.Ref
+  alias Jido.Instruction
   alias Runic.Workflow
 
   defmodule Decide do
@@ -36,6 +37,26 @@ defmodule Jido.Exec.Compile.InvokeTest do
     def run(params, _context), do: {:continue, params, Child}
   end
 
+  defmodule RawInput do
+    use Jido.Action, name: "compiled_invoke_raw"
+
+    @impl true
+    def on_before_validate_params(input) when is_map(input), do: {:ok, input}
+    def on_before_validate_params(input), do: {:ok, %{value: input}}
+
+    @impl true
+    def run(input, _context), do: {:ok, input}
+  end
+
+  defmodule ContinueBound do
+    use Jido.Action, name: "compiled_invoke_bound"
+
+    def run(params, _context) do
+      {:ok, instruction} = Instruction.bind(Instruction.template(:action, RawInput), "bound", %{})
+      {:continue, if(params.value == :bound, do: %{}, else: params), instruction}
+    end
+  end
+
   test "compile lowers one Invoke to one dedicated Runic Invoke component" do
     assert {:ok, %Workflow{} = workflow} =
              Exec.compile(invoke_flow("compiled_invoke_shape", ContinueAction), [])
@@ -54,8 +75,28 @@ defmodule Jido.Exec.Compile.InvokeTest do
   end
 
   test "Invoke can compile and run a dynamic Flow target" do
-    assert Exec.run(invoke_flow("compiled_invoke_flow", ContinueFlow), %{value: 7}) ==
-             {:ok, %{value: 8}, [:decision, :finish]}
+    flow = invoke_flow("compiled_invoke_flow", ContinueFlow)
+    assert {:ok, %{requirements: [], advisories: []}} = Flow.explain(flow)
+    assert Exec.run(flow, %{value: 7}) == {:ok, %{value: 8}, [:decision, :finish]}
+  end
+
+  test "Exec delivers raw bound inputs to the target hook" do
+    template = Instruction.template(:action, RawInput)
+
+    for raw <- ["bound", nil, ["raw", "list"]] do
+      assert {:ok, bound} = Instruction.bind(template, raw, %{})
+      assert Exec.run(bound) == {:ok, %{value: raw}}
+      assert Exec.run(bound, %{value: "replacement"}) == {:ok, %{value: "replacement"}}
+    end
+
+    {:ok, keyword} = Instruction.bind(template, [keep: true, value: :keyword], %{})
+    assert Exec.run(keyword, %{value: "override"}) == {:ok, %{keep: true, value: "override"}}
+  end
+
+  test "Invoke uses a raw bound input or replaces it with explicit parameters" do
+    flow = invoke_flow("compiled_invoke_bound_input", ContinueBound)
+    assert Exec.run(flow, %{value: :bound}) == {:ok, %{value: "bound"}, [:decision]}
+    assert Exec.run(flow, %{value: "replacement"}) == {:ok, %{value: "replacement"}, [:decision]}
   end
 
   test "a rebuilt Invoke can compile its dynamic Flow target" do

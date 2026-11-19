@@ -128,6 +128,44 @@ defmodule Jido.Flow.UnknownKeyValidationTest do
     end
   end
 
+  test "only Selection accepts options in Wait authoring" do
+    timer = %{kind: :timer, name: "timer", after_ms: 10}
+    event = %{kind: :await, name: "approval", event: "approuvé"}
+    selection = %{kind: :selection, name: "select", options: [event, timer]}
+
+    for component <- [timer, event] do
+      assert {:error, %ValidationError{details: %{path: [:components, 0, :options], key: :options}}} =
+               Flow.new(%{name: "wait", components: [Map.put(component, :options, [])], output: %{}})
+    end
+
+    assert {:ok, %Flow{components: %{"select" => %{options: [first, second]}}}} =
+             Flow.new(%{name: "wait", components: [selection], output: %{}})
+
+    assert %{name: "approval", event: "approuvé"} = first
+    assert %{name: "timer", after_ms: 10} = second
+  end
+
+  test "Await event names must be valid UTF-8 in authoring and storage" do
+    invalid = <<255>>
+    await = %{kind: :await, name: "approval", event: invalid}
+    selection = %{kind: :selection, name: "select", options: [await]}
+
+    for component <- [await, selection] do
+      assert {:error, %ValidationError{details: %{path: [:components, 0, :options, 0, :event]}}} =
+               Flow.new(%{name: "wait", components: [component], output: %{}})
+    end
+
+    flow = Flow.new!(%{name: "wait", components: [%{await | event: "approuvé"}], output: %{}})
+    catalog = Catalog.from_targets!(__MODULE__, :jido, %{{"map", 1} => Jido.Joi.map()})
+    assert {:ok, document} = Codec.encode(flow, catalog)
+    [component] = document["components"]
+    [option] = component["options"]
+    invalid_component = %{component | "options" => [%{option | "event" => invalid}]}
+
+    assert {:error, %ValidationError{details: %{path: ["components", 0, "options", 0, "event"]}}} =
+             Codec.decode(%{document | "components" => [invalid_component]}, catalog)
+  end
+
   test "Codec rejects unknown root and component fields" do
     flow =
       Flow.new!(%{

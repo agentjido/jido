@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 95,
+      "active": 96,
       "coverage": 1.0,
-      "covered": 95
+      "covered": 96
     },
     "jido.agent_server": {
       "active": 15,
@@ -21,9 +21,9 @@
       "covered": 53
     },
     "jido_ai": {
-      "active": 45,
+      "active": 46,
       "coverage": 1.0,
-      "covered": 45
+      "covered": 46
     }
   },
   "components": {
@@ -563,10 +563,10 @@
       }
     },
     "jido.agent_server": {
-      "active": 12,
+      "active": 13,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 12,
+      "covered": 13,
       "form": "light",
       "obligations": {
         "jido.agent_server.I1": {
@@ -673,10 +673,12 @@
         "jido.agent_server.I14": {
           "failing": 0,
           "kind": "functional",
-          "passing": 0,
-          "status": "retired",
-          "testable": false,
-          "tests": []
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test each submission uses a queue slot even when Turn IDs match"
+          ]
         },
         "jido.agent_server.I15": {
           "failing": 0,
@@ -1123,25 +1125,34 @@
         "jido.agent_server.composition.I11": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 4,
+          "passing": 10,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a conflicting activation returns its original registration error",
+            "test a member clears its recovery fence only under its owner",
+            "test a removed member cannot activate outside its owner",
             "test a timed out removal closes admission and a retry finishes cleanup",
             "test explicit cancellation stops an accepted pre-commit turn",
+            "test legacy slash-named members remain owned after owner deletion",
             "test removal keeps durable child state for a replacement root activation",
-            "test removal stops one selected subtree and keeps the root and sibling alive"
+            "test removal stops one selected subtree and keeps the root and sibling alive",
+            "test the instance restarts exec_runner and explicit activation restores the family",
+            "test the instance restarts registry and explicit activation restores the family"
           ]
         },
         "jido.agent_server.composition.I12": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 9,
+          "passing": 12,
           "status": "active",
           "testable": true,
           "tests": [
             "test a confirmed prune rejection leaves the sender available and retries cleanup",
+            "test a full legacy receipt history preserves retries and declines new IDs",
+            "test a later outbox head replaces the same sender's settled receipt",
             "test a quiesced receiver keeps the send recoverable",
+            "test a removed destination releases the next handoff after sender recovery",
             "test a retry reuses its preparation after a receiver dies before accepting",
             "test a slot marked for removal rejects new durable sends before commit",
             "test an expired or malformed delivery does not admit a Turn",
@@ -1814,10 +1825,11 @@
         "jido.error.I4": {
           "failing": 0,
           "kind": "security",
-          "passing": 43,
+          "passing": 44,
           "status": "active",
           "testable": true,
           "tests": [
+            "test bounds projected groups and the child messages they render",
             "test to_map/1 converts execution error to map with type execution_error",
             "test to_map/1 converts execution error with phase: :planning to map with type planning_error",
             "test to_map/1 converts internal error to map with type internal",
@@ -1893,7 +1905,7 @@
         "jido.error.I6": {
           "failing": 0,
           "kind": "functional",
-          "passing": 32,
+          "passing": 33,
           "status": "active",
           "testable": true,
           "tests": [
@@ -1903,6 +1915,7 @@
             "test Splode interop to_error/1 keeps Jido validation errors typed and classified",
             "test Splode interop to_error/1 preserves unknown error message for plain values",
             "test Splode interop to_map/1 keeps stack frames out of class error messages",
+            "test bounds projected groups and the child messages they render",
             "test transport boundaries bounds long invalid binaries and redacts them under sensitive keys",
             "test transport boundaries bounds nested public messages before rendering them",
             "test transport boundaries canonicalizes known and unknown atom and string error types",
@@ -2271,10 +2284,11 @@
         "jido.persistence.I16": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 2,
+          "passing": 3,
           "status": "active",
           "testable": true,
           "tests": [
+            "test an explicit legacy module permits an offline rename without losing Session history",
             "test stored upgrade rejects a nonterminal durable Turn without changing bytes",
             "test stored upgrade resolves old code only after the Action and commits the next revision"
           ]
@@ -3728,11 +3742,13 @@
         "jido_action.execution.I22": {
           "failing": 0,
           "kind": "persisted_format",
-          "passing": 2,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
             "test a checkpointed halt closes pending waits and keeps the original failure after resume",
+            "test a direct Flow resumes its saved value after display or executable changes",
+            "test a module-backed Flow rejects display and executable edits before resume",
             "test independent waits retain partial joins through replay"
           ]
         },
@@ -4012,13 +4028,15 @@
         "jido_action.flow.I12": {
           "failing": 0,
           "kind": "functional",
-          "passing": 7,
+          "passing": 9,
           "status": "active",
           "testable": true,
           "tests": [
             "test decoding improper arrays returns structured validation errors",
             "test encodes and decodes defaults through the same Flow schema",
             "test normalizes partial defaults with the selected Flow schema",
+            "test refuses a default that would change type after loading",
+            "test rejects an open field whose atom key would change on load",
             "test rejects invalid subjects and non-object schemas",
             "test rejects non-portable defaults after schema validation",
             "test rejects open defaults with duplicate JSON field names",
@@ -4028,7 +4046,7 @@
         "jido_action.flow.I7": {
           "failing": 0,
           "kind": "functional",
-          "passing": 30,
+          "passing": 31,
           "status": "active",
           "testable": true,
           "tests": [
@@ -4050,6 +4068,7 @@
             "test direct, Spark, and JSON Invoke forms produce the same canonical data",
             "test direct, Spark, and JSON authoring produce one mixed canonical Flow",
             "test direct, and Spark Step authoring produce the same canonical data",
+            "test generated Flow plans use module validation and preserve input source locations",
             "test inline Action identity includes its parent Parallel name",
             "test literal maps reject duplicate module keys after alias expansion",
             "test looked-up Actions use only the new map authoring refs, dependencies, and metadata",
@@ -4067,7 +4086,7 @@
         "jido_action.flow.I8": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 15,
+          "passing": 16,
           "status": "active",
           "testable": true,
           "tests": [
@@ -4082,6 +4101,7 @@
             "test direct, map, DSL, and stored graphs agree on valid and invalid dependencies",
             "test duplicates and missing references aggregate without cycle or Handoff cascades",
             "test error paths select the closest declaration before component or role hints",
+            "test generated Flow plans use module validation and preserve input source locations",
             "test hydration rejects a registered module that is not available",
             "test lowering records component and option indices with their names and nested sources",
             "test missing references and cycles identify their source declaration",
@@ -4091,10 +4111,11 @@
         "jido_action.flow.I9": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test inspection allows explicit Action output envelope fields",
             "test validation, inspection, and compilation do not run Action work"
           ]
         }
@@ -4653,7 +4674,7 @@
         "jido_ai.agent_authoring.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 29,
+          "passing": 30,
           "status": "active",
           "testable": true,
           "tests": [
@@ -4676,6 +4697,7 @@
             "test one model round executes multiple tool calls in one Parallel component",
             "test reasoning configuration accepts only its explicit data DSL",
             "test reasoning configuration is checked against the selected Flow schema",
+            "test stored reasoning defaults preserve the type seen by the reasoning Flow",
             "test the AI Agent requires an ai block",
             "test the Agent route contains the explicit graph of guarded Flow components",
             "test the ReAct budget decision preserves the reached limit",
@@ -5028,10 +5050,10 @@
       }
     },
     "jido_ai.react": {
-      "active": 9,
+      "active": 10,
       "app": "jido_ai",
       "coverage": 1.0,
-      "covered": 9,
+      "covered": 10,
       "form": "light",
       "obligations": {
         "jido_ai.react.I1": {
@@ -5079,6 +5101,17 @@
             "test tool results preserve model-visible content parts",
             "test two sequential tool rounds keep a valid model conversation",
             "test validated tool calls expand in model order"
+          ]
+        },
+        "jido_ai.react.I10": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a guarded tool review resumes with the same output policy",
+            "test guarded ReAct sends only approved text after the Session commits"
           ]
         },
         "jido_ai.react.I2": {
@@ -5741,8 +5774,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 238,
+    "active": 240,
     "coverage": 1.0,
-    "covered": 238
+    "covered": 240
   }
 }

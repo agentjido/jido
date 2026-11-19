@@ -108,6 +108,13 @@ defmodule Jido.AgentServer.Composition.DurableTopologyHandoffTest do
         end
       end
 
+      route "send.sibling" do
+        action _input, context: context do
+          {:ok, context.agent_state,
+           [Directive.emit(Signal.new!("count", %{}, source: "/root"), {:durable, {:agent, :sibling, 1}})]}
+        end
+      end
+
       route "cast.down" do
         action _input, context: context do
           {:ok, context.agent_state, [Directive.emit(Signal.new!("count", %{}, source: "/root"), {:agent, :child})]}
@@ -117,6 +124,15 @@ defmodule Jido.AgentServer.Composition.DurableTopologyHandoffTest do
 
     topology do
       agent :child, Child
+      agent :sibling, Child
+    end
+  end
+
+  defmodule LegacySlashRoot do
+    use Jido.Agent, name: "legacy_topology_slash_root"
+
+    topology do
+      agent :"field/service", Child
     end
   end
 
@@ -150,8 +166,95 @@ defmodule Jido.AgentServer.Composition.DurableTopologyHandoffTest do
 
     eventually(fn -> record(c, to).agent_rev == 1 end)
     assert count(root) == 1
-    assert %{topology_handoffs: %{accepted: %{^id => true}}} = record(c, to)
+    assert %{topology_handoffs: %{accepted: %{^id => %Jido.Agent.Address{}}}} = record(c, to)
     eventually(fn -> !Map.has_key?(record(c, c.address), :topology_handoffs) end)
+  end
+
+  @tag obligation: "jido.agent_server.composition.I11"
+  test "a removed member cannot activate outside its owner", c do
+    assert :ok = Server.remove_topology_member(c.root, :child, 1)
+
+    assert {:error, :topology_member_removed} =
+             Jido.call(c.instance, c.child_address, signal("count"))
+
+    assert {:ok, %{status: :committed}} = Server.call(c.root, signal("count"))
+    assert :ok = Jido.stop_agent(c.instance, c.root)
+
+    assert {:error, :topology_owner_required} = Jido.activate_agent(c.instance, c.child_address)
+    assert {:ok, new_root} = Jido.activate_agent(c.instance, c.address)
+    assert count(new_root) == 1
+    assert {:ok, child} = Jido.resolve_agent(c.instance, c.child_address)
+    assert count(child) == 0
+  end
+
+  @tag obligation: "jido.agent_server.composition.I11"
+  test "legacy slash-named members remain owned after owner deletion", c do
+    owner = %{c.address | id: "legacy"}
+    assert {:ok, ^owner} = Jido.create_agent(c.instance, owner, LegacySlashRoot)
+    assert {:ok, root} = Jido.activate_agent(c.instance, owner)
+    member = %{owner | id: "legacy/$topology/field/service/1/initial"}
+    assert :ok = Jido.stop_agent(c.instance, root)
+
+    key = Jido.Persistence.agent_key(member)
+    opts = [path: c.path]
+    {:ok, before} = Jido.Persistence.File.get(key, opts)
+    {:ok, record} = Jido.Persistence.Codec.Term.decode(before, [])
+    {:ok, legacy} = Jido.Persistence.Codec.Term.encode(Map.delete(record, :topology_owner))
+    :ok = Jido.Persistence.File.compare_and_swap(key, before, legacy, opts)
+    assert {:error, :topology_owner_required} = Jido.activate_agent(c.instance, member)
+
+    standalone = %{owner | id: "legacy/$topology/independent/1/initial"}
+    assert {:ok, ^standalone} = Jido.create_agent(c.instance, standalone, Child)
+    assert {:ok, _pid} = Jido.activate_agent(c.instance, standalone)
+
+    assert :ok = Jido.delete_agent(c.instance, owner)
+    assert {:error, :topology_owner_required} = Jido.activate_agent(c.instance, member)
+  end
+
+  @tag obligation: "jido.agent_server.composition.I11"
+  test "a member clears its recovery fence only under its owner", c do
+    assert :ok = Jido.stop_agent(c.instance, c.root)
+    assert :ok = Jido.Instance.RuntimeStore.put(c.instance, :agent_reconciliation, c.child_address, :indeterminate)
+    assert {:error, :topology_owner_required} = Jido.reconcile_agent(c.instance, c.child_address)
+    assert {:error, :reconciliation_required} = Jido.call(c.instance, c.child_address, signal("count"))
+
+    assert {:ok, _root} = Jido.activate_agent(c.instance, c.address)
+    assert {:ok, %{status: :committed}} = Jido.call(c.instance, c.child_address, signal("count"))
+  end
+
+  @tag obligation: "jido.agent_server.composition.I11"
+  test "a conflicting activation returns its original registration error", c do
+    assert {:error, {:already_started, activation}} =
+             Jido.start_agent(c.instance, Root, id: c.address.id, persistence_mode: :restore)
+
+    assert is_pid(activation)
+    assert Process.alive?(c.root)
+  end
+
+  for dependency <- [:registry, :exec_runner] do
+    @tag obligation: "jido.agent_server.composition.I11"
+    test "the instance restarts #{dependency} and explicit activation restores the family", c do
+      assert {:ok, %{status: :committed}} = Server.call(c.root, signal("count"))
+      assert {:ok, %{status: :committed}} = Server.call(c.child, signal("count"))
+      name = apply(Jido.Instance.Names, unquote(dependency), [c.instance])
+      dependency = Process.whereis(name)
+      root_monitor = Process.monitor(c.root)
+      member_monitor = Process.monitor(c.child)
+      Process.exit(dependency, :kill)
+
+      assert_receive {:DOWN, ^root_monitor, :process, _, _}, 5_000
+      assert_receive {:DOWN, ^member_monitor, :process, _, _}, 5_000
+
+      eventually(fn ->
+        replacement = Process.whereis(name)
+        is_pid(replacement) and replacement != dependency and Jido.resident_agent_count(c.instance) == 0
+      end)
+
+      assert {:ok, new_root} = Jido.activate_agent(c.instance, c.address)
+      assert {:ok, new_member} = Jido.resolve_agent(c.instance, c.child_address)
+      assert count(new_root) == 1
+      assert count(new_member) == 1
+    end
   end
 
   @tag obligation: "jido.agent_server.composition.I12"
@@ -164,7 +267,11 @@ defmodule Jido.AgentServer.Composition.DurableTopologyHandoffTest do
     assert %{id: id, to: address} = send
     assert address == c.address
 
-    assert %{agent_rev: 0, server_turn: %{id: ^id, status: :running}, topology_handoffs: %{accepted: %{^id => true}}} =
+    assert %{
+             agent_rev: 0,
+             server_turn: %{id: ^id, status: :running},
+             topology_handoffs: %{accepted: %{^id => %Jido.Agent.Address{}}}
+           } =
              record(c, c.address)
 
     kill_worker(c.root)
@@ -176,7 +283,7 @@ defmodule Jido.AgentServer.Composition.DurableTopologyHandoffTest do
     assert {:ok, %{status: :committed}} = Server.call(root, signal("count"))
     assert :accepted = accept(root, send, offset: -1)
     assert count(root) == 2
-    assert %{topology_handoffs: %{accepted: %{^id => true}}} = record(c, c.address)
+    assert %{topology_handoffs: %{accepted: %{^id => %Jido.Agent.Address{}}}} = record(c, c.address)
   end
 
   @tag obligation: "jido.agent_server.composition.I12"
@@ -191,7 +298,7 @@ defmodule Jido.AgentServer.Composition.DurableTopologyHandoffTest do
     kill_worker(c.child)
     child = recovered(c.instance, c.child_address, c.child)
     eventually(fn -> count(child) == 1 end)
-    assert %{topology_handoffs: %{accepted: %{^id => true}}} = record(c, c.child_address)
+    assert %{topology_handoffs: %{accepted: %{^id => %Jido.Agent.Address{}}}} = record(c, c.child_address)
     eventually(fn -> !Map.has_key?(record(c, c.address), :topology_handoffs) end)
   end
 
@@ -218,6 +325,81 @@ defmodule Jido.AgentServer.Composition.DurableTopologyHandoffTest do
   end
 
   @tag obligation: "jido.agent_server.composition.I12"
+  test "a removed destination releases the next handoff after sender recovery", c do
+    sibling_address = %{c.address | id: "root/$topology/sibling/1/initial"}
+    assert {:ok, _sibling} = Jido.resolve_agent(c.instance, sibling_address)
+
+    assert {:ok, _status} = Server.quiesce(c.child)
+    assert {:ok, %{status: :committed}} = Server.call(c.root, signal("send.down"))
+
+    eventually(fn ->
+      match?(
+        %{topology_handoffs: %{pending: 1, oldest_age_ms: age, last_failure: :topology_receiver_busy}}
+        when is_integer(age),
+        Server.status(c.root)
+      )
+    end)
+
+    :ok = Probe.configure(:sender_checkpoint)
+    assert :ok = Server.remove_topology_member(c.root, :child, 1)
+    assert :ok = Server.cast(c.root, signal("send.sibling"))
+    assert_receive {:durable_barrier, :sender_checkpoint, _writer}, 2_000
+
+    kill_worker(c.root)
+    root = recovered(c.instance, c.address, c.root)
+    eventually(fn -> record(c, sibling_address).agent_rev == 1 end)
+    assert record(c, c.child_address).agent_rev == 0
+
+    eventually(fn ->
+      match?(
+        %{topology_handoffs: %{pending: 0, oldest_age_ms: nil, last_failure: :topology_member_removed}},
+        Server.status(root)
+      )
+    end)
+  end
+
+  @tag obligation: "jido.agent_server.composition.I12"
+  test "a full legacy receipt history preserves retries and declines new IDs", c do
+    send = %{id: "1", to: c.child_address, signal: signal("count")}
+    assert :ok = Jido.stop_agent(c.instance, c.root)
+    key = Jido.Persistence.agent_key(c.child_address)
+    opts = [path: c.path]
+    {:ok, bytes} = Jido.Persistence.File.get(key, opts)
+    {:ok, record} = Jido.Persistence.Codec.Term.decode(bytes, [])
+    accepted = Map.new(1..16_384, &{Integer.to_string(&1), true})
+    record = Map.put(record, :topology_handoffs, %{outbox: [], accepted: accepted})
+    {:ok, next} = Jido.Persistence.Codec.Term.encode(record)
+    :ok = Jido.Persistence.File.compare_and_swap(key, bytes, next, opts)
+    assert {:ok, _root} = Jido.activate_agent(c.instance, c.address)
+    assert {:ok, child} = Jido.resolve_agent(c.instance, c.child_address)
+
+    assert :accepted = accept(child, send, offset: -1)
+    assert {:error, :topology_receipt_capacity} = accept(child, %{send | id: "new"})
+    assert count(child) == 0
+    assert record(c, c.child_address).topology_handoffs.accepted == accepted
+  end
+
+  @tag obligation: "jido.agent_server.composition.I12"
+  test "a later outbox head replaces the same sender's settled receipt", c do
+    assert {:ok, %{status: :committed}} = Server.call(c.root, signal("send.down"))
+    eventually(fn -> record(c, c.child_address).agent_rev == 1 end)
+    eventually(fn -> !Map.has_key?(record(c, c.address), :topology_handoffs) end)
+    [first] = Map.keys(record(c, c.child_address).topology_handoffs.accepted)
+
+    :ok = Probe.configure(:sender_prune)
+    assert {:ok, %{status: :committed}} = Server.call(c.root, signal("send.down"))
+    assert_receive {:durable_barrier, :sender_prune, _writer}, 5_000
+
+    assert %{topology_handoffs: %{outbox: [%{id: second} = send]}} = record(c, c.address)
+    assert second != first
+    assert record(c, c.child_address).topology_handoffs.accepted == %{second => c.address}
+    assert :accepted = accept(c.child, send, offset: -1)
+    eventually(fn -> count(c.child) == 2 end)
+    assert {:error, :admission_timeout} = accept(c.child, %{send | id: first}, offset: -1)
+    :ok = Probe.release(:ok)
+  end
+
+  @tag obligation: "jido.agent_server.composition.I12"
   test "an expired or malformed delivery does not admit a Turn", c do
     send = %{id: Jido.Id.uuid7(), to: c.child_address, signal: signal("count")}
 
@@ -239,7 +421,7 @@ defmodule Jido.AgentServer.Composition.DurableTopologyHandoffTest do
     assert_receive {:durable_barrier, :sender_prune, _writer}, 2_000
 
     assert %{topology_handoffs: %{outbox: [%{id: id}]}} = record(c, c.address)
-    assert %{topology_handoffs: %{accepted: %{^id => true}}} = record(c, c.child_address)
+    assert %{topology_handoffs: %{accepted: %{^id => %Jido.Agent.Address{}}}} = record(c, c.child_address)
     :ok = Probe.release({:error, {:rejected, :offline}})
 
     assert {:ok, %{status: :committed}} = Server.call(c.root, signal("count"))

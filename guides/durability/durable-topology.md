@@ -48,14 +48,16 @@ alias Jido.AgentServer, as: Server
 {:ok, root} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Team, id: "team")
 :ok = Server.await_ready(root)
 
-member_ids = fn root, name ->
-  root |> Server.members(name) |> Enum.map(&Server.snapshot(&1).agent.id)
+member_ids = fn name ->
+  for {id, _pid} <- Enum.sort(Jido.list_agents(TopologyGuide.Jido)),
+      String.starts_with?(id, "team/$topology/#{name}/"),
+      do: id
 end
 
-["team/$topology/triage/1/initial"] = member_ids.(root, :triage)
+["team/$topology/triage/1/initial" = triage_id] = member_ids.(:triage)
 
 ["team/$topology/responders/1/initial", "team/$topology/responders/2/initial"] =
-  member_ids.(root, :responders)
+  member_ids.(:responders)
 ```
 
 ## Know what each record holds
@@ -74,13 +76,14 @@ A member commits on its own revision, so member work does not change the root's 
 ```elixir
 alias Jido.AgentServer, as: Server
 
-[triage] = Server.members(root, :triage)
+{:ok, triage_address} = Jido.agent_address(TopologyGuide.Jido, triage_id)
+{:ok, triage} = Jido.resolve_agent(TopologyGuide.Jido, triage_address)
 handle = Jido.Signal.new!("ticket.handle", %{}, source: "/guides/durable_topology")
 
-{:ok, %{state: %{handled: 1}}, []} = Server.call(triage, handle)
+{:ok, %{status: :committed}} = Server.call(triage, handle)
 
-%{state_version: 1} = Server.snapshot(triage)
-%{state_version: 0} = Server.snapshot(root)
+%{agent_revision: 1, agent: %{state: %{handled: 1}}} = Server.snapshot(triage)
+%{agent_revision: 0} = Server.snapshot(root)
 ```
 
 ## Lose a member or a root
@@ -98,9 +101,9 @@ receive do
   {:DOWN, ^monitor, :process, ^triage, :killed} -> :ok
 end
 
-await_replacement = fn root, name, old ->
+await_replacement = fn address, old ->
   Enum.find_value(1..300, fn _attempt ->
-    with [pid] when pid != old <- Server.members(root, name),
+    with {:ok, pid} when pid != old <- Jido.resolve_agent(TopologyGuide.Jido, address),
          :ok <- Server.await_ready(pid) do
       pid
     else
@@ -111,7 +114,7 @@ await_replacement = fn root, name, old ->
   end)
 end
 
-new_triage = await_replacement.(root, :triage, triage)
+new_triage = await_replacement.(triage_address, triage)
 
 ^triage_id = Server.snapshot(new_triage).agent.id
 %{handled: 1} = Server.snapshot(new_triage).agent.state
@@ -119,24 +122,30 @@ new_triage = await_replacement.(root, :triage, triage)
 
 When a root's server or activation dies, the root restores first, then reconciles its members. The owned member activations restart, so member PIDs change. Each member reads its own record, so its ID, state, and any pending Flow Turn survive.
 
-## Hibernate and thaw a team
+## Stop and reactivate a team
 
-`Jido.AgentServer.hibernate/2` on the root saves the root and stops the whole activation, members included. It waits only for the root's own Turn to settle. A member's Flow Turn that is still running keeps its `:running` receipt, and it resumes after the thaw like any other durable Turn.
+Stopping the root stops the whole activation. Activate the root by Address to restore its members. A member with a saved running Turn resumes from that receipt. If reconciling a member returns `:topology_owner_required`, activate or reconcile its owner first.
 
 ```elixir
 alias Jido.AgentServer, as: Server
 
-:ok = Server.hibernate(root)
-0 = Jido.agent_count(TopologyGuide.Jido)
+:ok = Jido.stop_agent(TopologyGuide.Jido, root)
+0 = Jido.resident_agent_count(TopologyGuide.Jido)
 
-{:ok, root} = Jido.thaw(TopologyGuide.Jido, TopologyGuide.Team, "team")
+{:ok, root_address} = Jido.agent_address(TopologyGuide.Jido, "team")
+{:ok, root} = Jido.activate_agent(TopologyGuide.Jido, root_address)
 :ok = Server.await_ready(root)
 
-[thawed_triage] = Server.members(root, :triage)
+{:ok, thawed_triage} = Jido.resolve_agent(TopologyGuide.Jido, triage_address)
 ^triage_id = Server.snapshot(thawed_triage).agent.id
 %{handled: 1} = Server.snapshot(thawed_triage).agent.state
-%{state_version: 1} = Server.snapshot(thawed_triage)
+%{agent_revision: 1} = Server.snapshot(thawed_triage)
 ```
+
+The instance supervisor restarts a failed Registry or Runic Runner. Resident
+activations stop when either dependency stops. The application can activate
+each durable root again by Address after the dependency starts. The root
+restores its members.
 
 During reconciliation, the root loads each member's record. A found record is restored, a `:not_found` read creates the member, and any other error stops the root's readiness.
 
@@ -178,8 +187,10 @@ A resident sender tries its oldest pending send when it is idle and admission
 is open. It retries a rejected, busy, or unavailable receiver after a delay.
 Each attempt has an admission deadline. An expired attempt can confirm an
 earlier acceptance, but it cannot start a new Turn. A non-durable receiver or a route that cannot prepare a durable Flow rejects
-acceptance. The oldest send stays pending and delays later sends until that
-destination can accept it. Explicit hibernation or a shutdown pauses
+acceptance. A pending send delays later sends while its destination is unavailable. The
+sender drops the send if the destination is deleted, the owner has removed the
+member, or the owner's current topology has retired that identity. Status
+reports the pending count, oldest send age in milliseconds, and last failure. Explicit hibernation or a shutdown pauses
 delivery until the sender is resident again. A pending send prevents
 automatic idle passivation of its sender. Delivery does not start a
 passivated receiver.
@@ -196,34 +207,46 @@ write stops the sender until reconciliation reads its record.
 
 Send order applies to durable sends from one sender. Best-effort effects run
 through their existing path and can be lost in a crash. An acknowledgment
-does not prove that any receiver effect ran. Acceptance IDs stay in the
-receiver record for its lifetime, so the record grows with incoming sends.
-There is no expiry or automatic collection of these IDs. The new runtime
-can read older V3 records. Older runtimes reject records with the optional
-handoff field.
+does not prove that any receiver effect ran. A receiver keeps the latest
+receipt from each sender. The next handoff from that sender proves it has
+removed the previous handoff from its saved outbox. Jido keeps earlier
+receipts with no sender identity. If the receiver already holds 16,384
+receipts and cannot replace one, it returns `:topology_receipt_capacity`.
+Existing IDs still return their acknowledgment.
+
+The [durable handoff example](../../examples/13_durable_execution/13_14_topology_handoff/README.md)
+shows a pending send restored after an activation stops.
+
+## Deploy across the topology record change
+
+The current reader accepts earlier format-3 records. Earlier Jido builds can
+reject format-3 records that contain the `:topology_owner` field or store
+sender Addresses in accepted handoff receipts.
+
+Stop earlier Jido processes that use the store and back up the store before
+you deploy. After the new build writes either record shape, keep a reader that
+supports both shapes. To run the earlier binary, stop the new processes and
+restore the backup. Restoring the backup discards writes made since it was taken.
 
 ## Know the limits
 
 - **No family snapshot.** A root snapshot captures the logical topology, not the state of its running members. After a crash, members are each at their own last commit, and two members can reflect different points in a shared process. Keep invariants that span Agents in one Agent's state, or make your Flows tolerate this.
 - **No family upgrade.** `Jido.Persistence.upgrade_agent/5` changes one record. Upgrade the root and each member separately.
 - **Best-effort output.** Ordinary member outputs and connection deliveries are post-commit effects. They are not replayed. See [Recovery Limits](recovery-and-effect-limits.md).
-- **No family delete.** `Jido.delete_agent/4` on the root leaves member records in place. The next code shows this. Do not delete one member of a family you will restore, because the root's reconciliation reads `:deleted` and fails.
+- **No family delete.** `Jido.delete_agent/3` on the root leaves member records in place. An Address with a generated member ID under a deleted owner stays reserved, including when an older record has no explicit owner field. Use IDs outside this pattern for standalone Agents. Do not delete one member of a family you will restore, because the root's reconciliation reads `:deleted` and fails.
 
 ```elixir
 alias Jido.AgentServer, as: Server
 
-:ok = Server.stop(root)
-
-{:ok, root_address} = Jido.agent_address(TopologyGuide.Jido, "team")
-:ok = Jido.delete_agent(TopologyGuide.Jido, root_address, TopologyGuide.Team)
+:ok = Jido.stop_agent(TopologyGuide.Jido, root)
+:ok = Jido.delete_agent(TopologyGuide.Jido, root_address)
 
 {:error, :deleted} = Jido.Persistence.load_agent(TopologyGuide.Jido, TopologyGuide.Team, "team")
 
 {:ok, %{state: %{handled: 1}}} =
   Jido.Persistence.load_agent(TopologyGuide.Jido, TopologyGuide.Agent, triage_id)
 
-{:ok, member_address} = Jido.agent_address(TopologyGuide.Jido, triage_id)
-:ok = Jido.delete_agent(TopologyGuide.Jido, member_address, TopologyGuide.Agent)
+:ok = Jido.delete_agent(TopologyGuide.Jido, triage_address)
 
 :ok = Jido.stop(TopologyGuide.Jido)
 ```

@@ -46,14 +46,6 @@ defmodule Jido.Action.Inline.Owner do
     )
 
     if Module.defines?(caller.module, function), do: reserved_error!(caller, function)
-    reserved = Module.get_attribute(caller.module, :__jido_inline_reserved__) || []
-
-    Module.put_attribute(
-      caller.module,
-      :__jido_inline_reserved__,
-      Enum.uniq([function | reserved])
-    )
-
     :ok
   end
 
@@ -62,12 +54,14 @@ defmodule Jido.Action.Inline.Owner do
   def __on_definition__(caller, _kind, name, args, _guards, _body) do
     arity = length(args)
     defaults = Enum.count(args, &match?({:\\, _, [_, _]}, &1))
-    reserved = Module.get_attribute(caller.module, :__jido_inline_reserved__) || []
+    reserved = Module.get_attribute(caller.module, :__jido_inline_reserved_labels__) || %{}
     generated = Module.get_attribute(caller.module, :__jido_inline_generated__)
 
     for defined_arity <- (arity - defaults)..arity do
       function = {name, defined_arity}
-      if function in reserved and generated != function, do: reserved_error!(caller, function)
+
+      if Map.has_key?(reserved, function) and generated != function,
+        do: reserved_error!(caller, function)
     end
 
     :ok

@@ -2,6 +2,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RequestToolReview do
   alias Jido.Joi
   @moduledoc "Publishes one review request before the durable Flow wait."
 
+  alias Jido.AI.Reasoning.ReAct.Guards
   alias Jido.AI.Thread.Projection
 
   use Jido.Action,
@@ -32,7 +33,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RequestToolReview do
       tool_calls: turn.model_outcome.tool_calls
     }
 
-    _result = dispatch_review_signal(context, data)
+    _result = dispatch_review_signal(context, data, Guards.output?(turn))
 
     next_session =
       Projection.observe(
@@ -54,8 +55,18 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RequestToolReview do
     {:ok, %{turn: %{turn | review_id: review_id, session: Jido.Session.encode(next_session)}}}
   end
 
-  defp dispatch_review_signal(context, data) do
-    case Map.get(context, :jido_ai_dispatch) do
+  defp dispatch_review_signal(context, data, guarded?) do
+    {dispatch, data} =
+      if guarded? do
+        case Map.get(context, :jido_ai_review_dispatch) do
+          nil -> {Map.get(context, :jido_ai_dispatch), Map.drop(data, [:tool_calls, :policy_reason])}
+          reviewer -> {reviewer, data}
+        end
+      else
+        {Map.get(context, :jido_ai_dispatch), data}
+      end
+
+    case dispatch do
       nil ->
         :ok
 

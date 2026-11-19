@@ -67,6 +67,32 @@ defmodule Jido.Codec.CompilerTest do
              NamedMap.from_map(%{"state" => "unknown", "count" => 2})
   end
 
+  defmodule OpenNames do
+    alias Jido.Joi
+
+    use Jido.Codec,
+      schema:
+        Joi.object(%{
+          name: Joi.string(),
+          typed: Joi.map(Joi.union([Joi.atom(), Joi.string()]), Joi.integer())
+        })
+
+    codec(:name, as: "label")
+  end
+
+  test "refuses to dump two entries with the same JSON key" do
+    assert_raise ArgumentError, ~r/duplicate JSON key "label"/, fn ->
+      OpenNames.dump(%{:name => "declared", "label" => "extra"})
+    end
+
+    assert_raise ArgumentError, ~r/duplicate JSON key "name"/, fn ->
+      OpenNames.dump(%{typed: %{:name => 1, "name" => 2}})
+    end
+
+    assert OpenNames.dump(%{name: "declared", typed: %{name: 1}}) ==
+             %{"label" => "declared", "typed" => %{"name" => 1}}
+  end
+
   test "compiles the JSON Schema from Joi" do
     assert get_in(Person.json_schema(), [:properties, :state, :enum]) == [:active, :disabled]
   end

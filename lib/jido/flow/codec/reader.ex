@@ -130,7 +130,7 @@ defmodule Jido.Flow.Codec.Reader do
       )
 
   defp field(:components, values, registry, stored, canonical),
-    do: sequence(values, &component/4, stored, canonical, registry)
+    do: sequence(values, &component(&1, registry, &2, &3), stored, canonical)
 
   defp field(:on_error, value, _registry, stored, canonical),
     do: closed(@on_error, value, "on_error", stored, canonical)
@@ -253,19 +253,12 @@ defmodule Jido.Flow.Codec.Reader do
     end
   end
 
-  defp sequence(values, decoder, stored, canonical, registry \\ nil)
-
-  defp sequence(values, decoder, stored, canonical, registry) when is_list(values) do
+  defp sequence(values, decoder, stored, canonical) when is_list(values) do
     {values, paths} =
       values
       |> Enum.with_index()
       |> Enum.reduce({[], %{canonical => stored}}, fn {value, index}, {values, paths} ->
-        result =
-          if registry,
-            do: decoder.(value, registry, stored ++ [index], canonical ++ [index]),
-            else: decoder.(value, stored ++ [index], canonical ++ [index])
-
-        case result do
+        case decoder.(value, stored ++ [index], canonical ++ [index]) do
           {:ok, value, nested_paths} -> {[value | values], Map.merge(paths, nested_paths)}
           {:error, nested} -> {[Component.stored_field_error(nested) | values], paths}
         end
@@ -274,7 +267,7 @@ defmodule Jido.Flow.Codec.Reader do
     {:ok, Enum.reverse(values), paths}
   end
 
-  defp sequence(_values, _decoder, stored, _canonical, _registry),
+  defp sequence(_values, _decoder, stored, _canonical),
     do: failure("stored Flow field must be a list", stored)
 
   defp failure(message, path), do: {:error, [Error.validation_error(message, %{path: path})]}

@@ -9,13 +9,15 @@ defmodule Jido.AgentServer.Property.LifecycleModelTest do
   alias Jido.Test.Property.Fuzz
 
   defmodule Add do
-    use Jido.Action,
-      name: "runtime_property_add",
-      schema: Jido.Joi.object(%{delta: Jido.Joi.integer()})
+    use Jido.Flow, name: "runtime_property_add"
 
-    @impl true
-    def run(%{delta: delta}, %{agent_state: state}) do
-      {:ok, %{state | count: state.count + delta, history: state.history ++ [delta]}}
+    flow do
+      step "add", _input <- input(), inline: [context: context] do
+        state = context.agent_state
+        {:ok, %{state | count: state.count + 1, history: state.history ++ [1]}}
+      end
+
+      output result("add")
     end
   end
 
@@ -59,12 +61,31 @@ defmodule Jido.AgentServer.Property.LifecycleModelTest do
     end
   end
 
+  defmodule Team do
+    use Jido.Agent, name: "runtime_property_team"
+
+    topology do
+      agent :worker, Counter
+    end
+
+    routes do
+      route "runtime.property.send" do
+        action input, context: context do
+          signal = Jido.Signal.new!("runtime.property.add", input, source: "/property")
+          directive = Jido.Agent.Directive.emit(signal, {:durable, {:agent, :worker, 1}})
+          {:ok, context.agent_state, [directive]}
+        end
+      end
+    end
+  end
+
   for {suite, runs} <- [{:property, 30}, {:fuzz, 300}] do
     @tag [
       {suite, true},
       fuzz_id: "agent_server_lifecycle",
       max_runs: runs,
       max_run_time: 120_000,
+      max_shrinking_steps: 12,
       timeout: 180_000
     ]
     test "#{suite} generated histories preserve commit, recovery, and cleanup", c do
@@ -77,12 +98,14 @@ defmodule Jido.AgentServer.Property.LifecycleModelTest do
       generator =
         StreamData.fixed_map(%{
           "initial_count" => StreamData.integer(-1_000..1_000),
-          "steps" => StreamData.list_of(step, max_length: 20)
+          "steps" => StreamData.list_of(step, max_length: 20),
+          "topology" => StreamData.list_of(StreamData.member_of(~w(submit retry remove crash restore)), max_length: 8)
         })
 
       examples = [
         %{
           "initial_count" => 0,
+          "topology" => ~w(submit retry remove crash restore submit retry),
           "steps" =>
             for(
               mode <- ~w(success failure invalid_state invalid_directive),
@@ -95,14 +118,14 @@ defmodule Jido.AgentServer.Property.LifecycleModelTest do
         "agent_server_lifecycle",
         generator,
         Map.to_list(c) ++ [examples: examples],
-        fn %{"initial_count" => initial_count, "steps" => steps} ->
-          verify_history(c, initial_count, steps)
+        fn %{"initial_count" => initial_count, "steps" => steps, "topology" => topology} ->
+          verify_history(c, initial_count, steps, topology)
         end
       )
     end
   end
 
-  defp verify_history(c, initial_count, steps) do
+  defp verify_history(c, initial_count, steps, topology) do
     id = unique_id("runtime-property")
     path = Path.join(c.tmp_dir, id)
     persistence = {Jido.Persistence.File, path: path}
@@ -151,6 +174,116 @@ defmodule Jido.AgentServer.Property.LifecycleModelTest do
     assert Jido.whereis_agent(c.jido, id) == nil
     assert Jido.resident_agent_count(c.jido) == 0
 
-    ["hibernate", "restore", "cleanup" | MapSet.to_list(observations)]
+    verify_topology(c, persistence, topology)
+    ["hibernate", "restore", "cleanup" | topology ++ MapSet.to_list(observations)]
+  end
+
+  defp verify_topology(_context, _store, []), do: :ok
+
+  defp verify_topology(c, store, steps) do
+    {:ok, owner} = Jido.agent_address(c.jido, "property-team")
+    member = %{owner | id: "property-team/$topology/worker/1/initial"}
+    assert {:ok, ^owner} = Jido.create_agent(c.jido, owner, Team)
+    assert {:ok, root} = Jido.activate_agent(c.jido, owner)
+
+    data = %{instance: c.jido, owner: owner, member: member, store: store}
+    model = %{root: root, owned?: true, accepted: 0, crashed?: false}
+
+    model =
+      Enum.reduce(steps, model, fn step, model ->
+        next = topology_step(step, model, data)
+        verify_topology_model(next, data)
+        next
+      end)
+
+    assert :ok = Jido.stop_agent(c.jido, model.root)
+  end
+
+  defp topology_step("submit", model, data) do
+    request = Server.submit(model.root, signal("runtime.property.send"))
+    status = if model.owned?, do: :committed, else: :failed
+    assert {:ok, %{status: ^status}} = Server.await(request, 3_000)
+
+    if model.owned? do
+      expected = model.accepted + 1
+
+      eventually(
+        fn ->
+          {:ok, member} = Jido.resolve_agent(data.instance, data.member)
+          Server.snapshot(member).agent.state.count == expected
+        end,
+        timeout: 3_000
+      )
+
+      # Acceptance can finish before the sender gets its reply and clears the outbox.
+      eventually(fn -> match?(%{topology_handoffs: %{pending: 0}}, Server.status(model.root)) end, timeout: 3_000)
+      %{model | accepted: expected}
+    else
+      model
+    end
+  end
+
+  defp topology_step("retry", model, data) do
+    if model.owned? and model.accepted > 0 do
+      assert {:ok, member} = Jido.resolve_agent(data.instance, data.member)
+      [id | _] = Map.keys(receipts(data))
+      expired = {node(), System.monotonic_time(:millisecond) - 1}
+      retry = {:accept_topology_handoff, id, data.member, signal("runtime.property.add"), expired}
+      assert :accepted = :gen_statem.call(member, retry)
+    end
+
+    model
+  end
+
+  defp topology_step("remove", model, _data) do
+    assert :ok = Server.remove_topology_member(model.root, :worker, 1)
+    %{model | owned?: false}
+  end
+
+  defp topology_step("crash", %{crashed?: true} = model, _data), do: model
+
+  defp topology_step("crash", model, data) do
+    old = model.root
+    Process.exit(old, :kill)
+
+    root =
+      eventually(
+        fn ->
+          case Jido.resolve_agent(data.instance, data.owner) do
+            {:ok, pid} when pid != old -> pid
+            _ -> nil
+          end
+        end,
+        timeout: 2_000
+      )
+
+    assert :ok = Server.await_ready(root)
+    %{model | root: root, crashed?: true}
+  end
+
+  defp topology_step("restore", model, data) do
+    assert :ok = Jido.stop_agent(data.instance, model.root)
+    assert {:error, :topology_owner_required} = Jido.activate_agent(data.instance, data.member)
+    assert {:ok, root} = Jido.activate_agent(data.instance, data.owner)
+    %{model | root: root, owned?: true, crashed?: false}
+  end
+
+  defp verify_topology_model(model, data) do
+    assert %{queue_depth: 0} = Server.status(model.root)
+    assert map_size(receipts(data)) == min(model.accepted, 1)
+
+    if model.owned? do
+      assert {:ok, member} = Jido.resolve_agent(data.instance, data.member)
+      assert %{queue_depth: 0} = Server.status(member)
+      eventually(fn -> Server.snapshot(member).agent.state.count == model.accepted end)
+    else
+      assert {:error, :topology_member_removed} = Jido.activate_agent(data.instance, data.member)
+    end
+  end
+
+  defp receipts(data) do
+    {:ok, bytes, _condition} = Jido.Persistence.Store.read(data.store, Jido.Persistence.agent_key(data.member))
+    {:ok, record} = Jido.Persistence.Record.decode(bytes)
+    Jido.Persistence.Record.topology_handoffs(record).accepted
   end
 end

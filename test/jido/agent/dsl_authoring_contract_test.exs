@@ -341,7 +341,7 @@ defmodule Jido.Agent.DSLAuthoringContractTest do
                state: %{count: 0, enabled: false, note: nil, settings: %{}}
              )
 
-    assert instance.state === %{count: 0, enabled: false, note: "default", settings: %{}}
+    assert instance.state === %{count: 0, enabled: false, note: nil, settings: %{}}
     assert {:error, _} = Agent.instantiate(definition, id: "defaults", state: %{count: "0"})
   end
 

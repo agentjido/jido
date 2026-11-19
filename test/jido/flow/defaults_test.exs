@@ -9,6 +9,7 @@ defmodule Jido.Flow.DefaultsTest do
         Jido.Joi.object(
           %{
             input: Jido.Joi.string(),
+            ambiguous: Jido.Joi.union([Jido.Joi.any(), Jido.Joi.enum([:safe])]),
             mode: Jido.Joi.enum([:fast, :safe]),
             modes: Jido.Joi.list(Jido.Joi.enum([:fast, :safe])),
             mode_or_modes:
@@ -91,6 +92,21 @@ defmodule Jido.Flow.DefaultsTest do
              Jido.Flow.normalize_defaults(%{"unknown" => true}, ConfiguredFlow)
   end
 
+  test "refuses a default that would change type after loading" do
+    for input <- ["safe", :safe] do
+      assert Jido.Flow.normalize_defaults(%{ambiguous: input}, ConfiguredFlow) ==
+               {:ok, %{ambiguous: input}}
+    end
+
+    assert {:error, %Jido.Error.ValidationError{details: %{path: [:ambiguous]}}} =
+             Jido.Flow.encode_defaults(%{ambiguous: "safe"}, ConfiguredFlow)
+
+    assert {:ok, %{"ambiguous" => "safe"} = document} =
+             Jido.Flow.encode_defaults(%{ambiguous: :safe}, ConfiguredFlow)
+
+    assert {:ok, %{ambiguous: :safe}} = Jido.Flow.decode_defaults(document, ConfiguredFlow)
+  end
+
   test "decoding improper arrays returns structured validation errors" do
     for {defaults, path} <- [
           {%{modes: ["safe" | :tail]}, [:modes]},
@@ -112,6 +128,11 @@ defmodule Jido.Flow.DefaultsTest do
   test "rejects non-portable defaults after schema validation" do
     assert {:error, %Jido.Error.ValidationError{details: %{path: [:value]}}} =
              Jido.Flow.normalize_defaults(%{value: self()}, OpenFlow)
+  end
+
+  test "rejects an open field whose atom key would change on load" do
+    assert {:error, %{details: %{code: :ambiguous_default, path: ["config", :debug]}}} =
+             Jido.Flow.encode_defaults(%{"config" => %{debug: true}}, OpenFlow)
   end
 
   test "rejects open defaults with duplicate JSON field names" do

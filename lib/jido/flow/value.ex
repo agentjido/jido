@@ -110,10 +110,14 @@ defmodule Jido.Flow.Value do
 
   @doc false
   @spec result_refs(term()) :: [String.t()]
-  def result_refs(value) do
+  def result_refs(value), do: Enum.map(result_references(value), & &1.component)
+
+  @doc false
+  @spec result_references(term()) :: [Ref.t()]
+  def result_references(value) do
     reducer = fn
-      %Ref{source: :result, component: component}, _path, refs ->
-        {:cont, [component | refs]}
+      %Ref{source: :result} = ref, _path, refs ->
+        {:cont, [ref | refs]}
 
       _value, _path, refs ->
         {:cont, refs}

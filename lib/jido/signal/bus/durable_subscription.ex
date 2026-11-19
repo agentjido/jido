@@ -106,6 +106,37 @@ defmodule Jido.Signal.Bus.DurableSubscription do
       else: {:error, :invalid_store_subscription_cursor}
   end
 
+  @doc false
+  def recover(state, saved) do
+    state =
+      Enum.reduce(state.subscriptions, state, fn
+        {id, %Subscriber{durable?: true} = current}, state ->
+          case Map.get(saved, id) do
+            %Subscriber{path: path, created_at: created_at, cursor: cursor}
+            when path == current.path and created_at == current.created_at ->
+              in_flight = if is_integer(current.in_flight) and current.in_flight > cursor, do: current.in_flight
+              Subscriber.put_subscriber(state, %{current | cursor: cursor, in_flight: in_flight})
+
+            _changed ->
+              Runtime.remove_subscriber(state, current)
+          end
+
+        _ephemeral, state ->
+          state
+      end)
+
+    Enum.reduce(saved, state, fn {id, saved}, state ->
+      case Map.get(state.subscriptions, id) do
+        %Subscriber{durable?: true} = subscriber ->
+          {:ok, ^id, state} = finish_attach(state, subscriber)
+          state
+
+        nil ->
+          Subscriber.insert_subscriber(state, saved)
+      end
+    end)
+  end
+
   defp create(state, id, path, target, opts) do
     with {:ok, cursor} <- initial_cursor(state, Keyword.get(opts, :start_from, :current)),
          created_at <- DateTime.utc_now() |> DateTime.to_iso8601(),
