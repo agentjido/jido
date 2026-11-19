@@ -6,6 +6,16 @@ defmodule Jido.Telemetry.SemanticTest do
   alias Jido.Telemetry.Semantic
   alias Jido.Trace
 
+  defmodule ObservedError do
+    defexception [:observer]
+
+    @impl true
+    def message(%{observer: observer}) do
+      send(observer, :exception_message_called)
+      "private failure"
+    end
+  end
+
   test "metadata normalization keeps only bounded semantic fields" do
     invalid_utf8 = <<255>>
 
@@ -82,7 +92,7 @@ defmodule Jido.Telemetry.SemanticTest do
       ],
       stage: [:evaluate, :commit, :after_commit, :directive],
       kind: [:error, :throw, :exit],
-      operation: [:activate, :stop, :hibernate, :thaw, :load, :compare_and_swap, :delete],
+      operation: [:activate, :stop, :hibernate, :thaw, :load, :compare_and_swap, :delete, :scan],
       admission_reason: [:deadline_expired, :overloaded],
       persistence_reason: [:commit, :activate, :stop, :hibernate, :thaw, :manual, :topology, :stored_upgrade],
       topology_operation: [:activate, :repair, :update, :place, :cleanup]
@@ -208,6 +218,18 @@ defmodule Jido.Telemetry.SemanticTest do
     end
 
     assert Semantic.normalize_metadata(%{topology_operation: :rebalance}) == %{schema_version: 1}
+  end
+
+  test "error classification uses no exception message callback" do
+    reason = %ObservedError{observer: self()}
+
+    assert Semantic.result_metadata({:error, reason}) == %{
+             status: :error,
+             error_type: :internal,
+             retryable?: true
+           }
+
+    refute_received :exception_message_called
   end
 
   test "one span emits one terminal semantic event" do
@@ -460,6 +482,14 @@ defmodule Jido.Telemetry.SemanticTest do
 
     assert :unchanged =
              Semantic.with_span(prefix, %{}, %{}, fn -> :unchanged end, :invalid_callback)
+
+    assert_receive {:contained_event, ^start_event, _, %{schema_version: 1}}
+    assert_receive {:contained_event, ^stop_event, %{duration: _}, %{status: :ok}}
+
+    span = Semantic.start(prefix, %URI{}, %URI{})
+    assert_receive {:contained_event, ^start_event, _, %{schema_version: 1}}
+    assert :ok = Semantic.finish(span, %URI{}, %URI{})
+    assert_receive {:contained_event, ^stop_event, %{duration: _}, %{schema_version: 1}}
   end
 
   defp restore_env(app, key, {:ok, value}), do: Application.put_env(app, key, value)

@@ -151,6 +151,8 @@ A failed event sets the span status to error and adds `error.type`. A `:cancelle
 
 A Turn joins the trace on its Signal. If you attach a trace with `Jido.Signal.Context.put_trace/2`, the Turn span's parent is that remote span, and its `trace_id` matches your caller. The Turn's new span context is available to its work, so a commit span is a child of its Turn span. See [Telemetry and Tracing](telemetry-tracing-and-logs.md#trace-context).
 
+Settlement and effects point spans are also children of the Turn span. They retain that parent after the Turn span ends.
+
 Sampling is your SDK's decision. The SDK's default sampler is parent-based, so it follows the flags on a trace you attach. `Jido.Trace.new/1` uses flags `"00"` unless you pass `trace_flags: "01"`, and a Signal that carries a `"00"` trace produces no Turn span under that sampler. A Signal with no trace starts a root span, which that sampler keeps.
 
 ### AI spans

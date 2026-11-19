@@ -1,7 +1,7 @@
-defmodule Jido.Telemetry.ContextTest do
-  use Covenant.Case, component: "jido.telemetry", async: true
+defmodule Jido.Trace.ContextTest do
+  use Covenant.Case, component: "jido.trace.context", async: true
 
-  @moduletag obligation: ["jido.telemetry.I5", "jido.telemetry.I6"]
+  @moduletag obligation: "jido.trace.context.I1"
 
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext

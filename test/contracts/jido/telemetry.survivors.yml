@@ -34,61 +34,19 @@
   sort: equivalent
   reason: A non-map and non-list configuration either returns nil or makes Map.get fail inside the contained handler. Both paths fail closed without a log.
 
-- at: lib/jido/telemetry/open_telemetry.ex:73:38
-  operator: integer_shift
-  mutation: "`1` → `2`"
-  sort: equivalent
-  reason: The terminal guard uses only atomics slot 1. An unused second slot cannot change span behavior.
-
-- at: lib/jido/telemetry/open_telemetry.ex:207:55
-  operator: return_nil
-  mutation: "`true` → `nil`"
-  sort: equivalent
-  reason: The strict Boolean check in enabled?/0 rejects both values and its catch returns false for the nil case. The tuple no-op tracer remains disabled.
-
-- at: lib/jido/telemetry/open_telemetry.ex:208:45
-  operator: return_nil
-  mutation: "`true` → `nil`"
-  sort: equivalent
-  reason: The strict Boolean check in enabled?/0 rejects both values and its catch returns false for the nil case. The atom no-op tracer remains disabled.
-
-- at: lib/jido/telemetry/open_telemetry.ex:309:65
-  operator: return_nil
-  mutation: "`:ok` → `nil`"
-  sort: equivalent
-  reason: The stop branch return is private and ignored by the safe callback wrapper.
-
-- at: lib/jido/telemetry/open_telemetry.ex:328:44
-  operator: integer_shift
-  mutation: "`1` → `2`"
-  sort: equivalent
-  reason: The terminal claim uses only atomics slot 1. An unused second slot cannot change the one-terminal-event rule.
-
-- at: lib/jido/telemetry/open_telemetry.ex:341:36
-  operator: return_nil
-  mutation: "`:ok` → `nil`"
-  sort: equivalent
-  reason: Cross-process deactivation intentionally does no work, and finish/5 does not use this private return value.
-
-- at: lib/jido/telemetry/open_telemetry.ex:378:38
-  operator: clause_removal
-  mutation: "`case {:error, :invalid_traceparent} ->` → `(removed)`"
-  sort: equivalent
-  reason: This parser receives carrier data injected from a validated span. If the dependency returns invalid data, the outer trace_context/1 catch also converts the missing clause to nil.
-
 - at: lib/jido/telemetry/persistence.ex:50:61
   operator: return_nil
   mutation: "`%{}` → `nil`"
   sort: equivalent
   reason: Semantic measurement normalization converts both nil and an empty map to the same empty measurement map.
 
-- at: lib/jido/telemetry/semantic.ex:68:36
+- at: lib/jido/telemetry/semantic.ex:69:36
   operator: integer_shift
   mutation: "`1` → `2`"
   sort: equivalent
   reason: The semantic terminal guard uses only atomics slot 1. An unused second slot cannot change span behavior.
 
-- at: lib/jido/telemetry/semantic.ex:301:48
+- at: lib/jido/telemetry/semantic.ex:314:48
   operator: integer_shift
   mutation: "`1` → `2`"
   sort: equivalent

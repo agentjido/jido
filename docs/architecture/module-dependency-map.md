@@ -293,6 +293,18 @@ canonical namespace makes the common observation system visible:
 
 `Jido.Telemetry` is the public inventory and configuration facade. Reach must assign each feature module to the layer of the feature that it observes. A shared namespace does not make all telemetry code one dependency layer.
 
+The Covenant profiles follow these ownership boundaries.
+
+| Profile | Reach layer | Modules |
+| --- | --- | --- |
+| `jido.telemetry` | `live_runtime` | `Jido.Telemetry`, `AgentServer`, `Persistence`, and `Semantic` in its namespace |
+| `jido.telemetry.open_telemetry` | `execution` | `Jido.Telemetry.OpenTelemetry` and its span value |
+| `jido.trace` | `primitives` | `Jido.Trace` |
+| `jido.trace.context` | `execution` | `Jido.Trace.Context` and its captured value |
+
+The bridge proof covers span mapping and context restoration across the
+Telemetry and Trace integration. [ADR 0013](../adr/0013-telemetry-proof-ownership.md).
+
 ### Codec
 
 `Jido.Codec.Compiler` is the small general compile-time layer. It generates

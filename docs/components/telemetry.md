@@ -1,12 +1,71 @@
 ---
 title: Jido.Telemetry component
 status: current
-last-reviewed: 2026-11-10
+last-reviewed: 2026-11-19
 ---
 
 # Jido.Telemetry component
 
-Purpose: Record event, logging, metric, and span ownership.
+This record covers event, logging, metric, and span ownership.
+
+## Release review — 2026-11-19
+
+All four checks are complete for [`6fdc009a`](https://github.com/agentjido/jido/commit/6fdc009a1edd6261f3e26509fa2905bb9192faa5) on `release/v3`. The findings are open under [#453](https://github.com/agentjido/jido/issues/453).
+
+### Public surface
+
+- `Jido.Telemetry.metrics/0` returns 13 reporter definitions. Turn stop and persistence operation stop and exception have counters and millisecond duration summaries. Seven AgentServer point events have counters. The tag vocabularies contain status, stage, operation, and persistence reason. Agent identity and trace IDs stay out of tags. [Core catalog](../../lib/jido/telemetry.ex), [catalog tests](../../test/jido/telemetry/api_test.exs).
+- `Jido.Telemetry.open_telemetry?/0` reports whether configuration permits mapping and a host tracer is active. AgentServer and persistence operations map to spans. Point spans have zero duration. Returned error statuses and escaping faults have distinct records. Jido delegates SDK startup, sampling, and export to the host. [OpenTelemetry adapter](../../lib/jido/telemetry/open_telemetry.ex), [metrics and spans guide](../../guides/operations/metrics-and-open-telemetry.md).
+- AgentServer and persistence emit schema version 1, bounded scalar metadata, and approved integer measurements. Turn stop and settlement report evaluation and commit. Effects have a separate result after commit. The event reference describes the separate Exec, Signal, AI, and ReqLLM field contracts. [Semantic normalizers](../../lib/jido/telemetry/semantic.ex), [event reference](../../guides/reference/telemetry-event-reference.md).
+- The application attaches the core logger once to the metric event catalog. The default mode is `:off`. The other modes are `:errors`, `:interesting`, and `:all`. Instance startup and the documented internal `set_debug/2` entry point affect persistence operation logs for that instance. Turn and effects logs use the global mode. [Application startup](../../lib/jido/application.ex), [logging guide](../../guides/operations/telemetry-tracing-and-logs.md#debug-one-instance).
+
+### API contract usage
+
+- Traced runtime calls from the AgentServer worker and the persistence operation and Store adapters through semantic emission, logger attachment, reporter definitions, and span mapping. Verified the reporters and subscriptions in the observability examples. The application also starts the AI correlation store and attaches the AI handlers. AI subscribes to core Turn and Action events, and ReqLLM supplies model events. [AgentServer worker](../../lib/jido/agent_server/worker.ex), [Persistence Store](../../lib/jido/persistence/store.ex), [AI inventory](../../lib/jido/telemetry/ai.ex), [examples](../../examples/14_observability/README.md).
+- The tests exercise exact metric names and tags, log filtering and escapes, event order, terminal races, context handling, and disabled or failing tracers. The pre-existing settlement link test supplies a link directly. The review probe used an actual Turn with an after-commit Plugin. The Turn's commit span was its child. The settlement and effects point spans used separate traces for an untraced Signal and became siblings under the incoming span for a traced Signal. [OpenTelemetry tests](../../test/jido/telemetry/open_telemetry_test.exs).
+
+### Code quality
+
+- Reuse `Jido.Error.type/1`, `retryable?/1`, and `code/1` for semantic errors. The full transport projection constructs unused message and detail fields. A local Store probe observed a returned exception's `message/1` callback run. Keep the classification and emitted fields. [Semantic error fields](../../lib/jido/telemetry/semantic.ex#L152), [Error classification](../../lib/jido/error.ex#L543).
+- Keep field normalization and span mechanics shared for the core semantic families. Keep the feature-specific result vocabularies, event catalogs, and log policies. The core logger uses instance overrides. AI adds limit warnings and model data. A shared runtime observer would have to encode both policies. The metric and log subscriptions currently share one event selection through the metric catalog. [Core logger](../../lib/jido/telemetry.ex#L135), [AI logger](../../lib/jido/telemetry/ai.ex#L764).
+
+### Elixir and OTP design
+
+- Telemetry owns observation contracts, shared normalization, logging, metrics, and span mapping. The feature layers own the work and the event definitions they emit. Keep the shared namespace and the Reach layer assignments. `Jido.Trace` owns W3C values and propagation per D13. `Jido.Application` owns handler attachment and process startup. The Covenant records still contain earlier ownership and debug names. [Reach policy](../../.reach.exs), [architecture map](../architecture/module-dependency-map.md#telemetry), [D13](../../components.md#d13-trace-boundary).
+- Keep the atomic terminal guard and same-process OpenTelemetry context restoration. Telemetry handlers run synchronously in the emitting process. The probes found that a struct returned by the measurement callback can raise after work and leave the span context installed. This conflicts with best-effort observation. AI correlation and individual Exec, Signal, and AI observation behavior are outside this review beyond their effect on the parent contract. [Semantic tests](../../test/jido/telemetry/semantic_test.exs), [OpenTelemetry adapter](../../lib/jido/telemetry/open_telemetry.ex).
+
+### Findings
+
+| Severity | Defect | Issue |
+| --- | --- | --- |
+| P2 | Settlement and effects point spans lack a relationship to the completed Turn. | [#481](https://github.com/agentjido/jido/issues/481) |
+| P3 | Struct input can raise after the observed work and leave an active span context. | [#485](https://github.com/agentjido/jido/issues/485) |
+| P3 | Store scans lose their operation field during normalization. | [#490](https://github.com/agentjido/jido/issues/490) |
+
+| Severity | Behavior-preserving change | Issue |
+| --- | --- | --- |
+| P3 | Classify errors without formatting details. Preserve the status, type, retry flag, and error code. | [#492](https://github.com/agentjido/jido/issues/492) |
+| P3 | Align the Covenant records with D13 and the current debug entry points. Preserve all proof and runtime behavior. | [#493](https://github.com/agentjido/jido/issues/493) |
+
+### Checks
+
+- 134 tests passed on Elixir 1.20.4 and OTP 29. The selection covered `test/jido/telemetry`, `test/jido/ai/observability`, and `examples/14_observability` with integration tests enabled. Format passed.
+- Local probes confirmed scan field loss, the error message callback, struct result-measurement failure, and the actual Turn span relationships. The span probe used a local tracer. External export and live providers were outside the review.
+- The Reach architecture check passed. The Covenant run passed 2,924 tests with 112 excluded. Passing tests cover all eight core Telemetry obligations and all five AI observability obligations.
+
+### Implementation
+
+- [#481](https://github.com/agentjido/jido/issues/481) uses the completed Turn span as the explicit parent for settlement and effects point spans. A live AgentServer test checks traced and untraced Signals, Turn completion, commit parenting, and zero-duration points.
+- [#485](https://github.com/agentjido/jido/issues/485) treats structs as absent semantic metadata and measurements. A regression test checks the successful work result, one span end, and caller context restoration.
+- [#490](https://github.com/agentjido/jido/issues/490) allows `:scan` as a semantic operation. The test checks successful and failed Store scans in both Telemetry and OpenTelemetry. The event names, measurements, and metric definitions use the existing catalog.
+- [#492](https://github.com/agentjido/jido/issues/492) uses the existing type, retry, and code functions directly. Tests compare the classification and verify that semantic observation skips the exception message callback.
+- [#493](https://github.com/agentjido/jido/issues/493) separates live-runtime Telemetry, the OpenTelemetry bridge, W3C values, and process and task propagation into layer-specific Covenant profiles. The instance debug entry points retain their persistence-only scope. [ADR 0013](../adr/0013-telemetry-proof-ownership.md).
+
+All 153 focused tests passed after the runtime fixes and proof changes. The
+regression tests reproduced the three defects before their fixes.
+
+The sections below retain the earlier R5 review and its source context.
+
 Review result: All four checks have evidence (R5). Findings remain open.
 The user authorized the defect fixes noted below.
 

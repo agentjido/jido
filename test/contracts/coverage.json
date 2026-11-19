@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 100,
+      "active": 98,
       "coverage": 1.0,
-      "covered": 100
+      "covered": 98
     },
     "jido.agent_server": {
       "active": 15,
@@ -14,6 +14,16 @@
       "active": 30,
       "coverage": 1.0,
       "covered": 30
+    },
+    "jido.telemetry": {
+      "active": 2,
+      "coverage": 1.0,
+      "covered": 2
+    },
+    "jido.trace": {
+      "active": 1,
+      "coverage": 1.0,
+      "covered": 1
     },
     "jido_action": {
       "active": 53,
@@ -3056,10 +3066,10 @@
       }
     },
     "jido.telemetry": {
-      "active": 8,
+      "active": 5,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 8,
+      "covered": 5,
       "form": "light",
       "obligations": {
         "jido.telemetry.I1": {
@@ -3079,7 +3089,7 @@
         "jido.telemetry.I2": {
           "failing": 0,
           "kind": "security",
-          "passing": 21,
+          "passing": 22,
           "status": "active",
           "testable": true,
           "tests": [
@@ -3088,6 +3098,7 @@
             "test a returned failure stops a span and an escaping fault reports an exception",
             "test classifies load and default write revisions without result payloads",
             "test competing finishes emit one terminal semantic event",
+            "test error classification uses no exception message callback",
             "test every load function reports revision_after",
             "test measurement normalization keeps only approved integers",
             "test metadata normalization keeps only bounded semantic fields",
@@ -3109,7 +3120,7 @@
         "jido.telemetry.I3": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 23,
+          "passing": 24,
           "status": "active",
           "testable": true,
           "tests": [
@@ -3120,6 +3131,7 @@
             "test an inferred instance source applies only its own debug override",
             "test classifies load and default write revisions without result payloads",
             "test competing finishes emit one terminal semantic event",
+            "test error classification uses no exception message callback",
             "test every load function reports revision_after",
             "test malformed observation inputs and measurement callbacks cannot change work",
             "test measurement normalization keeps only approved integers",
@@ -3181,30 +3193,132 @@
             "test the default semantic handler attaches once and handles its catalog"
           ]
         },
-        "jido.telemetry.I5": {
+        "jido.telemetry.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 14,
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test malformed observation inputs and measurement callbacks cannot change work",
+            "test returns failures and re-raises faults after one terminal event",
+            "test semantic log configuration and formatting fail closed at exact bounds",
+            "test semantic log strings stay on one line and within the byte limit"
+          ]
+        }
+      }
+    },
+    "jido.telemetry.open_telemetry": {
+      "active": 2,
+      "app": "jido.telemetry",
+      "coverage": 1.0,
+      "covered": 2,
+      "form": "light",
+      "obligations": {
+        "jido.telemetry.open_telemetry.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 26,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test OpenTelemetry carrier conversion retains validated tracestate",
+            "test W3C context crosses Signal and task boundaries",
+            "test a direct bridge span ends once",
+            "test a new Turn removes the previous Turn parent context",
+            "test a struct result measurement preserves the return and restores the caller context",
+            "test a tracer callback failure does not stop semantic emission or leak context",
+            "test an end-span failure restores the caller context",
+            "test an untraced Signal lets the SDK make the root sampling decision",
+            "test bad event names do not interrupt the caller or alter its context",
+            "test cancelled spans do not set OpenTelemetry error status",
+            "test configuration can disable OpenTelemetry without disabling semantic events",
+            "test configuration maps disable tracing and malformed configuration fails closed",
+            "test direct bridge spans accept explicit parents and links",
+            "test exception event and status failures still end spans and restore context",
+            "test exceptions set error status without recording raw exception data",
+            "test finishing a foreign span does not replace the task context",
+            "test invalid error fields cannot become OpenTelemetry attributes or status",
+            "test malformed semantic bridge options retain exact event times",
+            "test missing carriers do not install context and callback faults restore the caller context",
+            "test operation names are bounded by the semantic vocabulary",
+            "test semantic spans use bounded names and attributes",
+            "test settlement and effects spans share the completed Turn as parent",
+            "test settlement is a zero-duration span linked to its completed Turn",
+            "test store scan events and spans identify the operation without scan data",
+            "test the API no-op tracer leaves semantic spans active",
+            "test the bridge normalizes scalar attributes and drops unsupported values"
+          ]
+        },
+        "jido.telemetry.open_telemetry.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 26,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test OpenTelemetry carrier conversion retains validated tracestate",
+            "test W3C context crosses Signal and task boundaries",
+            "test a direct bridge span ends once",
+            "test a new Turn removes the previous Turn parent context",
+            "test a struct result measurement preserves the return and restores the caller context",
+            "test a tracer callback failure does not stop semantic emission or leak context",
+            "test an end-span failure restores the caller context",
+            "test an untraced Signal lets the SDK make the root sampling decision",
+            "test bad event names do not interrupt the caller or alter its context",
+            "test cancelled spans do not set OpenTelemetry error status",
+            "test configuration can disable OpenTelemetry without disabling semantic events",
+            "test configuration maps disable tracing and malformed configuration fails closed",
+            "test direct bridge spans accept explicit parents and links",
+            "test exception event and status failures still end spans and restore context",
+            "test exceptions set error status without recording raw exception data",
+            "test finishing a foreign span does not replace the task context",
+            "test invalid error fields cannot become OpenTelemetry attributes or status",
+            "test malformed semantic bridge options retain exact event times",
+            "test missing carriers do not install context and callback faults restore the caller context",
+            "test operation names are bounded by the semantic vocabulary",
+            "test semantic spans use bounded names and attributes",
+            "test settlement and effects spans share the completed Turn as parent",
+            "test settlement is a zero-duration span linked to its completed Turn",
+            "test store scan events and spans identify the operation without scan data",
+            "test the API no-op tracer leaves semantic spans active",
+            "test the bridge normalizes scalar attributes and drops unsupported values"
+          ]
+        }
+      }
+    },
+    "jido.trace": {
+      "active": 1,
+      "app": "jido",
+      "coverage": 1.0,
+      "covered": 1,
+      "form": "light",
+      "obligations": {
+        "jido.trace.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 6,
           "status": "active",
           "testable": true,
           "tests": [
             "test Signal context uses the canonical Trace and removes old private fields",
-            "test an incoming carrier becomes the parent of the local Turn",
-            "test an untraced Signal starts one local root context",
-            "test captured task context is restored after success and failure",
             "test children require the canonical Trace value",
             "test children retain W3C sampling data and explicit causal data",
-            "test clear removes the current context",
-            "test context input functions reject unsupported values",
             "test invalid and legacy-only values are rejected",
             "test new roots use one valid W3C representation",
-            "test old or malformed context does not become a parent",
-            "test propagation carries the active Turn span and cause",
-            "test propagation validates its boundary",
             "test telemetry context contains only validated trace and causation identifiers"
           ]
-        },
-        "jido.telemetry.I6": {
+        }
+      }
+    },
+    "jido.trace.context": {
+      "active": 1,
+      "app": "jido.trace",
+      "coverage": 1.0,
+      "covered": 1,
+      "form": "light",
+      "obligations": {
+        "jido.trace.context.I1": {
           "failing": 0,
           "kind": "ordering",
           "passing": 8,
@@ -3219,75 +3333,6 @@
             "test old or malformed context does not become a parent",
             "test propagation carries the active Turn span and cause",
             "test propagation validates its boundary"
-          ]
-        },
-        "jido.telemetry.I7": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 24,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test OpenTelemetry carrier conversion retains validated tracestate",
-            "test W3C context crosses Signal and task boundaries",
-            "test a direct bridge span ends once",
-            "test a new Turn removes the previous Turn parent context",
-            "test a tracer callback failure does not stop semantic emission or leak context",
-            "test an end-span failure restores the caller context",
-            "test an untraced Signal lets the SDK make the root sampling decision",
-            "test bad event names do not interrupt the caller or alter its context",
-            "test cancelled spans do not set OpenTelemetry error status",
-            "test configuration can disable OpenTelemetry without disabling semantic events",
-            "test configuration maps disable tracing and malformed configuration fails closed",
-            "test direct bridge spans accept explicit parents and links",
-            "test exception event and status failures still end spans and restore context",
-            "test exceptions set error status without recording raw exception data",
-            "test finishing a foreign span does not replace the task context",
-            "test invalid error fields cannot become OpenTelemetry attributes or status",
-            "test malformed semantic bridge options retain exact event times",
-            "test missing carriers do not install context and callback faults restore the caller context",
-            "test operation names are bounded by the semantic vocabulary",
-            "test semantic spans use bounded names and attributes",
-            "test settlement is a zero-duration span linked to its completed Turn",
-            "test the API no-op tracer leaves semantic spans active",
-            "test the bridge normalizes scalar attributes and drops unsupported values",
-            "test the public API is metrics and OpenTelemetry status"
-          ]
-        },
-        "jido.telemetry.I8": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 27,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test OpenTelemetry carrier conversion retains validated tracestate",
-            "test W3C context crosses Signal and task boundaries",
-            "test a direct bridge span ends once",
-            "test a new Turn removes the previous Turn parent context",
-            "test a tracer callback failure does not stop semantic emission or leak context",
-            "test an end-span failure restores the caller context",
-            "test an untraced Signal lets the SDK make the root sampling decision",
-            "test bad event names do not interrupt the caller or alter its context",
-            "test cancelled spans do not set OpenTelemetry error status",
-            "test configuration can disable OpenTelemetry without disabling semantic events",
-            "test configuration maps disable tracing and malformed configuration fails closed",
-            "test direct bridge spans accept explicit parents and links",
-            "test exception event and status failures still end spans and restore context",
-            "test exceptions set error status without recording raw exception data",
-            "test finishing a foreign span does not replace the task context",
-            "test invalid error fields cannot become OpenTelemetry attributes or status",
-            "test malformed observation inputs and measurement callbacks cannot change work",
-            "test malformed semantic bridge options retain exact event times",
-            "test missing carriers do not install context and callback faults restore the caller context",
-            "test operation names are bounded by the semantic vocabulary",
-            "test returns failures and re-raises faults after one terminal event",
-            "test semantic log configuration and formatting fail closed at exact bounds",
-            "test semantic log strings stay on one line and within the byte limit",
-            "test semantic spans use bounded names and attributes",
-            "test settlement is a zero-duration span linked to its completed Turn",
-            "test the API no-op tracer leaves semantic spans active",
-            "test the bridge normalizes scalar attributes and drops unsupported values"
           ]
         }
       }
@@ -5842,8 +5887,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 244,
+    "active": 245,
     "coverage": 1.0,
-    "covered": 244
+    "covered": 245
   }
 }

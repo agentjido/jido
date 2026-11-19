@@ -17,6 +17,7 @@ This directory records decisions that constrain the Jido V3 architecture. The [m
 | [0009](0009-durable-topology-acceptance.md) | Proposed | Commit durable topology sends and receiver acceptance in Agent records |
 | [0010](0010-exec-task-ownership-and-admission.md) | Accepted | Use Runic task ownership and bound immediate admission |
 | [0011](0011-direct-durable-operation-ownership.md) | Accepted | Admit one direct Durable operation per reference |
+| [0013](0013-telemetry-proof-ownership.md) | Accepted | Align Telemetry and Trace proof with Reach |
 
 ## Backlog
 
