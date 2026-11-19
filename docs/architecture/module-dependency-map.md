@@ -655,6 +655,7 @@ Disposition terms:
 | `Jido.Exec.Waits` | Removed | Portable data moved to Wait and workflow host operations moved to Runtime |
 | `Jido.Exec.Wait` | Keep | Canonical portable wait, ID, match, deadline, and input-validation value |
 | `Jido.Durable.Continuation` | Keep | Canonical portable suspended Flow and Handoff state with stable identity and definition fingerprint |
+| `Jido.Durable.Operation` | Keep | Local ownership, deadlines, and worker cleanup for direct Durable calls |
 
 ### Agent domain
 
@@ -721,7 +722,7 @@ Disposition terms:
 | `Jido.Persistence.Codec.Term` | Added | Compact default codec for compatible application releases |
 | `Jido.Persistence.Codec.JSON` | Added | Opt-in bounded tagged JSON codec |
 | `Jido.Persistence.Config` | Added | One validated Store and codec profile for an instance namespace |
-| `Jido.Persistence.ContinuationStore` | Keep | Canonical Runic workflow checkpoint, fact, and saved wait receipt store |
+| `Jido.Persistence.ContinuationStore` | Keep | Runic workflow checkpoints, facts, wait receipts, and read-only checkpoint projection |
 | `Jido.Persistence.Ecto` | Keep | Ecto adapter |
 | `Jido.Persistence.ETS` | Keep | ETS adapter |
 | `Jido.Persistence.File` | Keep | File adapter |

@@ -333,6 +333,16 @@ uses the persistence adapter of the named Jido instance.
 | `Jido.Durable.status/2` | Reads the last committed state, waits, and next wake time. |
 | `Jido.Durable.result/2` | Reads the normal Exec result from the last committed state. |
 
+One direct operation can own a reference at a time. If a call returns
+`{:error, :execution_busy}`, retry after the active call reaches its next
+durable stop. Set `:operation_timeout` in milliseconds to bound progress
+across the operation. After expiry, the worker stops and a retry resumes from
+the last confirmed checkpoint. A storage call and cleanup can finish after
+expiry.
+
+Status keeps the waits and next wake time when it reports `:ready`. A host
+can resume that work immediately.
+
 ## Flows and expressions
 
 Guides: [Flows](../flows/flows.md), [Flow Data Definitions](../flow-data/flow-data.md).
