@@ -3522,7 +3522,7 @@ defmodule Jido.AgentServer.Worker do
 
     data = %{data | active: active}
 
-    AgentServerTelemetry.start_effects(active.span.metadata, length(directives))
+    AgentServerTelemetry.start_effects(active.span, length(directives))
 
     {:next_state, :effects, data, replies ++ [{:next_event, :internal, :effect_next}]}
   end
@@ -3563,7 +3563,7 @@ defmodule Jido.AgentServer.Worker do
     outcome = Effects.outcome(active, data.state_version, status)
 
     AgentServerTelemetry.finish_effects(
-      active.span.metadata,
+      active.span,
       status,
       outcome.stage,
       active.effect_index,

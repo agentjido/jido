@@ -52,7 +52,7 @@ defmodule Jido.Telemetry.AgentServerTest do
 
     assert :ok = AgentServer.lifecycle(:start, "agent-1")
     span = AgentServer.start_turn(%{agent_id: "agent-1", turn_id: "turn-1", private: :drop})
-    assert :ok = AgentServer.start_effects(span.metadata, 2)
+    assert :ok = AgentServer.start_effects(span, 2)
 
     assert :ok =
              AgentServer.settle_turn(
@@ -63,7 +63,7 @@ defmodule Jido.Telemetry.AgentServerTest do
                2
              )
 
-    assert :ok = AgentServer.finish_effects(span.metadata, :failed, :directive, 1, 2)
+    assert :ok = AgentServer.finish_effects(span, :failed, :directive, 1, 2)
 
     assert_receive {:event, [:jido, :agent_server, :lifecycle, :start], _, lifecycle}
     assert lifecycle.agent_id == "agent-1"

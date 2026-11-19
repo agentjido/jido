@@ -33,7 +33,10 @@ tests with its obligation tags.
 | `jido.durable` | Direct durable Flow admission, deadlines, and checkpoint reads | `test/contracts/jido/durable.*` |
 | `jido.persistence` | Records, snapshots, adapters, storage operations, and revisions | `test/contracts/jido/persistence.*` |
 | `jido.plugin` | Generic Plugin SDK and callback contracts | `test/contracts/jido/plugin.*` |
-| `jido.telemetry` | Telemetry, metrics, tracing, logs, and Debug support | `test/contracts/jido/telemetry.*` |
+| `jido.telemetry` | Core semantic events, metrics, logs, and debug overrides | `test/contracts/jido/telemetry.*` |
+| `jido.telemetry.open_telemetry` | Optional OpenTelemetry spans and carrier mapping | `test/contracts/jido.telemetry/open_telemetry.*` |
+| `jido.trace` | Primitive W3C Trace values | `test/contracts/jido/trace.*` |
+| `jido.trace.context` | Process and task Trace propagation | `test/contracts/jido.trace/context.*` |
 | `jido.error` | Shared error taxonomy and stable common codes | `test/contracts/jido/error.*` |
 | `jido.plugin.audit` | Bundled Audit Plugin behavior | `test/contracts/jido.plugin/audit.*` |
 | `jido.plugin.bus` | Bundled Bus Plugin behavior | `test/contracts/jido.plugin/bus.*` |
@@ -178,10 +181,13 @@ AgentServer recovery, commit publication, durable Flow progress, or
 backend-specific maintenance.
 
 `jido.telemetry` owns the fixed metric catalog, semantic event lifecycle, safe
-fields, bounded logs, per-instance Debug overrides, W3C trace context, and
-optional OpenTelemetry mapping. It does not own the runtime or persistence
-operations that emit events, reporter configuration, OpenTelemetry SDK startup,
-sampling, export, or durable audit records.
+fields, bounded logs, and per-instance debug overrides. Feature layers own the
+work that emits events. Host applications own reporter and SDK configuration.
+
+`jido.telemetry.open_telemetry` owns the optional span and carrier mapping.
+`jido.trace` owns the primitive W3C Trace representation. The separate
+`jido.trace.context` profile covers context capture, restoration, and
+propagation between processes and tasks.
 
 `jido.error` owns the shared taxonomy, constructors, common-code registry,
 retry classification, and bounded version-1 projection. It does not own Agent

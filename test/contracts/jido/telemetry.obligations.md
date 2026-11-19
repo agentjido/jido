@@ -1,21 +1,21 @@
 ---
 modules:
   - Jido.Telemetry
+  - Jido.Telemetry.AgentServer
   - Jido.Telemetry.Semantic
-  - Jido.Telemetry.OpenTelemetry
   - Jido.Telemetry.Persistence
-  - Jido.Trace
-  - Jido.Trace.Context
 ---
 
 ## Purpose
 
-Protect Jido observation values and adapters. Its public observation API is
-`Jido.Telemetry.metrics/0`, `Jido.Telemetry.open_telemetry?/0`, and the
-instance `debug/0` and `debug/1` facades. This component owns the fixed metric
-catalog, internal semantic event lifecycle, safe fields, bounded logs, instance
-debug overrides, W3C trace context, and optional OpenTelemetry mapping. It has
-no DSL.
+Protect the live-runtime observation boundary. The public facade provides
+`Jido.Telemetry.metrics/0` and `Jido.Telemetry.open_telemetry?/0`. The
+`:debug` instance option and the internal `Jido.Telemetry.set_debug/2`
+entry point change persistence operation logging for one instance. Turn and
+effects logs use the global mode.
+
+This component owns the metric catalog, core semantic events, field
+normalization, bounded logs, and debug overrides.
 
 It does not own the AgentServer or persistence operations that emit events,
 host reporter configuration, OpenTelemetry SDK startup, sampling, export, or
@@ -51,30 +51,9 @@ durable audit records.
 - **kind:** functional
 - **status:** active
 
-### jido.telemetry.I5 — W3C Signal trace values
-
-- **scope:** `Jido.Trace` and `Jido.Signal.Context`
-- **must:** Create valid W3C roots and children, retain trace flags and tracestate, record explicit parent and causation identifiers, and use `Jido.Signal.Context` as the Signal carrier owner. Remove old private trace fields when writing. Reject malformed or legacy-only values and expose only validated identifiers to telemetry.
-- **kind:** functional
-- **status:** active
-
-### jido.telemetry.I6 — Process and task trace context
-
-- **scope:** `Jido.Trace.Context`
-- **must:** Start one local Turn context from a valid incoming Signal parent or a new root. Capture and restore Jido and OpenTelemetry contexts across task boundaries. Restore the caller context after success or failure. Propagate the active context and explicit cause to an outbound Signal. Clear all locally installed context.
-- **kind:** ordering
-- **status:** active
-
-### jido.telemetry.I7 — Optional OpenTelemetry mapping
-
-- **scope:** `Jido.Telemetry.OpenTelemetry`
-- **must:** Activate only when the API is available, configuration permits it, and the host tracer is not a no-op tracer. Map normalized semantic spans and points to bounded internal span names and scalar attributes. Preserve parents and links, map W3C carriers, set error status without raw exception data, end each mapped span once, and restore caller context. Do not start or configure an SDK.
-- **kind:** functional
-- **status:** active
-
 ### jido.telemetry.I8 — Observation failure containment
 
-- **scope:** semantic emission, logging, trace adapters, and optional bridge callbacks
-- **must:** Contain logging, Telemetry handler, malformed configuration, metadata, options, carrier, event-name, result-measurement callback, and OpenTelemetry callback faults. Observation failure must not change the observed result, suppress a valid semantic event when the optional bridge fails, or leak an installed context.
+- **scope:** semantic emission and logging
+- **must:** Contain faults from logging, Telemetry handlers, and result-measurement callbacks. Treat malformed configuration, metadata, measurements, options, carriers, and event names as absent observation data. Preserve the observed result or fault and restore installed context.
 - **kind:** functional
 - **status:** active

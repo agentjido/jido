@@ -1,8 +1,10 @@
 defmodule Jido.Telemetry.OpenTelemetryTest do
-  use Covenant.Case, component: "jido.telemetry", async: false
+  use Covenant.Case, component: "jido.telemetry.open_telemetry", async: false
 
-  @moduletag obligation: ["jido.telemetry.I7", "jido.telemetry.I8"]
+  @moduletag obligation: ["jido.telemetry.open_telemetry.I1", "jido.telemetry.open_telemetry.I2"]
 
+  alias Jido.AgentServer
+  alias Jido.Persistence.Store
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext
   alias Jido.Telemetry.OpenTelemetry
@@ -43,6 +45,11 @@ defmodule Jido.Telemetry.OpenTelemetryTest do
     routes do
       route "trace.add", Add
     end
+  end
+
+  defmodule ScanAdapter do
+    def scan("scan/", nil, _limit, _opts), do: {:ok, [{"scan/key", "bytes"}], "next"}
+    def scan("scan/", "next", _limit, _opts), do: {:error, :not_found}
   end
 
   setup do
@@ -417,6 +424,115 @@ defmodule Jido.Telemetry.OpenTelemetryTest do
     point_ids = TestTracer.ids(point_span)
     assert_receive {:otel_end, ^point_ids, point_end}
     assert point_end == opts.start_time
+  end
+
+  test "settlement and effects spans share the completed Turn as parent" do
+    start_supervised!({Jido, name: __MODULE__})
+    assert {:ok, server} = Jido.start_agent(__MODULE__, NotifyAgent, id: "trace-review-agent")
+    assert :ok = AgentServer.await_ready(server)
+
+    signal = Signal.new!("trace.add", %{amount: 1}, source: "/test")
+    incoming = Trace.new(trace_flags: "01")
+    assert {:ok, traced} = SignalContext.put_trace(signal, incoming)
+
+    for {signal, incoming} <- [{signal, nil}, {traced, incoming}] do
+      assert {:ok, %AgentServer.TurnResult{status: :committed}} = AgentServer.call(server, signal)
+      assert_receive {:otel_start, turn, parent, "jido.agent_server.turn", _opts}
+      turn_ids = TestTracer.ids(turn)
+
+      if incoming do
+        assert :otel_span.hex_span_id(parent) == incoming.span_id
+        assert :otel_span.hex_trace_id(turn) == incoming.trace_id
+      else
+        refute :otel_span.is_valid(parent)
+      end
+
+      assert_receive {:otel_start, _commit, commit_parent, "jido.agent_server.commit", _opts}
+      assert TestTracer.ids(commit_parent) == turn_ids
+      assert_receive {:otel_end, ^turn_ids, _at}
+
+      for event <- ["turn.settled", "effects.start", "effects.stop"] do
+        span_name = "jido.agent_server." <> event
+        assert_receive {:otel_start, point, parent, ^span_name, %{start_time: at}}
+        assert :otel_span.is_valid(parent)
+        assert TestTracer.ids(parent) == turn_ids
+        assert %{trace_id: trace_id} = point_ids = TestTracer.ids(point)
+        assert trace_id == turn_ids.trace_id
+        assert_receive {:otel_end, ^point_ids, ^at}
+      end
+
+      refute_received {:otel_end, ^turn_ids, _at}
+    end
+  end
+
+  test "store scan events and spans identify the operation without scan data" do
+    event_prefix = [:jido, :persistence, :store]
+    handler = {__MODULE__, make_ref()}
+    events = for ending <- [:start, :stop], do: event_prefix ++ [ending]
+
+    :ok =
+      :telemetry.attach_many(
+        handler,
+        events,
+        fn event, measurements, metadata, owner -> send(owner, {event, measurements, metadata}) end,
+        self()
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    for {cursor, result, status} <- [
+          {nil, {:ok, [{"scan/key", "bytes"}], "next"}, :ok},
+          {"next", {:error, :not_found}, :not_found}
+        ] do
+      assert Store.scan({ScanAdapter, []}, "scan/", cursor: cursor) == result
+      assert_receive {[:jido, :persistence, :store, :start], _, %{operation: :scan} = start}
+      assert_receive {[:jido, :persistence, :store, :stop], %{duration: _}, %{operation: :scan} = stop}
+
+      expected = %{schema_version: 1, adapter_module: ScanAdapter, operation: :scan}
+      assert Map.drop(start, [:trace_id, :span_id]) == expected
+      assert Map.drop(stop, [:trace_id, :span_id]) == Map.put(expected, :status, status)
+
+      assert_receive {:otel_start, span, _parent, "jido.persistence.store", %{attributes: attributes}}
+
+      assert attributes == %{
+               "jido.adapter.module" => Atom.to_string(ScanAdapter),
+               "jido.operation" => "scan",
+               "jido.schema.version" => 1
+             }
+
+      ids = TestTracer.ids(span)
+      assert_receive {:otel_end, ^ids, _ended_at}
+    end
+  end
+
+  test "a struct result measurement preserves the return and restores the caller context" do
+    prefix = [:jido, :struct_measurement]
+    stop = prefix ++ [:stop]
+    exception = prefix ++ [:exception]
+    handler = {__MODULE__, make_ref()}
+
+    :ok =
+      :telemetry.attach_many(
+        handler,
+        [stop, exception],
+        fn event, measurements, metadata, owner -> send(owner, {event, measurements, metadata}) end,
+        self()
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+    before = OpenTelemetry.current_context()
+    result = {:ok, :work_finished}
+
+    assert ^result =
+             Semantic.with_span(prefix, %{}, %{}, fn -> result end, fn ^result -> %URI{} end)
+
+    assert_receive {:otel_start, span, _parent, "jido.struct_measurement", _opts}
+    ids = TestTracer.ids(span)
+    assert_receive {^stop, %{duration: _duration}, %{status: :ok}}
+    assert_receive {:otel_end, ^ids, _timestamp}
+    assert OpenTelemetry.current_context() == before
+    refute_received {:otel_end, ^ids, _timestamp}
+    refute_received {^exception, _, _}
   end
 
   test "W3C context crosses Signal and task boundaries" do

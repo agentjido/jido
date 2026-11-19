@@ -18,6 +18,7 @@ This directory records decisions that constrain the Jido V3 architecture. The [m
 | [0010](0010-exec-task-ownership-and-admission.md) | Accepted | Use Runic task ownership and bound immediate admission |
 | [0011](0011-direct-durable-operation-ownership.md) | Accepted | Admit one direct Durable operation per reference |
 | [0012](0012-agent-route-input-preparation.md) | Accepted | Apply Plugin policy before executable input validation |
+| [0013](0013-telemetry-proof-ownership.md) | Accepted | Align Telemetry and Trace proof with Reach |
 
 ## Backlog
 
