@@ -6,7 +6,7 @@ defmodule Jido.Exec.Node.Map do
   alias Jido.Error
   alias Jido.Exec.{ActionBoundary, ValueResolver}
   alias Jido.Exec.Result, as: ExecResult
-  alias Jido.Exec.Node.{Lifecycle, Targets}
+  alias Jido.Exec.Node.{Collection, Lifecycle, Targets}
   alias Runic.Identity
   alias Runic.Workflow.SingleOutput.{Context, Result}
 
@@ -61,7 +61,7 @@ defmodule Jido.Exec.Node.Map do
            {:ok, items} <- enumerable(collection, node) do
         items
         |> Enum.with_index()
-        |> concurrent_map(context.runtime, node.definition.on_error == :fail_fast, fn {item, index} ->
+        |> Collection.run(node.definition.on_error, fn {item, index} ->
           run_item(item, index, state, node, context)
         end)
         |> Enum.map(fn
@@ -95,7 +95,7 @@ defmodule Jido.Exec.Node.Map do
   end
 
   defp map_result(outcomes, :fail_fast, _target, node) do
-    case Enum.find(outcomes, &failed_outcome?/1) do
+    case Enum.find(outcomes, &(elem(&1, 0) != :ok)) do
       {:error, error} ->
         {:error, error}
 
@@ -139,44 +139,6 @@ defmodule Jido.Exec.Node.Map do
     end
   end
 
-  defp concurrent_map(items, runtime, fail_fast?, fun) do
-    max_concurrency = Map.get(runtime, :__jido_exec_max_concurrency__, 1)
-
-    if max_concurrency > 1 and match?([_, _ | _], items) do
-      items
-      |> Task.async_stream(fun,
-        ordered: true,
-        max_concurrency: max_concurrency,
-        timeout: :infinity
-      )
-      |> Enum.zip(items)
-      |> Enum.map(fn
-        {{:ok, value}, _item} -> value
-        {{:exit, reason}, item} -> {:task_exit, item, reason}
-      end)
-    else
-      serial_map(items, fail_fast?, fun)
-    end
-  end
-
-  defp serial_map(items, true, fun) do
-    items
-    |> Enum.reduce_while([], fn item, outcomes ->
-      outcome = fun.(item)
-
-      if failed_outcome?(outcome),
-        do: {:halt, [outcome | outcomes]},
-        else: {:cont, [outcome | outcomes]}
-    end)
-    |> Enum.reverse()
-  end
-
-  defp serial_map(items, false, fun), do: Enum.map(items, fun)
-
-  defp failed_outcome?({:error, _error}), do: true
-  defp failed_outcome?({:reference_error, _error, _index, _item_id}), do: true
-  defp failed_outcome?(_outcome), do: false
-
   defp item_id(owner_id, index) do
     {owner_id, index}
     |> :erlang.term_to_binary([:deterministic])
@@ -203,23 +165,12 @@ defimpl Runic.Identity.Projectable, for: Jido.Exec.Node.Map do
 end
 
 defimpl Runic.Component, for: Jido.Exec.Node.Map do
+  alias Jido.Exec.Node.Lifecycle
   alias Jido.Exec.Node.Map
-  alias Runic.Workflow
 
   def connectable?(_node, _other), do: true
 
-  def connect(%Map{} = node, parents, workflow) when is_list(parents) do
-    join = parents |> Enum.map(& &1.hash) |> Workflow.Join.new()
-    workflow = Enum.reduce(parents, workflow, &Workflow.add_step(&2, &1, join))
-    connect(node, join, workflow)
-  end
-
-  def connect(%Map{} = node, parent, workflow) do
-    workflow
-    |> Workflow.add_step(parent, node)
-    |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: :map})
-    |> Workflow.register_component(node)
-  end
+  def connect(%Map{} = node, parent, workflow), do: Lifecycle.connect(node, parent, workflow, :map)
 
   def source(%Map{} = node) do
     quote do

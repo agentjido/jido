@@ -60,6 +60,23 @@ defmodule Jido.Exec.HandoffTest do
     def run(_params, _context), do: raise("successor must run in a new Turn")
   end
 
+  defmodule Increment do
+    use Jido.Action, name: "handoff_increment", schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
+    def on_before_validate_params(%{value: value}) when is_integer(value), do: {:ok, %{value: value + 1}}
+    def on_before_validate_params(params), do: {:ok, params}
+    def run(params, _context), do: {:ok, params}
+  end
+
+  defmodule IncrementFlow do
+    use Jido.Flow, name: "handoff_increment_flow"
+    def on_before_validate_params(params), do: Increment.on_before_validate_params(params)
+
+    flow do
+      step "echo", action: Echo, params: input()
+      output result("echo")
+    end
+  end
+
   defmodule PortableTarget do
     use Jido.Action,
       name: "handoff_portable_target",
@@ -108,6 +125,41 @@ defmodule Jido.Exec.HandoffTest do
   test "a terminal handoff validates the successor without running it" do
     assert {:handoff, %Instruction{target: Target, kind: :action, params: %{value: 7}}, [:predecessor_effect]} =
              Exec.run(Example, %{value: 7}, %{})
+  end
+
+  test "a successor receives one input transformation for an Action or Flow" do
+    flow =
+      Flow.new!(%{
+        name: "handoff_validation",
+        components: [%{kind: :handoff, name: "next", selector: SelectTarget, params: Ref.input([])}],
+        output: Ref.result("next")
+      })
+
+    for target <- [Increment, IncrementFlow] do
+      assert {:handoff, %Instruction{} = successor, []} = Exec.run(flow, %{target: target})
+      assert Exec.run(successor) == Exec.run(target, %{value: 7})
+      assert Exec.run(successor, %{value: 10}) == {:ok, %{value: 11}}
+    end
+
+    assert {:error, %Jido.Error.ValidationError{}} = Runtime.handoff(Increment, %{value: "invalid"})
+
+    runner = __MODULE__.ValidationRunner
+    start_supervised!({Runic.Runner, name: runner})
+    owner = self()
+    opts = [on_complete: fn _, _ -> send(owner, :validation_done) end]
+    assert {:ok, _} = Jido.Test.Exec.RunnerHarness.start(runner, "validation", flow, %{target: Increment}, %{}, opts)
+    assert_receive :validation_done, 2_000
+
+    {:ok, workflow} = Runic.Runner.get_workflow(runner, "validation")
+    {:ok, restored} = workflow |> Runic.Runner.encode_snapshot() |> Runic.Runner.decode_snapshot()
+    replayed = workflow |> Runic.Workflow.event_log() |> Runic.Workflow.from_events()
+
+    for saved <- [restored, replayed] do
+      assert {:handoff, %Instruction{params: %{value: 7}} = successor, []} =
+               Jido.Test.Exec.RunnerHarness.result(saved)
+
+      assert Exec.run(successor) == {:ok, %{value: 8}}
+    end
   end
 
   test "ordinary data and validator output cannot grant control" do

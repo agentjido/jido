@@ -155,23 +155,12 @@ defimpl Runic.Identity.Projectable, for: Jido.Exec.Node.Reduce do
 end
 
 defimpl Runic.Component, for: Jido.Exec.Node.Reduce do
+  alias Jido.Exec.Node.Lifecycle
   alias Jido.Exec.Node.Reduce
-  alias Runic.Workflow
 
   def connectable?(_node, _other), do: true
 
-  def connect(%Reduce{} = node, parents, workflow) when is_list(parents) do
-    join = parents |> Enum.map(& &1.hash) |> Workflow.Join.new()
-    workflow = Enum.reduce(parents, workflow, &Workflow.add_step(&2, &1, join))
-    connect(node, join, workflow)
-  end
-
-  def connect(%Reduce{} = node, parent, workflow) do
-    workflow
-    |> Workflow.add_step(parent, node)
-    |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: :reduce})
-    |> Workflow.register_component(node)
-  end
+  def connect(%Reduce{} = node, parent, workflow), do: Lifecycle.connect(node, parent, workflow, :reduce)
 
   def source(%Reduce{} = node) do
     quote do

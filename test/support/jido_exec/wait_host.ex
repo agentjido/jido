@@ -289,7 +289,7 @@ defmodule Jido.Test.Exec.WaitHost do
     Workflow.apply_runnable(workflow, runnable)
   end
 
-  defp protect(work), do: Runtime.run(Jido.Exec.TaskSupervisor, Process.group_leader(), work)
+  defp protect(work), do: Runtime.run(Jido.Exec.TaskSupervisor, :infinity, work)
 
   defp runtime(workflow, context, state),
     do:

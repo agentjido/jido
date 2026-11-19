@@ -28,6 +28,11 @@ defmodule Jido.Exec.CompilerTest do
 
     @impl true
     def validate_output(output), do: {:ok, output}
+
+    def __jido_flow_source_map__ do
+      send(self(), {:lowered, __MODULE__})
+      %{}
+    end
   end
 
   defmodule CountedChild do
@@ -49,6 +54,11 @@ defmodule Jido.Exec.CompilerTest do
 
     @impl true
     def validate_output(output), do: {:ok, output}
+
+    def __jido_flow_source_map__ do
+      send(self(), {:lowered, __MODULE__})
+      %{}
+    end
   end
 
   defmodule RecursiveChild do
@@ -119,7 +129,7 @@ defmodule Jido.Exec.CompilerTest do
     assert {:ok, %{actual: 7}} = Exec.run(flow, %{raw: true})
   end
 
-  test "one compile materializes each shared child module once at every nesting depth" do
+  test "one compile materializes and lowers each shared child module once at every nesting depth" do
     flow =
       flow!(
         "shared_children",
@@ -135,6 +145,9 @@ defmodule Jido.Exec.CompilerTest do
       assert_received {:materialized, CountedChild}
       assert_received {:materialized, CountedLeaf}
       refute_received {:materialized, _module}
+      assert_received {:lowered, CountedChild}
+      assert_received {:lowered, CountedLeaf}
+      refute_received {:lowered, _module}
     end
   end
 

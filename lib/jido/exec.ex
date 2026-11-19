@@ -25,7 +25,6 @@ defmodule Jido.Exec do
 
   alias Runic.Workflow.Execution
 
-  @default_task_supervisor Jido.Exec.TaskSupervisor
   @default_max_concurrency_ceiling 10
 
   @type exec_result ::
@@ -52,22 +51,20 @@ defmodule Jido.Exec do
   @doc """
   Runs an Action or Flow to completion with the in-memory Runic runtime.
 
-  `Jido.Exec.run/4` runs the Action or Flow in a supervised task.
-  The complete execution runs in an unlinked temporary task under
-  `Jido.Exec.TaskSupervisor`. The task keeps the caller's group leader.
+  The run uses temporary supervised tasks that keep the caller's group leader.
+  Set `:deadline_ms` to bound the whole call, or `:task_supervisor` to use a local
+  host's admission limit. The default is `Jido.Exec.TaskSupervisor`.
   """
   @spec run(term(), map() | keyword() | nil, map() | keyword() | nil, keyword()) :: exec_result()
   def run(target, params \\ %{}, context \\ %{}, opts \\ []) do
-    group_leader = Process.group_leader()
-
-    with {:ok, instruction} <-
-           Jido.Exec.Runtime.run(@default_task_supervisor, group_leader, fn ->
-             resolve(target, params, context)
-           end) do
-      span(instruction, fn ->
-        Jido.Exec.Runtime.run(@default_task_supervisor, group_leader, fn ->
-          do_run_instruction(instruction, opts)
-        end)
+    with {:ok, policy, limit, deadline, supervisor} <-
+           Runtime.immediate_options(opts, default_max_concurrency()) do
+      Runtime.run(supervisor, deadline, fn ->
+        with {:ok, instruction} <- resolve(target, params, context) do
+          span(instruction, supervisor, deadline, fn ->
+            do_run_instruction(instruction, policy, limit, deadline)
+          end)
+        end
       end)
     end
   end
@@ -79,23 +76,21 @@ defmodule Jido.Exec do
     end
   end
 
-  defp span(%Instruction{kind: :flow} = instruction, work),
-    do: Telemetry.span(:flow, Telemetry.flow_metadata(instruction), work)
+  defp span(%Instruction{kind: :flow} = instruction, supervisor, deadline, work) do
+    Telemetry.span(:flow, Telemetry.flow_metadata(instruction), fn ->
+      Runtime.run(supervisor, deadline, work)
+    end)
+  end
 
-  defp span(%Instruction{}, work), do: work.()
+  defp span(%Instruction{}, _supervisor, _deadline, work), do: work.()
 
   defp reject_waits(workflow), do: Jido.Exec.Node.Wait.validate_host(workflow)
 
-  defp do_run_instruction(%Instruction{} = instruction, opts) do
-    with {:ok, workflow} <- compile(instruction, []),
-         :ok <- reject_waits(workflow),
-         {:ok, workflow, observation} <-
-           run_workflow(
-             workflow,
-             execution_input(instruction),
-             instruction.context,
-             opts
-           ) do
+  defp do_run_instruction(%Instruction{} = instruction, policy, limit, deadline) do
+    with {:ok, workflow, parallel?} <- Compiler.compile_for_run(instruction, []),
+         :ok <- reject_waits(workflow) do
+      concurrency = if parallel? and limit > 1, do: {:graph, limit}, else: {:component, limit}
+      {workflow, observation} = run_workflow(workflow, instruction, policy, concurrency, deadline)
       result(workflow, observation)
     else
       {:error, error} -> {:error, Result.normalize(error)}
@@ -107,46 +102,39 @@ defmodule Jido.Exec do
 
   With a workflow and observation from `Runic.Workflow.execute/3` or
   `Runic.Runner.execution/3`, selects that input occurrence. Active work,
-  stopped admission, failures, and uncertain work return errors. Store
-  acknowledgement remains a separate Runic persistence status.
+  stopped admission, foreign observations, failures, and uncertain work return
+  errors. Store acknowledgement remains a separate Runic persistence status.
   """
   @spec result(Workflow.t(), Execution.t()) :: exec_result()
   def result(%Workflow{} = workflow, %Execution{} = observation),
     do: Result.project(workflow, observation)
 
-  defp run_workflow(workflow, input, context, opts) do
-    with {:ok, policy, max_concurrency} <-
-           Runtime.execution_options(opts, max_concurrency: default_max_concurrency()) do
-      runic_concurrency? = max_concurrency > 1 and concurrent_graph?(workflow)
+  defp run_workflow(workflow, instruction, policy, concurrency, deadline) do
+    {react_opts, component_limit} =
+      case concurrency do
+        {:graph, limit} -> {[async: true, max_concurrency: limit], 1}
+        {:component, limit} -> {[], limit}
+      end
 
-      react_opts =
-        if runic_concurrency?,
-          do: [async: true, max_concurrency: max_concurrency],
-          else: []
+    context =
+      instruction.context
+      |> Runtime.caller_context()
+      |> Map.put(:__jido_exec_max_concurrency__, component_limit)
 
-      component_max_concurrency = if runic_concurrency?, do: 1, else: max_concurrency
+    opts = [
+      runnable_order: &Result.runnable_order/1,
+      scheduler_policies: [{:default, Map.from_struct(policy)}]
+    ]
 
-      context =
-        context
-        |> Jido.Exec.Runtime.caller_context()
-        |> Map.put(:__jido_exec_max_concurrency__, component_max_concurrency)
+    Runtime.quiet_failure_log()
 
-      Runtime.quiet_failure_log()
-
-      {workflow, observation} =
-        workflow
-        |> Workflow.enable_event_emission()
-        |> Workflow.put_run_context(%{_global: context})
-        |> Workflow.execute(
-          Jido.Exec.Fact.local_value(input),
-          Keyword.merge(react_opts,
-            runnable_order: &Result.runnable_order/1,
-            scheduler_policies: [{:default, Map.from_struct(policy)}]
-          )
-        )
-
-      {:ok, workflow, observation}
-    end
+    workflow
+    |> Workflow.enable_event_emission()
+    |> Workflow.put_run_context(%{_global: context})
+    |> Workflow.execute(
+      Jido.Exec.Fact.local_value(instruction.params),
+      opts ++ react_opts ++ Runtime.deadline_options(deadline)
+    )
   end
 
   defp default_max_concurrency do
@@ -156,32 +144,4 @@ defmodule Jido.Exec do
       min(System.schedulers_online(), @default_max_concurrency_ceiling)
     )
   end
-
-  defp concurrent_graph?(workflow) do
-    graph = Workflow.component_graph(workflow)
-
-    components =
-      workflow
-      |> Workflow.components()
-      |> Map.values()
-      |> Enum.reject(fn component ->
-        is_struct(component, Jido.Exec.Node.Input) or
-          is_struct(component, Jido.Exec.Node.Output)
-      end)
-
-    components
-    |> Enum.with_index()
-    |> Enum.any?(fn {left, index} ->
-      components
-      |> Enum.drop(index + 1)
-      |> Enum.any?(fn right -> independent?(graph, left, right) end)
-    end)
-  end
-
-  defp independent?(graph, left, right) do
-    right not in Multigraph.reachable(graph, [left]) and
-      left not in Multigraph.reachable(graph, [right])
-  end
-
-  defp execution_input(%Instruction{params: params}), do: params
 end

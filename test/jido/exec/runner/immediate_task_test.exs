@@ -9,6 +9,11 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
   defmodule BlockingAction do
     use Jido.Action, name: "exec_immediate_blocking"
 
+    def run(%{trap_exits: true}, context) do
+      Process.flag(:trap_exit, true)
+      run(%{}, context)
+    end
+
     @impl true
     def run(_params, %{observer: observer}) do
       send(observer, {:action_started, self(), Process.group_leader()})
@@ -25,6 +30,7 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
     @impl true
     def run(_params, %{observer: observer}) do
       send(observer, {:action_started, self(), Process.group_leader()})
+      send(observer, {:action_scope, Runic.TaskScope.current()})
 
       receive do
         :release -> Process.exit(self(), :normal)
@@ -37,6 +43,16 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
 
     @impl true
     def run(_params, _context), do: Process.exit(self(), :kill)
+  end
+
+  defmodule NestedAction do
+    use Jido.Action, name: "exec_immediate_nested"
+
+    @impl true
+    def run(%{supervisor: supervisor}, context),
+      do: Exec.run(BlockingAction, %{}, context, task_supervisor: supervisor)
+
+    def run(_params, context), do: Exec.run(BlockingAction, %{}, context)
   end
 
   defmodule ClassificationCrashAction do
@@ -159,6 +175,93 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
     test "stops concurrent Flow Actions" do
       assert_caller_exit_stops_actions(parallel_flow(), [max_concurrency: 2], 2)
     end
+
+    test "stops concurrent items owned by a Parallel component" do
+      assert_caller_exit_stops_actions(parallel_collection(%{trap_exits: true}), [max_concurrency: 2], 2)
+      refute_received {:action_started, _pid, _group_leader}
+    end
+  end
+
+  @tag obligation: "jido_action.execution.I18"
+  test "a Parallel component timeout stops its active items" do
+    caller = run_blocking(parallel_collection(%{trap_exits: true}), max_concurrency: 2, timeout: 400)
+
+    monitors =
+      for _index <- 1..2 do
+        assert_receive {:action_started, pid, _group_leader}, 1_000
+        Process.monitor(pid)
+      end
+
+    assert_caller_result(caller, &match?({:error, %Jido.Error.TimeoutError{timeout: 400}}, &1))
+
+    for monitor <- monitors do
+      assert_receive {:DOWN, ^monitor, :process, _pid, _reason}, 1_000
+    end
+
+    refute_received {:action_started, _pid, _group_leader}
+  end
+
+  @tag obligation: "jido_action.execution.I18"
+  test "a whole-call deadline stops nested work despite a longer component timeout" do
+    caller = run_blocking(NestedAction, deadline_ms: 450, timeout: 60_000)
+    assert_receive {:action_started, pid, _group_leader}, 1_000
+    ref = Process.monitor(pid)
+
+    assert_caller_result(caller, fn result ->
+      match?({:error, %Jido.Error.TimeoutError{timeout: 450, details: %{phase: :exec_deadline}}}, result)
+    end)
+
+    refute Process.alive?(pid)
+    assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 1_000
+  end
+
+  @tag obligation: "jido_action.execution.I20"
+  test "a full supervisor refuses a new run and admits nested work in the active run" do
+    supervisor = start_supervised!({Task.Supervisor, max_children: 1})
+    owner = self()
+
+    task =
+      Task.async(fn ->
+        Exec.run(NestedAction, %{supervisor: supervisor}, %{observer: owner}, task_supervisor: supervisor)
+      end)
+
+    assert_receive {:action_started, pid, _group_leader}, 1_000
+
+    assert {:error, %{details: %{reason: :exec_overloaded}}} =
+             Exec.run(BlockingAction, %{}, %{observer: owner}, task_supervisor: supervisor)
+
+    assert {:error, %{details: %{reason: :exec_overloaded}}} =
+             Exec.run(BlockingAction, %{}, %{observer: owner}, task_supervisor: supervisor, deadline_ms: 1_000)
+
+    refute_received {:action_started, _pid, _group_leader}
+    send(pid, :release)
+    assert Task.await(task) == {:ok, %{released: true}}
+  end
+
+  @tag obligation: "jido_action.execution.I18"
+  test "an expired call starts no work" do
+    assert {:error, %Jido.Error.TimeoutError{timeout: 0, details: %{phase: :exec_deadline}}} =
+             Exec.run(BlockingAction, %{}, %{observer: self()}, deadline_ms: 0)
+
+    refute_received {:action_started, _pid, _group_leader}
+  end
+
+  @tag obligation: "jido_action.execution.I18"
+  test "the whole-call deadline applies while the admission supervisor is suspended" do
+    supervisor = start_supervised!(Task.Supervisor)
+    :ok = :sys.suspend(supervisor)
+
+    try do
+      caller = run_blocking(BlockingAction, task_supervisor: supervisor, deadline_ms: 150)
+
+      assert_caller_result(caller, fn result ->
+        match?({:error, %Jido.Error.TimeoutError{timeout: 150, details: %{phase: :exec_deadline}}}, result)
+      end)
+    after
+      :ok = :sys.resume(supervisor)
+    end
+
+    refute_receive {:action_started, _pid, _group_leader}, 50
   end
 
   test "run/4 leaves no linked helper process after completion" do
@@ -177,10 +280,10 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
     end
   end
 
-  test "run/4 stops its caller watcher when the execution task exits normally" do
+  test "run/4 closes its ownership scope when the execution task exits normally" do
     owner = self()
 
-    # The caller stays alive, so only the task exit can stop the watcher.
+    # The caller stays alive after Exec returns.
     caller =
       spawn_link(fn ->
         result = Exec.run(NormalExitAction, %{}, %{observer: owner})
@@ -194,19 +297,15 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
     on_exit(fn -> send(caller, :stop) end)
 
     assert_receive {:action_started, task_pid, _group_leader}, 1_000
-    supervisor = GenServer.whereis(Jido.Exec.TaskSupervisor)
-    {:links, links} = Process.info(task_pid, :links)
-    monitors = for pid <- links, pid != supervisor, pid != caller, do: Process.monitor(pid)
-    assert monitors != []
+    assert_receive {:action_scope, scope}, 1_000
+    monitor = Process.monitor(scope)
 
     send(task_pid, :release)
 
     assert_receive {:caller_result, ^caller, {:error, %Jido.Error.ExecutionError{message: "Exec task exited"}}},
                    1_000
 
-    for monitor <- monitors do
-      assert_receive {:DOWN, ^monitor, :process, _pid, _reason}, 1_000
-    end
+    assert_receive {:DOWN, ^monitor, :process, ^scope, :normal}, 1_000
   end
 
   test "a normal Action exit fails once under concurrent and timed execution" do
@@ -270,6 +369,20 @@ defmodule Jido.Exec.Runner.ImmediateTaskTest do
         %{kind: :step, name: "right", action: BlockingAction, params: %{}}
       ],
       output: %{left: Ref.result("left"), right: Ref.result("right")}
+    })
+  end
+
+  defp parallel_collection(params) do
+    Flow.new!(%{
+      name: "exec_immediate_parallel_collection",
+      components: [
+        %{
+          kind: :parallel,
+          name: "work",
+          actions: Enum.map(~w(left right queued), &%{name: &1, action: BlockingAction, params: params})
+        }
+      ],
+      output: %{work: Ref.result("work")}
     })
   end
 

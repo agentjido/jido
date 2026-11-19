@@ -2,12 +2,28 @@ defmodule Jido.Exec.Node.Lifecycle do
   @moduledoc false
 
   alias Jido.Exec.{Fact, Runtime, Validation}
+  alias Runic.Workflow
   alias Runic.Workflow.SingleOutput.{Context, Result}
 
   @type execution_result ::
           {:ok, term(), [term()]}
           | {:ok, term(), [term()], :none | :handoff}
           | {:error, Exception.t()}
+
+  @doc false
+  @spec connect(struct(), struct() | [struct()], Workflow.t(), atom()) :: Workflow.t()
+  def connect(node, parents, workflow, kind) when is_list(parents) do
+    join = parents |> Enum.map(& &1.hash) |> Workflow.Join.new()
+    workflow = Enum.reduce(parents, workflow, &Workflow.add_step(&2, &1, join))
+    connect(node, join, workflow, kind)
+  end
+
+  def connect(node, parent, workflow, kind) do
+    workflow
+    |> Workflow.add_step(parent, node)
+    |> Workflow.draw_connection(node, node, :component_of, properties: %{kind: kind})
+    |> Workflow.register_component(node)
+  end
 
   @doc false
   @spec run(struct(), term(), Context.t(), (map() -> execution_result())) :: Result.t()

@@ -4,6 +4,7 @@ defmodule Jido.Exec.Node.Output do
   @behaviour Runic.Workflow.SingleOutput
 
   alias Jido.Exec.{Fact, Validation, ValueResolver}
+  alias Jido.Flow.Ref
   alias Runic.Identity
   alias Runic.Workflow.SingleOutput.{Context, Result}
 
@@ -48,17 +49,15 @@ defmodule Jido.Exec.Node.Output do
   def run(%__MODULE__{} = node, input, %Context{} = context) do
     bindings = Fact.unwrap(input)
 
-    handoff? =
-      bindings
-      |> Map.get(:controls, %{})
-      |> Enum.any?(fn {_key, control} -> control == :handoff end)
+    controls = Map.get(bindings, :controls, %{})
+    handoff? = :handoff in Map.values(controls)
 
     with {:ok, output} <-
            ValueResolver.resolve(
              node.output,
              ValueResolver.resolver_state(bindings, context.runtime)
            ),
-         {:ok, output} <- validate_output(node, output, handoff?) do
+         {:ok, output} <- validate_output(node, output, handoff?, controls) do
       effects = ordered_effects(bindings, node.effect_order)
       metadata = %{jido: %{effects: effects} |> maybe_control(handoff?)}
       Fact.result(input, context, Fact.localize(output), metadata)
@@ -68,8 +67,23 @@ defmodule Jido.Exec.Node.Output do
     end
   end
 
-  defp validate_output(_node, %Jido.Instruction{} = instruction, true), do: {:ok, instruction}
-  defp validate_output(node, output, _handoff?), do: Validation.output(node.validator, output)
+  defp validate_output(
+         %{output: %Ref{source: :result, component: name, path: []}},
+         %Jido.Instruction{} = instruction,
+         true,
+         controls
+       )
+       when controls == %{name => :handoff},
+       do: {:ok, instruction}
+
+  defp validate_output(_node, _output, true, _controls) do
+    {:error,
+     Jido.Error.config_error("the Flow must return the complete handoff result", %{
+       reason: :nested_handoff
+     })}
+  end
+
+  defp validate_output(node, output, false, _controls), do: Validation.output(node.validator, output)
 
   defp ordered_effects(bindings, order) do
     effects = Map.get(bindings, :effects, %{})

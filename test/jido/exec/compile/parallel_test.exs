@@ -13,6 +13,11 @@ defmodule Jido.Exec.Compile.ParallelTest do
     use Jido.Action, name: "compiled_parallel_effect"
 
     @impl true
+    def run(%{name: name}, %{observer: observer}) do
+      send(observer, {:action_started, name})
+      {:ok, %{name: name}, [name]}
+    end
+
     def run(%{name: name}, _context), do: {:ok, %{name: name}, [name]}
   end
 
@@ -21,6 +26,18 @@ defmodule Jido.Exec.Compile.ParallelTest do
 
     @impl true
     def run(_params, _context), do: {:error, "parallel failed"}
+  end
+
+  @tag obligation: "jido_action.execution.I18"
+  test "serial Parallel starts no later Action after failure" do
+    flow =
+      parallel_flow("compiled_parallel_stop_admission", [
+        action("fail", Fail, %{}),
+        action("queued", Effect, %{name: :queued})
+      ])
+
+    assert {:error, %{details: %{action_index: 0}}} = Exec.run(flow, %{}, %{observer: self()}, max_concurrency: 1)
+    refute_received {:action_started, :queued}
   end
 
   test "compile lowers one Parallel to one dedicated Runic Parallel component" do

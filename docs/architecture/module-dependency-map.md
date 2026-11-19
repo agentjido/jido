@@ -647,7 +647,7 @@ Disposition terms:
 | `Jido.Exec.Handoff` | Removed | Runtime normalizes a Handoff directly to the canonical `Jido.Instruction` value |
 | `Jido.Exec.NestedCompiler` | Added | Explicit compiler capability for runtime Invoke expansion |
 | `Jido.Exec.Portable` | Removed | Strict storage checks use `Jido.Codec.Term`; process-local execution checks belong to Runtime |
-| `Jido.Exec.Runtime` | Keep | Execution host policy |
+| `Jido.Exec.Runtime` | Keep | Immediate admission and deadlines. Adapts Runic task ownership for Exec and collections. |
 | `Jido.Exec.Source` | Removed | Source attachment now belongs to `Jido.Exec.Validation` |
 | `Jido.Exec.Telemetry` | Moved | `Jido.Telemetry.Exec` |
 | `Jido.Exec.Validation` | Keep | Shared Action and Flow execution-boundary validation |

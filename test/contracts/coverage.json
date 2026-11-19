@@ -3541,7 +3541,7 @@
         "jido_action.boundary.I8": {
           "failing": 0,
           "kind": "functional",
-          "passing": 14,
+          "passing": 16,
           "status": "active",
           "testable": true,
           "tests": [
@@ -3549,7 +3549,9 @@
             "test a Handoff joins more than one dependency before its selector",
             "test a nested Flow cannot terminate its parent with a handoff",
             "test a root Action cannot hand off",
+            "test a successor receives one input transformation for an Action or Flow",
             "test a terminal handoff validates the successor without running it",
+            "test an Invoke may hand off only through the complete result of the sole terminal",
             "test an ordinary Step cannot hand off",
             "test handoff Flow telemetry reports its outcome and effects",
             "test handoff normalization rejects invalid targets and non-portable open input",
@@ -3682,15 +3684,22 @@
         "jido_action.execution.I18": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 5,
+          "passing": 12,
           "status": "active",
           "testable": true,
           "tests": [
+            "test Map collects an abrupt item exit in serial and concurrent execution",
+            "test Map leaves queued items unstarted and selects the first input failure",
             "test Runic PolicyDriver owns retry and backoff policy",
             "test Runic PolicyDriver owns timeouts",
+            "test a Parallel component timeout stops its active items",
             "test a serial fail-fast Map does not start later items",
+            "test a whole-call deadline stops nested work despite a longer component timeout",
+            "test an expired call starts no work",
             "test max_attempts retries only errors marked retryable",
-            "test retry attempts keep one activation and one logical effect identity"
+            "test retry attempts keep one activation and one logical effect identity",
+            "test serial Parallel starts no later Action after failure",
+            "test the whole-call deadline applies while the admission supervisor is suspended"
           ]
         },
         "jido_action.execution.I19": {
@@ -3706,37 +3715,42 @@
         "jido_action.execution.I20": {
           "failing": 0,
           "kind": "functional",
-          "passing": 11,
+          "passing": 13,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a full supervisor refuses a new run and admits nested work in the active run",
             "test a normal Action exit fails once under concurrent and timed execution",
             "test an untrappable Action exit does not exit the caller",
             "test caller exit stops an Action that runs in the execution task",
             "test caller exit stops an Action that runs under a Runic timeout",
             "test caller exit stops concurrent Flow Actions",
+            "test caller exit stops concurrent items owned by a Parallel component",
             "test max_concurrency is one limit across independent Maps",
+            "test run/4 closes its ownership scope when the execution task exits normally",
             "test run/4 executes under the application Task Supervisor by default",
             "test run/4 leaves no linked helper process after completion",
             "test run/4 preserves the caller group leader",
-            "test run/4 stops its caller watcher when the execution task exits normally",
             "test target resolution cannot exit the caller"
           ]
         },
         "jido_action.execution.I21": {
           "failing": 0,
           "kind": "functional",
-          "passing": 7,
+          "passing": 10,
           "status": "active",
           "testable": true,
           "tests": [
             "test a computed result does not acknowledge failed persistence",
+            "test a foreign failure is rejected before its error is read",
             "test a running observation cannot return an already produced result",
             "test a successful new input does not inherit an earlier input's failure",
             "test an observation cannot select another input's result",
             "test earlier observations select their own result after another input completes",
             "test observation projects the declared result and preserves effects",
-            "test stopped admission cannot return a successful output"
+            "test reusing the explicit execution ID and input across workflows cannot select a foreign result",
+            "test stopped admission cannot return a successful output",
+            "test the same explicit ID and definition can still produce different results"
           ]
         },
         "jido_action.execution.I22": {
