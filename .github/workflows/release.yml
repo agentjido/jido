@@ -38,8 +38,46 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  release_tests:
     if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.operation == 'prepare' && inputs.dry_run == true && inputs.hex_dry_run == true) }}
+    name: Release tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      MIX_ENV: test
+    outputs:
+      commit: ${{ steps.checkout.outputs.commit }}
+    steps:
+      - name: Checkout release candidate
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: >-
+            ${{ (inputs.operation == 'publish' || (inputs.operation == 'auto' && startsWith(github.ref, 'refs/tags/v')))
+                && inputs.tag_name != '' && format('refs/tags/{0}', inputs.tag_name) || github.sha }}
+          persist-credentials: false
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          otp-version: "29"
+          elixir-version: "1.20"
+
+      - name: Install Hex and Rebar
+        run: |
+          mix local.hex --if-missing --force
+          mix local.rebar --if-missing --force
+
+      - name: Get test dependencies
+        run: mix deps.get
+
+      - name: Run offline tests and Covenants
+        run: mix test.all
+
+  release:
+    needs: release_tests
     name: Release
     uses: agentjido/github-actions/.github/workflows/jido-release.yml@v5
     with:
@@ -49,8 +87,8 @@ jobs:
       otp_version: "29"
       elixir_version: "1.20"
       preflight_command: >-
+        test "$(git rev-parse HEAD)" = "${{ needs.release_tests.outputs.commit }}" &&
         MIX_ENV=test mix quality &&
-        MIX_ENV=test mix test.all &&
         mix docs --no-open -f html --warnings-as-errors &&
         mix hex.audit
       dry_run: ${{ inputs.dry_run || false }}
