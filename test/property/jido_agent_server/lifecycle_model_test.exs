@@ -212,10 +212,11 @@ defmodule Jido.AgentServer.Property.LifecycleModelTest do
           {:ok, member} = Jido.resolve_agent(data.instance, data.member)
           Server.snapshot(member).agent.state.count == expected
         end,
-        timeout: 1_500
+        timeout: 3_000
       )
 
-      eventually(fn -> match?(%{topology_handoffs: %{pending: 0}}, Server.status(model.root)) end)
+      # Acceptance can finish before the sender gets its reply and clears the outbox.
+      eventually(fn -> match?(%{topology_handoffs: %{pending: 0}}, Server.status(model.root)) end, timeout: 3_000)
       %{model | accepted: expected}
     else
       model

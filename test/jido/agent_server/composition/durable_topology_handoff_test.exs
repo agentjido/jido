@@ -188,7 +188,7 @@ defmodule Jido.AgentServer.Composition.DurableTopologyHandoffTest do
   end
 
   @tag obligation: "jido.agent_server.composition.I11"
-  test "legacy slash-named members require a declared owner", c do
+  test "legacy slash-named members remain owned after owner deletion", c do
     owner = %{c.address | id: "legacy"}
     assert {:ok, ^owner} = Jido.create_agent(c.instance, owner, LegacySlashRoot)
     assert {:ok, root} = Jido.activate_agent(c.instance, owner)
@@ -206,6 +206,9 @@ defmodule Jido.AgentServer.Composition.DurableTopologyHandoffTest do
     standalone = %{owner | id: "legacy/$topology/independent/1/initial"}
     assert {:ok, ^standalone} = Jido.create_agent(c.instance, standalone, Child)
     assert {:ok, _pid} = Jido.activate_agent(c.instance, standalone)
+
+    assert :ok = Jido.delete_agent(c.instance, owner)
+    assert {:error, :topology_owner_required} = Jido.activate_agent(c.instance, member)
   end
 
   @tag obligation: "jido.agent_server.composition.I11"

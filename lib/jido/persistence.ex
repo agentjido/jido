@@ -414,8 +414,8 @@ defmodule Jido.Persistence do
   defp saved_topology_owner(_config, _address, %{topology_owner: owner}), do: {:ok, owner}
 
   defp saved_topology_owner(config, address, _record) do
-    # Older records have only the generated member ID. The owning record
-    # must also declare that member name before we treat the ID as reserved.
+    # Older members have only the generated ID. A tombstone no longer has its
+    # declared names, so keep canonical member IDs under that owner reserved.
     address.id
     |> :binary.matches("/$topology/")
     |> Enum.reverse()
@@ -434,11 +434,11 @@ defmodule Jido.Persistence do
     name = named |> Enum.reverse() |> Enum.join("/")
 
     with {index, ""} when index > 0 <- Integer.parse(slot),
+         true <- Integer.to_string(index) == slot,
          true <- identity == "initial" or Jido.Id.uuid7?(identity),
          {:ok, bytes, _condition} <- Store.read(config.store, Record.agent_key(owner)),
          {:ok, record} <- Record.decode(bytes, config),
-         %{agent: %{topology: %{agents: members}}} <- Record.checkpoint(record),
-         true <- Enum.any?(members, &(Atom.to_string(&1.name) == name)) do
+         :ok <- legacy_owner_record(record, owner, name) do
       {:ok, %{address: owner, slot: "$topology/#{name}/#{slot}"}}
     else
       {:error, :not_found} -> {:ok, nil}
@@ -448,6 +448,16 @@ defmodule Jido.Persistence do
   end
 
   defp legacy_owner(_config, _owner, _suffix), do: {:ok, nil}
+
+  defp legacy_owner_record(%{kind: :tombstone, agent_module: module} = record, owner, _name)
+       when is_atom(module) and not is_nil(module),
+       do: Record.validate(record, owner, module)
+
+  defp legacy_owner_record(record, _owner, name) do
+    with %{agent: %{topology: %{agents: members}}} <- Record.checkpoint(record),
+         true <- Enum.any?(members, &(Atom.to_string(&1.name) == name)),
+         do: :ok
+  end
 
   @doc """
   Atomically upgrades one inactive saved Agent.

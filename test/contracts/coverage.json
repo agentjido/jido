@@ -1134,7 +1134,7 @@
             "test a removed member cannot activate outside its owner",
             "test a timed out removal closes admission and a retry finishes cleanup",
             "test explicit cancellation stops an accepted pre-commit turn",
-            "test legacy slash-named members require a declared owner",
+            "test legacy slash-named members remain owned after owner deletion",
             "test removal keeps durable child state for a replacement root activation",
             "test removal stops one selected subtree and keeps the root and sibling alive",
             "test the instance restarts exec_runner and explicit activation restores the family",
@@ -4111,10 +4111,11 @@
         "jido_action.flow.I9": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test inspection allows explicit Action output envelope fields",
             "test validation, inspection, and compilation do not run Action work"
           ]
         }

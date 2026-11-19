@@ -39,7 +39,8 @@ defmodule Jido.Signal.Bus.Server do
 
   @impl GenServer
   def handle_call(request, from, %{store_dirty?: true} = state) do
-    with {:ok, latest_cursor, subscriptions, _router} <- load_store(state),
+    with :ok <- Store.settle(state),
+         {:ok, latest_cursor, subscriptions, _router} <- load_store(state),
          {:ok, recovered} <- recover_publications(state, latest_cursor) do
       state = %{state | next_cursor: latest_cursor + 1, store_dirty?: false}
       state = Subscriptions.recover(state, subscriptions)
@@ -120,7 +121,7 @@ defmodule Jido.Signal.Bus.Server do
   def format_status(status), do: status
 
   defp reply_error(reason, state),
-    do: {:reply, {:error, reason}, %{state | store_dirty?: Store.unknown_outcome?(reason)}}
+    do: {:reply, {:error, reason}, %{state | store_dirty?: Store.recovery_required?(reason)}}
 
   defp recover_publications(%{next_cursor: next} = state, latest) when latest >= next,
     do: replay(state, "**", after: next - 1, limit: latest - next + 1)

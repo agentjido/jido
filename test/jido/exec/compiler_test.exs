@@ -75,6 +75,8 @@ defmodule Jido.Exec.CompilerTest do
       name: "compiler_output_probe",
       output_schema: Jido.Joi.object(%{id: Jido.Joi.integer()}, unrecognized_keys: :error)
 
+    def run(%{raw: true}, _context), do: {:ok, Jido.Action.Output.raw(%{actual: 7})}
+
     def run(%{test_pid: pid}, _context) do
       send(pid, :action_ran)
       {:ok, %{id: 1}}
@@ -106,6 +108,15 @@ defmodule Jido.Exec.CompilerTest do
 
     wait = flow!("with_timer", [%{kind: :timer, name: "timer", after_ms: 1}], Ref.result("timer"))
     assert {:ok, %{requirements: [:waits], advisories: []}} = Flow.explain(wait)
+  end
+
+  @tag obligation: "jido_action.flow.I9"
+  test "inspection allows explicit Action output envelope fields" do
+    load = %{kind: :step, name: "load", action: OutputProbe, params: Ref.input([])}
+    flow = flow!("raw_output", [load], %{actual: Ref.result("load", [:value, :actual])})
+
+    assert {:ok, %{advisories: []}} = Flow.explain(flow)
+    assert {:ok, %{actual: 7}} = Exec.run(flow, %{raw: true})
   end
 
   test "one compile materializes each shared child module once at every nesting depth" do

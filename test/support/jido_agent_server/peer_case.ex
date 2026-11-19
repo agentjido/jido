@@ -3,9 +3,9 @@ defmodule Jido.Test.AgentServer.PeerCase do
   Two isolated Erlang nodes with a Jido instance on each node.
 
   Peer calls control the test through standard IO. Agent commands between the
-  two nodes use Erlang distribution. The ExUnit node stays unnamed. Cleanup is
-  registered before application startup, so a failed setup or assertion still
-  stops each peer.
+  two nodes use Erlang distribution. Set `:distributed` to `false` for tests
+  that only need separate BEAM processes. The ExUnit node stays unnamed.
+  Cleanup is registered before application startup.
   """
   use ExUnit.CaseTemplate
 
@@ -20,14 +20,15 @@ defmodule Jido.Test.AgentServer.PeerCase do
     end
   end
 
-  setup do
-    cookie =
-      :crypto.strong_rand_bytes(24) |> Base.url_encode64(padding: false) |> String.to_charlist()
-
+  setup tags do
     jido = Jido.Test.AgentServer.PeerInstance
+    cookie = if Map.get(tags, :distributed, true), do: peer_cookie()
     [{peer_a, node_a}, {peer_b, node_b}] = start_peers(cookie, jido)
-    assert peer_call(peer_a, Node, :connect, [node_b]) == true
-    assert peer_call(peer_b, Node, :connect, [node_a]) == true
+
+    if cookie do
+      assert peer_call(peer_a, Node, :connect, [node_b]) == true
+      assert peer_call(peer_b, Node, :connect, [node_a]) == true
+    end
 
     {:ok, jido: jido, peer_a: peer_a, peer_b: peer_b, node_a: node_a, node_b: node_b}
   end
@@ -94,24 +95,24 @@ defmodule Jido.Test.AgentServer.PeerCase do
     peers
   end
 
+  defp peer_cookie do
+    :crypto.strong_rand_bytes(24) |> Base.url_encode64(padding: false) |> String.to_charlist()
+  end
+
+  defp boot_peer(_prefix, nil), do: start_peer(%{}, [])
+
   defp boot_peer(prefix, cookie) do
-    :peer.start(%{
+    opts = %{
       name: :peer.random_name(prefix),
       host: ~c"127.0.0.1",
-      longnames: true,
-      connection: :standard_io,
-      args: [
-        ~c"+S",
-        ~c"2",
-        ~c"-setcookie",
-        cookie,
-        ~c"-kernel",
-        ~c"inet_dist_use_interface",
-        ~c"{127,0,0,1}"
-      ],
-      wait_boot: 15_000
-    })
+      longnames: true
+    }
+
+    start_peer(opts, [~c"-setcookie", cookie, ~c"-kernel", ~c"inet_dist_use_interface", ~c"{127,0,0,1}"])
   end
+
+  defp start_peer(opts, args),
+    do: :peer.start(Map.merge(opts, %{connection: :standard_io, args: [~c"+S", ~c"2" | args], wait_boot: 15_000}))
 
   defp initialize_peer(peer, jido, coverage_files) do
     :ok = peer_call(peer, :code, :add_paths, [:code.get_path()])

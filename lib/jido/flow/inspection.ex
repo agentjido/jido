@@ -1,8 +1,11 @@
 defmodule Jido.Flow.Inspection do
   @moduledoc false
 
+  alias Jido.Action.Output
   alias Jido.Flow.{Component, Value}
   alias Jido.Joi.Schema
+
+  @output_envelope Output.__struct__()
 
   def requirements(ordered) do
     if Enum.any?(ordered, fn {_name, node} -> node.kind == :wait end), do: [:waits], else: []
@@ -22,6 +25,7 @@ defmodule Jido.Flow.Inspection do
 
       for value <- values,
           ref <- Value.result_references(value),
+          not Map.has_key?(@output_envelope, List.first(ref.path)),
           missing_field?(producers[ref.component], ref.path),
           uniq: true do
         %{code: :unknown_result_field, component: ref.component, path: ref.path}

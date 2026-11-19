@@ -217,12 +217,23 @@ Existing IDs still return their acknowledgment.
 The [durable handoff example](../../examples/13_durable_execution/13_14_topology_handoff/README.md)
 shows a pending send restored after an activation stops.
 
+## Deploy across the topology record change
+
+The current reader accepts earlier format-3 records. Earlier Jido builds can
+reject format-3 records that contain the `:topology_owner` field or store
+sender Addresses in accepted handoff receipts.
+
+Stop earlier Jido processes that use the store and back up the store before
+you deploy. After the new build writes either record shape, keep a reader that
+supports both shapes. To run the earlier binary, stop the new processes and
+restore the backup. Restoring the backup discards writes made since it was taken.
+
 ## Know the limits
 
 - **No family snapshot.** A root snapshot captures the logical topology, not the state of its running members. After a crash, members are each at their own last commit, and two members can reflect different points in a shared process. Keep invariants that span Agents in one Agent's state, or make your Flows tolerate this.
 - **No family upgrade.** `Jido.Persistence.upgrade_agent/5` changes one record. Upgrade the root and each member separately.
 - **Best-effort output.** Ordinary member outputs and connection deliveries are post-commit effects. They are not replayed. See [Recovery Limits](recovery-and-effect-limits.md).
-- **No family delete.** `Jido.delete_agent/3` on the root leaves member records in place. The next code shows this. Do not delete one member of a family you will restore, because the root's reconciliation reads `:deleted` and fails.
+- **No family delete.** `Jido.delete_agent/3` on the root leaves member records in place. An Address with a generated member ID under a deleted owner stays reserved, including when an older record has no explicit owner field. Use IDs outside this pattern for standalone Agents. Do not delete one member of a family you will restore, because the root's reconciliation reads `:deleted` and fails.
 
 ```elixir
 alias Jido.AgentServer, as: Server

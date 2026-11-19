@@ -56,7 +56,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.flow.I9 — Validation and inspection do not run Action work
 - **scope:** `Jido.Flow.validate/1, Jido.Flow.dependencies/1, Jido.Flow.explain/1, Jido.Exec.compile/2`
-- **must:** Structural validation, inspection, encoding, and compilation do not call Action run/2. Structural checks do not validate target callbacks; Exec compilation checks trusted targets. Trusted module, schema, and Flow builders can run during compilation. Preparation rejects provably invalid map output. Inspection reports known wait requirements and missing fields on closed result schemas without resolving dynamic output.
+- **must:** Structural validation, inspection, encoding, and compilation do not call Action run/2. Structural checks do not validate target callbacks; Exec compilation checks trusted targets. Trusted module, schema, and Flow builders can run during compilation. Preparation rejects provably invalid map output. Inspection reports known wait requirements and missing fields on closed result schemas without resolving dynamic output. Inspection permits paths through explicit Action output envelope fields.
 - **kind:** functional
 - **status:** active
 

@@ -1,6 +1,8 @@
 defmodule Jido.JoiRebuildTest do
   use Jido.Test.AgentServer.PeerCase, async: false
 
+  @moduletag distributed: false
+
   @fixture Jido.Test.JoiRebuildFixture
   @action Jido.Test.JoiRebuildAction
   @source_file "joi_rebuild_fixture.ex"
