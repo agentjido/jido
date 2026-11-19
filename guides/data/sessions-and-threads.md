@@ -56,6 +56,10 @@ nil = Thread.get_entry(thread, 99)
 
 `Jido.Thread.slice/3` uses an inclusive range of sequence numbers. These reads scan the list, so their cost grows with the length of the Thread.
 
+### Decode Thread records
+
+Thread and Entry decoders accept either an atom key or a string key for a field. If both forms occur for the same field, decode returns an error.
+
 ## Wrap a Thread in a Session
 
 `Jido.Session.new/1` creates an open Session with an empty Thread named after it. `Jido.Session.from_thread/2` wraps a Thread you already have.
@@ -145,8 +149,6 @@ document = Session.encode(record)
 ```
 
 `Jido.Thread.encode/1` and `Jido.Thread.decode/1` do the same for a Thread. `Jido.Session.decode!/1` raises instead of returning an error.
-
-Thread and Entry decoders accept either an atom key or a string key for a field. If both forms occur for the same field, decode returns an error.
 
 These maps use a `"version"` field and are not routed by `Jido.Codec`. Call `Jido.Session.encode/1` and `Jido.Session.decode/1` directly. Only version 1 can be read.
 

@@ -83,7 +83,7 @@ entry has one payload field and one ref field.
 Entry. A narrow Covenant run passed both obligations across 10 tests. Session
 revision and AI projection keep their current proof in
 `jido_ai.conversation`. Their separate ownership decisions remain open.
-[ADR 0013](../adr/0013-thread-proof-ownership.md) · [Thread obligations](../../test/contracts/jido/thread.obligations.md)
+[ADR 0014](../adr/0014-thread-proof-ownership.md) · [Thread obligations](../../test/contracts/jido/thread.obligations.md)
 
 ## Review history for 2026-11-10
 
