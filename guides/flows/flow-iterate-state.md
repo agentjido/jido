@@ -1,11 +1,11 @@
 # Iterate and State
 
-Use `iterate` to call one Action in a bounded loop that keeps local state between calls. This guide covers a fixed count, a condition, state updates, and how a loop fails.
+Use `iterate` to call an Action or a Flow in a bounded loop that keeps local state between calls. This guide covers a fixed count, a condition, state updates, and how a loop fails.
 
 An Iterate works like this:
 
 1. `state` sets the initial State.
-2. Each call receives `params` built from the current State.
+2. Each call receives `params` built from the current State, the iteration index, and the previous result.
 3. `update` builds the next State from the call's result.
 4. `repeat` or `while` decides when the loop stops.
 
@@ -136,10 +136,72 @@ These references are valid in `params`, `update`, and `while`:
 
 ## Targets and scope
 
-The body must be an Action module. A Flow module raises `CompileError` with "Flow component has the wrong target kind", and inline bodies are not supported. The body Action validates its own parameters with its own schema.
+Choose exactly one body target. Use `action` with an Action module or `flow` with a Flow module. The target validates its parameters with its own schema.
+
+Jido compiles the child Flow when it compiles the parent. Each iteration runs the compiled child with new parameters. The child output becomes `body_result()`, and Jido returns the effects in iteration order. A child Flow cannot wait or hand off.
+
+The following loop calls a child Flow that uses the `PayDown` Action from the previous example.
+
+```elixir
+defmodule FlowIterate.Payment do
+  use Jido.Flow, name: "flow_iterate_payment"
+
+  flow do
+    step "pay", action: FlowIterate.PayDown, params: input()
+    output result("pay")
+  end
+end
+
+defmodule FlowIterate.PaymentLoop do
+  use Jido.Flow, name: "flow_iterate_payment_loop"
+
+  flow do
+    iterate "payments" do
+      state Jido.Joi.object(%{balance: Jido.Joi.integer()}), initial: %{balance: input(:balance)}
+      flow FlowIterate.Payment
+      params %{balance: state(:balance), payment: input(:payment)}
+      while state(:balance) > 0
+      max_iterations 6
+    end
+
+    output result("payments")
+  end
+end
+```
 
 An Iterate is one component. Other components read only its final result, and a failed call fails the Iterate. A durable Flow saves the result of the whole Iterate. If the Flow stops before that save, recovery can repeat every iteration that already ran. Use `needs` and `meta` as in [Steps and Output](flow-steps.md).
 
 ## Data form
 
-In a map definition, Iterate uses `completion` in place of `while` or `repeat`. `completion` is a stop condition, so the loop stops when it is true. A DSL `while condition` lowers to `completion: not condition`, and `repeat n` lowers to `completion: iteration_index() >= n` with `max_iterations: n`. See [Flow Data Definitions](../flow-data/flow-data.md).
+Use `kind: :iterate` and exactly one of `action` or `flow`. In a map definition, `completion` is true when the loop must stop. For a fixed count, compare the iteration index to that count and use the same count for `max_iterations`.
+
+This map runs the same payment loop. With a Flow body, you can omit `state.update` to use the complete child output as the next State.
+
+```elixir
+alias Jido.Flow.Ref
+
+{:ok, payment_loop} =
+  Jido.Flow.new(%{
+    name: "payment_loop_from_map",
+    components: [
+      %{
+        kind: :iterate,
+        name: "payments",
+        flow: FlowIterate.Payment,
+        params: %{balance: Ref.state(:balance), payment: Ref.input(:payment)},
+        state: %{
+          schema: Jido.Joi.object(%{balance: Jido.Joi.integer()}),
+          initial: %{balance: Ref.input(:balance)}
+        },
+        completion: Jido.Expr.new!(:<=, [Ref.state(:balance), 0]),
+        max_iterations: 6
+      }
+    ],
+    output: Ref.result("payments")
+  })
+
+{:ok, %{iterations: 3, state: %{balance: 0}, output: %{balance: 0}}} =
+  Jido.Exec.run(payment_loop, %{balance: 250, payment: 100})
+```
+
+See [Flow Data Definitions](../flow-data/flow-data.md).

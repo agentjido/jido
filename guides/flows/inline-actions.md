@@ -165,7 +165,7 @@ end
 
 Inline bodies work in `step` and in a named `action` inside `parallel`. In `parallel`, the only options are `inline:` and `do:`.
 
-Choice targets, `map`, `reduce`, `iterate`, `invoke`, and `handoff` take Action modules. For these, write a module.
+Choice targets, `map`, `reduce`, `invoke`, and `handoff` take Action modules. An `iterate` body takes an Action or Flow module.
 
 ## Reuse the Action
 

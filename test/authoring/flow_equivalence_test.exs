@@ -141,6 +141,22 @@ defmodule Jido.Authoring.FlowEquivalenceTest do
          ],
          output: %{counter: Ref.result("counter")}
        }},
+      {Components.IterateChild,
+       %{
+         name: Components.IterateChild.name(),
+         components: [
+           %{
+             kind: :iterate,
+             name: "counter",
+             flow: Components.Child,
+             params: Ref.state(),
+             state: %{initial: %{value: 0}},
+             completion: Expr.new!(:>=, [Ref.iteration_index(), 1]),
+             max_iterations: 1
+           }
+         ],
+         output: Ref.result("counter")
+       }},
       {Components.Parent,
        %{
          name: Components.Parent.name(),

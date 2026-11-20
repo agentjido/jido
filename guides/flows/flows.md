@@ -92,7 +92,7 @@ A `flow` block declares one or more components. At least one is required.
 | `map` | Runs one Action for each list item. | [Map and Reduce](flow-collections.md) |
 | `reduce` | Folds a list through one Action, one item at a time. | [Map and Reduce](flow-collections.md) |
 | `parallel` | Runs different named Actions and joins their results. | [Map and Reduce](flow-collections.md) |
-| `iterate` | Runs one Action as a bounded loop over local state. | [Iterate and State](flow-iterate-state.md) |
+| `iterate` | Runs an Action or Flow in a bounded loop over local state. | [Iterate and State](flow-iterate-state.md) |
 | `invoke` | Selects an Action or Flow at runtime and continues in this graph. | [Dynamic Flows](dynamic-flows.md) |
 | `handoff` | Ends the root Flow and returns a successor to run in a new Turn. | [Dynamic Flows](dynamic-flows.md) |
 | `timer`, `await`, `selection` | Wait for a deadline or a host input under a host that supports waits. | Flow Waits |

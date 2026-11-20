@@ -6,13 +6,14 @@ defmodule Jido.Exec.Node.Iterate do
   alias Jido.Action.Validation, as: ActionValidation
   alias Jido.Error
   alias Jido.Exec.{ActionBoundary, ValueResolver}
-  alias Jido.Exec.Node.{Lifecycle, Targets}
+  alias Jido.Exec.Node.{FlowTarget, Lifecycle, Targets}
+  alias Jido.Instruction
   alias Runic.Identity
   alias Runic.Workflow.SingleOutput.{Context, Result}
 
   @derive {Inspect, only: [:id, :name, :node_path]}
   @enforce_keys [:id, :name, :hash, :definition, :target_versions, :node_path]
-  defstruct [:id, :name, :hash, :definition, :target_versions, :node_path, :location]
+  defstruct [:id, :name, :hash, :definition, :target_versions, :child_workflow, :node_path, :location]
 
   @type t :: %__MODULE__{}
 
@@ -26,7 +27,8 @@ defmodule Jido.Exec.Node.Iterate do
         :definition,
         :location,
         :node_path,
-        :target_versions
+        :target_versions,
+        :child_workflow
       ])
 
     id = Keyword.fetch!(opts, :id)
@@ -44,6 +46,7 @@ defmodule Jido.Exec.Node.Iterate do
         }),
       definition: definition,
       target_versions: Keyword.get_lazy(opts, :target_versions, fn -> Targets.versions(definition) end),
+      child_workflow: Keyword.get(opts, :child_workflow),
       location: Keyword.get(opts, :location),
       node_path: Keyword.get(opts, :node_path, [name])
     }
@@ -96,23 +99,14 @@ defmodule Jido.Exec.Node.Iterate do
 
     result =
       with {:ok, params} <- ValueResolver.resolve(node.definition.call.params, iteration_resolver),
-           {:ok, output, effects} <-
-             ActionBoundary.call(node.definition.call, params, node, context, {:iterate, completed}),
+           {:ok, output, effects} <- call_body(node, params, context, completed),
            {:ok, candidate} <-
              ValueResolver.resolve(
                node.definition.state.update,
                Map.put(iteration_resolver, :body_result, output)
              ),
            {:ok, next_state} <- validate_state(node, candidate, :update, completed + 1) do
-        iterate(
-          node,
-          context,
-          resolver,
-          next_state,
-          completed + 1,
-          output,
-          [effects | effect_groups]
-        )
+        {:ok, next_state, output, effects}
       end
 
     case result do
@@ -123,10 +117,19 @@ defmodule Jido.Exec.Node.Iterate do
            state_revision: completed
          })}
 
-      other ->
-        other
+      {:ok, next_state, output, effects} ->
+        iterate(node, context, resolver, next_state, completed + 1, output, [effects | effect_groups])
     end
   end
+
+  defp call_body(%{definition: %{call: %{kind: :flow} = call}} = node, params, context, _index) do
+    with {:ok, instruction} <- Instruction.resolve(call.target, params) do
+      FlowTarget.run(instruction, context.runtime, node, node.child_workflow)
+    end
+  end
+
+  defp call_body(node, params, context, index),
+    do: ActionBoundary.call(node.definition.call, params, node, context, {:iterate, index})
 
   defp complete?(node, resolver, state, completed, body) do
     resolver =
@@ -247,6 +250,7 @@ defimpl Runic.Component, for: Jido.Exec.Node.Iterate do
         name: unquote(node.name),
         definition: unquote(Macro.escape(node.definition)),
         target_versions: unquote(Macro.escape(node.target_versions)),
+        child_workflow: unquote(Macro.escape(node.child_workflow)),
         location: unquote(Macro.escape(node.location)),
         node_path: unquote(Macro.escape(node.node_path))
       )

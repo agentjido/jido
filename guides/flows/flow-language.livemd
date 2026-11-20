@@ -177,7 +177,7 @@ end
 
 ## Iterate
 
-An `iterate` calls one Action in a bounded loop and keeps local state between calls. This loop retries a payment check until it clears, up to five times.
+An `iterate` calls an Action or Flow in a bounded loop and keeps local state between calls. This loop retries a payment check until it clears, up to five times.
 
 ```elixir
 defmodule Tour.CheckPayment do
