@@ -80,6 +80,53 @@ defmodule Jido.Exec.CompilerTest do
     def validate_output(output), do: {:ok, output}
   end
 
+  defmodule MixedRecursiveParent do
+    @behaviour Jido.Flow
+
+    @impl true
+    def flow do
+      Flow.new!(%{
+        name: "mixed_recursive_parent",
+        components: [
+          %{
+            kind: :iterate,
+            name: "loop",
+            flow: Jido.Exec.CompilerTest.MixedRecursiveChild,
+            state: %{initial: %{}},
+            completion: true,
+            max_iterations: 1
+          }
+        ],
+        output: Ref.result("loop")
+      })
+    end
+
+    @impl true
+    def validate_params(params), do: {:ok, params}
+
+    @impl true
+    def validate_output(output), do: {:ok, output}
+  end
+
+  defmodule MixedRecursiveChild do
+    @behaviour Jido.Flow
+
+    @impl true
+    def flow do
+      Flow.new!(%{
+        name: "mixed_recursive_child",
+        components: [%{kind: :subflow, name: "parent", flow: MixedRecursiveParent}],
+        output: Ref.result("parent")
+      })
+    end
+
+    @impl true
+    def validate_params(params), do: {:ok, params}
+
+    @impl true
+    def validate_output(output), do: {:ok, output}
+  end
+
   defmodule OutputProbe do
     use Jido.Action,
       name: "compiler_output_probe",
@@ -135,7 +182,14 @@ defmodule Jido.Exec.CompilerTest do
         "shared_children",
         [
           %{kind: :subflow, name: "left", flow: CountedChild, params: %{}},
-          %{kind: :subflow, name: "right", flow: CountedChild, params: %{}}
+          %{
+            kind: :iterate,
+            name: "right",
+            flow: CountedChild,
+            state: %{initial: %{}},
+            completion: true,
+            max_iterations: 1
+          }
         ],
         Ref.result("right")
       )
@@ -162,6 +216,12 @@ defmodule Jido.Exec.CompilerTest do
     assert {:error, error} = Exec.compile(RecursiveChild, [])
     assert error.message == "recursive nested Flow cycle"
     assert error.details.module_stack == [RecursiveChild, RecursiveChild]
+  end
+
+  test "preparation rejects recursion through Iterate and Subflow edges" do
+    assert {:error, error} = Exec.compile(MixedRecursiveParent, [])
+    assert error.message == "recursive nested Flow cycle"
+    assert error.details.module_stack == [MixedRecursiveParent, MixedRecursiveChild, MixedRecursiveParent]
   end
 
   defp flow!(name, components, output) do

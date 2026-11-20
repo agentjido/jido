@@ -71,11 +71,12 @@ defmodule Jido.Flow.Validation do
 
   defp validate_component_target(
          name,
-         %{kind: :call, call: %{kind: :flow} = call},
+         %{kind: kind, call: %{kind: :flow} = call},
          module_stack,
          children,
          prepare_child
-       ) do
+       )
+       when kind in [:call, :iterate] do
     with {:ok, instruction} <- resolve_target(call, :flow, name),
          :ok <- reject_recursive_flow(instruction.target, module_stack),
          {:ok, children} <- prepare_child.(instruction.target, module_stack, children) do

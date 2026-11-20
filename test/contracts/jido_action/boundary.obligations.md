@@ -61,7 +61,7 @@ callers. This does not establish complete Flow contract coverage.
 
 ### jido_action.boundary.I9 — Loop calls retain position and reject invalid state
 - **scope:** `Jido.Exec.Node.Reduce`, `Jido.Exec.Node.Iterate`
-- **must:** Reduce and Iterate Action failures retain node and item or iteration position, including item IDs and state revisions. Reject non-enumerable Reduce input and unsupported initial values. Iterate rejects invalid initial State, failed State schemas and exhausted limits. These failures expose no executable effects.
+- **must:** Reduce Action failures retain node and item position, including item IDs and state revisions. Iterate Action and Flow body failures retain the iteration position and state revision. A child Flow failure retains its node path. Reject non-enumerable Reduce input and unsupported initial values. Iterate rejects invalid initial State, failed State schemas and exhausted limits. These failures expose no executable effects.
 - **kind:** functional
 - **status:** active
 

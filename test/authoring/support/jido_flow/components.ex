@@ -87,6 +87,21 @@ defmodule Jido.Test.Flow.Authoring.Components.Child do
   end
 end
 
+defmodule Jido.Test.Flow.Authoring.Components.IterateChild do
+  use Jido.Flow, name: "authoring_iterate_child"
+
+  flow do
+    iterate "counter" do
+      state Jido.Joi.map(), initial: %{value: 0}
+      flow Jido.Test.Flow.Authoring.Components.Child
+      params state()
+      repeat 1
+    end
+
+    output result("counter")
+  end
+end
+
 defmodule Jido.Test.Flow.Authoring.Components.Parent do
   use Jido.Flow, name: "authoring_component_parent"
 

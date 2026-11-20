@@ -30,6 +30,73 @@ defmodule Jido.Exec.Perf.LoadTest do
     end
   end
 
+  defmodule IterateWork do
+    use Jido.Action, name: "load_iterate_work"
+
+    @impl true
+    def run(%{id: id, count: index, index: index, stage: :prepare}, %{run_id: id}) do
+      {:ok, %{id: id, index: index}, [{id, index, :prepare}]}
+    end
+
+    def run(%{id: id, index: index, stage: :commit}, %{run_id: id}) do
+      {:ok, %{id: id, count: index + 1}, [{id, index, :commit}]}
+    end
+  end
+
+  defmodule IterateChild do
+    use Jido.Flow, name: "load_iterate_child"
+
+    flow do
+      step "prepare",
+        action: IterateWork,
+        params: %{id: input(:id), count: input(:count), index: input(:index), stage: :prepare}
+
+      step "commit",
+        action: IterateWork,
+        params: %{id: result("prepare", :id), index: result("prepare", :index), stage: :commit}
+
+      output result("commit")
+    end
+  end
+
+  defmodule IterateParent do
+    use Jido.Flow, name: "load_iterate_parent"
+
+    flow do
+      iterate "loop" do
+        state Jido.Joi.map(), initial: %{id: input(:id), count: 0}
+        flow IterateChild
+        params %{id: state(:id), count: state(:count), index: iteration_index()}
+        while state(:count) < input(:iterations)
+        max_iterations 10_000
+      end
+
+      output result("loop")
+    end
+  end
+
+  test "a Flow body reaches the 10,000-iteration limit with every effect in order" do
+    baseline = task_children()
+    assert_iterate_result(1, 10_000, run_iterate(1, 10_000))
+    assert_task_children_return_to(baseline)
+  end
+
+  test "200 callers keep Flow body state, run context, and effects isolated" do
+    baseline = task_children()
+    iterations = 50
+
+    1..200
+    |> Task.async_stream(
+      fn id -> {id, run_iterate(id, iterations)} end,
+      max_concurrency: System.schedulers_online(),
+      ordered: false,
+      timeout: 30_000
+    )
+    |> Enum.each(fn {:ok, {id, result}} -> assert_iterate_result(id, iterations, result) end)
+
+    assert_task_children_return_to(baseline)
+  end
+
   test "200 concurrent workflows keep their own inputs and release every process" do
     baseline = task_children()
     observer = self()
@@ -70,6 +137,23 @@ defmodule Jido.Exec.Perf.LoadTest do
     assert Enum.all?(caller_tasks, &(not Process.alive?(&1)))
     assert Enum.all?(execution_tasks, &(not Process.alive?(&1)))
     assert_task_children_return_to(baseline)
+  end
+
+  defp run_iterate(id, iterations) do
+    Exec.run(IterateParent, %{id: id, iterations: iterations}, %{run_id: id})
+  end
+
+  defp assert_iterate_result(id, iterations, result) do
+    expected = %{id: id, count: iterations}
+
+    assert {:ok, %{iterations: ^iterations, state: ^expected, output: ^expected}, effects} = result
+
+    expected_effects =
+      for index <- 0..(iterations - 1), stage <- [:prepare, :commit] do
+        {id, index, stage}
+      end
+
+    assert effects == expected_effects
   end
 
   defp assert_task_children_return_to(expected, attempts \\ 50)

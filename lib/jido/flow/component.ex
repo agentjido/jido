@@ -23,7 +23,7 @@ defmodule Jido.Flow.Component do
       call: {:call, [:action], :reduce_params}
     ],
     iterate: [
-      call: {:call, [:action], :iterate_params},
+      call: {:call, [:action, :flow], :iterate_params},
       state: :state,
       completion: {:condition, :iterate_completion},
       max_iterations: :maximum_iterations
@@ -216,7 +216,14 @@ defmodule Jido.Flow.Component do
     })
   end
 
-  def authoring(%{kind: kind} = attrs) when kind in [:map, :reduce, :iterate] do
+  def authoring(%{kind: :iterate} = attrs) do
+    case Map.keys(Map.take(attrs, [:action, :flow])) do
+      [kind] -> attrs |> default_iterate_update(kind) |> authoring_call(kind)
+      _ -> field_error([Error.validation_error("iterate requires exactly one of action or flow")])
+    end
+  end
+
+  def authoring(%{kind: kind} = attrs) when kind in [:map, :reduce] do
     authoring_call(attrs)
   end
 
@@ -287,19 +294,25 @@ defmodule Jido.Flow.Component do
 
   defp wait_option(other), do: other
 
+  defp default_iterate_update(%{state: %{} = state} = attrs, :flow) when not is_struct(state),
+    do: %{attrs | state: Map.put_new(state, :update, Jido.Flow.Ref.body_result())}
+
+  defp default_iterate_update(attrs, _kind), do: attrs
+
   defp authoring_call(%{call: _}), do: unknown_call_field()
 
-  defp authoring_call(%{} = attrs) when not is_struct(attrs) do
+  defp authoring_call(%{} = attrs) when not is_struct(attrs), do: authoring_call(attrs, :action)
+  defp authoring_call(attrs), do: attrs
+
+  defp authoring_call(attrs, kind) do
     attrs
-    |> Map.drop([:action, :params])
+    |> Map.drop([kind, :params])
     |> Map.put(:call, %{
-      kind: :action,
-      target: Map.get(attrs, :action),
+      kind: kind,
+      target: Map.get(attrs, kind),
       params: Map.get(attrs, :params, %{})
     })
   end
-
-  defp authoring_call(attrs), do: attrs
 
   defp authoring_target_call(%{} = attrs) when not is_struct(attrs) do
     case unknown_fields(attrs, [:action, :params]) do

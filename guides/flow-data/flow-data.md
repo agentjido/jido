@@ -144,13 +144,14 @@ Runs named Action calls side by side.
 
 ### Iterate
 
-Repeats one Action and updates a state value. See [Iterate and State](../flows/flow-iterate-state.md).
+Repeats an Action or Flow and updates the state after each call. Supply exactly one of `:action` or `:flow`. See [Iterate and State](../flows/flow-iterate-state.md).
 
 | Field | Required | Rule |
 | --- | --- | --- |
-| `:action` | Yes | An Action module. |
+| `:action` | One target field | An Action module. |
+| `:flow` | One target field | A Flow module. |
 | `:params` | No | A Flow value. |
-| `:state` | Yes | A map with required `:initial` and `:update` values, and an optional `:schema` that defaults to `Jido.Joi.map()`. |
+| `:state` | Yes | A map with required `:initial`. An Action body also requires `:update`. A Flow body defaults `:update` to the complete body result. The optional `:schema` defaults to `Jido.Joi.map()`. |
 | `:completion` | Yes | A condition. |
 | `:max_iterations` | Yes | An integer from 1 to 10,000. |
 

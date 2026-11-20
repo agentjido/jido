@@ -159,6 +159,14 @@ defmodule Jido.Exec.Compiler do
   defp runtime_component(%{kind: :reduce} = definition, opts, _terminal?, _children),
     do: Reduce.new(opts ++ [definition: definition])
 
+  defp runtime_component(
+         %{kind: :iterate, call: %{kind: :flow, target: target}} = definition,
+         opts,
+         _terminal?,
+         children
+       ),
+       do: Iterate.new(opts ++ [definition: definition, child_workflow: Map.fetch!(children, target)])
+
   defp runtime_component(%{kind: :iterate} = definition, opts, _terminal?, _children),
     do: Iterate.new(opts ++ [definition: definition])
 
@@ -193,8 +201,8 @@ defmodule Jido.Exec.Compiler do
 
   defp compile_children(analysis, prepared, compiled) do
     Enum.reduce(analysis.ordered, compiled, fn
-      {_name, %{kind: :call, call: %{kind: :flow, target: target}}}, acc
-      when not is_map_key(acc, target) ->
+      {_name, %{kind: kind, call: %{kind: :flow, target: target}}}, acc
+      when kind in [:call, :iterate] and not is_map_key(acc, target) ->
         {attrs, child_analysis} = Map.fetch!(prepared, target)
         reject_child_wait!(child_analysis)
         acc = compile_children(child_analysis, prepared, acc)

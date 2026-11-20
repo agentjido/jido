@@ -632,6 +632,36 @@ defmodule Jido.Flow.DSL.FlowTest do
     end
   end
 
+  test "Iterate requires exactly one target of the declared kind" do
+    action = "Jido.Test.Action.Fixtures.Actions.Add"
+
+    for {{fields, message}, index} <-
+          Enum.with_index([
+            {"", "iterate requires exactly one of action or flow"},
+            {"action(#{action}); flow(#{action})", "iterate requires exactly one of action or flow"},
+            {"flow(#{action})", "Flow component has the wrong target kind"}
+          ]) do
+      code = """
+      defmodule InvalidIterateTarget#{index} do
+        use Jido.Flow, name: "invalid_iterate_target_#{index}"
+
+        flow do
+          iterate "loop" do
+            state(Jido.Joi.map(), initial: %{})
+            #{fields}
+            params(%{})
+            repeat(1)
+          end
+
+          output(result("loop"))
+        end
+      end
+      """
+
+      assert_raise CompileError, ~r/#{message}/, fn -> Code.compile_string(code) end
+    end
+  end
+
   test "Iterate requires valid state and termination data" do
     cases = [
       {"""

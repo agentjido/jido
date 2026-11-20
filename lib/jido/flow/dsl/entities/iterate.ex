@@ -30,9 +30,9 @@ defmodule Jido.Flow.DSL.Iterate do
     name: :__iterate__,
     args: [:name, :__source__],
     identifier: :name,
-    modules: [:action],
+    modules: [:action, :flow],
     describe: """
-    Declares one required `state` and an Action body in a field block.
+    Declares one required `state` and one body target, either `action` or `flow` in a field block.
     Choose exactly one termination form: `repeat`, without `max_iterations`,
     or `while` with `max_iterations`. The condition is checked before each call;
     if it remains true at the bound, execution fails.
@@ -42,8 +42,11 @@ defmodule Jido.Flow.DSL.Iterate do
       name: [type: :string, required: true, doc: "The unique component name. Pass it first."],
       action: [
         type: :atom,
-        required: true,
-        doc: "The Action module for the loop body. Flow targets and inline bodies are not supported."
+        doc: "The Action module for the loop body."
+      ],
+      flow: [
+        type: :atom,
+        doc: "The Flow module for the loop body."
       ],
       params: [
         type: :quoted,

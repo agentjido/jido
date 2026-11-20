@@ -141,12 +141,18 @@ defmodule Jido.Flow.DSL.Lowerer do
            ),
          {:ok, completion, max_iterations} <-
            normalize_termination(iterate, condition) do
-      component(iterate, :iterate,
-        action: iterate.action,
-        params: params,
-        state: Map.put(state, :update, update),
-        completion: completion,
-        max_iterations: max_iterations
+      targets = Enum.reject([action: iterate.action, flow: iterate.flow], fn {_key, value} -> is_nil(value) end)
+
+      component(
+        iterate,
+        :iterate,
+        targets ++
+          [
+            params: params,
+            state: Map.put(state, :update, update),
+            completion: completion,
+            max_iterations: max_iterations
+          ]
       )
     end
   end

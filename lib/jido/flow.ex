@@ -92,8 +92,9 @@ defmodule Jido.Flow do
   Use `inline:` to set the Action name, description, schemas, or
   `context: ctx`. Keep `needs:` and `meta:` at the Step level. Flow supports
   inline Actions for Step and for named Action calls inside Parallel. Map,
-  Reduce, Choice targets, Iterate, Invoke, and Handoff use Action modules. All
-  targets use normal Exec validation and result rules. See
+  Reduce, Choice targets, Invoke, and Handoff use Action modules. Iterate
+  accepts an Action or Flow module. All targets use normal Exec validation
+  and result rules. See
   [Inline Actions](inline-actions.md).
 
   After the owner compiles, `MyApp.Greeting.step_action("greet")` returns its
