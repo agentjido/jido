@@ -115,6 +115,8 @@
       "Jido.AI.*",
       "Jido.Plugin.Audit*",
       "Jido.Plugin.Bus.*",
+      "Jido.Plugin.FSM",
+      "Jido.Plugin.FSM.*",
       "Jido.Plugin.Timer*",
       "Jido.Plugin.SensorManager*",
       "Jido.Plugin.Statechart",

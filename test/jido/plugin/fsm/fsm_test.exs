@@ -1,9 +1,11 @@
-defmodule Jido.Agent.Plugin.FSMTest do
-  use ExUnit.Case, async: true
+defmodule Jido.Plugin.FSMTest do
+  use Covenant.Case, component: "jido.plugin.fsm", async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Plugin.FSM
+  alias Jido.Catalog
+  alias Jido.Plugin.FSM
   alias Jido.Persistence
+  alias Jido.Test.AgentServer.Registry
 
   defmodule Mark do
     use Jido.Action,
@@ -116,6 +118,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
     end
   end
 
+  @tag obligation: "jido.plugin.fsm.I1"
   test "the DSL lowers to one canonical Plugin representation" do
     [entry] = Guide.definition().plugins
 
@@ -135,6 +138,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
     assert map_entry.data == entry.data
   end
 
+  @tag obligation: "jido.plugin.fsm.I2"
   test "Action success advances FSM state after normal state projection" do
     agent = Guide.instantiate!(id: "guide")
     assert agent.state.fsm == %{definition_vsn: 1, current: :idle}
@@ -154,6 +158,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
     assert ready.state.fsm.current == :ready
   end
 
+  @tag obligation: "jido.plugin.fsm.I2"
   test "an unmanaged route uses normal selection and does not advance the FSM" do
     agent = Guide.instantiate!(id: "unmanaged")
     signal = Jido.Signal.new!("inspect", %{}, source: agent.signal_source)
@@ -163,6 +168,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
     assert inspected.state.fsm == agent.state.fsm
   end
 
+  @tag obligation: "jido.plugin.fsm.I2"
   test "Action failure leaves FSM state unchanged" do
     agent = FailingGuide.instantiate!(id: "failure")
     signal = Jido.Signal.new!("fail", %{}, source: agent.signal_source)
@@ -171,6 +177,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
     assert agent.state.fsm == %{definition_vsn: 1, current: :idle}
   end
 
+  @tag obligation: "jido.plugin.fsm.I2"
   test "Flow success advances FSM state only after Flow completion" do
     agent = FlowGuide.instantiate!(id: "flow")
     signal = Jido.Signal.new!("finish", %{}, source: agent.signal_source)
@@ -180,6 +187,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
     assert ready.state.fsm == %{definition_vsn: 1, current: :ready}
   end
 
+  @tag obligation: "jido.plugin.fsm.I3"
   test "FSM state restores through Agent persistence" do
     source = {Persistence.ETS, [table: __MODULE__]}
     id = "persist-#{System.unique_integer([:positive])}"
@@ -203,16 +211,32 @@ defmodule Jido.Agent.Plugin.FSMTest do
     assert :ok = Persistence.delete_agent(source, Guide, id, namespace: "fsm")
   end
 
-  test "Agent codec preserves the canonical FSM definition" do
+  @tag obligation: "jido.plugin.fsm.I1"
+  test "the Agent codec keeps the beta Catalog reference and resolves it to the new module" do
     definition = Guide.definition()
-    registry = Jido.Test.AgentServer.Registry.for(definition)
 
-    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
+    assert FSM in Catalog.Discovery.included_plugins()
+    assert %{id: "jido.fsm", vsn: 1, target: FSM} = FSM.__jido_catalog_manifest__()
 
-    assert {:ok, ^definition} =
-             Jido.Test.AgentServer.Registry.decode(JSON.decode!(JSON.encode!(document)), registry)
+    catalog =
+      definition
+      |> Registry.for()
+      |> Catalog.list()
+      |> Enum.map(fn
+        %{target: FSM} = entry -> %{entry | id: "jido.fsm", vsn: 1}
+        entry -> entry
+      end)
+      |> Catalog.new!()
+
+    assert {:ok, json} = Registry.encode_json(definition, catalog)
+
+    assert [%{"id" => "jido.fsm", "vsn" => 1, "provider" => %{"id" => "jido.fsm", "vsn" => 1}}] =
+             JSON.decode!(json)["definition"]["plugins"]
+
+    assert {:ok, ^definition} = Registry.decode_json(json, catalog)
   end
 
+  @tag obligation: "jido.plugin.fsm.I1"
   test "invalid graphs fail during normalization" do
     for {data, code} <- [
           {%{
@@ -244,6 +268,7 @@ defmodule Jido.Agent.Plugin.FSMTest do
     end
   end
 
+  @tag obligation: "jido.plugin.fsm.I1"
   test "unknown and non-executable route references fail definition validation" do
     assert {:error, unknown} =
              Agent.define(%{

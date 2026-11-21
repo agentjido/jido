@@ -1,0 +1,5 @@
+- id: bundled-fsm-boundary
+  date: 2026-11-21
+  decision: Give the bundled FSM Plugin and its DSL transition entity to jido.plugin.fsm.
+  driver: FSM route policy and state belong to a bundled capability.
+  approved_by: ADR 0016

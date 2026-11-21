@@ -363,7 +363,7 @@ Jido is a configurable actor runtime on OTP:
 - `Jido.AgentServer.Lifecycle` owns live Turn, wait, cancellation, commit, effect, and recovery transitions.
 - `Jido.AgentServer.Status` is the public, process-neutral runtime view used by inspection tools.
 
-The current included Plugin list is AI, Timer, Sensor Manager, Bus Manager, Bus Client, Heartbeat, Audit, and Statechart. Publish the exact list for each release. A later release can add or remove an included Plugin through a deliberate release-design decision.
+Use `Jido.Catalog.Discovery.included_plugins/0` for the list of bundled Plugins in the current release. The list includes `Jido.Plugin.FSM` and `Jido.Plugin.Statechart`.
 
 ### Catalog
 
@@ -712,6 +712,7 @@ Disposition terms:
 | `Jido.Plugin.DirectiveContext` | Removed | Directive callbacks use the explicit `:directive` phase of `Jido.Plugin.Context` |
 | `Jido.Plugin.Error` | Removed | Callback policy now belongs to `Jido.Plugin`; failures use `Jido.Error` values |
 | `Jido.Plugin.Heartbeat` | Removed | Use `Jido.Plugin.Timer` with static interval options for periodic Signals |
+| `Jido.Plugin.FSM` | Moved | Bundled route control in the capabilities layer. Owns `state_machine` authoring, transition selection, and the `:fsm` state. |
 | `Jido.Plugin.Init` | Keep | Runtime child initialization value |
 | `Jido.Plugin.Input` | Keep | Separate portable prepared and transient runtime inputs |
 | `Jido.Plugin.Manifest` | Keep | Static callback ownership and option assignment metadata in the definitions layer |
@@ -853,6 +854,7 @@ Jido
 │   ├── Audit
 │   ├── Bus
 │   ├── Config
+│   ├── FSM
 │   ├── Heartbeat
 │   ├── Timer
 │   ├── SensorManager

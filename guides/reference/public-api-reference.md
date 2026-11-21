@@ -598,11 +598,14 @@ Keeps supervised sensor processes aligned with portable Agent state.
 | `Jido.Plugin.SensorManager.start/3` | Creates a Directive that adds or replaces one tagged sensor. |
 | `Jido.Plugin.SensorManager.stop/1` | Creates a Directive that removes one tagged sensor. |
 
-### `Jido.Agent.Plugin.FSM`
+### `Jido.Plugin.FSM`
 
-Adds deterministic finite-state route control to one Agent.
+Declare this Plugin in the Agent's `plugins` list. Use `state_machine` to
+define the initial state, terminal states, and transitions. A transition
+selects a matching route by alias and advances the `:fsm` state after its
+Action or Flow succeeds. The Catalog reference is `{"id": "jido.fsm", "vsn": 1}`.
 
-This module has no public functions. Its struct is the contract.
+See [Upgrade the beta FSM Plugin](v2-to-v3-migration.md#upgrade-the-beta-fsm-plugin).
 
 ## Persistence
 
