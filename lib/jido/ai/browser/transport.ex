@@ -1,20 +1,19 @@
 defmodule Jido.AI.Browser.Transport do
   @moduledoc false
 
-  alias Mint.HTTP
+  alias Mint.HTTP1
 
   def get(uri, address, headers, deadline, max_bytes) do
     with {:ok, timeout} <- remaining(deadline),
          {:ok, conn} <-
-           HTTP.connect(scheme(uri), address, uri.port,
+           HTTP1.connect(scheme(uri), address, uri.port,
              hostname: uri.host,
              mode: :passive,
-             protocols: [:http1],
              max_header_list_size: 16_384,
              transport_opts: transport_options(address, timeout)
            ) do
       try do
-        case HTTP.request(conn, "GET", target(uri), [{"accept-encoding", "identity"} | headers], nil) do
+        case HTTP1.request(conn, "GET", target(uri), [{"accept-encoding", "identity"} | headers], nil) do
           {:ok, conn, ref} ->
             receive_response(conn, ref, deadline, max_bytes, %{status: nil, headers: [], chunks: [], bytes: 0})
 
@@ -22,7 +21,7 @@ defmodule Jido.AI.Browser.Transport do
             {:error, :http_request_failed}
         end
       after
-        HTTP.close(conn)
+        HTTP1.close(conn)
       end
     else
       {:error, :timeout} -> {:error, :timeout}
@@ -32,7 +31,7 @@ defmodule Jido.AI.Browser.Transport do
 
   defp receive_response(conn, ref, deadline, max_bytes, response) do
     with {:ok, timeout} <- remaining(deadline),
-         {:ok, conn, events} <- HTTP.recv(conn, 0, timeout) do
+         {:ok, conn, events} <- HTTP1.recv(conn, 0, timeout) do
       case Enum.reduce_while(events, response, &accumulate(&1, &2, ref, max_bytes)) do
         {:ok, result} -> {:ok, result}
         {:error, reason} -> {:error, reason}
