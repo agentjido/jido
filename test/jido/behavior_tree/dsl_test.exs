@@ -96,6 +96,31 @@ defmodule Jido.BehaviorTree.DSLTest do
     assert_received {^event, %{node_path: [:readiness, :ready, :check], status: :success}}
   end
 
+  @tag obligation: "jido.plugin.behavior_tree.I5"
+  test "an Agent cannot register the Behavior Tree Plugin twice" do
+    for {options, second_block} <- [
+          {", plugins: [Jido.Plugin.BehaviorTree]", ""},
+          {"", "behavior_tree :second do\n  wait :hold, milliseconds: 0\nend"}
+        ] do
+      source = """
+      defmodule Jido.BehaviorTree.DuplicateDSLTestFixture do
+        use Jido.Agent, name: "duplicate_behavior_tree"#{options}
+        use Jido.BehaviorTree.DSL
+
+        behavior_tree :first do
+          wait :hold, milliseconds: 0
+        end
+
+        #{second_block}
+      end
+      """
+
+      assert_raise Spark.Error.DslError, ~r/Duplicate declaration/, fn ->
+        Code.compile_string(source, "duplicate_behavior_tree.ex")
+      end
+    end
+  end
+
   def forward_event(event, _measurements, metadata, pid), do: send(pid, {event, metadata})
 
   @tag obligation: "jido.plugin.behavior_tree.I5"

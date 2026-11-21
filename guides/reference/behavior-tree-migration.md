@@ -13,7 +13,10 @@ package also declares a Jido v2 dependency.
 
 Move an Agent from `strategy: {Jido.Agent.Strategy.BehaviorTree, opts}` to
 `plugins: [{Jido.Plugin.BehaviorTree, %{tree: tree, blackboard: initial}}]`.
-An Elixir module can call a tree builder when it declares its Agent. A v2
+An Elixir module can call a tree builder when it declares its Agent.
+For a tree that belongs to one Agent, use the
+[`behavior_tree` block](../built-in-plugins/behavior-trees.md#define-a-tree-in-the-agent)
+to define the tree and enable the Plugin in the same module. A v2
 `:tree_builder` that takes an Agent instance needs an application-specific
 change. Define a static tree and pass per-instance data through the blackboard
 Signals. Tree structs in Plugin configuration use the Elixir authoring path.

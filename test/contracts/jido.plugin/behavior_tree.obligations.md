@@ -67,7 +67,7 @@ validation, commit, and runtime dispatch.
 
 ### jido.plugin.behavior_tree.I5 — Tree authoring
 
-- **scope:** `Jido.BehaviorTree.DSL.tree/2`, `Jido.BehaviorTree.Expression.evaluate/2`, `Jido.BehaviorTree.Nodes.Condition.tick/2`
-- **must:** Compile inline leaves to regular Actions. Evaluate declared conditions and Action inputs with the current blackboard. Reject unsupported expression syntax and fail a tick when a required input is missing.
+- **scope:** `Jido.BehaviorTree.DSL.behavior_tree/3`, `Jido.BehaviorTree.DSL.tree/2`, `Jido.BehaviorTree.Expression.evaluate/2`, `Jido.BehaviorTree.Nodes.Condition.tick/2`
+- **must:** An inline Agent block enables one Plugin with the declared tree and options. Reject duplicate Plugin declarations. Compile inline leaves to regular Actions. Evaluate declared conditions and Action inputs with the current blackboard. Reject unsupported expression syntax and fail a tick when a required input is missing.
 - **kind:** functional
 - **status:** active

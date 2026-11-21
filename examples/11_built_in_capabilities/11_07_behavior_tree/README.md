@@ -5,8 +5,8 @@ next. Run the same tick pattern with a standalone executor and a tool wrapper.
 
 ## What you will learn
 
-- Declare an inline Action and a blackboard condition in the Tree DSL.
-- Enable the Behavior Tree Plugin and configure its initial blackboard.
+- Define a tree in the Agent with a `behavior_tree` block that enables the Plugin.
+- Declare an inline Action and a blackboard condition.
 - Resume a running node. Commit an Action result and dispatch its Signal.
 - Run a tree without an AgentServer when the caller owns execution.
 

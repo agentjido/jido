@@ -2,7 +2,8 @@ defmodule Jido.Plugin.BehaviorTree do
   @moduledoc """
   Runs a Behavior Tree as part of a Jido Agent Turn.
 
-  Enable the Plugin with `plugins: [{Jido.Plugin.BehaviorTree, %{tree: tree}}]`.
+  Use a `behavior_tree` block from `Jido.BehaviorTree.DSL` in the Agent body.
+  For a shared tree, use `plugins: [{Jido.Plugin.BehaviorTree, %{tree: tree}}]`.
   The Plugin contributes the five `jido.bt.*` routes and stores the tree
   continuation, blackboard, status, and tick count in `state.behavior_tree`.
   Send one tick Signal for each traversal.

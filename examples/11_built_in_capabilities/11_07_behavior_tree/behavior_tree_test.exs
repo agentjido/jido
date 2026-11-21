@@ -11,6 +11,11 @@ defmodule Jido.Examples.Applications.BehaviorTreeTest do
   alias Jido.Signal
 
   test "a live Turn resumes the running tree and dispatches its Action effect after commit", %{jido: jido} do
+    assert [%{provider: Jido.Plugin.BehaviorTree, data: %{tree: tree, blackboard: %{quantity: 3}}}] =
+             Agent.definition().plugins
+
+    assert tree == Agent.reservation()
+
     {:ok, server} = Jido.start_agent(jido, Agent, id: unique_id("tree"), default_dispatch: {:pid, target: self()})
 
     assert {:ok, %{status: :committed}} = AgentServer.call(server, Agent.bt_tick_signal!())

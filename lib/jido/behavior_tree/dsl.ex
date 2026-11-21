@@ -4,7 +4,8 @@ defmodule Jido.BehaviorTree.DSL do
 
   Use this DSL at module scope. Each `tree` declaration defines a zero-argument
   function. Pass its result to the Agent Plugin, standalone executor, or tool
-  wrapper.
+  wrapper. In an Agent module, put a `behavior_tree` block after `use Jido.Agent`
+  to define the tree and enable the Plugin.
 
       defmodule Reservations.Tree do
         use Jido.BehaviorTree.DSL
@@ -27,9 +28,11 @@ defmodule Jido.BehaviorTree.DSL do
   """
 
   alias Jido.Action.Inline
+  alias Jido.Agent.DSL, as: AgentDSL
   alias Jido.BehaviorTree.{Expression, Tree}
   alias Jido.BehaviorTree.Nodes.{Action, Condition, Named, Selector, Sequence, Wait}
   alias Jido.Instruction.Config
+  alias Jido.Plugin.BehaviorTree
 
   @branches %{sequence: Sequence, selector: Selector}
   @inline_fields [:name, :description, :schema, :output_schema, :context]
@@ -38,16 +41,34 @@ defmodule Jido.BehaviorTree.DSL do
   defmacro __using__(_opts) do
     quote do
       use Jido.Action.Inline
-      import Jido.BehaviorTree.DSL, only: [tree: 2]
+      import Jido.BehaviorTree.DSL, only: [tree: 2, behavior_tree: 2, behavior_tree: 3]
     end
   end
 
   @doc "Defines a named tree function with exactly one root node."
-  defmacro tree(name, do: body) do
-    caller = __CALLER__
+  defmacro tree(name, do: body), do: compile_tree(name, body, __CALLER__, nil)
 
+  @doc """
+  Defines a named tree and enables the Behavior Tree Plugin in the current Agent.
+
+  Declare one block after `use Jido.Agent`. Options are `:blackboard` and
+  `:reset_on_completion`. The block also defines a function that returns the tree.
+  """
+  defmacro behavior_tree(name, options \\ [], do: body) do
+    options!(options, [:blackboard, :reset_on_completion], __CALLER__)
+
+    registration =
+      quote do
+        config = Map.put(unquote({:%{}, [], options}), :tree, @__jido_behavior_tree__)
+        AgentDSL.register_plugin!({BehaviorTree, config}, __ENV__)
+      end
+
+    compile_tree(name, body, __CALLER__, registration)
+  end
+
+  defp compile_tree(name, body, caller, registration) do
     unless caller.module && is_nil(caller.function) && valid_name?(name) do
-      Config.compile_error!(caller, "declare tree with a literal atom name at module scope")
+      Config.compile_error!(caller, "declare a tree with a literal atom name at module scope")
     end
 
     {root, declarations} =
@@ -56,7 +77,7 @@ defmodule Jido.BehaviorTree.DSL do
         _ -> Config.compile_error!(caller, "tree #{inspect(name)} requires exactly one root node")
       end
 
-    quote do
+    quote line: caller.line do
       if Module.defines?(__MODULE__, {unquote(name), 0}) do
         Jido.Instruction.Config.compile_error!(__ENV__, "duplicate tree function #{unquote(name)}/0")
       end
@@ -69,6 +90,7 @@ defmodule Jido.BehaviorTree.DSL do
         {:error, reason} -> Config.compile_error!(__ENV__, Exception.message(reason))
       end
 
+      unquote(registration)
       @spec unquote(name)() :: Tree.t()
       def unquote(name)(), do: @__jido_behavior_tree__
       Module.delete_attribute(__MODULE__, :__jido_behavior_tree__)

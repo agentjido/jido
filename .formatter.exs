@@ -154,6 +154,8 @@ ai_locals = [
 ]
 
 behavior_tree_locals = [
+  behavior_tree: 2,
+  behavior_tree: 3,
   tree: 2,
   sequence: 2,
   selector: 2,

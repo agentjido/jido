@@ -4,67 +4,24 @@ Use `Jido.Plugin.BehaviorTree` when a Jido Agent needs to run a tree in steps.
 Each tick Signal starts one Turn. A node can return `:running` so the next
 tick can resume it.
 
-## Configure the Plugin
+## Define a tree in the Agent
 
-Pass the Plugin and its configuration map in the Agent declaration. Define
-the Action modules referenced by the tree before you run the Agent.
+Use `Jido.BehaviorTree.DSL` after `use Jido.Agent`. One `behavior_tree` block
+defines the tree and enables the Plugin. Its options set the initial blackboard
+and completion behavior.
 
 ```elixir
 defmodule Reservations.Agent do
-  alias Jido.BehaviorTree.Tree
-  alias Jido.BehaviorTree.Nodes.{Action, Sequence, Wait}
-  alias Jido.Joi
+  use Jido.Agent, name: "reservation_agent"
+  use Jido.BehaviorTree.DSL
 
-  use Jido.Agent,
-    name: "reservation_agent",
-    plugins: [
-      {Jido.Plugin.BehaviorTree,
-       %{
-         tree:
-           Tree.new(
-             Sequence.new([
-               Wait.new(0),
-               Action.new(Reservations.Reserve, %{quantity: {:from_blackboard, :quantity}})
-             ])
-           ),
-         blackboard: %{quantity: 3}
-       }}
-    ]
+  alias Jido.Joi
 
   state do
     schema Joi.object(%{reserved: Joi.integer() |> Joi.default(0)})
   end
 
-  routes do
-    signal_source "/reservations"
-  end
-end
-```
-
-| Option | Value |
-| --- | --- |
-| `:tree` | Required `Jido.BehaviorTree.Tree` with a root node. |
-| `:blackboard` | Initial blackboard map. The default is `%{}`. |
-| `:reset_on_completion` | If `true`, halt node state after `:success` or `:failure`. Keep the status, tick count, and blackboard. The default is `false`. |
-
-The Plugin owns `agent.state.behavior_tree`. Read `:tree`, `:blackboard`,
-`:status`, and `:tick_count` there. Use `Jido.BehaviorTree.Blackboard.get/3`
-or `to_map/1` to read blackboard values. Keep configuration, node state, and
-blackboard data portable. Send a Signal to change the tree state.
-
-## Declare a tree in Elixir
-
-Use `Jido.BehaviorTree.DSL` in a module. The `tree :reservation` declaration
-defines `reservation/0`. Pass the returned tree to the Plugin as
-`%{tree: Reservations.Tree.reservation(), blackboard: %{quantity: 3}}`.
-
-```elixir
-defmodule Reservations.Tree do
-  use Jido.BehaviorTree.DSL
-
-  alias Jido.Joi
-
-  tree :reservation do
+  behavior_tree :reservation, blackboard: %{quantity: 3} do
     sequence :reserve_stock do
       wait :next_tick, milliseconds: 0
       condition :has_stock, blackboard(:quantity) > 0
@@ -75,8 +32,24 @@ defmodule Reservations.Tree do
       end
     end
   end
+
+  routes do
+    signal_source "/reservations"
+  end
 end
 ```
+
+| Option | Value |
+| --- | --- |
+| `:blackboard` | Initial blackboard map. The default is `%{}`. |
+| `:reset_on_completion` | If `true`, halt node state after `:success` or `:failure`. Keep the status, tick count, and blackboard. The default is `false`. |
+
+The Plugin owns `agent.state.behavior_tree`. Read `:tree`, `:blackboard`,
+`:status`, and `:tick_count` there. Use `Jido.BehaviorTree.Blackboard.get/3`
+or `to_map/1` to read blackboard values. Keep configuration, node state, and
+blackboard data portable. Send a Signal to change the tree state.
+
+## Conditions and Actions
 
 Use `action :reserve, Reservations.Reserve, params: %{quantity: blackboard(:quantity)}`
 to call an existing Action module. Use `action :reserve, [] do ... end` for
@@ -95,6 +68,24 @@ A tree needs one root. Use distinct names for children of the same parent.
 Named nodes add `:node_path` to their telemetry. Use
 `node :custom, MyNode.new(...)` to add a node from its constructor. The same
 tree works with the standalone executor and tool wrapper.
+
+## Use a shared tree
+
+Use `tree :reservation do ... end` in a separate module to share a tree
+or run it standalone. The declaration defines `reservation/0`. In an Agent,
+pass the returned tree to the Plugin through `plugins:`.
+
+```elixir
+use Jido.Agent,
+  name: "reservation_agent",
+  plugins: [
+    {Jido.Plugin.BehaviorTree,
+     %{tree: Reservations.Tree.reservation(), blackboard: %{quantity: 3}}}
+  ]
+```
+
+You can also pass a `Jido.BehaviorTree.Tree` built with node constructors.
+Use one Plugin declaration per Agent.
 
 ## Send commands
 

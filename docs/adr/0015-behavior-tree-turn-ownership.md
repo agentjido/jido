@@ -18,7 +18,8 @@ through the ordinary Turn path.
 
 The Elixir Tree DSL builds the same tree structs. It compiles inline leaves
 with the shared Action compiler and evaluates conditions and parameters with
-`Jido.Expr` at tick time.
+`Jido.Expr` at tick time. In the Agent body, `behavior_tree` supplies the
+Plugin configuration when the Agent compiler builds the definition.
 
 ## Consequences
 
