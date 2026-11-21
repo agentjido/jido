@@ -48,7 +48,9 @@ defmodule Jido.AI.Browser.Transport do
   defp accumulate({:status, ref, status}, response, ref, _limit), do: {:cont, %{response | status: status}}
 
   defp accumulate({:headers, ref, _headers}, %{status: status} = response, ref, _limit)
-       when status < 200, do: {:cont, response}
+       when status < 200 do
+    {:cont, response}
+  end
 
   defp accumulate({:headers, ref, headers}, response, ref, _limit) do
     response = %{response | headers: response.headers ++ headers}
