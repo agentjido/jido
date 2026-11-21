@@ -8,8 +8,15 @@ defmodule Jido.Agent.Plugin.Declaration do
 
   @doc false
   @spec normalize(term()) :: {:ok, [t()]} | {:error, Error.t()}
-  def normalize(value) do
-    with {:ok, declarations} <- Schema.list(value, &declaration/1),
+  def normalize(value), do: append([], value)
+
+  @doc false
+  @spec append([t()], term()) :: {:ok, [t()]} | {:error, Error.t()}
+  def append(declarations, []), do: {:ok, declarations}
+
+  def append(declarations, value) do
+    with {:ok, additions} <- Schema.list(value, &declaration/1),
+         declarations = declarations ++ additions,
          :ok <- Schema.unique(declarations, & &1.provider),
          :ok <- Extension.unique_ids(Enum.map(declarations, & &1.provider)) do
       {:ok, declarations}

@@ -204,6 +204,7 @@ defmodule Jido.MixProject do
        ]},
       {:"Built-In Plugins",
        [
+         {"Behavior Trees", "guides/built-in-plugins/behavior-trees.md"},
          {"Signal Bus Plugin", "guides/built-in-plugins/signal-bus-plugin.livemd"},
          {"Statecharts", "guides/built-in-plugins/statecharts.md"},
          {"Timers", "guides/built-in-plugins/timers.livemd"},
@@ -265,6 +266,7 @@ defmodule Jido.MixProject do
        ]},
       {:Reference,
        [
+         {"Behavior Tree Migration", "guides/reference/behavior-tree-migration.md"},
          {"Public API Guide", "guides/reference/public-api-reference.md"},
          {"Module and Namespace Map", "guides/reference/module-and-namespace-map.md"},
          {"Telemetry Events", "guides/reference/telemetry-event-reference.md"},

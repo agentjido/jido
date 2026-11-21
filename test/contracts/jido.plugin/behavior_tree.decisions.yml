@@ -1,0 +1,10 @@
+- id: behavior-tree-turn-boundary
+  date: 2026-11-21
+  decision: Execute the traversal in a contributed Action route and commit the continuation through the owning Plugin reducer.
+  driver: AgentServer already owns validation, state commit, and post-commit Directive dispatch.
+  approved_by: Behavior Tree v3 implementation request
+- id: behavior-tree-dsl-lowering
+  date: 2026-11-21
+  decision: Lower named Elixir trees to existing nodes and use the shared Jido Expr and inline Action compiler.
+  driver: The Plugin, standalone executor, and tool wrapper use the same traversal and Action execution.
+  approved_by: Behavior Tree inline Action and expression request

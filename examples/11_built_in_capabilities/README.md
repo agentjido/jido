@@ -18,6 +18,8 @@ same Agent, Plugin, Signal, and AgentServer contracts as an application Plugin.
    an initialized Agent from a chart.
 8. [Add a Chart to an Agent](11_08_statechart_plugin/README.md) runs a guarded
    transition alongside a separate Agent route.
+9. [Behavior Tree](11_09_behavior_tree/README.md) resumes a running tree and
+   dispatches an Action effect.
 
 ```sh
 mix test.examples examples/11_built_in_capabilities --warnings-as-errors

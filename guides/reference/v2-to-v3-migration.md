@@ -4,6 +4,8 @@ This guide moves an application from the Jido V2 packages to the consolidated V3
 
 Old module names that no longer exist are written in plain text. Current names are in code font.
 
+For the standalone Behavior Tree package, see [Behavior Tree migration](behavior-tree-migration.md).
+
 ## What was compared
 
 | V2 package | Version checked |
