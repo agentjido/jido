@@ -329,7 +329,7 @@ defmodule Jido.MixProject do
       {:reach, "~> 2.8", only: [:dev, :test], runtime: false},
 
       # Test support
-      {:ecto_sqlite3, "~> 0.24.1", only: :test},
+      {:ecto_sqlite3, "~> 0.26.0", only: :test},
       {:ex_aws, "~> 2.7", only: :test},
       {:ex_aws_s3, "~> 2.5", only: :test},
       {:mimic, "~> 2.0", only: :test},
