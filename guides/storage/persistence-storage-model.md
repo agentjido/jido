@@ -90,6 +90,26 @@ invoice = StorageModelGuide.Invoice.instantiate!(id: "inv-1001")
 :ok = Jido.Persistence.save_agent(store, invoice, namespace: "billing")
 ```
 
+## Use an external state provider
+
+A module-defined Agent can use `state_provider Provider, options` in its
+`state` block. The provider supplies the schema and loads the initial state.
+The Agent must run on a durable Jido instance. Each state block accepts one
+schema source. The provider controls initial values for that schema.
+The provider's start helper can load valid initial values before calling
+`Jido.start_agent/3`. To replace its definition, use a migration that
+preserves the provider's binding to its data.
+
+AgentServer evaluates the Turn before it calls the provider's commit
+function. The provider writes its state and calls the Jido save function with
+the canonical value in the same transaction. AgentServer publishes that value
+and runs Directives after confirmation. Jido still writes protocol checkpoints
+for waits, failed Turns and other lifecycle events. State refreshed for a new
+Turn remains private until commit. A waiting Flow preserves its starting
+state when the instance restarts. A direct `Jido.Agent.cmd/3`
+call evaluates in memory. See `Jido.AgentServer.StateProvider` for the adapter
+contract and error outcomes.
+
 ## Identity
 
 One record belongs to one exact `{namespace, partition, id}` key. The partition defaults to `nil`.

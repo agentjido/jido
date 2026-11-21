@@ -8,6 +8,7 @@ defmodule Jido.Durable.Continuation do
 
   @type direct :: %{
           optional(:result_handoff) => true,
+          optional(:state_base) => map(),
           id: id(),
           signal: Jido.Signal.t(),
           admitted_signal: Jido.Signal.t(),
@@ -86,6 +87,7 @@ defmodule Jido.Durable.Continuation do
         expires_at: expires_at
       }
       |> maybe_put_result_handoff(Map.get(attrs, :result_handoff, false))
+      |> maybe_put_state_base(Map.get(attrs, :state_base))
 
     with :ok <- validate(continuation),
          :ok <- portable(continuation),
@@ -151,6 +153,7 @@ defmodule Jido.Durable.Continuation do
   @spec put_status!(t(), status()) :: t()
   def put_status!(continuation, status) do
     updated = %{continuation | status: status}
+    updated = if status == :running, do: updated, else: Map.delete(updated, :state_base)
     :ok = validate(updated)
     updated
   end
@@ -252,6 +255,10 @@ defmodule Jido.Durable.Continuation do
 
   @doc false
   @spec validate(term()) :: :ok | {:error, term()}
+  def validate(%{status: :running, state_base: state} = continuation)
+      when is_map(state) and not is_map_key(continuation, :instruction),
+      do: validate(Map.delete(continuation, :state_base))
+
   def validate(
         %{
           id: id,
@@ -463,6 +470,9 @@ defmodule Jido.Durable.Continuation do
     do: Map.put(continuation, :result_handoff, true)
 
   defp maybe_put_result_handoff(continuation, false), do: continuation
+
+  defp maybe_put_state_base(continuation, nil), do: continuation
+  defp maybe_put_state_base(continuation, state), do: Map.put(continuation, :state_base, state)
 
   defp receipt_status(:committed), do: :completed
   defp receipt_status(:cancelled), do: :cancelled

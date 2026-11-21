@@ -104,6 +104,18 @@ defmodule Jido.Agent.DSL do
       @doc false
       def __jido_definition__(opts), do: Jido.Agent.DSL.definition(@agent_definition, opts)
 
+      @agent_state_provider Module.get_attribute(__MODULE__, :jido_state_provider)
+
+      if @agent_state_provider != nil and map_size(@agent_definition.initial_state) > 0 do
+        raise CompileError,
+          file: __ENV__.file,
+          line: __ENV__.line,
+          description: "Agent state provider supplies the initial state"
+      end
+
+      @doc false
+      def __jido_state_provider__, do: @agent_state_provider
+
       @doc "Builds and validates one instance of this Agent."
       @spec instantiate(keyword() | map()) ::
               {:ok, Jido.Agent.instance()} | {:error, term()}
@@ -235,7 +247,7 @@ defmodule Jido.Agent.DSL do
           |> Map.new()
           |> Map.merge(%{
             module: module,
-            schema: E.get_opt(dsl, [:__state__], :schema, Joi.object(%{})),
+            schema: E.get_opt(dsl, [:__state__], :__state_schema__, Joi.object(%{})),
             initial_state: E.get_opt(dsl, [:__state__], :initial_state, %{}),
             signal_source: E.get_opt(dsl, [:__routes__], :signal_source),
             routes:

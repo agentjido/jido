@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 102,
+      "active": 103,
       "coverage": 1.0,
-      "covered": 102
+      "covered": 103
     },
     "jido.agent_server": {
       "active": 15,
@@ -584,10 +584,10 @@
       }
     },
     "jido.agent_server": {
-      "active": 15,
+      "active": 16,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 15,
+      "covered": 16,
       "form": "light",
       "obligations": {
         "jido.agent_server.I1": {
@@ -688,6 +688,16 @@
             "test a call to an absent registered name leaves no reply gate",
             "test a submission to an absent registered name leaves no reply gate",
             "test quiesce closes the reply gates for a queued call and submission"
+          ]
+        },
+        "jido.agent_server.I108": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the provider commits canonical state and a rejected write leaves the agent usable"
           ]
         },
         "jido.agent_server.I11": {
@@ -6014,8 +6024,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 251,
+    "active": 252,
     "coverage": 1.0,
-    "covered": 251
+    "covered": 252
   }
 }

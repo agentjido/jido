@@ -358,13 +358,7 @@ defmodule Jido.AgentServer.Lifecycle do
   defp open_activation(data, mode) do
     with :ok <- ServerSupervisor.close_execution(data.activation_state),
          {:ok, config} <- Jido.Persistence.resolve_agent_config(data.persistence, data.jido),
-         {:ok, agent, revision, agent_revision, turn, handoffs} <-
-           Jido.Persistence.open_agent(
-             config,
-             data.agent,
-             mode,
-             [reason: :activate, topology_owner: topology_owner(data)] ++ persistence_options(data)
-           ),
+         {:ok, agent, revision, agent_revision, turn, handoffs} <- open_agent(data, config, mode),
          {:ok, agent} <- Validation.validate_instance(agent),
          {:ok, revision, turn} <- settle_unreleased_handoff(data, config, agent, revision, turn),
          :ok <- validate_continuation(agent, turn),
@@ -372,6 +366,24 @@ defmodule Jido.AgentServer.Lifecycle do
       {:ok, agent, revision, agent_revision, config, turn, handoffs}
     end
   end
+
+  defp open_agent(data, config, mode) do
+    opts = [reason: :activate, topology_owner: topology_owner(data)] ++ persistence_options(data)
+
+    Jido.AgentServer.StateProvider.open(data.agent, provider_context(data, config), mode, fn agent ->
+      Jido.Persistence.open_agent(config, agent, mode, opts)
+    end)
+  end
+
+  def refresh_state(data) do
+    Jido.AgentServer.StateProvider.refresh(data.agent, provider_context(data, data.persistence))
+  end
+
+  def commit_state(data, before, candidate, save) do
+    Jido.AgentServer.StateProvider.commit(before, candidate, provider_context(data, data.persistence), save)
+  end
+
+  defp provider_context(data, config), do: %{address: data.agent_address, persistence: config}
 
   defp reconcile_owned_member(%{jido: instance, agent_address: address, parent: %{tag: "$topology/" <> _}})
        when is_atom(instance) and not is_nil(instance),
@@ -463,9 +475,20 @@ defmodule Jido.AgentServer.Lifecycle do
              plugin_inputs: prepared.instruction.context.plugin_inputs,
              target: instruction.target,
              expires_at: continuation_expiry(data.active),
+             state_base: continuation_state_base(data),
              result_handoff: Map.get(data.active, :result_handoff, false)
            })
   end
+
+  defp continuation_state_base(data) do
+    case Map.get(data.active, :state_base) do
+      %{state: state} when state !== data.agent.state -> state
+      _other -> nil
+    end
+  end
+
+  def continuation_agent(agent, %{state_base: state}), do: Validation.transition(agent, state)
+  def continuation_agent(agent, _receipt), do: {:ok, agent}
 
   def restore_continuation(agent, receipt, context, specs) do
     with {:ok, command} <-
@@ -527,7 +550,8 @@ defmodule Jido.AgentServer.Lifecycle do
 
   def validate_continuation(agent, %{status: status} = receipt)
       when status in [:running, :released] do
-    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.Plugin.declarations(agent)),
+    with {:ok, agent} <- continuation_agent(agent, receipt),
+         {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(Jido.Agent.Plugin.declarations(agent)),
          {:ok, _prepared} <-
            if(status == :running,
              do: restore_continuation(agent, receipt, receipt.context, specs),

@@ -780,11 +780,17 @@ defmodule Jido.AgentServer.Worker do
         last_outcome: nil
       })
 
-    if data.persistence not in [nil, false] do
-      mode = Lifecycle.persistence_mode(data.activation_state, data.persistence_mode)
-      bootstrap(data, :persistence, data.persistence_timeout, fn -> Lifecycle.start(data, mode) end)
-    else
-      initialize_plugins(data)
+    cond do
+      data.persistence not in [nil, false] ->
+        mode = Lifecycle.persistence_mode(data.activation_state, data.persistence_mode)
+        bootstrap(data, :persistence, data.persistence_timeout, fn -> Lifecycle.start(data, mode) end)
+
+      Jido.AgentServer.StateProvider.configured?(agent) ->
+        Lifecycle.record_start_failure(:state_provider_requires_persistence, [data.activation, self()])
+        {:stop, :state_provider_requires_persistence}
+
+      true ->
+        initialize_plugins(data)
     end
   end
 
@@ -2343,6 +2349,7 @@ defmodule Jido.AgentServer.Worker do
         end,
       topology_sends: [],
       start_version: data.state_version,
+      state_base: nil,
       prepared: nil,
       operation: nil,
       worker: nil,
@@ -2396,7 +2403,10 @@ defmodule Jido.AgentServer.Worker do
     case mode do
       {:restore, receipt} ->
         operation(:restore_turn, %{data | active: active}, fn ->
-          Lifecycle.restore_continuation(agent, receipt, context, data.plugin_specs)
+          with {:ok, current} <- Lifecycle.continuation_agent(agent, receipt),
+               {:ok, prepared} <- Lifecycle.restore_continuation(current, receipt, context, data.plugin_specs) do
+            {:ok, current, prepared}
+          end
         end)
 
       {:handoff, receipt} ->
@@ -2406,7 +2416,10 @@ defmodule Jido.AgentServer.Worker do
 
       mode when elem(mode, 0) in [:turn, :topology] ->
         operation(:prepare, %{data | active: active}, fn ->
-          prepare_turn(agent, signal, context, data)
+          with {:ok, current} <- Lifecycle.refresh_state(data),
+               {:ok, prepared} <- prepare_turn(current, signal, context, %{data | agent: current}) do
+            {:ok, current, prepared}
+          end
         end)
     end
   end
@@ -2551,12 +2564,16 @@ defmodule Jido.AgentServer.Worker do
       settle: :settling,
       cleanup: :cleaning,
       save: :saving,
+      commit_state: :saving,
       commit_hook: :effects,
       effect: :effects
     }
 
     {:next_state, Map.fetch!(phases, kind), put_in(data.active.operation, %{kind: kind, task: task})}
   end
+
+  defp operation_result(kind, {:ok, agent, prepared}, data) when kind in [:prepare, :restore_turn],
+    do: operation_result(kind, {:ok, prepared}, put_in(data.active.state_base, agent))
 
   defp operation_result(kind, {:ok, prepared}, data)
        when kind in [:prepare, :restore_turn, :restore_handoff] do
@@ -2603,16 +2620,7 @@ defmodule Jido.AgentServer.Worker do
        do: stop_durable(data, reason)
 
   defp operation_result(:prepare_handoff, {:ok, receipt}, data) do
-    result = data.active.result
-
-    data =
-      data
-      |> put_in([:active, :handoff_receipt], receipt)
-      |> then(fn data ->
-        if data.persistence in [nil, false], do: data, else: %{data | server_turn: receipt}
-      end)
-
-    finish(data, result)
+    finish(put_in(data, [:active, :handoff_receipt], receipt), data.active.result)
   end
 
   defp operation_result(:prepare_handoff, {:error, reason}, data),
@@ -2861,6 +2869,23 @@ defmodule Jido.AgentServer.Worker do
           {:error, _reason} = turn_result -> publish_failed_result(data, turn_result)
           turn_result -> publish_commit(data, turn_result)
         end
+
+      {:error, reason} ->
+        stop_durable(data, reason)
+    end
+  end
+
+  defp operation_result(:commit_state, result, data) do
+    {timer, deadline} = data.active.storage
+    Process.cancel_timer(timer)
+
+    case Lifecycle.write_result(result, deadline) do
+      {:ok, {turn_result, receipt}} ->
+        data = if elem(turn_result, 0) == :handoff, do: put_in(data.active.persisted, true), else: data
+        publish_commit(%{data | server_turn: receipt}, turn_result)
+
+      {:error, {:state_provider_rejected, reason}} ->
+        finish(put_in(data.active.failure_stage, :saving), {:error, reason})
 
       {:error, reason} ->
         stop_durable(data, reason)
@@ -3201,39 +3226,9 @@ defmodule Jido.AgentServer.Worker do
 
   defp finish(
          %{persistence: persistence} = data,
-         {:handoff, candidate, _instruction, _directives} = result
+         result
        )
-       when persistence not in [nil, false] do
-    cancel_timer(data.active)
-    deadline = System.monotonic_time(:millisecond) + data.persistence_timeout
-
-    timer =
-      Process.send_after(
-        self(),
-        {:persistence_timeout, data.active.turn_id},
-        data.persistence_timeout
-      )
-
-    active =
-      Map.merge(data.active, %{result: result, storage: {timer, deadline}, persisted: true})
-
-    receipt = data.active.handoff_receipt
-    data = %{data | server_turn: receipt}
-
-    operation(:save, %{data | active: active}, fn ->
-      Lifecycle.save(
-        data,
-        candidate,
-        data.state_version + 1,
-        data.state_version,
-        receipt,
-        commit_topology_options(data)
-      )
-    end)
-  end
-
-  defp finish(%{persistence: persistence} = data, {:ok, candidate, _} = result)
-       when persistence not in [nil, false] do
+       when persistence not in [nil, false] and elem(result, 0) in [:ok, :handoff] do
     cancel_timer(data.active)
     deadline = System.monotonic_time(:millisecond) + data.persistence_timeout
 
@@ -3245,36 +3240,25 @@ defmodule Jido.AgentServer.Worker do
       )
 
     active = Map.merge(data.active, %{result: result, storage: {timer, deadline}})
+    candidate = elem(result, 1)
 
-    receipt =
-      if data.active.persisted,
-        do: Continuation.put_status!(data.server_turn, :completed),
-        else: data.server_turn
+    operation(:commit_state, %{data | active: active}, fn ->
+      Lifecycle.commit_state(data, data.active.state_base || data.agent, candidate, fn canonical ->
+        result = put_elem(result, 1, canonical)
+        receipt = commit_receipt(data, result)
 
-    projected =
-      projected_turn_result(
-        data,
-        result,
-        data.agent_revision + 1,
-        data.state_version + 1
-      )
-
-    receipt =
-      receipt
-      |> put_resume_result(data, projected)
-      |> maybe_retain_result(data, projected)
-
-    data = %{data | server_turn: receipt}
-
-    operation(:save, %{data | active: active}, fn ->
-      Lifecycle.save(
-        data,
-        candidate,
-        data.state_version + 1,
-        data.state_version,
-        receipt,
-        commit_topology_options(data)
-      )
+        with :ok <-
+               Lifecycle.save(
+                 data,
+                 canonical,
+                 data.state_version + 1,
+                 data.state_version,
+                 receipt,
+                 commit_topology_options(data)
+               ) do
+          {:ok, {result, receipt}}
+        end
+      end)
     end)
   end
 
@@ -3322,6 +3306,21 @@ defmodule Jido.AgentServer.Worker do
   defp finish(data, {:ok, _, _} = result), do: publish_commit(data, result)
   defp finish(data, {:handoff, _, _, _} = result), do: publish_commit(data, result)
   defp finish(data, result), do: finish_result(data, result)
+
+  defp commit_receipt(data, {:handoff, _, _, _}), do: data.active.handoff_receipt
+
+  defp commit_receipt(data, result) do
+    receipt =
+      if data.active.persisted,
+        do: Continuation.put_status!(data.server_turn, :completed),
+        else: data.server_turn
+
+    projected = projected_turn_result(data, result, data.agent_revision + 1, data.state_version + 1)
+
+    receipt
+    |> put_resume_result(data, projected)
+    |> maybe_retain_result(data, projected)
+  end
 
   defp commit_topology_options(data) do
     opts = [agent_revision: data.agent_revision + 1]

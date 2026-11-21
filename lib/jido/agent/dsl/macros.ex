@@ -16,7 +16,7 @@ defmodule Jido.Agent.DSL.Macros do
 
     settings =
       case name do
-        :state -> [:schema, :initial_state]
+        :state -> [:initial_state]
         :routes -> [:signal_source]
         _ -> []
       end

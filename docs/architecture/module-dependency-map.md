@@ -687,6 +687,7 @@ Disposition terms:
 | `Jido.Agent.Diff` | Removed | Agent evaluation returns the complete next Agent value; no parallel difference model remains |
 | `Jido.Agent.Directive` | Keep | Explicit deferred runtime work after an Agent state decision; owns Emit, Reply, AgentSend, ParentSend, and ServerStop values and constructors; `Jido.Agent.Directive.Kind` owns built-in classification |
 | `Jido.Agent.DSL` | Keep | Agent authoring DSL boundary |
+| `Jido.Agent.DSL.State` | Keep | Selects one declared schema source |
 | `Jido.Agent.Error` | Removed | Agent validation uses `Jido.Error.ValidationError` with path and code |
 | `Jido.Agent.Extension` | Keep | Agent DSL extension behavior |
 | `Jido.Agent.Mutation` | Removed | Definition mutation is not part of Agent evaluation; AgentServer upgrade replaces a complete trusted definition |
@@ -777,6 +778,7 @@ Disposition terms:
 | `Jido.AgentServer.TopologyBus` | Removed | Bus lifecycle and publication now belong to `Jido.AgentServer.Topology` |
 | `Jido.AgentServer.TopologyRuntime` | Removed | Static topology startup and explicit runtime child operations belong to `Jido.AgentServer.Topology` |
 | `Jido.AgentServer.Lifecycle` | Keep | Canonical Turn, wait, cancellation, commit, effect, and recovery policy owner |
+| `Jido.AgentServer.StateProvider` | Keep | Optional external state source and durable Turn transaction interface |
 | `Jido.AgentServer.Status` | Keep | Public typed process-neutral status view for state, active Turn, waits, effects, revision, and last failure |
 | `Jido.AgentOwnership` | Keep | Public process-neutral fence for one local activation ownership relation |
 | `Jido.Instance.Names` | Keep internal | Canonical per-instance runtime naming and partition-key policy |

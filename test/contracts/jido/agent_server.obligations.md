@@ -1,6 +1,7 @@
 ---
 modules:
   - Jido.AgentServer.Lifecycle
+  - Jido.AgentServer.StateProvider
   - Jido.AgentServer.Status
 ---
 
@@ -430,4 +431,12 @@ authoring surface.
 - **must:** Release reply gates after quiesce rejects queued requests and after the caller ends reply tracking on transport failure. Preserve owner-only collection. A wait timeout permits another await, and abandonment does not cancel accepted work.
 - **why:** A rejected or undelivered request must release its reply process while the caller stays alive.
 - **kind:** functional
+- **status:** active
+
+### jido.agent_server.I108 — Provider-owned state commit
+
+- **scope:** An Agent with a declared state provider and a durable instance
+- **must:** Give the provider the last state and validated candidate. Let it save the canonical candidate and the Jido checkpoint at its transaction boundary. Publish that candidate after the confirmed commit. Treat a confirmed provider rejection as a failed Turn. Preserve the prior committed state and do not run its effects.
+- **why:** An external domain record and its Jido checkpoint must agree at Turn completion.
+- **kind:** ordering
 - **status:** active

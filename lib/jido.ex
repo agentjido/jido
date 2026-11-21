@@ -489,15 +489,21 @@ defmodule Jido do
          :ok <- validate_create_agent_options(opts),
          {instance_opts, _runtime_opts} = Keyword.split(opts, [:id, :state]),
          {:ok, agent} <- startup_agent(agent, instance_opts, []),
-         {:ok, _agent, 0, 0, nil, _handoffs} <-
-           Jido.Persistence.open_agent(instance, agent, :create,
-             instance: instance,
-             namespace: address.namespace,
-             partition: address.partition,
-             reason: :create
-           ) do
+         {:ok, config} <- Jido.Persistence.resolve_agent_config(:inherit, instance),
+         {:ok, _agent, 0, 0, nil, _handoffs} <- create_addressed_agent(instance, address, agent, config) do
       {:ok, address}
     end
+  end
+
+  defp create_addressed_agent(instance, address, agent, config) do
+    AgentServer.StateProvider.open(agent, %{address: address, persistence: config}, :create, fn initial ->
+      Jido.Persistence.open_agent(instance, initial, :create,
+        instance: instance,
+        namespace: address.namespace,
+        partition: address.partition,
+        reason: :create
+      )
+    end)
   end
 
   @doc "Activates one existing durable Agent from its stable Agent Address."
@@ -570,7 +576,12 @@ defmodule Jido do
     end
   end
 
-  @doc "Replaces one inactive durable Agent definition at its stable Agent Address."
+  @doc """
+  Replaces one inactive durable Agent definition at its stable Agent Address.
+
+  An Agent with a state provider requires a provider-specific migration before
+  its definition can be replaced.
+  """
   @spec replace_agent(atom(), Address.t(), module() | Jido.Agent.t(), keyword()) ::
           {:ok, Address.t()} | {:error, term()}
   def replace_agent(instance, %Address{} = address, agent, opts \\ []) do
@@ -582,7 +593,9 @@ defmodule Jido do
          {:ok, saved, persistence_revision, agent_revision, turn} <-
            Jido.Persistence.load_agent_address(instance, address, instance: instance),
          :ok <- replaceable_turn(turn),
+         :ok <- replaceable_state_source(saved),
          {:ok, replacement} <- replacement_agent(agent, address.id, saved.state, state_policy),
+         :ok <- replaceable_state_source(replacement),
          :ok <-
            replace_agent_record(
              instance,
@@ -1137,6 +1150,10 @@ defmodule Jido do
     do: :ok
 
   defp replaceable_turn(_turn), do: {:error, :turn_in_flight}
+
+  defp replaceable_state_source(agent) do
+    if AgentServer.StateProvider.configured?(agent), do: {:error, :state_provider_replacement_unsupported}, else: :ok
+  end
 
   defp replace_agent_record(
          instance,
