@@ -116,6 +116,9 @@ defmodule Jido.Plugin do
   @callback load(term(), Jido.Plugin.Context.Persistence.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
 
+  @doc false
+  @callback state_source(term(), Macro.Env.t()) :: {Joi.schema(), term()}
+
   @owner_callbacks [
     agent: [prepare: 2, prepare_route_input: 4, select_route: 2, state_spec: 1, directives: 1, reduce: 2],
     agent_server: [
@@ -129,7 +132,7 @@ defmodule Jido.Plugin do
     ],
     persistence: [dump: 3, load: 3]
   ]
-  @optional_callbacks Enum.flat_map(@owner_callbacks, &elem(&1, 1))
+  @optional_callbacks [state_source: 2] ++ Enum.flat_map(@owner_callbacks, &elem(&1, 1))
   @use_options [:vsn, :option_keys, :id, :sections, :imports]
 
   @doc false

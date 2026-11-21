@@ -90,6 +90,45 @@ invoice = StorageModelGuide.Invoice.instantiate!(id: "inv-1001")
 :ok = Jido.Persistence.save_agent(store, invoice, namespace: "billing")
 ```
 
+## Use an external state provider
+
+A module-defined Agent can use `state_source Provider, options` in its
+`state` block to select a registered Plugin. The source supplies the domain
+schema and loads the initial state.
+The Agent must run on a durable Jido instance. Each state block accepts one
+schema source. Use a Joi object to declare the source fields. Jido rejects
+any returned field outside that object during creation, restore, refresh,
+or commit. Other Plugins keep ownership of their own fields.
+A provider can expose a startup source for the `:state` option of
+`Jido.start_agent/3`. The source identifies the data. The provider derives
+the Agent ID, then loads and validates the initial state during durable
+activation. Addressed creation accepts the same source and verifies its ID
+against the address. If a readiness wait elapses, use the pending address
+from the error to check activation before retrying.
+
+A checkpoint records the provider and verifies the provider and Agent code on
+restore. The JSON Agent codec accepts a Catalog reference to the compiled
+Agent and its declared schema. Schema overrides fail validation.
+Generic definition replacement and upgrade reject provider-backed Agents.
+A provider change requires an explicit migration that preserves the binding.
+
+AgentServer evaluates the Turn before it asks Persistence to commit it.
+Persistence asks the compatible adapter for a transaction. In that transaction,
+Persistence applies the source write, validates the result and saves the
+checkpoint and receipt. AgentServer publishes the result and runs Directives
+after confirmation. Jido still writes protocol checkpoints
+for waits, failed Turns and other lifecycle events. State refreshed for a new
+Turn remains private until commit. A waiting Flow preserves its starting
+state when the instance restarts. A direct `Jido.Agent.cmd/3`
+call evaluates in memory. The source and transaction callbacks are provisional
+in this spike.
+
+`Jido.Persistence.Ecto` can commit a row source and its checkpoint together
+on SQLite or PostgreSQL. Use the repo passed to the source and make all
+transactional writes in that process. The adapter permits checkpoint CAS in
+its Turn transaction and rejects standalone writes in caller-managed
+transactions.
+
 ## Identity
 
 One record belongs to one exact `{namespace, partition, id}` key. The partition defaults to `nil`.

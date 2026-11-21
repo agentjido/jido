@@ -190,6 +190,26 @@ defmodule Jido.Persistence.EctoTest do
     assert {:error, :not_found} = EctoPersistence.get("nested", opts)
   end
 
+  test "a Turn cannot move its checkpoint CAS to another dynamic repo", %{opts: opts} do
+    assert {:ok, config} = Persistence.resolve_config({EctoPersistence, opts}, nil)
+    original_repo = EctoRepo.get_dynamic_repo()
+
+    assert {:error, {:rejected, :ecto_turn_repo_changed}} =
+             EctoPersistence.transact(config, {__MODULE__, nil}, fn repo ->
+               assert :ok = EctoPersistence.compare_and_swap("scoped", :not_found, "value", opts)
+               repo.put_dynamic_repo(:unknown_repo)
+
+               assert {:error, {:rejected, :ecto_turn_repo_changed}} =
+                        EctoPersistence.compare_and_swap("scoped", "value", "other", opts)
+
+               {:ok, :unexpected}
+             end)
+
+    assert EctoRepo.get_dynamic_repo() == original_repo
+    assert {:error, :not_found} = EctoPersistence.get("scoped", opts)
+    assert :ok = EctoPersistence.compare_and_swap("scoped", :not_found, "standalone", opts)
+  end
+
   test "only a statement the database never ran is definite during CAS" do
     cas = fn error ->
       opts = [repo: FaultRepo, repo_options: [reply: fn -> raise error end]]

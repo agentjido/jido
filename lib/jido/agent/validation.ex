@@ -41,6 +41,7 @@ defmodule Jido.Agent.Validation do
     with {:ok, definition} <- fields(input, @fields, defaults()),
          :ok <- fields(definition),
          {:ok, plugins} <- Error.prefix_result_path(Extension.normalize(definition.plugins), :plugins),
+         :ok <- state_source_plugin(definition.module, plugins),
          {:ok, route_contributions} <-
            Error.prefix_result_path(Extension.route_contributions(plugins), :plugins),
          {:ok, routes} <-
@@ -370,6 +371,7 @@ defmodule Jido.Agent.Validation do
          :ok <- Error.prefix_result_path(positive(definition.vsn), :vsn),
          :ok <- Error.prefix_result_path(schema(definition.schema), :schema),
          :ok <- Error.prefix_result_path(plain_map(definition.initial_state), :initial_state),
+         :ok <- provider_schema(definition),
          :ok <- Error.prefix_result_path(static(definition.initial_state), :initial_state),
          :ok <- Error.prefix_result_path(plain_map(definition.metadata), :metadata),
          :ok <- Error.prefix_result_path(static(definition.metadata), :metadata),
@@ -379,6 +381,47 @@ defmodule Jido.Agent.Validation do
 
   defp neutral(%{id: nil, state: nil}), do: :ok
   defp neutral(_), do: Error.validation_result(:definition_required, [], "Definition id and state must be nil")
+
+  defp provider_schema(%{module: module, schema: schema, initial_state: initial_state}) do
+    case Jido.Agent.DSL.State.declaration(module) do
+      {_provider, _descriptor, expected} when schema !== expected ->
+        Error.validation_result(
+          :state_provider_schema_mismatch,
+          [:schema],
+          "Use the schema declared by the Agent state provider"
+        )
+
+      {_provider, _descriptor, _schema} when map_size(initial_state) > 0 ->
+        Error.validation_result(
+          :state_provider_initial_state,
+          [:initial_state],
+          "The Agent state provider supplies the initial state"
+        )
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp state_source_plugin(module, plugins) do
+    case Jido.Agent.DSL.State.declaration(module) do
+      {provider, _descriptor, _schema} ->
+        if Enum.any?(plugins, &(&1.provider == provider)) do
+          :ok
+        else
+          Error.validation_result(
+            :state_source_plugin_required,
+            [:plugins],
+            "Include the Agent state source in the declared Plugins",
+            %{provider: provider}
+          )
+        end
+
+      nil ->
+        :ok
+    end
+  end
+
   defp optional_module(nil), do: :ok
   defp optional_module(module), do: Error.prefix_result_path(name(module), :module)
   defp optional_description(nil), do: :ok

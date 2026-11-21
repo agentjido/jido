@@ -10,7 +10,9 @@ modules:
   - Jido.Persistence.Plugin
   - Jido.Persistence.Record
   - Jido.Persistence.Snapshot
+  - Jido.Persistence.StateSource
   - Jido.Persistence.Store
+  - Jido.Persistence.TurnTransaction
   - Jido.Persistence.WakeStore
   - Jido.Instance.Wake
 ---
@@ -152,7 +154,7 @@ the expected predecessor; a stale write leaves the newer record unchanged.
 ### jido.persistence.I15 — Built-in adapter conformance and inspection
 
 - **scope:** built-in persistence adapters
-- **must:** Each active built-in adapter obeys the shared binary read, atomic compare-and-swap, mandatory delete, and strict unique-option contract. Redis does not accept automatic TTL. Ecto rejects writes inside an outer Repo transaction. Optional scans are paged, prefix-bounded, and use bounded page work. Store rejects invalid pages and unchanged nonterminal cursors. Runtime recovery never uses scan. Inspection tasks load configuration without starting the application or Agents. They safely decode only V3 records and produce JSON. Default exact inspection and JSONL export omit saved Agent definition values, state, Turn payloads, and topology handoff data. Show those values only with an explicit sensitive-output option. Keep prepared values, fact values, and execution batches projected to metadata and shape in exports.
+- **must:** Each active built-in adapter obeys the shared binary read, atomic compare-and-swap, mandatory delete, and strict unique-option contract. Redis does not accept automatic TTL. Ecto rejects standalone writes inside a Repo transaction. Ecto permits checkpoint CAS within its own Turn transaction on the configured repo and rolls it back on rejection. Optional scans are paged, prefix-bounded, and use bounded page work. Store rejects invalid pages and unchanged nonterminal cursors. Runtime recovery never uses scan. Inspection tasks load configuration without starting the application or Agents. They safely decode only V3 records and produce JSON. Default exact inspection and JSONL export omit saved Agent definition values, state, Turn payloads, and topology handoff data. Show those values only with an explicit sensitive-output option. Keep prepared values, fact values, and execution batches projected to metadata and shape in exports.
 - **why:** All bundled adapters must implement the same durability boundary while developer inspection stays above the byte Store.
 - **kind:** functional
 - **status:** active

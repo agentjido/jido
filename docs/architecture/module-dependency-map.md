@@ -687,6 +687,7 @@ Disposition terms:
 | `Jido.Agent.Diff` | Removed | Agent evaluation returns the complete next Agent value; no parallel difference model remains |
 | `Jido.Agent.Directive` | Keep | Explicit deferred runtime work after an Agent state decision; owns Emit, Reply, AgentSend, ParentSend, and ServerStop values and constructors; `Jido.Agent.Directive.Kind` owns built-in classification |
 | `Jido.Agent.DSL` | Keep | Agent authoring DSL boundary |
+| `Jido.Agent.DSL.State` | Keep | Selects one declared schema source |
 | `Jido.Agent.Error` | Removed | Agent validation uses `Jido.Error.ValidationError` with path and code |
 | `Jido.Agent.Extension` | Keep | Agent DSL extension behavior |
 | `Jido.Agent.Mutation` | Removed | Definition mutation is not part of Agent evaluation; AgentServer upgrade replaces a complete trusted definition |
@@ -737,6 +738,8 @@ Disposition terms:
 | `Jido.Persistence.Codec.Term` | Added | Compact default codec for compatible application releases |
 | `Jido.Persistence.Codec.JSON` | Added | Opt-in bounded tagged JSON codec |
 | `Jido.Persistence.Config` | Added | One validated Store and codec profile for an instance namespace |
+| `Jido.Persistence.StateSource` | Experimental | Resolves a Plugin's domain-state binding and applies its conditional write |
+| `Jido.Persistence.TurnTransaction` | Experimental | Selects and invokes a compatible adapter's Turn transaction |
 | `Jido.Persistence.ContinuationStore` | Keep | Runic workflow checkpoints, facts, wait receipts, and read-only checkpoint projection |
 | `Jido.Persistence.Ecto` | Keep | Ecto adapter |
 | `Jido.Persistence.ETS` | Keep | ETS adapter |

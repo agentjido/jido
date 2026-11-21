@@ -431,3 +431,19 @@ authoring surface.
 - **why:** A rejected or undelivered request must release its reply process while the caller stays alive.
 - **kind:** functional
 - **status:** active
+
+### jido.agent_server.I108 — Persistence-owned state commit
+
+- **scope:** An Agent with a declared state source and a durable instance
+- **must:** Give the source the prior state and validated candidate. Reject fields outside the source schema. Apply the source write and save the checkpoint and receipt in the same adapter transaction. Publish the saved candidate after the confirmed commit. For a confirmed rejection, fail the Turn, preserve the prior committed state and skip the effects.
+- **why:** An external domain record and its Jido checkpoint must agree at Turn completion.
+- **kind:** ordering
+- **status:** active
+
+### jido.agent_server.I109 — State provider binding and startup
+
+- **scope:** Authoring, startup, and restoration of a durable Agent with a declared state provider
+- **must:** Use the schema declared by the provider. Reject a different schema in a loaded definition. Accept only source fields in creation, restore and refresh projections. Keep Jido in control of the activated Agent and its identity. Validate provider startup sources and addressed creation against the derived identity. Reject duplicate startup options. Wait according to both effective startup budgets and identify a still-pending activation by its Address. Preserve provider identity and verify provider and Agent code when restoring a checkpoint.
+- **why:** A durable Agent must retain its state and identity contract through definition import, startup, and restore.
+- **kind:** persisted-format
+- **status:** active
