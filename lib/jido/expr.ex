@@ -144,6 +144,13 @@ defmodule Jido.Expr do
   @spec parse(Macro.t(), parse_options()) :: {:ok, t()} | {:error, term()}
   def parse(ast, options \\ []), do: Parser.parse(ast, options)
 
+  @doc """
+  Parses quoted data and expressions with the same inert grammar as `parse/2`.
+  The root can be a literal, map, list, host reference, or expression.
+  """
+  @spec parse_value(Macro.t(), parse_options()) :: {:ok, term()} | {:error, term()}
+  def parse_value(ast, options \\ []), do: Parser.parse_value(ast, options)
+
   @doc "Parses quoted source, or raises on a parse failure."
   @spec parse!(Macro.t(), parse_options()) :: t()
   def parse!(ast, options \\ []), do: unwrap!(parse(ast, options))
@@ -210,6 +217,13 @@ defmodule Jido.Expr do
   """
   @spec evaluate(t(), evaluate_options()) :: {:ok, term()} | {:error, term()}
   def evaluate(value, options \\ []), do: Runtime.evaluate(value, options)
+
+  @doc """
+  Evaluates data that can contain expressions and host references.
+  The complete value shares one evaluation budget.
+  """
+  @spec evaluate_value(term(), evaluate_options()) :: {:ok, term()} | {:error, term()}
+  def evaluate_value(value, options \\ []), do: Runtime.evaluate_value(value, options)
 
   defp unwrap!({:ok, value}), do: value
   defp unwrap!({:error, error}), do: raise(error)

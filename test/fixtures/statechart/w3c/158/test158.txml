@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+
+<!-- test that executable content executes in document order.  if event1 occurs then event2, succeed, otherwise fail -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="0"/>
+  </datamodel>
+  
+<state id="s0">
+  <onentry>
+   <raise event="event1"/>
+   <raise event="event2"/>
+    </onentry>
+  <transition event="event1"  target="s1"/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+ 
+<state id="s1">
+  <transition event="event2"  conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+   
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

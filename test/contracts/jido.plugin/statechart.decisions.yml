@@ -1,0 +1,5 @@
+- id: bundled-statechart-boundary
+  date: 2026-11-21
+  decision: Ship Jido.Statechart and Jido.Plugin.Statechart in the capabilities layer. Run W3C fixtures through opt-in ExUnit tests.
+  driver: Statechart already depends on Agent, Flow, Signal, and Plugin contracts.
+  approved_by: User-requested Statechart integration

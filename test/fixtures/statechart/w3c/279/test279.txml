@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+
+<!--  testing that in case of early binding variables are assigned values at init time, before
+ the state containing them is visited  -->
+<scxml initial="s0" version="1.0" xmlns="http://www.w3.org/2005/07/scxml" conf:datamodel="" 
+  xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+   
+     
+ <state id="s0">
+   <transition conf:idVal="1=1" conf:targetpass=""/>
+
+  <transition  conf:targetfail=""/>
+
+   </state>
+   
+<state id="s1">
+  <datamodel>
+    <data conf:id="1" conf:expr="1"/>
+    </datamodel>
+  </state>
+   
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

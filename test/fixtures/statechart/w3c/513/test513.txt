@@ -1,0 +1,16 @@
+This is a fully manual test.  You send a well formed event to the 'location' URL
+ specified for your SCXML interpreter and check that you get a 200 response code back.  
+ One way of doing this, using wget, is shown below (you can use any event name you
+ want, but you must use '_scxmleventname' to indicate the name of the event):
+
+$ wget \
+--post-data='key1=value1&key2=value2' \
+--header '_scxmleventname: test' \
+<!-- URL of your processor goes here -->
+
+--2014-06-25 17:54:49--  http://epikur.local:8090/925c760f-2093-4054-a24c-d972d75f0dcd/basichttp
+Resolving epikur.local (epikur.local)... 10.211.55.2, 10.37.129.2, 10.0.1.54, ...
+Connecting to epikur.local (epikur.local)|10.211.55.2|:8090... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 0 [text/html]
+Saving to: ‘basichttp’

@@ -5,8 +5,11 @@ their URLs. Each Agent must declare which tools and destinations it needs.
 
 ## Configure the host
 
-Set the allowlist in your application's runtime configuration. To use search,
-select Brave and supply its API key from the host environment.
+Set the allowlist in your application's runtime configuration. To use Brave
+search, export `BRAVE_SEARCH_API_KEY` before you start Mix or the release.
+For local use, copy the root `.env.example` to `.env` and export the values
+from your local file. The default ReAct model uses `OPENAI_API_KEY`. For
+other models, see [Configure ReqLLM](req-llm-configuration.livemd).
 
 ```elixir
 # config/runtime.exs
@@ -78,8 +81,8 @@ reply.data.output
 
 ## Find and read a page with Brave
 
-Set `BRAVE_SEARCH_API_KEY` in the environment that runs the Agent. Use the
-Brave setup above, with `fetch_format: :markdown` if you want Markdown.
+Use the Brave setup above. Add `fetch_format: :markdown` to that same
+configuration to return HTML as Markdown.
 This example uses both the Brave Search API and your configured model.
 
 ```elixir
@@ -114,7 +117,8 @@ reply.data.output
 Configure the ReAct model for your application before you run the Agent.
 
 - `search_web(query)` returns up to five permitted results. Each has a title,
-  URL, and snippet. Brave can return zero results within the allowed paths.
+  URL, and snippet. If the result list is empty, try a query specific to an
+  allowed site.
 - `web_fetch(url)` returns `url` and `text`. Use the returned URL for
   citations because the page can redirect. Fetch accepts uncompressed UTF-8
   HTML and plain text. Plain-text HTML extraction removes tags and common
@@ -124,6 +128,9 @@ Each call has an eight-second deadline and a 512 KiB response body limit.
 Fetch follows up to three redirects and returns up to 6,000 bytes in either
 output format.
 Treat returned text as source data. The source can contain instructions.
+
+If search reports `:search_not_configured`, check that the host selects
+`:brave` and that the key is available when runtime configuration runs.
 
 ## Migrate from Jido Browser
 

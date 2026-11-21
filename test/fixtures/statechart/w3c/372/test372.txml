@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!-- test that entering a final state generates done.state.parentid after executing the onentry elements.  
+Var1 should be set to 2 (but not 3) by the time the event is raised -->
+
+
+<scxml  conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+<datamodel>
+  <data conf:id="1" conf:expr="1"/>
+  </datamodel>
+       
+<state id="s0" initial="s0final">
+  <onentry>
+    <send event="timeout" delay="1s"/>
+    </onentry>
+  <transition event="done.state.s0" conf:idVal="1=2" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+  
+  <final id="s0final">
+    <onentry>
+     <assign conf:location="1" conf:expr="2"/>
+     </onentry>
+    <onexit>
+     <assign conf:location="1" conf:expr="3"/>
+     </onexit>
+     </final>
+</state>
+
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+
+<!-- check that the required fields are present in both internal and external events -->
+
+<scxml version="1.0" initial="s0" conf:datamodel=""  name="machineName" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+     
+ <state id="s0">
+   <onentry>
+     <raise event="foo"/>
+   </onentry>
+   <transition event="foo"  conf:eventFieldsAreBound="" target="s1"/> 
+      <transition event="*" conf:targetfail=""/> 
+   </state>
+   
+ <state id="s1">
+   <onentry>
+     <send event="foo"/>
+   </onentry>
+   <transition event="foo"  conf:eventFieldsAreBound="" conf:targetpass=""/> 
+      <transition event="*" conf:targetfail=""/> 
+   </state>
+   
+    
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+
+<!-- test that _event stays bound during the onexit and entry into the next state -->
+
+<scxml initial="s0" version="1.0" xmlns="http://www.w3.org/2005/07/scxml" conf:datamodel=""  name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+ <data conf:id="1"/>
+ </datamodel>
+     
+ <state id="s0">
+   <onentry>
+     <raise event="foo"/>
+   </onentry>
+   <transition event="foo" target="s1"/> 
+   </state>
+   
+ <state id="s1">
+  <onentry>
+    <raise event="bar"/>
+    <!-- _event should still be bound to 'foo' at this point -->
+    <assign conf:location="1" conf:eventName=""/>
+    </onentry>
+   <transition  conf:idQuoteVal="1=foo" conf:targetpass=""/> 
+   <transition conf:targetfail=""/>
+   </state>
+   
+    
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

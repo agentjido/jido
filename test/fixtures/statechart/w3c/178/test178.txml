@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<!-- we test that multiple key/value pairs are included, even when the keys are the same.
+This is a manual test.  The tester must look at the log output and verify that both
+keys are there.  (This test uses the SCXML Event I/O processor, which is the only
+one that all platforms must support.  It does not specify the message format, so 
+we cannot test _event.raw directly.  Therefore we print it out for visual 
+inspection.) -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+  
+<state id="s0">
+  <onentry>
+   <send  event="event1">
+    <param conf:name="1" conf:expr="2"/>
+    <param conf:name="1" conf:expr="3"/>
+    </send>
+     </onentry>
+
+  <transition event="event1" target="final">
+   <log label="_event " conf:eventRaw=""/>
+   </transition>
+  <transition event="*" conf:targetfail=""/>
+ 
+ </state>
+
+
+<final id="final"/>
+<conf:fail/>
+
+</scxml>

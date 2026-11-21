@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!-- a simple test that a legal value may be assigned to a valid data model location -->
+
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance" 
+   conf:datamodel="" version="1.0" initial="s0">
+   
+<datamodel>
+    <data conf:id="1" conf:expr="0"/>
+    </datamodel>   
+     
+ <state id="s0">
+   <onentry>
+   <assign conf:location="1" conf:expr="1"/>
+   </onentry>
+   
+   <transition conf:idVal="1=1" conf:targetpass=""/>
+   <transition  conf:targetfail=""/>
+ </state>
+
+<conf:pass/>
+<conf:fail/>
+     
+</scxml>

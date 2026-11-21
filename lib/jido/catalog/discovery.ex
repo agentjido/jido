@@ -42,9 +42,11 @@ defmodule Jido.Catalog.Discovery do
     Jido.AI.Agent.Plugin,
     Jido.Plugin.Timer,
     Jido.Plugin.SensorManager,
+    Jido.Plugin.Statechart,
     Jido.Plugin.Bus.Manager,
     Jido.Plugin.Bus.Client,
-    Jido.Plugin.Audit
+    Jido.Plugin.Audit,
+    Jido.Plugin.FSM
   ]
   @bundled_codecs %{
     {"jido.agent.definition", 1} => Jido.Agent.Codec,

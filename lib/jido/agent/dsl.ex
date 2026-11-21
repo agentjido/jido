@@ -226,9 +226,25 @@ defmodule Jido.Agent.DSL do
     draft |> Map.put(:routes, routes) |> Validation.define(opts)
   end
 
+  @doc false
+  @spec register_plugin!(Jido.Plugin.declaration(), Macro.Env.t()) :: :ok
+  def register_plugin!(declaration, caller) do
+    unless Module.has_attribute?(caller.module, :__jido_body_plugins__) do
+      raise CompileError,
+        file: caller.file,
+        line: caller.line,
+        description: "declare the Plugin after use Jido.Agent"
+    end
+
+    Module.put_attribute(caller.module, :__jido_body_plugins__, declaration)
+  end
+
   def build!(dsl, opts, module) do
+    body_plugins = module |> Module.get_attribute(:__jido_body_plugins__, []) |> Enum.reverse()
+
     result =
-      with {:ok, entries} <- Extension.lower(opts[:plugin_declarations], dsl) do
+      with {:ok, declarations} <- Declaration.append(opts[:plugin_declarations], body_plugins),
+           {:ok, entries} <- Extension.lower(declarations, dsl) do
         input =
           opts
           |> Keyword.take([:name, :description, :vsn, :metadata])

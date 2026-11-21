@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+
+<!-- test that eventexpr works and sets the name field of the resulting event -->
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml"  name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">  
+ <datamodel>
+   <data conf:id="1" conf:quoteExpr="foo"/>
+   <data conf:id="2"/>
+   </datamodel>
+     
+ <state id="s0">
+   <onentry>
+     <send  conf:eventExpr="1"/>
+   </onentry>
+   <transition event="foo" target="s1">
+      <assign conf:location="2" conf:eventField="name"/>
+      </transition>
+      <transition event="*" conf:targetfail=""/> 
+   </state>
+   
+<state id="s1">
+  <transition conf:VarEqVar="1 2" conf:targetpass=""/>
+   <transition conf:targetfail=""/>
+   </state>
+      
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

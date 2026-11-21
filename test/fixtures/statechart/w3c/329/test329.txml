@@ -1,0 +1,55 @@
+<!-- test that none of the system variables can be modified -->
+
+<scxml initial="s0" version="1.0" conf:datamodel="" xmlns="http://www.w3.org/2005/07/scxml" name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+   <datamodel>
+     <data conf:id="1"/>
+     <data conf:id="2"/>
+     <data conf:id="3"/>
+     <data conf:id="4"/>
+     </datamodel>
+        
+ <state id="s0">
+   <onentry>
+     <!-- get _event bound so we can use it in s1-->
+     <raise event="foo"/>
+     <assign conf:location="1" conf:systemVarExpr="_sessionid"/>
+     <assign conf:systemVarLocation="_sessionid" conf:invalidSessionID=""/>
+   </onentry>
+
+   <transition event="foo" conf:idSystemVarVal="1=_sessionid" target="s1"/>
+   <transition event="*" conf:targetfail=""/>
+   </state>
+   
+ <state id="s1">
+  <onentry>
+     <assign conf:location="2" conf:systemVarExpr="_event"/>
+     <assign conf:systemVarLocation="_event" expr="27"/>
+    </onentry>
+   <transition conf:idSystemVarVal="2=_event" target="s2"/>
+   <transition  conf:targetfail=""/>
+   </state>  
+   
+<state id="s2">
+  <onentry>
+     <assign conf:location="3" conf:systemVarExpr="_name"/>
+     <assign conf:systemVarLocation="_name" expr="27"/>
+    </onentry>
+   <transition conf:idSystemVarVal="3=_name" target="s3"/>
+   <transition conf:targetfail=""/>
+   </state> 
+
+   
+<state id="s3">
+  <onentry>
+     <assign conf:location="4" conf:systemVarExpr="_ioprocessors"/>
+     <assign conf:systemVarLocation="_ioprocessors" expr="27"/>
+    </onentry>
+   <transition conf:idSystemVarVal="4=_ioprocessors" conf:targetpass=""/>
+   <transition conf:targetfail=""/>
+   </state>  
+   
+   
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

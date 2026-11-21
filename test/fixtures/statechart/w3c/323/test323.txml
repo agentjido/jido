@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+
+<!-- test that _name is bound on startup -->
+
+<scxml initial="s0" version="1.0" xmlns="http://www.w3.org/2005/07/scxml" conf:datamodel=""  name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:systemVarExpr="_name"/>
+  </datamodel>
+     
+ <state id="s0">
+<transition conf:isBound="1" conf:targetpass=""/> 
+   <transition conf:true="" conf:targetfail=""/>
+   </state>
+   
+    
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

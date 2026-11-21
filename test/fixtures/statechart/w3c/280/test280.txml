@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+
+
+<!-- test late binding.  var2 won't get bound until s1 is entered, so it shouldn't  have a value in s0 and
+accessing it should cause an error. It should get bound before the onentry code in s1 so it should  be
+possible access it there and assign its value to var1 -->
+
+<scxml initial="s0" version="1.0" xmlns="http://www.w3.org/2005/07/scxml" conf:datamodel="" 
+  binding="late" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+ 
+ <datamodel>
+   <data conf:id="1"/>
+   </datamodel>  
+     
+ <state id="s0">
+   <transition conf:unboundVar="2" target="s1"/>
+  <transition  conf:targetfail=""/>
+   </state>
+   
+<state id="s1">
+  <datamodel>
+    <data conf:id="2" conf:expr="1"/>
+    </datamodel>
+    <onentry>
+    <assign conf:location="1" conf:varExpr="2"/>
+    </onentry>
+    <transition conf:VarEqVar="1 2" conf:targetpass=""/>
+    <transition conf:targetfail=""/>
+  </state>
+   
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

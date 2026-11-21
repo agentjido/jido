@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+
+<!-- test that an illegal array or item value causes error.execution and results in executable content
+not being executed. -->
+
+<scxml initial="s0" conf:datamodel="" version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="0"/>
+  <data conf:id="2"/>
+  <data conf:id="3"/>
+  <data conf:id="4" conf:illegalArray=""/>
+  <data conf:id="5">
+    <conf:array123/>
+    </data>
+  </datamodel>
+  
+   <state id="s0">
+      <onentry>
+<!-- invalid array, legal item -->
+        <foreach conf:item="2" conf:index="3" conf:arrayTextVar="4">
+          <conf:incrementID id="1"/>
+          </foreach>
+        <raise event="foo"/>
+        </onentry>
+   <transition event="error.execution" target="s1"/>
+   <transition event="*" conf:targetfail=""/> 
+   </state>
+   
+   <state id="s1">
+      <onentry>
+<!-- illegal item, legal array -->
+        <foreach conf:illegalItem="" conf:index="3" conf:arrayVar="5">
+          <conf:incrementID id="1"/>
+          </foreach>
+        <raise event="bar"/>
+        </onentry>
+   <transition event="error.execution" target="s2"/>
+   <transition event="bar" conf:targetfail=""/> 
+   </state>
+
+<state id="s2">
+  <!-- check that var1 has its original value (so executable content never got executed -->
+  <transition conf:idVal="1=0" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+  </state> 
+   
+   <conf:pass/>
+   <conf:fail/>
+   
+
+
+</scxml>

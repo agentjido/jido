@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!-- test that a param inside donedata ends up in the data field of the done event and
+that content inside donedata sets the full value of the event.data field -->
+
+<scxml version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance" conf:datamodel="" initial="s0">
+ <datamodel>
+       <data conf:id="1" conf:expr="0"/>
+    </datamodel>   
+     
+ <state id="s0" initial="s01">
+    
+   <transition event="done.state.s0"  conf:eventvarVal="1=1" target="s1">
+     </transition>
+     
+      <transition event="done.state.s0"  conf:targetfail="">
+     </transition>
+
+   <state id="s01">
+   <transition target="s02"/>
+   </state>
+   <final id="s02">
+     <donedata>
+      <param conf:name="1" conf:expr="1"/>
+      </donedata>
+     </final>
+ </state>
+ 
+ <state id="s1" initial="s11">
+    
+   <transition event="done.state.s1"  conf:eventdataVal="'foo'" conf:targetpass="">
+     </transition>
+     
+      <transition event="done.state.s1"  conf:targetfail="">
+     </transition>
+
+   <state id="s11">
+   <transition target="s12"/>
+   </state>
+   <final id="s12">
+     <donedata>
+      <conf:contentFoo/>
+      </donedata>
+     </final>
+ </state>
+
+<conf:pass/>
+<conf:fail/>
+     
+</scxml>

@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+
+<!-- test that foreach executes the executable content once for each item in the list '(1,2,3)'. The executable
+content sums the items into var1 so it should be 6 at the end -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+<datamodel>
+  <data conf:id="1" conf:expr="0"/>
+  <data conf:id="2"/>
+  <data conf:id="3">
+    <conf:array123/>
+    </data>
+  </datamodel>
+  
+   <state id="s0">
+      <onentry>
+        <foreach conf:item="2"  conf:arrayVar="3">
+          <conf:sumVars id1="1" id2="2"/>
+          </foreach>
+        </onentry>
+
+  <transition conf:idVal="1=6" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+  </state> 
+   
+   <conf:pass/>
+   <conf:fail/>
+   
+</scxml>

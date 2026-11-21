@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?><!-- test that <foreach> does a shallow copy, so that modifying the array does not change
+the iteration behavior. -->
+
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance" datamodel="ecmascript" version="1.0">
+  <datamodel>
+    <data id="Var1" expr="[1,2,3]"/>
+    <data id="Var2" expr="0"/>  <!-- counts the number of iterations -->
+    </datamodel>
+     
+<state id="s0">
+  <onentry>
+  <foreach item="Var3" array="Var1">
+    <assign location="Var1" expr="[].concat(Var1, [4])"/>
+    <assign location="Var2" expr="Var2 + 1"/>
+    </foreach>
+   </onentry>
+   
+   <transition cond="Var2==3" target="pass"/>
+   <transition target="fail"/>
+</state>
+
+
+ 
+<final id="pass"><onentry><log label="Outcome" expr="'pass'"/></onentry></final>
+<final id="fail"><onentry><log label="Outcome" expr="'fail'"/></onentry></final>
+</scxml>

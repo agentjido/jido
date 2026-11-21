@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!-- test that the event name matching works correctly, including prefix matching and the fact
+that the event attribute of transition may contain multiple event designators.    -->
+
+
+<scxml  initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+       
+<state id="s0" initial="s01">
+  <onentry>
+    <send event="timeout" delay="2s"/>
+    </onentry>
+    
+  <!-- this will catch the failure case -->
+  <transition event="timeout" conf:targetfail=""/>
+  
+  <state id="s01">
+  <onentry>
+    <raise event="foo"/>
+    </onentry>
+  <!-- test that an event can match against a transition with multiple descriptors -->  
+  <transition  event="foo bar" target="s02"/>
+  </state>
+  
+ <state id="s02">
+  <onentry>
+    <raise event="bar"/>
+    </onentry>
+  <!-- test that an event can match the second descriptor as well -->  
+  <transition  event="foo bar" target="s03"/>
+  </state>
+
+  <state id="s03">
+  <onentry>
+    <raise event="foo.zoo"/>
+    </onentry>
+  <!-- test that a prefix descriptor matches -->  
+  <transition  event="foo bar" target="s04"/>
+  </state>
+
+<state id="s04">
+  <onentry>
+    <raise event="foos"/>
+    </onentry>
+  <!-- test that only token prefixes match -->  
+  <transition  event="foo" conf:targetfail=""/>
+  <transition event="foos" target="s05"/>
+</state>
+
+<state id="s05">
+  <onentry>
+    <raise event="foo.zoo"/>
+    </onentry>
+  <!-- test that .* works at the end of a descriptor -->  
+  <transition  event="foo.*" target="s06"/>
+  </state>  
+
+  <state id="s06">
+  <onentry>
+    <raise event="foo"/>
+    </onentry>
+  <!-- test that "*" works by itself -->  
+  <transition  event="*" conf:targetpass=""/>
+  </state>
+  
+</state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

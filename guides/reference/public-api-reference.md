@@ -557,6 +557,22 @@ Stores bounded domain audit records in portable Agent state.
 | --- | --- |
 | `Jido.Plugin.Audit.record/3` | Creates one domain audit Directive. |
 
+### `Jido.Statechart`
+
+Use `Jido.Plugin.Statechart` to run an SCXML chart on an Agent. Route its
+application events through `Jido.Plugin.Statechart.Route`.
+See [Statecharts](../built-in-plugins/statecharts.md).
+
+| API | Purpose |
+| --- | --- |
+| `Jido.Statechart.sigil_SCXML/2` | Compiles literal SCXML at compile time. |
+| `Jido.Statechart.compile/1` | Compiles XML and returns a chart or a typed error. |
+| `Jido.Statechart.compile!/1` | Compiles XML and raises on failure. |
+| `Jido.Statechart.spawn/3` | Starts an Agent and initializes its chart. |
+| `Jido.Statechart.initialize/3` | Initializes a chart on an existing Agent. |
+| `Jido.Statechart.session/1` | Reads the committed chart session. |
+| `Jido.Statechart.BasicHTTP.receive_post/3` | Submits a Basic HTTP request body as a chart event. |
+
 ### `Jido.Plugin.Timer`
 
 Adds delayed, static periodic, interval, and cron Signals to an Agent. See
@@ -582,11 +598,14 @@ Keeps supervised sensor processes aligned with portable Agent state.
 | `Jido.Plugin.SensorManager.start/3` | Creates a Directive that adds or replaces one tagged sensor. |
 | `Jido.Plugin.SensorManager.stop/1` | Creates a Directive that removes one tagged sensor. |
 
-### `Jido.Agent.Plugin.FSM`
+### `Jido.Plugin.FSM`
 
-Adds deterministic finite-state route control to one Agent.
+Declare this Plugin in the Agent's `plugins` list. Use `state_machine` to
+define the initial state, terminal states, and transitions. A transition
+selects a matching route by alias and advances the `:fsm` state after its
+Action or Flow succeeds. The Catalog reference is `{"id": "jido.fsm", "vsn": 1}`.
 
-This module has no public functions. Its struct is the contract.
+See [Upgrade the beta FSM Plugin](v2-to-v3-migration.md#upgrade-the-beta-fsm-plugin).
 
 ## Persistence
 

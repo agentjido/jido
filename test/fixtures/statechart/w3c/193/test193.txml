@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!-- we test that omitting target and targetexpr of <send> when using the
+SCXML event i/o processor puts the event on the external queue.  -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+  
+<state id="s0">
+  <onentry>
+  	  <send event="internal"/>
+   <!-- this should put event1 in the external queue -->
+   <send event="event1" type="http://www.w3.org/TR/scxml/#SCXMLEventProcessor"/>
+   <send event="timeout" delay="1s"/>
+    </onentry>
+  
+  <transition event="event1" conf:targetfail=""/>
+  <transition event="internal" target="s1"/>
+ </state>
+ 
+ <state id="s1">
+ 	<transition event="event1" conf:targetpass=""/>
+ 	<transition event="timeout" conf:targetfail=""/>
+ 	
+ 	</state>
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

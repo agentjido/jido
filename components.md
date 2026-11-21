@@ -391,7 +391,7 @@ still needs review.
 | `Jido.Durable` | Component | None | Persisted Flow execution, portable references and status, Signal wait input, continuation recovery, and host wake boundary | Confirmed |
 | `Jido.Signal` | Parent component | `Jido.Signal.Router`, `Jido.Signal.Bus`, `Jido.Signal.Dispatch` | Envelope, context, boundary rules, codec, catalog | Confirmed |
 | `Jido.Agent` | Component | None | Fixed definitions, instances, routes, runtime Directives, static topology, state validation, Codec, Plugin preparation, references, and views | Confirmed |
-| `Jido.Plugin` | Parent component | `Jido.Plugin.Audit`, `Jido.Plugin.Bus`, `Jido.Plugin.Timer`, `Jido.Plugin.SensorManager` | Plugin behavior, config, specification, manifest, normalization, contexts, runtime callbacks | Reviewed and confirmed |
+| `Jido.Plugin` | Parent component | `Jido.Plugin.Audit`, `Jido.Plugin.Bus`, `Jido.Plugin.FSM`, `Jido.Plugin.Timer`, `Jido.Plugin.SensorManager` | Plugin behavior, config, specification, manifest, normalization, contexts, runtime callbacks | Reviewed and confirmed |
 | `Jido.AgentServer` | Component | None | Lifecycle, activation, composition, durable Turns, effects, handoff, Plugin runtime, status, topology, supervision | Reviewed and confirmed |
 | `Jido.Instance` | Internal namespace of `Jido` | None | Names, namespace registry, options, runtime store | Confirmed internal ownership |
 | `Jido.Persistence` | Component | None | Records, snapshots, checkpoints, stores, continuation storage, Plugin conversion, adapters | Proposed |
@@ -643,10 +643,11 @@ These are first-party capabilities built on the Plugin contract.
 | --- | --- | --- | --- | --- |
 | Audit | Keep bounded committed audit records | `jido.plugin.audit` | `jido.plugin.audit` | Sub-component reviewed and confirmed |
 | Bus Manager and Client | Own a Bus and consume Signal subscriptions | `jido.plugin.bus` | `jido.plugin.bus` | Sub-component reviewed and confirmed |
+| FSM | Select routes by state and advance after execution | `jido.plugin.fsm` | `jido.plugin.fsm` | Active |
 | Timer | Deliver delayed, static periodic, interval, and cron Signals | `jido.plugin.timer` | `jido.plugin.timer` | Sub-component reviewed and confirmed |
 | Sensor Manager | Reconcile supervised input sensors | `jido.plugin.sensor_manager` | `jido.plugin.sensor_manager` | Sub-component reviewed and confirmed |
 
-Resolved boundary: Four capabilities are first-party Plugin sub-components in
+Resolved boundary: These capabilities are first-party Plugin sub-components in
 core Jido. `Jido.Plugin.Heartbeat` was removed; use `Jido.Plugin.Timer` for
 periodic Signals. Bus has Manager, Client, and DSL public entries; it does not
 need an empty namespace facade.

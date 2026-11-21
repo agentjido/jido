@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!-- we test that idlocation is supported.   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+ <datamodel>
+   <data conf:id="1"/>
+   </datamodel>
+     
+<state id="s0" >
+  <onentry>
+    <send event="timeout" delay="1s"/>
+    </onentry>
+     <invoke type="http://www.w3.org/TR/scxml/" conf:idlocation="1">
+     <content>
+     <!-- when invoked, terminate returning done.invoke. This proves that the invocation succeeded.   -->
+       <scxml initial="subFinal" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+       <final id="subFinal"/>
+        </scxml>
+       </content>
+    </invoke>
+  <transition event="*" target="s1"/>
+</state>
+
+<state id="s1">
+  <transition conf:isBound="1" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+  </state>
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

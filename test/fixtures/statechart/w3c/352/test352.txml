@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+
+<!-- test the origintype is 'http://www.w3.org/TR/scxml/#SCXMLEventProcessor' -->
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1"/>
+  </datamodel>
+
+  
+<state id="s0">
+   <onentry>
+     <send delay="5s" event="timeout"/>
+    <send type="http://www.w3.org/TR/scxml/#SCXMLEventProcessor"  event="s0Event"/>  
+     </onentry>
+  <transition event="s0Event"  target="s1">
+    <assign conf:location="1" conf:eventField="origintype"/>
+    </transition>
+  <transition event="*" conf:targetfail="">
+    </transition>
+
+</state>
+
+<state id="s1">
+  <transition conf:idQuoteVal="1=http://www.w3.org/TR/scxml/#SCXMLEventProcessor" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+ </state>
+ 
+
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

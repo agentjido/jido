@@ -420,6 +420,9 @@ Proposed lessons:
 4. Static periodic Timer Signals.
 5. SensorManager.
 6. Bus Manager and Bus Client.
+7. Standalone approval chart.
+8. Chart Plugin with a named guard and a separate Agent route.
+9. Behavior Tree continuation and Action effects.
 
 Primary coverage:
 
@@ -428,6 +431,9 @@ Primary coverage:
 - `Jido.Plugin.SensorManager`
 - `Jido.Plugin.Bus.Manager`
 - `Jido.Plugin.Bus.Client`
+- `Jido.Statechart`
+- `Jido.Plugin.Statechart`
+- `Jido.Plugin.BehaviorTree`
 
 ### 12 Persistence
 
