@@ -173,7 +173,8 @@ defmodule Jido.AgentServer.Worker do
   defp validate_start_agent(opts) do
     agent = Keyword.fetch!(opts, :agent)
 
-    if opts[:persistence_mode] == :restore and match?(%Agent{state: nil}, agent) do
+    if match?(%Agent{id: id, state: nil} when is_binary(id), agent) and
+         (opts[:persistence_mode] == :restore or Jido.AgentServer.StateProvider.loads_initial_state?(agent)) do
       with {:ok, _} <- Jido.Agent.Validation.validate_definition(Agent.definition(agent)),
            do: {:ok, agent}
     else

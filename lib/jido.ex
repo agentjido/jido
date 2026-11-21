@@ -1307,6 +1307,10 @@ defmodule Jido do
   and partition. Starting a duplicate returns an error and leaves the existing
   Agent unchanged.
 
+  A state provider can supply a startup source for `:state`. The provider
+  derives the Agent ID and loads and validates the state during durable startup.
+  The call waits for readiness when the caller supplies a provider source.
+
   An instance with persistence uses its one configured Store and codec for all
   Agents. Per-Agent Store overrides are not supported.
 
@@ -1320,16 +1324,50 @@ defmodule Jido do
       {instance_opts, runtime_opts} = Keyword.split(opts, [:id, :state])
 
       with :ok <- validate_agent_persistence_override(runtime_opts),
-           {:ok, agent} <- startup_agent(agent, instance_opts, runtime_opts) do
-        runtime_opts
-        |> inherit_instance_persistence(instance)
-        |> Keyword.merge(agent: agent, jido: instance)
-        |> Jido.AgentServer.Worker.start()
+           {:ok, agent, await?} <- prepare_agent_start(agent, instance_opts, runtime_opts) do
+        opts = inherit_instance_persistence(runtime_opts, instance)
+
+        with :ok <- startup_persistence(opts, await?),
+             {:ok, server} <- AgentServer.Worker.start(Keyword.merge(opts, agent: agent, jido: instance)),
+             :ok <- await_provider_start(server, opts, await?) do
+          {:ok, server}
+        end
       end
     else
       {:error, Jido.Error.validation_error("Agent startup options must be a keyword list", kind: :config)}
     end
   end
+
+  defp prepare_agent_start(agent, opts, runtime_opts) do
+    case AgentServer.StateProvider.startup(agent, opts, runtime_opts[:persistence_mode]) do
+      :default ->
+        with {:ok, agent} <- startup_agent(agent, opts, runtime_opts), do: {:ok, agent, false}
+
+      {:ok, %Jido.Agent{} = agent} ->
+        {:ok, agent, true}
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  defp startup_persistence(opts, true) do
+    if opts[:persistence],
+      do: :ok,
+      else:
+        Jido.Error.validation_result(
+          :state_provider_requires_persistence,
+          [:state],
+          "Configure a durable Jido Store to start this Agent."
+        )
+  end
+
+  defp startup_persistence(_opts, false), do: :ok
+
+  defp await_provider_start(server, opts, true),
+    do: AgentServer.await_ready(server, Keyword.get(opts, :persistence_timeout, 5_000))
+
+  defp await_provider_start(_server, _opts, false), do: :ok
 
   defp validate_agent_persistence_override(opts) do
     case Keyword.fetch(opts, :persistence) do

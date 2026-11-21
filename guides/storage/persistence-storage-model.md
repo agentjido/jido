@@ -96,9 +96,11 @@ A module-defined Agent can use `state_provider Provider, options` in its
 `state` block. The provider supplies the schema and loads the initial state.
 The Agent must run on a durable Jido instance. Each state block accepts one
 schema source. The provider controls initial values for that schema.
-The provider's start helper can load valid initial values before calling
-`Jido.start_agent/3`. To replace its definition, use a migration that
-preserves the provider's binding to its data.
+A provider can expose a startup source for the `:state` option of
+`Jido.start_agent/3`. The source identifies the data. The provider derives
+the Agent ID, then loads and validates the initial state during durable
+activation. To replace its definition, use a migration that preserves the
+provider's binding to its data.
 
 AgentServer evaluates the Turn before it calls the provider's commit
 function. The provider writes its state and calls the Jido save function with
