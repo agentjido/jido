@@ -1,5 +1,5 @@
 defmodule Jido.BehaviorTree.Expression do
-  @moduledoc "A Behavior Tree expression with access to the current blackboard."
+  @moduledoc "A Behavior Tree expression that can read the current blackboard and Agent state."
 
   alias Jido.BehaviorTree.{Blackboard, Tick}
   alias Jido.Expr
@@ -7,7 +7,7 @@ defmodule Jido.BehaviorTree.Expression do
   defmodule Reference do
     @moduledoc false
     @enforce_keys [:key]
-    defstruct [:key]
+    defstruct [:key, source: :blackboard]
   end
 
   @enforce_keys [:value]
@@ -26,22 +26,38 @@ defmodule Jido.BehaviorTree.Expression do
 
   @doc "Evaluates the expression against the current Tick."
   @spec evaluate(t(), Tick.t()) :: {:ok, term()} | {:error, Exception.t()}
-  def evaluate(%__MODULE__{value: value}, %Tick{blackboard: blackboard}) do
-    Expr.evaluate_value(value,
-      resolve: fn %Reference{key: key}, path ->
-        case Map.fetch(Blackboard.to_map(blackboard), key) do
-          {:ok, value} ->
-            {:ok, value}
-
-          :error ->
-            Jido.Error.validation_result(:missing_blackboard_key, path, "Missing blackboard key #{inspect(key)}")
-        end
-      end
-    )
+  def evaluate(%__MODULE__{value: value}, %Tick{} = tick) do
+    Expr.evaluate_value(value, resolve: &resolve(&1, &2, tick))
   end
 
-  defp parse_reference({:blackboard, _, [key]}) when is_atom(key) or is_binary(key) or is_integer(key),
-    do: {:ok, %Reference{key: key}}
+  defp resolve(%Reference{source: :state, key: key}, path, tick) do
+    case Tick.agent_state(tick) do
+      state when is_map(state) ->
+        fetch(state, key, path, :missing_state_key, "Agent state")
+
+      _ ->
+        Jido.Error.validation_result(
+          :missing_agent_state,
+          path,
+          "Agent state is unavailable for state(#{inspect(key)})"
+        )
+    end
+  end
+
+  defp resolve(%Reference{key: key}, path, tick) do
+    fetch(Blackboard.to_map(tick.blackboard), key, path, :missing_blackboard_key, "blackboard")
+  end
+
+  defp fetch(values, key, path, code, label) do
+    case Map.fetch(values, key) do
+      {:ok, value} -> {:ok, value}
+      :error -> Jido.Error.validation_result(code, path, "Missing #{label} key #{inspect(key)}")
+    end
+  end
+
+  defp parse_reference({source, _, [key]})
+       when source in [:blackboard, :state] and (is_atom(key) or is_binary(key) or is_integer(key)),
+       do: {:ok, %Reference{source: source, key: key}}
 
   defp parse_reference(_ast), do: :error
 end

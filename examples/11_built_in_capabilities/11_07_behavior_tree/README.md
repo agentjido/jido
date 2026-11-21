@@ -6,7 +6,7 @@ next. Run the same tick pattern with a standalone executor and a tool wrapper.
 ## What you will learn
 
 - Define a tree in the Agent with a `behavior_tree` block that enables the Plugin.
-- Declare an inline Action and a blackboard condition.
+- Read the requested quantity from the blackboard and available stock from Agent state.
 - Resume a running node. Commit an Action result and dispatch its Signal.
 - Run a tree without an AgentServer when the caller owns execution.
 
@@ -28,8 +28,8 @@ mix test.examples examples/11_built_in_capabilities/11_07_behavior_tree --warnin
 Expected live output:
 
 ```text
-tick=1 status=running reserved=0
-tick=2 status=success reserved=3
+tick=1 status=running reserved=0 available_stock=5
+tick=2 status=success reserved=3 available_stock=2
 signal=examples.11.07.stock.reserved reserved=3
 ```
 
@@ -43,10 +43,12 @@ tool=check_readiness ready=true
 ## Important behavior
 
 The first tick reaches the Wait node and returns `:running`. The second tick
-starts with that Wait node, checks `:quantity` on the blackboard, and calls the
-inline Reserve Action. The AgentServer commits `:reserved` before it dispatches the
-Signal. The reset Signal restores the tree and its blackboard. The stock total
-stays at its committed value. The runners stop their processes when they finish.
+resumes at that Wait node. The condition compares `:available_stock` in Agent
+state with `:requested_quantity` on the blackboard. The inline Reserve Action
+returns the updated stock and reservation values. The AgentServer commits both
+values before it dispatches the Signal. The reset Signal restores the tree and
+blackboard. Stock and reservations stay at their committed values. The runners
+stop their processes when they finish.
 
 ## Limits
 

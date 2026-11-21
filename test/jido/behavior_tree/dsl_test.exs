@@ -43,6 +43,19 @@ defmodule Jido.BehaviorTree.DSLTest do
       end
     end
 
+    tree :stock do
+      sequence :reserve do
+        wait :hold, milliseconds: 0
+        condition :has_stock, state(:stock) >= blackboard(:requested)
+
+        action :decrement, remaining <- state(:stock) - blackboard(:requested) do
+          {:ok, %{stock: remaining}}
+        end
+
+        action :report, ExternalAction, params: %{result: [state(:stock), blackboard(:requested)]}
+      end
+    end
+
     defp total(units, %{extra: extra}), do: units + extra
   end
 
@@ -81,6 +94,35 @@ defmodule Jido.BehaviorTree.DSLTest do
 
     assert {{:error, error}, _, _} = Tree.tick_with_context(tree, Tick.new())
     assert Exception.message(error) =~ "Missing blackboard key :available"
+  end
+
+  @tag obligation: "jido.plugin.behavior_tree.I5"
+  test "conditions and both Action forms read current state and blackboard values" do
+    blackboard = Blackboard.new(%{requested: 3})
+    tick = Tick.new_with_context(blackboard, nil, [], %{agent_state: %{stock: 2}})
+
+    assert {:running, running, tick} = Tree.tick_with_context(Trees.stock(), tick)
+    assert {:failure, _, _} = Tree.tick_with_context(running, tick)
+
+    updated_tick = %{tick | context: %{agent_state: %{stock: 5}}}
+    assert {:success, _, done} = Tree.tick_with_context(running, updated_tick)
+    assert done.context.agent_state == %{stock: 2, observed: [2, 3]}
+  end
+
+  @tag obligation: "jido.plugin.behavior_tree.I5"
+  test "state references distinguish an unavailable state from a missing state key" do
+    tick = Tick.new(Blackboard.new(%{requested: 3, stock: 10}))
+    assert {:running, running, tick} = Tree.tick_with_context(Trees.stock(), tick)
+
+    assert {{:error, %Jido.Error.ValidationError{code: :missing_agent_state} = error}, _, _} =
+             Tree.tick_with_context(running, tick)
+
+    assert Exception.message(error) =~ "Agent state is unavailable for state(:stock)"
+
+    assert {{:error, %Jido.Error.ValidationError{code: :missing_state_key} = error}, _, _} =
+             Tree.tick_with_context(running, %{tick | context: %{agent_state: %{}}})
+
+    assert Exception.message(error) =~ "Missing Agent state key :stock"
   end
 
   @tag obligation: "jido.plugin.behavior_tree.I5"

@@ -9,19 +9,25 @@ defmodule Jido.Examples.Applications.BehaviorTree.Agent do
   alias Jido.Joi
 
   state do
-    schema Joi.object(%{reserved: Joi.integer() |> Joi.default(0)})
+    schema Joi.object(%{
+             available_stock: Joi.integer() |> Joi.min(0) |> Joi.default(5),
+             reserved: Joi.integer() |> Joi.default(0)
+           })
   end
 
-  behavior_tree :reservation, blackboard: %{quantity: 3} do
+  behavior_tree :reservation, blackboard: %{requested_quantity: 3} do
     sequence :reserve_stock do
       node :mark_started, SetBlackboard.new(:stage, :started)
       wait :next_tick, milliseconds: 0
-      condition :has_stock, blackboard(:quantity) >= 1
+      condition :has_stock, state(:available_stock) >= blackboard(:requested_quantity)
 
       action :reserve,
-             quantity <- blackboard(:quantity),
-             inline: [schema: Joi.object(%{quantity: Joi.integer() |> Joi.min(1)}), context: context] do
-        reserve(context.agent_state.reserved + quantity)
+             [quantity <- blackboard(:requested_quantity), available <- state(:available_stock)],
+             inline: [
+               schema: Joi.object(%{quantity: Joi.integer() |> Joi.min(1), available: Joi.integer()}),
+               context: context
+             ] do
+        reserve(context.agent_state.reserved + quantity, available - quantity)
       end
     end
   end
@@ -30,7 +36,8 @@ defmodule Jido.Examples.Applications.BehaviorTree.Agent do
     signal_source "/examples/11/07/reservation"
   end
 
-  defp reserve(total) do
-    {:ok, %{reserved: total}, [Directive.emit("examples.11.07.stock.reserved", %{reserved: total})]}
+  defp reserve(total, available) do
+    {:ok, %{reserved: total, available_stock: available},
+     [Directive.emit("examples.11.07.stock.reserved", %{reserved: total})]}
   end
 end

@@ -21,8 +21,10 @@ defmodule Jido.BehaviorTree.DSL do
       end
 
   Conditions, Action params, and inline Action bindings use `Jido.Expr`.
-  Use `blackboard(key)` to read a required value. Inline Action bodies are
-  ordinary Elixir. They can call private functions in the owner module.
+  Use `blackboard(key)` or `state(key)` to read a required value when the node
+  runs. `state(key)` reads the current candidate Agent state. Missing state or
+  keys cause a tick error. Inline Action bodies are ordinary Elixir. They can
+  call private functions in the owner module.
   An inline Action can take `inline: [schema: ..., context: variable]`.
   Use `node :name, expression` to insert a custom node or subtree root.
   """

@@ -243,6 +243,12 @@ defmodule Jido.BehaviorTree.Tick do
     %{tick | agent: agent}
   end
 
+  @doc false
+  @spec agent_state(t()) :: map() | nil
+  def agent_state(%__MODULE__{agent: %Jido.Agent{state: state}}), do: state
+  def agent_state(%__MODULE__{context: %{agent_state: state}}), do: state
+  def agent_state(%__MODULE__{}), do: nil
+
   @doc """
   Appends directives to the tick's directive list.
 

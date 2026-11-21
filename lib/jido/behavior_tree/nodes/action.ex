@@ -89,7 +89,7 @@ defmodule Jido.BehaviorTree.Nodes.Action do
   @impl true
   def tick_with_context(%__MODULE__{} = node, tick) do
     context = Map.merge(node.context, tick.context)
-    state = agent_state(tick)
+    state = Tick.agent_state(tick)
     context = if state, do: Map.merge(context, %{agent_state: state, state: state}), else: context
 
     with {:ok, params} <- resolve_params(node.params, tick) do
@@ -110,9 +110,6 @@ defmodule Jido.BehaviorTree.Nodes.Action do
         {{:error, reason}, node, Tick.put(tick, :error, reason)}
     end
   end
-
-  defp agent_state(%Tick{agent: %Jido.Agent{state: state}}), do: state
-  defp agent_state(%Tick{context: context}), do: Map.get(context, :agent_state)
 
   defp success(node, tick, state, result, directives) do
     tick =

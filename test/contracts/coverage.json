@@ -2815,14 +2815,16 @@
         "jido.plugin.behavior_tree.I5": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
             "test an Agent cannot register the Behavior Tree Plugin twice",
+            "test conditions and both Action forms read current state and blackboard values",
             "test false conditions reach the fallback and expression errors stop the tick",
             "test inline code keeps private helpers and context, and sees blackboard changes after a wait",
             "test rejects unsupported calls in expressions at compile time",
+            "test state references distinguish an unavailable state from a missing state key",
             "test the tool wrapper uses a DSL tree and emits named node paths"
           ]
         }

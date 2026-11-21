@@ -18,17 +18,21 @@ defmodule Reservations.Agent do
   alias Jido.Joi
 
   state do
-    schema Joi.object(%{reserved: Joi.integer() |> Joi.default(0)})
+    schema Joi.object(%{
+             available_stock: Joi.integer() |> Joi.min(0) |> Joi.default(5),
+             reserved: Joi.integer() |> Joi.default(0)
+           })
   end
 
-  behavior_tree :reservation, blackboard: %{quantity: 3} do
+  behavior_tree :reservation, blackboard: %{requested_quantity: 3} do
     sequence :reserve_stock do
       wait :next_tick, milliseconds: 0
-      condition :has_stock, blackboard(:quantity) > 0
+      condition :has_stock, state(:available_stock) >= blackboard(:requested_quantity)
 
-      action :reserve, quantity <- blackboard(:quantity),
-        inline: [schema: Joi.object(%{quantity: Joi.integer() |> Joi.min(1)})] do
-        {:ok, %{reserved: quantity}}
+      action :reserve,
+             [quantity <- blackboard(:requested_quantity), available <- state(:available_stock)],
+             inline: [schema: Joi.object(%{quantity: Joi.integer() |> Joi.min(1), available: Joi.integer()})] do
+        {:ok, %{reserved: quantity, available_stock: available - quantity}}
       end
     end
   end
@@ -51,23 +55,31 @@ blackboard data portable. Send a Signal to change the tree state.
 
 ## Conditions and Actions
 
-Use `action :reserve, Reservations.Reserve, params: %{quantity: blackboard(:quantity)}`
+Use `action :reserve, Reservations.Reserve, params: %{quantity: blackboard(:requested_quantity)}`
 to call an existing Action module. Use `action :reserve, [] do ... end` for
 an inline Action with no inputs. Inline Actions can call private helpers in
 the tree module. Add `context: ctx` to the `inline:` options to bind the
 Action context. Use the same return values and Directives as other Actions.
 
 Conditions, Action parameters, and inline bindings use
-[Jido expressions](../flows/flow-expressions.md). A condition must return a
-Boolean. A false condition returns `:failure` and a selector can try its next
-child. A missing blackboard key or an expression error fails the tick. A
-running sequence resumes with its current child. Put a condition after a
-Wait if it must read values when that Wait finishes.
+[Jido expressions](../flows/flow-expressions.md). You can use `state(key)` and
+`blackboard(key)` together in any of these positions. Each reference reads a
+key from its source when the node runs. `state(key)` reads the current
+candidate Agent state, including changes from earlier Actions in the same
+tick. Use an Action result to change state.
+
+A condition must return a Boolean. A false condition returns `:failure` and
+a selector can try its next child. Unavailable Agent state, missing keys,
+and other expression errors fail the tick. A running sequence resumes with
+its current child. Put a condition after a Wait to read values when that
+Wait finishes.
 
 A tree needs one root. Use distinct names for children of the same parent.
 Named nodes add `:node_path` to their telemetry. Use
-`node :custom, MyNode.new(...)` to add a node from its constructor. The same
-tree works with the standalone executor and tool wrapper.
+`node :custom, MyNode.new(...)` to add a node from its constructor. For
+standalone execution, give trees that use `state(key)` an Agent or an
+`:agent_state` map in the Tick context. The tool wrapper accepts the map
+in its execution context.
 
 ## Use a shared tree
 
@@ -80,7 +92,7 @@ use Jido.Agent,
   name: "reservation_agent",
   plugins: [
     {Jido.Plugin.BehaviorTree,
-     %{tree: Reservations.Tree.reservation(), blackboard: %{quantity: 3}}}
+     %{tree: Reservations.Tree.reservation(), blackboard: %{requested_quantity: 3}}}
   ]
 ```
 
@@ -96,8 +108,8 @@ the Agent module's `cmd/2` and use the returned Agent for the next call.
 | Signal type | Signal data | Effect |
 | --- | --- | --- |
 | `jido.bt.tick` | `%{}` | Run one traversal. Save the continuation on `:running`. |
-| `jido.bt.blackboard.put` | `%{key: :quantity, value: 4}` | Set one value without ticking. |
-| `jido.bt.blackboard.merge` | `%{data: %{quantity: 4}}` | Merge values without ticking. |
+| `jido.bt.blackboard.put` | `%{key: :requested_quantity, value: 4}` | Set one value without ticking. |
+| `jido.bt.blackboard.merge` | `%{data: %{requested_quantity: 4}}` | Merge values without ticking. |
 | `jido.bt.halt` | `%{}` | Halt the nodes and set status to `:idle`. Keep the blackboard and tick count. |
 | `jido.bt.reset` | `%{}` | Halt the current tree. Restore the configured tree and blackboard, set status to `:idle`, and set the count to zero. |
 
@@ -138,8 +150,8 @@ mix run examples/11_built_in_capabilities/11_07_behavior_tree/demo.exs
 Expected output:
 
 ```text
-tick=1 status=running reserved=0
-tick=2 status=success reserved=3
+tick=1 status=running reserved=0 available_stock=5
+tick=2 status=success reserved=3 available_stock=2
 signal=examples.11.07.stock.reserved reserved=3
 ```
 

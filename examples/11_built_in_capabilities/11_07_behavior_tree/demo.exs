@@ -13,8 +13,8 @@ try do
 
   for _tick <- 1..2 do
     {:ok, %{status: :committed}} = AgentServer.call(server, Agent.bt_tick_signal!())
-    %{state: %{behavior_tree: tree, reserved: reserved}} = AgentServer.snapshot(server).agent
-    IO.puts("tick=#{tree.tick_count} status=#{tree.status} reserved=#{reserved}")
+    %{state: %{behavior_tree: tree, reserved: reserved, available_stock: stock}} = AgentServer.snapshot(server).agent
+    IO.puts("tick=#{tree.tick_count} status=#{tree.status} reserved=#{reserved} available_stock=#{stock}")
   end
 
   receive do
