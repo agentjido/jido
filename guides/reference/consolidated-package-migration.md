@@ -33,7 +33,7 @@ end
 
 Elixir `~> 1.18` is still required. `:jido` now brings `req_llm`, `runic`, `spark`, `splode`, `sched_ex`, `yaml_elixir`, `zoi`, `telemetry`, `telemetry_metrics`, and `multigraph` for every application, including one with no AI Agents. It requires `zoi ~> 0.19.0`, where `jido` and `jido_action` required `~> 0.18.11`.
 
-These remain optional. Add one only if you use it: `bedrock` and `bedrock_raft`, `ecto_sql`, `opentelemetry_api`, and `phoenix_pubsub`.
+These remain optional. Add one only if you use it: `ecto_sql`, `opentelemetry_api`, and `phoenix_pubsub`.
 
 ## Application startup
 

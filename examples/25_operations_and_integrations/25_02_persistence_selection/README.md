@@ -28,7 +28,7 @@ It does not survive BEAM loss.
 
 ## Limits
 
-This lesson does not contact Redis, S3, Ecto, Bedrock, or another external store.
+This lesson does not contact Redis, S3, Ecto, or another external store.
 
 ## Core Fit and Gaps
 

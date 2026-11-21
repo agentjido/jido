@@ -225,8 +225,7 @@ defmodule Jido.MixProject do
          {"Storage Model", "guides/storage/persistence-storage-model.md"},
          {"Local Stores", "guides/storage/local-persistence-adapters.md"},
          {"Ecto Storage", "guides/storage/ecto-persistence.md"},
-         {"Redis and S3 Stores", "guides/storage/redis-and-s3-persistence.md"},
-         {"Bedrock and Raft Storage", "guides/storage/bedrock-persistence.md"}
+         {"Redis and S3 Stores", "guides/storage/redis-and-s3-persistence.md"}
        ]},
       {:"AI Agents",
        [
@@ -311,8 +310,6 @@ defmodule Jido.MixProject do
       {:zoi, "~> 0.19.0"},
 
       # Optional integrations
-      {:bedrock, "~> 0.7.2", optional: true},
-      {:bedrock_raft, "~> 0.10.0", optional: true},
       {:ecto_sql, "~> 3.14", optional: true},
       {:html2markdown, "~> 0.3.2", optional: true},
       {:opentelemetry_api, "~> 1.0", optional: true},
@@ -333,11 +330,14 @@ defmodule Jido.MixProject do
 
       # Test support
       {:ecto_sqlite3, "~> 0.24.1", only: :test},
+      {:ex_aws, "~> 2.7", only: :test},
+      {:ex_aws_s3, "~> 2.5", only: :test},
       {:mimic, "~> 2.0", only: :test},
       {:opentelemetry, "~> 1.0", only: :test, runtime: false},
       {:plug, "~> 1.0", only: [:dev, :test]},
       {:postgrex, "~> 0.19 or ~> 1.0", only: :test},
-      {:stream_data, "~> 1.4", only: :test, runtime: false}
+      {:stream_data, "~> 1.4", only: :test, runtime: false},
+      {:sweet_xml, "~> 0.7", only: :test}
     ]
   end
 
