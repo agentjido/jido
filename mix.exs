@@ -17,6 +17,7 @@ defmodule Jido.MixProject do
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      build_path: if(playground?(), do: "_build/playground", else: "_build"),
       deps: deps(),
       aliases: aliases(),
       dialyzer: [plt_add_apps: [:ex_unit, :mix], ignore_warnings: ".dialyzer_ignore.exs"],
@@ -325,7 +326,6 @@ defmodule Jido.MixProject do
       {:excoveralls, "~> 0.18.5", only: [:dev, :test]},
       {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
       {:git_ops, "~> 2.12", only: :dev, runtime: false},
-      {:phoenix_playground, "~> 0.1.9", only: [:dev, :test]},
       {:reach, "~> 2.8", only: [:dev, :test], runtime: false},
 
       # Test support
@@ -338,8 +338,23 @@ defmodule Jido.MixProject do
       {:postgrex, "~> 0.19 or ~> 1.0", only: :test},
       {:stream_data, "~> 1.4", only: :test, runtime: false},
       {:sweet_xml, "~> 0.7", only: :test}
-    ]
+    ] ++ playground_deps()
   end
+
+  defp playground_deps do
+    if playground?() do
+      [
+        {:lumis, "~> 0.10.9", only: [:dev, :test]},
+        {:lumis_wasm_elixir, "~> 0.26.10", only: [:dev, :test]},
+        {:mdex, "~> 0.14.7", only: [:dev, :test]},
+        {:phoenix_playground, "~> 0.1.9", only: [:dev, :test]}
+      ]
+    else
+      []
+    end
+  end
+
+  defp playground?, do: System.get_env("JIDO_PLAYGROUND") == "1"
 
   defp aliases do
     [

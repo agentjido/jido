@@ -49,4 +49,4 @@ now gives reconcile-before-stop as the standard operator response.
 - [Fault adapter](indeterminate_store.ex)
 - [Tests](indeterminate_write_test.exs)
 
-Previous: [Durable Delete](../12_05_durable_delete/README.md) | Next: [Recoverable Delivery](../12_07_recoverable_delivery/README.md)
+Previous: [Durable Delete](../12_05_durable_delete/README.md) | Next: [Definition Revision](../12_08_definition_revision/README.md)

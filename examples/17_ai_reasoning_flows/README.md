@@ -7,7 +7,7 @@ deterministic inference or pure Flow behavior.
 2. [Linear reasoning comparison](17_02_linear_reasoning_comparison/README.md) compares Chain of Thought, Chain of Draft, and Algorithm of Thoughts.
 3. [Branching reasoning comparison](17_03_branching_reasoning_comparison/README.md) compares Tree of Thoughts and Graph of Thoughts.
 4. [Revision and adaptive reasoning](17_04_revision_and_adaptive/README.md) compares TRM with local strategy selection.
-5. [Custom reasoning Flow](17_05_custom_reasoning_flow/README.md) shows schema-owned defaults and overrides.
+5. [Define a Custom Reasoning Flow](17_05_custom_reasoning_flow/README.md) shows schema-owned defaults and overrides.
 
 Run the current chapter:
 

@@ -50,6 +50,6 @@ revision conflicts are separate runtime concerns.
 - [Tests](persistence_and_restoration_test.exs)
 - [Offline client](../../support/offline_inference_client.ex)
 
-[Previous: Concurrent request modes](../19_06_request_modes/README.md)
+[Previous: Reply ownership with call, submit, and cast](../19_06_request_modes/README.md)
 
 [Next: Non-AI Session use](../19_08_non_ai_session/README.md)

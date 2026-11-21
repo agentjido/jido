@@ -10,7 +10,6 @@ These examples move from one durable Agent record to recovery after uncertain wr
 4. [Plugin State Conversion](12_04_plugin_state_conversion/README.md) — convert one Plugin-owned value.
 5. [Durable Delete](12_05_durable_delete/README.md) — keep a tombstone fence against stale writers.
 6. [Indeterminate Write](12_06_indeterminate_write/README.md) — stop an activation after an uncertain result.
-7. [Recoverable Delivery](12_07_recoverable_delivery/README.md) — save and resume external delivery intent.
 8. [Definition Revision](12_08_definition_revision/README.md) — retain saved definitions and code provenance; upgrade explicitly.
 9. [State Migration](12_09_state_migration/README.md) — change schema,
    definition, and state together with a deterministic local migration.
@@ -41,3 +40,6 @@ contact or prove a shared external persistence service.
 
 Continue with [Durable Agents](../13_durable_execution/README.md) for an abrupt whole-BEAM
 restart proof and the proposed execution recovery learning path.
+
+For a complete application that saves and resumes delivery intent, see
+[Recoverable External Delivery](../24_application_patterns/24_07_recoverable_external_delivery/README.md).

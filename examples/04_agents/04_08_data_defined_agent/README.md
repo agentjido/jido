@@ -64,7 +64,7 @@ full DSL, data, and JSON format matrix.
 
 - [Source](data_defined_agent.ex)
 - [Tests](data_defined_agent_test.exs)
-- [Timer import tests](../../../test/jido/agent/scheduler_codec_test.exs)
+- [Timer import tests](../../../test/jido/agent/timer_codec_test.exs)
 
 Previous: [Agent Views](../04_07_agent_views/README.md) | Next: [Plugins](../../05_plugins/README.md)
 

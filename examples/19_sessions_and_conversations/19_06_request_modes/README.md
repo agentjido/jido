@@ -1,4 +1,4 @@
-# 19_06 Concurrent request modes
+# 19_06 Reply Ownership with Call, Submit, and Cast
 
 This lesson runs one offline AI Agent through AgentServer call, submit, and cast.
 

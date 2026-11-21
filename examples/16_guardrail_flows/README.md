@@ -13,7 +13,7 @@ guardrail middleware.
    call before execution and checks its result before model reuse.
 3. [Human review](16_03_human_review/README.md) uses a durable Wait for an
    explicit approval, denial, or timeout decision.
-4. [Support Desk](16_04_support_desk/README.md) applies ticket policy to stock ReAct.
+4. [Ticket Policy with Stock ReAct](16_04_support_desk/README.md) applies ticket policy to stock ReAct.
 
 The tests are deterministic and offline. They do not call a model provider,
 moderation service, PII service, or external tool.

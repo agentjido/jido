@@ -35,6 +35,19 @@ defmodule Jido.Examples.Collaboration.IncidentResponseTest do
     assert Process.alive?(audit)
     assert AgentServer.snapshot(audit).agent_revision == 0
 
+    pending = AgentServer.snapshot(root)
+    assert :ok = Jido.stop_agent(jido, root)
+    assert :ok = wait_until(fn -> Jido.resident_agent_count(jido) == 0 end)
+    assert {:ok, root} = Jido.activate_agent(jido, pending.agent_address)
+    assert :ok = AgentServer.await_ready(root)
+    restored_pending = AgentServer.snapshot(root)
+    assert restored_pending.agent.state == pending.agent.state
+    refute restored_pending.agent_activation_id == pending.agent_activation_id
+    assert Jido.resident_agent_count(jido) == 6
+    assert AgentServer.snapshot(find_agent(jido, AuditTeam)).agent_revision == 0
+    assert {:ok, %AgentServer.TurnResult{status: :failed}} = AgentServer.call(root, report)
+    assert AgentServer.snapshot(root).agent.state == pending.agent.state
+
     assert {:ok, %AgentServer.TurnResult{status: :committed}} =
              AgentServer.call(root, Coordinator.approve_signal!(%{incident_id: "incident-42"}))
 
@@ -42,6 +55,11 @@ defmodule Jido.Examples.Collaboration.IncidentResponseTest do
     assert resolved.agent.state.status == :resolved
     assert resolved.agent.state.remediation == "shed noncritical load"
     assert Enum.map(resolved.agent.state.events, & &1.event) == [:reported, :contained, :approved]
+
+    assert {:ok, %AgentServer.TurnResult{status: :failed}} =
+             AgentServer.call(root, Coordinator.approve_signal!(%{incident_id: "incident-42"}))
+
+    assert AgentServer.snapshot(root).agent.state == resolved.agent.state
     refute Map.has_key?(Map.from_struct(resolved), :children)
 
     address = resolved.agent_address

@@ -91,16 +91,8 @@ workflow runs each required offline surface as a named job. Its
 scheduled or manual extended jobs run longer fuzz, load burn-in, and benchmark
 checks. Service and live jobs are manual only.
 
-The live graph-first example makes a paid model call. It starts a Jido instance,
-runs the canonical ReAct Flow in an AgentServer, calls two Actions in one tool
-round, and checks the committed Session.
-
-```sh
-mix run examples/00_quick_start/00_03_live_react/live_react.exs
-```
-
-The default model is `openai:gpt-4o-mini`. Use `JIDO_LIVE_MODEL` and
-`JIDO_LIVE_PROMPT` to change the model and prompt.
+Start with the [example catalog](examples/README.md) or run the
+[offline ReAct tool loop](examples/17_ai_reasoning_flows/17_01_react_tool_loop/README.md).
 
 ## Runic ReAct memory benchmark
 

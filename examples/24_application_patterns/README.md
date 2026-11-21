@@ -11,6 +11,7 @@ applications.
 6. [Phoenix LiveView Chat](24_06_phoenix_liveview_chat/README.md).
 7. [Recoverable External Delivery](24_07_recoverable_external_delivery/README.md).
 8. [Controlled Agent Upgrade](24_08_controlled_agent_upgrade/README.md).
+9. [Support Desk](24_09_support_desk/README.md) checks requests and model replies with a custom reasoning Flow.
 
 ```sh
 mix test.examples examples/24_application_patterns --warnings-as-errors

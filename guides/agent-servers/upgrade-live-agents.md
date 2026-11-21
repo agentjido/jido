@@ -68,6 +68,6 @@ identity.
 ## Example
 
 The runnable
-[Whole Definition Upgrade](../../examples/08_runtime/08_12_definition_changes/README.md)
+[Whole Definition Upgrade](../../examples/06_agent_server/06_10_definition_changes/README.md)
 lesson shows the Codec document, Catalog, state migration, stable Address, and new
 PID in one ExUnit test.
