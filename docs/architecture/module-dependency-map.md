@@ -107,7 +107,9 @@ violations.
 
 `Jido.BehaviorTree` and `Jido.Plugin.BehaviorTree` are capabilities. The
 Plugin uses lower layers for Action execution, Agent state validation, and
-post-commit dispatch. The tree engine has no application startup entry. See
+post-commit dispatch. The Tree DSL uses the shared inline Action compiler
+and the `Jido.Expr` parser and evaluator. The tree engine has no application
+startup entry. See
 [ADR 0015](../adr/0015-behavior-tree-turn-ownership.md).
 
 ### Covenant ownership rule

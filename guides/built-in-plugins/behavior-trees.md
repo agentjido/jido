@@ -52,6 +52,50 @@ The Plugin owns `agent.state.behavior_tree`. Read `:tree`, `:blackboard`,
 or `to_map/1` to read blackboard values. Keep configuration, node state, and
 blackboard data portable. Send a Signal to change the tree state.
 
+## Declare a tree in Elixir
+
+Use `Jido.BehaviorTree.DSL` in a module. The `tree :reservation` declaration
+defines `reservation/0`. Pass the returned tree to the Plugin as
+`%{tree: Reservations.Tree.reservation(), blackboard: %{quantity: 3}}`.
+
+```elixir
+defmodule Reservations.Tree do
+  use Jido.BehaviorTree.DSL
+
+  alias Jido.Joi
+
+  tree :reservation do
+    sequence :reserve_stock do
+      wait :next_tick, milliseconds: 0
+      condition :has_stock, blackboard(:quantity) > 0
+
+      action :reserve, quantity <- blackboard(:quantity),
+        inline: [schema: Joi.object(%{quantity: Joi.integer() |> Joi.min(1)})] do
+        {:ok, %{reserved: quantity}}
+      end
+    end
+  end
+end
+```
+
+Use `action :reserve, Reservations.Reserve, params: %{quantity: blackboard(:quantity)}`
+to call an existing Action module. Use `action :reserve, [] do ... end` for
+an inline Action with no inputs. Inline Actions can call private helpers in
+the tree module. Add `context: ctx` to the `inline:` options to bind the
+Action context. Use the same return values and Directives as other Actions.
+
+Conditions, Action parameters, and inline bindings use
+[Jido expressions](../flows/flow-expressions.md). A condition must return a
+Boolean. A false condition returns `:failure` and a selector can try its next
+child. A missing blackboard key or an expression error fails the tick. A
+running sequence resumes with its current child. Put a condition after a
+Wait if it must read values when that Wait finishes.
+
+A tree needs one root. Use distinct names for children of the same parent.
+Named nodes add `:node_path` to their telemetry. Use
+`node :custom, MyNode.new(...)` to add a node from its constructor. The same
+tree works with the standalone executor and tool wrapper.
+
 ## Send commands
 
 Start the Agent through `Jido.start_agent/3`, then send a Signal through

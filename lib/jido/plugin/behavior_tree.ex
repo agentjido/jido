@@ -38,7 +38,7 @@ defmodule Jido.Plugin.BehaviorTree do
   def normalize(data) do
     with {:ok, config} <- Schema.fields(data, @config_keys, %{}),
          {:ok, config} <- Jido.Agent.Directive.parse(@config_schema, config),
-         :ok <- validate_tree(config.tree),
+         :ok <- Error.prefix_result_path(Tree.validate(config.tree), :tree),
          :ok <- Schema.plain_map(config.blackboard),
          :ok <- Schema.static(config) do
       {:ok, config}
@@ -96,12 +96,4 @@ defmodule Jido.Plugin.BehaviorTree do
   @doc false
   @impl true
   def dispatch(_runtime, %StateUpdate{}, _context, _opts), do: :ok
-
-  defp validate_tree(tree) do
-    if Tree.valid?(tree) do
-      :ok
-    else
-      Error.validation_result(:invalid_behavior_tree, [:tree], "Expected a tree of Behavior Tree nodes")
-    end
-  end
 end

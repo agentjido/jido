@@ -90,6 +90,27 @@ defmodule Jido.Plugin.BehaviorTreeTest do
     assert {:error, _} = define_tree(Tree.new(Wait.new(0)), unsupported: true)
   end
 
+  @tag obligation: "jido.plugin.behavior_tree.I1"
+  test "rejects malformed nested nodes during Agent definition" do
+    invalid = Tree.new(Sequence.new([Wait.new(0), :not_a_node]))
+    assert {:error, %Jido.Error.ValidationError{path: path}} = define_tree(invalid)
+    assert Enum.take(path, -4) == [:tree, :root, :children, 1]
+  end
+
+  @tag obligation: "jido.plugin.behavior_tree.I2"
+  test "a blackboard write does not retain the previous Agent state" do
+    tree = Tree.new(SetBlackboard.new(:ready, true))
+    assert {:ok, definition} = define_tree(tree)
+    agent = Jido.Agent.instantiate!(definition, id: "bt-bounded-state")
+
+    Enum.reduce(1..8, agent, fn count, current ->
+      assert {:ok, next, _} = Jido.Agent.cmd(current, signal("tick"))
+      assert %{tree: ^tree, tick_count: ^count, blackboard: blackboard} = next.state.behavior_tree
+      assert Blackboard.get(blackboard, :ready)
+      next
+    end)
+  end
+
   @tag obligation: "jido.plugin.behavior_tree.I2"
   test "resumes the running child, applies result maps in order, and returns Directives" do
     agent = TestAgent.instantiate!(id: "bt-continue")

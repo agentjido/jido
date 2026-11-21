@@ -9,10 +9,19 @@ defmodule Jido.Expr.Runtime do
   @spec evaluate(term(), keyword()) :: {:ok, term()} | {:error, term()}
   def evaluate(value, options) do
     with {:ok, state} <- Limits.new(options, [:resolve]),
-         :ok <- expression_root(value),
-         {:ok, result, _state} <- visit(value, state, [], 0, :evaluate) do
-      {:ok, result}
+         :ok <- expression_root(value) do
+      evaluate_value_with_state(value, state)
     end
+  end
+
+  @doc false
+  @spec evaluate_value(term(), keyword()) :: {:ok, term()} | {:error, term()}
+  def evaluate_value(value, options) do
+    with {:ok, state} <- Limits.new(options, [:resolve]), do: evaluate_value_with_state(value, state)
+  end
+
+  defp evaluate_value_with_state(value, state) do
+    with {:ok, result, _state} <- visit(value, state, [], 0, :evaluate), do: {:ok, result}
   end
 
   @doc false

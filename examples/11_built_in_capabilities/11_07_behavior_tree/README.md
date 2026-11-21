@@ -5,13 +5,14 @@ next. Run the same tick pattern with a standalone executor and a tool wrapper.
 
 ## What you will learn
 
+- Declare an inline Action and a blackboard condition in the Tree DSL.
 - Enable the Behavior Tree Plugin and configure its initial blackboard.
 - Resume a running node. Commit an Action result and dispatch its Signal.
 - Run a tree without an AgentServer when the caller owns execution.
 
 ## Read the code
 
-Start with the [Agent and Action](behavior_tree.ex). Then read the
+Start with the [tree and Agent](behavior_tree.ex). Then read the
 [live runner](demo.exs) and the [standalone runner](standalone.exs).
 
 ## Run it
@@ -42,8 +43,8 @@ tool=check_readiness ready=true
 ## Important behavior
 
 The first tick reaches the Wait node and returns `:running`. The second tick
-starts with that Wait node, reads `:quantity` from the blackboard, and runs the
-Reserve Action. The AgentServer commits `:reserved` before it dispatches the
+starts with that Wait node, checks `:quantity` on the blackboard, and calls the
+inline Reserve Action. The AgentServer commits `:reserved` before it dispatches the
 Signal. The reset Signal restores the tree and its blackboard. The stock total
 stays at its committed value. The runners stop their processes when they finish.
 
@@ -61,7 +62,7 @@ Plugin or send tick Signals from its own scheduler.
 
 ## Files
 
-- [Agent and Action](behavior_tree.ex)
+- [Tree and Agent](behavior_tree.ex)
 - [Live runner](demo.exs)
 - [Standalone runner](standalone.exs)
 - [Integration test](behavior_tree_test.exs)

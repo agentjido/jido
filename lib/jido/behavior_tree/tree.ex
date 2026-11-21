@@ -29,6 +29,7 @@ defmodule Jido.BehaviorTree.Tree do
   """
 
   alias Jido.BehaviorTree.{Node, Status, Tick}
+  alias Jido.Error
 
   @typedoc "A behavior tree with execution state"
   @schema Zoi.struct(
@@ -153,20 +154,42 @@ defmodule Jido.BehaviorTree.Tree do
     %{tree | root: Node.execute_halt(root_node)}
   end
 
-  @doc """
-  Checks if the tree is valid (has a root node that implements Node behavior).
-
-  ## Examples
-
-      iex> tree = Jido.BehaviorTree.Tree.new(valid_node)
-      iex> Jido.BehaviorTree.Tree.valid?(tree)
-      true
-
-  """
+  @doc "Checks the root and each child of the tree."
   @spec valid?(t()) :: boolean()
-  def valid?(%__MODULE__{root: root_node}) do
-    Node.node?(root_node)
+  def valid?(%__MODULE__{} = tree), do: validate(tree) == :ok
+
+  @doc "Validates the tree and returns the path of its first invalid node."
+  @spec validate(t()) :: :ok | {:error, Error.ValidationError.t()}
+  def validate(%__MODULE__{root: root}), do: validate_node(root, [:root])
+
+  defp validate_node(node, path) do
+    if Node.node?(node) do
+      validate_children(node, path)
+    else
+      Error.validation_result(:invalid_behavior_tree, path, "Expected a Behavior Tree node")
+    end
   end
+
+  defp validate_children(%{children: children}, path) when is_list(children) do
+    if List.improper?(children) do
+      Error.validation_result(:invalid_behavior_tree, path ++ [:children], "Expected a proper list of child nodes")
+    else
+      children
+      |> Enum.with_index()
+      |> Enum.reduce_while(:ok, fn {child, index}, :ok ->
+        case validate_node(child, path ++ [:children, index]) do
+          :ok -> {:cont, :ok}
+          {:error, _} = error -> {:halt, error}
+        end
+      end)
+    end
+  end
+
+  defp validate_children(%{children: _children}, path),
+    do: Error.validation_result(:invalid_behavior_tree, path ++ [:children], "Expected a list of child nodes")
+
+  defp validate_children(%{child: child}, path), do: validate_node(child, path ++ [:child])
+  defp validate_children(_node, _path), do: :ok
 
   @doc """
   Gets the depth of the tree (maximum number of levels).

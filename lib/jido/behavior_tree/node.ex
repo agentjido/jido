@@ -219,8 +219,10 @@ defmodule Jido.BehaviorTree.Node do
   def execute_halt(node_state) do
     node_module = node_state.__struct__
 
-    :telemetry.span([:jido, :bt, :node, :halt], %{node: node_module}, fn ->
-      {node_module.halt(node_state), %{node: node_module}}
+    metadata = Map.put(Map.take(node_state, [:node_path]), :node, node_module)
+
+    :telemetry.span([:jido, :bt, :node, :halt], metadata, fn ->
+      {node_module.halt(node_state), metadata}
     end)
   rescue
     _error -> node_state
@@ -248,6 +250,7 @@ defmodule Jido.BehaviorTree.Node do
     metadata =
       tick.context
       |> Map.take([:agent_id, :agent_module, :plugin])
+      |> Map.merge(Map.take(node_state, [:node_path]))
       |> Map.merge(%{node: node_state.__struct__, sequence: tick.sequence})
 
     :telemetry.span([:jido, :bt, :node, :tick], metadata, fn ->

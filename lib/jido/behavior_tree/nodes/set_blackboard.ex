@@ -3,8 +3,8 @@ defmodule Jido.BehaviorTree.Nodes.SetBlackboard do
   A leaf node that sets values in the blackboard.
 
   Always returns `:success` after setting the specified key-value pairs.
-  Note: Since ticks are immutable, the updated blackboard is returned
-  in the node state for the parent to propagate.
+  Use the Tick returned by `tick_with_context/2` to read the new blackboard.
+  The legacy `tick/2` callback returns that Tick in the node state.
 
   ## Example
 
@@ -63,8 +63,8 @@ defmodule Jido.BehaviorTree.Nodes.SetBlackboard do
 
   @impl true
   def tick(state, tick) do
-    {status, state, _tick} = tick_with_context(state, tick)
-    {status, state}
+    {status, state, updated_tick} = tick_with_context(state, tick)
+    {status, %{state | updated_tick: updated_tick}}
   end
 
   @doc """
@@ -75,7 +75,7 @@ defmodule Jido.BehaviorTree.Nodes.SetBlackboard do
           {Jido.BehaviorTree.Status.t(), t(), Tick.t()}
   def tick_with_context(%__MODULE__{entries: entries} = state, tick) do
     updated_tick = apply_entries(entries, tick)
-    {:success, %{state | updated_tick: updated_tick}, updated_tick}
+    {:success, %{state | updated_tick: nil}, updated_tick}
   end
 
   @impl true

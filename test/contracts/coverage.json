@@ -11,9 +11,9 @@
       "covered": 15
     },
     "jido.plugin": {
-      "active": 34,
+      "active": 35,
       "coverage": 1.0,
-      "covered": 34
+      "covered": 35
     },
     "jido.telemetry": {
       "active": 2,
@@ -2762,29 +2762,31 @@
       }
     },
     "jido.plugin.behavior_tree": {
-      "active": 4,
+      "active": 5,
       "app": "jido.plugin",
       "coverage": 1.0,
-      "covered": 4,
+      "covered": 5,
       "form": "light",
       "obligations": {
         "jido.plugin.behavior_tree.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
-            "test contributes routes only when enabled and validates configuration"
+            "test contributes routes only when enabled and validates configuration",
+            "test rejects malformed nested nodes during Agent definition"
           ]
         },
         "jido.plugin.behavior_tree.I2": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a blackboard write does not retain the previous Agent state",
             "test resumes the running child, applies result maps in order, and returns Directives"
           ]
         },
@@ -2808,6 +2810,19 @@
           "tests": [
             "test aborts a failed tick and dispatches no earlier Action Directive",
             "test rejects bad command input, nonportable node state, and writes to Plugin-owned state"
+          ]
+        },
+        "jido.plugin.behavior_tree.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test false conditions reach the fallback and expression errors stop the tick",
+            "test inline code keeps private helpers and context, and sees blackboard changes after a wait",
+            "test rejects unsupported calls in expressions at compile time",
+            "test the tool wrapper uses a DSL tree and emits named node paths"
           ]
         }
       }
@@ -6065,8 +6080,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 255,
+    "active": 256,
     "coverage": 1.0,
-    "covered": 255
+    "covered": 256
   }
 }

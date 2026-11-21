@@ -29,7 +29,7 @@ defmodule Jido.BehaviorTree.Nodes.Action do
 
   """
 
-  alias Jido.BehaviorTree.Tick
+  alias Jido.BehaviorTree.{Error, Expression, Tick}
 
   @schema Zoi.struct(
             __MODULE__,
@@ -70,7 +70,7 @@ defmodule Jido.BehaviorTree.Nodes.Action do
       %Action{action_module: MyAction, params: %{input: "value"}, context: %{}}
 
   """
-  @spec new(module(), map(), map()) :: t()
+  @spec new(module(), map() | Expression.t(), map()) :: t()
   def new(action_module, params \\ %{}, context \\ %{}) do
     %__MODULE__{
       action_module: action_module,
@@ -88,12 +88,18 @@ defmodule Jido.BehaviorTree.Nodes.Action do
 
   @impl true
   def tick_with_context(%__MODULE__{} = node, tick) do
-    params = Map.new(node.params, fn {key, value} -> {key, resolve_value(value, tick)} end)
     context = Map.merge(node.context, tick.context)
     state = agent_state(tick)
     context = if state, do: Map.merge(context, %{agent_state: state, state: state}), else: context
 
-    case Jido.Exec.run(node.action_module, params, context) do
+    with {:ok, params} <- resolve_params(node.params, tick) do
+      Jido.Exec.run(node.action_module, params, context)
+    end
+    |> finish(node, tick, state)
+  end
+
+  defp finish(result, node, tick, state) do
+    case result do
       {:ok, result} ->
         success(node, tick, state, result, [])
 
@@ -133,6 +139,18 @@ defmodule Jido.BehaviorTree.Nodes.Action do
   @impl true
   def halt(state) do
     %{state | result: nil}
+  end
+
+  defp resolve_params(%Expression{} = expression, tick) do
+    case Expression.evaluate(expression, tick) do
+      {:ok, params} when is_map(params) and not is_struct(params) -> {:ok, params}
+      {:ok, _} -> {:error, Error.execution_error("Action params must evaluate to a map")}
+      {:error, _} = error -> error
+    end
+  end
+
+  defp resolve_params(params, tick) do
+    {:ok, Map.new(params, fn {key, value} -> {key, resolve_value(value, tick)} end)}
   end
 
   defp resolve_value({:from_blackboard, key}, tick) do

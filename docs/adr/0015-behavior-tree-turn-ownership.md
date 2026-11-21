@@ -16,6 +16,10 @@ contribute command routes, own continuation state, and reduce one tree-state
 Directive per command. Leaf Actions return candidate changes and Directives
 through the ordinary Turn path.
 
+The Elixir Tree DSL builds the same tree structs. It compiles inline leaves
+with the shared Action compiler and evaluates conditions and parameters with
+`Jido.Expr` at tick time.
+
 ## Consequences
 
 AgentServer validates the complete state and dispatches Directives after

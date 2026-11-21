@@ -76,7 +76,7 @@ defmodule Jido.BehaviorTree.Nodes.AdditionalNodesTest do
       {status, updated_node, updated_tick} = SetBlackboard.tick_with_context(node, tick)
 
       assert status == :success
-      assert Tick.get(updated_node.updated_tick, :flag) == true
+      assert updated_node.updated_tick == nil
       assert Tick.get(updated_tick, :flag) == true
     end
   end
