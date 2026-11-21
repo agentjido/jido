@@ -237,6 +237,7 @@ defmodule Jido.MixProject do
          {"Configure ReqLLM", "guides/ai/req-llm-configuration.livemd"},
          {"Model Capabilities", "guides/ai/model-capabilities.md"},
          {"Tools and Toolsets", "guides/ai/tools-skills-and-toolsets.livemd"},
+         {"Search and Read Web Pages", "guides/ai/basic-web-browser.livemd"},
          {"Tool Calls and Results", "guides/ai/tool-calls-and-results.md"},
          {"Model Budgets and Usage", "guides/ai/budgets-and-usage.md"},
          {"ReAct Reasoning", "guides/ai/react-reasoning.livemd"},
@@ -294,6 +295,7 @@ defmodule Jido.MixProject do
     [
       # Runtime
       {:multigraph, "~> 0.16.1-mg.5"},
+      {:mint, "~> 1.11"},
       {:req_llm, "~> 1.30"},
       {:runic, "~> 0.1.0-alpha.13"},
       {:sched_ex, "~> 1.2.1"},
