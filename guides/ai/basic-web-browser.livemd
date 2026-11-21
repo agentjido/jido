@@ -1,0 +1,83 @@
+# Search and read web pages
+
+Use the browser tools in a ReAct Agent to find pages, read their text, and cite
+their URLs. Each Agent must declare which tools and destinations it needs.
+
+## Configure the host
+
+Set the allowlist in your application's runtime configuration. To use search,
+select Brave and supply its API key from the host environment.
+
+```elixir
+# config/runtime.exs
+config :jido, :browser,
+  allow: [%{"host" => "hexdocs.pm", "path_prefix" => "/jido/"}],
+  search: :brave,
+  brave_api_key: System.get_env("BRAVE_SEARCH_API_KEY")
+```
+
+Each rule uses an exact DNS hostname. Use `"/"` to permit all paths on that
+host. A more specific path prefix must end with `/`. URLs under that prefix
+must use plain ASCII path segments. Encoded paths, dot segments, and
+duplicate slashes are rejected for path-scoped rules.
+
+The host list and the Agent list must both permit a page. Jido checks each
+redirect and connects to a DNS address only after it checks the resolved
+addresses. Public HTTP and HTTPS on their standard ports are supported.
+The fixed Brave endpoint receives the search query and the key. The key
+stays out of Agent definitions, tool arguments, and page requests.
+
+## Declare and run a research Agent
+
+```elixir
+defmodule JidoDocsResearcher do
+  use Jido.AI.Agent,
+    name: "jido_docs_researcher",
+    description: "Answer questions with sources from the Jido documentation."
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      instructions "Search the Jido docs, read a result, and cite its final URL."
+    end
+
+    tools do
+      browser do
+        allow "hexdocs.pm", path_prefix: "/jido/"
+        expose [:search, :fetch]
+      end
+    end
+  end
+end
+
+agent = JidoDocsResearcher.instantiate!(id: "docs-research")
+signal = JidoDocsResearcher.request_signal!(%{input: "How does a Jido Agent process a Signal?"})
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  JidoDocsResearcher.cmd(agent, signal)
+
+reply.data.output
+```
+
+Configure the ReAct model for your application before you run the Agent.
+
+- `search_web(query)` returns up to five permitted results. Each has a title,
+  URL, and snippet. Brave can return zero results within the allowed paths.
+- `web_fetch(url)` returns `url` and `text`. Use the returned URL for
+  citations because the page can redirect. Fetch accepts uncompressed UTF-8
+  HTML and plain text. HTML extraction removes tags and common non-content
+  elements and has limited entity decoding.
+
+Each call has an eight-second deadline and a 512 KiB response body limit.
+Fetch follows up to three redirects and returns up to 6,000 bytes of text.
+Treat returned text as source data. The source can contain instructions.
+
+## Migrate from Jido Browser
+
+Replace standalone `Jido.Browser.Actions.SearchWeb` and
+`Jido.Browser.Actions.WebFetch` tool declarations with the browser block. Move
+the Brave key to the host configuration above. Move destination restrictions to
+the host and Agent allowlists. For fetch only, use `expose [:fetch]` and supply
+only the host allowlist. Update consumers to read `results` from search and
+`url` and `text` from fetch.
+
+Keep Jido Browser for sessions, tabs, page interaction, screenshots,
+JavaScript, rendering, and rich document extraction.

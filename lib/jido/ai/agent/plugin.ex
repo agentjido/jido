@@ -8,6 +8,11 @@ defmodule Jido.AI.Agent.Plugin.Tool do
   defstruct [:target, :__spark_metadata__]
 end
 
+defmodule Jido.AI.Agent.Plugin.Browser do
+  @moduledoc false
+  defstruct [:config, :__spark_metadata__]
+end
+
 defmodule Jido.AI.Agent.Plugin do
   @moduledoc """
   Adds AI authoring data and static tool preparation to a Jido Agent.
@@ -41,7 +46,13 @@ defmodule Jido.AI.Agent.Plugin do
     schema: [target: [type: :atom, required: true]]
   }
   @flow_tool %{@tool | name: :flow}
-  @tools %Spark.Dsl.Section{name: :__tools__, entities: [@tool, @flow_tool]}
+  @browser %Spark.Dsl.Entity{
+    name: :__browser__,
+    target: __MODULE__.Browser,
+    args: [:config],
+    schema: [config: [type: :any, required: true]]
+  }
+  @tools %Spark.Dsl.Section{name: :__tools__, entities: [@tool, @flow_tool, @browser]}
   @ai %Spark.Dsl.Section{name: :__ai__, entities: [@reasoning], sections: [@tools]}
   @reasoning_entity Module.concat([
                       __MODULE__,
@@ -53,11 +64,18 @@ defmodule Jido.AI.Agent.Plugin do
                    Macro.camelize("__tools__")
                  ])
 
+  @browser_entity Module.concat([
+                    __MODULE__,
+                    Macro.camelize("__ai__"),
+                    Macro.camelize("__tools__"),
+                    Macro.camelize("__browser__")
+                  ])
+
   use Jido.Plugin,
     id: "jido.ai/agent",
     vsn: 1,
     sections: [@ai],
-    option_keys: [agent: [:reasoning, :defaults, :tools]]
+    option_keys: [agent: [:reasoning, :defaults, :tools, :browser]]
 
   defmacro ai(do: block) do
     caller = __CALLER__
@@ -92,13 +110,51 @@ defmodule Jido.AI.Agent.Plugin do
   defmacro tools(do: block) do
     caller = __CALLER__
 
-    unless Enum.all?(expressions(block), &tool_declaration?/1) do
-      compile_error!(caller, caller.line, "tools accepts only action or flow declarations")
+    declarations = expressions(block)
+    {browser, tools} = Enum.split_with(declarations, &match?({:browser, _, _}, &1))
+
+    unless Enum.all?(tools, &tool_declaration?/1) and length(browser) <= 1 do
+      compile_error!(caller, caller.line, "tools accepts action, flow, and at most one browser block")
     end
+
+    declarations =
+      Enum.map(declarations, fn
+        {:browser, _, [[do: body]]} -> browser_declaration!(body, caller)
+        {:browser, _, _} -> compile_error!(caller, caller.line, "browser requires a block")
+        declaration -> declaration
+      end)
 
     quote do
       require unquote(@tools_section)
-      unquote(@tools_section).__tools__(do: unquote(block))
+      unquote(@tools_section).__tools__(do: unquote({:__block__, [], declarations}))
+    end
+  end
+
+  defp browser_declaration!(body, caller) do
+    {expose, rules} = Enum.split_with(expressions(body), &match?({:expose, _, _}, &1))
+
+    rules =
+      Enum.map(rules, fn
+        {:allow, _, [host]} when is_binary(host) ->
+          %{"host" => host, "path_prefix" => "/"}
+
+        {:allow, _, [host, [path_prefix: prefix]]} when is_binary(host) and is_binary(prefix) ->
+          %{"host" => host, "path_prefix" => prefix}
+
+        other ->
+          compile_error!(caller, expression_line(other, caller.line), "browser requires literal allow rules")
+      end)
+
+    with [{:expose, _, [operations]}] when is_list(operations) <- expose,
+         true <- Enum.all?(operations, &(&1 in [:search, :fetch])),
+         {:ok, config} <-
+           Jido.AI.Browser.normalize(%{"allow" => rules, "expose" => Enum.map(operations, &Atom.to_string/1)}) do
+      quote do
+        require unquote(@browser_entity)
+        unquote(@browser_entity).__browser__(unquote(Macro.escape(config)))
+      end
+    else
+      _ -> compile_error!(caller, caller.line, "browser requires an allowlist and expose [:search, :fetch] or a subset")
     end
   end
 
@@ -126,7 +182,10 @@ defmodule Jido.AI.Agent.Plugin do
       true ->
         [reasoning] = reasonings
 
+        {browser, tools} = Enum.split_with(tools, &is_struct(&1, __MODULE__.Browser))
+
         normalize(%{
+          browser: Map.get(List.first(browser) || %{}, :config),
           reasoning: reasoning.target,
           defaults: reasoning.defaults,
           tools: Enum.map(tools, & &1.target)
@@ -137,12 +196,13 @@ defmodule Jido.AI.Agent.Plugin do
   @impl true
   def normalize(data) do
     with {:ok, data} <-
-           Schema.fields(data, [:reasoning, :defaults, :tools], %{defaults: %{}, tools: []}),
+           Schema.fields(data, [:reasoning, :defaults, :tools, :browser], %{defaults: %{}, tools: [], browser: nil}),
          :ok <- validate_reasoning(data[:reasoning]),
          :ok <- reserved_defaults(data.defaults),
          {:ok, defaults} <- normalize_defaults(data.defaults, data.reasoning),
-         :ok <- validate_tools(data.tools) do
-      {:ok, %{reasoning: data.reasoning, defaults: defaults, tools: data.tools}}
+         {:ok, browser} <- normalize_browser(data.browser),
+         :ok <- validate_tools(data.tools, browser) do
+      {:ok, maybe_put_browser(%{reasoning: data.reasoning, defaults: defaults, tools: data.tools}, browser)}
     end
   end
 
@@ -164,7 +224,11 @@ defmodule Jido.AI.Agent.Plugin do
   def prepare(_preparation, options) do
     tools = Keyword.get(options, :tools, [])
     defaults = Keyword.get(options, :defaults, %{})
-    with :ok <- Jido.AI.Toolset.validate(tools), do: {:ok, %{tools: tools, defaults: defaults}}
+
+    with {:ok, browser} <- normalize_browser(Keyword.get(options, :browser)),
+         :ok <- validate_tools(tools, browser) do
+      {:ok, maybe_put_browser(%{tools: tools ++ Jido.AI.Browser.tools(browser), defaults: defaults}, browser)}
+    end
   end
 
   @impl true
@@ -207,7 +271,8 @@ defmodule Jido.AI.Agent.Plugin do
          {:ok, reasoning} <- Reference.encode(registry, data.reasoning),
          {:ok, defaults} <- encode_defaults(data.defaults, data.reasoning),
          {:ok, tools} <- encode_tools(data.tools, registry) do
-      {:ok, %{"reasoning" => reasoning, "config" => defaults, "tools" => tools}}
+      {:ok,
+       maybe_put_browser(%{"reasoning" => reasoning, "config" => defaults, "tools" => tools}, data[:browser], "browser")}
     end
   end
 
@@ -217,7 +282,7 @@ defmodule Jido.AI.Agent.Plugin do
          {:ok, reasoning} <- resolve_reference(data["reasoning"], :flow, registry, ["reasoning"]),
          {:ok, defaults} <- decode_defaults(data["config"], reasoning),
          {:ok, tools} <- decode_tools(data["tools"], registry) do
-      normalize_authoring(reasoning, defaults, tools)
+      normalize_authoring(reasoning, defaults, tools, data["browser"])
     end
   end
 
@@ -259,11 +324,24 @@ defmodule Jido.AI.Agent.Plugin do
     end
   end
 
-  defp validate_tools(actions) do
-    case Jido.AI.Toolset.validate(actions) do
-      :ok ->
-        :ok
+  defp normalize_browser(nil), do: {:ok, nil}
 
+  defp normalize_browser(config) do
+    case Jido.AI.Browser.normalize(config) do
+      {:ok, config} -> {:ok, config}
+      {:error, _reason} -> Error.validation_result(:invalid_browser, [:browser], "Invalid browser configuration")
+    end
+  end
+
+  defp maybe_put_browser(data, browser, key \\ :browser)
+  defp maybe_put_browser(data, nil, _key), do: data
+  defp maybe_put_browser(data, browser, key), do: Map.put(data, key, browser)
+
+  defp validate_tools(actions, browser) do
+    with :ok <- Jido.AI.Toolset.validate(actions),
+         :ok <- Jido.AI.Toolset.validate(actions ++ Jido.AI.Browser.tools(browser)) do
+      :ok
+    else
       {:error, reason} ->
         Error.validation_result(:invalid_tools, [:tools], "Invalid Agent tools", %{reason: reason})
     end
@@ -284,7 +362,7 @@ defmodule Jido.AI.Agent.Plugin do
   end
 
   defp authoring_object(data) when is_map(data) and not is_struct(data) do
-    if Enum.sort(Map.keys(data)) == ~w(config reasoning tools) do
+    if Enum.sort(Map.keys(data)) in [~w(config reasoning tools), ~w(browser config reasoning tools)] do
       :ok
     else
       issue(:invalid_document, [], "AI Plugin data requires reasoning, config, and tools")
@@ -333,8 +411,8 @@ defmodule Jido.AI.Agent.Plugin do
   defp decode_tools(_values, _registry),
     do: issue(:invalid_tools, ["tools"], "AI Plugin tools must be a list")
 
-  defp normalize_authoring(reasoning, defaults, tools) do
-    case normalize(%{reasoning: reasoning, defaults: defaults, tools: tools}) do
+  defp normalize_authoring(reasoning, defaults, tools, browser) do
+    case normalize(%{reasoning: reasoning, defaults: defaults, tools: tools, browser: browser}) do
       {:ok, data} -> {:ok, data}
       {:error, error} -> {:error, normalize_issue(error)}
     end

@@ -5,6 +5,12 @@ modules:
   - Jido.AI.ToolResult
   - Jido.AI.ToolSource
   - Jido.AI.Toolset
+  - Jido.AI.Browser
+  - Jido.AI.Browser.Address
+  - Jido.AI.Browser.Fetch
+  - Jido.AI.Browser.Policy
+  - Jido.AI.Browser.Search
+  - Jido.AI.Browser.Transport
 ---
 
 ## Purpose
@@ -55,5 +61,12 @@ model-visible results. It does not own ReAct routing or approval waits.
 
 - **scope:** `Jido.AI.ToolResult`
 - **must:** Keep local result data separate from bounded model content. Preserve valid ReqLLM content parts and result metadata, and replace oversized or invalid content with a safe portable result.
+- **kind:** security
+- **status:** active
+
+### jido_ai.tools.I7 — Bounded browser access
+
+- **scope:** `Jido.AI.Browser`, `Jido.AI.Browser.Policy`, `Jido.AI.Browser.Address`, `Jido.AI.Browser.Transport`
+- **must:** Expose browser Actions through the Agent tool path. Filter search results by the host and Agent allowlists. Check the destination before each page connection and redirect. Connect to the address checked by the policy and bound the response by time and bytes.
 - **kind:** security
 - **status:** active

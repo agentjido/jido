@@ -4,6 +4,7 @@ modules:
   - Jido.AI.Agent.Plugin
   - Jido.AI.Agent.Plugin.Reasoning
   - Jido.AI.Agent.Plugin.Tool
+  - Jido.AI.Agent.Plugin.Browser
   - Jido.AI.Reasoning
 ---
 

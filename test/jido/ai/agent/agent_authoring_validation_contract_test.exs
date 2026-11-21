@@ -30,7 +30,7 @@ defmodule Jido.AI.Agent.AuthoringValidationContractTest do
     end
     """)
 
-    assert_compile_error(~r/tools accepts only action or flow declarations/, """
+    assert_compile_error(~r/tools accepts action, flow, and at most one browser block/, """
     ai do
       reasoning Jido.AI.Reasoning.ReAct
       tools do
