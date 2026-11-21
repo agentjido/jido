@@ -22,6 +22,7 @@ defmodule Jido.Persistence.Snapshot do
            references: references,
            state_format: format
          },
+         snapshot = put_provider(snapshot, frozen),
          :ok <- portable(snapshot) do
       {:ok, snapshot}
     end
@@ -30,6 +31,7 @@ defmodule Jido.Persistence.Snapshot do
   @doc false
   def load(snapshot, context, convert_state) do
     with :ok <- envelope(snapshot),
+         :ok <- validate_provider(snapshot),
          :ok <- required_references(snapshot),
          :ok <- verify_references(snapshot.references),
          true <-
@@ -64,8 +66,8 @@ defmodule Jido.Persistence.Snapshot do
   end
 
   def envelope(snapshot) do
-    with {:ok, _} <- Schema.fields(snapshot, @keys),
-         true <- Map.keys(snapshot) |> Enum.sort() == Enum.sort(@keys),
+    with {:ok, _} <- Schema.fields(snapshot, [:state_provider | @keys]),
+         true <- Map.keys(Map.delete(snapshot, :state_provider)) |> Enum.sort() == Enum.sort(@keys),
          true <- snapshot.format == @format,
          %Agent{} <- snapshot.agent,
          :ok <- Schema.nonempty(snapshot.agent.id),
@@ -82,6 +84,41 @@ defmodule Jido.Persistence.Snapshot do
       _ -> Error.validation_result(:invalid_snapshot, [], "Invalid Agent snapshot")
     end
   end
+
+  defp put_provider(snapshot, agent) do
+    case provider(agent) do
+      nil -> snapshot
+      module -> Map.put(snapshot, :state_provider, module)
+    end
+  end
+
+  defp validate_provider(snapshot) do
+    if Map.get(snapshot, :state_provider) == provider(snapshot.agent) do
+      :ok
+    else
+      Error.validation_result(
+        :changed_state_provider,
+        [:state_provider],
+        "The checkpoint state provider changed. An explicit provider migration is required."
+      )
+    end
+  end
+
+  defp provider(agent) do
+    case state_provider_modules(agent) do
+      [_agent, provider] -> provider
+      [] -> nil
+    end
+  end
+
+  @doc false
+  def allow_upgrade(%{state_provider: _provider}), do: {:error, :state_provider_upgrade_unsupported}
+
+  def allow_upgrade(%{agent: agent}) do
+    if provider(agent), do: {:error, :state_provider_upgrade_unsupported}, else: :ok
+  end
+
+  def allow_upgrade(_snapshot), do: :ok
 
   @doc false
   def freeze(%Agent{} = agent) do
@@ -158,7 +195,17 @@ defmodule Jido.Persistence.Snapshot do
 
     custom = if state_format == :custom, do: [agent.module], else: []
     nested = Enum.flat_map(agent.topology.agents, &code_modules(&1.definition))
-    Enum.uniq(handlers ++ providers ++ custom ++ nested ++ schema_modules(agent.schema))
+
+    Enum.uniq(
+      handlers ++ providers ++ custom ++ nested ++ schema_modules(agent.schema) ++ state_provider_modules(agent)
+    )
+  end
+
+  defp state_provider_modules(agent) do
+    case Jido.Agent.DSL.State.declaration(agent.module) do
+      {provider, _descriptor, _schema} -> [agent.module, provider]
+      nil -> []
+    end
   end
 
   # Check saved declarations before any code-dependent state converter runs.

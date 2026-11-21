@@ -56,7 +56,7 @@ defmodule Jido.Persistence do
   alias Jido.Agent
   alias Jido.Agent.Address
   alias Jido.Error
-  alias Jido.Persistence.{Checkpoint, Config, NamespaceManifest, Record, Store}
+  alias Jido.Persistence.{Checkpoint, Config, NamespaceManifest, Record, Snapshot, Store}
   alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
   alias Jido.Codec.Term
 
@@ -84,7 +84,8 @@ defmodule Jido.Persistence do
           required(:format) => pos_integer(),
           required(:agent) => Agent.t(),
           required(:references) => %{module() => binary()},
-          required(:state_format) => :default | :custom
+          required(:state_format) => :default | :custom,
+          optional(:state_provider) => module()
         }
 
   @doc "Captures the complete Agent as portable data without writing storage."
@@ -497,6 +498,7 @@ defmodule Jido.Persistence do
                :ok <- Record.validate(record, address, agent_module),
                :ok <- Record.require_active(record),
                :ok <- require_inactive_turn(record),
+               :ok <- Snapshot.allow_upgrade(Record.checkpoint(record)),
                revision = Record.revision(record),
                action_context = stored_upgrade_context(context, instance, address, revision),
                {:ok, upgraded} <-

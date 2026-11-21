@@ -99,8 +99,15 @@ schema source. The provider controls initial values for that schema.
 A provider can expose a startup source for the `:state` option of
 `Jido.start_agent/3`. The source identifies the data. The provider derives
 the Agent ID, then loads and validates the initial state during durable
-activation. To replace its definition, use a migration that preserves the
-provider's binding to its data.
+activation. Addressed creation accepts the same source and verifies its ID
+against the address. If a readiness wait elapses, use the pending address
+from the error to check activation before retrying.
+
+A checkpoint records the provider and verifies the provider and Agent code on
+restore. The JSON Agent codec accepts a Catalog reference to the compiled
+Agent and its declared schema. Schema overrides fail validation.
+Generic definition replacement and upgrade reject provider-backed Agents.
+A provider change requires an explicit migration that preserves the binding.
 
 AgentServer evaluates the Turn before it calls the provider's commit
 function. The provider writes its state and calls the Jido save function with

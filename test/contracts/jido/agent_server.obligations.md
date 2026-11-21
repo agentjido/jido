@@ -440,3 +440,11 @@ authoring surface.
 - **why:** An external domain record and its Jido checkpoint must agree at Turn completion.
 - **kind:** ordering
 - **status:** active
+
+### jido.agent_server.I109 — State provider binding and startup
+
+- **scope:** Authoring, startup, and restoration of a durable Agent with a declared state provider
+- **must:** Use the schema declared by the provider. Reject a different schema in a loaded definition. Validate provider startup sources and addressed creation against the derived identity. Reject duplicate startup options. Wait according to both effective startup budgets and identify a still-pending activation by its Address. Preserve provider identity and verify provider and Agent code when restoring a checkpoint.
+- **why:** A durable Agent must retain its state and identity contract through definition import, startup, and restore.
+- **kind:** persisted-format
+- **status:** active

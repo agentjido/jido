@@ -47,10 +47,17 @@ defmodule Jido.AgentServer.StateProvider do
   @optional_callbacks startup_id: 2
 
   @doc false
-  def startup(%Agent{id: id, state: state}, opts, _mode) when is_binary(id) and is_map(state) do
-    if match?(%Source{}, opts[:state]),
-      do: startup_error(:state_source_requires_definition, "Pass the Agent module when starting from a state source."),
-      else: :default
+  def startup(%Agent{id: id, state: state} = agent, opts, mode) when is_binary(id) and is_map(state) do
+    case {declaration(agent), opts[:state], mode} do
+      {_, %Source{}, _} ->
+        startup_error(:state_source_requires_definition, "Pass the Agent module when starting from a state source.")
+
+      {{provider, descriptor, _}, _, mode} when mode in [nil, :create] ->
+        missing_source(provider, descriptor)
+
+      _ ->
+        :default
+    end
   end
 
   def startup(source, opts, mode) do
@@ -159,10 +166,5 @@ defmodule Jido.AgentServer.StateProvider do
 
   defp declaration(%Agent{module: module}), do: declaration(module)
 
-  defp declaration(module) when is_atom(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :__jido_state_provider__, 0),
-      do: module.__jido_state_provider__()
-  end
-
-  defp declaration(_source), do: nil
+  defp declaration(module), do: Jido.Agent.DSL.State.declaration(module)
 end

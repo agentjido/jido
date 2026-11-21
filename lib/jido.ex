@@ -488,10 +488,30 @@ defmodule Jido do
          {:ok, opts} <- Address.operation_options(address, opts, "Agent Address create options"),
          :ok <- validate_create_agent_options(opts),
          {instance_opts, _runtime_opts} = Keyword.split(opts, [:id, :state]),
-         {:ok, agent} <- startup_agent(agent, instance_opts, []),
+         {:ok, agent} <- prepare_addressed_create(agent, address, instance_opts),
          {:ok, config} <- Jido.Persistence.resolve_agent_config(:inherit, instance),
          {:ok, _agent, 0, 0, nil, _handoffs} <- create_addressed_agent(instance, address, agent, config) do
       {:ok, address}
+    end
+  end
+
+  defp prepare_addressed_create(agent, address, opts) do
+    case AgentServer.StateProvider.startup(agent, Keyword.delete(opts, :id), :create) do
+      :default ->
+        startup_agent(agent, opts, [])
+
+      {:ok, %Jido.Agent{id: id} = agent} when id == address.id ->
+        {:ok, agent}
+
+      {:ok, %Jido.Agent{}} ->
+        Jido.Error.validation_result(
+          :state_source_address_mismatch,
+          [:state],
+          "The state source must identify the same row as the supplied Agent Address."
+        )
+
+      {:error, _} = error ->
+        error
     end
   end
 
@@ -558,7 +578,11 @@ defmodule Jido do
     end
   end
 
-  @doc "Upgrades one inactive durable Agent and replaces its active activation."
+  @doc """
+  Upgrades a durable Agent and replaces its active activation.
+
+  An Agent with a state provider requires an explicit provider migration.
+  """
   @spec upgrade_agent(atom(), Address.t(), term(), keyword()) :: {:ok, Address.t()} | {:error, term()}
   def upgrade_agent(instance, %Address{} = address, action, opts \\ []) do
     with {:ok, address} <- validate_instance_address(instance, address),
@@ -1200,7 +1224,9 @@ defmodule Jido do
       {:ok, pid} ->
         case AgentServer.status(pid) do
           %{work_state: :idle, queue_depth: 0, effects: :none} ->
-            with {:ok, snapshot} <- AgentServer.stop(pid, :definition_upgrade, 5_000),
+            with %{agent: agent} <- AgentServer.snapshot(pid),
+                 :ok <- upgradeable_state_source(agent),
+                 {:ok, snapshot} <- AgentServer.stop(pid, :definition_upgrade, 5_000),
                  do: {:ok, snapshot.agent, true}
 
           %{} ->
@@ -1213,6 +1239,7 @@ defmodule Jido do
       {:error, :not_found} ->
         with {:ok, agent, _persistence_revision, _agent_revision, _turn} <-
                Jido.Persistence.load_agent_address(instance, address, instance: instance),
+             :ok <- upgradeable_state_source(agent),
              do: {:ok, agent, false}
 
       {:error, state} when state in [:recovering, :passivating] ->
@@ -1221,6 +1248,10 @@ defmodule Jido do
       {:error, _reason} = error ->
         error
     end
+  end
+
+  defp upgradeable_state_source(agent) do
+    if AgentServer.StateProvider.configured?(agent), do: {:error, :state_provider_upgrade_unsupported}, else: :ok
   end
 
   defp restore_after_upgrade(_instance, _address, false), do: :ok
@@ -1310,6 +1341,9 @@ defmodule Jido do
   A state provider can supply a startup source for `:state`. The provider
   derives the Agent ID and loads and validates the state during durable startup.
   The call waits for readiness when the caller supplies a provider source.
+  If the wait elapses, it returns `:state_provider_start_pending` with the
+  stable Agent Address in the error details. Use that address to check the
+  activation before retrying.
 
   An instance with persistence uses its one configured Store and codec for all
   Agents. Per-Agent Store overrides are not supported.
@@ -1323,13 +1357,15 @@ defmodule Jido do
     if is_list(opts) and Keyword.keyword?(opts) do
       {instance_opts, runtime_opts} = Keyword.split(opts, [:id, :state])
 
-      with :ok <- validate_agent_persistence_override(runtime_opts),
+      with :ok <- validate_unique_start_options(opts),
+           :ok <- validate_agent_persistence_override(runtime_opts),
            {:ok, agent, await?} <- prepare_agent_start(agent, instance_opts, runtime_opts) do
         opts = inherit_instance_persistence(runtime_opts, instance)
 
         with :ok <- startup_persistence(opts, await?),
+             {:ok, address} <- provider_start_address(instance, agent, opts, await?),
              {:ok, server} <- AgentServer.Worker.start(Keyword.merge(opts, agent: agent, jido: instance)),
-             :ok <- await_provider_start(server, opts, await?) do
+             :ok <- await_provider_start(instance, server, opts, address) do
           {:ok, server}
         end
       end
@@ -1364,10 +1400,41 @@ defmodule Jido do
 
   defp startup_persistence(_opts, false), do: :ok
 
-  defp await_provider_start(server, opts, true),
-    do: AgentServer.await_ready(server, Keyword.get(opts, :persistence_timeout, 5_000))
+  defp provider_start_address(instance, agent, opts, true),
+    do: agent_address(instance, agent.id, Keyword.take(opts, [:partition]))
 
-  defp await_provider_start(_server, _opts, false), do: :ok
+  defp provider_start_address(_instance, _agent, _opts, false), do: {:ok, nil}
+
+  defp await_provider_start(instance, server, opts, %Address{} = address) do
+    effective =
+      AgentServer.Lifecycle.runtime_defaults()
+      |> Keyword.merge(RuntimeStore.instance_agent_server_options(instance))
+      |> Keyword.merge(opts)
+
+    timeout = Keyword.fetch!(effective, :persistence_timeout) + Keyword.fetch!(effective, :readiness_timeout)
+    timeout = min(timeout, AgentServer.Lifecycle.max_timeout())
+
+    case AgentServer.await_ready(server, timeout) do
+      {:error, :timeout} ->
+        Jido.Error.validation_result(
+          :state_provider_start_pending,
+          [:state],
+          "The readiness wait elapsed. Use the Agent Address to check activation before retrying.",
+          %{address: address}
+        )
+
+      result ->
+        result
+    end
+  end
+
+  defp await_provider_start(_instance, _server, _opts, nil), do: :ok
+
+  defp validate_unique_start_options(opts) do
+    if AgentServer.Lifecycle.unique_keyword?(opts),
+      do: :ok,
+      else: Jido.Error.validation_result(:duplicate_start_options, [], "Pass each Agent startup option only once.")
+  end
 
   defp validate_agent_persistence_override(opts) do
     case Keyword.fetch(opts, :persistence) do

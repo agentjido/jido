@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 103,
+      "active": 104,
       "coverage": 1.0,
-      "covered": 103
+      "covered": 104
     },
     "jido.agent_server": {
       "active": 15,
@@ -584,10 +584,10 @@
       }
     },
     "jido.agent_server": {
-      "active": 16,
+      "active": 17,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 16,
+      "covered": 17,
       "form": "light",
       "obligations": {
         "jido.agent_server.I1": {
@@ -699,6 +699,19 @@
           "tests": [
             "test closes admission while a retained result is already readable from storage",
             "test the provider commits canonical state and a rejected write leaves the agent usable"
+          ]
+        },
+        "jido.agent_server.I109": {
+          "failing": 0,
+          "kind": "persisted-format",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test addressed creation uses the row source and verifies its ID",
+            "test checkpoint verifies the provider and its declaring module",
+            "test rejects a Catalog schema override for a compiled provider",
+            "test startup waits using the instance persistence budget"
           ]
         },
         "jido.agent_server.I11": {
@@ -6025,8 +6038,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 252,
+    "active": 253,
     "coverage": 1.0,
-    "covered": 252
+    "covered": 253
   }
 }

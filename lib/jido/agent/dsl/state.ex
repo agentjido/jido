@@ -36,6 +36,14 @@ defmodule Jido.Agent.DSL.State do
     end
   end
 
+  @doc false
+  def declaration(module) when is_atom(module) and module not in [nil, true, false] do
+    if Code.ensure_loaded?(module) and function_exported?(module, :__jido_state_provider__, 0),
+      do: module.__jido_state_provider__()
+  end
+
+  def declaration(_module), do: nil
+
   defp claim!(env) do
     if Module.has_attribute?(env.module, :jido_state_schema_origin) do
       raise CompileError,
