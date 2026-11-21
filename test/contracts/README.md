@@ -42,6 +42,7 @@ tests with its obligation tags.
 | `jido.plugin.audit` | Bundled Audit Plugin behavior | `test/contracts/jido.plugin/audit.*` |
 | `jido.plugin.bus` | Bundled Bus Plugin behavior | `test/contracts/jido.plugin/bus.*` |
 | `jido.plugin.fsm` | Bundled FSM authoring, route control, and state | `test/contracts/jido.plugin/fsm.*` |
+| `jido.plugin.statechart` | SCXML compilation and Agent chart sessions | `test/contracts/jido.plugin/statechart.*` |
 | `jido.plugin.timer` | Bundled Timer Plugin behavior | `test/contracts/jido.plugin/timer.*` |
 | `jido.plugin.sensor_manager` | Bundled SensorManager Plugin behavior | `test/contracts/jido.plugin/sensor_manager.*` |
 

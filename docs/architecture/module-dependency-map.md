@@ -363,7 +363,7 @@ Jido is a configurable actor runtime on OTP:
 - `Jido.AgentServer.Lifecycle` owns live Turn, wait, cancellation, commit, effect, and recovery transitions.
 - `Jido.AgentServer.Status` is the public, process-neutral runtime view used by inspection tools.
 
-Use `Jido.Catalog.Discovery.included_plugins/0` for the list of bundled Plugins in the current release. The list includes `Jido.Plugin.FSM`.
+Use `Jido.Catalog.Discovery.included_plugins/0` for the list of bundled Plugins in the current release. The list includes `Jido.Plugin.FSM` and `Jido.Plugin.Statechart`.
 
 ### Catalog
 
@@ -717,6 +717,7 @@ Disposition terms:
 | `Jido.Plugin.Input` | Keep | Separate portable prepared and transient runtime inputs |
 | `Jido.Plugin.Manifest` | Keep | Static callback ownership and option assignment metadata in the definitions layer |
 | `Jido.Plugin.Normalizer` | Keep | Real normalization boundary; split internally before adding more behavior |
+| `Jido.Statechart` and `Jido.Plugin.Statechart` | Keep | Bundled chart capability. Compiles SCXML, uses Flow to stabilize each turn, and dispatches effects after AgentServer commits the chart session. |
 | `Jido.Plugin.Timer` | Keep | Included timer Plugin; the root owns delayed timers, static and dynamic fixed-delay interval definitions, cron definitions, interval pause and resume state, Plugin runtime callbacks, and public scheduling algorithms, with no Agent or Server delegate modules; `Occurrence.from_signal/1` is the only occurrence parser |
 | `Jido.Plugin.SensorManager` | Keep | Included sensor supervision Plugin; the root owns Agent state and Plugin runtime callbacks, with no Agent or Server delegate modules |
 | `Jido.Plugin.SignalContext` | Removed | Outbound callbacks use the explicit `:signal` phase of `Jido.Plugin.Context` |

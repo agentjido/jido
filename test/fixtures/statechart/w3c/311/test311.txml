@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- test that assignment to a non-existent location yields an error -->
+
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" conf:datamodel=""
+xmlns:conf="http://www.w3.org/2005/scxml-conformance" initial="s0">
+
+
+<state id="s0">
+  <onentry>
+  	<send event="timeout" delay="1s"/>
+   <assign conf:invalidLocation="" conf:expr="1"/>
+   </onentry>
+   <transition event="error.execution" conf:targetpass=""/> 
+   <transition event=".*" conf:targetfail=""/>
+   </state>
+    
+<conf:pass/>
+<conf:fail/>
+
+   
+</scxml>

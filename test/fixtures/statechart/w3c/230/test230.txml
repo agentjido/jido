@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<!-- a manual test that an autofowarded event has the same fields and values as the original event.
+the child process sends the parent process an event which is forwarded back to it.  
+Both the parent and child process print out the contents of the event. The tester 
+must check if they are the same and report his result.   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0" initial="s01">
+  <onentry>
+    <send event="timeout" delay="3s"/>
+    </onentry>
+  <invoke type="http://www.w3.org/TR/scxml/" autoforward="true">
+    <content>
+    <!-- when invoked, send childToParent to parent.  If it is forwarded back to us, print out its
+        fields and terminate.  -->
+        <scxml initial="sub0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+           <state id="sub0">
+            <onentry>
+              <send target="#_parent" event="childToParent"/> 
+              <send event="timeout" delay="2s"/>
+             </onentry> 
+           <transition event="childToParent" target="subFinal">
+                  <log label="name is " conf:eventField="name" />
+                  <log label="type is " conf:eventField="type" />
+                  <log label="sendid is "  conf:eventField="sendid"/>
+                 <log  label="origin is "  conf:eventField="origin" />
+                 <log label="origintype is "  conf:eventField="origintype" />
+                 <log label="invokeid is " conf:eventField="invokeid" />
+                 <log label="data is "  conf:eventField="data"/>
+              </transition>
+          <transition event="*" target="subFinal"/>  
+          </state>
+        <final id="subFinal"/>
+       </scxml>
+       </content>
+       </invoke>
+  <transition event="timeout" target="final"/>
+   
+ 
+  <state id="s01">
+  <transition event="childToParent" target="s02">
+    <log label="name is " conf:eventField="name" />
+    <log label="type is " conf:eventField="type" />
+    <log label="sendid is "  conf:eventField="sendid"/>
+    <log  label="origin is "  conf:eventField="origin" />
+    <log label="origintype is "  conf:eventField="origintype" />
+    <log label="invokeid is " conf:eventField="invokeid" />
+    <log label="data is "  conf:eventField="data"/>
+    </transition>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+ 
+ <state id="s02">
+  <!-- wait till we get the done event to ensure that the child process has time to print out its results -->
+   <transition event="done.invoke" target="final"/>
+   </state>
+
+</state>
+
+<final id="final"/>
+<conf:fail/>
+
+</scxml>

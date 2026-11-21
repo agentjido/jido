@@ -557,6 +557,22 @@ Stores bounded domain audit records in portable Agent state.
 | --- | --- |
 | `Jido.Plugin.Audit.record/3` | Creates one domain audit Directive. |
 
+### `Jido.Statechart`
+
+Use `Jido.Plugin.Statechart` to run an SCXML chart on an Agent. Route its
+application events through `Jido.Plugin.Statechart.Route`.
+See [Statecharts](../built-in-plugins/statecharts.md).
+
+| API | Purpose |
+| --- | --- |
+| `Jido.Statechart.sigil_SCXML/2` | Compiles literal SCXML at compile time. |
+| `Jido.Statechart.compile/1` | Compiles XML and returns a chart or a typed error. |
+| `Jido.Statechart.compile!/1` | Compiles XML and raises on failure. |
+| `Jido.Statechart.spawn/3` | Starts an Agent and initializes its chart. |
+| `Jido.Statechart.initialize/3` | Initializes a chart on an existing Agent. |
+| `Jido.Statechart.session/1` | Reads the committed chart session. |
+| `Jido.Statechart.BasicHTTP.receive_post/3` | Submits a Basic HTTP request body as a chart event. |
+
 ### `Jido.Plugin.Timer`
 
 Adds delayed, static periodic, interval, and cron Signals to an Agent. See

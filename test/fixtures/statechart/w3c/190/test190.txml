@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<!-- we test that #_scxml_sessionid as a target of <send> puts the event on the external queue.  If it does,
+event1 will be processed before event2, because event1 is added to the internal queue while event2 is
+added to the external queue (event though event2 is generated first).  we have to make sure that event2
+is actually delivered.  The delayed <send> makes sure another event is generated (so the test doesn't hang) -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+ <data conf:id="1" conf:quoteExpr="#_scxml_"/>
+ <data conf:id="2" conf:systemVarExpr="_sessionid"/>
+ </datamodel>
+  
+<state id="s0">
+  <onentry>
+  <conf:concatVars id1="1" id2="2"/>
+   <!-- goes to the external queue -->
+   <send event="event2" conf:targetExpr="1"/>
+   <!-- to the internal queue -->
+   <raise event="event1"/>
+   <!-- this should get added to the external queue after event2 -->
+   <send event="timeout"/>
+    </onentry>
+ 
+ <!-- once we've entered the state, we should check for internal events first -->   
+  <transition event="event1" target="s1"/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+ 
+<!-- now check that we get event2 and not a timeout -->
+<state id="s1">
+  <transition event="event2" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+  </state>
+
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

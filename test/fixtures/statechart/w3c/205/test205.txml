@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!-- we test that the processor doesn't  change the message.  We can't test that it never does this, but
+at least we can check that the event name and included data are the same as we sent.  -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+   <data conf:id="1"/>
+   </datamodel>
+   
+<state id="s0">
+  <onentry>
+   <send  event="event1">
+     <param name="aParam" conf:expr="1"/>
+     </send>
+   <send event="timeout"/>
+    </onentry>
+ 
+ 
+  <transition event="event1" target="s1">
+     <assign conf:location="1" conf:eventDataFieldValue="aParam"/>
+     </transition>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+
+<state id="s1">
+  <transition conf:idVal="1=1" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+  </state> 
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

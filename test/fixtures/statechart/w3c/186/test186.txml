@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!-- we test that <send> evals its args when it is evaluated, not when the delay interval expires and the
+message is actually sent.  If it does, aParam will have the value of 1 (even though var1 has been incremented
+in the interval.)  If var2 ends up == 1, we pass.  Otherwise we fail  -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+ <data conf:id="1" conf:expr="1"/>
+ <data conf:id="2"/>
+ </datamodel>
+  
+<state id="s0">
+  <onentry>
+   <send event="event1" conf:delay="1">
+     <param name="aParam" conf:varExpr="1"/>
+     </send>
+   <assign conf:location="1" conf:expr="2"/>
+    </onentry>
+    
+  <transition event="event1" target="s1">
+    <assign conf:location="2" conf:eventDataFieldValue="aParam"/>
+    </transition>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+
+<state id="s1">
+  <transition conf:idVal="2=1"  conf:targetpass=""/>
+  <transition  conf:targetfail=""/>
+  </state>
+       
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

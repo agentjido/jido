@@ -35,7 +35,7 @@ Each namespace belongs to one layer, and a module can depend only on lower layer
 | Execution | `Jido.Exec`, `Jido.Telemetry.Exec` |
 | Agent domain | `Jido.Agent`, `Jido.Plugin`, and the Plugin context, init, and input modules |
 | Live runtime | `Jido`, `Jido.AgentServer`, `Jido.Persistence`, `Jido.Signal.Bus`, `Jido.Signal.Dispatch`, `Jido.Telemetry`, `Jido.Telemetry.AgentServer`, `Jido.Telemetry.Signal`, `Jido.Trace.Context` |
-| Capabilities | `Jido.AI`, `Jido.Telemetry.AI`, and the bundled Plugins: `Jido.Plugin.Audit`, `Jido.Plugin.Bus.Client`, `Jido.Plugin.Bus.Manager`, `Jido.Plugin.FSM`, `Jido.Plugin.Timer`, `Jido.Plugin.SensorManager` |
+| Capabilities | `Jido.AI`, `Jido.Telemetry.AI`, and the bundled Plugins: `Jido.Plugin.Audit`, `Jido.Plugin.Bus.Client`, `Jido.Plugin.Bus.Manager`, `Jido.Plugin.FSM`, `Jido.Plugin.Timer`, `Jido.Plugin.SensorManager`, `Jido.Plugin.Statechart` |
 | Composition | `Jido.Catalog.Discovery` and the application module |
 
 A sub-module can sit in a different layer from its parent. For example, `Jido.Signal` is in the value model while `Jido.Signal.Bus` is in the live runtime.
@@ -303,6 +303,9 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | `Jido.Plugin.FSM` | Selects a route by state and advances after successful execution. |
 | `Jido.Plugin.Init` | Input for one supervised Agent Plugin runtime generation. |
 | `Jido.Plugin.Input` | Package-owned input for one Agent Turn. |
+| `Jido.Statechart` | Compiles SCXML and starts or inspects chart sessions. |
+| `Jido.Plugin.Statechart` | Commits one chart session on an Agent and dispatches its effects. |
+| `Jido.Plugin.Statechart.Route` | Routes an application Signal to the chart. |
 | `Jido.Plugin.Timer` | Adds delayed and recurring Signals to an Agent. |
 | `Jido.Plugin.Timer.Cancel` | Cancels one recurring Signal schedule. |
 | `Jido.Plugin.Timer.Cron` | Creates or replaces one recurring Signal schedule. |

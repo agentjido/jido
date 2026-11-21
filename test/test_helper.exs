@@ -17,7 +17,8 @@ special_suite_tags = [
   :peer,
   :bench,
   :live,
-  :service
+  :service,
+  :scxml_conformance
 ]
 
 ExUnit.configure(seed: 0, exclude: [:integration, :skip, :flaky] ++ special_suite_tags)

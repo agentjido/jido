@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+
+<!-- test that origin field is blank for internal events -->
+
+<scxml version="1.0" xmlns="http://www.w3.org/2005/07/scxml" initial="s0" conf:datamodel=""  name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">  
+   
+ <state id="s0">
+   <onentry>
+     <raise  event="foo"/>
+   </onentry>
+   <transition event="foo"  conf:eventFieldHasNoValue="origin" conf:targetpass=""/>
+      <transition event="*" conf:targetfail=""/> 
+   </state>
+   
+
+      
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

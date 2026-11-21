@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<!-- The child process will return success ifits Var1 is set to 1, failure otherwise. For this test
+we try passing in Var1 by param and by namelist and check that we either get two successes
+or two failures.  This test will fail schema validation due to multiple  declarations of
+Var1, but should  run correctly.  -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="1"/>
+  </datamodel>
+     
+<state id="s0" initial="s01">
+  <onentry>
+    <send event="timeout" delay="2s"/>
+    </onentry>
+    <transition event="timeout" conf:targetfail=""/>
+   
+   <state id="s01">
+     <invoke type="http://www.w3.org/TR/scxml/" conf:namelist="1">
+              <content>
+            <scxml initial="sub01" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+             <datamodel>
+               <data conf:id="1" conf:expr="0"/>
+                </datamodel>
+   
+           <state id="sub01">
+              <transition conf:idVal="1=1" target="subFinal1">
+                  <send target="#_parent" event="success"/>
+                    </transition>
+              <transition  target="subFinal1">
+                    <send target="#_parent" event="failure"/>
+                </transition>
+              </state>
+     
+            <final id="subFinal1"/>
+            </scxml>
+       </content>
+       </invoke>
+     <transition event="success" target="s02"/>
+     <transition event="failure" target="s03"/>
+   </state>
+
+<state id="s02">
+      <invoke type="http://www.w3.org/TR/scxml/">
+          <param conf:name="1" conf:expr="1"/>
+          <content>
+            <scxml initial="sub02" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+             <datamodel>
+               <data conf:id="1" conf:expr="0"/>
+                </datamodel>
+   
+           <state id="sub02">
+              <transition conf:idVal="1=1" target="subFinal2">
+                  <send target="#_parent" event="success"/>
+                    </transition>
+              <transition  target="subFinal2">
+                    <send target="#_parent" event="failure"/>
+                </transition>
+              </state>
+     
+            <final id="subFinal2"/>
+            </scxml>
+       </content>
+        </invoke>
+        <!-- we got success in s01, so we need to do so here -->
+     <transition event="success" conf:targetpass=""/>
+     <transition event="failure" conf:targetfail=""/>
+  </state>
+  
+<state id="s03">
+      <invoke type="http://www.w3.org/TR/scxml/" >
+          <param conf:name="1" conf:expr="1"/>
+           <content>
+            <scxml initial="sub03" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+             <datamodel>
+               <data conf:id="1" conf:expr="0"/>
+                </datamodel>
+   
+           <state id="sub03">
+              <transition conf:idVal="1=1" target="subFinal3">
+                  <send target="#_parent" event="success"/>
+                    </transition>
+              <transition  target="subFinal3">
+                    <send target="#_parent" event="failure"/>
+                </transition>
+              </state>
+     
+            <final id="subFinal3"/>
+            </scxml>
+       </content>
+        </invoke>
+        <!-- we got failure in s01, so we need to do so here -->
+     <transition event="failure" conf:targetpass=""/>
+     <transition event="success" conf:targetfail=""/>
+  </state>
+ 
+</state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+
+<!-- test that any attempt to change the value of a system variable causes error.execution to be raised.  
+Event1..4 are there to catch the case where the error event is not raised. In cases where it is, we have
+to dispose of eventn in the next state, hence the targetless transitions (which simply throw away the event.) -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml"  name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+   
+ <state id="s0">
+   <onentry>
+    <assign conf:systemVarLocation="_sessionid" conf:quoteExpr="otherName"/>
+    <raise event="event1"/>
+    </onentry>
+ 
+   <transition event="error.execution" target="s1"/>
+   <transition event="*" conf:targetfail=""/>
+   </state>
+   
+ <state id="s1">
+     <onentry>
+    <assign conf:systemVarLocation="_event" conf:quoteExpr="otherName"/>
+    <raise event="event2"/>
+    </onentry>
+    <!-- throw out event1 if it's still around -->
+   <transition event="event1"/>
+   <transition event="error.execution" target="s2"/>
+   <!-- event1 would trigger this transition if we didn't drop it.  We want this transition to have
+   a very general trigger to catch cases where the wrong error event was raised -->
+   <transition event="*" conf:targetfail=""/>
+   </state>  
+   
+<state id="s2">
+     <onentry>
+    <assign conf:systemVarLocation="_ioprocessors" conf:quoteExpr="otherName"/>
+    <raise event="event3"/>
+    </onentry>
+   <transition event="event2"/>
+   <transition event="error.execution" target="s3"/>
+   <transition event="*" conf:targetfail=""/>
+   </state>  
+   
+<state id="s3">
+     <onentry>
+    <assign conf:systemVarLocation="_name" conf:quoteExpr="otherName"/>
+    <raise event="event4"/>
+    </onentry>
+   <transition event="event3"/>
+   <transition event="error.execution" conf:targetpass=""/>
+   <transition event="*" conf:targetfail=""/>
+   </state>  
+   
+   
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+
+<!-- test that we generate done.state.id when all a parallel state's children are in final states -->
+
+<scxml initial="p0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+  <datamodel>
+    <data conf:id="1" conf:expr="0"/>
+    </datamodel>
+<parallel id="p0">
+  <onentry>
+   <send event="timeout" delay="2s"/>
+   <raise event="e1"/>
+   <raise event="e2"/>
+   </onentry>
+   <!-- record that we get the first done event -->
+   <transition event="done.state.p0s1">
+     <assign conf:location="1" conf:expr="1"/>
+     </transition>
+   <!-- we should get the second done event before done.state.p0 -->
+   <transition event="done.state.p0s2" target="s1"/>
+   <transition event="timeout" conf:targetfail=""/>
+
+   
+   <state id="p0s1" initial="p0s11">
+    <state id="p0s11">
+      <transition event="e1" target="p0s1final"/>
+      </state>
+    <final id="p0s1final"/>
+   </state>
+   
+  <state id="p0s2" initial="p0s21">
+    <state id="p0s21">
+       <transition event="e2" target="p0s2final"/>
+     </state>
+    <final id="p0s2final"/>
+   </state>
+  
+ </parallel>
+ 
+ <state id="s1">
+  <!-- if we get done.state.p0, success -->
+  <transition event="done.state.p0" conf:idVal="1=1" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+  </state>
+   
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

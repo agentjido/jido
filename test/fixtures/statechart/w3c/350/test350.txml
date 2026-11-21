@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+
+<!-- test that target value is used to decide what session to deliver the event to.  A session should be
+able to send an event to itself using its own session ID as the target -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:quoteExpr="#_scxml_"/>
+  <data conf:id="2" conf:systemVarExpr="_sessionid"/> 
+</datamodel>
+  
+<state id="s0">
+
+   <onentry>
+     <conf:concatVars id1="1" id2="2"/> 
+     <send delay="5s" event="timeout"/>
+     <send  type="http://www.w3.org/TR/scxml/#SCXMLEventProcessor" conf:targetVar="1" event="s0Event"/> 
+     </onentry>
+  <transition event="s0Event" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+
+</state>
+
+
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

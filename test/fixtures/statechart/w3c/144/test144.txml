@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+
+<!-- test that events are inserted into the queue in the order in which they are raised.  If
+foo occurs before bar, success, otherwise failure -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+  
+<state id="s0">
+  <onentry>
+    <raise event="foo"/>
+    <raise event="bar"/>
+    </onentry>
+  <transition event="foo" target="s1"/>
+  <transition event="*" conf:targetfail=""/>
+   
+ </state>
+
+<state id="s1">
+  <transition event="bar" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/> 
+  </state>
+  
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+
+<!-- test that event.data can be populated using both namelist, param and <content>
+and that correct values are used -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" expr="1"/>
+  <data conf:id="2"/>
+  <data conf:id="3"/>
+  </datamodel>
+  
+<state id="s0">
+   <onentry>
+     <send delay="5s" event="timeout"/>
+    <send event="event1" type="http://www.w3.org/TR/scxml/#SCXMLEventProcessor" conf:namelist="1"> 
+      <param name="param1" conf:expr="2"/>
+      </send> 
+     </onentry>
+  <transition event="event1" target="s1">
+    <assign conf:location="2" conf:eventDataNamelistValue="1"/>
+    <assign conf:location="3" conf:eventDataParamValue="param1"/>
+    </transition>
+  <transition event="*" conf:targetfail="">
+    </transition>
+
+</state>
+
+<state id="s1">
+  
+  <transition conf:idVal="2=1" target="s2"/>
+  <transition conf:targetfail=""/>
+  </state>
+
+<state id="s2">
+    <transition conf:idVal="3=2" target="s3"/>
+  <transition conf:targetfail=""/>
+  </state>
+
+<state id="s3">
+   <onentry>
+     <send delay="5s" event="timeout"/>
+    <send  event="event2"> 
+      <content><conf:someInlineVal/></content>
+      </send>
+     </onentry>
+  <transition event="event2" conf:eventdataSomeVal="" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+
+</state>
+
+
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

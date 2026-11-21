@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!-- test that cancelling works. invoked child sleeps for two seconds, then terminates.  We
+sleep for 1 sec in s0, then move to s1.  This should cause the invocation to get cancelled.
+If we receive done.invoke, the invocation wasn't cancelled, and we fail. If we receive no events by
+the time timeout2 fires, success   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0">
+  <onentry>
+    <send event="timeout1" conf:delay="1"/>
+    </onentry>
+  <invoke type="http://www.w3.org/TR/scxml/">
+    <content>
+      <!-- when invoked, sleep for 2 secs then terminate.  Parent will try to cancel this session -->
+         <scxml initial="sub0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+           <state id="sub0">
+            <onentry>
+              <send event="timeout" conf:delay="2"/>
+                </onentry>
+               <transition event="timeout" target="subFinal"/>
+                </state>   
+            <final id="subFinal"/>
+         </scxml>
+         </content>
+          </invoke>
+ 
+  <transition event="timeout1" target="s1"/>    
+
+</state>
+
+<state id="s1">
+    <onentry>
+    <send event="timeout2" conf:delay="1.5"/>
+    </onentry>
+  <!-- here we should NOT get done.invoke -->
+  <transition event="done.invoke" conf:targetfail=""/>
+  <transition event="*" conf:targetpass=""/>
+  </state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

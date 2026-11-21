@@ -2,7 +2,7 @@
   {"lib/jido/action.ex", :callback_type_mismatch, 69},
   {"lib/jido/action.ex", :callback_type_mismatch, 92},
   {"lib/jido/action.ex", :callback_type_mismatch, 107},
-  {"lib/jido/catalog/discovery.ex", :pattern_match, 286},
+  {"lib/jido/catalog/discovery.ex", :pattern_match, 287},
   {"lib/jido/telemetry/open_telemetry.ex", :pattern_match_cov, 364},
   {"test/support/jido_action/fixtures/failures.ex", :invalid_contract, 65},
   {"test/support/jido_action/fixtures/failures.ex", :invalid_contract, 90},

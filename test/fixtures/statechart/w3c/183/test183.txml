@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!-- we test that <send> stores the value of the sendid in idlocation.  If it does,
+var1 has a value and we pass.  Otherwise we fail  -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1"/>
+
+  </datamodel>
+  
+<state id="s0">
+  <onentry>
+   <send event="event1" conf:idlocation="1"/>
+    </onentry>
+    
+  <transition conf:isBound="1" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+ </state>
+
+     
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

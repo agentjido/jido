@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><!-- test that foreach goes over the array in the right order.  since the array contains 1 2 3, we compare the current 
+value with the previous value, which is stored in var1. The current value should always be larger.  If
+it ever isn't, set Var4 to 0, indicating failure.  Also check that the final value of the index
+is 2 (meaning that the initial value was 0, not 1) -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" 
+xmlns:conf="http://www.w3.org/2005/scxml-conformance" initial="s0" version="1.0" datamodel="ecmascript">
+<datamodel>
+  <data id="Var1" expr="0"/> <!-- contains the previous value -->
+  <data id="Var2"/> <!-- the item which will contain the current value -->
+  <data id="Var3"/>  <!-- the index -->
+  <data id="Var4" expr="[1,2,3]"/>
+  <data id="Var5" expr="1"/> <!-- 1 if success, 0 if failure -->
+  </datamodel>
+  
+   <state id="s0">
+      <onentry>
+        <foreach item="Var2" array="Var4" index="Var3">
+         <if cond="Var1&lt;Var2">
+         <assign location="Var1" expr="Var2"/>
+         <else/>
+         <!-- values are out of order, record failure -->
+         <assign location="Var5" expr="0"/>
+         </if>
+          </foreach>
+        </onentry>
+
+  <!-- check that var1 has its original value  -->
+  <transition cond="Var4==0 | Var3 != 2" target="fail"/>
+  <transition target="pass"/>
+  </state> 
+   
+   <final id="pass"><onentry><log label="Outcome" expr="'pass'"/></onentry></final>
+   <final id="fail"><onentry><log label="Outcome" expr="'fail'"/></onentry></final>
+   
+
+
+</scxml>

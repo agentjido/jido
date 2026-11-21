@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- test that assignment with an illegal expr raises an error -->
+
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" conf:datamodel=""
+xmlns:conf="http://www.w3.org/2005/scxml-conformance" initial="s0">
+
+<datamodel>
+  <data conf:id="1" conf:expr="1"/>
+ </datamodel>
+
+<state id="s0">
+  <onentry>
+   <assign conf:location="1" conf:illegalExpr=""/>
+   <raise event="foo"/>
+   </onentry>
+   <transition event="error.execution" conf:targetpass=""/> 
+   <transition event=".*" conf:targetfail=""/>
+   </state>
+    
+<conf:pass/>
+<conf:fail/>
+
+   
+</scxml>

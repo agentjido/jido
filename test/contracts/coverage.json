@@ -11,9 +11,9 @@
       "covered": 15
     },
     "jido.plugin": {
-      "active": 33,
+      "active": 36,
       "coverage": 1.0,
-      "covered": 33
+      "covered": 36
     },
     "jido.telemetry": {
       "active": 2,
@@ -3006,6 +3006,62 @@
             "test Plugin runtime callbacks contain an unavailable runtime exit",
             "test failed starts and restarts retry without a new Directive",
             "test invalid child specifications fail without damaging the runtime"
+          ]
+        }
+      }
+    },
+    "jido.plugin.statechart": {
+      "active": 3,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 3,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.statechart.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 10,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test multiple targets require distinct parallel regions",
+            "test runtime compilation returns a typed error for invalid input and unsupported charts",
+            "test the XML reader rejects a DOCTYPE in UTF-16",
+            "test the XML reader rejects undeclared prefixes and content after the root",
+            "test the XML reader resolves prefixes and preserves ordered text",
+            "test the compiler rejects XML outside the supported subset",
+            "test the compiler rejects initial targets outside their compound state",
+            "test the compiler rejects unknown transition targets and duplicate IDs",
+            "test the compiler rejects unsupported literal invoke types",
+            "test the sigil rejects modifiers and non-literal input"
+          ]
+        },
+        "jido.plugin.statechart.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test spawn starts an initialized order approval Agent",
+            "test spawn stops the Agent when a compiled chart fails to initialize"
+          ]
+        },
+        "jido.plugin.statechart.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 8,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a chart must initialize before use and stops processing events when complete",
+            "test a failed if condition queues an error and evaluates the next branch",
+            "test a guard that cannot evaluate queues an error and permits the next transition",
+            "test a top-level final runs its exit handler before it returns data",
+            "test an empty foreach declares missing variables and keeps existing values",
+            "test an eventless loop fails its turn without changing the session",
+            "test initialization keeps caller values literal and applies overrides only at the root",
+            "test selected transition actions run in XML document order"
           ]
         }
       }
@@ -6061,8 +6117,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 254,
+    "active": 257,
     "coverage": 1.0,
-    "covered": 254
+    "covered": 257
   }
 }

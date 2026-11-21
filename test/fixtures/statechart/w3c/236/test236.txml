@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!-- test that done.invoke.id event is the last event we receive.  the invoked process sends childToParent
+in the exit handler of its final state.  We should get it before the done.invoke, and we should get no
+events after the done.invoke.  Hence timeout indicates success   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0">
+  <onentry>
+    <send event="timeout" conf:delay="2"/>
+    </onentry>
+  <invoke type="http://www.w3.org/TR/scxml/">
+    <content>
+      <scxml initial="subFinal" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+       <final id="subFinal">
+          <onexit>
+           <send target="#_parent" event="childToParent"/>
+            </onexit>
+           </final>
+         </scxml>
+      </content>
+      </invoke>
+ 
+  <transition event="childToParent" target="s1"/>    
+  <transition event="done.invoke" conf:targetfail=""/>
+</state>
+
+<state id="s1">
+  <!-- here we should get done.invoke -->
+  <transition event="done.invoke" target="s2"/>
+  <transition event="*" conf:targetfail=""/>
+  </state>
+  
+<state id="s2">
+  <transition event="timeout" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+  </state>   
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

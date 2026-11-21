@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- test that an expression that cannot be interpreted as a boolean is treated as false -->
+
+<scxml version="1.0" conf:datamodel="" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance" initial="s0">
+
+<state id="s0"> 
+  <transition conf:nonBoolean=""  conf:targetfail=""/>
+  <transition conf:targetpass=""/>
+  </state>
+    
+<conf:pass/>
+<conf:fail/>
+
+   
+</scxml>

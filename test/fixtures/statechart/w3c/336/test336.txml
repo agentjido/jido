@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+
+<!-- test that the origin field of an external event contains a URL that lets you send back to the originator.  In
+this case it's the same session, so if we get bar we succeed -->
+
+<scxml initial="s0" conf:datamodel="" version="1.0" xmlns="http://www.w3.org/2005/07/scxml" name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">  
+   
+ <state id="s0">
+   <onentry>
+     <send  event="foo"/>
+   </onentry>
+   <transition event="foo"   target="s1">
+     <conf:sendToSender name="bar"/>
+      </transition>
+      <transition event="*" conf:targetfail=""/> 
+   </state>
+   
+<state id="s1">
+  <onentry>
+    <send event="baz"/>
+    </onentry>
+  <transition event="bar" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+  </state>
+      
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>
