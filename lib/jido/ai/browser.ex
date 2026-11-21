@@ -4,13 +4,17 @@ defmodule Jido.AI.Browser do
 
   Configure the host allowlist in the `:jido, :browser` application environment.
   The Agent allowlist restricts that host policy further.
+  Set `:fetch_format` to `:markdown` and install `:html2markdown` to read HTML as Markdown.
   """
 
   alias Jido.AI.Agent.Plugin
   alias Jido.AI.Browser.{Address, Fetch, Policy, Search, Transport}
 
+  @compile {:no_warn_undefined, Html2Markdown}
+
   @timeout 8_000
   @max_body 512 * 1024
+  @max_text 6_000
   @max_redirects 3
   @brave_url "https://api.search.brave.com/res/v1/web/search"
 
@@ -57,18 +61,19 @@ defmodule Jido.AI.Browser do
 
   @doc false
   def fetch(url, context) do
-    with {:ok, agent_rules, host_rules, _config} <- policies(context, "fetch"),
+    with {:ok, agent_rules, host_rules, config} <- policies(context, "fetch"),
+         {:ok, format} <- fetch_format(config),
          {:ok, uri} <- Policy.parse(url) do
-      bounded(&read_page(uri, agent_rules, host_rules, &1, @max_redirects))
+      bounded(&read_page(uri, agent_rules, host_rules, format, &1, @max_redirects))
     end
   end
 
-  defp read_page(uri, agent_rules, host_rules, deadline, redirects) do
+  defp read_page(uri, agent_rules, host_rules, format, deadline, redirects) do
     if Policy.allowed?(uri, agent_rules, host_rules) do
       case request(uri, [{"accept", "text/html, text/plain"}], deadline) do
         {:ok, %{status: 200} = response} ->
           with :ok <- unencoded(response),
-               {:ok, text} <- readable(response) do
+               {:ok, text} <- readable(response, format) do
             {:ok, %{url: URI.to_string(uri), text: text}}
           end
 
@@ -77,7 +82,7 @@ defmodule Jido.AI.Browser do
             {:error, :redirect_limit}
           else
             with {:ok, destination} <- Policy.redirect(uri, header(headers, "location")) do
-              read_page(destination, agent_rules, host_rules, deadline, redirects - 1)
+              read_page(destination, agent_rules, host_rules, format, deadline, redirects - 1)
             end
           end
 
@@ -166,15 +171,36 @@ defmodule Jido.AI.Browser do
     if header(headers, "content-encoding") in [nil, "identity"], do: :ok, else: {:error, :unsupported_encoding}
   end
 
-  defp readable(%{headers: headers, body: body}) do
+  defp fetch_format(config) do
+    case Keyword.get(config, :fetch_format, :text) do
+      :text ->
+        {:ok, :text}
+
+      :markdown ->
+        if Code.ensure_loaded?(Html2Markdown), do: {:ok, :markdown}, else: {:error, :html2markdown_unavailable}
+
+      _other ->
+        {:error, :invalid_fetch_format}
+    end
+  end
+
+  defp readable(%{headers: headers, body: body}, format) do
     type = headers |> header("content-type") |> to_string() |> String.split(";", parts: 2) |> hd() |> String.downcase()
 
     cond do
       not String.valid?(body) -> {:error, :unsupported_text_encoding}
-      type == "text/html" -> {:ok, body |> html_text() |> compact_text(6_000)}
-      type == "text/plain" -> {:ok, compact_text(body, 6_000)}
+      type == "text/html" and format == :markdown -> html_markdown(body)
+      type == "text/html" -> {:ok, body |> html_text() |> compact_text(@max_text)}
+      type == "text/plain" -> {:ok, compact_text(body, @max_text)}
       true -> {:error, :unsupported_content_type}
     end
+  end
+
+  defp html_markdown(body) do
+    markdown = body |> Html2Markdown.convert() |> String.trim() |> truncate(@max_text)
+    {:ok, markdown}
+  rescue
+    _error -> {:error, :markdown_conversion_failed}
   end
 
   defp html_text(body) do
@@ -200,10 +226,14 @@ defmodule Jido.AI.Browser do
 
   defp compact_text(text, max_bytes) when is_binary(text) do
     text = text |> String.replace(~r/[\s\x00-\x1f\x7f]+/u, " ") |> String.trim()
-    binary_part(text, 0, min(byte_size(text), max_bytes)) |> String.replace_invalid("")
+    truncate(text, max_bytes)
   end
 
   defp compact_text(_text, _max_bytes), do: ""
+
+  defp truncate(text, max_bytes) do
+    binary_part(text, 0, min(byte_size(text), max_bytes)) |> String.replace_invalid("")
+  end
 
   defp header(headers, name) do
     case for({^name, value} <- headers, do: value) do

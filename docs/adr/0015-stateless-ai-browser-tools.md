@@ -16,6 +16,9 @@ allow and exposure data, then prepare the selected static Actions through the
 existing tool path. Keep the provider key in host runtime configuration. Apply
 both allowlists to page URLs and check the address before each pinned
 connection. Use bounded HTTP requests for search and page reading.
+Keep plain text as the default fetch format. Allow the host to select
+Markdown from the optional Html2Markdown dependency. Apply the same byte
+limits to both formats.
 
 ## Consequences
 

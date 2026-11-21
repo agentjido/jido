@@ -310,6 +310,7 @@ defmodule Jido.MixProject do
       {:bedrock, "~> 0.7.2", optional: true},
       {:bedrock_raft, "~> 0.10.0", optional: true},
       {:ecto_sql, "~> 3.14", optional: true},
+      {:html2markdown, "~> 0.3.2", optional: true},
       {:opentelemetry_api, "~> 1.0", optional: true},
       {:phoenix_pubsub, "~> 2.1", optional: true},
 

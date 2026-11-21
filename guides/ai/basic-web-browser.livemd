@@ -11,7 +11,10 @@ select Brave and supply its API key from the host environment.
 ```elixir
 # config/runtime.exs
 config :jido, :browser,
-  allow: [%{"host" => "hexdocs.pm", "path_prefix" => "/jido/"}],
+  allow: [
+    %{"host" => "hexdocs.pm", "path_prefix" => "/jido/"},
+    %{"host" => "jido.hexdocs.pm", "path_prefix" => "/"}
+  ],
   search: :brave,
   brave_api_key: System.get_env("BRAVE_SEARCH_API_KEY")
 ```
@@ -27,7 +30,57 @@ addresses. Public HTTP and HTTPS on their standard ports are supported.
 The fixed Brave endpoint receives the search query and the key. The key
 stays out of Agent definitions, tool arguments, and page requests.
 
-## Declare and run a research Agent
+## Read a page as Markdown
+
+Add `{:html2markdown, "~> 0.3.2"}` to your application's Mix dependencies.
+Select Markdown in your host configuration.
+
+```elixir
+# config/runtime.exs
+config :jido, :browser,
+  allow: [%{"host" => "jido.hexdocs.pm", "path_prefix" => "/"}],
+  fetch_format: :markdown
+```
+
+The default is `:text`. With `:markdown`, HTML headings, links, tables, and
+code blocks keep their structure in the returned `text` field. Plain text
+pages continue to return plain text. If the host selects Markdown and the
+dependency is missing, fetch returns `:html2markdown_unavailable`.
+
+Use a fetch-only Agent when you already have a URL. This example can run
+with your configured model and does not need a Brave key.
+
+```elixir
+defmodule JidoDocsReader do
+  use Jido.AI.Agent, name: "jido_docs_reader"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      instructions "Read the page at the given URL and summarize its main sections."
+    end
+
+    tools do
+      browser do
+        allow "jido.hexdocs.pm"
+        expose [:fetch]
+      end
+    end
+  end
+end
+
+reader = JidoDocsReader.instantiate!(id: "docs-reader")
+request = JidoDocsReader.request_signal!(%{input: "Read https://jido.hexdocs.pm/readme.html"})
+{:ok, _reader, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  JidoDocsReader.cmd(reader, request)
+
+reply.data.output
+```
+
+## Find and read a page with Brave
+
+Set `BRAVE_SEARCH_API_KEY` in the environment that runs the Agent. Use the
+Brave setup above, with `fetch_format: :markdown` if you want Markdown.
+This example uses both the Brave Search API and your configured model.
 
 ```elixir
 defmodule JidoDocsResearcher do
@@ -37,12 +90,13 @@ defmodule JidoDocsResearcher do
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct do
-      instructions "Search the Jido docs, read a result, and cite its final URL."
+      instructions "Search for Jido documentation on HexDocs, read a result, and cite its final URL."
     end
 
     tools do
       browser do
         allow "hexdocs.pm", path_prefix: "/jido/"
+        allow "jido.hexdocs.pm"
         expose [:search, :fetch]
       end
     end
@@ -63,11 +117,12 @@ Configure the ReAct model for your application before you run the Agent.
   URL, and snippet. Brave can return zero results within the allowed paths.
 - `web_fetch(url)` returns `url` and `text`. Use the returned URL for
   citations because the page can redirect. Fetch accepts uncompressed UTF-8
-  HTML and plain text. HTML extraction removes tags and common non-content
-  elements and has limited entity decoding.
+  HTML and plain text. Plain-text HTML extraction removes tags and common
+  non-content elements and has limited entity decoding.
 
 Each call has an eight-second deadline and a 512 KiB response body limit.
-Fetch follows up to three redirects and returns up to 6,000 bytes of text.
+Fetch follows up to three redirects and returns up to 6,000 bytes in either
+output format.
 Treat returned text as source data. The source can contain instructions.
 
 ## Migrate from Jido Browser

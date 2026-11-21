@@ -11,6 +11,26 @@ defmodule Jido.AI.BrowserTest do
   @host_rules [%{"host" => "hexdocs.pm", "path_prefix" => "/jido/guide/"}]
   @source "https://hexdocs.pm/jido/guide/start.html"
   @ip {93, 184, 216, 34}
+  @hexdocs_page """
+  <!doctype html>
+  <html>
+    <head><title>Jido Agent Guide</title></head>
+    <body>
+      <nav class="sidebar"><a href="api-reference.html">API navigation</a></nav>
+      <main id="main" class="content">
+        <h1>Start an Agent</h1>
+        <p>Read the <a href="signals.html">Signal guide</a> for details.</p>
+        <pre><code class="language-elixir">agent = MyAgent.instantiate!(id: "demo")
+  MyAgent.cmd(agent, signal)</code></pre>
+        <table>
+          <thead><tr><th>Input</th><th>Purpose</th></tr></thead>
+          <tbody><tr><td>Signal</td><td>Start a Turn</td></tr></tbody>
+        </table>
+        <p>EXTRA_CONTENT</p>
+      </main>
+    </body>
+  </html>
+  """
 
   defmodule ResearchAgent do
     use Jido.AI.Agent,
@@ -138,6 +158,43 @@ defmodule Jido.AI.BrowserTest do
     expect(Address, :resolve, fn "hexdocs.pm" -> {:error, :destination_blocked} end)
     reject(&Transport.get/5)
     assert {:error, :destination_blocked} = Fetch.run(%{url: @source}, context)
+  end
+
+  test "host opt-in preserves HexDocs structure as Markdown within the fetch limits", %{context: context} do
+    expect(Address, :resolve, 2, fn "hexdocs.pm" -> {:ok, @ip} end)
+
+    expect(Transport, :get, 2, fn _uri, @ip, _headers, deadline, 524_288 ->
+      remaining = deadline - System.monotonic_time(:millisecond)
+      assert remaining in 1..8_000
+
+      body = String.replace(@hexdocs_page, "EXTRA_CONTENT", String.duplicate("é", 4_000))
+      {:ok, %{status: 200, headers: [{"content-type", "text/html; charset=utf-8"}], body: body}}
+    end)
+
+    assert {:ok, %{url: @source, text: plain}} = Fetch.run(%{url: @source}, context)
+    refute plain =~ "# Start an Agent"
+    refute plain =~ "\n"
+
+    config = Application.fetch_env!(:jido, :browser)
+    Application.put_env(:jido, :browser, Keyword.put(config, :fetch_format, :markdown))
+
+    assert {:ok, %{url: @source, text: markdown}} = Fetch.run(%{url: @source}, context)
+    assert markdown =~ "# Start an Agent"
+    assert markdown =~ "[Signal guide](signals.html)"
+    assert markdown =~ "```"
+    assert markdown =~ "demo\")\nMyAgent.cmd(agent, signal)"
+    assert markdown =~ "| Signal | Start a Turn |"
+    refute markdown =~ "API navigation"
+    assert byte_size(markdown) in 5_999..6_000
+    assert String.valid?(markdown)
+  end
+
+  test "invalid host fetch format stops before resolving the page", %{context: context} do
+    config = Application.fetch_env!(:jido, :browser)
+    Application.put_env(:jido, :browser, Keyword.put(config, :fetch_format, :html))
+
+    reject(&Address.resolve/1)
+    assert {:error, :invalid_fetch_format} = Fetch.run(%{url: @source}, context)
   end
 
   test "a search result must match both allowlists", %{context: context} do
