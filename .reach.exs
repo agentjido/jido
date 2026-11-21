@@ -113,7 +113,10 @@
     capabilities: [
       "Jido.AI",
       "Jido.AI.*",
+      "Jido.BehaviorTree",
+      "Jido.BehaviorTree.*",
       "Jido.Plugin.Audit*",
+      "Jido.Plugin.BehaviorTree*",
       "Jido.Plugin.Bus.*",
       "Jido.Plugin.Timer*",
       "Jido.Plugin.SensorManager*",

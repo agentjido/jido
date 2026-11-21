@@ -11,9 +11,9 @@
       "covered": 15
     },
     "jido.plugin": {
-      "active": 30,
+      "active": 34,
       "coverage": 1.0,
-      "covered": 30
+      "covered": 34
     },
     "jido.telemetry": {
       "active": 2,
@@ -2757,6 +2757,57 @@
           "tests": [
             "test bounded updates retain the newest records in original order",
             "test reduction selects only Audit Records and applies the same bound"
+          ]
+        }
+      }
+    },
+    "jido.plugin.behavior_tree": {
+      "active": 4,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 4,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.behavior_tree.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test contributes routes only when enabled and validates configuration"
+          ]
+        },
+        "jido.plugin.behavior_tree.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test resumes the running child, applies result maps in order, and returns Directives"
+          ]
+        },
+        "jido.plugin.behavior_tree.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test halts without wiping the blackboard and resets to the configured tree and blackboard",
+            "test optional cleanup halts the tree after terminal status without clearing the blackboard"
+          ]
+        },
+        "jido.plugin.behavior_tree.I4": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test aborts a failed tick and dispatches no earlier Action Directive",
+            "test rejects bad command input, nonportable node state, and writes to Plugin-owned state"
           ]
         }
       }
@@ -6014,8 +6065,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 251,
+    "active": 255,
     "coverage": 1.0,
-    "covered": 251
+    "covered": 255
   }
 }
