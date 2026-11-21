@@ -238,6 +238,7 @@ defmodule Jido.MixProject do
          {"Configure ReqLLM", "guides/ai/req-llm-configuration.livemd"},
          {"Model Capabilities", "guides/ai/model-capabilities.md"},
          {"Tools and Toolsets", "guides/ai/tools-skills-and-toolsets.livemd"},
+         {"Search and Read Web Pages", "guides/ai/basic-web-browser.livemd"},
          {"Tool Calls and Results", "guides/ai/tool-calls-and-results.md"},
          {"Model Budgets and Usage", "guides/ai/budgets-and-usage.md"},
          {"ReAct Reasoning", "guides/ai/react-reasoning.livemd"},
@@ -296,6 +297,7 @@ defmodule Jido.MixProject do
     [
       # Runtime
       {:multigraph, "~> 0.16.1-mg.5"},
+      {:mint, "~> 1.11"},
       {:req, "~> 0.7"},
       {:req_llm, "~> 1.30"},
       {:runic, "~> 0.1.0-alpha.13"},
@@ -309,6 +311,7 @@ defmodule Jido.MixProject do
 
       # Optional integrations
       {:ecto_sql, "~> 3.14", optional: true},
+      {:html2markdown, "~> 0.3.2", optional: true},
       {:opentelemetry_api, "~> 1.0", optional: true},
       {:phoenix_pubsub, "~> 2.1", optional: true},
 

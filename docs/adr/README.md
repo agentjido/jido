@@ -23,6 +23,7 @@ This directory records decisions that constrain the Jido V3 architecture. The [m
 | [0015](0015-bundle-statechart-plugin.md) | Accepted | Bundle Statechart as a Jido Plugin |
 | [0016](0016-fsm-plugin-namespace.md) | Accepted | Give the bundled FSM Plugin one public namespace |
 | [0017](0017-behavior-tree-turn-ownership.md) | Proposed | Run Behavior Trees through v3 Agent Turns |
+| [0018](0018-stateless-ai-browser-tools.md) | Accepted | Use the AI Plugin for stateless browser tools |
 
 ## Backlog
 

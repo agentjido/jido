@@ -515,7 +515,7 @@ defmodule Jido.AI.AgentTest do
     end
     """
 
-    assert_raise CompileError, ~r/tools accepts only action or flow declarations/, fn ->
+    assert_raise CompileError, ~r/tools accepts action, flow, and at most one browser block/, fn ->
       Code.compile_string(source)
     end
   end

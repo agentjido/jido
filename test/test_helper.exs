@@ -1,4 +1,6 @@
 Mimic.copy(ReqLLM)
+Mimic.copy(Jido.AI.Browser.Address)
+Mimic.copy(Jido.AI.Browser.Transport)
 Mimic.copy(Jido.Test.AI.Tools.Add)
 
 ExUnit.start(capture_log: true)

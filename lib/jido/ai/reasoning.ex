@@ -76,8 +76,11 @@ defmodule Jido.AI.Reasoning do
   defp tools(agent) do
     agent.definition().plugins
     |> Enum.find_value([], fn
-      %{provider: Jido.AI.Agent.Plugin, data: %{tools: actions}} -> actions
-      _plugin -> nil
+      %{provider: Jido.AI.Agent.Plugin, data: %{tools: actions} = data} ->
+        actions ++ Jido.AI.Browser.tools(data[:browser])
+
+      _plugin ->
+        nil
     end)
   end
 
