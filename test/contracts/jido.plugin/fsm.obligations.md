@@ -14,7 +14,7 @@ owned state.
 ### jido.plugin.fsm.I1 — Canonical provider and authoring
 
 - **scope:** `Jido.Plugin.FSM`, `Jido.Plugin.FSM.Transition`
-- **must:** Use `Jido.Plugin.FSM` for DSL and map definitions, including declarations that use the beta name. Keep the `jido.fsm` provider ID and version 1. Reject invalid transition graphs and routes.
+- **must:** Use `Jido.Plugin.FSM` for DSL and map definitions. Keep the `jido.fsm` provider ID and version 1. Reject invalid transition graphs and routes.
 - **kind:** functional
 - **status:** active
 

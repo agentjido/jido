@@ -2874,11 +2874,10 @@
         "jido.plugin.fsm.I1": {
           "failing": 0,
           "kind": "functional",
-          "passing": 5,
+          "passing": 4,
           "status": "active",
           "testable": true,
           "tests": [
-            "test beta source and map declarations select the canonical provider",
             "test invalid graphs fail during normalization",
             "test the Agent codec keeps the beta Catalog reference and resolves it to the new module",
             "test the DSL lowers to one canonical Plugin representation",

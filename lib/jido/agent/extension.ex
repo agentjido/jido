@@ -121,9 +121,6 @@ defmodule Jido.Agent.Extension do
   end
 
   @doc false
-  # Accept the beta declaration during the v3 migration.
-  def provider(Jido.Agent.Plugin.FSM), do: provider(Jido.Plugin.FSM)
-
   def provider(module) when is_atom(module) and module not in [nil, true, false] do
     required_callbacks =
       __MODULE__.behaviour_info(:callbacks) -- __MODULE__.behaviour_info(:optional_callbacks)

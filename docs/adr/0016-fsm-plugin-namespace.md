@@ -16,10 +16,9 @@ the `state_machine` section and the `jido.fsm` Catalog ID at version 1.
 
 ## Consequences
 
-Agent provider normalization accepts the beta name during V3 and records
-the current module. Keep that source compatibility through V3. Durable
-records retain their original provider fingerprint and require an explicit
-upgrade.
+Beta applications must update their Agent declarations to use
+`Jido.Plugin.FSM`. Durable records retain their original provider fingerprint
+and require an explicit upgrade.
 
 ## References
 

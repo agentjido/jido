@@ -118,27 +118,6 @@ defmodule Jido.Plugin.FSMTest do
     end
   end
 
-  defmodule BetaGuide do
-    use Jido.Agent,
-      name: "fsm_beta_guide",
-      plugins: [{Jido.Agent.Plugin.FSM, %{definition_vsn: 1}}]
-
-    state_machine do
-      initial :idle
-      terminal(:ready)
-      transition(:finish, from: :idle, route: :finish, to: :ready)
-    end
-
-    routes do
-      signal_source "/plugin/fsm/beta"
-      route "finish", MarkFlow, as: :finish, defaults: %{label: :flow}
-    end
-
-    state do
-      schema Jido.Joi.object(%{log: Jido.Joi.list(Jido.Joi.atom()) |> Jido.Joi.default([])})
-    end
-  end
-
   @tag obligation: "jido.plugin.fsm.I1"
   test "the DSL lowers to one canonical Plugin representation" do
     [entry] = Guide.definition().plugins
@@ -157,23 +136,6 @@ defmodule Jido.Plugin.FSMTest do
 
     assert [map_entry] = map_definition.plugins
     assert map_entry.data == entry.data
-  end
-
-  @tag obligation: "jido.plugin.fsm.I1"
-  test "beta source and map declarations select the canonical provider" do
-    assert [%{id: "jido.fsm", provider: FSM, vsn: 1} = entry] = BetaGuide.definition().plugins
-
-    assert {:ok, %{plugins: [^entry]}} =
-             Agent.define(%{
-               BetaGuide.definition()
-               | plugins: [%{entry | provider: Jido.Agent.Plugin.FSM}]
-             })
-
-    agent = BetaGuide.instantiate!(id: "beta")
-    signal = Jido.Signal.new!("finish", %{}, source: agent.signal_source)
-
-    assert {:ok, done, []} = Agent.cmd(agent, signal)
-    assert done.state.fsm == %{definition_vsn: 1, current: :ready}
   end
 
   @tag obligation: "jido.plugin.fsm.I2"

@@ -190,10 +190,9 @@ Jido.Agent.Strategy, the Direct and FSM strategies, `on_before_cmd/2`, and `on_a
 
 ## Upgrade the beta FSM Plugin
 
-Use `Jido.Plugin.FSM` in Agent declarations, direct calls, and Plugin
-lookups. When you recompile Agent source, Jido accepts
-`Jido.Agent.Plugin.FSM` in `plugins:` and records `Jido.Plugin.FSM` in
-the definition. Keep the same `state_machine` section and transition data.
+Replace `Jido.Agent.Plugin.FSM` with `Jido.Plugin.FSM` in Agent
+declarations, direct calls, and Plugin lookups. Keep the same
+`state_machine` section and transition data.
 
 Encoded Agent definitions keep the same `jido.fsm` provider reference at
 version `1`. Catalog Discovery registers that reference for
