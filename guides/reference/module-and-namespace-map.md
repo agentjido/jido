@@ -273,7 +273,6 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | Module | Purpose |
 | --- | --- |
 | `Jido.Persistence` | Saves and restores portable Agent checkpoints through a persistence adapter. |
-| `Jido.Persistence.Bedrock` | Bedrock KV persistence adapter for binary keys and values. |
 | `Jido.Persistence.ETS` | In-memory persistence adapter for development and tests. |
 | `Jido.Persistence.Ecto` | Ecto SQL persistence adapter for binary keys and values. |
 | `Jido.Persistence.Ecto.Migration` | Creates and removes the default Ecto persistence table. |

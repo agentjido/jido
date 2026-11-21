@@ -57,11 +57,5 @@ The test creates a random bucket, removes all objects that it wrote, and
 removes the bucket. If the three variables are absent, the MinIO tests are
 reported as excluded.
 
-## Bedrock
-
-The Bedrock service family is deferred. The current profile records the known
-upstream blocker `bedrock-kv/bedrock#319`. Local adapter and transaction tests
-remain active in the normal unit suite.
-
 The live AI provider boundary is under `test/external/jido_ai` and uses the
 separate `mix test.live` command documented in that directory.

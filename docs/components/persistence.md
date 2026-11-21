@@ -83,7 +83,6 @@ continuation paths use keyed reads independently of inspection scans.
 | Redis | Injected command function and prefix; Lua owns atomic comparison and update. The adapter has no automatic TTL. |
 | Ecto | Repo, schema and repo options; write token separates equal-value writes. Writes reject an outer Repo transaction. PostgreSQL and SQLite support is conditional on dependencies. |
 | S3 | Conditional object write with ETag token, checksum and size limit. Monitored worker and watchdog bound the adapter call. No hidden write retry. |
-| Bedrock | Optional supported dependency versions and isolated call with no retry. Real service proof is paused in the current test profile. |
 
 ## Defects
 
@@ -136,8 +135,8 @@ indeterminate-write suites. [#469](https://github.com/agentjido/jido/issues/469)
   topology handoff selection passed all 44 tests.
 - `MIX_ENV=test mix format --check-formatted` passed. The review used Elixir
   1.20.4 and Erlang/OTP 29.
-- This review used local and injected backends. Redis, PostgreSQL, S3, and
-  Bedrock service runs are separate evidence. File atomic rename and its local
+- This review used local and injected backends. Redis, PostgreSQL, and S3
+  service runs are separate evidence. File atomic rename and its local
   lock have no proof for separate BEAM nodes that share a directory or for
   recovery after power loss. ETS keeps data only while its BEAM stays up.
 
