@@ -739,7 +739,6 @@ Disposition terms:
 | `Jido.Persistence.Adapter` | Removed | The byte-store behavior now belongs to `Jido.Persistence.Store` |
 | `Jido.Persistence.AdapterOps` | Removed | Safe adapter invocation now belongs to `Jido.Persistence.Store` |
 | `Jido.Persistence.AgentCheckpoint` | Removed | Agent dump, load, identity, and state-conversion policy now belong to `Jido.Persistence.Checkpoint` |
-| `Jido.Persistence.Bedrock` | Keep | Bedrock adapter |
 | `Jido.Persistence.Checkpoint` | Keep | Durable Agent checkpoint value |
 | `Jido.Persistence.CLI` | Added internal | Strict shared parsing for persistence inspection Mix tasks |
 | `Jido.Persistence.Codec` | Added | Stable persistence byte-codec behavior |

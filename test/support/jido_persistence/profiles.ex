@@ -43,13 +43,6 @@ defmodule Jido.Test.Persistence.Profiles do
       tier: :service,
       status: :active,
       description: "S3-compatible object storage"
-    },
-    bedrock: %{
-      adapter: Jido.Persistence.Bedrock,
-      tier: :service,
-      status: :paused,
-      reason: "Bedrock service tests are paused pending bedrock-kv/bedrock#319",
-      description: "Bedrock KV"
     }
   }
 

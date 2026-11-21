@@ -226,7 +226,6 @@ Jido ships these adapters. All of them implement `Jido.Persistence.Store`.
 | `Jido.Persistence.Ecto` | One SQL table on PostgreSQL or SQLite | Yes | Yes on PostgreSQL | `:ecto_sql` and a driver | [Ecto Storage](ecto-persistence.md) |
 | `Jido.Persistence.Redis` | Redis keys, through your client function | Depends on your Redis setup | Yes | A Redis client | [Redis and S3 Stores](redis-and-s3-persistence.md) |
 | `Jido.Persistence.S3` | One object per key, through your request function | Yes | Yes | An S3 client | [Redis and S3 Stores](redis-and-s3-persistence.md) |
-| `Jido.Persistence.Bedrock` | A Bedrock cluster | Depends on your cluster's durability profile | Yes | `:bedrock` and `:bedrock_raft` | [Bedrock and Raft Storage](bedrock-persistence.md) |
 
 For anything else, see [Custom Adapters](custom-persistence-adapter.md). No adapter gives you exclusive ownership of an Agent across a cluster. Revision checks reject stale writes, and they do not elect a single owner.
 

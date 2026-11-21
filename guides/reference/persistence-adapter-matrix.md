@@ -1,6 +1,6 @@
 # Persistence Matrix
 
-This guide compares the seven `Jido.Persistence.Store` adapters that Jido includes. Use it to choose an adapter, then follow the link for setup. For what each layer writes, see [Storage Model](../storage/persistence-storage-model.md).
+This guide compares the six `Jido.Persistence.Store` adapters that Jido includes. Use it to choose an adapter, then follow the link for setup. For what each layer writes, see [Storage Model](../storage/persistence-storage-model.md).
 
 ## Compare the adapters
 
@@ -12,11 +12,10 @@ This guide compares the seven `Jido.Persistence.Store` adapters that Jido includ
 | `Jido.Persistence.Ecto` | As your database defines | Yes | One `INSERT`, or one conditional `UPDATE` | None | A running repo and a migrated table. PostgreSQL or SQLite only. | [Ecto Storage](../storage/ecto-persistence.md) |
 | `Jido.Persistence.Redis` | As your Redis defines. Jido does not expire keys. | Yes | One Lua `EVAL` | None | `:command_fn`, which runs one command. The connection must permit `EVAL`. | [Redis and S3 Stores](../storage/redis-and-s3-persistence.md) |
 | `Jido.Persistence.S3` | As your bucket defines | Yes | A conditional `PUT` with an ETag token | 5,000,000 bytes | `:request_fn`, which signs and sends one request | [Redis and S3 Stores](../storage/redis-and-s3-persistence.md) |
-| `Jido.Persistence.Bedrock` | As your cluster's durability mode defines | Yes | One Bedrock transaction | Value 128 KiB. Key plus prefix 16 KiB. | A supervised cluster and a module with `use Bedrock.Repo` | [Bedrock and Raft Storage](../storage/bedrock-persistence.md) |
 
-"Data survives" and "Shared" state the adapter's limit. The system you connect to sets the real guarantee. An adapter cannot make a relaxed database, a Redis without persistence, or a relaxed Bedrock cluster durable.
+"Data survives" and "Shared" state the adapter's limit. The system you connect to sets the real guarantee. An adapter cannot make a relaxed database or Redis without persistence durable.
 
-Jido includes only these seven. Raft support comes through Bedrock, which uses Bedrock Raft. To target another store, write a custom adapter.
+To target another store, write a custom adapter.
 
 ## Choose by need
 
@@ -26,7 +25,7 @@ Jido includes only these seven. Raft support comes through Bedrock, which uses B
 | One node with a local disk | `Jido.Persistence.File` |
 | An application that already runs Mnesia | `Jido.Persistence.Mnesia` |
 | A SQL database you already run | `Jido.Persistence.Ecto` |
-| Several BEAM nodes with frequent writes | `Jido.Persistence.Ecto`, `Jido.Persistence.Redis`, or `Jido.Persistence.Bedrock` |
+| Several BEAM nodes with frequent writes | `Jido.Persistence.Ecto` or `Jido.Persistence.Redis` |
 | Low-frequency records in object storage | `Jido.Persistence.S3` |
 
 This guide makes no throughput claim. Measure with your own record sizes, as Load Testing describes.
@@ -49,9 +48,6 @@ This guide makes no throughput claim. Measure with your own record sizes, as Loa
 | S3 | `:request_fn` | Required | A one-argument function. |
 | S3 | `:prefix` | `"jido/"` | A string prepended to each object key. |
 | S3 | `:timeout_ms` | `5_000` | Per request, at most `120_000`. |
-| Bedrock | `:repo` | Required | A loaded module with `use Bedrock.Repo`. |
-| Bedrock | `:prefix` | `"jido:persistence:"` | A nonempty binary below the system keyspace. |
-| Bedrock | `:timeout_in_ms` | `5_000` | A positive integer or `:infinity`, per transaction. |
 
 Every built-in adapter rejects unknown and duplicate options.
 
@@ -78,7 +74,6 @@ alias Jido.Persistence.Store
 | Ecto | `:ecto_sql` and a driver, before Jido compiles | `Jido.Persistence.Ecto` reports invalid configuration |
 | Redis | A Redis client of your choice, called from `:command_fn` | Not applicable |
 | S3 | An HTTP client and an AWS signer of your choice, called from `:request_fn` | Not applicable |
-| Bedrock | `{:bedrock, "~> 0.7.2"}` and `{:bedrock_raft, "~> 0.10.0"}` | `Jido.Persistence.Bedrock` reports invalid configuration |
 
 ## Callback contract
 
@@ -86,13 +81,13 @@ Each adapter implements the required option validation, get,
 compare-and-swap, and delete callbacks. Maintenance `put/3` and paged
 `scan/4` are optional. ETS and File implement scan for inspection and export.
 
-| Callback | ETS | File | Mnesia | Ecto | Redis | S3 | Bedrock |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `get/2` returns a read token | No | No | No | No | No | Yes, an ETag | No |
-| `compare_and_swap/4` compares | Bytes | Bytes | Bytes | Bytes | Bytes | ETag | Bytes |
-| Maintenance `put/3` | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Maintenance `delete/2` | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Inspection `scan/4` | Yes | Yes | No | No | No | No | No |
+| Callback | ETS | File | Mnesia | Ecto | Redis | S3 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `get/2` returns a read token | No | No | No | No | No | Yes, an ETag |
+| `compare_and_swap/4` compares | Bytes | Bytes | Bytes | Bytes | Bytes | ETag |
+| Maintenance `put/3` | Yes | Yes | Yes | Yes | Yes | Yes |
+| Maintenance `delete/2` | Yes | Yes | Yes | Yes | Yes | Yes |
+| Inspection `scan/4` | Yes | Yes | No | No | No | No |
 
 Each adapter reports write results the same way:
 
@@ -116,7 +111,7 @@ store = {Jido.Persistence.ETS, table: :matrix_guide}
 
 A durable Flow writes several keys per step through the same adapter, one value for each batch or produced value. These facts affect your choice. See Continuation Storage.
 
-- `Jido.Persistence.Bedrock` and `Jido.Persistence.S3` apply their limits to each value, so a large step result can fail. Pass a reference to a large payload through a Flow.
+- `Jido.Persistence.S3` applies its limit to each value, so a large step result can fail. Pass a reference to a large payload through a Flow.
 - `Jido.Persistence.S3` makes at least one request per write, and its documents describe it as for low-frequency records.
 - Redis eviction can remove a record that a waiting Flow still needs. Jido
   does not configure automatic expiry.

@@ -228,7 +228,7 @@ A rejected, conflicting, or uncertain save stops durable execution of the Turn, 
 Execution records use the ordinary Store contract, so an adapter needs nothing extra. These points affect your choice of adapter:
 
 - **Write rate.** Each step writes several keys, and each write is a conditional write with its own read. `Jido.Persistence.S3` is meant for low-frequency records, so measure before you use it for frequent Flow Turns.
-- **Value size.** One batch or fact is one value, so adapter limits apply per step. `Jido.Persistence.Bedrock` allows 128 KiB and `Jido.Persistence.S3` allows 5,000,000 bytes. Pass references to large payloads through a Flow, not the payloads.
+- **Value size.** One batch or fact is one value, so adapter limits apply per step. `Jido.Persistence.S3` allows 5,000,000 bytes. Pass references to large payloads through a Flow, not the payloads.
 - **`delete/2`.** Every Store adapter must support physical delete. Jido uses
   it to collect completed Flow execution records.
 - **Expiry.** Jido does not apply automatic TTL. Backend eviction or an

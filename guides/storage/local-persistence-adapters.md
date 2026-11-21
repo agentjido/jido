@@ -87,7 +87,7 @@ That lock is the limit of this adapter:
 - All callers must use the same path, with no alternate symbolic links.
 - The adapter does not call `fsync`. A power loss or OS crash can lose a recent write that already returned `:ok`.
 
-For storage shared across BEAM instances, use [Ecto on PostgreSQL](ecto-persistence.md), [Redis or S3](redis-and-s3-persistence.md), or [Bedrock](bedrock-persistence.md).
+For storage shared across BEAM instances, use [Ecto on PostgreSQL](ecto-persistence.md) or [Redis or S3](redis-and-s3-persistence.md).
 
 ## Mnesia
 

@@ -2,7 +2,6 @@ defmodule Jido.Test.External.MinIO do
   @moduledoc false
 
   import ExUnit.Assertions
-  alias Bedrock.ObjectStorage
 
   def start_s3!(on_exit) do
     endpoint = required!("JIDO_SYSTEM_MINIO_URL") |> URI.parse()
@@ -27,12 +26,15 @@ defmodule Jido.Test.External.MinIO do
 
     bucket = "jido-system-" <> Base.encode16(:crypto.strong_rand_bytes(10), case: :lower)
     assert {:ok, _} = ExAws.S3.put_bucket(bucket, "us-east-1") |> ExAws.request(config)
-    backend = ObjectStorage.backend(ObjectStorage.S3, bucket: bucket, config: config)
 
     on_exit.(fn ->
-      keys = ObjectStorage.list(backend, "") |> Enum.to_list()
-      for key <- keys, do: assert(:ok == ObjectStorage.delete(backend, key))
-      assert Enum.to_list(ObjectStorage.list(backend, "")) == []
+      objects = ExAws.S3.list_objects_v2(bucket) |> ExAws.stream!(config) |> Enum.to_list()
+
+      for %{key: key} <- objects do
+        assert {:ok, _} = ExAws.S3.delete_object(bucket, key) |> ExAws.request(config)
+      end
+
+      assert Enum.empty?(ExAws.S3.list_objects_v2(bucket) |> ExAws.stream!(config))
       assert {:ok, _} = ExAws.S3.delete_bucket(bucket) |> ExAws.request(config)
     end)
 
