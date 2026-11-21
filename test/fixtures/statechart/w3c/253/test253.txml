@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<!-- test that the scxml event processor is used in both directions.  If child process uses the 
+scxml event i/o processor to communicate with us, send it an event.  It will send back success if
+this process uses the scxml processor to send the message to it, otherwise failure.  For this test we allow 
+'scxml' as an alternative to the full url.   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1"/>
+  </datamodel>
+     
+<state id="s0" initial="s01">
+  <onentry>
+    <send event="timeout" delay="2s"/>
+    </onentry>
+    
+    <transition event="timeout" conf:targetfail=""/>
+    
+    <invoke type="scxml"  id="foo">
+      <content>
+      <!-- inform parent we're running then wait for it to send us an event.  If it uses the scxml event i/o
+             processor to do so, return success, otherwise return failure.   -->
+       <scxml initial="sub0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+         <datamodel>
+          <data conf:id="2"/>
+           </datamodel>
+            <state id="sub0">
+              <onentry>
+               <send target="#_parent" event="childRunning"/>
+            </onentry>
+   
+           <transition event="parentToChild" target="sub1">
+           <assign conf:location="2" conf:eventField="origintype"/>
+          </transition>
+         </state>
+          <state id="sub1">
+            <transition conf:idQuoteVal="2=http://www.w3.org/TR/scxml/#SCXMLEventProcessor" target="subFinal">
+             <send target="#_parent" event="success"/>
+                </transition>
+            <transition conf:idQuoteVal="2=scxml" target="subFinal">
+             <send target="#_parent" event="success"/>
+              </transition>
+            <transition target="subFinal">
+                <send target="#_parent" event="failure"/>
+             </transition>
+           </state>
+          <final id="subFinal"/>
+            </scxml>
+        </content>
+        </invoke>
+    
+    <state id="s01">
+    <transition event="childRunning" target="s02">
+       <assign conf:location="1" conf:eventField="origintype"/>
+       </transition>
+   </state>
+    
+    <state id="s02">
+
+     <transition conf:idQuoteVal="1=http://www.w3.org/TR/scxml/#SCXMLEventProcessor" target="s03">
+        <send target="#_foo" event="parentToChild"/>
+        </transition>
+    <transition conf:idQuoteVal="1=scxml" target="s03">
+        <send target="#_foo" event="parentToChild"/>
+        </transition>
+ 
+    <transition conf:targetfail=""/>
+
+    </state>        
+
+     
+     <state id="s03">
+       <transition event="success" conf:targetpass=""/>
+       <transition event="fail" conf:targetfail=""/>
+  
+     </state>   
+
+</state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

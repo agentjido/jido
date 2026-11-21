@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+
+<!-- test that foreach causes a new variable to be declared if 'item' doesn't already exist.  Also
+test that it will use an existing var if it does exist. -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1"/>
+  <data conf:id="2"/>
+  <data conf:id="3">
+    <conf:array123/>
+    </data>
+  </datamodel>
+  
+   <state id="s0">
+      <onentry>
+<!-- first use declared variables -->
+        <foreach conf:item="1" conf:index="2" conf:arrayVar="3"/>
+        <raise event="foo"/>
+        </onentry>
+   <transition event="error" conf:targetfail=""/>
+   <transition event="*" target="s1"/> 
+   </state>
+   
+<state id="s1">
+     <onentry>
+<!-- now use undeclared variables -->
+        <foreach conf:item="4" conf:index="5" conf:arrayVar="3"/>
+        <raise event="bar"/>
+        </onentry>
+   <transition event="error" conf:targetfail=""/>
+   <transition event="*" target="s2"/> 
+   </state>
+
+<state id="s2">
+  <!-- check that var4 is bound -->
+  <transition conf:isBound="4" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+  </state>  
+   <conf:pass/>
+   <conf:fail/>
+   
+
+
+</scxml>

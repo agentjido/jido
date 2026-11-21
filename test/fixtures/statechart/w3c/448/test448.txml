@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!--  test that all ecmascript objects are placed in a single global scope -->
+
+
+<scxml  datamodel="ecmascript"  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+ 
+     
+<state id="s0">
+<!-- test that a parent state can access a variable defined in a child -->
+  <transition  cond="var1==1" target="s1"/>
+  <transition  conf:targetfail=""/>
+   <state id="s01">
+    <datamodel>
+      <data id="var1" expr="1"/>
+       </datamodel>
+    </state>
+ </state>  
+    <state id="s1" initial="s01p">  
+     <parallel id="s01p">
+       <state id="s01p1">
+  <!-- test that we can access a variable defined in a parallel sibling state -->
+           <transition cond="var2==1" conf:targetpass=""/>
+           <transition conf:targetfail=""/>
+       </state>
+       <state id="s01p2">
+           <datamodel>
+           <data id="var2" expr="1"/>
+          </datamodel>
+       </state>
+     </parallel>
+    </state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

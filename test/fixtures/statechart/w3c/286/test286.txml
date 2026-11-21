@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+
+<!-- test that assigment to a non-declared var causes an error.  the transition on foo catches the case
+where no error is raised -->
+
+<scxml xmlns="http://www.w3.org/2005/07/scxml" 
+   xmlns:conf="http://www.w3.org/2005/scxml-conformance" version="1.0" conf:datamodel="" initial="s0">
+   
+     
+ <state id="s0">
+   <onentry>
+   <assign conf:invalidLocation="" conf:expr="1"/>
+   <raise event="foo"/>
+   </onentry>
+   
+   <transition event="error.execution" conf:targetpass=""/>
+   <transition event="*" conf:targetfail=""/>
+ </state>
+
+<conf:pass/>
+<conf:fail/>
+     
+</scxml>

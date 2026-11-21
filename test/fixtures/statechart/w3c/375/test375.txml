@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!-- test that onentry handlers are executed in document order.  event1 should be raised before event2 -->
+
+
+<scxml  conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+
+       
+<state id="s0">
+  <onentry>
+    <raise event="event1"/>
+    </onentry>
+  <onentry>
+    <raise event="event2"/>
+    </onentry>
+    
+  <transition event="event1"  target="s1"/>
+  <transition event="*" conf:targetfail=""/>
+
+</state>
+
+<state id="s1">
+  <transition event="event2" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+  </state>
+
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

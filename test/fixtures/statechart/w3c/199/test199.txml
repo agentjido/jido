@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!-- we test that using an invalid send type results in error.execution -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+<state id="s0">
+  <onentry>
+   <send conf:invalidSendType="" event="event1"/>
+   <send event="timeout"/>
+    </onentry>
+ 
+ 
+  <transition event="error.execution" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+ 
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

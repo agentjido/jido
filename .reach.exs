@@ -117,6 +117,10 @@
       "Jido.Plugin.Bus.*",
       "Jido.Plugin.Timer*",
       "Jido.Plugin.SensorManager*",
+      "Jido.Plugin.Statechart",
+      "Jido.Plugin.Statechart.*",
+      "Jido.Statechart",
+      "Jido.Statechart.*",
       "Jido.Telemetry.AI",
       "Jido.Telemetry.AI.*",
       "Runic.Identity.Projectable.Jido.AI.*"

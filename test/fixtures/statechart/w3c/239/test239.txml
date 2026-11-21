@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<!-- test that markup can be specified both by 'src' and by <content>  -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0" initial="s01">
+  <onentry>
+    <send event="timeout" delay="2s"/>
+    </onentry>
+    <transition event="timeout" conf:targetfail=""/>
+    
+   <state id="s01">
+     <invoke type="http://www.w3.org/TR/scxml/"  src="file:test239sub1.scxml"/>
+     <transition event="done.invoke" target="s02"/>
+   </state>
+
+<state id="s02">
+      <invoke type="http://www.w3.org/TR/scxml/">
+        <!-- identical to test239sub1.scxml.  -->
+          <content>
+            <scxml version="1.0" initial="final" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+             <final id="final"/>
+              </scxml>
+            </content>
+        </invoke>
+ 
+  <transition event="done.invoke" conf:targetpass=""/>
+  </state>
+  
+</state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!-- we test that the processor does not dispatch the event if evaluation
+of <send>'s args causes an error..  -->
+
+
+<scxml initial="s0"  conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+  
+<state id="s0">
+  <onentry>
+   <!-- timeout event -->
+   <send event="timeout" conf:delay="1"/>
+   <!-- generate an invalid namelist -->
+   <send event="event1" conf:invalidNamelist=""/> 
+    </onentry>
+ 
+ <!-- if we get the timeout before event1, we assume that event1 hasn't been sent
+ We ignore the error event here because this assertion doesn't mention it -->   
+  <transition event="timeout" conf:targetpass=""/>
+  <transition event="event1" conf:targetfail=""/>
+ </state>
+ 
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<!-- test that markup specified  by 'src' and by <content> is treated the same way.  That means that
+either we get done.invoke in both cases or in neither case (in which case we timeout) -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0" >
+  <onentry>
+    <send event="timeout1" delay="1s"/>
+    </onentry>
+    <transition event="timeout" conf:targetfail=""/>
+
+     <invoke type="http://www.w3.org/TR/scxml/"  src="file:test242sub1.scxml"/>
+     <transition event="done.invoke" target="s02"/>
+     <transition event="timeout1" target="s03"/>
+   </state>
+
+<state id="s02">
+    <onentry>
+    <send event="timeout2" delay="1s"/>
+    </onentry>
+      <invoke type="http://www.w3.org/TR/scxml/">
+        <!-- identical to test242sub1.scxml.  -->
+          <content>
+            <scxml version="1.0" initial="subFinal1" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+             <final id="subFinal1"/>
+              </scxml>
+            </content>
+        </invoke>
+ <!-- we got done.invoke last time, so we need it this time too -->
+  <transition event="done.invoke" conf:targetpass=""/>
+  <transition event="timeout2" conf:targetfail=""/>
+ </state>
+ 
+<state id="s03">
+    <onentry>
+    <send event="timeout3" delay="1s"/>
+    </onentry>
+      <invoke type="http://www.w3.org/TR/scxml/">
+        <!-- identical to test242sub1.scxml.  -->
+          <content>
+            <scxml version="1.0" initial="subFinal2" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+             <final id="subFinal2"/>
+              </scxml>
+            </content>
+        </invoke>
+ <!-- we got timeout last time, so we need it this time too -->
+  <transition event="timeout3" conf:targetpass=""/>
+  <transition event="done.invoke" conf:targetfail=""/>
+ </state>
+  
+
+<conf:pass/>
+<conf:fail/>
+</scxml>

@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!--  test that illegal expr in <param> produces error.execution and empty event.data -->
+
+<scxml version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance" conf:datamodel="" initial="s0">
+
+     
+ <state id="s0" initial="s01">
+   <!-- we should get the error before the done event -->
+   <transition event="error.execution" target="s1"/>
+   <transition event="done.state.s0" conf:targetfail=""/>     
+
+      <transition event="done.state.s0"  conf:targetfail="">
+     </transition>
+
+   <state id="s01">
+   <transition target="s02"/>
+   </state>
+   <final id="s02">
+     <donedata>
+      <param conf:illegalExpr="" name="someParam"/>
+      </donedata>
+     </final>
+  </state>
+
+ 
+ <!-- if we get here, we received the error event. Now check that the done
+ event has empty event.data -->
+ 
+ <state id="s1">
+   <transition event="done.state.s0" conf:emptyEventData="" conf:targetpass=""/>
+   <transition event="*" conf:targetfail=""/>
+   </state>
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

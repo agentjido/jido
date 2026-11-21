@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+ <!-- in the ECMA data model, test that if the child of <data> is XML, or if XML is loaded via src=, the processor
+ assigns it as the value of the var -->
+ 
+ <scxml xmlns="http://www.w3.org/2005/07/scxml" 
+   xmlns:conf="http://www.w3.org/2005/scxml-conformance" initial="s0" version="1.0" datamodel="ecmascript">
+ <datamodel>
+   <data id="var1">
+   <books xmlns="">
+     <book title="title1"/>
+     <book title="title2"/>
+   </books>  
+</data>
+ <data id="var2" src="file:test557.txt"/> 
+  </datamodel>
+  
+<state id="s0">
+   <transition  cond="var1.getElementsByTagName('book')[0].getAttribute('title') == 'title1'" target="s1"/>
+   <transition  conf:targetfail=""/>
+  </state>
+  
+<state id="s1">
+   <transition  cond="var2.getElementsByTagName('book')[1].getAttribute('title') == 'title2'" conf:targetpass=""/>
+   <transition  conf:targetfail=""/>
+   </state>
+    
+<conf:pass/>
+<conf:fail/>  
+
+</scxml>

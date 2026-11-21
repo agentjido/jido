@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- the processor should  reject this document because it can't download the script.  
+Therefore  we fail if it runs at all. This test is valid only for datamodels that support scripting -->
+
+<scxml version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance" initial="s0">
+ <script conf:scriptBadSrc=""/>
+     
+ <state id="s0">
+   <transition conf:targetfail=""/>
+   </state>
+   
+<conf:pass/>
+<conf:fail/>
+
+   
+</scxml>

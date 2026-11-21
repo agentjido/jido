@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+<!-- Test that at the end of a macrostep, the processor executes all invokes in states
+that have been entered and not exited during the step.  (The invokes are supposed to be executed
+in document order, but we can test that since each invocation is separate and they may take
+different amounts to time to start up.)  In this case, there are three invoke statements,
+in states s1, s11 and s12.  Each invoked process returns an event named after its parent state.
+The invokes in s1 and s12 should execute, but not the one
+in s11. So we should receive invokeS1, invokeS12, but not invokeS12.  Furthermore, when the timeout fires, var1 should equal 2.-->
+
+<scxml version="1.0" initial="s1" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+	 <data conf:id="1" conf:expr="0"/>
+	</datamodel>
+ <state id="s1" initial="s11">
+ 	 <onentry>
+ 	 	<send event="timeout" conf:delay="2"/>
+ 	 	</onentry>
+ 	   <transition event="invokeS1 invokeS12">
+ 	   	<conf:incrementID id="1"/>
+ 	   	</transition>
+ 	   	<transition event="invokeS11" conf:targetfail=""/>
+ 	  
+ 	  <transition event="timeout" conf:idVal="1=2" conf:targetpass=""/>
+ 	  <transition event="timeout" conf:targetfail=""/>
+     <invoke>
+     	  <content>
+        <!-- when invoked, send 'foo' to parent, then terminate.   -->
+          <scxml initial="sub0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+            <state id="sub0">
+            	 <onentry>
+                <send target="#_parent" event="invokeS1"/>
+               </onentry>
+                <transition target="subFinal0"/>
+              </state>
+           <final id="subFinal0"/>
+        </scxml>
+      </content>
+     	 </invoke>
+     
+   <state id="s11">
+   	<invoke>
+   		    	  <content>
+        <!-- when invoked, send 'foo' to parent, then terminate.   -->
+          <scxml initial="sub1" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+            <state id="sub1">
+           	 <onentry>
+                <send target="#_parent" event="invokeS11"/>
+               </onentry>
+                <transition target="subFinal1"/>
+              </state>
+           <final id="subFinal1"/>
+            </scxml>
+      </content>
+      </invoke>
+   	  <transition target="s12"/>
+   	</state>
+  <state id="s12">
+  	<invoke>
+     <content>
+        <!-- when invoked, send 'foo' to parent, then terminate.   -->
+          <scxml initial="sub2" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+            <state id="sub2">
+            	 <onentry>
+                <send target="#_parent" event="invokeS12"/>
+               </onentry>
+                <transition target="subFinal2"/>
+              </state>
+           <final id="subFinal2"/>
+            </scxml>
+      </content>
+  		</invoke>
+  	</state>
+ </state>
+     
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<!-- we test that 'optimally enabled set' really is a set, specifically that if a transition is optimally enabled in
+two different states, it is taken only once.  --> 
+
+
+<scxml  initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+  <datamodel>
+   <data conf:id="1" conf:expr="0"/>
+   </datamodel>
+   
+<state id="s0" initial="p0">
+  <!-- this transition should never be taken because a transition in a lower state should
+  always be selected -->
+  <transition event="event1">
+    <conf:incrementID id="1"/>
+      </transition>
+   
+     
+   
+ <parallel id="p0">
+
+  <onentry>
+     <raise event="event1"/>
+     <raise event="event2"/>
+    </onentry>
+    
+    <!-- this transition will be selected by both states p0s1 and p0s2, but should be executed only once -->
+    <transition event="event1">
+      <conf:incrementID id="1"/>
+      </transition>
+      
+ <state id="p0s1">
+   <transition event="event2" conf:idVal="1=1" conf:targetpass=""/>
+   <transition event="event2" conf:targetfail=""/>
+   </state>
+   
+ <state id="p0s2"/>  
+ 
+</parallel>
+</state>
+
+<conf:pass/>
+<conf:fail/>
+</scxml>

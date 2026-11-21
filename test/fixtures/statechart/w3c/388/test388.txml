@@ -1,0 +1,80 @@
+<?xml version="1.0"?>
+<!-- test that history states works correctly.  The counter Var1 counts how many times
+we have entered s0.  The initial state is s012.  We then transition to s1, which transitions
+to s0's deep history state.  entering.s012 should be raised, otherwise failure.  Then we transition
+to s02, which transitions to s0's shallow history state.  That should have value s01, and its initial
+state is s011, so we should get entering.s011, otherwise failure.-->
+
+
+<scxml  version="1.0" initial="s012" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="0"/>
+  </datamodel>
+       
+<state id="s0" initial="s01">
+  <onentry>
+    <conf:incrementID id="1"/>
+    </onentry>
+    
+  <!-- the first time through, go to s1, setting  a timer just in case something hangs -->
+  <transition event="entering.s012" conf:idVal="1=1" target="s1">
+     <send event="timeout" delay="2s"/>
+     </transition>
+  
+  <!-- the second time, we should get entering.s012.  If so, go to s2, otherwise fail -->
+  <transition event="entering.s012" conf:idVal="1=2" target="s2"/>
+    <transition event="entering" conf:idVal="1=2" conf:targetfail=""/>
+    
+  <!-- the third time we should get entering-s011. If so, pass, otherwise fail -->
+  <transition event="entering.s011" conf:idVal="1=3" conf:targetpass=""/>
+  <transition event="entering" conf:idVal="1=3" conf:targetfail=""/>
+ 
+ <!-- if we timeout, the state machine is hung somewhere, so fail -->
+ <transition event="timeout" conf:targetfail=""/>
+  
+  <history type="shallow" id="s0HistShallow">
+    <transition target="s02"/>
+    </history>
+  <history type="deep" id="s0HistDeep">
+    <transition target="s022"/>
+    </history>
+  <state id="s01" initial="s011">
+    <state id="s011">
+       <onentry>
+         <raise event="entering.s011"/>
+         </onentry>
+    </state>
+    <state id="s012">
+      <onentry>
+       <raise event="entering.s012"/>
+        </onentry>
+    </state>
+  </state>
+ <state id="s02" initial="s021">
+     <state id="s021">
+       <onentry>
+         <raise event="entering.s021"/>
+         </onentry>
+    </state>
+    <state id="s022">
+      <onentry>
+       <raise event="entering.s022"/>
+        </onentry>
+    </state>
+  </state>
+ 
+</state>
+
+
+<state id="s1">
+  <transition  target="s0HistDeep"/>
+</state>
+
+<state id="s2">
+  <transition  target="s0HistShallow"/>
+</state>
+ 
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

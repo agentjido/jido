@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<!-- test that autofoward works. If the child  process receives back a copy of the
+childToParent event that it sends to this doc, it sends eventReceived, signalling success. (Note
+that this doc is not required to process that event explicitly.  It should be forwarded in any case.) Otherwise
+it eventually times out and the done.invoke signals failure   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0" >
+  <onentry>
+    <send event="timeout" delay="3s"/>
+    </onentry>
+ 
+  <invoke type="http://www.w3.org/TR/scxml/" autoforward="true">
+    <content>
+      <!-- when invoked, send childToParent to parent.  
+      If it is forwarded back to us, send
+      eventReceived to signal success and terminate.  
+      Otherwise wait for timer to expire and terminate.  -->
+     <scxml initial="sub0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+        <state id="sub0">
+          <onentry>
+             <send target="#_parent" event="childToParent"/> 
+              <send event="timeout" delay="3s"/> 
+            </onentry> 
+         <transition event="childToParent" target="subFinal">
+         <send target="#_parent" event="eventReceived"/>
+          </transition>
+           <transition event="*" target="subFinal"/>
+       </state>
+        <final id="subFinal"/>
+        </scxml>
+    </content>
+    </invoke>
+
+  <transition event="childToParent"/>
+  <transition event="eventReceived" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+</state>
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

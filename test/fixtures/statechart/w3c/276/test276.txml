@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+
+<!-- test that values passed in from parent process override default values specified in the child, test276sub1.scxml.
+The child returns event1 if var1 has value 1, event0 if it has default value 0.  -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+   <state id="s0">
+     <invoke type="scxml" src="file:test276sub1.scxml" >
+       <param conf:name="1" conf:expr="1"/>
+       </invoke>
+       <transition event="event1" conf:targetpass=""/>
+       <transition event="event0" conf:targetfail=""/>
+   </state>
+
+   <conf:pass/>
+   <conf:fail/>
+   
+
+
+</scxml>

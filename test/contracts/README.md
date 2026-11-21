@@ -41,6 +41,7 @@ tests with its obligation tags.
 | `jido.thread` | Thread and Entry sequence rules and portable maps | `test/contracts/jido/thread.*` |
 | `jido.plugin.audit` | Bundled Audit Plugin behavior | `test/contracts/jido.plugin/audit.*` |
 | `jido.plugin.bus` | Bundled Bus Plugin behavior | `test/contracts/jido.plugin/bus.*` |
+| `jido.plugin.statechart` | SCXML compilation and Agent chart sessions | `test/contracts/jido.plugin/statechart.*` |
 | `jido.plugin.timer` | Bundled Timer Plugin behavior | `test/contracts/jido.plugin/timer.*` |
 | `jido.plugin.sensor_manager` | Bundled SensorManager Plugin behavior | `test/contracts/jido.plugin/sensor_manager.*` |
 

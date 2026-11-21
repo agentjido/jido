@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- test that a cond expression that cannot be evaluated as a 
+boolean cond expression evaluates to false and causes error.execution to be raised.
+In some languages, any valid expression/object can be converted to a boolean, so conf:nonBoolean will
+have to be mapped onto something that produces a syntax error or something similarly invalid -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" 
+	conf:datamodel="" xmlns:conf="http://www.w3.org/2005/scxml-conformance" initial="s0">
+
+<state id="s0"> 
+  <transition conf:nonBoolean=""  conf:targetfail=""/>
+  <transition target="s1"/>
+  </state>
+  
+<state id="s1">
+  <onentry>
+    <raise event="foo"/>
+    </onentry>
+  <transition event="error.execution" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+  </state>
+    
+<conf:pass/>
+<conf:fail/>
+
+   
+</scxml>

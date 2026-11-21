@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!-- test that <content> child is evaluated when <invoke> is. Var1 is initialized
+with an integer value, then set to an scxml script in the onentry to s0.  If <content>
+is evaluated at the right time, we should get invoke.done, otherwise an error  -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+  <datamodel>
+    <data conf:id="1" conf:expr="1"/>
+    </datamodel>
+    
+    <state id="s0">
+      <onentry>
+        <assign conf:location="1">
+           <scxml version="1.0"><final/></scxml>
+           </assign>
+        <send event="timeout" delay="2s"/>
+        </onentry>
+        
+      <invoke type="http://www.w3.org/TR/scxml/">
+        <content conf:varChildExpr="1"/>
+        </invoke>
+        
+        <transition event="done.invoke" conf:targetpass=""/>
+        <transition event="*" conf:targetfail=""/>
+    </state>
+    
+    <conf:pass/>
+    <conf:fail/>
+  </scxml>

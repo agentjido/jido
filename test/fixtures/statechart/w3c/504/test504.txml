@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+
+<!-- test that an external transition exits all states up the the LCCA -->
+
+<scxml  initial="s1" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="0"/>  <!-- how often we have exited p -->
+  <data conf:id="2" conf:expr="0"/>  <!-- how often we have exited ps1 -->
+  <data conf:id="3" conf:expr="0"/>  <!-- how often we have exited ps2 -->
+  <data conf:id="4" conf:expr="0"/>  <!-- how often the transition for foo has been taken -->
+  <data conf:id="5" conf:expr="0"/>  <!-- how often we have exited s2  -->
+  </datamodel>
+    
+ <state id="s1">
+   <onentry>
+    <raise event="foo"/>
+    <raise event="bar"/>
+    </onentry>
+   <transition target="p"/>
+   </state>
+   
+<state id="s2">
+	 <onexit>
+	 	<conf:incrementID id="5"/>
+	 	</onexit>
+
+<parallel id="p">
+  <onexit>
+    <conf:incrementID id="1"/>
+    </onexit>
+  <transition event="foo" target="ps1">
+     <conf:incrementID id="4"/>
+     </transition>
+     
+   <!-- make sure the transition on foo was actually taken --> 
+  <transition event="bar" conf:idVal="4=1" target="s3"/>
+  <transition event="bar" conf:targetfail=""/>
+  
+ <state id="ps1">
+   <onexit>
+   <conf:incrementID id="2"/>
+   </onexit>
+  </state>
+  <state id="ps2">
+   <onexit>
+   <conf:incrementID id="3"/>
+   </onexit>
+  </state>
+</parallel>
+</state>
+  
+<state id="s3">
+  <!-- make sure that p was exited twice -->
+    <transition conf:idVal="1=2" target="s4"/>
+    <transition conf:targetfail=""/>
+ </state> 
+ 
+<state id="s4">
+  <!-- make sure that ps1 was exited twice -->
+    <transition conf:idVal="2=2" target="s5"/>
+    <transition conf:targetfail=""/>
+ </state> 
+  
+<state id="s5">
+  <!-- make sure that ps2 was exited twice -->
+    <transition conf:idVal="3=2" target="s6"/>
+    <transition conf:targetfail=""/>
+ </state>
+ 
+<state id="s6">
+	<!-- make sure that s1 was exited once -->
+	<transition conf:idVal="5=1" conf:targetpass=""/>
+	<transition conf:targetfail=""/>
+	</state>
+  
+<conf:pass/>
+<conf:fail/>
+     
+</scxml>

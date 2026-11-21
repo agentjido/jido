@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+
+<!-- test that location field is found inside entry for SCXML Event I/O processor -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:scxmlEventIOLocation=""/>
+  </datamodel>
+  
+<state id="s0">
+  <transition conf:isBound="1" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+   
+ </state>
+  
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

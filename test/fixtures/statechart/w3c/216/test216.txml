@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!-- we test that srcexpr is evaluated at runtime.  If the original value of var1 is used, the invocation
+will fail (assuming that there is no script named 'foo').  If
+the runtime value is used, the invocation will succeed -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+<datamodel>
+  <data conf:id="1" conf:quoteExpr="foo"/>
+   </datamodel> 
+   
+<state id="s0" >
+  <onentry>
+    <send event="timeout" delay="5s"/>
+   <assign conf:location="1" conf:quoteExpr="file:test216sub1.scxml"/>
+    </onentry>
+  <invoke conf:srcExpr="1" type="http://www.w3.org/TR/scxml"/>
+  <transition event="done.invoke" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/> 
+</state>
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>
