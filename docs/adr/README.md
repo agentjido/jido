@@ -22,6 +22,7 @@ This directory records decisions that constrain the Jido V3 architecture. The [m
 | [0014](0014-thread-proof-ownership.md) | Accepted | Give Thread and Entry their own Covenant proof |
 | [0015](0015-bundle-statechart-plugin.md) | Accepted | Bundle Statechart as a Jido Plugin |
 | [0016](0016-fsm-plugin-namespace.md) | Accepted | Give the bundled FSM Plugin one public namespace |
+| [0017](0017-behavior-tree-turn-ownership.md) | Proposed | Run Behavior Trees through v3 Agent Turns |
 
 ## Backlog
 

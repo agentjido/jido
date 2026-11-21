@@ -41,6 +41,8 @@ This page is the index for Jido project documentation.
 - [Package vision](architecture/package-vision.md)
 - [Supported examples](../examples/README.md)
 - [Dynamic Flows guide](../guides/flows/dynamic-flows.md)
+- [Run a Behavior Tree in an Agent](../guides/built-in-plugins/behavior-trees.md)
+- [Behavior Tree migration](../guides/reference/behavior-tree-migration.md)
 
 ## Plans at required paths
 

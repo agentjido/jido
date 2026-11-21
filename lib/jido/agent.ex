@@ -128,6 +128,7 @@ defmodule Jido.Agent do
     quote do
       use Jido.Action.Inline
       use Jido.Flow.Inline
+      Module.register_attribute(__MODULE__, :__jido_body_plugins__, accumulate: true)
       use Jido.Agent.DSL, unquote(Macro.escape(opts))
       import Jido.Agent.DSL.Macros
       import Jido.Agent.Directive, only: [emit: 1, emit: 2]
