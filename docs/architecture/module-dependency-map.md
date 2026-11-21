@@ -105,6 +105,13 @@ primitives <- value_model <- definitions <- execution <- agent_domain <- live_ru
 The current Reach check covers all production source files and reports no layer
 violations.
 
+`Jido.BehaviorTree` and `Jido.Plugin.BehaviorTree` are capabilities. The
+Plugin uses lower layers for Action execution, Agent state validation, and
+post-commit dispatch. The Tree DSL uses the shared inline Action compiler
+and the `Jido.Expr` parser and evaluator. The tree engine has no application
+startup entry. See
+[ADR 0015](../adr/0015-behavior-tree-turn-ownership.md).
+
 ### Covenant ownership rule
 
 Each Covenant component owns modules from one Reach layer. The `modules:` list

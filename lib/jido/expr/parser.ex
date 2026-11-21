@@ -52,12 +52,16 @@ defmodule Jido.Expr.Parser do
 
   @doc false
   @spec parse(Macro.t(), keyword()) :: {:ok, term()} | {:error, term()}
-  def parse(ast, options), do: run(ast, options, false)
+  def parse(ast, options), do: ast |> run(options, false) |> require_operation()
+
+  @doc false
+  @spec parse_value(Macro.t(), keyword()) :: {:ok, term()} | {:error, term()}
+  def parse_value(ast, options), do: run(ast, options, false)
 
   @doc false
   @spec expand!(Macro.t()) :: Macro.t()
   def expand!(ast) do
-    case run(ast, [], true) do
+    case ast |> run([], true) |> require_operation() do
       {:ok, expression} -> Macro.escape(expression, unquote: true)
       {:error, error} -> raise error
     end
@@ -66,11 +70,13 @@ defmodule Jido.Expr.Parser do
   defp run(ast, options, pins?) do
     with {:ok, state} <- Limits.new(options, [:leaf_parser]),
          {:ok, result, _state} <- walk(ast, Map.put(state, :pins?, pins?), [], 0) do
-      if is_struct(result, Operation),
-        do: {:ok, result},
-        else: Limits.fail(:expected_expression, [])
+      {:ok, result}
     end
   end
+
+  defp require_operation({:ok, %Operation{}} = result), do: result
+  defp require_operation({:ok, _value}), do: Limits.fail(:expected_expression, [])
+  defp require_operation({:error, _} = error), do: error
 
   defp walk(ast, state, path, depth) do
     with {:ok, state} <- Limits.enter(state, ast, path, depth) do

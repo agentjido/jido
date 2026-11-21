@@ -14,6 +14,8 @@ same Agent, Plugin, Signal, and AgentServer contracts as an application Plugin.
    aligned with committed Plugin state.
 6. [Bus Delivery](11_06_bus_delivery/README.md) uses an ordered local Bus
    subscription.
+7. [Behavior Tree](11_07_behavior_tree/README.md) resumes a running tree and
+   dispatches an Action effect.
 
 ```sh
 mix test.examples examples/11_built_in_capabilities --warnings-as-errors

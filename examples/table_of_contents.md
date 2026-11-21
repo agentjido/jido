@@ -420,6 +420,7 @@ Proposed lessons:
 4. Static periodic Timer Signals.
 5. SensorManager.
 6. Bus Manager and Bus Client.
+7. Behavior Tree continuation and Action effects.
 
 Primary coverage:
 
@@ -428,6 +429,7 @@ Primary coverage:
 - `Jido.Plugin.SensorManager`
 - `Jido.Plugin.Bus.Manager`
 - `Jido.Plugin.Bus.Client`
+- `Jido.Plugin.BehaviorTree`
 
 ### 12 Persistence
 

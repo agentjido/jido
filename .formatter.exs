@@ -153,7 +153,17 @@ ai_locals = [
   metadata: 1
 ]
 
-locals_without_parens = Enum.uniq(action_locals ++ agent_locals ++ ai_locals)
+behavior_tree_locals = [
+  tree: 2,
+  sequence: 2,
+  selector: 2,
+  condition: 2,
+  action: 2,
+  wait: 2,
+  node: 2
+]
+
+locals_without_parens = Enum.uniq(action_locals ++ agent_locals ++ ai_locals ++ behavior_tree_locals)
 
 [
   line_length: 120,
