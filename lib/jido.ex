@@ -496,7 +496,7 @@ defmodule Jido do
   end
 
   defp prepare_addressed_create(agent, address, opts) do
-    case AgentServer.StateProvider.startup(agent, Keyword.delete(opts, :id), :create) do
+    case Jido.Persistence.StateSource.startup(agent, Keyword.delete(opts, :id), :create) do
       :default ->
         startup_agent(agent, opts, [])
 
@@ -516,7 +516,7 @@ defmodule Jido do
   end
 
   defp create_addressed_agent(instance, address, agent, config) do
-    AgentServer.StateProvider.open(agent, %{address: address, persistence: config}, :create, fn initial ->
+    Jido.Persistence.StateSource.open(agent, %{address: address, persistence: config}, :create, fn initial ->
       Jido.Persistence.open_agent(instance, initial, :create,
         instance: instance,
         namespace: address.namespace,
@@ -1176,7 +1176,7 @@ defmodule Jido do
   defp replaceable_turn(_turn), do: {:error, :turn_in_flight}
 
   defp replaceable_state_source(agent) do
-    if AgentServer.StateProvider.configured?(agent), do: {:error, :state_provider_replacement_unsupported}, else: :ok
+    if Jido.Persistence.StateSource.configured?(agent), do: {:error, :state_provider_replacement_unsupported}, else: :ok
   end
 
   defp replace_agent_record(
@@ -1251,7 +1251,7 @@ defmodule Jido do
   end
 
   defp upgradeable_state_source(agent) do
-    if AgentServer.StateProvider.configured?(agent), do: {:error, :state_provider_upgrade_unsupported}, else: :ok
+    if Jido.Persistence.StateSource.configured?(agent), do: {:error, :state_provider_upgrade_unsupported}, else: :ok
   end
 
   defp restore_after_upgrade(_instance, _address, false), do: :ok
@@ -1375,7 +1375,7 @@ defmodule Jido do
   end
 
   defp prepare_agent_start(agent, opts, runtime_opts) do
-    case AgentServer.StateProvider.startup(agent, opts, runtime_opts[:persistence_mode]) do
+    case Jido.Persistence.StateSource.startup(agent, opts, runtime_opts[:persistence_mode]) do
       :default ->
         with {:ok, agent} <- startup_agent(agent, opts, runtime_opts), do: {:ok, agent, false}
 

@@ -738,6 +738,8 @@ Disposition terms:
 | `Jido.Persistence.Codec.Term` | Added | Compact default codec for compatible application releases |
 | `Jido.Persistence.Codec.JSON` | Added | Opt-in bounded tagged JSON codec |
 | `Jido.Persistence.Config` | Added | One validated Store and codec profile for an instance namespace |
+| `Jido.Persistence.StateSource` | Experimental | Resolves a Plugin's domain-state binding and applies its conditional write |
+| `Jido.Persistence.TurnTransaction` | Experimental | Selects and invokes a compatible adapter's Turn transaction |
 | `Jido.Persistence.ContinuationStore` | Keep | Runic workflow checkpoints, facts, wait receipts, and read-only checkpoint projection |
 | `Jido.Persistence.Ecto` | Keep | Ecto adapter |
 | `Jido.Persistence.ETS` | Keep | ETS adapter |
@@ -778,7 +780,6 @@ Disposition terms:
 | `Jido.AgentServer.TopologyBus` | Removed | Bus lifecycle and publication now belong to `Jido.AgentServer.Topology` |
 | `Jido.AgentServer.TopologyRuntime` | Removed | Static topology startup and explicit runtime child operations belong to `Jido.AgentServer.Topology` |
 | `Jido.AgentServer.Lifecycle` | Keep | Canonical Turn, wait, cancellation, commit, effect, and recovery policy owner |
-| `Jido.AgentServer.StateProvider` | Keep | Optional external state source and durable Turn transaction interface |
 | `Jido.AgentServer.Status` | Keep | Public typed process-neutral status view for state, active Turn, waits, effects, revision, and last failure |
 | `Jido.AgentOwnership` | Keep | Public process-neutral fence for one local activation ownership relation |
 | `Jido.Instance.Names` | Keep internal | Canonical per-instance runtime naming and partition-key policy |

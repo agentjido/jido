@@ -370,17 +370,28 @@ defmodule Jido.AgentServer.Lifecycle do
   defp open_agent(data, config, mode) do
     opts = [reason: :activate, topology_owner: topology_owner(data)] ++ persistence_options(data)
 
-    Jido.AgentServer.StateProvider.open(data.agent, provider_context(data, config), mode, fn agent ->
+    Jido.Persistence.StateSource.open(data.agent, provider_context(data, config), mode, fn agent ->
       Jido.Persistence.open_agent(config, agent, mode, opts)
     end)
   end
 
   def refresh_state(data) do
-    Jido.AgentServer.StateProvider.refresh(data.agent, provider_context(data, data.persistence))
+    Jido.Persistence.StateSource.refresh(data.agent, provider_context(data, data.persistence))
   end
 
-  def commit_state(data, before, candidate, save) do
-    Jido.AgentServer.StateProvider.commit(before, candidate, provider_context(data, data.persistence), save)
+  def commit_turn(data, before, candidate, opts, build_result) do
+    revision = data.state_version + 1
+    persistence_opts = save_options(data, revision, data.state_version, opts)
+    handoffs = Keyword.get(opts, :topology_handoffs, :preserve)
+
+    Jido.Persistence.commit_turn(
+      provider_context(data, data.persistence),
+      before,
+      candidate,
+      persistence_opts,
+      handoffs,
+      build_result
+    )
   end
 
   defp provider_context(data, config), do: %{address: data.agent_address, persistence: config}
@@ -397,19 +408,26 @@ defmodule Jido.AgentServer.Lifecycle do
   defp topology_owner(_data), do: nil
 
   def save(data, agent, revision, expected_revision, server_turn, opts \\ []) do
-    persistence_opts =
-      persistence_options(data) ++
-        [
-          agent_revision: Keyword.get(opts, :agent_revision, data.agent_revision),
-          revision: revision,
-          expected_revision: expected_revision,
-          server_turn: server_turn,
-          # Only hibernation saves without a new revision.
-          reason: if(revision == expected_revision, do: :hibernate, else: :commit)
-        ]
-
+    persistence_opts = save_options(data, revision, expected_revision, opts)
     handoffs = Keyword.get(opts, :topology_handoffs, :preserve)
-    Jido.Persistence.save_agent_runtime(data.persistence, agent, persistence_opts, handoffs)
+
+    Jido.Persistence.save_agent_runtime(
+      data.persistence,
+      agent,
+      Keyword.put(persistence_opts, :server_turn, server_turn),
+      handoffs
+    )
+  end
+
+  defp save_options(data, revision, expected_revision, opts) do
+    persistence_options(data) ++
+      [
+        agent_revision: Keyword.get(opts, :agent_revision, data.agent_revision),
+        revision: revision,
+        expected_revision: expected_revision,
+        # Only hibernation saves without a new revision.
+        reason: if(revision == expected_revision, do: :hibernate, else: :commit)
+      ]
   end
 
   def write_result(result, deadline) do

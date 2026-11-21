@@ -106,6 +106,8 @@ defmodule Jido.Agent.DSL do
 
       @agent_state_provider Module.get_attribute(__MODULE__, :jido_state_provider)
 
+      Jido.Agent.DSL.State.validate_plugin!(@agent_state_provider, @agent_definition, __ENV__)
+
       if @agent_state_provider != nil and map_size(@agent_definition.initial_state) > 0 do
         raise CompileError,
           file: __ENV__.file,

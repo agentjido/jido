@@ -174,7 +174,7 @@ defmodule Jido.AgentServer.Worker do
     agent = Keyword.fetch!(opts, :agent)
 
     if match?(%Agent{id: id, state: nil} when is_binary(id), agent) and
-         (opts[:persistence_mode] == :restore or Jido.AgentServer.StateProvider.loads_initial_state?(agent)) do
+         (opts[:persistence_mode] == :restore or Jido.Persistence.StateSource.loads_initial_state?(agent)) do
       with {:ok, _} <- Jido.Agent.Validation.validate_definition(Agent.definition(agent)),
            do: {:ok, agent}
     else
@@ -786,7 +786,7 @@ defmodule Jido.AgentServer.Worker do
         mode = Lifecycle.persistence_mode(data.activation_state, data.persistence_mode)
         bootstrap(data, :persistence, data.persistence_timeout, fn -> Lifecycle.start(data, mode) end)
 
-      Jido.AgentServer.StateProvider.configured?(agent) ->
+      Jido.Persistence.StateSource.configured?(agent) ->
         Lifecycle.record_start_failure(:state_provider_requires_persistence, [data.activation, self()])
         {:stop, :state_provider_requires_persistence}
 
@@ -3251,22 +3251,16 @@ defmodule Jido.AgentServer.Worker do
     candidate = elem(result, 1)
 
     operation(:commit_state, %{data | active: active}, fn ->
-      Lifecycle.commit_state(data, data.active.state_base || data.agent, candidate, fn canonical ->
-        result = put_elem(result, 1, canonical)
-        receipt = commit_receipt(data, result)
-
-        with :ok <-
-               Lifecycle.save(
-                 data,
-                 canonical,
-                 data.state_version + 1,
-                 data.state_version,
-                 receipt,
-                 commit_topology_options(data)
-               ) do
-          {:ok, {result, receipt}}
+      Lifecycle.commit_turn(
+        data,
+        data.active.state_base || data.agent,
+        candidate,
+        commit_topology_options(data),
+        fn canonical ->
+          result = put_elem(result, 1, canonical)
+          {result, commit_receipt(data, result)}
         end
-      end)
+      )
     end)
   end
 

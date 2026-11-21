@@ -96,8 +96,8 @@ defmodule Jido.Agent do
       end
 
   The `state` section accepts `schema` and `initial_state`. A durable Agent can
-  use `state_provider` as its schema and initial state source. See
-  `Jido.AgentServer.StateProvider`. The `plugins` option
+  use a Plugin declared with `state_source` as its schema and initial state source. See
+  `Jido.Persistence.StateSource`. The `plugins` option
   accepts ordered Plugin declarations. The `routes` section accepts
   `signal_source` and ordered `route` declarations. A route can
   use an Action or Flow module, an inline `action` or `flow`, a `transform`, or

@@ -24,6 +24,7 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
     @moduledoc false
 
     @behaviour Jido.Persistence.Store
+    @behaviour Jido.Persistence.TurnTransaction
 
     @default_schema Jido.Persistence.Ecto.Record
     @supported_adapters [
@@ -32,6 +33,7 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
     ]
     @required_schema_fields MapSet.new([:key, :value, :write_token])
     @reserved_repo_options [:conflict_target, :on_conflict]
+    @turn_scope {__MODULE__, :turn_scope}
 
     import Ecto.Query, only: [from: 2]
 
@@ -92,13 +94,68 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
       validate_options!(opts)
       repo = Keyword.fetch!(opts, :repo)
 
-      with :ok <- reject_outer_transaction(repo) do
+      with :ok <- authorize_compare_and_swap(repo, opts) do
         protect_write(fn ->
           case expected do
             :not_found -> insert_missing(key, value, opts)
             expected_value -> update_expected(key, expected_value, value, opts)
           end
         end)
+      end
+    end
+
+    @impl true
+    def transact(%{store: {Jido.Persistence.Ecto, opts}}, _binding, operation) do
+      validate_options!(opts)
+      repo = Keyword.fetch!(opts, :repo)
+
+      with :ok <- reject_outer_transaction(repo) do
+        dynamic_repo = repo.get_dynamic_repo()
+        transaction_opts = Keyword.take(repo_options(opts), [:timeout])
+
+        transaction_opts =
+          if repo.__adapter__() == Ecto.Adapters.SQLite3,
+            do: Keyword.put(transaction_opts, :mode, :immediate),
+            else: transaction_opts
+
+        case repo.transaction(fn -> run_turn(repo, dynamic_repo, opts, operation) end, transaction_opts) do
+          {:ok, {:ok, _} = success} -> success
+          {:error, {@turn_scope, reason}} -> {:error, reason}
+          _other -> {:error, :indeterminate}
+        end
+      end
+    end
+
+    defp run_turn(repo, dynamic_repo, opts, operation) do
+      # Ecto attaches the checked-out transaction to this process. Scope the
+      # checkpoint CAS exception to the exact repo and Store options.
+      Process.put(@turn_scope, {repo, dynamic_repo, opts})
+      result = operation.(repo)
+
+      if repo.get_dynamic_repo() != dynamic_repo do
+        repo.put_dynamic_repo(dynamic_repo)
+        repo.rollback({@turn_scope, {:rejected, :ecto_turn_repo_changed}})
+      end
+
+      case result do
+        {:ok, _} = success -> success
+        {:error, reason} -> repo.rollback({@turn_scope, reason})
+        _other -> repo.rollback({@turn_scope, :indeterminate})
+      end
+    after
+      repo.put_dynamic_repo(dynamic_repo)
+      Process.delete(@turn_scope)
+    end
+
+    defp authorize_compare_and_swap(repo, opts) do
+      case Process.get(@turn_scope) do
+        {^repo, dynamic_repo, ^opts} ->
+          if repo.get_dynamic_repo() == dynamic_repo and repo.in_transaction?(),
+            do: :ok,
+            else: {:error, {:rejected, :ecto_turn_repo_changed}}
+
+        _outside_scope ->
+          reject_outer_transaction(repo)
       end
     end
 
@@ -253,7 +310,7 @@ if Code.ensure_loaded?(Ecto.Query) and Code.ensure_loaded?(Ecto.Adapters.SQL) do
     defp write_token, do: :crypto.strong_rand_bytes(16)
 
     defp reject_outer_transaction(repo) do
-      if function_exported?(repo, :in_transaction?, 0) and repo.in_transaction?(),
+      if Process.get(@turn_scope) != nil or (function_exported?(repo, :in_transaction?, 0) and repo.in_transaction?()),
         do: {:error, {:rejected, :ecto_outer_transaction}},
         else: :ok
     end
@@ -333,6 +390,12 @@ defmodule Jido.Persistence.Ecto do
   Postgres, which the database refuses before it runs the statement. That result
   is `{:error, {:rejected, reason}}`.
 
+  For a durable Agent with a state source, this adapter opens the Turn
+  transaction and passes the configured repo to the source. Run source writes
+  in the same process with that repo and its current dynamic repo. Keep related
+  writes in the same database. Standalone Store writes still reject a
+  caller-managed transaction.
+
   Ecto SQL is an optional dependency. Add `:ecto_sql` and the database driver
   to the host application. The adapter reports invalid configuration when Ecto
   SQL was not present while Jido compiled.
@@ -364,6 +427,7 @@ defmodule Jido.Persistence.Ecto do
   """
 
   @behaviour Jido.Persistence.Store
+  @behaviour Jido.Persistence.TurnTransaction
 
   @implementation Jido.Persistence.Ecto.Implementation
   @unavailable "requires the optional :ecto_sql dependency at compile time"
@@ -394,6 +458,10 @@ defmodule Jido.Persistence.Ecto do
   @impl true
   def delete(key, opts) when is_binary(key) and is_list(opts),
     do: call_or_unavailable!(:delete, [key, opts])
+
+  @impl true
+  def transact(config, binding, operation),
+    do: call_or_unavailable!(:transact, [config, binding, operation])
 
   defp call_or_unavailable!(function, arguments) do
     if Code.ensure_loaded?(@implementation) do

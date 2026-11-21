@@ -703,13 +703,14 @@
         },
         "jido.agent_server.I109": {
           "failing": 0,
-          "kind": "persisted-format",
-          "passing": 4,
+          "kind": "persisted_format",
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
             "test addressed creation uses the row source and verifies its ID",
             "test checkpoint verifies the provider and its declaring module",
+            "test create, restore and refresh reject fields outside the source schema",
             "test rejects a Catalog schema override for a compiled provider",
             "test startup waits using the instance persistence budget"
           ]

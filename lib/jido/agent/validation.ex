@@ -41,6 +41,7 @@ defmodule Jido.Agent.Validation do
     with {:ok, definition} <- fields(input, @fields, defaults()),
          :ok <- fields(definition),
          {:ok, plugins} <- Error.prefix_result_path(Extension.normalize(definition.plugins), :plugins),
+         :ok <- state_source_plugin(definition.module, plugins),
          {:ok, route_contributions} <-
            Error.prefix_result_path(Extension.route_contributions(plugins), :plugins),
          {:ok, routes} <-
@@ -398,6 +399,25 @@ defmodule Jido.Agent.Validation do
         )
 
       _ ->
+        :ok
+    end
+  end
+
+  defp state_source_plugin(module, plugins) do
+    case Jido.Agent.DSL.State.declaration(module) do
+      {provider, _descriptor, _schema} ->
+        if Enum.any?(plugins, &(&1.provider == provider)) do
+          :ok
+        else
+          Error.validation_result(
+            :state_source_plugin_required,
+            [:plugins],
+            "Include the Agent state source in the declared Plugins",
+            %{provider: provider}
+          )
+        end
+
+      nil ->
         :ok
     end
   end

@@ -53,10 +53,12 @@ defmodule Jido.Persistence do
   Restore does not rebuild a saved definition from the current source module.
   """
 
+  require Logger
+
   alias Jido.Agent
   alias Jido.Agent.Address
   alias Jido.Error
-  alias Jido.Persistence.{Checkpoint, Config, NamespaceManifest, Record, Snapshot, Store}
+  alias Jido.Persistence.{Checkpoint, Config, NamespaceManifest, Record, Snapshot, StateSource, Store, TurnTransaction}
   alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
   alias Jido.Codec.Term
 
@@ -250,6 +252,53 @@ defmodule Jido.Persistence do
   def save_agent_runtime(source, %Agent{} = agent, opts, topology_handoffs) do
     with :ok <- validate_operation_options(opts, @save_options),
          do: save_record(source, agent, agent.module, opts, topology_handoffs, :runtime)
+  end
+
+  @doc false
+  def commit_turn(%{persistence: config} = context, before, candidate, opts, handoffs, build_result) do
+    case StateSource.binding(before) do
+      nil ->
+        persist_turn(config, candidate, opts, handoffs, build_result)
+
+      {provider, descriptor, _schema} = binding ->
+        committed =
+          TurnTransaction.run(config, {provider, descriptor}, fn tx ->
+            with {:ok, canonical, notify} <- StateSource.apply(binding, context, before, candidate, tx),
+                 {:ok, result} <- persist_turn(config, canonical, opts, handoffs, build_result) do
+              {:ok, {result, notify}}
+            end
+          end)
+
+        case committed do
+          {:ok, {result, notify}} when is_nil(notify) or is_function(notify, 0) ->
+            notify_committed_turn(notify)
+            {:ok, result}
+
+          {:error, _reason} = error ->
+            error
+
+          _other ->
+            {:error, :indeterminate}
+        end
+    end
+  end
+
+  defp persist_turn(config, agent, opts, handoffs, build_result) do
+    {result, receipt} = build_result.(agent)
+
+    with :ok <- save_agent_runtime(config, agent, Keyword.put(opts, :server_turn, receipt), handoffs) do
+      {:ok, {result, receipt}}
+    end
+  end
+
+  defp notify_committed_turn(nil), do: :ok
+
+  defp notify_committed_turn(notify) do
+    notify.()
+  rescue
+    _error -> Logger.warning("State source notification raised after the Turn committed")
+  catch
+    _kind, _reason -> Logger.warning("State source notification exited after the Turn committed")
   end
 
   defp save_record(source, agent, previous_module, opts, topology_handoffs, scope) do
