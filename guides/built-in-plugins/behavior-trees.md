@@ -144,7 +144,7 @@ failed ticks to leave external systems unchanged.
 From the Jido repository root, run:
 
 ```sh
-mix run examples/11_built_in_capabilities/11_07_behavior_tree/demo.exs
+mix run examples/11_built_in_capabilities/11_09_behavior_tree/demo.exs
 ```
 
 Expected output:
@@ -152,7 +152,7 @@ Expected output:
 ```text
 tick=1 status=running reserved=0 available_stock=5
 tick=2 status=success reserved=3 available_stock=2
-signal=examples.11.07.stock.reserved reserved=3
+signal=examples.11.09.stock.reserved reserved=3
 ```
 
 The live example uses an in-memory Agent. An ETS-backed Agent can also

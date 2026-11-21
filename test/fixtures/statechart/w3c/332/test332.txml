@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+
+<!-- test that sendid is present in error events triggered by send errors -->
+
+<scxml version="1.0" xmlns="http://www.w3.org/2005/07/scxml" initial="s0" conf:datamodel=""  name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+ <datamodel>
+   <data conf:id="1"/>
+    <data conf:id="2"/>
+   </datamodel>    
+
+   
+ <state id="s0">
+   <onentry>
+   <!-- this will raise an error and also store the sendid in var1 -->
+     <send conf:illegalTarget="" event="foo" conf:idlocation="1"/>
+   </onentry>
+   <transition event="error"   target="s1">
+   <!-- get the sendid out of the error event -->
+       <assign conf:location="2" conf:eventSendid=""/>
+       </transition>
+      <transition event="*" conf:targetfail=""/> 
+   </state>
+   
+<state id="s1">
+<!-- make sure that the sendid in the error event matches the one generated when send executed -->
+  <transition conf:VarEqVar="1 2" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+  </state>
+      
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

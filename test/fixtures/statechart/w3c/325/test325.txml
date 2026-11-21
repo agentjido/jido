@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+
+<!-- test that _ioprocessors is bound at startup.  I'm not sure how to test for a set value or
+how to test that the entries in it do represent I/O processors, since the set that each implementation
+supports may be different.  Suggestions welcome -->
+
+<scxml initial="s0" conf:datamodel="" version="1.0" xmlns="http://www.w3.org/2005/07/scxml" name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:systemVarExpr="_ioprocessors"/>
+  </datamodel>
+
+
+ <state id="s0">
+    <transition conf:isBound="1" conf:targetpass=""/> 
+   <transition  conf:targetfail=""/>
+   </state>
+   
+    
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

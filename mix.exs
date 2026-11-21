@@ -31,7 +31,7 @@ defmodule Jido.MixProject do
   def application do
     [
       mod: {Jido.Application, []},
-      extra_applications: [:crypto, :inets, :logger, :public_key, :ssl]
+      extra_applications: [:crypto, :inets, :logger, :public_key, :ssl, :xmerl]
     ]
   end
 
@@ -206,6 +206,7 @@ defmodule Jido.MixProject do
        [
          {"Behavior Trees", "guides/built-in-plugins/behavior-trees.md"},
          {"Signal Bus Plugin", "guides/built-in-plugins/signal-bus-plugin.livemd"},
+         {"Statecharts", "guides/built-in-plugins/statecharts.md"},
          {"Timers", "guides/built-in-plugins/timers.livemd"},
          {"Periodic Timer Signals", "guides/built-in-plugins/heartbeats.livemd"}
        ]},
@@ -296,6 +297,7 @@ defmodule Jido.MixProject do
     [
       # Runtime
       {:multigraph, "~> 0.16.1-mg.5"},
+      {:req, "~> 0.7"},
       {:req_llm, "~> 1.30"},
       {:runic, "~> 0.1.0-alpha.13"},
       {:sched_ex, "~> 1.2.1"},

@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+
+<!-- test that _name stays bound till the session ends.  This means that it cannot be assigned to -->
+
+<scxml initial="s0" version="1.0" xmlns="http://www.w3.org/2005/07/scxml" conf:datamodel=""  name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+ <state id="s0">
+   <transition conf:nameVarVal="machineName" target="s1"/>
+    <transition conf:targetfail=""/>
+   </state>
+   
+ <state id="s1">
+   <onentry>
+    <assign conf:systemVarLocation="_name" expr="'otherName'"/>
+    </onentry>
+   <transition conf:nameVarVal="machineName" conf:targetpass=""/>
+   <transition conf:targetfail=""/>
+   </state>  
+   
+   
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

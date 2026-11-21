@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<!-- test that executable content in the <initial> transition executes after the onentry handler on the state
+and before the onentry handler of the child states.  Event1, event2, and event3 should occur in that order. -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0" initial="s01">
+  <onentry>
+    <send event="timeout" delay="1s"/>
+    </onentry>
+  
+  <transition event="timeout" conf:targetfail=""/> 
+  <transition event="event1" conf:targetfail=""/>
+  <transition event="event2" conf:targetpass=""/>
+  
+  <state id="s01" >
+    <onentry>
+      <raise event="event1"/>
+       </onentry>
+     <initial>
+       <transition target="s011">
+         <raise event="event2"/>
+         </transition>
+      </initial>
+      
+   <state id="s011">
+     <onentry>
+       <raise event="event3"/>
+       </onentry>
+    <transition target="s02"/>
+  </state> 
+ </state>
+ 
+<state id="s02">
+  <transition event="event1" target="s03"/>
+  <transition event="*" conf:targetfail=""/>
+  </state>
+  
+<state id="s03">
+  <transition event="event2" target="s04"/>
+  <transition event="*" conf:targetfail=""/>
+  </state>
+
+<state id="s04">
+  <transition event="event3" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+  </state>
+  
+</state> <!-- end s0 -->
+ 
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

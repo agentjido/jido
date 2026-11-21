@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!--  test that ecmascript objects are converted to booleans inside cond -->
+
+
+<scxml  datamodel="ecmascript" version="1.0"  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+ 
+     
+<state id="s0">
+  <transition  cond="'foo'" conf:targetpass=""/>
+  <transition  conf:targetfail=""/>
+    </state>
+
+<conf:pass/>
+<conf:fail/>
+</scxml>

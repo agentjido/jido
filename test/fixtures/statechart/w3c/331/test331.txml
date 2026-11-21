@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<scxml version="1.0" conf:datamodel="" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance" initial="s0" name="machineName">
+
+<!-- test that _event.type is set correctly for internal, platform, and external events -->
+<datamodel>
+ <data conf:id="1"/>
+ </datamodel>
+     
+ <state id="s0">
+   <onentry>
+   <!-- internal event -->
+     <raise event="foo"/>
+   </onentry>
+   <transition event="foo"  target="s1"> 
+     <assign conf:location="1" conf:eventType=""/>
+     </transition>
+      <transition event="*" target="fail"/> 
+   </state>
+
+<state id="s1">
+  <transition conf:idQuoteVal="1=internal" target="s2"/>
+  <transition conf:targetfail=""/>
+  </state>
+   
+<state id="s2">
+   <onentry>
+   <!-- this will generate an error, which is a platform event -->
+     <assign conf:invalidLocation="" conf:expr="1"/>
+   </onentry>
+   <transition event="error"  target="s3">
+     <assign conf:location="1" conf:eventType=""/>
+     </transition> 
+      <transition event="*" target="fail"/>
+   </state>
+   
+<state id="s3">
+  <transition conf:idQuoteVal="1=platform" target="s4"/>
+  <transition conf:targetfail=""/>
+  </state>
+   
+ <state id="s4">
+   <onentry>
+   <!-- external event -->
+     <send event="foo"/>
+   </onentry>
+   <transition event="foo"  target="s5">
+   <assign conf:location="1" conf:eventType=""/>
+     </transition>   
+      <transition event="*" target="fail"/>
+   </state>
+   
+<state id="s5">
+  <transition conf:idQuoteVal="1=external" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+  </state>
+   
+    
+  <conf:pass/>
+  <conf:fail/>
+     
+</scxml>

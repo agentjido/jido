@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<!-- when invoked, terminate returning done.invoke. This proves that the invocation succeeded.   -->
+
+
+<scxml initial="final" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+<final id="final"/>
+
+</scxml>

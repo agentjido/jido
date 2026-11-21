@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!-- we test that the processor raises error.communication if it cannot dispatch the event.
+(To create an undispatchable event, we choose a non-existent session as target).  If it raises
+the error event, we succeed.  Otherwise we eventually timeout and fail.  -->
+
+
+<scxml initial="s0"  conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+  
+<state id="s0">
+  <onentry>
+   <!-- should cause an error -->
+   <send conf:unreachableTarget="" event="event2"/>
+   <!-- this will get added to the external event queue after the error has been raised -->
+   <send event="timeout"/>
+    </onentry>
+ 
+ <!-- once we've entered the state, we should check for internal events first -->   
+  <transition event="error.communication" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+ 
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

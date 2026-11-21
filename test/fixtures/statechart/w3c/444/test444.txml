@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--  test that <data> creates a new ecmascript variable. -->
+
+
+<scxml  datamodel="ecmascript"  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+  <datamodel>
+    <data id="var1" expr="1"/>
+    </datamodel>
+     
+<state id="s0">
+<!-- test that var1 can be used as an ecmascript variable -->
+  <transition  cond="++var1==2" conf:targetpass=""/>
+  <transition  conf:targetfail=""/>
+</state>
+
+
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

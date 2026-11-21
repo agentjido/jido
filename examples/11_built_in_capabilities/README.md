@@ -14,7 +14,11 @@ same Agent, Plugin, Signal, and AgentServer contracts as an application Plugin.
    aligned with committed Plugin state.
 6. [Bus Delivery](11_06_bus_delivery/README.md) uses an ordered local Bus
    subscription.
-7. [Behavior Tree](11_07_behavior_tree/README.md) resumes a running tree and
+7. [Standalone Approval Chart](11_07_statechart_approval/README.md) starts
+   an initialized Agent from a chart.
+8. [Add a Chart to an Agent](11_08_statechart_plugin/README.md) runs a guarded
+   transition alongside a separate Agent route.
+9. [Behavior Tree](11_09_behavior_tree/README.md) resumes a running tree and
    dispatches an Action effect.
 
 ```sh

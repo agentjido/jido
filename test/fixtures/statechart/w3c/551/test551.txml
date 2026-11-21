@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+
+<!-- test that inline content can be used to assign a value to a var.  -->
+
+<scxml initial="s0" version="1.0" binding="early" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+    
+   <state id="s0">
+ 
+       <transition conf:isBound="1" conf:targetpass=""/>
+       <transition  conf:targetfail=""/>
+   </state>
+   
+<state id="s1">
+	  <datamodel>
+    <data conf:id="1">
+     <conf:array123/>
+     </data>
+    </datamodel>
+    </state>
+
+   <conf:pass/>
+   <conf:fail/>
+   
+
+
+</scxml>

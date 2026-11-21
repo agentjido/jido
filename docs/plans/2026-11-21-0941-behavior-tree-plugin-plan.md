@@ -149,7 +149,7 @@ Run these commands from the isolated core checkout.
 - R1 and R4. `mix test test/jido/behavior_tree`
 - R2 and R3. `mix test test/jido/plugin/behavior_tree_test.exs` and
   `mix test.contracts`
-- R5. `mix test.examples examples/11_built_in_capabilities/11_07_behavior_tree`
+- R5. `mix test.examples examples/11_built_in_capabilities/11_09_behavior_tree`
   and the runner documented in that example
 - All requirements. `mix test.ci`, `mix quality`, and
   `mix format --check-formatted`

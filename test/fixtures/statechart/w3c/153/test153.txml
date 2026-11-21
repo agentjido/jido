@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+
+<!-- test that foreach goes over the array in the right order.  since the array contains 1 2 3, we compare the current 
+value with the previous value, which is stored in var1. The current value should always be larger.  If
+it ever isn't, set Var4 to 0, indicating failure -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="0"/> <!-- contains the previous value -->
+  <data conf:id="2"/> <!-- the item which will contain the current value -->
+  <data conf:id="3">
+    <conf:array123/>
+    </data>
+  <data conf:id="4" conf:expr="1"/> <!-- 1 if success, 0 if failure -->
+  </datamodel>
+  
+   <state id="s0">
+      <onentry>
+        <foreach conf:item="2"  conf:arrayVar="3">
+         <if conf:compareIDVal="1&lt;2">
+         <assign conf:location="1" conf:varExpr="2"/>
+         <else/>
+         <!-- values are out of order, record failure -->
+         <assign conf:location="4" conf:expr="0"/>
+         </if>
+          </foreach>
+        </onentry>
+
+  <!-- check that var1 has its original value  -->
+  <transition conf:idVal="4=0" conf:targetfail=""/>
+  <transition conf:targetpass=""/>
+  </state> 
+   
+   <conf:pass/>
+   <conf:fail/>
+   
+
+
+</scxml>

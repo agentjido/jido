@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<!-- we test one part of 'optimal enablement' meaning that of all transitions that are enabled, we chose the ones
+in child states over parent states, and use document order to break ties. We have
+a parent state s0 with two children, s01 and s02. In s01, we test that a) if
+a transition in the child matches, we don't consider matches in the parent and b)
+that if two transitions match in any state, we take the first in document order.
+In s02 we test that we take a transition in the parent if there is no
+matching transition in the child. -->
+
+
+<scxml  initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+       
+<state id="s0" initial="s01">
+  <onentry>
+     <!-- catch the failure case -->
+     <send event="timeout" delay="1s"/>
+    </onentry>
+  <transition event="timeout" conf:targetfail=""/>
+  <transition event="event1"  conf:targetfail=""/>
+  <transition event="event2" conf:targetpass=""/>
+
+ <state id="s01">
+   <onentry>
+   <!-- this should be caught by the first transition in this state, taking us to S02 -->
+      <raise event="event1"/>
+   </onentry>
+       
+  <transition  event="event1" target="s02"/>
+  <transition  event="*" conf:targetfail=""/>
+ </state>
+ 
+<state id="s02">
+  <onentry>
+  <!-- since the local transition has a cond that evaluates to false this should be caught by a 
+    transition in the parent state, taking us to pass -->
+    <raise event="event2"/>
+    </onentry>
+  <transition event="event1" conf:targetfail=""/>
+  <transition event="event2" conf:false="" conf:targetfail=""/>
+  </state>
+
+</state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

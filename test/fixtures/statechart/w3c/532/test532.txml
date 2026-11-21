@@ -1,0 +1,22 @@
+<!-- test that that if _scxmleventname  is not present, the name of the HTTP method is used
+as the name of the resulting event. -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+   
+<state id="s0">
+  <onentry>
+    <send event="timeout" delay="3s"/>
+    <send   conf:basicHTTPAccessURITarget="" type="http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor">
+    <!-- this content will be ignored, but it's here to make sure we have a message body -->
+      <content>some content</content>
+      </send>  
+     </onentry>
+     
+  <transition event="HTTP.POST" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+  
+   <conf:pass/>
+   <conf:fail/>
+</scxml>

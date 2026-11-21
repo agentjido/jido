@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+
+<!-- test that _event is not bound before any event has been raised -->
+
+<scxml initial="s0" conf:datamodel="" version="1.0" xmlns="http://www.w3.org/2005/07/scxml"
+ name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+ <state id="s0">
+   <onentry>
+     <if conf:systemVarIsBound="_event">
+       <raise event="bound"/>
+       <else/>
+         <raise event="unbound"/>
+     </if>
+   </onentry>
+   <transition event="unbound" conf:targetpass=""/>
+   <transition event="bound" conf:targetfail=""/> 
+
+   </state>
+   
+    
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

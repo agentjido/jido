@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+
+<!-- define var1 with default value 0.  Parent will invoke this process setting var1 = 1.  Return event1 if var1 == 1, event0 otherwise -->
+<scxml initial="s0" version="1.0" conf:datamodel="" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+   <datamodel>
+     <data conf:id="1" conf:expr="0"/>
+     </datamodel>
+     
+ <state id="s0">
+ 
+     
+  <transition conf:idVal="1=1" target="final">
+     <send target="#_parent" event="event1"/>
+     </transition>
+     
+  <transition target="final">
+     <send target="#_parent" event="event0"/>
+     </transition>
+     
+   </state>
+   
+   <final id="final"/>
+     
+</scxml>

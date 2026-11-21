@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!-- test that the state machine is put into the configuration specified by the initial element, without regard
+to any other defaults.  we should start off in s2p111 and s2p122.  the atomic
+states we should not enter all have immediate transitions to failure in them -->
+
+
+<scxml initial="s2p112 s2p122" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+ <state id="s1">
+   <transition conf:targetfail=""/>
+   </state>
+       
+<state id="s2" initial="s2p1">
+
+<parallel id="s2p1">
+  <!-- this transition will be triggered only if we end up in an illegal configuration where we're in
+  either s2p112 or s2p122, but not both of them -->
+  <transition conf:targetfail=""/>
+  
+  <state id="s2p11" initial="s2p111" >
+    <state id="s2p111">
+      <transition conf:targetfail=""/>
+    </state>
+    
+    <state id="s2p112">
+      <transition conf:inState="s2p122" conf:targetpass=""/>
+      </state>
+
+  </state> <!-- end s2p11 -->
+  
+  <state id="s2p12" initial="s2p121">
+    <state id="s2p121">
+       <transition conf:targetfail=""/>
+     </state>
+    
+    <state id="s2p122">
+      <transition conf:inState="s2p112" conf:targetpass=""/>
+    </state>
+  </state>
+  
+</parallel>
+
+</state>  <!-- end s2 -->
+ 
+ 
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

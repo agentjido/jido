@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+ <!-- in the ECMA data model, test that processor creates space normalized string in
+ _event.data when receiving anything other than KVPs or XML in an event -->
+ 
+ <scxml xmlns="http://www.w3.org/2005/07/scxml" 
+   xmlns:conf="http://www.w3.org/2005/scxml-conformance" initial="s0" version="1.0" datamodel="ecmascript">
+
+  
+<state id="s0">
+   <onentry>
+    <send event="foo">
+    <content>
+this is  a  
+string
+</content>
+    </send>
+  </onentry>
+  <transition event="foo" cond="_event.data == 'this is a string'" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+  </state>
+  
+    
+<conf:pass/>
+<conf:fail/>  
+
+</scxml>

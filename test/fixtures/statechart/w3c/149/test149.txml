@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!-- test that neither if clause executes, so that bat is the only event raised. -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="0"/>
+  </datamodel>
+  
+<state id="s0">
+  <onentry>
+  <if conf:false="">
+    <raise event="foo"/>
+    <conf:incrementID id="1"/>
+  <elseif conf:false=""/>
+    <raise event="bar"/>
+    <conf:incrementID id="1"/>
+ </if>
+   <raise event="bat"/>
+    </onentry>
+  <transition event="bat" conf:idVal="1=0" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+
+  
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

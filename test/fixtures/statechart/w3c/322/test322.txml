@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+
+<!-- test that _sessionid remains bound to the same value throught the session.  this means that it can't
+be assigned to  -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:systemVarExpr="_sessionid"/>
+  <data conf:id="2"/>
+  </datamodel>
+     
+ <state id="s0">
+   <transition  target="s1"/>
+
+   </state>
+   
+ <state id="s1">
+   <onentry>
+    <assign conf:systemVarLocation="_sessionid" conf:quoteExpr="otherName"/>
+    <raise event="foo"/>
+    </onentry>
+ 
+   <transition event="error.execution" target="s2"/>
+   <transition event="*" conf:targetfail=""/>
+   </state>
+   
+ <state id="s2">
+ 
+   <transition conf:idSystemVarVal="1=_sessionid" conf:targetpass=""/>
+   <transition conf:targetfail=""/>
+   </state>  
+   
+   
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

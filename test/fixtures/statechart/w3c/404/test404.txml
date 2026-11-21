@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<!--  test that states are exited in exit order (children before parents with reverse doc order used to break ties
+ before the executable content in the transitions.  event1, event2, event3, event4 should be raised in that 
+ order when s01p is exited  -->
+
+
+<scxml  initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+       
+<state id="s0" initial="s01p">
+ 
+
+
+<parallel id="s01p">
+  <onexit>
+   <!-- this should be the 3rd event raised -->
+   <raise event="event3"/>
+   </onexit>
+   <transition target="s02">
+   <!-- this should be the fourth event raised -->
+   <raise event="event4"/>
+   </transition>
+   
+ <state id="s01p1">
+   <onexit>
+   <!-- this should be the second event raised -->
+      <raise event="event2"/>
+   </onexit>
+   </state>
+  
+  <state id="s01p2">
+    <!-- this should be the first event raised -->
+    <onexit>
+     <raise event="event1"/>
+     </onexit>
+    </state>
+ </parallel>
+  
+  <state id="s02">
+    <transition event="event1" target="s03"/>
+    <transition event="*" conf:targetfail=""/>
+    </state>
+    
+  <state id="s03">
+    <transition event="event2" target="s04"/>
+    <transition event="*" conf:targetfail=""/>
+    </state>
+
+  <state id="s04">
+    <transition event="event3" target="s05"/>
+    <transition event="*" conf:targetfail=""/>
+    </state>
+    
+  <state id="s05">
+    <transition event="event4" conf:targetpass=""/>
+    <transition event="*" conf:targetfail=""/>
+    </state>
+   
+ </state>
+ 
+
+<conf:pass/>
+<conf:fail/>
+</scxml>

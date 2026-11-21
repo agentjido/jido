@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+
+<!-- test that the location entry for the SCXML Event I/O processor can be used as the target for an event -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:scxmlEventIOLocation=""/>
+  </datamodel>
+  
+<state id="s0">
+  <onentry>
+    <send conf:targetVar="1" event="foo"/>
+    <send event="timeout" delay="2s"/>
+    </onentry>
+  <transition event="foo" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+   
+ </state>
+  
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+
+<!-- test that location field the entry for Basic HTTP Event I/O processor can be used
+to send a message to the processor -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+  
+<state id="s0">
+  <onentry>
+    <send event="timeout" delay="30s"/>
+    <send event="test" type="http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor" 
+conf:basicHTTPAccessURITarget=""/>
+
+     </onentry>
+     <!-- the event we receive should be called 'test', but that's not actually
+     required for this test. Only that the send deliver some event to us.  So if
+     we get something other than timeout or error, we call it success -->
+  <transition event="timeout" conf:targetfail=""/>
+  <transition event="error" conf:targetfail=""/>
+  <transition event="*" conf:targetpass=""/>
+
+ </state>
+  
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

@@ -67,7 +67,7 @@ node callbacks must return promptly.
 Run the standalone executor and tool wrapper from the core repository:
 
 ```sh
-mix run examples/11_built_in_capabilities/11_07_behavior_tree/standalone.exs
+mix run examples/11_built_in_capabilities/11_09_behavior_tree/standalone.exs
 ```
 
 For node telemetry, attach to the established `[:jido, :bt, :node, ...]`
