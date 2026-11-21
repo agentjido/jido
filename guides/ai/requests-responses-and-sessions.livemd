@@ -6,7 +6,7 @@ This tutorial sends AI requests to an Agent, reads the response, and follows the
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "release/v3"}
+  {:jido, github: "agentjido/jido", branch: "main"}
 ])
 ```
 

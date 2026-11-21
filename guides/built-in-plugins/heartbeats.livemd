@@ -11,7 +11,7 @@ liveness. Use a cron definition when work must align with a wall-clock slot.
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "release/v3"}
+  {:jido, github: "agentjido/jido", branch: "main"}
 ])
 ```
 

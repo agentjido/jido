@@ -6,7 +6,7 @@ This tutorial writes ExUnit tests for an invoice system at each level: an Action
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "release/v3"}
+  {:jido, github: "agentjido/jido", branch: "main"}
 ])
 ```
 

@@ -10,7 +10,7 @@ interval or cron definition starts after a Directive commits.
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "release/v3"}
+  {:jido, github: "agentjido/jido", branch: "main"}
 ])
 ```
 

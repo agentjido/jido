@@ -6,7 +6,7 @@ This tutorial builds an invoice Agent with the DSL, creates an instance, runs on
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "release/v3"}
+  {:jido, github: "agentjido/jido", branch: "main"}
 ])
 ```
 

@@ -106,5 +106,5 @@ fixtures in memory. Fixture 198 checks the translated `origintype` comparison.
 Fixture 352 expects the event processor URI and has a test for its known
 failure. The runtime reports `"scxml"`.
 
-See the [standalone approval example](https://github.com/agentjido/jido/blob/release/v3/examples/11_built_in_capabilities/11_07_statechart_approval/README.md)
-and the [Agent Plugin example](https://github.com/agentjido/jido/blob/release/v3/examples/11_built_in_capabilities/11_08_statechart_plugin/README.md).
+See the [standalone approval example](https://github.com/agentjido/jido/blob/main/examples/11_built_in_capabilities/11_07_statechart_approval/README.md)
+and the [Agent Plugin example](https://github.com/agentjido/jido/blob/main/examples/11_built_in_capabilities/11_08_statechart_plugin/README.md).

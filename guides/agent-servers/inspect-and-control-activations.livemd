@@ -6,7 +6,7 @@ This tutorial reads the status of a running Agent, drains its active work, reope
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "release/v3"}
+  {:jido, github: "agentjido/jido", branch: "main"}
 ])
 ```
 

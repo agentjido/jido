@@ -6,7 +6,7 @@ This tutorial writes ExUnit tests for an AI Agent at each level: its definition,
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "release/v3"}
+  {:jido, github: "agentjido/jido", branch: "main"}
 ])
 ```
 

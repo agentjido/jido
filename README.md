@@ -1,8 +1,8 @@
 # Jido V3 Consolidation
 
 > [!WARNING]
-> The `release/v3` branch is the Jido V3 release candidate. It is not the
-> current stable Jido release. APIs can change during the beta period.
+> The `main` branch contains Jido V3 beta development. APIs can change during
+> the beta period. Use the `v2.x` branch for Jido V2 maintenance.
 
 This branch consolidates the four core Jido repositories, `jido`,
 `jido_action`, `jido_signal`, and `jido_ai`, into one Mix project and one OTP
@@ -43,10 +43,10 @@ Add this dependency to try the consolidated Jido package:
 See the [beta.3 release notes](https://github.com/agentjido/jido/releases/tag/v3.0.0-beta.3)
 and the [v2-to-v3 migration guide](https://github.com/agentjido/jido/blob/v3.0.0-beta.3/guides/reference/v2-to-v3-migration.md).
 
-Use the Git dependency to test the current release branch:
+Use the Git dependency to test the current development branch:
 
 ```elixir
-{:jido, github: "agentjido/jido", branch: "release/v3"}
+{:jido, github: "agentjido/jido", branch: "main"}
 ```
 
 ## Local checks

@@ -17,7 +17,7 @@ The code here runs in your application and needs a database, so the examples are
 ```elixir
 defp deps do
   [
-    {:jido, github: "agentjido/jido", branch: "release/v3"},
+    {:jido, github: "agentjido/jido", branch: "main"},
     {:ecto_sql, "~> 3.14"},
     {:postgrex, "~> 0.19 or ~> 1.0"}
   ]

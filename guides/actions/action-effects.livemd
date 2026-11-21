@@ -4,7 +4,7 @@ In this tutorial you build Actions that return plain outputs, deferred effect re
 
 ```elixir
 Mix.install([
-  {:jido, github: "agentjido/jido", branch: "release/v3"}
+  {:jido, github: "agentjido/jido", branch: "main"}
 ])
 ```
 
