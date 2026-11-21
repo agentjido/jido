@@ -11,9 +11,9 @@
       "covered": 15
     },
     "jido.plugin": {
-      "active": 30,
+      "active": 33,
       "coverage": 1.0,
-      "covered": 30
+      "covered": 33
     },
     "jido.telemetry": {
       "active": 2,
@@ -2860,6 +2860,53 @@
             "test Client ignores foreign lifecycle and durable delivery messages",
             "test Client runtime death stops its pending delivery worker",
             "test delivery-worker failure retries without stopping the Client runtime"
+          ]
+        }
+      }
+    },
+    "jido.plugin.fsm": {
+      "active": 3,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 3,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.fsm.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test invalid graphs fail during normalization",
+            "test the Agent codec keeps the beta Catalog reference and resolves it to the new module",
+            "test the DSL lowers to one canonical Plugin representation",
+            "test unknown and non-executable route references fail definition validation"
+          ]
+        },
+        "jido.plugin.fsm.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 5,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test Action failure leaves FSM state unchanged",
+            "test Action success advances FSM state after normal state projection",
+            "test Flow success advances FSM state only after Flow completion",
+            "test a durable Flow wait keeps the source FSM state until completion",
+            "test an unmanaged route uses normal selection and does not advance the FSM"
+          ]
+        },
+        "jido.plugin.fsm.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 2,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test FSM state restores through Agent persistence",
+            "test an inactive beta checkpoint needs an explicit upgrade and keeps its FSM state"
           ]
         }
       }
@@ -6014,8 +6061,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 251,
+    "active": 254,
     "coverage": 1.0,
-    "covered": 251
+    "covered": 254
   }
 }
