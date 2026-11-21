@@ -1,0 +1,47 @@
+- id: instance-boundary
+  date: 2026-10-19
+  decision: Use jido.instance for instance configuration, supervision identity, namespaces, lifecycle selection, and stable Address routing.
+  driver: These rules select and locate a runtime. They do not define AgentServer Turn behavior or persistence record meaning.
+  approved_by: User-approved Jido V3 component map
+
+- id: instance-mutation-profile
+  date: 2026-10-19
+  decision: Mutate Jido.Instance.Options, Jido.Instance.NamespaceRegistry, and Jido.Agent.Address. Test the Address-specific public functions in Jido through this component contract. Jido.Instance.RefFacade is removed.
+  driver: Stable Address validation belongs to the Address value. Instance lookup and direct AgentServer routing belong to the existing public Jido entry point. Selecting all of Jido for mutation would include unrelated components. A forwarding module has no separate responsibility.
+  approved_by: Component hardening pass
+
+- id: instance-agent-server-migration
+  date: 2026-10-19
+  decision: Move stable Address identity and routing from jido.agent_server I70 and I71 to jido.instance I6 through I8. Keep activation ownership, runtime-default consumption, and activation uniqueness in narrowed AgentServer obligations I36, I38, and I69.
+  driver: Address selection belongs to the instance boundary. AgentServer still owns the selected activation and its runtime behavior.
+  approved_by: Component hardening pass
+
+- id: instance-definition-dsl
+  date: 2026-10-22
+  decision: Treat `use Jido` as the only instance declaration DSL. Validate its option names, uniqueness, and required `otp_app` key during macro expansion. Validate the merged option values before any child starts.
+  driver: Declaration syntax errors must fail at compilation, while caller module attributes and application runtime configuration must remain supported.
+  approved_by: Component hardening pass
+
+- id: instance-generated-api
+  date: 2026-10-22
+  decision: Remove the unused generated `__otp_app__/0` and `__jido_namespace__/0` functions. Keep `__jido_persistence__/0` as a hidden interoperability hook. Use `config/1`, `namespace/0`, and the typed lifecycle and Address functions as the public generated API.
+  driver: The removed functions had no internal or sibling-package consumers and exposed declaration details that the supported runtime API already represents.
+  approved_by: Component hardening pass
+
+- id: instance-durable-agent-creation
+  date: 2026-11-12
+  decision: Separate durable Agent creation from activation. Jido.create_agent/4 synchronously creates revision zero through the Instance persistence adapter and does not start a process. Jido.activate_agent/4 strictly restores an existing record and never creates one.
+  driver: A logical Agent must exist durably before it is activated. Restore-or-create made process startup decide Agent identity and lifetime.
+  approved_by: Durable Agent activation design review
+
+- id: instance-local-agent-ownership
+  date: 2026-11-13
+  decision: Keep dynamic Agent ownership local to one child activation. Use stable Addresses, an activation-specific fence, and one idempotency request ID for adoption and transfer.
+  driver: Applications need owner-linked shutdown and safe transfer without storing process ownership in Agent state or claiming a durable distributed lease.
+  approved_by: EX-011 implementation
+
+- id: instance-inactive-definition-replacement
+  date: 2026-11-14
+  decision: Expose inactive durable Agent definition replacement through the Jido Address facade with explicit preserve or reset state policy.
+  driver: Data-defined Agent applications need a native lifecycle operation and must not prepare or write Jido checkpoint records themselves.
+  approved_by: Jido v3 Jidoka burn-in

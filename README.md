@@ -1,539 +1,272 @@
-# Jido
+# Jido V3 Consolidation
 
-[![Hex.pm](https://img.shields.io/hexpm/v/jido.svg)](https://hex.pm/packages/jido)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/jido/)
-[![CI](https://github.com/agentjido/jido/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido/actions/workflows/ci.yml)
-[![License](https://img.shields.io/hexpm/l/jido.svg)](https://github.com/agentjido/jido/blob/main/LICENSE)
-[![Website](https://img.shields.io/badge/website-jido.run-0f172a.svg)](https://jido.run)
-[![Ecosystem](https://img.shields.io/badge/ecosystem-jido.run-0ea5e9.svg)](https://jido.run/ecosystem)
-[![Discord](https://img.shields.io/badge/discord-join-5865F2.svg?logo=discord&logoColor=white)](https://jido.run/discord)
+> [!WARNING]
+> The `main` branch contains Jido V3 beta development. APIs can change during
+> the beta period. Use the `v2.x` branch for Jido V2 maintenance.
 
-> **Jido is an autonomous agent framework for Elixir, built for workflows and multi-agent systems.**
-<!-- package.jido.framework -->
+This branch consolidates the four core Jido repositories, `jido`,
+`jido_action`, `jido_signal`, and `jido_ai`, into one Mix project and one OTP
+application. The first source port is complete. The project is now testing and
+refining the module boundaries that became visible after the packages moved
+together.
 
-Define agents, connect them to actions, signals, and directives, and run them
-with supervision and fault tolerance built in.
+Release-readiness work includes:
 
-_The name "Jido" (自動) comes from the Japanese word meaning "automatic" or "automated", where 自 (ji) means "self" and 動 (dō) means "movement"._
+- final review of user and module documentation;
+- final review of tutorials and examples;
+- migration guidance from the four separate packages;
+- a complete public API and compatibility review; and
+- final performance baselines across the supported runtime matrix.
 
-_Learn more about Jido at [jido.run](https://jido.run)._
+The main work is:
 
-## Overview
+- organize code by `Jido.*` ownership instead of old package boundaries;
+- keep one `Jido.Application` composition root;
+- use `Jido.Flow` as the Agent behavior boundary;
+- compile Actions and Flows to Runic workflows; and
+- keep Joi schemas as the Jido data boundary.
 
-Jido helps you build agent systems as ordinary Elixir and OTP software.
+The repository keeps its architecture and consolidation decisions in
+[`docs/architecture/module-dependency-map.md`](docs/architecture/module-dependency-map.md).
 
-- Agents hold state and implement `cmd/2`
-- Actions do work and transform that state
-- Signals route events into the system
-- Directives describe effects for the runtime to execute
+Use the [documentation index](docs/README.md) for project documents, required
+fixed paths, and material that still needs review.
 
-The purity boundary is the agent's decision logic: Jido keeps agent decisions and
-state transitions explicit, actions may be pure or effectful, and directives are
-for effects you want the runtime to own.
+## Install the beta
 
-Use Jido when software needs to inspect context, choose among multiple steps,
-coordinate with other agents, and keep running reliably over time.
-
-AI is optional. The core package gives you the agent architecture and runtime;
-companion packages such as `jido_ai` add model integration when you need it.
-
-At the core, Jido agents are immutable data structures with a single command function:
+Add this dependency to try the consolidated Jido package:
 
 ```elixir
-defmodule MyAgent do
-  use Jido.Agent,
-    name: "my_agent",
-    description: "My custom agent",
-    schema: [
-      count: [type: :integer, default: 0]
-    ]
-end
-
-{agent, directives} = MyAgent.cmd(agent, action)
+{:jido, "== 3.0.0-beta.3"}
 ```
 
-State changes are explicit data transformations. If an action needs a result
-back immediately to continue reasoning or update state, it may perform that work
-itself. If the workflow has already decided on an outbound effect and wants the
-runtime or integration layer to own delivery, return a directive.
-<!-- package.jido.pure_cmd package.jido.runtime_separation -->
+See the [beta.3 release notes](https://github.com/agentjido/jido/releases/tag/v3.0.0-beta.3)
+and the [v2-to-v3 migration guide](https://github.com/agentjido/jido/blob/v3.0.0-beta.3/guides/reference/v2-to-v3-migration.md).
 
-## The Jido Ecosystem
-
-Jido is the core package of the Jido ecosystem. The ecosystem is built around the core Jido Agent behavior and offer several opt-in packages to extend the core behavior.
-
-| Package                                                 | Description                                                                                   |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| [req_llm](https://github.com/agentjido/req_llm)         | HTTP client for LLM APIs                                                                      |
-| [jido_action](https://github.com/agentjido/jido_action) | Composable, validated actions with AI tool integration                                        |
-| [jido_signal](https://github.com/agentjido/jido_signal) | CloudEvents-based message envelope and supporting utilities for routing and pub/sub messaging |
-| [jido](https://github.com/agentjido/jido)               | Core agent framework with state management, directives, and runtime                           |
-| [jido_ai](https://github.com/agentjido/jido_ai)         | AI/LLM integration for agents                                                                 |
-
-For demos and examples of what you can build with the Jido Ecosystem, see [https://jido.run](https://jido.run). For the package map and support levels, see [https://jido.run/ecosystem](https://jido.run/ecosystem).
-
-## Why Jido?
-
-OTP primitives are excellent. You can build agent systems with raw GenServer. But when building *multiple cooperating agents*, you'll reinvent:
-
-| Raw OTP                             | Jido Formalizes                         |
-| ----------------------------------- | --------------------------------------- |
-| Ad-hoc message shapes per GenServer | Signals as standard envelope            |
-| Business logic mixed in callbacks   | Actions as reusable command pattern     |
-| Implicit effects scattered in code  | Directives as typed effect descriptions |
-| Custom child tracking per server    | Built-in parent/child hierarchy         |
-| Process exit = completion           | State-based completion semantics        |
-
-Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenServer.
-
-## Key Features
-
-### Immutable Agent Architecture
-- Functional agent state model inspired by Elm/Redux
-- `cmd/2` as the core operation: actions in, updated agent + directives out
-- Schema-validated state with NimbleOptions or Zoi
-
-### Directive-Based Effects
-- Actions transform state and may perform required work
-- Directives describe runtime-owned external effects
-- Built-in directives: Emit, Spawn, SpawnAgent, StopChild, StartSensor, StopSensor, Schedule, Stop
-- Protocol-based extensibility for custom directives
-
-### OTP Runtime Integration
-- GenServer-based AgentServer for production deployment
-- Parent-child agent hierarchies with lifecycle management
-- Signal routing with configurable strategies
-- Instance-scoped supervision plus logical partitions for multi-tenant deployments
-
-### Composable Plugins
-- Reusable capability modules that extend agents
-- State isolation per plugin with automatic schema merging
-- Lifecycle hooks for initialization and signal handling
-
-### Execution Strategies
-- Direct execution for simple workflows
-- FSM (Finite State Machine) strategy for state-driven workflows
-- Extensible strategy protocol for custom execution patterns
-
-### Multi-Agent Orchestration
-- Multi-agent workflows with configurable strategies
-- Plan-based orchestration for complex workflows
-- Durable groups of agents with named topology, hierarchical runtime ownership, nested pod nodes, and partition-safe tenancy boundaries
-
-## Installation
-
-### Using Igniter (Recommended)
-
-The fastest way to get started is with [Igniter](https://hex.pm/packages/igniter):
-
-```bash
-mix igniter.install jido
-```
-
-This automatically:
-- Adds Jido to your dependencies
-- Creates a `MyApp.Jido` instance module (`use Jido, otp_app: :my_app`)
-- Creates configuration in `config/config.exs`
-- Adds `MyApp.Jido` to your supervision tree
-
-Generate an example agent to get started:
-
-```bash
-mix igniter.install jido --example
-```
-
-### Manual Installation
-
-Add `jido` to your list of dependencies in `mix.exs`:
+Use the Git dependency to test the current development branch:
 
 ```elixir
-def deps do
-  [
-    {:jido, "~> 2.0"}
-  ]
-end
+{:jido, github: "agentjido/jido", branch: "main"}
 ```
 
-Then define a Jido instance module and add it to your supervision tree:
+## Local checks
 
-```elixir
-# In lib/my_app/jido.ex
-defmodule MyApp.Jido do
-  use Jido, otp_app: :my_app
-end
-```
-
-```elixir
-# In config/config.exs
-config :my_app, MyApp.Jido,
-  max_tasks: 1000,
-  agent_pools: []
-```
-
-```elixir
-# In your application.ex
-children = [
-  MyApp.Jido
-]
-
-Supervisor.start_link(children, strategy: :one_for_one)
-```
-
-## Quick Start
-
-### 1. Define an Agent
-
-```elixir
-defmodule MyApp.CounterAgent do
-  use Jido.Agent,
-    name: "counter",
-    description: "A simple counter agent",
-    schema: [
-      count: [type: :integer, default: 0]
-    ],
-    signal_routes: [
-      {"increment", MyApp.Actions.Increment}
-    ]
-end
-```
-
-### 2. Define an Action
-
-```elixir
-defmodule MyApp.Actions.Increment do
-  use Jido.Action,
-    name: "increment",
-    description: "Increments the counter by a given amount",
-    schema: [
-      amount: [type: :integer, default: 1]
-    ]
-
-  def run(params, context) do
-    current = context.state[:count] || 0
-    {:ok, %{count: current + params.amount}}
-  end
-end
-```
-
-### 3. Execute Commands
-
-```elixir
-# Create an agent
-agent = MyApp.CounterAgent.new()
-
-# Execute an action - returns updated agent + directives
-{agent, directives} = MyApp.CounterAgent.cmd(agent, {MyApp.Actions.Increment, %{amount: 5}})
-
-# Check the state
-agent.state.count
-# => 5
-```
-
-### 4. Run with AgentServer
-
-```elixir
-# Start the agent server
-{:ok, pid} = MyApp.Jido.start_agent(MyApp.CounterAgent, id: "counter-1")
-
-# Send signals to the running agent (synchronous)
-# Signal types must be declared in signal_routes
-{:ok, agent} = Jido.AgentServer.call(pid, Jido.Signal.new!("increment", %{amount: 10}, source: "/user"))
-
-# Look up the agent by ID
-pid = MyApp.Jido.whereis("counter-1")
-
-# List all running agents
-agents = MyApp.Jido.list_agents()
-```
-
-## Core Concepts
-
-### The `cmd/2` Contract
-
-The fundamental operation in Jido:
-
-```elixir
-{agent, directives} = MyAgent.cmd(agent, action)
-```
-
-Key invariants:
-- The returned `agent` is always complete - no "apply directives" step needed
-- `directives` describe runtime-owned external effects only - they never modify
-  agent state
-- Agent decision logic stays explicit and testable; deterministic actions produce
-  deterministic `cmd/2` results
-
-Use this rule of thumb for side effects:
-
-- If the step needs a result back now to continue reasoning or update state, an
-  effectful action is acceptable.
-- If the workflow has already decided on an outbound effect and wants the
-  runtime or integration layer to own delivery, return a directive.
-
-### Actions vs Directives vs State Operations
-
-| Actions                                    | Directives                            | State Operations                |
-| ------------------------------------------ | ------------------------------------- | ------------------------------- |
-| Transform state, may perform side effects  | Describe runtime-owned effects        | Describe internal state changes |
-| Executed by `cmd/2`, update `agent.state`  | Bare structs emitted by agents        | Applied by strategy layer       |
-| Can call APIs, read files, query databases | Runtime (AgentServer) interprets them | Never leave the strategy        |
-
-### State Operations (`Jido.Agent.StateOp`)
-
-State operations are internal state transitions handled by the strategy layer during `cmd/2`. Unlike directives, they never reach the runtime.
-
-| StateOp        | Purpose                          |
-| -------------- | -------------------------------- |
-| `SetState`     | Deep merge attributes into state |
-| `ReplaceState` | Replace state wholesale          |
-| `DeleteKeys`   | Remove top-level keys            |
-| `SetPath`      | Set value at nested path         |
-| `DeletePath`   | Delete value at nested path      |
-
-### Directive Types
-
-| Directive    | Purpose                                          |
-| ------------ | ------------------------------------------------ |
-| `Emit`       | Dispatch a signal via configured adapters        |
-| `Error`      | Signal an error from cmd/2                       |
-| `Spawn`      | Spawn a generic BEAM child process               |
-| `SpawnAgent` | Spawn a tracked child Jido agent (`restart: :transient` by default) |
-| `StopChild`  | Gracefully stop and remove a tracked child agent                      |
-| `StartSensor` | Start or replace a tagged sensor runtime        |
-| `StopSensor` | Stop a tagged sensor runtime                     |
-| `Schedule`   | Schedule a delayed message                       |
-| `Stop`       | Stop the agent process                           |
-
-Sensor runtimes started by `StartSensor` are tracked under `{:sensor, tag}` and
-are owner-monitored by default. Unexpected sensor exits emit
-`jido.agent.sensor.exit` back to the owning agent; controlled `StopSensor`
-shutdowns do not. Use `link?: true` only when a sensor should fail fast with
-its owning `AgentServer`.
-
-## Documentation
-
-**Start here:**
-- [Quick Start](guides/getting-started.livemd) - Build your first agent in 5 minutes
-- [Core Loop](guides/core-loop.md) - Understand the mental model
-
-**Guides:**
-- [Building Agents](guides/agents.md) - Agent definitions and state management
-- [Signals & Routing](guides/signals.md) - Signal-based communication
-- [Agent Directives](guides/directives.md) - Effect descriptions for the runtime
-- [Runtime and AgentServer](guides/runtime.md) - Process-based agent execution
-- [Choosing a Runtime Pattern](guides/runtime-patterns.md) - When to use `SpawnAgent`, `InstanceManager`, `Pod`, and `partition`
-- [Pods](guides/pods.md) - Durable groups of agents with named topology, lazy activation, nested pods, and live add/remove mutation
-- [Multi-Tenancy](guides/multi-tenancy.md) - Shared-instance tenancy with partitions and Pod-first durable workspaces
-- [Persistence & Storage](guides/storage.md) - Hibernate, thaw, and InstanceManager lifecycle
-- [Scheduling](guides/scheduling.md) - Declarative and dynamic cron scheduling
-- [Plugins](guides/plugins.md) - Composable capability bundles
-- [Strategies](guides/strategies.md) - Execution strategies (Direct, FSM)
-
-**Advanced:**
-- [FSM Strategy Deep Dive](guides/fsm-strategy.livemd) - State machine workflows
-- [Worker Pools](guides/worker-pools.md) - Pre-warmed agent pools for throughput
-- [Testing Agents](guides/testing.md) - Testing patterns and best practices
-
-**API Reference:** [hexdocs.pm/jido](https://hexdocs.pm/jido)
-
-## FAQ
-
-### General Questions
-
-**Q: What is Jido and how does it differ from other agent frameworks?**
-
-A: Jido is an **autonomous agent framework for Elixir, built for workflows and multi-agent systems**. Key differentiators:
-- **OTP-native architecture**: Built on GenServer with supervision and fault tolerance built in
-- **Immutable agents**: Functional state model inspired by Elm/Redux
-- **AI optional**: Core package provides agent architecture without requiring AI/LLM
-- **Explicit effect boundaries**: actions may own immediate work; directives describe runtime-owned effects
-
-Compared to LangChain/CrewAI:
-- **LangChain**: Chain-based orchestration, Python-first
-- **CrewAI**: Role-playing autonomous agents, team-based collaboration
-- **Jido**: OTP-native with supervision trees, Elixir/BEAM ecosystem
-
-**Q: What is the Agent/Action/Signal/Directive architecture?**
-
-A:
-- **Agents**: Immutable structs plus modules that hold state and implement `cmd/2`
-- **Actions**: Receive validated params and context, then return state updates and optional directives
-- **Signals**: CloudEvents-compliant messages routed into the system
-- **Directives**: Bare structs that describe effects for the runtime to execute
-
-`cmd/2` returns the updated agent plus directives. Directives never mutate agent
-state; the OTP runtime interprets them for runtime-owned external effects.
-Actions may still perform work such as API calls, file I/O, or database queries
-when that result is needed immediately by the action or state transition.
-
-**Q: Is AI required for Jido?**
-
-A: **No!** The core package (`jido`) provides agent architecture and runtime without AI. AI/LLM integration is optional via companion packages:
-- `jido_ai`: AI/LLM integration for agents
-- `req_llm`: HTTP client for LLM APIs
-
-Use Jido when software needs to inspect context, choose steps, coordinate agents, and run reliably - AI is optional.
-
-**Q: What are the Jido ecosystem packages?**
-
-A:
-| Package | Description |
-|---------|-------------|
-| **req_llm** | HTTP client for LLM APIs |
-| **jido_action** | Composable, validated actions with AI tool integration |
-| **jido_signal** | CloudEvents-based message envelope and routing utilities |
-| **jido** | Core agent framework with state management, directives, runtime |
-| **jido_ai** | AI/LLM integration for agents |
-
-### Getting Started
-
-**Q: How do I install Jido?**
-
-A: Jido is available on Hex.pm:
-```elixir
-def deps do
-  [
-    {:jido, "~> 2.0"}
-  ]
-end
-```
-
-See [jido.run](https://jido.run) for demos and examples.
-
-**Q: How do I create an agent?**
-
-A:
-```elixir
-defmodule MyAgent do
-  use Jido.Agent,
-    name: "my_agent",
-    description: "My custom agent",
-    schema: [
-      count: [type: :integer, default: 0]
-    ]
-end
-
-{agent, directives} = MyAgent.cmd(agent, action)
-```
-
-See [hexdocs.pm/jido](https://hexdocs.pm/jido) for API reference.
-
-**Q: How do I run agents in production?**
-
-A: Use `AgentServer` (GenServer-based) for production deployment:
-- Parent-child agent hierarchies with lifecycle management
-- Signal routing with configurable strategies
-- Instance-scoped supervision plus logical partitions for multi-tenant deployments
-
-### Features
-
-**Q: What directives are available?**
-
-A: Built-in directives:
-- **Emit**: Emit signals to the system
-- **Error**: Signal an error from `cmd/2`
-- **Spawn**: Spawn child processes
-- **SpawnAgent**: Spawn child agents
-- **AdoptChild**: Attach an orphaned or unattached child to the current parent
-- **StopChild**: Stop child processes/agents
-- **StartSensor**: Start or replace owner-monitored tagged sensor runtimes
-- **StopSensor**: Stop tagged sensor runtimes
-- **Schedule**: Schedule future actions
-- **RunInstruction**: Execute an instruction at runtime and route the result back to `cmd/2`
-- **Stop**: Stop the agent
-- **Cron / CronCancel**: Register and cancel cron-based schedules
-
-External packages can also define custom directive structs. See [Agent Directives](guides/directives.md) for details.
-
-**Q: How do plugins work?**
-
-A: Composable plugins extend agents with:
-- Reusable capability modules
-- State isolation per plugin with automatic schema merging
-- Easy capability sharing across agents
-
-See [Plugins Guide](guides/plugins.md) for details.
-
-**Q: What execution strategies are available?**
-
-A:
-- **Direct Strategy**: Immediate execution
-- **FSM Strategy**: State machine workflows
-
-See [Strategies Guide](guides/strategies.md) and [FSM Strategy Deep Dive](guides/fsm-strategy.livemd).
-
-### Troubleshooting
-
-**Q: I'm getting GenServer timeout errors. What should I check?**
-
-A:
-1. Check action execution time
-2. Consider using worker pools for throughput (`guides/worker-pools.md`)
-3. Review supervision tree configuration
-
-**Q: My agents aren't receiving signals. What's wrong?**
-
-A:
-1. Check signal routing configuration
-2. Verify signal envelope format (CloudEvents)
-3. Review signal dispatch strategy
-
-### Help Resources
-
-- **Documentation**: [hexdocs.pm/jido](https://hexdocs.pm/jido)
-- **Website**: [jido.run](https://jido.run)
-- **Ecosystem**: [jido.run/ecosystem](https://jido.run/ecosystem)
-- **Discord**: [jido.run/discord](https://jido.run/discord)
-- **GitHub**: [github.com/agentjido/jido](https://github.com/agentjido/jido)
-- **Jido Workbench**: [github.com/agentjido/jido_workbench](https://github.com/agentjido/jido_workbench)
-
-## Development
-
-### Prerequisites
-
-- Elixir 1.17+
-- Erlang/OTP 26+
-
-### Running Tests
-
-```bash
+```sh
+mix deps.get
 mix test
+mix test.ci
+mix test.all
+mix test.contracts
+mix test.authoring
+mix test.examples
+mix test.property
+mix test.fuzz
+mix test.load
+mix test.peer
+mix test.bench
+mix quality
+mix reach.check --arch --smells
 ```
 
-### Quality Checks
+Live provider and external service checks are separate opt-in commands.
 
-```bash
-mix quality  # Runs formatter, dialyzer, and credo
+`mix quality` blocks highest-priority Credo findings, compile warnings,
+Dialyzer errors, ExDNA errors, Reach architecture errors, and formatting
+errors. It also prints the full strict Credo backlog as advisory output.
+Dialyzer checks new warnings against the line-specific baseline in
+`.dialyzer_ignore.exs` and rejects unused baseline entries.
+ExDNA reports all clone groups and fails above the current 17-clone baseline.
+
+Run external services and the paid provider only when you explicitly select
+them:
+
+```sh
+mix test.services
+JIDO_LIVE_OPENAI_API_KEY=... mix test.live
 ```
 
-### Generating Documentation
+The live command requires a dedicated test key. See `test/external/README.md`
+and `test/external/jido_ai/README.md` for setup and cleanup rules. The CI
+workflow runs each required offline surface as a named job. Its
+scheduled or manual extended jobs run longer fuzz, load burn-in, and benchmark
+checks. Service and live jobs are manual only.
 
-```bash
-mix docs
+The live graph-first example makes a paid model call. It starts a Jido instance,
+runs the canonical ReAct Flow in an AgentServer, calls two Actions in one tool
+round, and checks the committed Session.
+
+```sh
+mix run examples/00_quick_start/00_03_live_react/live_react.exs
 ```
 
-HTML and Markdown documentation is generated in `doc/`, including Markdown pages and `llms.txt`.
+The default model is `openai:gpt-4o-mini`. Use `JIDO_LIVE_MODEL` and
+`JIDO_LIVE_PROMPT` to change the model and prompt.
 
-## Contributing
+## Runic ReAct memory benchmark
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
+[`test/perf/jido_ai/react_memory.exs`](test/perf/jido_ai/react_memory.exs) is one self-contained
+reproduction and benchmark for the canonical graph-first ReAct path. It does
+not call a model provider. A deterministic local inference client emits known
+tool calls. A local Action returns an empty payload.
 
-- Setting up your development environment
-- Running tests and quality checks
-- Submitting pull requests
-- Code style guidelines
+The default `quick` profile is one bounded iterative case for local checks. The
+`base` profile is the shared comparison case for Jido and Runic work. It removes
+model, network, payload, concurrency, and AgentServer effects. It compares two
+orchestration strategies.
 
-## License
+The benchmark-local `recursive` strategy preserves the former core path:
 
-Copyright 2024-2025 Mike Hostetler
+```text
+Jido Agent.cmd/3
+  -> Jido.Exec
+  -> Runic.Workflow.execute/3
+  -> dynamic ReAct invoke graphs
+```
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+The production `iterative` strategy is now `Jido.AI.Reasoning.ReAct` and uses
+this path:
 
-## Links
+```text
+Jido Agent.cmd/3
+  -> one fixed Jido iterate graph
+  -> one ReAct transition Action per model round
+  -> the same loop nodes for the next round
+```
 
-- **Documentation**: [https://hexdocs.pm/jido](https://hexdocs.pm/jido)
-- **GitHub**: [https://github.com/agentjido/jido](https://github.com/agentjido/jido)
-- **AgentJido**: [https://jido.run](https://jido.run)
-- **Ecosystem**: [https://jido.run/ecosystem](https://jido.run/ecosystem)
-- **Discord**: [https://jido.run/discord](https://jido.run/discord)
-- **Jido Workbench**: [https://github.com/agentjido/jido_workbench](https://github.com/agentjido/jido_workbench)
+The base profile has these fixed defaults:
+
+| Setting | Value |
+| --- | --- |
+| Strategies | `recursive` and `iterative` |
+| Execution | Direct, in-memory Runic workflow |
+| Tool calls | One serial call per ReAct round |
+| Tool result payload | 0 bytes |
+| Maximum concurrency | 1 |
+| Round counts | 1, 3, and 5 |
+| Isolation | One new BEAM VM for each round count |
+
+With Runic `0.1.0-alpha.13`, the recursive one-round and three-round cases
+finish. The recursive five-round case reaches the canonical identity item limit
+while it processes 137,659 items at path `[:value, 1]`. The iterative strategy
+finishes all three cases.
+
+One local comparison produced these peak process-memory changes:
+
+| Rounds | Recursive | Iterative | Iterative / recursive |
+| ---: | ---: | ---: | ---: |
+| 1 | 7.95 MiB | 3.26 MiB | 0.41x |
+| 3 | 36.29 MiB | 3.13 MiB | 0.09x |
+| 5 | 64.98 MiB, then error | 6.89 MiB | 0.11x |
+
+The production iterative strategy also completed eight tool rounds with 9.35
+MiB of peak process-memory growth.
+
+These values vary by host. The growth shape and execution outcome are the
+important results.
+
+The script captures the recursive execution error as benchmark data and exits
+normally. The benchmark runner does not fail.
+
+### What the experiment proves
+
+The former ReAct design recursively added a new ModelRound and tool Flow to the
+active Runic workflow. Every round also carried the prior Jido Frame. Replacing
+that recursive expansion with a fixed loop removes the identity-limit failure
+and most of the memory growth.
+
+The core implementation preserves the normal request and response contract,
+parallel tools, durable review waits, model and tool counts, Session entries,
+output guards, retry routing, and budget routing.
+
+One loop transition calls the existing ReAct Actions inside one outer Runic
+Action. Each tool batch runs as a short-lived Runic Flow with explicit parallel
+tool nodes. The inner Flow is discarded after the round, so it cannot expand
+the active outer graph. An approved review resumes through another fixed loop.
+
+The remaining boundary is checkpoint detail. Inner model work and a complete
+tool batch belong to the outer transition checkpoint. They do not have separate
+checkpoints in the active outer workflow.
+
+The benchmark keeps the former recursive Flow in the benchmark file only. It is
+not a second library implementation.
+
+### Run and capture the base case
+
+Run the base profile in the production Mix environment:
+
+```sh
+JIDO_MEMORY_BENCH_PROFILE=base mix bench
+```
+
+Save one report that you can attach to an issue or send to another developer:
+
+```sh
+JIDO_MEMORY_BENCH_PROFILE=base mix bench 2>&1 | tee runic-react-memory.txt
+```
+
+The report records the Jido Git revision, dirty-worktree state, Runic version,
+Elixir version, OTP version, system architecture, scheduler count, and memory
+sample interval. For each isolated case, it reports:
+
+- elapsed time;
+- peak process, total, binary, and ETS memory above the forced-GC baseline;
+- final process-memory change;
+- retained Agent and Session term sizes;
+- committed Thread entry count;
+- model, tool-round, and tool-call count checks; and
+- the Runic error and stack trace when a case fails.
+
+The report also shows the compiled Runic graph component count, build-log entry
+count, shared size, and flat size. It compares the peak process memory of the
+three-round and five-round cases with the one-round case.
+
+The iterative base case has two success conditions:
+
+1. All three iterative round counts finish without a canonical identity limit.
+2. Peak memory grows in proportion to the added rounds. It must not make a
+   large jump between adjacent cases.
+
+### Run the expanded profile
+
+The expanded profile keeps the same deterministic model and tool. It adds the
+managed AgentServer path, four-call workloads, parallel execution, and a small
+tool payload:
+
+```sh
+JIDO_MEMORY_BENCH_PROFILE=expanded mix bench
+```
+
+This profile runs 18 recursive-strategy isolated cases:
+
+- direct and managed execution;
+- 1, 3, and 4 rounds; and
+- serial, constrained, and parallel workloads.
+
+The workloads are:
+
+| Workload | Tool calls per round | Maximum concurrency |
+| --- | ---: | ---: |
+| `serial` | 1 | 1 |
+| `constrained` | 4 | 1 |
+| `parallel` | 4 | 4 |
+
+### Configuration
+
+| Environment variable | Meaning |
+| --- | --- |
+| `JIDO_MEMORY_BENCH_PROFILE` | `quick`, `base`, or `expanded` |
+| `JIDO_MEMORY_BENCH_STRATEGIES` | Comma-separated `recursive` or `iterative` strategies |
+| `JIDO_MEMORY_BENCH_MODES` | Comma-separated `direct` or `managed` modes |
+| `JIDO_MEMORY_BENCH_ROUNDS` | Comma-separated round counts from 1 through 8 |
+| `JIDO_MEMORY_BENCH_WORKLOADS` | Comma-separated workload names |
+| `JIDO_MEMORY_BENCH_PAYLOAD_BYTES` | Bytes returned by each tool call, from 0 through 1,000,000 |
+| `JIDO_MEMORY_BENCH_REPEATS` | Number of isolated runs for each case |
+| `JIDO_MEMORY_BENCH_SAMPLE_MS` | VM memory sampling interval |
+| `JIDO_MEMORY_BENCH_OUTPUT` | `markdown` or `json` |
+
+Peak values come from `:erlang.memory/0`. Retained values come from
+`:erts_debug.size/1` and `:erts_debug.flat_size/1`. These are VM-level
+diagnostics, not operating-system resident-set measurements. Use the same
+Elixir, OTP, Runic version, scheduler count, Mix environment, and host when you
+compare two commits.
+

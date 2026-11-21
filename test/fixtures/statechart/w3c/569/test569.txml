@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+
+<!-- test that location field is found inside entry for SCXML Event I/O processor in the ECMAScript
+data model.  The tests for the relevant event i/o processors will test that it can be used to
+send events. -->
+
+<scxml initial="s0" version="1.0" datamodel="ecmascript"  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+  
+<state id="s0">
+  <transition cond="_ioprocessors['scxml'].location" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+   
+ </state>
+  
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+
+<!-- test that sendid is set in event if present in send, blank otherwise -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1"/>
+  <data conf:id="2"/>
+  </datamodel>
+
+  
+<state id="s0">
+
+   <onentry>
+     <send delay="5s" event="timeout"/>
+     <send type="http://www.w3.org/TR/scxml/#SCXMLEventProcessor" id="send1" event="s0Event"/>  
+     </onentry>
+  <transition event="s0Event"  target="s1">
+    <assign conf:location="1" conf:eventField="sendid"/>
+    </transition>
+  <transition event="*" conf:targetfail="">
+    </transition>
+
+</state>
+
+<state id="s1">
+  <transition conf:idQuoteVal="1=send1" target="s2"/>
+  <transition conf:targetfail=""/>
+ </state>
+ 
+<state id="s2">
+
+   <onentry>
+     <send delay="5s" event="timeout"/>
+      <send  event="s0Event2"/>
+     </onentry>
+  <transition event="s0Event2"   target="s3">
+    <assign conf:location="2" conf:eventField="sendid"/>
+    </transition>
+  <transition event="*" conf:targetfail=""/>
+</state>
+
+<state id="s3">
+  <transition conf:noValue="2" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+ </state>
+
+
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

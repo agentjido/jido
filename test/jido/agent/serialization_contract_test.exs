@@ -1,0 +1,57 @@
+defmodule Jido.Agent.SerializationContractTest do
+  use Jido.Test.Case, async: true
+
+  alias Jido.Catalog
+  alias Jido.Persistence
+  alias Jido.Test.Persistence.CheckpointIdentityProbe, as: Probe
+  alias Jido.Test.Persistence.ProbeStore, as: Store
+
+  test "Agent persistence uses a separate namespace and rejects an old envelope" do
+    opts = [store: start_supervised!(Store)]
+    store = {Store, opts}
+    agent = Probe.instantiate!(id: unique_id())
+    assert :ok = Persistence.save_agent(store, agent, namespace: "persistence-test")
+    key = Persistence.agent_key(Jido.Agent.Address.new!(namespace: "persistence-test", id: agent.id))
+    assert "jido:agent:v3:" <> _identity = key
+    assert {:ok, bytes} = Store.get(key, opts)
+    assert {:ok, record} = Jido.Persistence.Codec.Term.decode(bytes, [])
+    assert record.fmt == 3
+    assert record.kind == :active
+    assert record.vsn == Probe.vsn()
+    assert record.agent_id == agent.id
+
+    # These old identifiers are intentional rejection fixtures.
+    old_record =
+      record
+      |> Map.drop([:agent_module, :agent_id])
+      |> Map.merge(%{kind: :actor, actor_module: Probe, actor_id: agent.id})
+
+    {:ok, old_bytes} = Jido.Persistence.Codec.Term.encode(old_record)
+    old_key = String.replace_prefix(key, "jido:agent:v3:", "jido:actor:v1:")
+    assert :ok = Store.delete(key, opts)
+    assert :ok = Store.put(old_key, old_bytes, opts)
+
+    assert {:error, :not_found} =
+             Persistence.load_agent(store, Probe, agent.id, namespace: "persistence-test")
+
+    assert :ok = Store.put(key, old_bytes, opts)
+
+    assert {:error, {:invalid_persistence_record, :kind}} =
+             Persistence.load_agent(store, Probe, agent.id, namespace: "persistence-test")
+  end
+
+  test "authoring JSON preserves the Agent definition through a trusted Catalog" do
+    definition = Probe.definition()
+
+    registry =
+      Catalog.from_targets!(__MODULE__, :jido, %{
+        {"agents/probe", 1} => Probe,
+        {"schemas/probe", 1} => definition.schema
+      })
+
+    assert {:ok, document} = Jido.Test.AgentServer.Registry.encode(definition, registry)
+    assert {:ok, ^definition} = Jido.Test.AgentServer.Registry.decode(document, registry)
+    assert_raise ArgumentError, fn -> Jido.Test.AgentServer.Registry.decode(document, %{}) end
+    assert {:error, _} = Jido.Test.AgentServer.Registry.decode(%{}, registry)
+  end
+end

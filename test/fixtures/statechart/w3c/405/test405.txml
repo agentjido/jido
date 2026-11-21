@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<!--  test that the executable content in the transitions is executed in document order after 
+the states are exited. event1, event2, event3, event4 should be raised in that order when the
+state machine is entered  -->
+
+<scxml  initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" 
+    xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+    
+<state id="s0" initial="s01p">
+ <onentry>
+  <send event="timeout" delay="1s"/>
+  </onentry>
+  <transition event="timeout" conf:targetfail=""/>
+
+<parallel id="s01p">
+  <transition event="event1" target="s02"/>
+
+   
+ <state id="s01p1" initial="s01p11">
+    <state id="s01p11">
+      <onexit>
+       <!-- this should be the second event raised -->
+       <raise event="event2"/>
+       </onexit>
+      <transition target="s01p12">
+        <!-- this should be the third event raised -->
+        <raise event="event3"/>
+        </transition>
+   </state>
+    <state id="s01p12"/>
+ </state>  <!-- end s01p1 -->
+ 
+ <state id="s01p2" initial="s01p21">
+    <state id="s01p21">
+      <onexit>
+       <!-- this should be the first event raised -->
+       <raise event="event1"/>
+       </onexit>
+      <transition target="s01p22">
+        <!-- this should be the fourth event raised -->
+        <raise event="event4"/>
+        </transition>
+   </state>
+    <state id="s01p22"/>
+    
+ </state>  <!-- end s01p2 -->
+ </parallel> 
+
+  
+  <state id="s02">
+    <transition event="event2" target="s03"/>
+    <transition event="*" conf:targetfail=""/>
+    </state>
+    
+  <state id="s03">
+    <transition event="event3" target="s04"/>
+    <transition event="*" conf:targetfail=""/>
+    </state>
+
+    
+  <state id="s04">
+    <transition event="event4" conf:targetpass=""/>
+    <transition event="*" conf:targetfail=""/>
+    </state>
+   
+ </state>  <!-- end s01 -->
+ 
+
+<conf:pass/>
+<conf:fail/>
+</scxml>

@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!-- test that done.invoke.id event has the right id.  the invoked child terminates immediately
+and should generate done.invoke.foo   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0">
+  <onentry>
+    <send event="timeout" delay="2s"/>
+    </onentry>
+  <invoke type="http://www.w3.org/TR/scxml/" id="foo">
+    <content>
+      <scxml initial="subFinal" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+        <final id="subFinal"/>
+        </scxml>
+        </content>
+        </invoke>
+      
+  <transition event="done.invoke.foo" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+</state>   
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

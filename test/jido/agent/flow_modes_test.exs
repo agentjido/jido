@@ -1,0 +1,80 @@
+defmodule Jido.Agent.FlowModesTest do
+  use Jido.Test.Case, async: true
+
+  alias Jido.AgentServer
+  alias Jido.Persistence.ETS
+
+  defmodule Add do
+    use Jido.Action, name: "flow_mode_add"
+
+    @impl true
+    def run(%{amount: amount}, context) do
+      {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
+    end
+  end
+
+  defmodule Flow do
+    use Jido.Flow,
+      name: "flow_mode_contract",
+      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
+
+    flow do
+      step "add", action: Add, params: input()
+      output result("add")
+    end
+  end
+
+  defmodule Worker do
+    use Jido.Agent, name: "flow_mode_worker"
+
+    state do
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    end
+
+    routes do
+      route "work", Flow
+    end
+  end
+
+  test "one Flow has the same result in direct, managed, and durable execution", %{jido: jido} do
+    signal = Jido.Signal.new!("work", %{amount: 4}, source: "/flow-modes")
+    direct_source = Worker.instantiate!(id: unique_id("direct"))
+
+    assert {:ok, direct, direct_directives} = Jido.Agent.cmd(direct_source, signal)
+
+    assert {:ok, managed_server} =
+             Jido.start_agent(jido, Worker, id: unique_id("managed"), persistence: false)
+
+    assert :ok = AgentServer.await_ready(managed_server)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             AgentServer.call(managed_server, signal)
+
+    managed = AgentServer.snapshot(managed_server).agent
+
+    durable_jido = :"flow_modes_durable_#{System.unique_integer([:positive])}"
+
+    start_supervised!(
+      {Jido,
+       name: durable_jido,
+       namespace: "test/flow-modes/#{System.unique_integer([:positive])}",
+       persistence: {ETS, table: __MODULE__}},
+      id: {Jido, durable_jido}
+    )
+
+    assert {:ok, durable_server} =
+             Jido.start_agent(durable_jido, Worker, id: unique_id("durable"))
+
+    assert :ok = AgentServer.await_ready(durable_server)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             AgentServer.call(durable_server, signal)
+
+    durable = AgentServer.snapshot(durable_server).agent
+
+    assert direct.state == managed.state
+    assert managed.state == durable.state
+    assert direct_directives == []
+    assert direct.state == %{count: 4}
+  end
+end

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- test that in() predicate works in null data model -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" datamodel="null"
+xmlns:conf="http://www.w3.org/2005/scxml-conformance" version="1.0" initial="p">
+
+     
+ <parallel id="p">
+ 
+   <state id="ps0">
+   <transition conf:inState="s1" conf:targetfail=""/>
+   <transition conf:inState="ps1" conf:targetpass=""/> 
+   <transition conf:targetfail=""/>
+   </state>
+
+   <state id="ps1"/> 
+ </parallel>
+ 
+ <state id="s1"/>
+    
+<conf:pass/>
+<conf:fail/>
+
+   
+</scxml>

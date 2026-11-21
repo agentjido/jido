@@ -1,0 +1,85 @@
+defmodule Jido.Plugin.StateRuntimeTest do
+  use Jido.Test.Case, async: false
+
+  alias Jido.AgentServer, as: Server
+  alias Jido.Signal
+
+  defmodule Spend do
+    @schema Jido.Joi.struct(__MODULE__, %{amount: Jido.Joi.integer() |> Jido.Joi.min(1)})
+    @enforce_keys Jido.Joi.enforce_keys(@schema)
+    defstruct Jido.Joi.struct_fields(@schema)
+
+    def schema, do: @schema
+    def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, directive)
+  end
+
+  defmodule Credits do
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Plugin.StateRuntimeTest.Credits.Agent
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Plugin.StateRuntimeTest.Credits.Agent
+
+    @impl true
+    defdelegate reduce(reduction, opts), to: Jido.Plugin.StateRuntimeTest.Credits.Agent
+  end
+
+  defmodule Credits.Agent do
+    @behaviour Jido.Plugin
+
+    @impl true
+    def state_spec(_opts), do: {:credits, Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(3)}
+
+    @impl true
+    def directives(_opts), do: [Spend]
+
+    @impl true
+    def reduce(reduction, _opts),
+      do:
+        {:ok,
+         Enum.reduce(reduction.directives, reduction.plugin_state, fn
+           %Spend{amount: amount}, left -> left - amount
+           _directive, left -> left
+         end)}
+  end
+
+  defmodule SpendCredits do
+    use Jido.Action,
+      name: "plugin_spend_credits"
+
+    @impl Jido.Action
+    def run(%{amount: amount}, context) do
+      {:ok, context.agent_state, [%Spend{amount: amount}]}
+    end
+  end
+
+  defmodule DataAgent do
+    use Jido.Agent, name: "plugin_data_agent", plugins: [Credits]
+
+    routes do
+      route "plugin.credits.spend", SpendCredits
+    end
+  end
+
+  test "state-only Plugins compose optional state into the Agent" do
+    agent = DataAgent.instantiate!(id: Jido.Id.uuid7())
+
+    assert agent.state == %{credits: 3}
+    assert agent.schema.fields == []
+    assert Keyword.keys(Jido.Agent.schema(agent).fields) == [:credits]
+  end
+
+  test "state-only Plugin Directives update state without a Plugin runtime", %{jido: jido} do
+    {:ok, pid} =
+      Jido.Test.AgentServer.Assertions.start_agent(jido, DataAgent, id: unique_id("plugin-data"))
+
+    signal = Signal.new!("plugin.credits.spend", %{amount: 1}, source: "/test")
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Server.call(pid, signal)
+    agent = Server.snapshot(pid).agent
+    assert agent.state.credits == 2
+    assert Jido.Test.AgentServer.Assertions.plugin(pid, Credits) == nil
+  end
+end

@@ -1,118 +1,93 @@
-defmodule JidoTest.IDTest do
+defmodule Jido.IdTest do
   use ExUnit.Case, async: true
 
-  import Bitwise
-
-  alias Jido.ID
-
-  @uuid7_regex ~r/\A[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/
+  alias Jido.Id
 
   describe "uuid7/0" do
-    test "generates lowercase RFC 9562 UUIDv7 strings" do
-      assert ID.uuid7() =~ @uuid7_regex
+    test "generates a valid UUIDv7 with a timestamp" do
+      uuid = Id.uuid7()
+
+      assert Id.uuid7?(uuid)
+      assert is_integer(Id.uuid7_timestamp(uuid))
+      assert Id.uuid7_timestamp(uuid) >= 0
+      assert <<_timestamp::48, 7::4, _random_a::12, 2::2, _random_b::62>> = decode(uuid)
     end
 
-    test "encodes current Unix millisecond timestamp, version, variant, and random fields" do
-      before_ms = System.system_time(:millisecond)
-      uuid = ID.uuid7()
-      after_ms = System.system_time(:millisecond)
-
-      decoded = decode_uuid7(uuid)
-
-      assert decoded.timestamp in before_ms..after_ms
-      assert decoded.version == 7
-      assert decoded.variant == 2
-      assert decoded.rand_a in 0..0xFFF
-      assert decoded.rand_b in 0..0x3FFFFFFFFFFFFFFF
-    end
-
-    test "generates unique IDs" do
-      ids = for _index <- 1..1000, do: ID.uuid7()
-
-      assert length(Enum.uniq(ids)) == 1000
+    test "generates unique identifiers" do
+      ids = Enum.map(1..1_000, fn _number -> Id.uuid7() end)
+      assert length(Enum.uniq(ids)) == 1_000
     end
   end
 
-  describe "uuid7/2" do
-    test "matches RFC 9562 UUIDv7 example bit layout" do
-      timestamp = 0x017F22E279B0
-      rand_a = 0x0CC3
-      rand_b = 0b01 <<< 60 ||| 0x8C4DC0C0C07398F
-      random_bytes = <<rand_a::12, rand_b::62, 0::6>>
+  describe "uuid7?/1" do
+    test "accepts RFC 9562 and mixed-case UUIDv7 values" do
+      uuid = "017f22e2-79b0-7cc3-98c4-dc0c0c07398f"
 
-      assert ID.uuid7(timestamp, random_bytes) ==
-               "017f22e2-79b0-7cc3-98c4-dc0c0c07398f"
+      assert Id.uuid7?(uuid)
+      assert Id.uuid7?(String.upcase(uuid))
     end
 
-    test "supports minimum and maximum representable values" do
-      assert ID.uuid7(0, <<0::80>>) == "00000000-0000-7000-8000-000000000000"
+    test "rejects invalid shape, version, and variant values" do
+      refute Id.uuid7?("not-a-uuid")
+      refute Id.uuid7?("017f22e279b07cc398c4dc0c0c07398f")
+      refute Id.uuid7?("017f22e2-79b0-6cc3-98c4-dc0c0c07398f")
+      refute Id.uuid7?("017f22e2-79b0-7cc3-78c4-dc0c0c07398f")
+      refute Id.uuid7?(123)
+      refute Id.uuid7?(nil)
+    end
+  end
 
-      assert ID.uuid7(0xFFFFFFFFFFFF, :binary.copy(<<0xFF>>, 10)) ==
-               "ffffffff-ffff-7fff-bfff-ffffffffffff"
+  describe "UUIDv7 reading and comparison" do
+    test "extracts the timestamp" do
+      uuid = "017f22e2-79b0-7cc3-98c4-dc0c0c07398f"
+      assert Id.uuid7_timestamp(uuid) == 1_645_557_742_000
     end
 
-    test "preserves lexical timestamp ordering with fixed random bytes" do
-      random_bytes = <<0::80>>
+    test "compares complete UUID values" do
+      older = "017f22e2-79b0-7000-8000-000000000000"
+      newer = "017f22e2-79b1-7000-8000-000000000000"
+      same_time = "017f22e2-79b0-7000-8000-000000000001"
 
-      assert ID.uuid7(1, random_bytes) < ID.uuid7(2, random_bytes)
+      assert Id.compare_uuid7(older, newer) == :lt
+      assert Id.compare_uuid7(newer, older) == :gt
+      assert Id.compare_uuid7(older, older) == :eq
+      assert Id.compare_uuid7(older, same_time) == :lt
+      assert Id.compare_uuid7(same_time, older) == :gt
+      assert Id.uuid7_timestamp(older) == Id.uuid7_timestamp(same_time)
     end
 
-    test "uses the high 74 random bits and ignores only the low 6 padding bits" do
-      rand_a = 0x0ABC
-      rand_b = 0x123456789ABCDEF
+    test "treats mixed-case forms of one UUID as equal" do
+      uuid = "017f22e2-79b0-7cc3-98c4-dc0c0c07398f"
 
-      uuid_with_zero_padding = ID.uuid7(42, <<rand_a::12, rand_b::62, 0::6>>)
-      uuid_with_one_padding = ID.uuid7(42, <<rand_a::12, rand_b::62, 0b111111::6>>)
-
-      assert uuid_with_zero_padding == uuid_with_one_padding
-
-      decoded = decode_uuid7(uuid_with_zero_padding)
-
-      assert decoded.rand_a == rand_a
-      assert decoded.rand_b == rand_b
+      assert Id.compare_uuid7(uuid, String.upcase(uuid)) == :eq
+      assert Id.uuid7_timestamp(uuid) == Id.uuid7_timestamp(String.upcase(uuid))
     end
 
-    test "rejects timestamps outside the 48-bit UUIDv7 range" do
-      assert_raise FunctionClauseError, fn ->
-        ID.uuid7(0x1_0000_0000_0000, <<0::80>>)
-      end
-
-      assert_raise FunctionClauseError, fn ->
-        ID.uuid7(-1, <<0::80>>)
-      end
-
-      assert_raise FunctionClauseError, fn ->
-        ID.uuid7(1.0, <<0::80>>)
-      end
-    end
-
-    test "rejects random inputs that are not 80 bits" do
-      assert_raise FunctionClauseError, fn ->
-        ID.uuid7(0, <<0::72>>)
-      end
-
-      assert_raise FunctionClauseError, fn ->
-        ID.uuid7(0, <<0::88>>)
-      end
-
-      assert_raise FunctionClauseError, fn ->
-        ID.uuid7(0, :not_binary)
+    test "raises a clear error for invalid input" do
+      assert_raise ArgumentError, "expected a valid UUIDv7 identifier", fn ->
+        Id.uuid7_timestamp("not-a-uuid")
       end
     end
   end
 
-  defp decode_uuid7(uuid) do
-    {:ok, <<timestamp::48, version::4, rand_a::12, variant::2, rand_b::62>>} =
-      uuid
-      |> String.replace("-", "")
-      |> Base.decode16(case: :mixed)
+  describe "uuid8/1" do
+    test "formats deterministic bytes with the UUIDv8 version and variant" do
+      assert Id.uuid8(<<0::128>>) == "00000000-0000-8000-8000-000000000000"
 
-    %{
-      timestamp: timestamp,
-      version: version,
-      rand_a: rand_a,
-      variant: variant,
-      rand_b: rand_b
-    }
+      digest = :crypto.hash(:sha256, "stable input")
+      assert Id.uuid8(digest) == Id.uuid8(digest)
+      assert <<_prefix::48, 8::4, _custom_a::12, 2::2, _custom_b::62>> = decode(Id.uuid8(digest))
+    end
+
+    test "rejects a value that is shorter than 16 bytes" do
+      assert_raise ArgumentError, "expected at least 16 bytes for a UUIDv8 identifier", fn ->
+        Id.uuid8(<<0::120>>)
+      end
+    end
+  end
+
+  defp decode(uuid) do
+    {:ok, raw} = uuid |> String.replace("-", "") |> Base.decode16(case: :mixed)
+    raw
   end
 end

@@ -1,0 +1,356 @@
+defmodule Jido.Persistence.LiveStateTest do
+  use Jido.Test.Case, async: true
+
+  alias Jido.Agent
+  alias Jido.AgentServer, as: Server
+  alias Jido.Persistence
+  alias Jido.Persistence.ETS
+
+  defmodule Update do
+    use Jido.Action,
+      name: "local_state_update"
+
+    def run(input, context) do
+      state = %{
+        context.agent_state
+        | payload: input.payload,
+          count: context.agent_state.count + 1
+      }
+
+      effect =
+        Jido.Agent.Directive.emit(Jido.Signal.new!("local.updated", %{}, source: "/test"))
+
+      {:ok, state, [effect]}
+    end
+  end
+
+  defmodule LocalAgent do
+    use Jido.Agent, name: "local_state_agent"
+
+    state do
+      schema Jido.Joi.object(%{
+               payload: Jido.Joi.any() |> Jido.Joi.default(<<>>),
+               count: Jido.Joi.integer() |> Jido.Joi.default(0)
+             })
+    end
+
+    routes do
+      route "local.update", Update
+    end
+  end
+
+  defmodule CustomAgent do
+    use Jido.Agent, name: "local_custom_checkpoint"
+
+    state do
+      schema Jido.Joi.object(%{
+               payload: Jido.Joi.any() |> Jido.Joi.default(<<>>),
+               count: Jido.Joi.integer() |> Jido.Joi.default(0)
+             })
+    end
+
+    routes do
+      route "local.update", Update
+    end
+
+    def checkpoint(agent, _context) do
+      case agent.state.payload do
+        :invalid_dump ->
+          {:ok, %{value: self()}}
+
+        :dump_failure ->
+          {:error, :conversion_failed}
+
+        bits ->
+          {:ok, %{id: agent.id, bits: for(<<bit::1 <- bits>>, do: bit), count: agent.state.count}}
+      end
+    end
+
+    def restore(payload, _context) do
+      bits = for bit <- payload.bits, into: <<>>, do: <<bit::1>>
+      agent = instantiate!(id: payload.id, state: %{payload: bits})
+      {:ok, %{agent | state: %{agent.state | count: payload.count}}}
+    end
+  end
+
+  defmodule Package do
+    use Jido.Plugin
+
+    def state_spec(_opts),
+      do: {:owned, Jido.Joi.object(%{bits: Jido.Joi.any()}) |> Jido.Joi.default(%{bits: <<>>})}
+
+    def reduce(reduction, _opts),
+      do: {:ok, Map.get(reduction.signal.data, :owned, reduction.plugin_state)}
+
+    def dump(%{bits: :invalid_dump}, _context, _opts), do: {:ok, %{bits: <<5::3>>}}
+    def dump(%{bits: :dump_failure}, _context, _opts), do: {:error, :conversion_failed}
+    def dump(%{bits: bits}, _context, _opts), do: {:ok, for(<<bit::1 <- bits>>, do: bit)}
+
+    def load(:invalid_state, _context, _opts), do: {:ok, :invalid_state}
+
+    def load(bits, _context, _opts),
+      do: {:ok, %{bits: for(bit <- bits, into: <<>>, do: <<bit::1>>)}}
+  end
+
+  defmodule PluginAgent do
+    use Jido.Agent, name: "local_plugin_checkpoint", plugins: [Package]
+
+    state do
+      schema Jido.Joi.object(%{
+               payload: Jido.Joi.any() |> Jido.Joi.default(<<>>),
+               count: Jido.Joi.integer() |> Jido.Joi.default(0)
+             })
+    end
+
+    routes do
+      route "local.update", Update
+    end
+  end
+
+  defmodule RejectedStorage do
+    @behaviour Jido.Persistence.Store
+    defdelegate validate_options(opts), to: ETS
+    defdelegate get(key, opts), to: ETS
+    defdelegate put(key, value, opts), to: ETS
+    defdelegate delete(key, opts), to: ETS
+
+    def compare_and_swap(key, expected, value, opts) do
+      case decode_term(value) do
+        %{rev: revision} when revision > 0 -> {:error, {:rejected, :storage_unavailable}}
+        _other -> ETS.compare_and_swap(key, expected, value, opts)
+      end
+    end
+
+    defp decode_term(value) do
+      case Jido.Persistence.Codec.Term.decode(value, []) do
+        {:ok, decoded} -> decoded
+        {:error, _reason} -> :not_an_external_term
+      end
+    end
+  end
+
+  setup do
+    {:ok, persistence: {ETS, table: :"local_state_#{System.unique_integer([:positive])}"}}
+  end
+
+  test "custom conversion saves and restores a non-byte-aligned value", c do
+    agent = CustomAgent.instantiate!(id: unique_id(), state: %{payload: <<5::3>>, count: 2})
+    assert {:ok, checkpoint} = Jido.Persistence.snapshot(agent)
+    assert checkpoint.agent.state.bits == [1, 0, 1]
+    assert {:ok, ^agent} = Jido.Persistence.restore(checkpoint)
+    assert :ok = Persistence.save_agent(c.persistence, agent, instance: c.jido)
+
+    assert {:ok, ^agent} =
+             Persistence.load_agent(c.persistence, CustomAgent, agent.id, instance: c.jido)
+  end
+
+  test "custom output and restored schema and identity remain strict", c do
+    agent = CustomAgent.instantiate!(id: unique_id(), state: %{payload: <<5::3>>})
+    assert :ok = Persistence.save_agent(c.persistence, agent, instance: c.jido)
+    record = record(c, agent.id)
+
+    for {field, value} <- [id: "different", count: :invalid, bits: self()] do
+      changed =
+        put_in(record, [:checkpoint, Access.key(:agent), Access.key(:state), field], value)
+
+      put_record(c, agent.id, changed)
+
+      assert {:error, _reason} =
+               Persistence.load_agent(c.persistence, CustomAgent, agent.id, instance: c.jido)
+    end
+
+    for changed <- [
+          put_in(record, [:checkpoint, Access.key(:agent), Access.key(:vsn)], 99),
+          put_in(record, [:checkpoint, Access.key(:agent), Access.key(:module)], LocalAgent)
+        ] do
+      put_record(c, agent.id, changed)
+
+      assert {:error, _reason} =
+               Persistence.load_agent(c.persistence, CustomAgent, agent.id, instance: c.jido)
+    end
+
+    invalid = %{agent | state: %{agent.state | payload: :invalid_dump}}
+
+    assert {:error, %{code: :non_portable_term, path: [:snapshot, :agent, :state, :value]}} =
+             Persistence.save_agent(c.persistence, invalid, instance: c.jido)
+  end
+
+  test "Plugin conversion handles local owned state for generated and embedded definitions", c do
+    for definition <- [
+          PluginAgent.definition(),
+          Agent.define!(%{
+            name: "embedded_local_plugin",
+            plugins: [%{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{}}]
+          }),
+          Agent.define!(%{
+            name: "embedded_generated_plugin",
+            module: PluginAgent,
+            plugins: [%{id: Package.id(), provider: Package, vsn: Package.vsn(), data: %{}}]
+          })
+        ] do
+      agent = Agent.instantiate!(definition, id: unique_id(), state: %{owned: %{bits: <<5::3>>}})
+      assert {:ok, snapshot} = Jido.Persistence.snapshot(agent)
+      assert {:ok, ^agent} = Jido.Persistence.restore(snapshot)
+      assert :ok = Persistence.save_agent(c.persistence, agent, instance: c.jido)
+      assert record(c, agent.id).checkpoint.agent.state.owned == [1, 0, 1]
+
+      assert {:ok, ^agent} =
+               Persistence.load_agent(c.persistence, agent.module, agent.id, instance: c.jido)
+    end
+  end
+
+  test "Plugin conversion cannot hide invalid stored records or invalid restored owned state",
+       c do
+    agent = PluginAgent.instantiate!(id: unique_id(), state: %{owned: %{bits: <<5::3>>}})
+    assert :ok = Persistence.save_agent(c.persistence, agent, instance: c.jido)
+    record = record(c, agent.id)
+
+    for value <- [self(), <<5::3>>, :invalid_state] do
+      put_record(
+        c,
+        agent.id,
+        put_in(record, [:checkpoint, Access.key(:agent), Access.key(:state), :owned], value)
+      )
+
+      assert {:error, _reason} =
+               Persistence.load_agent(c.persistence, PluginAgent, agent.id, instance: c.jido)
+    end
+
+    for changed <- [
+          put_in(record, [:checkpoint, Access.key(:agent), Access.key(:id)], "different"),
+          put_in(record, [:checkpoint, Access.key(:agent), Access.key(:vsn)], 99)
+        ] do
+      put_record(c, agent.id, changed)
+
+      assert {:error, _reason} =
+               Persistence.load_agent(c.persistence, PluginAgent, agent.id, instance: c.jido)
+    end
+  end
+
+  test "live execution commits local domain and Plugin values without persistence", c do
+    initial =
+      PluginAgent.instantiate!(
+        id: Jido.Id.uuid7(),
+        state: %{payload: self(), owned: %{bits: <<5::3>>}}
+      )
+
+    assert {:ok, server} =
+             Jido.Test.AgentServer.Assertions.start_agent(c.jido, initial, default_dispatch: {:pid, target: self()})
+
+    port = Port.open({:spawn_executable, System.find_executable("true")}, [])
+    on_exit(fn -> if Port.info(port), do: Port.close(port) end)
+
+    for value <- [self(), port, make_ref(), fn -> :local end, [1 | :tail], <<5::3>>] do
+      input = %{payload: value, owned: %{bits: value}}
+      assert {:ok, candidate, [_effect]} = Agent.cmd(initial, signal("local.update", input))
+      assert candidate.state.owned.bits === value
+
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+               Server.call(server, signal("local.update", input))
+
+      committed = Server.snapshot(server).agent
+      assert committed.state.payload === value
+      assert committed.state.owned.bits === value
+      assert_receive {:signal, %{type: "local.updated"}}, 1_000
+      assert Server.snapshot(server).agent == committed
+    end
+
+    assert {:ok,
+            %Jido.AgentServer.TurnResult{
+              status: :failed,
+              error: %Jido.Error.ExecutionError{}
+            }} =
+             Server.call(
+               server,
+               signal("local.update", %{payload: :valid, owned: :invalid})
+             )
+
+    assert Server.snapshot(server).agent.state.count == 6
+  end
+
+  test "persistent custom and Plugin checkpoints convert before storage and dispatch", c do
+    jido = persistent_instance(c.persistence)
+
+    for {module, input} <- [
+          {CustomAgent, %{payload: "portable"}},
+          {PluginAgent, %{payload: :portable, owned: %{bits: "portable"}}}
+        ] do
+      assert {:ok, server} =
+               Jido.Test.AgentServer.Assertions.start_agent(jido, module, default_dispatch: {:pid, target: self()})
+
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+               Server.call(server, signal("local.update", input))
+
+      assert_receive {:signal, %{type: "local.updated"}}, 1_000
+
+      committed = Server.snapshot(server).agent
+
+      assert {:ok, ^committed, 2} =
+               Persistence.load_agent_with_revision(c.persistence, module, committed.id, instance: jido)
+    end
+  end
+
+  test "checkpoint, conversion, and storage failures neither commit nor dispatch", c do
+    cases = [
+      {CustomAgent, ETS, %{payload: :invalid_dump}, 1},
+      {CustomAgent, ETS, %{payload: :dump_failure}, 1},
+      {PluginAgent, ETS, %{payload: :portable, owned: %{bits: :invalid_dump}}, 1},
+      {PluginAgent, ETS, %{payload: :portable, owned: %{bits: :dump_failure}}, 1},
+      {CustomAgent, RejectedStorage, %{payload: "portable"}, 0},
+      {PluginAgent, RejectedStorage, %{payload: :portable, owned: %{bits: "portable"}}, 0}
+    ]
+
+    for {module, adapter, input, saved_revision} <- cases do
+      persistence = {adapter, elem(c.persistence, 1)}
+      jido = persistent_instance(persistence)
+
+      assert {:ok, server} =
+               Jido.Test.AgentServer.Assertions.start_agent(jido, module, default_dispatch: {:pid, target: self()})
+
+      before = Jido.Test.AgentServer.Assertions.committed(server)
+      monitor = Process.monitor(server)
+
+      assert {:error, %Jido.Error.ExecutionError{message: "Required durable commit failed"}} =
+               Server.call(server, signal("local.update", input))
+
+      assert_receive {:DOWN, ^monitor, :process, ^server, _reason}, 1_000
+
+      assert {:ok, saved, ^saved_revision} =
+               Persistence.load_agent_with_revision(persistence, module, before.agent.id, instance: jido)
+
+      assert saved == before.agent
+      refute_received {:signal, %{type: "local.updated"}}
+    end
+  end
+
+  defp record(c, id) do
+    {ETS, opts} = c.persistence
+    assert {:ok, bytes} = ETS.get(key(c, id), opts)
+    assert {:ok, record} = Jido.Persistence.Codec.Term.decode(bytes, [])
+    record
+  end
+
+  defp persistent_instance(persistence) do
+    id = System.unique_integer([:positive])
+    name = :"live_state_persistence_#{id}"
+
+    start_supervised!(
+      {Jido, name: name, namespace: "test/live-state/#{id}", persistence: persistence},
+      id: {Jido, name}
+    )
+
+    name
+  end
+
+  defp put_record(c, id, record) do
+    {ETS, opts} = c.persistence
+    assert {:ok, bytes} = Jido.Persistence.Codec.Term.encode(record)
+    assert :ok = ETS.put(key(c, id), bytes, opts)
+  end
+
+  defp key(c, id),
+    do:
+      Persistence.agent_key(
+        Jido.Agent.Address.new!(namespace: Jido.Instance.NamespaceRegistry.namespace(c.jido), id: id)
+      )
+end

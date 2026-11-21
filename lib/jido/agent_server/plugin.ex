@@ -1,0 +1,181 @@
+defmodule Jido.AgentServer.Plugin do
+  @moduledoc "Live Plugin state access and lifecycle policy for one AgentServer."
+
+  alias Jido.AgentServer.Command
+  alias Jido.AgentServer.Plugin.Callbacks
+  alias Jido.Plugin.Init
+  alias Jido.Plugin.Context.Commit
+
+  @doc "Reads the current state owned by one live Plugin runtime."
+  @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
+  def state(%Init{agent_server: agent_server, module: package}, timeout \\ 5_000) do
+    Jido.AgentServer.Worker.plugin_state(agent_server, package, timeout)
+  catch
+    :exit, reason -> {:error, {:agent_server_unavailable, reason}}
+  end
+
+  @doc false
+  def directive_owner(specs, directive) do
+    case Jido.Plugin.directive_owner(specs, directive) do
+      %{agent_server: %{dispatch?: true}} = owner -> owner
+      _ -> nil
+    end
+  end
+
+  @doc false
+  def bootstrap(data, owner) do
+    Enum.reduce_while(data.plugin_specs, {:ok, %{}}, fn spec, {:ok, refs} ->
+      case Callbacks.child_spec(init(data, spec, owner), spec) do
+        :none ->
+          {:cont, {:ok, Map.put(refs, spec.module, nil)}}
+
+        {:ok, child_spec} ->
+          case start(data.activation, spec, child_spec, data.activation_state) do
+            {:ok, pid} -> {:cont, {:ok, Map.put(refs, spec.module, pid)}}
+            _ -> {:halt, {:error, :plugin_start_failed}}
+          end
+
+        _ ->
+          {:halt, {:error, :invalid_plugin_child_spec}}
+      end
+    end)
+    |> case do
+      {:ok, refs} -> await_ready(data.plugin_specs, refs)
+      error -> error
+    end
+  catch
+    _, _ -> {:error, :plugin_start_failed}
+  end
+
+  @doc false
+  def init(data, spec, owner) do
+    %Init{
+      agent_server:
+        if(data.activation,
+          do: Jido.AgentServer.ActivationHandle.via(data.activation),
+          else: owner
+        ),
+      agent_id: data.agent.id,
+      module: spec.module,
+      plugin_state: owned_state(data.agent, spec),
+      state_version: data.state_version,
+      jido: data.jido,
+      partition: data.partition
+    }
+  end
+
+  @doc false
+  def owned_state(agent, %{agent: %{state_key: key}}),
+    do: Map.get(agent.state, key)
+
+  def owned_state(_agent, _spec), do: nil
+
+  @doc false
+  def admit(%Command{} = command, data) do
+    Callbacks.admit(
+      command,
+      data.plugin_specs,
+      data.plugin_refs,
+      data.state_version
+    )
+  end
+
+  @doc false
+  def after_commit(data, active, plugin) do
+    commit = %Commit{
+      plugin: plugin.module,
+      turn_id: active.turn_id,
+      agent_id: data.agent.id,
+      agent_module: data.agent.module,
+      plugin_state: owned_state(data.agent, plugin),
+      state_version: data.state_version,
+      jido: data.jido,
+      partition: data.partition
+    }
+
+    Callbacks.after_commit(plugin, Map.get(data.plugin_refs, plugin.module), commit)
+  end
+
+  @doc false
+  def dispatch(data, active, directive) do
+    case directive_owner(data.plugin_specs, directive) do
+      nil ->
+        :unowned
+
+      owner ->
+        context = %Jido.Plugin.Context{
+          phase: :directive,
+          turn_id: active.turn_id,
+          agent_id: data.agent.id,
+          source_signal: active.source_signal,
+          effective_signal: active.prepared.signal,
+          state_version: data.state_version,
+          plugin_state: owned_state(data.agent, owner),
+          turn_context: active.turn_context,
+          jido: data.jido,
+          partition: data.partition
+        }
+
+        Callbacks.dispatch(
+          owner,
+          Map.get(data.plugin_refs, owner.module),
+          directive,
+          context
+        )
+    end
+  end
+
+  @doc false
+  def start_root(spec, state) do
+    [{:worker, owner}] = :ets.lookup(state, :worker)
+
+    case :gen_statem.call(owner, {:plugin_start, spec.module}) do
+      {:ok, init, current_spec} ->
+        {:ok, %{start: {module, function, args}}} = Callbacks.child_spec(init, current_spec)
+        apply(module, function, args)
+
+      {:error, :plugin_not_found} ->
+        :ignore
+    end
+  end
+
+  @doc false
+  def start(activation, spec, child_spec, state) do
+    child_spec = %{
+      child_spec
+      | id: {:plugin, spec.module},
+        start: {__MODULE__, :start_root, [spec, state]}
+    }
+
+    supervisor = Jido.AgentServer.Supervisor.plugin_supervisor(activation)
+
+    case Supervisor.start_child(supervisor, child_spec) do
+      {:ok, pid} when is_pid(pid) ->
+        {:ok, pid}
+
+      {:ok, pid, _info} when is_pid(pid) ->
+        {:ok, pid}
+
+      {:error, {:already_started, pid}} = error ->
+        case List.keyfind(Supervisor.which_children(supervisor), child_spec.id, 0) do
+          {_, ^pid, _, _} when is_pid(pid) -> {:ok, pid}
+          _ -> error
+        end
+
+      {:ok, _} ->
+        {:error, :plugin_root_required}
+
+      error ->
+        error
+    end
+  end
+
+  defp await_ready(specs, refs) do
+    Enum.reduce_while(specs, {:ok, refs}, fn spec, result ->
+      case Callbacks.await_ready(spec, Map.get(refs, spec.module)) do
+        :ok -> {:cont, result}
+        _ -> {:halt, {:error, :plugin_not_ready}}
+      end
+    end)
+  end
+end

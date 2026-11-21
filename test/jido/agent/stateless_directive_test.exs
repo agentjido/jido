@@ -1,0 +1,104 @@
+defmodule Jido.Agent.StatelessDirectiveTest do
+  use Jido.Test.Case, async: true
+
+  alias Jido.AgentServer, as: Server
+  alias Jido.Signal
+
+  defmodule Effect do
+    @schema Jido.Joi.struct(__MODULE__, %{kind: Jido.Joi.enum([:reply, :block, :last])}, coerce: true)
+    @enforce_keys Jido.Joi.enforce_keys(@schema)
+    defstruct Jido.Joi.struct_fields(@schema)
+    def schema, do: @schema
+    def validate(%__MODULE__{} = effect), do: Jido.Joi.parse(@schema, Map.from_struct(effect))
+  end
+
+  defmodule Effects do
+    use Jido.Plugin
+
+    @impl true
+    defdelegate directives(opts), to: Jido.Agent.StatelessDirectiveTest.Effects.Agent
+
+    @impl true
+    defdelegate dispatch(runtime, directive, context, opts),
+      to: Jido.Agent.StatelessDirectiveTest.Effects.Server
+  end
+
+  defmodule Effects.Agent do
+    @behaviour Jido.Plugin
+
+    @impl true
+    def directives(_opts), do: [Effect]
+  end
+
+  defmodule Effects.Server do
+    @behaviour Jido.Plugin
+
+    @impl true
+    def dispatch(nil, %Effect{kind: kind}, context, _opts) do
+      observer = context.turn_context.observer
+      send(observer, {:effect_started, kind, self()})
+
+      case kind do
+        :reply ->
+          server =
+            Jido.whereis_agent(context.jido, context.agent_id, partition: context.partition)
+
+          Server.cast(server, Signal.new!("effect.result", %{value: 8}, source: "/effect"))
+
+        :block ->
+          receive do
+            :release -> :ok
+          end
+
+        :last ->
+          :ok
+      end
+    end
+  end
+
+  defmodule Submit do
+    use Jido.Action,
+      name: "stateless_directive_submit",
+      schema: Jido.Joi.object(%{kind: Jido.Joi.enum([:reply, :block])})
+
+    @impl true
+    def run(%{kind: kind}, %{agent_state: state}),
+      do: {:ok, %{state | value: 7}, [%Effect{kind: kind}, %Effect{kind: :last}]}
+  end
+
+  defmodule Result do
+    use Jido.Action,
+      name: "stateless_directive_result",
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
+
+    @impl true
+    def run(%{value: value}, %{agent_state: state}), do: {:ok, %{state | value: value}}
+  end
+
+  defmodule Agent do
+    use Jido.Agent, name: "stateless_directive_agent", plugins: [Effects]
+
+    state do
+      schema Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    end
+
+    routes do
+      route "effect.submit", Submit
+      route "effect.result", Result
+    end
+  end
+
+  test "a handler without a Plugin process sends its result through another Turn", %{jido: jido} do
+    {:ok, server} = Jido.Test.AgentServer.Assertions.start_agent(jido, Agent)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             Server.call(server, signal("effect.submit", %{kind: :reply}), context: %{observer: self()})
+
+    assert Server.snapshot(server).agent.state == %{value: 7}
+    assert_receive {:effect_started, :reply, worker}
+    refute worker == server
+    assert_receive {:effect_started, :last, _}
+    eventually(fn -> Server.status(server).agent_revision == 2 end)
+    assert Server.snapshot(server).agent.state == %{value: 8}
+  end
+end

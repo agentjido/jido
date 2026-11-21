@@ -1,0 +1,80 @@
+---
+modules:
+  - Jido.Exec
+  - Jido.Exec.ActionBoundary
+  - Jido.Exec.Compiler
+  - Jido.Exec.Fact
+  - Jido.Exec.Fact.LocalValue
+  - Jido.Exec.Node.Action
+  - Jido.Exec.Node.Choice
+  - Jido.Exec.Node.Collection
+  - Jido.Exec.Node.FlowTarget
+  - Jido.Exec.Node.Handoff
+  - Jido.Exec.Node.Input
+  - Jido.Exec.Node.Invoke
+  - Jido.Exec.Node.Iterate
+  - Jido.Exec.Node.Lifecycle
+  - Jido.Exec.Node.Map
+  - Jido.Exec.Node.Output
+  - Jido.Exec.Node.Parallel
+  - Jido.Exec.Node.Reduce
+  - Jido.Exec.Node.Subflow
+  - Jido.Exec.Node.Targets
+  - Jido.Exec.Node.Wait
+  - Jido.Exec.Runtime
+  - Jido.Telemetry.Exec
+  - Jido.Exec.ValueResolver
+---
+# Execution public promise obligations
+
+## Purpose
+
+Check focused facets of the [reviewed public promises](../../../guides/public-api-contract-review.md). The module reference defines the supported API. Passing tags are evidence for these facets, not complete branch or acceptance-matrix coverage.
+
+### jido_action.execution.I17 — Choice selects the first match or its distinct default
+- **scope:** `Jido.Exec.run/4, Jido.Exec.compile/2`
+- **must:** Choice conditions run in authored order. Run only the first matching Action, or the default when none match. An option named fallback is an ordinary option distinct from the default. A failed selected Action does not trigger fallback. Compilation and Runic reconstruction preserve these rules.
+- **kind:** functional
+- **status:** active
+
+### jido_action.execution.I18 — Policy bounds attempts and preserves outcome order
+- **scope:** `Jido.Exec.run/4, Jido.Durable, Runic.Runner`
+- **must:** Timeout applies to each authored component attempt. An optional immediate-call deadline covers admission, resolution, execution, and retries and cancels owned work on expiry. Max attempts counts the first attempt and retries only eligible errors. Map and Parallel can use bounded concurrency inside one component while Reduce and Iterate remain serial. In fail-fast mode, Map and Parallel let started items finish and stop admitting new work after a failure. Collect-errors mode reports abnormal item exits as item errors. A composite retry repeats the complete component. Defined result and failure order do not depend on completion order.
+- **kind:** ordering
+- **status:** active
+
+### jido_action.execution.I19 — Effects retain canonical order without dispatch
+- **scope:** `Jido.Exec.run/4, Jido.Exec.result/2`
+- **must:** Return successful component effects in dependency then component order, with nested Flows at their parent position and collections in input or iteration order. Preserve duplicates. Failed output, failed items, cancellation, and uncertain execution expose no executable effect batch. Exec never performs the requests.
+- **kind:** ordering
+- **status:** active
+
+### jido_action.execution.I20 — Execution follows caller and Runner process ownership
+- **scope:** `Jido.Exec.run/4, Jido.Durable, Runic.Runner`
+- **must:** Immediate Action failures cannot exit a live caller. Caller exit stops immediate work. Release owned tasks on completion, timeout, and termination, including collection items that trap exits. Keep the caller group leader and honor the selected local Task Supervisor. Reject new top-level work when that supervisor is full. Nested work in an active scope shares its admission. Managed work survives caller exit. Successful Runner stop or cancel waits for owned tasks to exit, while failed persistent stop keeps its worker running. Untracked user processes and custom executors require caller-owned cleanup.
+- **kind:** functional
+- **status:** active
+
+### jido_action.execution.I21 — Runic results respect input scope and progress
+- **scope:** `Jido.Exec.compile/2, Jido.Exec.result/2, Runic.Runner`
+- **must:** Project the selected Runic input observation, rejecting active, stopped, failed, foreign, or uncertain work as documented. Later input occurrences cannot replace its result. Keep local Elixir values, including structs, equivalent to immediate execution without expanding their identity document. Direct Runner steps dispatch one scheduler unit. Computed success is separate from Store acknowledgement. Runner control and lookup errors retain Runic values.
+- **kind:** functional
+- **status:** active
+
+### jido_action.execution.I22 — Recovery preserves acknowledged stored progress
+- **scope:** `Jido.Durable, Jido.Durable.Runtime, Runic.Runner.Store`
+- **must:** Restore acknowledged authored component boundaries and continue remaining components with the same public value and effects. Jido Durable selects a supported Runic rehydration mode. Reject incompatible changed targets. Recovery restores runtime context and policy from the Jido durable record. A saved terminal failure keeps its original cause and stops dispatch and wait input on resume. Work inside an unacknowledged composite component can repeat; no exactly-once execution or effect delivery is promised.
+- **kind:** persisted-format
+- **status:** active
+
+### jido_action.execution.I23 — Telemetry retains bounded documented event shapes
+- **scope:** `Jido.Telemetry.Exec, Jido.Exec.run/4, Jido.Durable, Runic.Runner`
+- **must:** Emit documented Action-attempt and immediate-Flow events with measurements, outcome, and correlation fields. Start and stop metadata omit params, context, results, and full errors. Retries have separate attempt identities. Runner events belong to Runic. Timeout or process death can prevent Action stop events. Caller death or a whole-call deadline can prevent Flow stop.
+- **kind:** functional
+- **status:** active
+
+### jido_action.execution.I25 — Execution hosts own Action capabilities
+- **scope:** `Jido.Exec.supports?/2, Jido.Exec.Runtime`
+- **must:** Report only capabilities that the execution host gives to an Action callback. Ordinary execution reports no wait capability. Wait hosts report the wait capability, including through nested Flow and Invoke calls. Strip caller and bound values for the reserved `:jido_exec_capabilities` key and internal wait-host key. Return false for missing, unknown, or malformed capability lists. Require a map Action context.
+- **kind:** security
+- **status:** active

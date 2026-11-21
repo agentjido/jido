@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+ <!-- test that event param of send sets the name of the event -->
+  
+<state id="s0">
+
+   <onentry>
+     <send  type="http://www.w3.org/TR/scxml/#SCXMLEventProcessor" event="s0Event"/>
+     </onentry>
+  <transition event="s0Event" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+
+</state>
+  
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

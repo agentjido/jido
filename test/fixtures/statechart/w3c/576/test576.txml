@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<!-- test that the 'initial' value of scxml is respected.  We set the value to deeply nested non-default parallel siblings and
+test that both are entered. -->
+
+
+<scxml  initial="s11p112 s11p122" conf:datamodel="" version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0">
+  <transition conf:targetfail=""/>
+</state>
+
+<state id="s1">
+  <onentry>
+    <send event="timeout" delay="1s"/>
+    </onentry>
+  <transition event="timeout" conf:targetfail=""/>
+  <state id="s11" initial="s111">
+    <state id="s111"/>
+    <parallel id="s11p1">
+       <state id="s11p11" initial="s11p111">
+         <state id="s11p111"/>
+         <state id="s11p112">
+           <onentry>
+             <raise event="In-s11p112"/>
+             </onentry>
+         </state>
+       </state>
+       <state id="s11p12" initial="s11p121">
+        <state id="s11p121"/>
+        <state id="s11p122">
+          <transition event="In-s11p112" conf:targetpass=""/>
+          </state>
+       </state>
+      </parallel>
+  </state>
+</state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

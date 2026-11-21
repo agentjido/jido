@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+
+<!-- make sure sendid is blank in a non-error event -->
+
+<scxml version="1.0" xmlns="http://www.w3.org/2005/07/scxml" initial="s0" conf:datamodel=""  name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">  
+   
+ <state id="s0">
+   <onentry>
+     <send  event="foo"/>
+   </onentry>
+   <transition event="foo"  conf:eventFieldHasNoValue="sendid" conf:targetpass=""/>
+      <transition event="*" conf:targetfail=""/> 
+   </state>
+   
+
+      
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

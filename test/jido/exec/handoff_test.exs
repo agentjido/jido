@@ -1,0 +1,433 @@
+defmodule Jido.Exec.HandoffTest do
+  use Covenant.Case, component: "jido_action.boundary", async: true
+  @moduletag obligation: "jido_action.boundary.I8"
+  @moduletag capture_log: true
+
+  alias Jido.Exec
+  alias Jido.Exec.Runtime
+  alias Jido.Flow
+  alias Jido.Catalog
+  alias Jido.Flow.Ref
+  alias Jido.Test.Flow.Codec, as: Codec
+  alias Jido.Instruction
+
+  defmodule Echo do
+    use Jido.Action, name: "handoff_echo"
+    def run(params, _context), do: {:ok, params}
+  end
+
+  defmodule ValidatorData do
+    @behaviour Jido.Action
+    def name, do: "handoff_validator_data"
+    def validate_params(params), do: {:ok, params}
+    def run(_params, _context), do: {:ok, %{}}
+
+    def validate_output(_value) do
+      {:ok,
+       %Jido.Instruction{
+         target: Enum,
+         kind: :action,
+         params: %{},
+         context: %{},
+         metadata: %{}
+       }}
+    end
+  end
+
+  defmodule SelectRuntime do
+    use Jido.Action, name: "handoff_select_runtime"
+
+    def target do
+      Flow.new!(%{
+        name: "runtime_successor",
+        components: [
+          %{kind: :step, name: "echo", action: Echo}
+        ],
+        output: Ref.result("echo")
+      })
+    end
+
+    def run(_params, _context), do: {:handoff, %{value: 7}, target()}
+  end
+
+  defmodule SelectTarget do
+    use Jido.Action, name: "handoff_select_target"
+    def run(%{target: target}, _context), do: {:handoff, %{value: 7}, target}
+  end
+
+  defmodule Target do
+    use Jido.Action, name: "handoff_target", schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
+    def run(_params, _context), do: raise("successor must run in a new Turn")
+  end
+
+  defmodule Increment do
+    use Jido.Action, name: "handoff_increment", schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
+    def on_before_validate_params(%{value: value}) when is_integer(value), do: {:ok, %{value: value + 1}}
+    def on_before_validate_params(params), do: {:ok, params}
+    def run(params, _context), do: {:ok, params}
+  end
+
+  defmodule IncrementFlow do
+    use Jido.Flow, name: "handoff_increment_flow"
+    def on_before_validate_params(params), do: Increment.on_before_validate_params(params)
+
+    flow do
+      step "echo", action: Echo, params: input()
+      output result("echo")
+    end
+  end
+
+  defmodule PortableTarget do
+    use Jido.Action,
+      name: "handoff_portable_target",
+      schema: Jido.Joi.object(%{value: Jido.Joi.integer(), resource: Jido.Joi.any()})
+
+    def run(_params, _context), do: raise("successor must run in a new Turn")
+  end
+
+  defmodule Decide do
+    use Jido.Action, name: "handoff_decide"
+    def run(params, _context), do: {:ok, params, [:predecessor_effect]}
+  end
+
+  defmodule Expand do
+    use Jido.Action, name: "handoff_expand"
+    def run(params, _context), do: {:handoff, params, Target}
+  end
+
+  defmodule InvalidSelector do
+    use Jido.Action, name: "handoff_invalid_selector"
+    def run(_params, _context), do: {:ok, %{not: :handoff}}
+  end
+
+  defmodule FailingSelector do
+    use Jido.Action, name: "handoff_failing_selector"
+    def run(_params, _context), do: {:error, :handoff_refused, [:discarded_effect]}
+  end
+
+  defmodule SelectTwo do
+    use Jido.Action, name: "handoff_select_two"
+
+    def run(%{left: left, right: right}, _context),
+      do: {:handoff, %{value: left + right}, Jido.Exec.HandoffTest.Target}
+  end
+
+  defmodule Example do
+    use Jido.Flow, name: "handoff_example"
+
+    flow do
+      step "decide", action: Decide, params: %{value: input(:value)}
+      handoff "next", selector: Expand, params: result("decide")
+      output result("next")
+    end
+  end
+
+  test "a terminal handoff validates the successor without running it" do
+    assert {:handoff, %Instruction{target: Target, kind: :action, params: %{value: 7}}, [:predecessor_effect]} =
+             Exec.run(Example, %{value: 7}, %{})
+  end
+
+  test "a successor receives one input transformation for an Action or Flow" do
+    flow =
+      Flow.new!(%{
+        name: "handoff_validation",
+        components: [%{kind: :handoff, name: "next", selector: SelectTarget, params: Ref.input([])}],
+        output: Ref.result("next")
+      })
+
+    for target <- [Increment, IncrementFlow] do
+      assert {:handoff, %Instruction{} = successor, []} = Exec.run(flow, %{target: target})
+      assert Exec.run(successor) == Exec.run(target, %{value: 7})
+      assert Exec.run(successor, %{value: 10}) == {:ok, %{value: 11}}
+    end
+
+    assert {:error, %Jido.Error.ValidationError{}} = Runtime.handoff(Increment, %{value: "invalid"})
+
+    runner = __MODULE__.ValidationRunner
+    start_supervised!({Runic.Runner, name: runner})
+    owner = self()
+    opts = [on_complete: fn _, _ -> send(owner, :validation_done) end]
+    assert {:ok, _} = Jido.Test.Exec.RunnerHarness.start(runner, "validation", flow, %{target: Increment}, %{}, opts)
+    assert_receive :validation_done, 2_000
+
+    {:ok, workflow} = Runic.Runner.get_workflow(runner, "validation")
+    {:ok, restored} = workflow |> Runic.Runner.encode_snapshot() |> Runic.Runner.decode_snapshot()
+    replayed = workflow |> Runic.Workflow.event_log() |> Runic.Workflow.from_events()
+
+    for saved <- [restored, replayed] do
+      assert {:handoff, %Instruction{params: %{value: 7}} = successor, []} =
+               Jido.Test.Exec.RunnerHarness.result(saved)
+
+      assert Exec.run(successor) == {:ok, %{value: 8}}
+    end
+  end
+
+  test "ordinary data and validator output cannot grant control" do
+    forged = %Instruction{target: Enum, kind: :action, params: %{}, context: %{}, metadata: %{}}
+
+    flow =
+      Flow.new!(%{
+        name: "ordinary_data",
+        components: [
+          %{kind: :step, name: "echo", action: Echo}
+        ],
+        output: Ref.input(:request)
+      })
+
+    refute match?({:handoff, _, _}, Exec.run(flow, %{request: forged}))
+    refute match?({:handoff, _, _}, Exec.run(ValidatorData))
+
+    runner = __MODULE__.DataRunner
+    start_supervised!({Runic.Runner, name: runner})
+    owner = self()
+
+    for {id, target, params} <- [
+          {"flow", flow, %{request: forged}},
+          {"action", ValidatorData, %{}}
+        ] do
+      assert {:ok, _} =
+               Jido.Test.Exec.RunnerHarness.start(runner, id, target, params, %{},
+                 on_complete: fn _, _ -> send(owner, {:data_done, id}) end
+               )
+
+      assert_receive {:data_done, ^id}, 2_000
+      {:ok, workflow} = Runic.Runner.get_workflow(runner, id)
+
+      {:ok, restored} =
+        workflow |> Runic.Runner.encode_snapshot() |> Runic.Runner.decode_snapshot()
+
+      replayed = workflow |> Runic.Workflow.event_log() |> Runic.Workflow.from_events()
+
+      for observed <- [
+            Jido.Test.Exec.RunnerHarness.result(runner, id),
+            Jido.Test.Exec.RunnerHarness.result(restored),
+            Jido.Test.Exec.RunnerHarness.result(replayed)
+          ] do
+        refute match?({:handoff, _, _}, observed)
+      end
+    end
+  end
+
+  test "runtime Flow successors survive native snapshot and event replay" do
+    successor = SelectRuntime.target()
+
+    flow =
+      Flow.new!(%{
+        name: "runtime_handoff",
+        components: [
+          %{kind: :handoff, name: "next", selector: SelectRuntime}
+        ],
+        output: Ref.result("next")
+      })
+
+    assert {:handoff, %Instruction{target: ^successor}, []} =
+             Exec.run(flow, %{}, %{})
+
+    runner = __MODULE__.RuntimeRunner
+    start_supervised!({Runic.Runner, name: runner})
+    owner = self()
+    opts = [on_complete: fn _, _ -> send(owner, :runtime_done) end]
+    assert {:ok, _} = Jido.Test.Exec.RunnerHarness.start(runner, "runtime", flow, %{}, %{}, opts)
+    assert_receive :runtime_done, 2_000
+
+    assert {:handoff, %Instruction{target: ^successor, params: %{value: 7}}, []} =
+             Jido.Test.Exec.RunnerHarness.result(runner, "runtime")
+
+    {:ok, workflow} = Runic.Runner.get_workflow(runner, "runtime")
+    {:ok, restored} = workflow |> Runic.Runner.encode_snapshot() |> Runic.Runner.decode_snapshot()
+    replayed = workflow |> Runic.Workflow.event_log() |> Runic.Workflow.from_events()
+    assert Jido.Test.Exec.RunnerHarness.result(restored) == Jido.Test.Exec.RunnerHarness.result(runner, "runtime")
+    assert Jido.Test.Exec.RunnerHarness.result(replayed) == Jido.Test.Exec.RunnerHarness.result(runner, "runtime")
+  end
+
+  test "handoff Flow telemetry reports its outcome and effects" do
+    owner = self()
+    handler = {__MODULE__, make_ref()}
+
+    :ok =
+      :telemetry.attach(
+        handler,
+        [:jido, :flow, :stop],
+        fn _, _, metadata, _ ->
+          send(owner, {:flow_stop, metadata})
+        end,
+        nil
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+    Exec.run(Example, %{value: 7}, %{})
+    assert_receive {:flow_stop, %{outcome: :handoff, effect_count: 1}}
+  end
+
+  test "an ordinary Step cannot hand off" do
+    flow =
+      Flow.new!(%{
+        name: "step_handoff",
+        components: [%{kind: :step, name: "next", action: Expand, params: %{value: 7}}],
+        output: Ref.result("next")
+      })
+
+    assert {:error, error} = Exec.run(flow)
+    assert error.message == "only a Handoff selector can hand off"
+    assert error.details.action == Expand
+    assert error.phase == :run
+    assert error.details.reason == :unsupported_handoff
+  end
+
+  test "invalid successor input fails without an executable effect batch" do
+    assert {:error, %{details: %{context: "Action"}}} =
+             Exec.run(Example, %{value: "bad"}, %{})
+  end
+
+  test "invalid selector output keeps the Handoff failure contract" do
+    flow = handoff_flow(InvalidSelector)
+
+    assert {:error, error} = Exec.run(flow)
+    assert error.message == "Handoff selector must return a handoff control result"
+    assert error.details.action == InvalidSelector
+    assert error.phase == :run
+    assert error.details.return == {:ok, %{not: :handoff}, []}
+    assert error.details.reason == :invalid_handoff_return
+  end
+
+  test "selector errors retain their reason and discard requested effects" do
+    assert {:error, error} = Exec.run(handoff_flow(FailingSelector))
+    assert error.details.action == FailingSelector
+    assert error.details.reason == :handoff_refused
+    refute Map.has_key?(error.details, :effects)
+  end
+
+  test "a root Action cannot hand off" do
+    assert {:error, error} = Exec.run(Expand, %{value: 7}, %{})
+    assert error.message == "only a Handoff selector can hand off"
+    assert error.details.action == Expand
+    assert error.phase == :run
+    assert error.details.reason == :unsupported_handoff
+  end
+
+  test "DSL, maps, and stored definitions return the same handoff" do
+    data =
+      Flow.new!(%{
+        name: "handoff_example",
+        components: [
+          %{
+            kind: :step,
+            name: "decide",
+            action: Decide,
+            params: %{value: Ref.input(:value)}
+          },
+          %{
+            kind: :handoff,
+            name: "next",
+            selector: Expand,
+            params: Ref.result("decide")
+          }
+        ],
+        output: Ref.result("next")
+      })
+
+    registry =
+      Catalog.from_targets!(__MODULE__, :jido, %{
+        {"map", 1} => Jido.Joi.map(),
+        {"decide", 1} => Decide,
+        {"expand", 1} => Expand,
+        {"value", 1} => :value
+      })
+
+    assert {:ok, document} = Codec.encode(data, registry)
+    assert {:ok, restored} = Codec.decode(document, registry)
+
+    results =
+      for target <- [Example, data, restored],
+          do: Exec.run(target, %{value: 7}, %{})
+
+    assert length(Enum.uniq(results)) == 1
+    assert {:handoff, %Instruction{}, _effects} = hd(results)
+  end
+
+  test "a Handoff joins more than one dependency before its selector" do
+    flow =
+      Flow.new!(%{
+        name: "handoff_multiple_parents",
+        components: [
+          %{kind: :step, name: "left", action: Echo, params: %{value: 2}},
+          %{kind: :step, name: "right", action: Echo, params: %{value: 3}},
+          %{
+            kind: :handoff,
+            name: "next",
+            selector: SelectTwo,
+            params: %{
+              left: Ref.result("left", :value),
+              right: Ref.result("right", :value)
+            }
+          }
+        ],
+        output: Ref.result("next")
+      })
+
+    rebuilt = flow |> Jido.Exec.Compiler.compile!() |> Runic.Workflow.build_log() |> Runic.Workflow.from_log()
+
+    {completed, observation} = Runic.Workflow.execute(rebuilt, %{})
+
+    assert Jido.Test.Exec.RunnerHarness.result(completed, observation) ==
+             {:handoff, %Instruction{target: Target, kind: :action, params: %{value: 5}}, []}
+  end
+
+  test "handoff normalization rejects invalid targets and non-portable open input" do
+    assert {:error, _} = Runtime.handoff(Enum, %{})
+
+    assert {:error, %{details: %{reason: :non_portable_durable_value}}} =
+             Runtime.handoff(Target, %{value: 1, resource: self()})
+
+    assert {:error, _} = Runtime.handoff(PortableTarget, %{value: 1, resource: self()})
+
+    for runtime <- [context: %{tenant: "tenant"}, metadata: %{request_id: "request"}] do
+      bound = Instruction.new!([target: Target] ++ [runtime])
+
+      assert {:error, %{details: %{reason: :bound_handoff_runtime}}} =
+               Runtime.handoff(bound, %{value: 1})
+    end
+  end
+
+  test "a nested Flow cannot terminate its parent with a handoff" do
+    parent =
+      Flow.new!(%{
+        name: "parent",
+        components: [
+          %{kind: :subflow, name: "child", flow: Example, params: %{value: 1}}
+        ],
+        output: Ref.result("child")
+      })
+
+    assert {:error, error} = Exec.run(parent, %{}, %{})
+    assert error.message == "handoff must finish the root Flow"
+    assert error.details.reason == :nested_handoff
+  end
+
+  test "managed results retain the same terminal contract across restore" do
+    runner = __MODULE__.Runner
+    start_supervised!({Runic.Runner, name: runner})
+    owner = self()
+    id = "handoff-#{System.unique_integer([:positive])}"
+    opts = [on_complete: fn _, _ -> send(owner, :done) end]
+    assert {:ok, _} = Jido.Test.Exec.RunnerHarness.start(runner, id, Example, %{value: 3}, %{}, opts)
+    assert_receive :done, 2_000
+
+    assert {:handoff, %Instruction{params: %{value: 3}}, [:predecessor_effect]} =
+             Jido.Test.Exec.RunnerHarness.result(runner, id)
+
+    assert :ok = Runic.Runner.stop(runner, id, persist: true)
+    assert {:ok, _} = Jido.Test.Exec.RunnerHarness.resume(runner, id, %{}, opts)
+
+    assert {:handoff, %Instruction{params: %{value: 3}}, [:predecessor_effect]} =
+             Jido.Test.Exec.RunnerHarness.result(runner, id)
+  end
+
+  defp handoff_flow(selector) do
+    Flow.new!(%{
+      name: "invalid_handoff_selector",
+      components: [%{kind: :handoff, name: "next", selector: selector}],
+      output: Ref.result("next")
+    })
+  end
+end

@@ -1,121 +1,118 @@
 defmodule Jido.Plugin.Config do
   @moduledoc """
-  Resolves and validates plugin configuration.
+  Deferred environment references for Plugin options.
 
-  Config resolution merges three sources (in order of precedence):
-  1. Per-agent overrides (highest priority)
-  2. Application environment config (`Application.get_env(otp_app, plugin_module)`)
-  3. Default values from the plugin's config_schema (lowest priority)
+  `env/1` stores a variable name as `{:env, name}`. It does not read the
+  environment. `use Jido.Agent` imports this helper for DSL declarations.
+  Map authoring can use `Jido.Plugin.Config.env/1` or the same tuple.
 
-  ## Example
+  A Plugin runtime owner calls `resolve/1` when it starts its resources. The
+  runtime keeps the resolved options. Agent definitions, JSON documents, and
+  snapshots retain the references. A replacement runtime resolves them again
+  from the current environment.
 
-      # In config/config.exs:
-      config :my_app, MyApp.SlackPlugin,
-        token: "default-token",
-        channel: "#general"
-
-      # In agent definition:
-      use Jido.Agent,
-        plugins: [
-          {MyApp.SlackPlugin, %{channel: "#support"}}  # Override channel
-        ]
-
-      # Resolved config:
-      %{token: "default-token", channel: "#support"}
+  The host application owns environment file loading. This module reads
+  variables with `System.fetch_env/1`. It does not load files or convert values.
+  The Plugin validates the resolved options with its own schema.
   """
+
+  alias Jido.Error
+
+  @typedoc "A required environment variable whose value is read at runtime."
+  @type env_reference :: {:env, String.t()}
 
   @doc """
-  Resolves configuration for a plugin module by merging app env with overrides.
+  Creates a deferred reference without reading the environment.
 
-  ## Parameters
+  Raises `ArgumentError` if the name is empty, is not a UTF-8 string, or
+  contains `=` or a null byte.
 
-  - `plugin_module` - The plugin module (must implement `otp_app/0` and optionally `config_schema/0`)
-  - `overrides` - Per-agent config overrides (map)
-
-  ## Returns
-
-  - `{:ok, resolved_config}` - Successfully resolved and validated config
-  - `{:error, errors}` - Validation errors from Zoi schema
-
-  ## Examples
-
-      Config.resolve_config(MyApp.SlackPlugin, %{channel: "#support"})
-      # => {:ok, %{token: "env-token", channel: "#support"}}
-
-      Config.resolve_config(MyApp.SlackPlugin, %{invalid: "field"})
-      # => {:error, validation_errors}
+      iex> Jido.Plugin.Config.env("API_KEY")
+      {:env, "API_KEY"}
   """
-  @spec resolve_config(module(), map()) :: {:ok, map()} | {:error, list()}
-  def resolve_config(plugin_module, overrides \\ %{}) do
-    base_config = get_app_env_config(plugin_module)
-    merged_config = Map.merge(base_config, overrides)
-
-    validate_config(plugin_module, merged_config)
+  @spec env(String.t()) :: env_reference()
+  def env(name) do
+    if valid_name?(name),
+      do: {:env, name},
+      else: raise(ArgumentError, "env/1 requires a nonempty environment variable name")
   end
 
   @doc """
-  Like `resolve_config/2` but raises on validation errors.
+  Resolves environment references in Plugin option values.
 
-  ## Examples
+  Walks plain map values, lists, keyword lists, and tuples. Preserves map keys,
+  keyword order, duplicate keyword entries, and tuple shape. Structs and other
+  values are unchanged. Environment values remain strings, including empty
+  strings. `{:env, name}` is reserved, including in lists such as
+  `[env("ROOM_ID")]`; an `:env` keyword entry has the same reference meaning.
 
-      Config.resolve_config!(MyApp.SlackPlugin, %{channel: "#support"})
-      # => %{token: "env-token", channel: "#support"}
-
-      Config.resolve_config!(MyApp.SlackPlugin, %{invalid: "field"})
-      # Raises ArgumentError when the resolved config fails schema validation.
+  Missing variables return `Jido.Error.ValidationError` with `kind: :config`
+  and details `%{code: :missing_env, name: name, path: path}`. Invalid reference
+  names return details `%{code: :invalid_env, path: path}`. Paths contain map
+  or keyword keys and zero-based list or tuple indices. Errors do not include
+  the complete configuration or resolved values. Improper lists return code
+  `:invalid_config` and the path of the invalid tail.
   """
-  @spec resolve_config!(module(), map()) :: map()
-  def resolve_config!(plugin_module, overrides \\ %{}) do
-    case resolve_config(plugin_module, overrides) do
-      {:ok, config} ->
-        config
+  @spec resolve(term()) :: {:ok, term()} | {:error, Error.ValidationError.t()}
+  def resolve(value), do: resolve(value, [])
 
-      {:error, errors} ->
-        raise ArgumentError,
-              "Config validation failed for #{inspect(plugin_module)}: #{inspect(errors)}"
+  defp resolve({:env, name}, path) do
+    if valid_name?(name) do
+      case System.fetch_env(name) do
+        {:ok, value} -> {:ok, value}
+        :error -> error("Required environment variable is missing", :missing_env, path, name)
+      end
+    else
+      error("Invalid environment variable reference", :invalid_env, path)
     end
   end
 
-  @doc false
-  @spec get_app_env_config(module()) :: map()
-  def get_app_env_config(plugin_module) do
-    otp_app = get_otp_app(plugin_module)
+  defp resolve(value, _path) when is_struct(value), do: {:ok, value}
 
-    if otp_app do
-      Application.get_env(otp_app, plugin_module, %{})
-      |> normalize_to_map()
-    else
-      %{}
-    end
+  defp resolve(value, path) when is_map(value) do
+    with {:ok, pairs} <- resolve_pairs(Enum.sort(value), path), do: {:ok, Map.new(pairs)}
   end
 
-  defp get_otp_app(plugin_module) do
-    if function_exported?(plugin_module, :otp_app, 0) do
-      plugin_module.otp_app()
-    else
-      nil
-    end
+  defp resolve(value, path) when is_list(value) do
+    if Keyword.keyword?(value) and not Keyword.has_key?(value, :env),
+      do: resolve_pairs(value, path),
+      else: resolve_list(value, path, 0)
   end
 
-  defp normalize_to_map(config) when is_list(config), do: Map.new(config)
-  defp normalize_to_map(config) when is_map(config), do: config
-  defp normalize_to_map(_), do: %{}
-
-  defp validate_config(plugin_module, config) do
-    config_schema = get_config_schema(plugin_module)
-
-    if config_schema do
-      Zoi.parse(config_schema, config)
-    else
-      {:ok, config}
-    end
+  defp resolve(value, path) when is_tuple(value) do
+    with {:ok, values} <- resolve_list(Tuple.to_list(value), path, 0),
+         do: {:ok, List.to_tuple(values)}
   end
 
-  defp get_config_schema(plugin_module) do
-    if function_exported?(plugin_module, :config_schema, 0) do
-      plugin_module.config_schema()
-    else
-      nil
-    end
+  defp resolve(value, _path), do: {:ok, value}
+
+  defp resolve_pairs([], _path), do: {:ok, []}
+
+  defp resolve_pairs([{key, value} | rest], path) do
+    with {:ok, value} <- resolve(value, path ++ [key]),
+         {:ok, rest} <- resolve_pairs(rest, path),
+         do: {:ok, [{key, value} | rest]}
+  end
+
+  defp resolve_list([], _path, _index), do: {:ok, []}
+
+  defp resolve_list([value | rest], path, index) do
+    with {:ok, value} <- resolve(value, path ++ [index]),
+         {:ok, rest} <- resolve_list(rest, path, index + 1),
+         do: {:ok, [value | rest]}
+  end
+
+  defp resolve_list(_tail, path, index),
+    do: error("Configuration lists must be proper lists", :invalid_config, path ++ [index])
+
+  defp valid_name?(name) when is_binary(name),
+    do: name != "" and String.valid?(name) and not String.contains?(name, ["=", <<0>>])
+
+  defp valid_name?(_name), do: false
+
+  defp error(message, code, path, name \\ nil) do
+    details = %{code: code, path: path}
+    details = if name, do: Map.put(details, :name, name), else: details
+    {:error, Error.validation_error(message, kind: :config, details: details)}
   end
 end

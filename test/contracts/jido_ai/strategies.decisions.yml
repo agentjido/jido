@@ -1,0 +1,5 @@
+- id: strategies-component-boundary
+  date: "2026-10-27"
+  decision: Keep the seven non-ReAct standard reasoning graphs in one jido_ai.strategies component with one common request and result contract.
+  driver: The strategies differ in graph routing, but they share model execution, turn records, and authoring rules.
+  approved_by: User-requested initial Covenant scaffold

@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!-- test that each onentry handler is a separate block.  The <send> of event1 will cause an error but
+ the increment to var1 should happen anyways -->
+
+
+<scxml  conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="1"/>
+ </datamodel>
+       
+<state id="s0">
+  <onentry>
+    <send conf:illegalTarget="" event="event1"/>
+    </onentry>
+  <onentry>
+    <conf:incrementID id="1"/>
+    </onentry>
+    
+  <transition  conf:idVal="1=2" conf:targetpass=""/>
+  <transition  conf:targetfail=""/>
+
+</state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

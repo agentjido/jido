@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--  test that ecmascript objects defined by <data> have value undefined if <data> does not assign a value -->
+
+
+<scxml  datamodel="ecmascript"  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+  <datamodel>
+    <data id="var1"/>
+    </datamodel>
+     
+<state id="s0">
+
+  <transition  cond="var1==undefined" conf:targetpass=""/>
+  <transition  conf:targetfail=""/>
+</state>
+
+
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<!-- we test 'optimally enabled set', specifically that preemption works correctly --> 
+
+
+<scxml  initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+  <datamodel>
+   <data conf:id="1" expr="0"/>
+   </datamodel>
+   
+<state id="s0" initial="p0">
+  <onentry>
+     <raise event="event1"/>
+     <send event="timeout" delay="1s"/>
+    </onentry>
+  <transition event="event2" conf:targetfail=""/>   
+  <transition event="timeout" conf:targetfail=""/>
+   
+ <parallel id="p0">
+ 	
+ 	<state id="p0s1">
+ 		<transition event="event1"/>
+ 		<transition event="event2"/>
+ 		</state>
+ 
+ <state id="p0s2">
+   <transition event="event1" target="p0s1">
+     <raise event="event2"/>
+     </transition>
+     
+   </state>
+   
+ <state id="p0s3">
+   <!-- this transition should be blocked by the one in p0s2-->
+   <transition event="event1" conf:targetfail=""/>
+   <!-- this transition will preempt the one that p0s2 inherits
+   from an ancestor  -->
+   <transition event="event2" target="s1"/>
+
+   </state> 
+
+<state id="p0s4">
+	<!-- this transition never gets preempted, should fire twice -->
+	<transition event="*">
+		<conf:incrementID id="1"/>
+		</transition>
+	</state> 
+ 
+</parallel>
+</state>
+
+<state id="s1">
+  <transition conf:idVal="1=2" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+  </state>
+
+<conf:pass/>
+<conf:fail/>
+</scxml>

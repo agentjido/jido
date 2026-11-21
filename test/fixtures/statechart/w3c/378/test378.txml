@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!-- test that each onexithandler is a separate block.  The <send> of event1 will cause an error but
+ the increment to var1 should happen anyways -->
+
+
+<scxml  version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="1"/>
+ </datamodel>
+       
+<state id="s0">
+  <onexit>
+    <send conf:illegalTarget="" event="event1"/>
+    </onexit>
+  <onexit>
+    <conf:incrementID id="1"/>
+    </onexit>
+    
+<transition target="s1"/>
+</state>
+
+<state id="s1">
+  <transition  conf:idVal="1=2" conf:targetpass=""/>
+  <transition  conf:targetfail=""/>
+</state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

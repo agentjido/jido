@@ -1,0 +1,965 @@
+# Public API Guide
+
+This guide lists the public functions of the Jido modules you call most, grouped by task. Use it to find a function, then follow its link for the full document. It is a map of the API, not a replacement for the generated module pages.
+
+A module is public when it has a module document, and a function is public when it has a function document. `@doc false` functions are private even when they are exported. The [Module and Namespace Map](module-and-namespace-map.md) lists every public module, including the many Action modules inside `Jido.AI.Reasoning`.
+
+Each table is generated from the function documents. The arity shown is the highest one. A function with default arguments also has lower arities, so `Jido.AgentServer.call/3` can also be called with two arguments.
+
+## Functions that `use` generates
+
+`use` adds functions to your own module. These do not appear in the module tables below.
+
+| You write | Your module gets |
+| --- | --- |
+| `use Jido, otp_app: :my_app` | `child_spec/1`, `start_link/1`, and `config/1` |
+| `use Jido.Agent` | `instantiate/1`, `instantiate!/1`, `definition/0`, `schema/0`, `vsn/0`, `cmd/3`, and a `<as>_signal/2` and `<as>_signal!/2` pair for each named route |
+| `use Jido.Action` | `run/2` (yours), `name/0`, `description/0`, `schema/0`, `output_schema/0`, `validate_params/1`, `validate_output/1`, `authoring_contract/0` |
+| `use Jido.Flow` | `flow/0`, `run/2`, `name/0`, `description/0`, `schema/0`, `output_schema/0`, `validate_params/1`, `validate_output/1`, `authoring_contract/0` |
+| `use Jido.Signal` | `type/0`, `default_source/0`, `datacontenttype/0`, `dataschema/0`, `schema/0`, `validate_data/1`, `new/2`, `new!/2` |
+
+```elixir
+defmodule ApiGuide.Reserve do
+  use Jido.Action,
+    name: "reserve_stock",
+    schema: Jido.Joi.object(%{sku: Jido.Joi.string()})
+
+  @impl true
+  def run(%{sku: sku}, _context), do: {:ok, %{reserved: sku}}
+end
+
+defmodule ApiGuide.OrderFlow do
+  use Jido.Flow,
+    name: "order_flow",
+    schema: Jido.Joi.object(%{sku: Jido.Joi.string()})
+
+  flow do
+    step "reserve", action: ApiGuide.Reserve, params: %{sku: input(:sku)}
+    output result("reserve")
+  end
+end
+
+defmodule ApiGuide.Order do
+  use Jido.Agent, name: "api_guide_order"
+
+  state do
+    schema Jido.Joi.object(%{status: Jido.Joi.string() |> Jido.Joi.default("new")})
+  end
+
+  routes do
+    signal_source "/orders"
+
+    route "order.place", as: :place do
+      action %{}, schema: Jido.Joi.object(%{}), context: context do
+        {:ok, %{context.agent_state | status: "placed"}}
+      end
+    end
+  end
+end
+
+defmodule ApiGuide.OrderPlaced do
+  use Jido.Signal,
+    type: "order.placed",
+    default_source: "/orders",
+    schema: Jido.Joi.object(%{id: Jido.Joi.string()})
+end
+
+for {module, functions} <- [
+      {ApiGuide.Reserve, [name: 0, run: 2, validate_params: 1, validate_output: 1, authoring_contract: 0]},
+      {ApiGuide.OrderFlow, [flow: 0, run: 2, name: 0, validate_params: 1, authoring_contract: 0]},
+      {ApiGuide.Order, [instantiate: 1, instantiate!: 1, definition: 0, schema: 0, vsn: 0, cmd: 3, place_signal: 2, place_signal!: 2]},
+      {ApiGuide.OrderPlaced, [type: 0, default_source: 0, schema: 0, validate_data: 1, new: 2, new!: 2]}
+    ],
+    {name, arity} <- functions do
+  true = function_exported?(module, name, arity)
+end
+
+{:ok, %{reserved: "sku-1"}} = Jido.Exec.run(ApiGuide.OrderFlow, %{sku: "sku-1"})
+```
+
+A `use Jido` instance has no generated runtime functions. Pass the instance to `Jido` functions, as in `Jido.start_agent(MyApp.Jido, MyApp.Order)`.
+
+## Behaviours
+
+Implement these to extend Jido. An optional callback can be left out.
+
+| Behaviour | Required callbacks | Optional callbacks | Guide |
+| --- | --- | --- | --- |
+| `Jido.Action` | `c:Jido.Action.run/2` | `c:Jido.Action.on_before_validate_params/1` | [Actions](../actions/actions.md) |
+| `Jido.Agent` | None | `c:Jido.Agent.initialize/2`, `c:Jido.Agent.checkpoint/2`, `c:Jido.Agent.restore/2` | [Agent Callbacks](../agents/agent-callbacks.md) |
+| `Jido.Plugin` | None | `c:Jido.Plugin.state_spec/1`, `c:Jido.Plugin.validate_options/1`, `c:Jido.Plugin.directives/1`, `c:Jido.Plugin.select_route/2`, `c:Jido.Plugin.prepare/2`, `c:Jido.Plugin.prepare_route_input/4`, `c:Jido.Plugin.reduce/2`, `c:Jido.Plugin.admit/3`, `c:Jido.Plugin.prepare_outbound/4`, `c:Jido.Plugin.dispatch/4`, `c:Jido.Plugin.after_commit/3`, `c:Jido.Plugin.child_spec/1`, `c:Jido.Plugin.await_ready/2`, `c:Jido.Plugin.dump/3`, `c:Jido.Plugin.load/3` | [Plugin Design](../plugins/plugin-design.md) |
+| `Jido.Persistence.Store` | `c:Jido.Persistence.Store.validate_options/1`, `c:Jido.Persistence.Store.get/2`, `c:Jido.Persistence.Store.compare_and_swap/4`, `c:Jido.Persistence.Store.delete/2` | `c:Jido.Persistence.Store.put/3`, `c:Jido.Persistence.Store.scan/4` | Custom Adapters |
+| `Jido.Signal.Dispatch.Adapter` | `c:Jido.Signal.Dispatch.Adapter.options_schema/0`, `c:Jido.Signal.Dispatch.Adapter.deliver/2` | None | [Signal Dispatch Adapters](../signals/dispatch-adapters.md) |
+| `Jido.Signal.Bus.Store` | `c:Jido.Signal.Bus.Store.init/1`, `c:Jido.Signal.Bus.Store.append/2`, `c:Jido.Signal.Bus.Store.read/2`, `c:Jido.Signal.Bus.Store.latest_cursor/1`, `c:Jido.Signal.Bus.Store.put_subscription/2`, `c:Jido.Signal.Bus.Store.list_subscriptions/1`, `c:Jido.Signal.Bus.Store.delete_subscription/2` | None | [Durable Subscriptions](../signals/durable-subscriptions.md) |
+| `Jido.Plugin.Timer.DeliveryAdapter` | `c:Jido.Plugin.Timer.DeliveryAdapter.schedule/3`, `c:Jido.Plugin.Timer.DeliveryAdapter.reconcile/2` | None | [Timers](../built-in-plugins/timers.livemd) |
+| `Jido.Codec.Contract` | `c:Jido.Codec.Contract.type/0`, `c:Jido.Codec.Contract.version/0`, `c:Jido.Codec.Contract.target/0`, `c:Jido.Codec.Contract.decode/2` | `c:Jido.Codec.Contract.encode/2` | [Jido.Codec Documents](../data/versioned-documents.md) |
+| `Jido.AI.ToolSource` | `c:Jido.AI.ToolSource.list_tools/2`, `c:Jido.AI.ToolSource.run_tool/3` | None | [Tools and Toolsets](../ai/tools-skills-and-toolsets.livemd) |
+| `Jido.AI.InferenceClient` | Each model operation, 22 callbacks. Start from `c:Jido.AI.InferenceClient.generate_text/3`. | None | [Inference Clients](../ai/inference-clients.md) |
+
+`use Jido.Action` generates `validate_params/1` and `validate_output/1`, so `run/2` is the only one you write. A `Jido.Flow.Extension` provides Flow DSL macros. See [Flow Extensions](../flows/flow-modules.md).
+
+## Schemas
+
+`Jido.Joi` has 93 public functions, one for each schema type and refinement, so this guide does not list them. See [Jido.Joi Validation](../data/joi-validation.md) and the `Jido.Joi` module page.
+
+## Instances and stable Agent Addresses
+
+Guides: [Instances and Tenants](../operations/configuration-and-tenant-isolation.md).
+
+### `Jido`
+
+自動 (Jido) - A declarative actor and agent framework for Elixir, built for workflows and multi-agent systems.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.activate_agent/3` | Activates one existing durable Agent with an explicit stable Agent Address. |
+| `Jido.agent_address/3` | Builds one stable Agent Address in the selected instance namespace. |
+| `Jido.agent_ownership/2` | Returns the local runtime ownership of one resident Agent. |
+| `Jido.call/4` | Sends one synchronous Signal through a stable Agent Address. |
+| `Jido.cancel_turn/4` | Cancels one matching Turn for a stable Agent Address. |
+| `Jido.cast/3` | Sends one best-effort asynchronous Signal through a stable Agent Address. |
+| `Jido.create_agent/4` | Creates one durable Agent with an explicit stable Agent Address. |
+| `Jido.delete_agent/3` | Writes a durable tombstone for one inactive stable Agent Address. |
+| `Jido.list_agents/2` | Lists Agents with options in the selected Jido instance. |
+| `Jido.reconcile_agent/3` | Replaces one faulted activation from its authoritative durable record. |
+| `Jido.replace_agent/4` | Replaces one exact inactive durable Agent definition with preserve or reset state policy. |
+| `Jido.resident_agent_count/2` | Counts resident Agent activations. |
+| `Jido.resolve_agent/2` | Resolves the current local worker for one stable Agent Address. |
+| `Jido.start/1` | Start the default Jido instance for scripts and Livebook. |
+| `Jido.start_agent/3` | Starts one Agent under the selected Jido instance supervisor. |
+| `Jido.start_link/1` | Starts a Jido instance supervisor. |
+| `Jido.status/3` | Returns Turn status through a stable Agent Address. |
+| `Jido.stop/1` | Stop a Jido instance. |
+| `Jido.stop_agent/3` | Stops an Agent with options in the selected Jido instance. |
+| `Jido.submit/4` | Submits one AgentServer turn through a stable Agent Address. |
+| `Jido.thaw/4` | Thaws an Agent with options in the selected Jido instance. |
+| `Jido.transfer_agent_ownership/4` | Adopts or transfers one resident Agent with a fenced expected ownership value. |
+| `Jido.upgrade_agent/4` | Applies one trusted upgrade Action to an inactive durable Agent. |
+| `Jido.whereis_agent/3` | Looks up an Agent with options in the selected Jido instance. |
+
+## Live Agents
+
+Guides: [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd), [Status and Snapshots](../agent-servers/status-and-history.md).
+
+### `Jido.AgentServer`
+
+Runs one serialized Agent Turn at a time.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AgentServer.abandon/1` | Stops local waiting for one pending Turn without cancelling it. |
+| `Jido.AgentServer.await/2` | Waits for a submitted Turn and returns its `TurnResult`. |
+| `Jido.AgentServer.await_ready/2` | Waits for Plugin startup and readiness. |
+| `Jido.AgentServer.call/3` | Runs one Signal and waits for its accepted `TurnResult`. |
+| `Jido.AgentServer.cancel_turn/3` | Cancels the matching active or waiting Turn, including a pending Handoff in its chain. |
+| `Jido.AgentServer.cast/3` | Sends one Signal through the same Turn path and discards its reply. |
+| `Jido.AgentServer.child_spec/1` | Returns a child specification for one complete activation. |
+| `Jido.AgentServer.quiesce/2` | Closes admission and returns a stable `Status`. |
+| `Jido.AgentServer.remove_topology_member/4` | Drains and removes one declared member slot from this activation. |
+| `Jido.AgentServer.resume/2` | Reopens admission when the activation is safe. |
+| `Jido.AgentServer.snapshot/2` | Returns the complete committed `Snapshot`. |
+| `Jido.AgentServer.status/2` | Returns the process-neutral semantic `Status`. |
+| `Jido.AgentServer.stop/3` | Stops one resident activation and returns its final `Snapshot`. |
+| `Jido.AgentServer.submit/3` | Submits one Signal and returns an owner-bound `Pending` value. |
+
+### `Jido.AgentServer.Plugin`
+
+Live Plugin state access and lifecycle policy for one AgentServer.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AgentServer.Plugin.state/2` | Reads the current state owned by one live Plugin runtime. |
+
+### `Jido.AgentServer.Command`
+
+The live AgentServer admission envelope.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AgentServer.Command.new/3` | Creates one validated AgentServer command. |
+| `Jido.AgentServer.Command.validate/1` | Validates one AgentServer command. |
+
+## Agent definitions and commands
+
+Guides: [Define an Agent](../agents/define-and-instantiate-an-agent.livemd).
+
+### `Jido.Agent`
+
+Author Agent definitions as Maps or with the Spark DSL.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Agent.build_signal/3` | Builds one Agent-owned Signal from an Action context without dispatching it. |
+| `Jido.Agent.cmd/3` | Runs one complete Turn through `Jido.Exec.run/4` without an AgentServer. |
+| `Jido.Agent.define/1` | Builds and validates a neutral Agent definition from a plain Map. |
+| `Jido.Agent.define!/1` | Builds one neutral Agent definition or raises its validation error. |
+| `Jido.Agent.definition/1` | Returns the neutral definition for an Agent value or compiled Agent module. |
+| `Jido.Agent.definition?/1` | Checks definition shape only. |
+| `Jido.Agent.instance?/1` | Checks instance shape only. |
+| `Jido.Agent.instantiate/2` | Builds and validates one Agent instance from a definition or compiled Agent module. |
+| `Jido.Agent.instantiate!/2` | Builds one Agent instance or raises its validation error. |
+| `Jido.Agent.schema/1` | Returns the state schema, including Plugin-owned fields. |
+| `Jido.Agent.set/2` | Replaces supplied top-level domain fields and validates the complete next state. |
+| `Jido.Agent.validate/1` | Validates a definition or instance, including schema, routes, and provider data. |
+
+### `Jido.Agent.Directive`
+
+Changes and runtime work returned by an Agent executable turn.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Agent.Directive.emit/2` | Creates an emission request. |
+| `Jido.Agent.Directive.reply/1` | Creates one correlated response request. |
+| `Jido.Agent.Directive.validate/1` | Validates one built-in or custom Agent Directive. |
+
+### `Jido.Agent.Address`
+
+Stable identity for one logical Agent.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Agent.Address.from_map/1` | Decodes and validates one exact version-1 Agent Address map. |
+| `Jido.Agent.Address.from_map!/1` | Decodes one exact version-1 Agent Address map or raises its validation error. |
+| `Jido.Agent.Address.new/1` | Creates and validates one Agent Address. |
+| `Jido.Agent.Address.new!/1` | Creates one Agent Address or raises its validation error. |
+| `Jido.Agent.Address.schema/0` | Returns the static schema for an Agent Address. |
+| `Jido.Agent.Address.to_map/1` | Returns the exact version-1 public map for one Agent Address. |
+| `Jido.Agent.Address.to_map!/1` | Returns the exact version-1 public map or raises its validation error. |
+| `Jido.Agent.Address.validate/1` | Validates one Agent Address without changing its identity fields. |
+
+### `Jido.AgentOwnership`
+
+A process-neutral, activation-scoped fence for one local Agent ownership
+relation. The struct is the public contract and has no public functions.
+
+### `Jido.Agent.Route`
+
+Pure route normalization and selection.
+
+This module has no public functions. Its struct is the contract.
+
+### `Jido.Agent.Topology`
+
+Logical members and output connections.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Agent.Topology.bind/3` | Binds member inputs from one parent state snapshot. |
+| `Jido.Agent.Topology.checks/3` | Reports connection proofs. |
+| `Jido.Agent.Topology.connections_for/3` | Selects all declared output connections for one logical source and type. |
+
+### `Jido.Agent.View`
+
+Builds a safe, framework-neutral view of one Agent.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Agent.View.project/3` | Projects one Agent source as a JSON-safe map. |
+
+## Actions, Instructions, and execution
+
+Guides: [Actions](../actions/actions.md), [Execution](../flow-runtime/execution.md).
+
+### `Jido.Action.Inline`
+
+Compile-time inline Action support for host DSLs.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Action.Inline.compile!/3` | Compiles a declaration with an explicit `name:` and no compiler options. |
+| `Jido.Action.Inline.compile!/4` | Builds declaration and target AST inside a compiling owner module. |
+| `Jido.Action.Inline.parse_bound!/3` | Parses named bindings, a binding list, a sole map binding, or `[]`. |
+| `Jido.Action.Inline.parse_callback!/3` | Parses a named parameter variable or a map pattern for direct callback input. |
+| `Jido.Action.Inline.setup!/1` | Installs owner hooks during module construction. |
+| `Jido.Action.Inline.target!/2` | Returns the compiled Action for the owner's exact typed path. |
+
+### `Jido.Action.Output`
+
+Explicit envelope for successful Action outputs that are not normal maps.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Action.Output.batch/2` | Builds an explicit batch output envelope. |
+| `Jido.Action.Output.opaque/2` | Builds an explicit opaque output envelope. |
+| `Jido.Action.Output.preserve/2` | Builds an output that applies the output schema and keeps its root shape. |
+| `Jido.Action.Output.raw/2` | Builds an explicit raw output envelope. |
+| `Jido.Action.Output.stream/2` | Builds an explicit stream output envelope. |
+
+### `Jido.Instruction`
+
+Defines the invocation value for one Action or Flow target.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Instruction.bind/4` | Binds concrete call data to an inert Instruction template. |
+| `Jido.Instruction.new/1` | Creates an Instruction from a map or keyword list. |
+| `Jido.Instruction.new!/1` | Creates an Instruction or raises on failure. |
+| `Jido.Instruction.resolve/3` | Resolves a target or Instruction and applies call-site data. |
+| `Jido.Instruction.template/3` | Creates an inert Instruction template for a module target. |
+| `Jido.Instruction.validate/1` | Validates the current target contract. |
+
+### `Jido.Exec`
+
+Compiles and runs Jido Actions and Flows with Runic.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Exec.compile/2` | Compiles an Action, Instruction, Flow module, or Flow value to Runic. |
+| `Jido.Exec.result/2` | Projects one Runic execution observation to the `run/4` result contract. |
+| `Jido.Exec.run/4` | Runs an Action or Flow to completion with the in-memory Runic runtime. |
+| `Jido.Exec.supports?/2` | Returns true when an Action context supports the specified host capability. |
+
+### `Jido.Exec.Wait`
+
+Portable data for one suspended Flow wait.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Exec.Wait.input/2` | Builds a portable input for one wait from a Signal. |
+| `Jido.Exec.Wait.matches?/3` | Checks an event name and payload against this wait. |
+| `Jido.Exec.Wait.new/1` | Creates and validates one portable wait value. |
+| `Jido.Exec.Wait.next_deadline/1` | Returns the earliest timer deadline, or `nil`. |
+
+### `Jido.Durable`
+
+Runs and resumes persisted Flows from Signals without an Agent. Every operation
+uses the persistence adapter of the named Jido instance.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Durable.ref/2` | Builds a portable durable execution reference. |
+| `Jido.Durable.start/4` | Starts or idempotently resumes one persisted Flow from a Signal. |
+| `Jido.Durable.resume/3` | Continues a stored execution to its next durable stop. |
+| `Jido.Durable.signal/5` | Saves one Signal for an addressed wait and continues the Flow. |
+| `Jido.Durable.status/2` | Reads the last committed state, waits, and next wake time. |
+| `Jido.Durable.result/2` | Reads the normal Exec result from the last committed state. |
+
+One direct operation can own a reference at a time. If a call returns
+`{:error, :execution_busy}`, retry after the active call reaches its next
+durable stop. Set `:operation_timeout` in milliseconds to bound progress
+across the operation. After expiry, the worker stops and a retry resumes from
+the last confirmed checkpoint. A storage call and cleanup can finish after
+expiry.
+
+Status keeps the waits and next wake time when it reports `:ready`. A host
+can resume that work immediately.
+
+## Flows and expressions
+
+Guides: [Flows](../flows/flows.md), [Flow Data Definitions](../flow-data/flow-data.md).
+
+### `Jido.Flow`
+
+Defines the canonical Jido Flow data artifact and compile-time module DSL.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Flow.decode_defaults/2` | Decodes JSON Flow defaults with the selected Flow input schema. |
+| `Jido.Flow.dependencies/1` | Returns explicit, reference, and effective dependencies for each component. |
+| `Jido.Flow.encode_defaults/2` | Encodes partial Flow defaults as JSON data after schema validation. |
+| `Jido.Flow.explain/1` | Returns the versioned canonical inspection data for a Flow. |
+| `Jido.Flow.from_action/1` | Builds the canonical one-step Flow for an Action module. |
+| `Jido.Flow.from_action!/1` | Builds the canonical one-step Flow for an Action module, or raises. |
+| `Jido.Flow.new/1` | Builds and validates one canonical Flow value from a data definition. |
+| `Jido.Flow.new!/1` | Builds one canonical Flow value or raises its validation error. |
+| `Jido.Flow.normalize_defaults/2` | Validates partial, portable input defaults for one Flow module. |
+| `Jido.Flow.semantic_identity/1` | Returns the deterministic SHA-256 and UUIDv8 identity for a Flow. |
+| `Jido.Flow.to_map/1` | Converts a Flow artifact to its deterministic semantic map. |
+| `Jido.Flow.validate/1` | Validates the exact canonical Flow structure. |
+
+### `Jido.Flow.Ref`
+
+A portable reference in a canonical Flow expression.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Flow.Ref.accumulator/1` | Builds a Reduce accumulator reference. |
+| `Jido.Flow.Ref.body_result/1` | Builds an Iterate body result reference. |
+| `Jido.Flow.Ref.context/1` | Builds a runtime context reference. |
+| `Jido.Flow.Ref.input/1` | Builds a Flow input reference with a required path. |
+| `Jido.Flow.Ref.item/1` | Builds a Map or Reduce item reference. |
+| `Jido.Flow.Ref.item_id/0` | Builds a collection item identifier reference. |
+| `Jido.Flow.Ref.item_index/0` | Builds a collection item index reference. |
+| `Jido.Flow.Ref.iteration_index/0` | Builds an Iterate index reference. |
+| `Jido.Flow.Ref.result/2` | Builds a named component result reference. |
+| `Jido.Flow.Ref.select/2` | Appends a path to a reference after validating its source. |
+| `Jido.Flow.Ref.state/1` | Builds an Iterate state reference. |
+
+### `Jido.Flow.Inline`
+
+Compiles an embedded Flow declaration for another module DSL.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Flow.Inline.compile!/4` | Compiles one embedded Flow declaration. |
+| `Jido.Flow.Inline.setup!/1` | Installs owner hooks during module construction. |
+| `Jido.Flow.Inline.target!/2` | Returns the generated Flow module for an owner's exact typed path. |
+
+### `Jido.Flow.Extension`
+
+Defines compile-time macro extensions for the Flow module DSL.
+
+This module has no public functions. Its struct is the contract.
+
+### `Jido.Flow.Value`
+
+Defines the canonical Flow value union.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Flow.Value.validate_data/1` | Validates portable Flow data without references or expressions. |
+| `Jido.Flow.Value.validate_object/1` | Validates a portable Flow metadata object. |
+
+### `Jido.Expr`
+
+Small, data-only expressions for limited use in Flow DSLs.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Expr.evaluate/2` | Evaluates an expression tree with bounded fixed operations. |
+| `Jido.Expr.expr/1` | Builds expression data from source; `^variable` inserts trusted host data. |
+| `Jido.Expr.new/2` | Constructs an expression after checking its operator and operand arity. |
+| `Jido.Expr.new!/2` | Constructs an expression, or raises `Jido.Expr.Error`. |
+| `Jido.Expr.normalize/2` | Normalizes an expression or a data tree without evaluating operations. |
+| `Jido.Expr.operations/0` | Returns the closed list of supported Elixir operators and arities. |
+| `Jido.Expr.parse/2` | Parses quoted source with the shared, inert expression grammar. |
+| `Jido.Expr.parse!/2` | Parses quoted source, or raises on a parse failure. |
+| `Jido.Expr.reduce/4` | Reduces an expression or data tree with limits and exact paths. |
+| `Jido.Expr.validate/2` | Validates a complete expression tree without running operations. |
+
+## Signals
+
+Guides: [Custom Signals](../signals/signals-and-custom-types.md), [Signal Bus](../signals/signal-bus-and-subscriptions.md).
+
+### `Jido.Signal`
+
+Defines the Jido event envelope.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Signal.defined?/1` | Returns true when `module` was defined with `use Jido.Signal`. |
+| `Jido.Signal.delete_context/2` | Deletes a CloudEvents extension context attribute. |
+| `Jido.Signal.get_context/2` | Gets a CloudEvents extension context attribute. |
+| `Jido.Signal.list_context/1` | Lists the CloudEvents extension context attribute names. |
+| `Jido.Signal.new/1` | Creates a Signal from an attribute map or keyword list. |
+| `Jido.Signal.new/3` | Creates a Signal with an explicit type, data value, and attributes. |
+| `Jido.Signal.new!/1` | Creates a Signal and raises when its envelope is invalid. |
+| `Jido.Signal.new!/3` | Creates a Signal with explicit type and data, or raises when it is invalid. |
+| `Jido.Signal.put_context/3` | Adds a CloudEvents extension context attribute. |
+| `Jido.Signal.schema/0` | Returns the Joi schema for the core Signal envelope. |
+
+### `Jido.Signal.Context`
+
+Validates CloudEvents extension context attributes.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Signal.Context.delete/2` | Deletes one context attribute from a Signal. |
+| `Jido.Signal.Context.delete_trace/1` | Deletes W3C, causation, and legacy trace attributes from a Signal. |
+| `Jido.Signal.Context.ensure_trace/2` | Returns the Signal trace, or creates and stores a new root Trace. |
+| `Jido.Signal.Context.get/2` | Gets one context attribute from a Signal. |
+| `Jido.Signal.Context.get_trace/1` | Gets the valid Trace carried by a Signal. |
+| `Jido.Signal.Context.names/1` | Lists the context attribute names on a Signal. |
+| `Jido.Signal.Context.normalize/1` | Validates and normalizes a context attribute map. |
+| `Jido.Signal.Context.put/3` | Adds one validated context attribute to a Signal. |
+| `Jido.Signal.Context.put_trace/2` | Puts a valid Trace on a Signal. |
+| `Jido.Signal.Context.trace_names/0` | Lists the Signal extension names used for Trace propagation. |
+
+### `Jido.Signal.Codec`
+
+Encodes and decodes Signals through the canonical CloudEvents map.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Signal.Codec.deserialize/2` | Decodes one Signal or a list of Signals. |
+| `Jido.Signal.Codec.from_map/1` | Parses a complete CloudEvents structured-mode map. |
+| `Jido.Signal.Codec.serialize/2` | Encodes one Signal or a list of Signals. |
+| `Jido.Signal.Codec.serialize!/2` | Encodes one Signal or a list of Signals, or raises. |
+| `Jido.Signal.Codec.to_map/1` | Returns the canonical CloudEvents structured-mode map. |
+
+### `Jido.Signal.Catalog`
+
+Selects and validates explicitly registered Signal definitions.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Signal.Catalog.decode/3` | Decodes one canonical wire map or binary and validates its definition. |
+| `Jido.Signal.Catalog.new/1` | Builds a catalog from an explicit list of custom Signal modules. |
+| `Jido.Signal.Catalog.new!/1` | Builds a catalog, or raises `Jido.Error.ValidationError`. |
+| `Jido.Signal.Catalog.validate/2` | Revalidates an existing Signal without replacing its identity or metadata. |
+
+### `Jido.Signal.Router`
+
+Maps Signal type patterns to ordered targets.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Signal.Router.add/2` | Adds one or more routes and preserves their registration order. |
+| `Jido.Signal.Router.count/1` | Returns the number of registered Route values. |
+| `Jido.Signal.Router.empty?/1` | Checks if a Router has no routes. |
+| `Jido.Signal.Router.filter/2` | Filters Signals whose types match a route path pattern. |
+| `Jido.Signal.Router.has_route?/2` | Checks if an exact route path is registered. |
+| `Jido.Signal.Router.list/1` | Lists Routes in registration order. |
+| `Jido.Signal.Router.matches?/2` | Checks if a Signal type matches a route path pattern. |
+| `Jido.Signal.Router.merge/2` | Appends routes or another Router to a Router. |
+| `Jido.Signal.Router.new/2` | Creates a Router from route specifications. |
+| `Jido.Signal.Router.new!/2` | Creates a Router and raises for an invalid route specification. |
+| `Jido.Signal.Router.normalize/1` | Normalizes and validates one or more route specifications. |
+| `Jido.Signal.Router.path/1` | Resolves a route path. |
+| `Jido.Signal.Router.remove/2` | Removes all routes that have one of the specified paths. |
+| `Jido.Signal.Router.route/2` | Returns all targets whose route path and optional `Route.match` predicate match a Signal. |
+| `Jido.Signal.Router.validate/1` | Validates one or more Route values with the Route Joi schema. |
+
+### `Jido.Signal.Dispatch`
+
+Validates dispatch targets and delivers Signals.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Signal.Dispatch.dispatch/2` | Delivers a Signal to one target or a list of targets. |
+| `Jido.Signal.Dispatch.validate_opts/1` | Validates one target tuple or a list of target tuples. |
+
+### `Jido.Signal.Bus`
+
+Provides ordered local publish and subscribe delivery for Signals.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Signal.Bus.ack/3` | Acknowledges the current record for a durable subscription. |
+| `Jido.Signal.Bus.child_spec/1` | Returns a child specification for a named Bus. |
+| `Jido.Signal.Bus.delete_subscription/2` | Permanently removes a subscription and its durable cursor. |
+| `Jido.Signal.Bus.publish/2` | Publishes Signals after the Store accepts all records. |
+| `Jido.Signal.Bus.replay/3` | Reads retained records that match a signal-type path. |
+| `Jido.Signal.Bus.start_link/1` | Starts a Bus linked to the caller. |
+| `Jido.Signal.Bus.subscribe/3` | Adds a subscription for a signal-type path. |
+| `Jido.Signal.Bus.unsubscribe/3` | Detaches a subscription target. |
+| `Jido.Signal.Bus.via_tuple/2` | Returns the Registry tuple for a Bus name. |
+| `Jido.Signal.Bus.whereis/2` | Finds a Bus by PID, name, or `{name, registry}` tuple. |
+
+## Plugins
+
+Guides: [Plugin Design](../plugins/plugin-design.md).
+
+### `Jido.Plugin.Config`
+
+Deferred environment references for Plugin options.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Plugin.Config.env/1` | Creates a deferred reference without reading the environment. |
+| `Jido.Plugin.Config.resolve/1` | Resolves environment references in Plugin option values. |
+
+### `Jido.Plugin.Audit`
+
+Stores bounded domain audit records in portable Agent state.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Plugin.Audit.record/3` | Creates one domain audit Directive. |
+
+### `Jido.Statechart`
+
+Use `Jido.Plugin.Statechart` to run an SCXML chart on an Agent. Route its
+application events through `Jido.Plugin.Statechart.Route`.
+See [Statecharts](../built-in-plugins/statecharts.md).
+
+| API | Purpose |
+| --- | --- |
+| `Jido.Statechart.sigil_SCXML/2` | Compiles literal SCXML at compile time. |
+| `Jido.Statechart.compile/1` | Compiles XML and returns a chart or a typed error. |
+| `Jido.Statechart.compile!/1` | Compiles XML and raises on failure. |
+| `Jido.Statechart.spawn/3` | Starts an Agent and initializes its chart. |
+| `Jido.Statechart.initialize/3` | Initializes a chart on an existing Agent. |
+| `Jido.Statechart.session/1` | Reads the committed chart session. |
+| `Jido.Statechart.BasicHTTP.receive_post/3` | Submits a Basic HTTP request body as a chart event. |
+
+### `Jido.Plugin.Timer`
+
+Adds delayed, static periodic, interval, and cron Signals to an Agent. See
+[Timers](../built-in-plugins/timers.livemd).
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Plugin.Timer.cancel/1` | Creates one recurring schedule cancellation Directive. |
+| `Jido.Plugin.Timer.cron/4` | Creates one recurring Signal Directive. |
+| `Jido.Plugin.Timer.every/4` | Creates one recurring fixed-delay Signal Directive. |
+| `Jido.Plugin.Timer.next_occurrence/3` | Returns the next UTC occurrence after one UTC instant. |
+| `Jido.Plugin.Timer.occurrence_signal/5` | Builds one fresh recurring occurrence Signal. |
+| `Jido.Plugin.Timer.pause/1` | Pauses one recurring interval without removing it. |
+| `Jido.Plugin.Timer.resume/1` | Resumes one paused recurring interval. |
+| `Jido.Plugin.Timer.schedule/2` | Creates one delayed Signal Directive. |
+
+### `Jido.Plugin.SensorManager`
+
+Keeps supervised sensor processes aligned with portable Agent state.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Plugin.SensorManager.start/3` | Creates a Directive that adds or replaces one tagged sensor. |
+| `Jido.Plugin.SensorManager.stop/1` | Creates a Directive that removes one tagged sensor. |
+
+### `Jido.Plugin.FSM`
+
+Declare this Plugin in the Agent's `plugins` list. Use `state_machine` to
+define the initial state, terminal states, and transitions. A transition
+selects a matching route by alias and advances the `:fsm` state after its
+Action or Flow succeeds. The Catalog reference is `{"id": "jido.fsm", "vsn": 1}`.
+
+See [Upgrade the beta FSM Plugin](v2-to-v3-migration.md#upgrade-the-beta-fsm-plugin).
+
+## Persistence
+
+Guides: [Storage Model](../storage/persistence-storage-model.md).
+
+### `Jido.Persistence`
+
+Saves and restores portable Agent checkpoints through a persistence adapter.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Persistence.delete_agent/4` | Logically deletes one Agent record with a compare-and-swap tombstone. |
+| `Jido.Persistence.load_agent/4` | Loads and restores one Agent value. |
+| `Jido.Persistence.load_agent_with_revision/4` | Loads and restores one Agent value with its stored revision. |
+| `Jido.Persistence.resolve_config/2` | Resolves and validates a persistence adapter configuration. |
+| `Jido.Persistence.restore/2` | Restores saved definition and state without consulting the source definition. |
+| `Jido.Persistence.save_agent/3` | Saves one Agent checkpoint with an atomic revision check. |
+| `Jido.Persistence.snapshot/2` | Captures the complete Agent as portable data without writing storage. |
+| `Jido.Persistence.upgrade/3` | Runs an explicit data upgrade Action before resolving saved code references. |
+| `Jido.Persistence.upgrade_agent/5` | Atomically upgrades one inactive saved Agent. |
+
+### `Jido.Persistence.Store`
+
+Shared byte storage boundary for Jido runtimes.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Persistence.Store.compare_and_swap/4` | Atomically writes bytes when the supplied read condition still holds. |
+| `Jido.Persistence.Store.delete/2` | Physically deletes one key for explicit maintenance and cleanup. |
+| `Jido.Persistence.Store.open/1` | Validates a byte adapter and returns its normalized configuration. |
+| `Jido.Persistence.Store.read/2` | Returns bytes and the condition from one read of a validated store. |
+| `Jido.Persistence.Store.scan/3` | Returns one optional prefix-bounded page for inspection tools. |
+
+### `Jido.Persistence.Config` and codecs
+
+A persistence profile combines one Store with one codec. The Term codec is
+the compact default. The JSON codec is an inspectable opt-in format.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Persistence.Config.open/1` | Validates and opens one persistence profile. |
+| `Jido.Persistence.Config.encode/2` | Encodes one logical record with the profile codec. |
+| `Jido.Persistence.Config.decode/3` | Decodes one logical record with the profile codec. |
+| `Jido.Persistence.Codec.open/1` | Validates one codec module. |
+| `Jido.Persistence.Codec.Term.encode/1` | Encodes compact deterministic Erlang term bytes. |
+| `Jido.Persistence.Codec.Term.decode/2` | Decodes Term bytes, safely by default. |
+| `Jido.Persistence.Codec.JSON.encode/1` | Encodes one value as tagged JSON. |
+| `Jido.Persistence.Codec.JSON.decode/2` | Decodes tagged JSON for a compatible release. |
+
+### `Jido.Persistence.Inspector`
+
+Read-only inspection redacts Agent state and execution fact values by default.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Persistence.Inspector.read/3` | Safely decodes one supported V3 record. |
+| `Jido.Persistence.Inspector.export_jsonl/4` | Exports supported scanned V3 records as JSONL. |
+| `Jido.Persistence.Inspector.redact/1` | Redacts state and execution values. |
+
+### `Jido.Persistence.Ecto.Migration`
+
+Creates and removes the default Ecto persistence table.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Persistence.Ecto.Migration.current_version/0` | Returns the latest migration version. |
+| `Jido.Persistence.Ecto.Migration.down/1` | Reverses migrations through the selected version. |
+| `Jido.Persistence.Ecto.Migration.up/1` | Runs migrations through the selected version. |
+
+## Observability
+
+Guides: [Telemetry Events](telemetry-event-reference.md), [Trace Context](../data/trace-context.md).
+
+### `Jido.Telemetry`
+
+The public runtime observability API.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Telemetry.metrics/0` | Returns metric definitions for the Jido semantic event catalog. |
+| `Jido.Telemetry.open_telemetry?/0` | Returns true when the optional OpenTelemetry mapping is active. |
+
+### `Jido.Telemetry.AI`
+
+The public observability API for AI Agent execution.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Telemetry.AI.attach/3` | Attaches one handler to the complete event inventory. |
+| `Jido.Telemetry.AI.attach_open_telemetry/1` | Attaches the vendor-neutral Agent, reasoning, tool, and ReqLLM OpenTelemetry bridges. |
+| `Jido.Telemetry.AI.events/0` | Returns the complete AI Agent event inventory, including lower layers. |
+| `Jido.Telemetry.AI.metrics/0` | Returns low-cardinality metrics for Agent, tool, and model operations. |
+| `Jido.Telemetry.AI.open_telemetry?/0` | Returns true when optional OpenTelemetry mapping is active. |
+
+### `Jido.Telemetry.AgentServer`
+
+Owns the semantic event contract for AgentServer runtime work.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Telemetry.AgentServer.event_names/0` | Returns every semantic AgentServer event name. |
+| `Jido.Telemetry.AgentServer.point_metrics/0` | Returns the AgentServer point metric specifications. |
+| `Jido.Telemetry.AgentServer.span_metrics/0` | Returns the AgentServer span metric specifications. |
+
+### `Jido.Telemetry.Exec`
+
+Emits semantic telemetry for Jido execution.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Telemetry.Exec.event_names/0` | Returns all telemetry event names emitted by Jido Exec. |
+
+### `Jido.Trace`
+
+One validated W3C trace value for Jido.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Trace.child/2` | Creates a child Trace with a new span ID. |
+| `Jido.Trace.from_traceparent/2` | Parses a W3C version 00 traceparent value. |
+| `Jido.Trace.metadata/1` | Returns the W3C carrier and semantic fields as one flat metadata map. |
+| `Jido.Trace.new/1` | Creates a new root Trace. |
+| `Jido.Trace.schema/0` | Returns the Joi schema for a Trace value. |
+| `Jido.Trace.telemetry_context/1` | Returns the trace fields used as semantic telemetry metadata. |
+| `Jido.Trace.to_traceparent/1` | Formats a Trace as a W3C version 00 traceparent value. |
+| `Jido.Trace.valid?/1` | Checks a Trace struct or traceparent string. |
+| `Jido.Trace.with_causation/2` | Returns a Trace with one causation identifier. |
+
+## Data values
+
+Guides: [Jido.Codec Documents](../data/versioned-documents.md), [Catalog and Discovery](../data/catalog.md), [Sessions and Threads](../data/sessions-and-threads.md), [Jido Error Contracts](../data/error-contracts.md).
+
+### `Jido.Codec`
+
+Compiles Joi-backed JSON codecs and routes trusted versioned documents.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Codec.decode/2` | Decodes one trusted runtime document. |
+| `Jido.Codec.decode_json/2` | Decodes one trusted runtime JSON document. |
+| `Jido.Codec.encode/2` | Encodes one supported runtime value. |
+| `Jido.Codec.encode_json/2` | Encodes one supported runtime value as JSON. |
+
+### `Jido.Catalog`
+
+A passive registry of explicitly registered values.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Catalog.from_targets/3` | Builds an explicit Catalog from a map of references to values. |
+| `Jido.Catalog.from_targets!/3` | Builds a Catalog from a compact target map or raises its error. |
+| `Jido.Catalog.get/3` | Returns the exact Entry for a stable ID and version. |
+| `Jido.Catalog.get_by_target/2` | Returns a registered Entry for a value. |
+| `Jido.Catalog.list/1` | Lists all Entries in deterministic order. |
+| `Jido.Catalog.new/1` | Builds an immutable Catalog from Entries or Manifests. |
+| `Jido.Catalog.new!/1` | Builds an immutable Catalog or raises `ArgumentError`. |
+| `Jido.Catalog.reference/2` | Returns a registered reference for a value. |
+| `Jido.Catalog.resolve/2` | Resolves one exact registered reference. |
+
+### `Jido.Catalog.Discovery`
+
+Builds and atomically publishes the application-wide Catalog. It also selects
+bundled document codecs without published state.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Catalog.Discovery.bundled_codec/2` | Returns the bundled codec for one exact document type and version. |
+| `Jido.Catalog.Discovery.catalog/0` | Returns the current immutable application-wide Catalog. |
+| `Jido.Catalog.Discovery.get/2` | Returns a discovered entry for a stable identifier and `vsn`. |
+| `Jido.Catalog.Discovery.get_by_target/1` | Returns a discovered registration for a value. |
+| `Jido.Catalog.Discovery.included_plugins/0` | Lists the first-party Plugin modules included in this Jido release. |
+| `Jido.Catalog.Discovery.list/0` | Lists all registered entries. |
+| `Jido.Catalog.Discovery.ready?/0` | Returns true when the first Catalog build is complete. |
+| `Jido.Catalog.Discovery.refresh/1` | Rebuilds and atomically replaces the complete Catalog and Codec index. |
+
+### `Jido.Session`
+
+A portable Agent Session that owns one `Jido.Thread`.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Session.append/2` | Appends entries and returns the complete next Session. |
+| `Jido.Session.close/1` | Closes the Session. |
+| `Jido.Session.decode/1` | Decodes and validates a portable Session map. |
+| `Jido.Session.decode!/1` | Decodes and validates a portable Session map or raises on invalid data. |
+| `Jido.Session.encode/1` | Returns a versioned portable map. |
+| `Jido.Session.from_thread/2` | Builds an open Session around an existing Thread. |
+| `Jido.Session.new/1` | Creates an open Session with an empty Thread or a supplied Thread. |
+| `Jido.Session.open?/1` | Returns true when the Session accepts entries. |
+| `Jido.Session.put_metadata/2` | Replaces the portable Session metadata. |
+| `Jido.Session.schema/0` | Returns the schema for the shape of a portable Session. |
+| `Jido.Session.state_schema/0` | Returns the schema that validates a portable Session in Agent state. |
+
+### `Jido.Thread`
+
+A portable append-only Agent Thread.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Thread.append/2` | Appends entries and returns the complete next Thread. |
+| `Jido.Thread.decode/1` | Decodes and validates a portable Thread map. |
+| `Jido.Thread.encode/1` | Returns a versioned portable map. |
+| `Jido.Thread.entry_count/1` | Returns the number of entries. |
+| `Jido.Thread.filter_by_kind/2` | Returns entries with one of the selected kinds. |
+| `Jido.Thread.get_entry/2` | Returns one entry by its sequence number. |
+| `Jido.Thread.last/1` | Returns the last entry or nil. |
+| `Jido.Thread.new/1` | Creates an empty Thread. |
+| `Jido.Thread.schema/0` | Returns the Thread schema. |
+| `Jido.Thread.slice/3` | Returns entries in an inclusive sequence range. |
+| `Jido.Thread.to_list/1` | Returns entries in append order, from the lowest sequence number to the highest. |
+
+### `Jido.Id`
+
+Creates the RFC 9562 UUID formats used by Jido.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Id.compare_uuid7/2` | Compares the complete binary values of two valid UUIDv7 identifiers. |
+| `Jido.Id.uuid7/0` | Returns a new UUIDv7 identifier. |
+| `Jido.Id.uuid7?/1` | Returns true when the value is a valid UUIDv7 identifier. |
+| `Jido.Id.uuid7_timestamp/1` | Returns the Unix millisecond timestamp in a valid UUIDv7 identifier. |
+| `Jido.Id.uuid8/1` | Formats the first 16 bytes of a binary value as a UUIDv8 identifier. |
+
+### `Jido.Error`
+
+Unified error handling for the Jido ecosystem using Splode.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Error.code/1` | Returns the registered Jido program code carried by an error. |
+| `Jido.Error.config_error/2` | Creates a configuration validation error. |
+| `Jido.Error.execution_error/2` | Creates an execution error. |
+| `Jido.Error.internal_error/2` | Creates an internal error. |
+| `Jido.Error.prefix_path/2` | Prefixes a structured error path. |
+| `Jido.Error.prefix_result_path/2` | Prefixes the field path in a validation error result. |
+| `Jido.Error.retryable?/1` | Returns whether an error is safe to retry by default. |
+| `Jido.Error.routing_error/2` | Creates a routing error. |
+| `Jido.Error.stable_codes/0` | Returns the closed set of Jido-owned program codes. |
+| `Jido.Error.timeout_error/2` | Creates a timeout error. |
+| `Jido.Error.to_map/1` | Converts an error into a stable, public map. |
+| `Jido.Error.traverse_errors/2` | Traverses errors, calling `fun` for each leaf error, and returns a nested map of results grouped by each error's `path`. |
+| `Jido.Error.type/1` | Returns the stable public type for an error. |
+| `Jido.Error.unwrap!/2` | Raises an error if the result is an error, otherwise returns the result |
+| `Jido.Error.validation_error/2` | Creates a validation error. |
+| `Jido.Error.validation_result/4` | Creates a validation error result with a stable code and field path. |
+
+## AI
+
+Guides: [Graph-First AI Agents](../ai/graph-first-ai-agents.livemd), [Reasoning Matrix](reasoning-strategy-matrix.md).
+
+### `Jido.AI.Reasoning`
+
+Small inspection helpers for a graph-first AI Agent.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AI.Reasoning.explain/1` | Returns the root Flow, schemas, defaults, and Agent-local tools. |
+| `Jido.AI.Reasoning.preflight/2` | Validates one request and compiles its root Flow without execution. |
+| `Jido.AI.Reasoning.root/1` | Returns the root reasoning Flow module. |
+
+### `Jido.AI.Budget`
+
+Checks portable request budgets before Jido AI starts more work.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AI.Budget.before_model/2` | Checks all budgets before a model call starts. |
+| `Jido.AI.Budget.remaining_elapsed_ms/2` | Returns the remaining request time in milliseconds. |
+| `Jido.AI.Budget.resources/2` | Checks time, token, and cost budgets before another graph phase starts. |
+| `Jido.AI.Budget.summary/2` | Returns a portable summary of used and configured budgets. |
+
+### `Jido.AI.Usage`
+
+Aggregates normalized usage across all model calls in one request.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AI.Usage.add/2` | Adds one provider usage value to request totals. |
+| `Jido.AI.Usage.cache_observation/3` | Returns provider-reported prompt-cache use for one model call. |
+| `Jido.AI.Usage.normalize/1` | Normalizes provider usage and preserves reported numeric cost facts. |
+| `Jido.AI.Usage.zero/0` | Returns a normalized zero usage value. |
+
+### `Jido.AI.Toolset`
+
+The tools selected for one AI Agent.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AI.Toolset.definitions/1` | Builds ReqLLM definitions for an Agent Toolset. |
+| `Jido.AI.Toolset.names/1` | Returns the model tool names in declaration order. |
+| `Jido.AI.Toolset.provider_tool_choice/3` | Lowers semantic tool-use policy to one provider tool-choice value. |
+| `Jido.AI.Toolset.requirement_satisfied?/3` | Checks whether one final answer satisfies semantic tool-use policy. |
+| `Jido.AI.Toolset.resolve_call/2` | Resolves one portable model tool call against an Agent Toolset. |
+| `Jido.AI.Toolset.select/2` | Selects a request tool subset below the protected Agent allowlist. |
+| `Jido.AI.Toolset.validate/1` | Validates an ordered Agent Toolset. |
+| `Jido.AI.Toolset.validate_call/2` | Validates one portable model tool call against an Agent Toolset. |
+
+### `Jido.AI.ToolResult`
+
+Separates a local Action result from bounded model-visible content.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AI.ToolResult.normalize/2` | Normalizes one local Action outcome without putting its value in model context. |
+| `Jido.AI.ToolResult.project/2` | Returns JSON-safe model content and size metadata. |
+
+### `Jido.AI.Skill`
+
+Loads trusted `SKILL.md` instructions through `Jido.AI.ToolSource`.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AI.Skill.discover/1` | Discovers valid skills one directory level below each root. |
+| `Jido.AI.Skill.load/2` | Loads one discovered skill by name. |
+| `Jido.AI.Skill.source/1` | Builds a portable tool source for trusted skill roots. |
+
+### `Jido.AI.Context`
+
+The lifecycle boundary for one ReqLLM call.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AI.Context.complete/3` | Attaches the exact ReqLLM result without changing the request. |
+| `Jido.AI.Context.new/2` | Builds an open lifecycle around an existing ReqLLM context. |
+| `Jido.AI.Context.prepare/2` | Freezes the exact ReqLLM model, context, and options for one call. |
+| `Jido.AI.Context.schema/0` | Returns the Joi schema for a model-call context. |
+| `Jido.AI.Context.transform/3` | Applies one idempotent transformation to the open ReqLLM context. |
+| `Jido.AI.Context.validate/1` | Validates the lifecycle and its ReqLLM context. |
+
+### `Jido.AI.Thread.Projection`
+
+Projects the canonical `Jido.Session` Thread into portable model messages.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AI.Thread.Projection.append/4` | Appends one portable model message to a Session. |
+| `Jido.AI.Thread.Projection.breakpoint/1` | Returns the final included Thread sequence for one projection. |
+| `Jido.AI.Thread.Projection.context/2` | Projects a Session into the canonical ReqLLM context and its decisions. |
+| `Jido.AI.Thread.Projection.explain/2` | Projects a Thread and reports why each model message was included or excluded. |
+| `Jido.AI.Thread.Projection.messages/1` | Projects complete model exchanges from a Session. |
+| `Jido.AI.Thread.Projection.observe/5` | Appends one non-message observation to a Session. |
+| `Jido.AI.Thread.Projection.project/2` | Projects a bounded set of complete conversation turns from a Session. |
+| `Jido.AI.Thread.Projection.schema/0` | Returns the canonical Agent-state schema for a nullable Session. |
+
+### `Jido.AI.InferenceClient.Selection`
+
+Selects and validates the inference client for one AI operation.
+
+| Function | Summary |
+| --- | --- |
+| `Jido.AI.InferenceClient.Selection.client!/1` | Returns the configured inference client for one action context. |
+
+## Related
+
+- [Module and Namespace Map](module-and-namespace-map.md)
+- Configuration Reference
+- [Telemetry Events](telemetry-event-reference.md)

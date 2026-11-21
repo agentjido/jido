@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<!-- we test that #_invokeid works as  a target of  <send> .  A child  script is invoked and sends us
+childToParent once its running.  Then we send it the event parentToChild using its invokeid as the target.  
+If it receives this event, it sends sends the event eventReceived to its parent session (ths session). 
+If we get this event, we pass, otherwise the child script eventually times out sends invoke.done and we fail.
+We also set a timeout in this process to make sure the test doesn't hang  -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+  
+<state id="s0" initial="s01" >
+  <onentry>
+   <send event="timeout" delay="5s"/>
+   </onentry>
+   
+  <invoke type="scxml" id="invokedChild">
+    <content>
+    <!-- let the parent session know we're running by sending childToParent, then wait for parentToChild.
+       If we get it, send eventReceived.  If we don't we eventually time out -->
+          <scxml initial="sub0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+ 
+         <state id="sub0">
+            <onentry>
+           <send event="childToParent" target="#_parent"/>
+            <send event="timeout" delay="3s"/>
+          </onentry>
+    
+        <transition event="parentToChild" target="subFinal">
+          <send target="#_parent" event="eventReceived"/>
+         </transition>
+    
+          <transition event="timeout" target="subFinal"/>
+         </state>
+
+        <final id="subFinal"/>
+
+         </scxml>
+      </content>
+     </invoke>
+     
+  <transition event="timeout" conf:targetfail=""/> 
+  <transition event="done.invoke" conf:targetfail=""/>
+  
+<state id="s01">
+    <transition event="childToParent" target="s02">
+         <send target="#_invokedChild" event="parentToChild"/>
+     </transition>
+</state>
+
+<state id="s02">
+  <transition event="eventReceived" conf:targetpass=""/>
+  </state>
+
+</state>
+
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

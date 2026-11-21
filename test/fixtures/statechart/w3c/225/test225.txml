@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!-- we test that the automatically generated id is unique, we call invoke twice and compare the ids.   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+ <datamodel>
+   <data conf:id="1"/>
+   <data conf:id="2"/>
+   </datamodel>
+     
+<state id="s0" >
+  <onentry>
+    <send event="timeout" delay="1s"/>
+    </onentry>
+
+   <invoke type="http://www.w3.org/TR/scxml/" conf:idlocation="1">
+      <content>
+      <scxml initial="subFinal1" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+         <final id="subFinal1"/>
+        </scxml>
+     </content>
+     </invoke>
+   <invoke type="http://www.w3.org/TR/scxml/" conf:idlocation="2" >
+      <content>
+      <scxml initial="subFinal2" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+         <final id="subFinal2"/>
+        </scxml>
+     </content>
+     </invoke>
+
+  <transition event="*" target="s1"/>
+</state>
+
+<state id="s1">
+  <transition conf:VarEqVar="1 2" conf:targetfail=""/>
+  <transition conf:targetpass=""/>
+  </state>
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

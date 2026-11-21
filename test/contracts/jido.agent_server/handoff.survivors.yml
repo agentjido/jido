@@ -1,0 +1,29 @@
+- at: lib/jido/agent_server.ex:1977:49
+  operator: element_removal
+  mutation: "`status: :released` → `(removed)`"
+  sort: equivalent
+  reason: >-
+    pending_handoff is created only by handoff_transition/1 after
+    release_handoff/3 returns a released receipt. The public coordinator cannot
+    put an accepted or terminal receipt in this mailbox-only state.
+
+- at: lib/jido/agent_server.ex:2389:9
+  operator: return_nil
+  mutation: "`cleanup(put_in(data.active.failure_stage, :preparing), {:er…` → `nil`"
+  sort: dead-code
+  reason: >-
+    A transient predecessor skips portable validation, so accept_handoff/2
+    always returns ok. A durable Flow predecessor validates its source,
+    context, and terminal Handoff instruction before this coordinator call.
+    Therefore the public server path cannot return an error from
+    accept_handoff/2. The clause remains defensive for invalid internal data.
+
+- at: lib/jido/agent_server.ex:3156:9
+  operator: element_removal
+  mutation: "`from: if(handoff_result?(data.active.result)) do data.active.from…` → `(removed)`"
+  sort: equivalent
+  reason: >-
+    For the Handoff result owned by this Contract, this field writes the
+    existing data.active.from value back to the same map. Removing that write
+    produces the same coordinator state. The other branch is ordinary Turn
+    reconciliation and is outside this Handoff component.

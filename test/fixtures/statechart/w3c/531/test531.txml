@@ -1,0 +1,22 @@
+<!-- test that that the value of the <param> _scxmleventname gets used as the name
+of the raised event. -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+   
+<state id="s0">
+  <onentry>
+    <send event="timeout" delay="3s"/>
+    <send   conf:basicHTTPAccessURITarget="" type="http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor">
+      <param name="_scxmleventname" conf:quoteExpr="test"/>
+      </send>  
+     </onentry>
+     
+     <!-- if we get an event named 'test' we succeed. Otherwise fail -->
+  <transition event="test" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+  
+   <conf:pass/>
+   <conf:fail/>
+</scxml>

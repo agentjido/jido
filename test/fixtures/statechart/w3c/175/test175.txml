@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!-- we test that delayexpr uses the current value of var1, not its initial value
+(If it uses the initial value, event2 will be generated first, before event1.  If it uses the current value, 
+event1 will be raised first.  Succeed if event1 occurs before event2, otherwise fail -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:quoteExpr="0s"/>
+  </datamodel>
+  
+<state id="s0">
+  <onentry>
+   <assign conf:location="1" conf:quoteExpr="1s"/>
+   <send conf:delayFromVar="1" event="event2"/>
+   <send conf:delay=".5" event="event1"/>
+    </onentry>
+    
+  <transition event="event1"  target="s1"/>
+  <transition event="event2" conf:targetfail=""/>
+ </state>
+
+<state id="s1">
+  <transition event="event2"  conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+  </state>
+   
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

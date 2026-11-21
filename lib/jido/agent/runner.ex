@@ -1,0 +1,406 @@
+defmodule Jido.Agent.Runner do
+  @moduledoc false
+
+  alias Jido.Agent.{Plugin, Validation}
+  alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
+  alias Jido.Error
+  alias Jido.Signal
+
+  @type stage :: :route | :prepare | :input | :compose | :validate
+  @type admission :: map()
+
+  defmodule Prepared do
+    @moduledoc false
+
+    @enforce_keys [
+      :agent,
+      :schema,
+      :signal,
+      :source_signal,
+      :route,
+      :instruction,
+      :exec_opts,
+      :plugin_specs
+    ]
+    defstruct @enforce_keys
+
+    @type t :: %__MODULE__{
+            agent: map(),
+            schema: Jido.Joi.schema(),
+            signal: Jido.Signal.t(),
+            source_signal: Jido.Signal.t(),
+            route: map(),
+            instruction: Jido.Instruction.t(),
+            exec_opts: keyword(),
+            plugin_specs: [Jido.Plugin.Spec.Agent.t()]
+          }
+  end
+
+  @doc false
+  @spec run(map(), Signal.t(), keyword()) ::
+          {:ok, map(), [struct()]}
+          | {:handoff, map(), Jido.Instruction.t(), [struct()]}
+          | {:error, term()}
+  def run(agent, %Signal{} = signal, opts) do
+    with {:ok, prepared} <- prepare(agent, signal, opts),
+         result <-
+           Jido.Exec.run(
+             prepared.instruction,
+             %{},
+             %{},
+             prepared.exec_opts
+           ) do
+      finish(prepared, result)
+    end
+  end
+
+  @doc false
+  @spec prepare(map(), Signal.t(), keyword()) ::
+          {:ok, Prepared.t()} | {:error, term()}
+  def prepare(agent, %Signal{} = signal, opts) do
+    prepare_direct(agent, signal, opts) |> unstage()
+  end
+
+  @doc false
+  @spec prepare_admitted(
+          admission(),
+          term(),
+          keyword(),
+          term()
+        ) ::
+          {:ok, Prepared.t()} | {:error, stage(), term()}
+  def prepare_admitted(
+        admission,
+        source_signal,
+        exec_opts,
+        plugin_specs
+      ) do
+    prepare_admitted(admission, source_signal, exec_opts, plugin_specs, nil)
+  end
+
+  @doc false
+  @spec prepare_admitted_handoff(
+          admission(),
+          term(),
+          Jido.Instruction.t(),
+          keyword(),
+          term()
+        ) :: {:ok, Prepared.t()} | {:error, stage(), term()}
+  def prepare_admitted_handoff(
+        admission,
+        source_signal,
+        %Jido.Instruction{} = instruction,
+        exec_opts,
+        plugin_specs
+      ) do
+    prepare_admitted(admission, source_signal, exec_opts, plugin_specs, instruction)
+  end
+
+  defp prepare_admitted(
+         %{
+           agent: agent,
+           signal: %Signal{} = signal,
+           context: context,
+           plugin_inputs: plugin_inputs
+         },
+         %Signal{} = source_signal,
+         exec_opts,
+         plugin_specs,
+         successor
+       ) do
+    agent_specs = Plugin.specs(plugin_specs)
+
+    with :ok <- at(:input, Validation.validate_caller_context(context)),
+         {:ok, selection} <-
+           at(:route, select(agent, source_signal, plugin_inputs, agent_specs)),
+         {:ok, schema} <-
+           at(:input, Plugin.compose_schema_from_specs(agent.schema, plugin_specs)) do
+      at(
+        :route,
+        prepared(
+          agent,
+          schema,
+          signal,
+          select_successor(selection, successor),
+          context,
+          exec_opts,
+          plugin_inputs,
+          agent_specs
+        )
+      )
+    end
+  end
+
+  defp select_successor(selection, nil), do: selection
+
+  defp select_successor(selection, instruction),
+    do: %{selection | executable: instruction, input: %{}}
+
+  @doc false
+  @spec finish_for_server(Prepared.t(), term()) ::
+          {:ok, map(), [struct()]}
+          | {:handoff, map(), Jido.Instruction.t(), [struct()]}
+          | {:error, stage(), term()}
+  def finish_for_server(%Prepared{} = prepared, result), do: do_finish(prepared, result)
+
+  defp prepare_direct(agent, signal, opts) do
+    {caller_context, exec_opts} = Keyword.pop(opts, :context, %{})
+
+    with {:ok, caller_context} <- at(:input, Validation.normalize_context(caller_context)),
+         :ok <- at(:input, Validation.validate_caller_context(caller_context)),
+         validation = Validation.validate_instance_with_plugins(agent),
+         {:ok, agent, specs, schema} <- at(:input, validation),
+         {:ok, signal} <- at(:input, Validation.normalize_signal(signal)),
+         plugin_specs = Plugin.specs(specs),
+         {:ok, plugin_inputs} <- at(:prepare, Plugin.prepare(agent, signal, plugin_specs)),
+         {:ok, selection} <-
+           at(:route, select(agent, signal, plugin_inputs, plugin_specs)) do
+      at(
+        :route,
+        prepared(
+          agent,
+          schema,
+          signal,
+          selection,
+          caller_context,
+          exec_opts,
+          plugin_inputs,
+          plugin_specs
+        )
+      )
+    end
+  end
+
+  defp prepared(
+         agent,
+         schema,
+         signal,
+         selection,
+         caller_context,
+         exec_opts,
+         plugin_inputs,
+         plugin_specs
+       ) do
+    context =
+      Map.merge(caller_context, %{
+        agent_id: agent.id,
+        agent_module: agent.module,
+        agent_signal_source: agent.signal_source,
+        agent_state: agent.state,
+        agent_topology: agent.topology,
+        plugin_inputs: plugin_inputs,
+        signal: signal
+      })
+
+    with {:ok, input} <- prepare_route_input(selection, plugin_specs),
+         {:ok, instruction} <- Jido.Instruction.resolve(selection.executable, input, context),
+         :ok <- Jido.Instruction.validate_resolved(instruction),
+         {:ok, instruction} <- Jido.Exec.Runtime.flow_instruction(instruction) do
+      {:ok,
+       %Prepared{
+         agent: agent,
+         schema: schema,
+         signal: signal,
+         source_signal: selection.source_signal,
+         route: selection.route,
+         instruction: instruction,
+         exec_opts: exec_opts,
+         plugin_specs: plugin_specs
+       }}
+    end
+  end
+
+  defp finish(%Prepared{} = prepared, result) do
+    prepared
+    |> do_finish(result)
+    |> unstage()
+  end
+
+  defp do_finish(
+         %Prepared{} = prepared,
+         {:handoff, %Jido.Instruction{} = instruction, directives}
+       ) do
+    with {:ok, directives} <-
+           at(:compose, Jido.Agent.Directive.directives(prepared.agent, directives)),
+         {:ok, agent, directives} <- settle_candidate(prepared, prepared.agent.state, directives) do
+      {:handoff, agent, instruction, directives}
+    end
+  end
+
+  defp do_finish(%Prepared{} = prepared, result) do
+    with {:ok, output, directives} <- at(:compose, normalize_exec_result(result)),
+         {:ok, directives} <-
+           at(:compose, Jido.Agent.Directive.directives(prepared.agent, directives)),
+         {:ok, state, directives} <-
+           at(:compose, project_route_result(prepared, output, directives)) do
+      settle_candidate(prepared, state, directives)
+    end
+  end
+
+  defp settle_candidate(prepared, state, directives) do
+    with {:ok, state, directives} <-
+           at(
+             :compose,
+             PluginPipeline.run(
+               {:ok, state, directives},
+               prepared.agent,
+               prepared.source_signal,
+               prepared.instruction.context.plugin_inputs,
+               prepared.plugin_specs
+             )
+           ),
+         {:ok, agent} <-
+           at(:validate, Validation.replace_state(prepared.agent, state, prepared.schema)) do
+      {:ok, agent, directives}
+    end
+  end
+
+  defp select(agent, signal, plugin_inputs, plugin_specs) do
+    with {:ok, route} <- Plugin.select_route(agent, signal, plugin_inputs, plugin_specs),
+         {:ok, executable, input, request} <- selection(route, signal) do
+      {:ok,
+       %{
+         executable: executable,
+         input: input,
+         request: request,
+         route: route,
+         source_signal: signal
+       }}
+    end
+  end
+
+  defp selection(%{handler: %{kind: kind, target: target}} = route, signal)
+       when kind in [:action, :flow] do
+    with {:ok, request, input} <- merge_route_input(route, signal), do: {:ok, target, input, request}
+  end
+
+  defp selection(%{handler: handler}, _signal),
+    do: {:ok, Jido.Agent.Runner.SignalHandler, %{handler: handler}, nil}
+
+  defp prepare_route_input(%{executable: target, request: request} = selection, plugin_specs)
+       when is_atom(target) and is_map(request) do
+    Plugin.prepare_route_input(selection.route, request, selection.input, plugin_specs)
+  end
+
+  defp prepare_route_input(selection, _plugin_specs), do: {:ok, selection.input}
+
+  defp normalize_exec_result({:ok, output}), do: normalize_exec_result({:ok, output, []})
+
+  defp normalize_exec_result({:ok, output, directives})
+       when is_map(output) and not is_struct(output),
+       do:
+         with(
+           {:ok, values} <- Jido.Agent.Schema.list(directives, &{:ok, &1}),
+           do: {:ok, output, values}
+         )
+
+  defp normalize_exec_result({:ok, output, _directives}) do
+    {:error,
+     Error.execution_error("Agent executable output must be a plain state map",
+       details: %{code: :agent_invalid_callback_result, callback: :execute, output: output}
+     )}
+  end
+
+  defp normalize_exec_result({:error, reason}), do: {:error, reason}
+
+  defp normalize_exec_result(result) do
+    {:error,
+     Error.execution_error("Agent executable returned an invalid result",
+       details: %{code: :agent_invalid_callback_result, callback: :execute, result: result}
+     )}
+  end
+
+  defp project_route_result(%Prepared{} = prepared, output, directives) do
+    route = prepared.route
+
+    with {:ok, state} <- project_state(route.state, output, prepared.agent.state),
+         :ok <- Jido.Error.prefix_result_path(Jido.Agent.Schema.plain_map(state), :state),
+         {:ok, directives} <- project_reply(route.reply, output, directives, prepared) do
+      {:ok, state, directives}
+    end
+  end
+
+  defp project_state(:unchanged, _output, prepared_state), do: {:ok, prepared_state}
+
+  defp project_state(selector, output, _prepared_state),
+    do: select_output(selector, output, [:state])
+
+  defp project_reply(nil, _output, directives, _prepared), do: {:ok, directives}
+
+  defp project_reply(reply, output, directives, prepared) do
+    with {:ok, data} <- select_output(reply.from, output, [:reply, :from]),
+         {:ok, signal} <- build_reply_signal(reply.type, data, prepared) do
+      {:ok, insert_reply(directives, Jido.Agent.Directive.reply(signal))}
+    end
+  end
+
+  defp insert_reply(directives, reply) do
+    directives ++ [reply]
+  end
+
+  defp select_output(%{source: :output, path: path}, output, mapping_path) do
+    path
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, output}, fn {key, index}, {:ok, value} ->
+      case value do
+        %{^key => selected} ->
+          {:cont, {:ok, selected}}
+
+        _ ->
+          {:halt,
+           Jido.Error.validation_result(
+             :missing_output_field,
+             mapping_path ++ [:path, index],
+             "Selected output field is missing",
+             %{key: key}
+           )}
+      end
+    end)
+  end
+
+  defp build_reply_signal(type, data, %Prepared{} = prepared) do
+    with {:ok, signal} <- Signal.new(type, data, source: prepared.agent.signal_source),
+         {:ok, _request, trace} <- Signal.Context.ensure_trace(prepared.source_signal),
+         {:ok, signal} <-
+           Signal.Context.put_trace(
+             signal,
+             Jido.Trace.with_causation(trace, prepared.source_signal.id)
+           ) do
+      {:ok, signal}
+    else
+      {:error, reason} ->
+        {:error,
+         Error.execution_error("Agent route Reply Signal could not be built",
+           details: %{reason: reason, type: type}
+         )}
+    end
+  end
+
+  defp merge_route_input(route, %Signal{} = signal) do
+    case normalize_input(signal.data) do
+      {:ok, input} ->
+        with {:ok, params} <- Jido.Agent.Route.params(route, input), do: {:ok, input, params}
+
+      {:error, _error} ->
+        {:error,
+         Error.validation_error("Agent Signal data must be a map, keyword list, or nil",
+           kind: :input,
+           subject: :data,
+           field: :data,
+           details: %{signal_id: signal.id, data: signal.data}
+         )}
+    end
+  end
+
+  defp normalize_input(nil), do: {:ok, %{}}
+  defp normalize_input(value), do: Validation.normalize_input(value)
+
+  defp at(_stage, {:ok, _value} = result), do: result
+  defp at(_stage, {:ok, _first, _second} = result), do: result
+  defp at(_stage, {:ok, _first, _second, _third} = result), do: result
+  defp at(_stage, :ok), do: :ok
+  defp at(stage, {:error, reason}), do: {:error, stage, reason}
+
+  defp unstage({:error, _stage, reason}), do: {:error, reason}
+  defp unstage(result), do: result
+end

@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!-- when invoked, if var1 has a value notify parent. Then terminate.   -->
+
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+<datamodel>
+  <data conf:id="1"/>
+  </datamodel>
+
+<state id="s0">
+  <transition conf:isBound="1" target="final">
+    <send target="#_parent" event="varBound"/>
+    </transition>
+  <transition target="final"/>
+  </state>
+  
+<final id="final"/>
+
+</scxml>

@@ -1,0 +1,11 @@
+{
+  "format": 1,
+  "property": "diagnostics",
+  "input": {
+    "depth": 20,
+    "size": 4000,
+    "width": 80,
+    "key": "tuple"
+  },
+  "description": "Fixed review regression. Construct process values at test time."
+}

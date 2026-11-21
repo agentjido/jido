@@ -1,0 +1,22 @@
+<!--  test that we can use any ecmascript expression as a value expression. 
+In this case, we just test that we can assign
+a function to a variable and then call it.  -->
+
+
+<scxml  datamodel="ecmascript"  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+ <datamodel>
+   <data id="var1" expr="function(invar) {return invar + 1;}"/>
+   </datamodel>
+
+<state id="s0">
+  <onentry>
+   <raise event="event1"/>
+   </onentry>
+<!-- test that we can call the function -->  
+   <transition event="event1" cond="var1(2) == 3" conf:targetpass=""/>
+   <transition event="*" conf:targetfail=""/>
+    </state>
+
+<conf:pass/>
+<conf:fail/>
+</scxml>

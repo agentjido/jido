@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+
+<!-- test that invokeid is blank in an event that wasn't returned from an invoked process -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">  
+   
+ <state id="s0">
+   <onentry>
+     <raise  event="foo"/>
+   </onentry>
+   <transition event="foo"  conf:eventFieldHasNoValue="invokeid" conf:targetpass=""/>
+      <transition event="*" conf:targetfail=""/> 
+   </state>
+   
+
+      
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

@@ -1,0 +1,59 @@
+- id: bundled-timer-boundary
+  date: 2026-10-19
+  decision: Give schedule definitions, timer reconciliation, generations, occurrence metadata, restart recovery, and clock rules to jido.plugin.timer.
+  driver: These rules are bundled Timer Plugin behavior, not generic Plugin SDK behavior.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: remove-timer-delivery
+  date: 2026-10-19
+  decision: Remove Timer durable business delivery, enqueue control Signals, pending work, retries, admission, and acknowledgement.
+  driver: Timer production and durable business delivery are different ownership domains. The Timer must not be a second delivery system.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: reject-retired-saved-definitions
+  date: 2026-10-19
+  decision: Reject saved Timer definitions that contain retired delivery fields.
+  driver: Silently stripping pending delivery state can lose business work. An explicit restore failure is safer and makes migration necessary.
+  approved_by: Jido V3 hardening pass
+
+- id: best-effort-timer-slots
+  date: 2026-10-19
+  decision: Restore future recurring timers, but do not replay slots that passed while the Timer runtime was offline.
+  driver: Timer owns timer production. Durable replay belongs to an explicit delivery or application-state design.
+  approved_by: Approved Jido V3 Covenant component map
+
+- id: timer-public-api
+  date: 2026-10-22
+  decision: Expose Timer constructors, validated Directive types, occurrence data, and the separate static-authoring DSL. Keep Agent state and Plugin callbacks on the root. Keep runtime, wall-clock, and DSL entity modules internal. Assign retry and clock options only to the AgentServer owner.
+  driver: Timer options configure the live runtime. They do not configure the owned Agent state schema.
+  approved_by: Component hardening pass
+
+- id: timer-mutation-profile
+  date: 2026-10-19
+  decision: Mutate the Timer root, Directive definitions, occurrence identity, runtime, and clock helpers. Verify the Spark DSL with contract and authoring tests instead of AST mutation.
+  driver: Mutating the Spark entity target to nil exits Spark's compile verifier before Covenant can classify the mutant. The executable DSL contract still protects normalization, validation, and route verification.
+  approved_by: User-requested component hardening pass
+
+- id: stateful-recurring-intervals
+  date: 2026-11-14
+  decision: Add fixed-delay interval definitions and recurring pause and resume to the bundled Timer while keeping Agent work and acknowledgement outside it.
+  driver: Interval timing, lifecycle state, generation fencing, reconciliation, and recovery are Timer concerns. A second Cycle Plugin duplicates those concerns and still depends on Timer.
+  approved_by: User-requested Timer extension
+
+- id: recurring-adapter-compatibility
+  date: 2026-11-14
+  decision: Keep the cron-only reconcile callback unchanged and reject active intervals when an external delivery adapter is configured.
+  driver: Existing durable adapters consume the cron map. External interval delivery needs its own design and must not make the current adapter contract larger by accident.
+  approved_by: User-requested Timer extension
+
+- id: static-periodic-signals
+  date: 2026-11-14
+  decision: Let Timer Agent options create one running fixed-delay interval with the standard periodic Signal defaults.
+  driver: Static periodic Signal production is the same timer lifecycle as a dynamic interval and needs the same state, runtime, and recovery rules.
+  approved_by: User-requested Timer consolidation
+
+- id: heartbeat-consolidation
+  date: 2026-11-14
+  decision: Remove Jido.Plugin.Heartbeat and its runtime. Direct periodic Signal users to Timer.
+  driver: One public timer API and one timer engine are easier to understand, restore, test, and operate.
+  approved_by: User-requested Timer consolidation

@@ -1,0 +1,94 @@
+# The Turn contract tests all valid values produced by StartRequest and the
+# model boundary. These survivors are equivalent within that boundary or only
+# broaden private matching for malformed internal values that the contract does
+# not promise to accept.
+- at: lib/jido_ai/reasoning/actions/decide_input.ex:19:32
+  operator: element_removal
+  mutation: "`allowed: false` → `(removed)`"
+  sort: unpromised
+  reason: "Valid guard decisions contain allowed: true or allowed: false. Removing the false literal only broadens this private clause to malformed non-boolean decisions."
+- at: lib/jido_ai/reasoning/actions/finalize_turn.ex:34:53
+  operator: integer_shift
+  mutation: "`0` → `1`"
+  sort: equivalent
+  reason: "StartRequest always initializes tool_cycle_count, so this Map.get default is not read by a valid turn."
+- at: lib/jido_ai/reasoning/actions/finalize_turn.ex:34:53
+  operator: integer_shift
+  mutation: "`0` → `-1`"
+  sort: equivalent
+  reason: "StartRequest always initializes tool_cycle_count, so this Map.get default is not read by a valid turn."
+- at: lib/jido_ai/reasoning/actions/finalize_turn.ex:55:9
+  operator: element_removal
+  mutation: "`usage: turn.usage` → `(removed)`"
+  sort: equivalent
+  reason: "The response starts from summary, which already contains the same usage value. Removing the duplicate Map.merge override does not change the response."
+- at: lib/jido_ai/reasoning/actions/finalize_turn.ex:56:9
+  operator: element_removal
+  mutation: "`budget: budget` → `(removed)`"
+  sort: equivalent
+  reason: "The response starts from summary, which already contains the same budget value. Removing the duplicate Map.merge override does not change the response."
+- at: lib/jido_ai/reasoning/actions/finalize_turn.ex:71:7
+  operator: element_removal
+  mutation: "`tool_cycles: Map.get(turn, :tool_cycle_count, 0)` → `(removed)`"
+  sort: dead-code
+  reason: "Telemetry.record_agent_summary normalizes a fixed measurement set and does not read tool_cycles. The persisted outcome and response tool_cycles fields are tested separately."
+- at: lib/jido_ai/reasoning/actions/finalize_turn.ex:71:53
+  operator: integer_shift
+  mutation: "`0` → `1`"
+  sort: equivalent
+  reason: "StartRequest always initializes tool_cycle_count, so this Map.get default is not read by a valid turn."
+- at: lib/jido_ai/reasoning/actions/finalize_turn.ex:71:53
+  operator: integer_shift
+  mutation: "`0` → `-1`"
+  sort: equivalent
+  reason: "StartRequest always initializes tool_cycle_count, so this Map.get default is not read by a valid turn."
+- at: lib/jido_ai/reasoning/actions/guard_input.ex:49:26
+  operator: guard_removal
+  mutation: "`when is_list(input)` → `(no guard)`"
+  sort: unpromised
+  reason: "The public request contract accepts binary or list input. Removing this private dispatch guard only changes unsupported input types."
+- at: lib/jido_ai/reasoning/actions/guard_input.ex:52:14
+  operator: guard_removal
+  mutation: "`when is_binary(text)` → `(no guard)`"
+  sort: unpromised
+  reason: "Content-part text is binary when present. Removing this private guard only changes malformed content-part values."
+- at: lib/jido_ai/reasoning/actions/guard_input.ex:60:34
+  operator: guard_removal
+  mutation: "`when is_list(input)` → `(no guard)`"
+  sort: unpromised
+  reason: "The helper receives a list only through the validated list-input branch. Behavior for other private helper inputs is not promised."
+- at: lib/jido_ai/reasoning/actions/guard_input.ex:75:27
+  operator: guard_removal
+  mutation: "`when is_list(input)` → `(no guard)`"
+  sort: unpromised
+  reason: "The helper receives a list only through the validated list-input branch. Behavior for other private helper inputs is not promised."
+- at: lib/jido_ai/reasoning/actions/guard_output.ex:18:24
+  operator: element_removal
+  mutation: "`status: :budget` → `(removed)`"
+  sort: unpromised
+  reason: "Valid budget outcomes carry status: :budget. Removing the literal only broadens the private clause to malformed outcomes with a reason field."
+- at: lib/jido_ai/reasoning/actions/guard_output.ex:26:36
+  operator: element_removal
+  mutation: "`kind: :final_answer` → `(removed)`"
+  sort: unpromised
+  reason: "Valid final outcomes carry kind: :final_answer. Removing the literal only broadens the private clause to unsupported outcome kinds with text."
+- at: lib/jido_ai/reasoning/actions/record_model_attempt.ex:94:12
+  operator: element_removal
+  mutation: "`status: :ok` → `(removed)`"
+  sort: unpromised
+  reason: "A completed ReqLLM response and a non-ok portable outcome are contradictory internal values. The contract does not define that malformed combination."
+- at: lib/jido_ai/reasoning/actions/record_model_attempt.ex:103:42
+  operator: element_removal
+  mutation: "`status: :ok` → `(removed)`"
+  sort: unpromised
+  reason: "Only an ok outcome can be output_allowed and persisted as an assistant message. Removing the literal changes contradictory internal values only."
+- at: lib/jido_ai/reasoning/actions/record_model_attempt.ex:158:41
+  operator: return_nil
+  mutation: "`\"\"` → `nil`"
+  sort: equivalent
+  reason: "Projection.append normalizes nil assistant content to the same empty portable content as an empty string."
+- at: lib/jido_ai/reasoning/actions/start_request.ex:18:52
+  operator: element_removal
+  mutation: "`session: nil` → `(removed)`"
+  sort: equivalent
+  reason: "session/3 sends both the default %{session: nil} and an empty state map through the same new-session fallback."

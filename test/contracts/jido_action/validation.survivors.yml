@@ -1,0 +1,12 @@
+# Validation survivors; reasons apply to the supported Joi facade contract.
+
+- at: "lib/jido_action/validation.ex:11:36"
+  operator: "guard_removal"
+  mutation: "`when is_map(details)` → `(no guard)`"
+  sort: "equivalent"
+  reason: "All admitted calls supply a map for details, as required by the function specification and every Action/Flow caller. Removing this guard preserves those calls."
+- at: "lib/jido_action/validation.ex:19:53"
+  operator: "guard_removal"
+  mutation: "`when is_map(details)` → `(no guard)`"
+  sort: "equivalent"
+  reason: "All admitted calls supply a map for details, as required by the function specification and every Action/Flow caller. Removing this guard preserves those calls."

@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<!-- test that a history state never ends up part of the configuration -->
+
+
+<scxml  version="1.0" initial="p1" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+	<datamodel>
+		  <data conf:id="1" conf:expr="0"/>
+		</datamodel>
+	
+<parallel id="p1">
+  <onentry>
+  	<send delay="2s" event="timeout"/>
+    </onentry>
+   
+   
+  <state id="s0">
+ <transition conf:inState="sh1"  conf:targetfail=""/>
+ <transition event="timeout" conf:targetfail=""/>
+  	</state>
+ 
+           
+<state id="s1">
+	<initial>
+		 <transition target="sh1"/>
+		 	</initial>
+
+
+ <history id="sh1">
+ 	  <transition target="s11"/>
+   	</history>
+  	
+  	<state id="s11">
+  		<transition conf:inState="sh1"  conf:targetfail=""/>
+  		<transition target="s12"/>
+  		</state>
+  		
+  	<state id="s12"/>
+  <transition conf:inState="sh1"  conf:targetfail=""/>
+ <transition conf:idVal="1=0" target="sh1"/>
+ <transition conf:idVal="1=1"  conf:targetpass=""/>
+   <onexit>
+  	<conf:incrementID id="1"/>
+  	</onexit>
+ </state>
+ 
+
+ </parallel>
+ 
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

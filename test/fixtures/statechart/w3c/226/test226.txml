@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!-- this is basically just a test that invoke works correctly and that you can pass data
+to the invoked process.  If the invoked session finds aParam==1, it exits, signalling
+success.  otherwise it will hang and the timeout in this doc signifies failure.   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0" >
+  <onentry>
+    <send event="timeout" delay="3s"/>
+    </onentry>
+
+ 
+   <invoke type="http://www.w3.org/TR/scxml/" src="file:test226sub1.scxml">
+      <param conf:name="1" conf:expr="1"/>
+      </invoke>
+
+  <transition event="varBound" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+</state>
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

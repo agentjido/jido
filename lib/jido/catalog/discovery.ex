@@ -1,0 +1,443 @@
+defmodule Jido.Catalog.Discovery do
+  @moduledoc """
+  Builds and atomically publishes the application-wide Catalog.
+
+  Discovery scans configured application module lists and explicit modules.
+  Modules publish static entries through `__jido_catalog_manifest__/0`. Document
+  codecs implement the `Jido.Codec.Contract` behaviour. One atomic published
+  value contains the immutable Catalog and the private Codec Index.
+
+      config :jido, Jido.Catalog.Discovery,
+        applications: [:my_app, :jido],
+        modules: [MyApp.SpecialAction]
+
+  Use an application allowlist when stored definitions are accepted from
+  users. Discovery is an inventory service. It does not grant permission to
+  execute a discovered module.
+
+  Use `bundled_codec/2` to select an Agent or Flow document codec without a
+  published Catalog or codec index. The caller still supplies and authorizes
+  the explicit Catalog used for decode.
+
+  Use `get/2` and `get_by_target/1` for registered values.
+
+  Inline Actions remain implementation details of their owner modules.
+
+  `jido` starts one asynchronous scan of all loaded applications. This
+  happens once when the consolidated package starts.
+  Applications loaded after this scan can call `refresh/1`. A refresh that
+  publishes before the scan finishes is kept, and the scan discards its result.
+  """
+
+  require Logger
+
+  alias Jido.Catalog
+  alias Jido.Catalog.{Entry, Manifest}
+  alias Jido.Codec.{Contract, Index, Issue}
+
+  @publication_key {:jido, :catalog}
+  @default_applications :loaded
+  @option_keys [:applications, :modules]
+  @included_plugins [
+    Jido.AI.Agent.Plugin,
+    Jido.Plugin.Timer,
+    Jido.Plugin.SensorManager,
+    Jido.Plugin.Statechart,
+    Jido.Plugin.Bus.Manager,
+    Jido.Plugin.Bus.Client,
+    Jido.Plugin.Audit,
+    Jido.Plugin.FSM
+  ]
+  @bundled_codecs %{
+    {"jido.agent.definition", 1} => Jido.Agent.Codec,
+    {"jido.flow", 2} => Jido.Flow.Codec
+  }
+  @base_entry %{
+    id: "jido/schemas/map",
+    vsn: 1,
+    target: Jido.Joi.map(),
+    provider: Jido.Codec,
+    application: :jido
+  }
+
+  @doc false
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {Task, :start_link, [fn -> initialize_child(opts) end]},
+      restart: :temporary,
+      type: :worker
+    }
+  end
+
+  @doc "Returns true when the first Catalog build is complete."
+  @spec ready?() :: boolean()
+  def ready?, do: match?(%{catalog: %Catalog{}, codecs: %Index{}}, published())
+
+  @doc "Lists the first-party Plugin modules included in this Jido release."
+  @spec included_plugins() :: [module()]
+  def included_plugins, do: @included_plugins
+
+  @doc """
+  Returns the bundled codec for one exact document type and version.
+
+  This function reads no published state. It selects only codecs that ship
+  with Jido. It does not authorize a stored reference or a Catalog target.
+  Pass the returned module to `Jido.Codec.decode/2` or
+  `Jido.Codec.decode_json/2` with an explicit trusted Catalog.
+  """
+  @spec bundled_codec(term(), term()) :: {:ok, module()} | {:error, [Issue.t()]}
+  def bundled_codec(type, vsn) do
+    cond do
+      not is_binary(type) or byte_size(type) not in 1..255 or not String.valid?(type) ->
+        codec_issue(
+          :invalid_document_type,
+          ["type"],
+          "codec document type must be a string of 1 to 255 bytes"
+        )
+
+      not is_integer(vsn) or vsn <= 0 ->
+        codec_issue(
+          :invalid_document_vsn,
+          ["vsn"],
+          "codec document vsn must be a positive integer"
+        )
+
+      true ->
+        select_bundled_codec(type, vsn)
+    end
+  end
+
+  @doc "Returns the current immutable application-wide Catalog."
+  @spec catalog() :: Catalog.t()
+  def catalog do
+    case published() do
+      :not_ready -> raise_not_ready()
+      {:error, reason} -> raise_build_failed(reason)
+      %{catalog: %Catalog{} = catalog} -> catalog
+    end
+  end
+
+  @doc false
+  @spec codec_index() :: Index.t()
+  def codec_index do
+    case published() do
+      :not_ready -> raise_not_ready()
+      {:error, reason} -> raise_build_failed(reason)
+      %{codecs: %Index{} = codecs} -> codecs
+    end
+  end
+
+  @doc "Lists all registered entries."
+  @spec list() :: [Entry.t()]
+  def list, do: Catalog.list(catalog())
+
+  @doc "Returns a discovered entry for a stable identifier and `vsn`."
+  @spec get(String.t(), pos_integer()) :: Entry.t() | nil
+  def get(id, vsn), do: Catalog.get(catalog(), id, vsn)
+
+  @doc "Returns a discovered registration for a value."
+  @spec get_by_target(term()) :: Entry.t() | nil
+  def get_by_target(target), do: Catalog.get_by_target(catalog(), target)
+
+  @doc "Rebuilds and atomically replaces the complete Catalog and Codec index."
+  @spec refresh(keyword()) :: :ok | {:error, term()}
+  def refresh(opts \\ []) do
+    with {:ok, publication} <- build_publication(opts) do
+      locked(fn -> :persistent_term.put(@publication_key, publication) end)
+      :ok
+    end
+  end
+
+  # A refresh that publishes while this scan runs is newer, so it is kept.
+  @doc false
+  @spec initialize(keyword()) :: :ok | {:error, term()}
+  def initialize(opts \\ []) do
+    scan_base = published()
+
+    with {:ok, publication} <- build_publication(opts) do
+      locked(fn ->
+        if published() == scan_base, do: :persistent_term.put(@publication_key, publication)
+      end)
+
+      :ok
+    end
+  end
+
+  defp build_publication(opts) do
+    with {:ok, sources} <- discovery_modules(opts),
+         {:ok, entries, codecs} <- discover_all(sources),
+         {:ok, base_entry} <- Entry.new(@base_entry),
+         entries = [base_entry | entries],
+         {:ok, catalog} <- Catalog.new(entries),
+         {:ok, index} <- Index.new(codecs) do
+      {:ok, %{catalog: catalog, codecs: index, publication: make_ref()}}
+    end
+  end
+
+  defp locked(publish), do: :global.trans({__MODULE__, self()}, publish, [node()])
+
+  defp initialize_child(opts) do
+    case initialize(opts) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        locked(fn ->
+          unless match?(%{catalog: %Catalog{}, codecs: %Index{}}, published()),
+            do: :persistent_term.put(@publication_key, {:error, reason})
+        end)
+
+        Logger.warning("Jido Catalog Discovery did not refresh: #{inspect(reason)}")
+    end
+  end
+
+  defp discovery_modules(opts) do
+    with {:ok, opts} <- validate_options(opts, :invalid_discovery_options),
+         {:ok, config} <- discovery_config(),
+         {:ok, applications} <- application_option(opts, config),
+         {:ok, configured_modules} <- module_option(config),
+         {:ok, option_modules} <- module_option(opts),
+         {:ok, application_modules} <- modules_for_applications(applications),
+         {:ok, configured_sources} <- modules_with_applications(configured_modules),
+         {:ok, option_sources} <- modules_with_applications(option_modules) do
+      sources =
+        application_modules
+        |> Kernel.++(configured_sources)
+        |> Kernel.++(option_sources)
+        |> Enum.uniq()
+        |> Enum.sort_by(fn {module, application} ->
+          {Atom.to_string(application), Atom.to_string(module)}
+        end)
+
+      {:ok, sources}
+    end
+  end
+
+  defp discovery_config do
+    case Application.get_env(:jido, __MODULE__, []) do
+      config when is_list(config) ->
+        case validate_options(config, :invalid_discovery_config) do
+          {:ok, config} ->
+            {:ok, config}
+
+          {:error, {:invalid_discovery_config, keys}} ->
+            {:error, {:invalid_discovery_config, {:unknown_options, keys}}}
+        end
+
+      config ->
+        {:error, {:invalid_discovery_config, config}}
+    end
+  end
+
+  defp validate_options(options, error) when is_list(options) do
+    if Keyword.keyword?(options) do
+      case Keyword.validate(options, @option_keys) do
+        {:ok, options} -> {:ok, options}
+        {:error, keys} -> {:error, {error, keys}}
+      end
+    else
+      {:error, {error, options}}
+    end
+  end
+
+  defp validate_options(options, error), do: {:error, {error, options}}
+
+  defp application_option(opts, config) do
+    value =
+      Keyword.get(opts, :applications, Keyword.get(config, :applications, @default_applications))
+
+    case value do
+      :loaded -> {:ok, loaded_applications()}
+      applications when is_list(applications) -> validate_atoms(:applications, applications)
+      other -> {:error, {:invalid_applications, other}}
+    end
+  end
+
+  defp module_option(options) do
+    case Keyword.get(options, :modules, []) do
+      modules when is_list(modules) -> validate_modules(modules)
+      other -> {:error, {:invalid_modules, other}}
+    end
+  end
+
+  defp validate_modules(modules) do
+    if not List.improper?(modules) and Enum.all?(modules, &valid_module_source?/1),
+      do: {:ok, modules},
+      else: {:error, {:invalid_modules, modules}}
+  end
+
+  defp valid_module_source?({module, application}),
+    do: valid_atom?(module) and valid_atom?(application)
+
+  defp valid_module_source?(module), do: valid_atom?(module)
+
+  defp validate_atoms(_name, []), do: {:ok, []}
+
+  defp validate_atoms(name, values) do
+    if not List.improper?(values) and Enum.all?(values, &valid_atom?/1) do
+      {:ok, values}
+    else
+      {:error, {invalid_atom_list(name), values}}
+    end
+  end
+
+  defp invalid_atom_list(:applications), do: :invalid_applications
+  defp invalid_atom_list(:modules), do: :invalid_modules
+  defp valid_atom?(value), do: is_atom(value) and value not in [nil, true, false]
+
+  defp loaded_applications do
+    Application.loaded_applications()
+    |> Enum.map(&elem(&1, 0))
+  end
+
+  defp modules_for_applications(applications) do
+    Enum.reduce_while(applications, {:ok, []}, fn application, {:ok, result} ->
+      case Application.spec(application, :modules) do
+        modules when is_list(modules) ->
+          available =
+            modules
+            |> Enum.reject(&(:code.which(&1) == :non_existing))
+            |> Enum.map(&{&1, application})
+
+          {:cont, {:ok, available ++ result}}
+
+        nil ->
+          {:halt, {:error, {:application_not_loaded, application}}}
+      end
+    end)
+  end
+
+  defp modules_with_applications(modules) do
+    Enum.reduce_while(modules, {:ok, []}, fn module, {:ok, sources} ->
+      case module do
+        {module, application} ->
+          {:cont, {:ok, [{module, application} | sources]}}
+
+        module ->
+          with {:module, ^module} <- Code.ensure_loaded(module),
+               application when application not in [nil, true, false] <-
+                 Application.get_application(module) do
+            {:cont, {:ok, [{module, application} | sources]}}
+          else
+            {:error, reason} -> {:halt, {:error, {:module_not_loaded, reason}}}
+            nil -> {:halt, {:error, {:module_application_not_found, module}}}
+          end
+      end
+    end)
+  end
+
+  defp discover_all(sources) do
+    Enum.reduce_while(sources, {:ok, [], []}, fn source, {:ok, entries, codecs} ->
+      case discover(source) do
+        {:ok, found_entries, found_codecs} ->
+          {:cont, {:ok, found_entries ++ entries, found_codecs ++ codecs}}
+
+        {:error, error} ->
+          {:halt, {:error, error}}
+      end
+    end)
+  end
+
+  defp discover({module, application}) do
+    case Code.ensure_loaded(module) do
+      {:module, ^module} -> discover_loaded(module, application)
+      {:error, reason} -> {:error, {:module_not_loaded, reason}}
+    end
+  end
+
+  defp discover_loaded(module, application) do
+    if function_exported?(module, :__jido_inline_action__, 0) do
+      {:ok, [], []}
+    else
+      with {:ok, entries} <- discover_entries(module, application),
+           {:ok, codecs} <- codec_metadata(module),
+           do: {:ok, entries, codecs}
+    end
+  end
+
+  defp discover_entries(module, application) do
+    if function_exported?(module, :__jido_catalog_manifest__, 0) do
+      with {:ok, %Manifest{entries: entries}} <-
+             Manifest.new(module, application, module.__jido_catalog_manifest__()) do
+        {:ok, entries}
+      end
+    else
+      {:ok, []}
+    end
+  rescue
+    error -> {:error, {:catalog_manifest_failed, module, error}}
+  catch
+    kind, reason -> {:error, {:catalog_manifest_failed, module, {kind, reason}}}
+  end
+
+  defp codec_metadata(module) do
+    if codec_module?(module) do
+      case Contract.metadata(module) do
+        {:ok, metadata} ->
+          {:ok, [Map.put(metadata, :module, module)]}
+
+        {:error, {:metadata_failure, kind, reason}} ->
+          {:error, {:codec_failed, module, {kind, reason}}}
+
+        {:error, {:invalid_metadata, metadata}} ->
+          {:error, {:invalid_codec, module, metadata}}
+
+        {:error, :invalid_contract} ->
+          {:error, {:invalid_codec, module, :invalid_contract}}
+      end
+    else
+      {:ok, []}
+    end
+  end
+
+  defp codec_module?(module) do
+    module.module_info(:attributes)
+    |> Keyword.get_values(:behaviour)
+    |> List.flatten()
+    |> Enum.member?(Jido.Codec.Contract)
+  end
+
+  defp select_bundled_codec(type, vsn) do
+    case Map.fetch(@bundled_codecs, {type, vsn}) do
+      {:ok, codec} ->
+        {:ok, codec}
+
+      :error ->
+        supported_vsns =
+          for {{entry_type, entry_vsn}, _codec} <- @bundled_codecs,
+              entry_type == type,
+              do: entry_vsn
+
+        path = if supported_vsns == [], do: ["type"], else: ["vsn"]
+
+        codec_issue(
+          :unsupported_document,
+          path,
+          "bundled codec document type or vsn is not supported",
+          %{type: type, vsn: vsn, supported_vsns: Enum.sort(supported_vsns)}
+        )
+    end
+  end
+
+  defp codec_issue(code, path, message, details \\ %{}),
+    do: {:error, [Issue.new(code, path, message, details: details)]}
+
+  defp published, do: :persistent_term.get(@publication_key, :not_ready)
+
+  defp raise_not_ready do
+    raise Jido.Codec.Error.internal(
+            :catalog_not_ready,
+            "Catalog is not ready"
+          )
+  end
+
+  defp raise_build_failed(reason) do
+    raise Jido.Codec.Error.internal(
+            :catalog_build_failed,
+            "Catalog build failed: #{inspect(reason)}",
+            %{reason: reason}
+          )
+  end
+end

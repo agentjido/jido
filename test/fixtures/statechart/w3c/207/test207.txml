@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<!-- we test that that we can't  cancel an event in another session.  We invoke a child process.  It notifies
+us when it has generated a delayed event with sendid foo.  We try to cancel foo.  The child  process sends us event
+ event success if the event is not cancelled, event fail otherwise.  This doesn't test that there is absolutely no way to cancel an event
+raised in another session, but the spec doesn't define any way to refer to an event in another process  -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+   
+<state id="s0" initial="s01">
+  <onentry>
+    <send event="timeout" conf:delay="2"/>
+    </onentry>
+  <invoke type="scxml">
+    <content>
+    <!-- when invoked, we raise a delayed event1 with sendid 'foo' and notify our parent.  Then we wait.
+      If event1 occurs, the parent hasn't succeeded in canceling it and we return pass.  If event2 occurs
+      it means event1 was canceled (because event2 is delayed longer than event1) and we return 'fail'.  -->
+
+
+         <scxml initial="sub0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+           <state id="sub0">
+            <onentry>
+             <send event="event1" id="foo" conf:delay="1"/>
+              <send event="event2" conf:delay="1.5"/>
+              <send target="#_parent" event="childToParent"/>
+              </onentry>
+ 
+               <transition event="event1" target="subFinal">
+                   <send target="#_parent" event="pass"/>
+                   </transition>
+               <transition event="*" target="subFinal">
+                      <send target="#_parent" event="fail"/>
+              </transition>
+ 
+               </state>
+            <final id="subFinal"/>
+           </scxml>
+    </content>
+    </invoke>
+  
+  <state id="s01">
+    <transition event="childToParent" target="s02">
+      <cancel sendid="foo"/>
+      </transition>
+   </state>
+   
+ <state id="s02">
+  <transition event="pass" conf:targetpass=""/>
+  <transition event="fail" conf:targetfail=""/>
+  <transition event="timeout" conf:targetfail=""/>
+ </state>
+ 
+</state>
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

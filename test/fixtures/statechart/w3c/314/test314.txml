@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- this is a manual test because the processor is allowed to reject this document.  But if it executes it,
+it should not raise an error until it gets to s03 and evaluates the illegal expr -->
+
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" 
+	conf:datamodel="" xmlns:conf="http://www.w3.org/2005/scxml-conformance" initial="s0">
+<datamodel>
+  <data conf:id="1" conf:expr="1"/>
+ </datamodel>
+
+
+<state id="s0" initial="s01">
+  <transition event="error.execution" conf:targetfail=""/>
+  
+   <state id="s01">
+      <transition target="s02"/>
+    </state>
+
+   <state id="s02">
+     <transition target="s03"/>
+   </state>
+
+  <state id="s03">
+    <onentry>
+     <assign conf:location="1" conf:illegalExpr=""/>
+      <raise event="foo"/>
+   </onentry>
+     <transition event="error.execution" conf:targetpass=""/> 
+     <transition event=".*" conf:targetfail=""/>
+  </state>
+   
+</state>
+    
+<conf:pass/>
+<conf:fail/>
+
+   
+</scxml>

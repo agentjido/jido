@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+
+<!-- test that platform creates undound variable if we assign an illegal value to it.  Thus
+ we can assign to it later in state s1.  -->
+
+<scxml initial="s0" version="1.0" xmlns="http://www.w3.org/2005/07/scxml" conf:datamodel=""  xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+   <datamodel>
+     <data conf:id="1" conf:illegalExpr=""/>
+     </datamodel>
+     
+ <state id="s0">
+    <onentry>
+    <raise event="foo"/>
+    </onentry>
+    
+   <transition event="error.execution" conf:unboundVar="1" target="s1"/>
+   <transition event="*" conf:targetfail=""/>
+   </state>
+   
+ <state id="s1">
+ <onentry>
+   <assign conf:location="1" conf:expr="1"/>
+   </onentry>
+   <transition  conf:idVal="1=1" conf:targetpass=""/>
+   <transition conf:targetfail=""/>
+
+   </state>
+   
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

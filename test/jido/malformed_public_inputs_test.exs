@@ -1,0 +1,76 @@
+defmodule Jido.MalformedPublicInputsTest do
+  use Jido.Test.Case, async: true
+
+  alias Jido.Agent
+  alias Jido.Agent.Extension
+  alias Jido.Agent.Validation
+  alias Jido.Persistence
+  alias Jido.Signal
+
+  test "Plugin lowering rejects improper declarations and invalid DSL data" do
+    for {declarations, dsl} <- [
+          {[String | :invalid], %{}},
+          {[%{provider: String, config: %{}}], %{}},
+          {[%{provider: Jido.Plugin.Audit, config: nil}], %{}},
+          {[], nil},
+          {[], %URI{}}
+        ] do
+      assert {:error, %{__exception__: true}} = Extension.lower(declarations, dsl)
+    end
+  end
+
+  test "direct command options must be a proper keyword list" do
+    agent = Agent.define!(%{name: "malformed_command"}) |> Agent.instantiate!(id: "cmd")
+    signal = Signal.new!("input.invalid", %{}, source: "/test")
+
+    for opts <- [[1], [{:context, %{}}, 1], [{:context, %{}} | :invalid], nil] do
+      assert {:error, %{__exception__: true}} = Agent.cmd(agent, signal, opts)
+    end
+  end
+
+  test "Agent input normalization accepts maps and keyword lists but rejects malformed lists" do
+    assert {:ok, %{by: 1}} = Validation.normalize_input(%{by: 1})
+    assert {:ok, %{by: 1}} = Validation.normalize_input(by: 1)
+
+    for input <- [[1], [{:by, 1}, 2], [{:by, 1} | :invalid]] do
+      assert {:error, :invalid_input} = Validation.normalize_input(input)
+    end
+  end
+
+  test "Persistence rejects wrong Agent, module, and ID inputs" do
+    source = {Jido.Persistence.ETS, table: :malformed_public_inputs}
+
+    assert {:error, %{__exception__: true}} = Persistence.save_agent(source, :not_an_agent)
+
+    for operation <- [:load_agent, :load_agent_with_revision, :delete_agent] do
+      assert {:error, %{__exception__: true}} = apply(Persistence, operation, [source, 123, "id"])
+
+      assert {:error, %{__exception__: true}} =
+               apply(Persistence, operation, [source, Agent, 123])
+    end
+  end
+
+  test "Address creation rejects wrong ID and unknown options" do
+    instance = :"malformed_address_#{System.unique_integer([:positive])}"
+    start_supervised!({Jido, name: instance, namespace: "malformed/address"}, id: instance)
+
+    assert {:ok, _address} = Jido.agent_address(instance, "agent-1", partition: nil)
+    assert {:error, %{__exception__: true}} = Jido.agent_address(instance, 123)
+    assert {:error, %{__exception__: true}} = Jido.agent_address(instance, "agent-1", extra: true)
+  end
+
+  test "compatibility lookup, list, count, and stop report malformed options", %{jido: jido} do
+    assert nil == Jido.whereis_agent(jido, "missing")
+    assert {:error, :not_found} = Jido.stop_agent(jido, "missing")
+
+    for opts <- [[1], [{:partition, nil}, 1], [{:partition, nil} | :invalid]] do
+      assert {:error, %{__exception__: true}} = Jido.whereis_agent(jido, "missing", opts)
+      assert {:error, %{__exception__: true}} = Jido.list_agents(jido, opts)
+      assert {:error, %{__exception__: true}} = Jido.resident_agent_count(jido, opts)
+      assert {:error, %{__exception__: true}} = Jido.stop_agent(jido, "missing", opts)
+    end
+
+    assert {:error, %{__exception__: true}} = Jido.whereis_agent(jido, 123)
+    assert {:error, %{__exception__: true}} = Jido.stop_agent(jido, 123)
+  end
+end

@@ -1,0 +1,165 @@
+defmodule Jido.Plugin.Timer.DSL.Schedule do
+  @moduledoc false
+  defstruct [:name, :every, :cron, :timezone, :signal, :__spark_metadata__]
+end
+
+defmodule Jido.Plugin.Timer.DSL do
+  @moduledoc "Static schedule authoring. This provider does not start timers."
+  alias Crontab.CronExpression.Parser
+  alias Jido.Agent.{Route, Schema}
+  alias Jido.Error
+  alias Spark.Dsl.Extension, as: E
+
+  @schedule %Spark.Dsl.Entity{
+    name: :schedule,
+    target: Jido.Plugin.Timer.DSL.Schedule,
+    args: [:name],
+    schema: [
+      name: [type: :atom, required: true],
+      every: [type: :pos_integer],
+      cron: [type: :string],
+      timezone: [type: :string],
+      signal: [type: :any, required: true]
+    ]
+  }
+  Jido.Plugin.Timer.DSL.Schedule = @schedule.target
+  @section %Spark.Dsl.Section{name: :schedules, entities: [@schedule]}
+  use Jido.Plugin, id: "jido.scheduling", sections: [@section]
+
+  @impl Jido.Agent.Extension
+  def lower(dsl, config) do
+    schedules = E.get_entities(dsl, [:schedules])
+
+    cond do
+      config != %{} and schedules != [] ->
+        Error.validation_result(:ambiguous_config, [], "Use schedule DSL or Plugin data, not both")
+
+      config != %{} ->
+        {:ok, config}
+
+      true ->
+        lower_schedules(schedules)
+    end
+  end
+
+  defp lower_schedules(schedules) do
+    with {:ok, entries} <- Schema.list(schedules, &lower_schedule/1),
+         do: {:ok, %{schedules: entries}}
+  end
+
+  defp lower_schedule(entry) do
+    cond do
+      entry.every != nil and (entry.cron != nil or entry.timezone != nil) ->
+        Error.validation_result(
+          :schedule_timing,
+          [],
+          "Use one interval or cron; timezone is valid only with cron"
+        )
+
+      entry.every != nil ->
+        {:ok,
+         %{
+           name: entry.name,
+           timing: %{kind: :every, milliseconds: entry.every},
+           signal: entry.signal
+         }}
+
+      entry.cron != nil ->
+        {:ok,
+         %{
+           name: entry.name,
+           timing: %{
+             kind: :cron,
+             expression: entry.cron,
+             timezone: entry.timezone || "Etc/UTC"
+           },
+           signal: entry.signal
+         }}
+
+      true ->
+        Error.validation_result(:schedule_timing, [], "Schedule needs an interval or cron")
+    end
+  end
+
+  @impl Jido.Agent.Extension
+  def normalize(value) do
+    with {:ok, value} <- Schema.fields(value, [:schedules], %{schedules: []}),
+         {:ok, schedules} <- Error.prefix_result_path(Schema.list(value.schedules, &schedule/1), :schedules),
+         :ok <- Schema.unique(schedules, & &1.name),
+         do: {:ok, %{schedules: schedules}}
+  end
+
+  defp schedule(value) do
+    with {:ok, value} <- Schema.fields(value, [:name, :timing, :signal]),
+         :ok <- Schema.name(value[:name]),
+         {:ok, timing} <- timing(value[:timing]),
+         {:ok, signal} <- template(value[:signal]),
+         do: {:ok, %{name: value.name, timing: timing, signal: signal}}
+  end
+
+  defp timing(%{kind: :every} = value) do
+    with {:ok, value} <- Schema.fields(value, [:kind, :milliseconds]),
+         :ok <- Schema.positive(value[:milliseconds]),
+         do: {:ok, value}
+  end
+
+  defp timing(%{kind: :cron} = value) do
+    with {:ok, value} <-
+           Schema.fields(value, [:kind, :expression, :timezone], %{timezone: "Etc/UTC"}),
+         :ok <- Schema.nonempty(value[:expression]),
+         :ok <- Schema.nonempty(value.timezone),
+         {:ok, _} <- Parser.parse(value.expression, extended_cron?(value.expression)),
+         :ok <- timezone(value.timezone) do
+      {:ok, value}
+    else
+      {:error, %Error.ValidationError{}} = error ->
+        error
+
+      {:error, reason} ->
+        Error.validation_result(:invalid_cron, [], "Invalid cron expression", %{reason: reason})
+    end
+  end
+
+  defp timing(_), do: Error.validation_result(:schedule_timing, [], "Expected interval or cron timing")
+
+  defp extended_cron?(expression), do: length(String.split(expression)) > 5
+
+  defp timezone(zone) do
+    case DateTime.shift_zone(~U[2000-01-01 00:00:00Z], zone) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Error.validation_result(:invalid_timezone, [], "Unknown timezone", %{timezone: zone, reason: reason})
+    end
+  end
+
+  defp template(value) do
+    with {:ok, value} <- Schema.fields(value, [:type, :data], %{data: %{}}),
+         :ok <- Schema.exact(value[:type]),
+         :ok <- Schema.plain_map(value.data),
+         :ok <- Schema.static(value.data),
+         do: {:ok, value}
+  end
+
+  @impl Jido.Agent.Extension
+  def verify(data, definition) do
+    with {:ok, _} <- Schema.list(data.schedules, &verify_schedule(&1, definition)),
+         do: :ok
+  end
+
+  defp verify_schedule(schedule, definition) do
+    case Route.select(definition, schedule.signal.type) do
+      {:ok, _} ->
+        {:ok, schedule}
+
+      {:error, _} ->
+        Error.validation_result(
+          :schedule_input,
+          [:schedules, schedule.name],
+          "Scheduled Signal has no input route",
+          %{type: schedule.signal.type}
+        )
+    end
+  end
+end

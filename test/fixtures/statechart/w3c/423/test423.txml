@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!-- test that we keep pulling external events off the queue till we find one that matches a transition. -->
+
+<scxml  initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+ <state id="s0">
+  <onentry>
+    <send event="externalEvent1"/>
+    <send event="externalEvent2" conf:delay="1"/>
+    <raise event="internalEvent"/>
+    </onentry>
+    <!-- in this state we should process only internalEvent -->
+   <transition event="internalEvent" target="s1"/>
+    <transition event="*" conf:targetfail=""/>
+   </state>
+   
+ <state id="s1">
+ <!-- in this state we ignore externalEvent1 and wait for externalEvent2 -->
+   <transition event="externalEvent2" conf:targetpass=""/>
+   <transition event="internalEvent" conf:targetfail=""/>
+   </state>  
+   
+   
+   <conf:pass/>
+   <conf:fail/>
+     
+</scxml>

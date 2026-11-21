@@ -1,328 +1,215 @@
-defmodule JidoTest.Agent.DirectiveTest do
-  use ExUnit.Case, async: true
-
+defmodule Jido.Agent.DirectiveContractTest do
+  use Covenant.Case, component: "jido.agent", async: true
   alias Jido.Agent.Directive
-  alias Jido.AgentServer.ParentRef
+  alias Jido.Agent.Directive.Kind
+  alias Jido.Signal
 
-  describe "emit/2" do
-    test "creates Emit directive without dispatch" do
-      signal = %{type: "test"}
-      directive = Directive.emit(signal)
-      assert %Directive.Emit{signal: ^signal, dispatch: nil} = directive
-    end
+  defmodule PlainDirective do
+    use Jido.Agent.Directive
+    defstruct [:value]
+  end
 
-    test "creates Emit directive with dispatch config" do
-      signal = %{type: "test"}
-      directive = Directive.emit(signal, {:pubsub, topic: "events"})
-      assert directive.signal == signal
-      assert directive.dispatch == {:pubsub, topic: "events"}
+  defmodule SchemaDirective do
+    use Jido.Agent.Directive
+
+    @schema Jido.Joi.struct(__MODULE__, %{value: Jido.Joi.integer()}, coerce: true)
+    defstruct [:value]
+    def schema, do: @schema
+  end
+
+  defmodule OverrideDirective do
+    use Jido.Agent.Directive
+    defstruct [:value]
+
+    @impl true
+    def validate(%__MODULE__{}), do: {:error, :custom_validation}
+    def validate(_value), do: {:error, :wrong_type}
+  end
+
+  defmodule ChangedType do
+    use Jido.Agent.Directive
+    defstruct []
+    def validate(%__MODULE__{}), do: {:ok, %PlainDirective{}}
+  end
+
+  defmodule InvalidResult do
+    use Jido.Agent.Directive
+    defstruct []
+    def validate(%__MODULE__{}), do: :invalid
+  end
+
+  defmodule Raises do
+    use Jido.Agent.Directive
+    defstruct []
+    def validate(%__MODULE__{}), do: raise("validation fault")
+  end
+
+  defmodule Throws do
+    use Jido.Agent.Directive
+    defstruct []
+    def validate(%__MODULE__{}), do: throw(:validation_fault)
+  end
+
+  defmodule SignalField do
+    use Jido.Agent.Directive
+    defstruct [:signal]
+  end
+
+  @tag obligation: "jido.agent.I27"
+  test "custom Directives can use the behavior before their struct is defined" do
+    plain = %PlainDirective{value: 1}
+    assert {:ok, ^plain} = PlainDirective.validate(plain)
+    assert {:ok, ^plain} = Directive.validate(plain)
+
+    typed = %SchemaDirective{value: 1}
+    assert {:ok, ^typed} = SchemaDirective.validate(typed)
+    assert {:ok, ^typed} = Directive.validate(typed)
+    assert {:error, _issues} = SchemaDirective.validate(%SchemaDirective{value: "invalid"})
+
+    for module <- [PlainDirective, SchemaDirective],
+        value <- [:invalid, %URI{}, plain, typed],
+        not is_struct(value, module) do
+      assert {:error, %Jido.Error.ValidationError{}} = module.validate(value)
     end
   end
 
-  describe "error/2" do
-    test "creates Error directive without context" do
-      error = %{message: "test error"}
-      directive = Directive.error(error)
-      assert %Directive.Error{error: ^error, context: nil} = directive
-    end
-
-    test "creates Error directive with context" do
-      error = %{message: "test error"}
-      directive = Directive.error(error, :normalize)
-      assert directive.error == error
-      assert directive.context == :normalize
-    end
+  @tag obligation: "jido.agent.I27"
+  test "custom Directives can override the default validator" do
+    assert {:error, :custom_validation} = Directive.validate(%OverrideDirective{value: 1})
+    assert {:error, :wrong_type} = OverrideDirective.validate(:invalid)
   end
 
-  describe "spawn/2" do
-    test "creates Spawn directive without tag" do
-      child_spec = {MyWorker, arg: :value}
-      directive = Directive.spawn(child_spec)
-      assert %Directive.Spawn{child_spec: ^child_spec, tag: nil} = directive
-    end
+  @tag obligation: "jido.agent.I27"
+  test "built-in identity and validation cover runtime Directives" do
+    signal = Signal.new!("event", %{}, source: "/test")
+    request = Signal.new!("request", %{}, source: "/test")
+    reply = Signal.new!("response", %{value: 1}, source: "/test")
+    {:ok, reply} = Signal.put_context(reply, "jidocausationid", request.id)
 
-    test "creates Spawn directive with tag" do
-      child_spec = {MyWorker, arg: :value}
-      directive = Directive.spawn(child_spec, :worker_1)
-      assert directive.child_spec == child_spec
-      assert directive.tag == :worker_1
-    end
-  end
-
-  describe "spawn_agent/3" do
-    test "creates SpawnAgent directive with defaults" do
-      directive = Directive.spawn_agent(MyAgent, :worker_1)
-      assert %Directive.SpawnAgent{} = directive
-      assert directive.agent == MyAgent
-      assert directive.tag == :worker_1
-      assert directive.opts == %{}
-      assert directive.meta == %{}
-      assert directive.restart == :transient
-    end
-
-    test "creates SpawnAgent directive with opts" do
-      directive =
-        Directive.spawn_agent(MyAgent, :processor, opts: %{initial_state: %{batch: 100}})
-
-      assert directive.opts == %{initial_state: %{batch: 100}}
-      assert directive.meta == %{}
-      assert directive.restart == :transient
-    end
-
-    test "creates SpawnAgent directive with meta" do
-      directive = Directive.spawn_agent(MyAgent, :handler, meta: %{topic: "events"})
-      assert directive.opts == %{}
-      assert directive.meta == %{topic: "events"}
-      assert directive.restart == :transient
-    end
-
-    test "creates SpawnAgent directive with both opts and meta" do
-      directive =
-        Directive.spawn_agent(MyAgent, :worker,
-          opts: %{id: "custom"},
-          meta: %{assigned: true}
-        )
-
-      assert directive.opts == %{id: "custom"}
-      assert directive.meta == %{assigned: true}
-      assert directive.restart == :transient
-    end
-
-    test "creates SpawnAgent directive with explicit restart policy" do
-      directive = Directive.spawn_agent(MyAgent, :durable, restart: :permanent)
-
-      assert directive.restart == :permanent
-    end
-
-    test "raises validation error for unsupported lifecycle opts" do
-      assert_raise Jido.Error.ValidationError,
-                   ~r/SpawnAgent does not support lifecycle\/persistence opts/,
-                   fn ->
-                     Directive.spawn_agent(MyAgent, :worker,
-                       opts: %{storage: Jido.Storage.ETS, idle_timeout: 5_000}
-                     )
-                   end
-    end
-
-    test "raises validation error when opts is not a map" do
-      assert_raise Jido.Error.ValidationError, ~r/SpawnAgent opts must be a map/, fn ->
-        Directive.spawn_agent(MyAgent, :worker, opts: [:not_a_map])
-      end
-    end
-  end
-
-  describe "start_sensor/3" do
-    test "creates StartSensor directive with defaults" do
-      directive = Directive.start_sensor(:market_data, MySensor)
-
-      assert %Directive.StartSensor{} = directive
-      assert directive.tag == :market_data
-      assert directive.sensor == MySensor
-      assert directive.config == %{}
-      assert directive.meta == %{}
-      assert directive.replace? == true
-      assert directive.link? == false
-    end
-
-    test "creates StartSensor directive with lifecycle options" do
-      directive =
-        Directive.start_sensor(:market_data, MySensor,
-          config: %{symbol: "AAPL"},
-          meta: %{purpose: :quotes},
-          replace?: false,
-          link?: true
-        )
-
-      assert directive.config == %{symbol: "AAPL"}
-      assert directive.meta == %{purpose: :quotes}
-      assert directive.replace? == false
-      assert directive.link? == true
-    end
-  end
-
-  describe "adopt_child/3" do
-    test "creates AdoptChild directive for pid" do
-      directive = Directive.adopt_child(self(), :worker_1)
-      assert %Directive.AdoptChild{child: child, tag: :worker_1, meta: %{}} = directive
-      assert child == self()
-    end
-
-    test "creates AdoptChild directive for child id with meta" do
-      directive = Directive.adopt_child("child-123", :worker_1, meta: %{restored: true})
-
-      assert directive.child == "child-123"
-      assert directive.tag == :worker_1
-      assert directive.meta == %{restored: true}
-    end
-
-    test "raises validation error for unsupported child reference" do
-      assert_raise Jido.Error.ValidationError, fn ->
-        Directive.adopt_child(:not_a_pid_or_id, :worker_1)
-      end
-    end
-  end
-
-  describe "stop_child/2" do
-    test "creates StopChild directive with default reason" do
-      directive = Directive.stop_child(:worker_1)
-      assert %Directive.StopChild{tag: :worker_1, reason: :normal} = directive
-    end
-
-    test "creates StopChild directive with custom reason" do
-      directive = Directive.stop_child(:processor, :shutdown)
-      assert directive.tag == :processor
-      assert directive.reason == :shutdown
-    end
-  end
-
-  describe "schedule/2" do
-    test "creates Schedule directive" do
-      directive = Directive.schedule(5000, :timeout)
-      assert %Directive.Schedule{delay_ms: 5000, message: :timeout} = directive
-    end
-
-    test "creates Schedule directive with complex message" do
-      directive = Directive.schedule(1000, {:check, ref: "abc123"})
-      assert directive.delay_ms == 1000
-      assert directive.message == {:check, ref: "abc123"}
-    end
-  end
-
-  describe "stop/1" do
-    test "creates Stop directive with default reason" do
-      directive = Directive.stop()
-      assert %Directive.Stop{reason: :normal} = directive
-    end
-
-    test "creates Stop directive with custom reason" do
-      directive = Directive.stop(:shutdown)
-      assert directive.reason == :shutdown
-    end
-  end
-
-  describe "emit_to_pid/3" do
-    test "creates Emit directive targeting a pid" do
-      signal = %{type: "test"}
-      pid = self()
-      directive = Directive.emit_to_pid(signal, pid)
-      assert %Directive.Emit{signal: ^signal, dispatch: {:pid, opts}} = directive
-      assert opts[:target] == pid
-    end
-
-    test "merges extra options" do
-      signal = %{type: "test"}
-      pid = self()
-      directive = Directive.emit_to_pid(signal, pid, delivery_mode: :sync, timeout: 10_000)
-      {:pid, opts} = directive.dispatch
-      assert opts[:target] == pid
-      assert opts[:delivery_mode] == :sync
-      assert opts[:timeout] == 10_000
-    end
-  end
-
-  describe "emit_to_parent/3" do
-    test "returns nil when agent has no parent" do
-      agent = %{state: %{}}
-      assert Directive.emit_to_parent(agent, %{type: "test"}) == nil
-    end
-
-    test "returns nil when parent ref is missing pid" do
-      agent = %{state: %{__parent__: %{}}}
-      assert Directive.emit_to_parent(agent, %{type: "test"}) == nil
-    end
-
-    test "returns nil when the agent is orphaned" do
-      agent = %{state: %{__orphaned_from__: %{id: "former-parent"}}}
-      assert Directive.emit_to_parent(agent, %{type: "test"}) == nil
-    end
-
-    test "creates Emit directive when parent is present" do
-      parent_pid = self()
-
-      parent_ref =
-        ParentRef.new!(%{pid: parent_pid, id: "parent-123", tag: :child})
-
-      agent = %{state: %{__parent__: parent_ref}}
-      signal = %{type: "child.result"}
-
-      directive = Directive.emit_to_parent(agent, signal)
-
-      assert %Directive.Emit{signal: ^signal, dispatch: {:pid, opts}} = directive
-      assert opts[:target] == parent_pid
-    end
-
-    test "passes extra options to emit_to_pid" do
-      parent_pid = self()
-
-      parent_ref =
-        ParentRef.new!(%{pid: parent_pid, id: "parent-123", tag: :child})
-
-      agent = %{state: %{__parent__: parent_ref}}
-
-      directive = Directive.emit_to_parent(agent, %{type: "test"}, delivery_mode: :sync)
-
-      {:pid, opts} = directive.dispatch
-      assert opts[:delivery_mode] == :sync
-    end
-  end
-
-  describe "cron/3" do
-    test "creates Cron directive with defaults" do
-      directive = Directive.cron("* * * * *", :tick)
-      assert %Directive.Cron{} = directive
-      assert directive.cron == "* * * * *"
-      assert directive.message == :tick
-      assert directive.job_id == nil
-      assert directive.timezone == nil
-    end
-
-    test "creates Cron directive with job_id" do
-      directive = Directive.cron("@daily", :cleanup, job_id: :daily_cleanup)
-      assert directive.cron == "@daily"
-      assert directive.message == :cleanup
-      assert directive.job_id == :daily_cleanup
-    end
-
-    test "creates Cron directive with timezone" do
-      directive = Directive.cron("0 9 * * MON", :weekly, timezone: "America/New_York")
-      assert directive.timezone == "America/New_York"
-    end
-
-    test "creates Cron directive with all options" do
-      directive = Directive.cron("*/5 * * * *", :check, job_id: :health, timezone: "UTC")
-      assert directive.job_id == :health
-      assert directive.timezone == "UTC"
-    end
-  end
-
-  describe "cron_cancel/1" do
-    test "creates CronCancel directive" do
-      directive = Directive.cron_cancel(:heartbeat)
-      assert %Directive.CronCancel{} = directive
-      assert directive.job_id == :heartbeat
-    end
-  end
-
-  describe "schema functions" do
-    @schema_modules [
-      Directive.Emit,
-      Directive.Error,
-      Directive.Spawn,
-      Directive.SpawnAgent,
-      Directive.AdoptChild,
-      Directive.StopChild,
-      Directive.Schedule,
-      Directive.Stop,
-      Directive.Cron,
-      Directive.CronCancel
+    directives = [
+      Directive.emit(signal),
+      Directive.reply(reply)
     ]
 
-    for module <- @schema_modules do
-      @module module
-      test "#{inspect(@module)}.schema/0 returns Zoi schema" do
-        schema = @module.schema()
-        assert is_struct(schema)
-      end
+    for directive <- directives do
+      assert Kind.built_in?(directive) === true
+      assert Kind.built_in_module?(directive.__struct__) === true
+      assert Kind.validator?(directive.__struct__) === true
+      assert {:ok, ^directive} = Directive.validate(directive)
     end
+
+    assert Kind.built_in?(:unknown) === false
+    assert Kind.built_in?(%PlainDirective{}) === false
+    assert Kind.validator?(PlainDirective) === true
+
+    assert {:error, %Jido.Error.ValidationError{details: %{directive: :unknown}}} =
+             Directive.validate(:unknown)
+  end
+
+  @tag obligation: "jido.agent.I27"
+  test "Signal Directives require and normalize one complete Signal" do
+    signal = Signal.new!("agent.outbound", %{value: 1}, source: "/agent")
+    {:ok, reply} = Signal.put_context(signal, "jidocausationid", "request-id")
+
+    for malformed <- [
+          %{signal | id: ""},
+          %{signal | source: ""},
+          %{signal | type: ""},
+          %{signal | specversion: "2.0"},
+          %{signal | extensions: %URI{host: "example.com"}},
+          %{signal | extensions: %{"Bad_Key" => "value"}},
+          %{signal | extensions: %{"invalid" => self()}}
+        ],
+        directive <- [
+          Directive.emit(malformed)
+        ] do
+      assert {:error, _reason} = Directive.validate(directive)
+    end
+
+    for directive <- [Directive.emit(signal)] do
+      assert {:ok, ^directive} = Directive.validate(directive)
+    end
+
+    assert {:ok, %Directive.Reply{signal: ^reply}} =
+             reply |> Directive.reply() |> Directive.validate()
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             signal |> Directive.reply() |> Directive.validate()
+
+    for directive <- [
+          %Directive.Emit{signal: %{}},
+          %Directive.Reply{signal: %{}}
+        ] do
+      assert {:error, %Jido.Error.ValidationError{details: %{directive: ^directive}}} =
+               Directive.validate(directive)
+    end
+  end
+
+  @tag obligation: "jido.agent.I27"
+  test "AgentServer validates Reply independently of the current requester" do
+    signal = Signal.new!("response", %{}, source: "/test")
+    {:ok, signal} = Signal.put_context(signal, "jidocausationid", "request-id")
+
+    config = %{
+      directive_handler: fn _directive, _context -> :ok end,
+      max_directives_per_turn: 10
+    }
+
+    assert :ok = Jido.AgentServer.Effects.validate_batch([Directive.reply(signal)], config)
+
+    assert :ok =
+             Jido.AgentServer.Effects.validate_batch(
+               [Directive.reply(signal)],
+               Map.put(config, :requester, self())
+             )
+
+    assert :ok =
+             Jido.AgentServer.Effects.validate_batch(
+               [Directive.reply(signal)],
+               Map.merge(config, %{durable: true, requester: nil})
+             )
+  end
+
+  @tag obligation: "jido.agent.I27"
+  test "custom Directive validation contains changed types, invalid results, and faults" do
+    custom = %SignalField{signal: Signal.new!("event", %{}, source: "/test")}
+    assert {:ok, ^custom} = Directive.validate(custom)
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{expected: ChangedType, actual: PlainDirective}
+            }} = Directive.validate(%ChangedType{})
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{directive: InvalidResult, result: :invalid}
+            }} = Directive.validate(%InvalidResult{})
+
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              details: %{directive: Raises, error: %RuntimeError{message: "validation fault"}}
+            }} = Directive.validate(%Raises{})
+
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              details: %{directive: Throws, kind: :throw, reason: :validation_fault}
+            }} = Directive.validate(%Throws{})
+  end
+
+  @tag obligation: "jido.agent.I27"
+  test "Directive constructors preserve runtime values" do
+    signal = Signal.new!("event", %{}, source: "/test")
+    {:ok, reply} = Signal.put_context(signal, "jidocausationid", "request-id")
+    assert Directive.emit("event", %{}) === %{kind: :emit, type: "event", data: %{}}
+
+    assert Directive.emit(signal, :dispatch) === %Directive.Emit{
+             signal: signal,
+             dispatch: :dispatch
+           }
+
+    assert Directive.reply(reply) === %Directive.Reply{signal: reply}
+
+    assert {:error, _} = Directive.emit("event.*", %{})
+    assert {:error, _} = Directive.emit("event", [])
   end
 end

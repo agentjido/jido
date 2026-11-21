@@ -1,0 +1,314 @@
+defmodule Jido.Persistence.Record do
+  @moduledoc false
+
+  alias Jido.Agent
+  alias Jido.Agent.Address
+  alias Jido.Error
+  alias Jido.Codec.Term
+  alias Jido.Persistence.Config
+
+  @format_version 3
+  @key_prefix "jido:agent:v3:"
+  @common_keys [:fmt, :kind, :namespace, :agent_module, :agent_id, :partition, :rev, :agent_rev]
+  @active_keys @common_keys ++ [:vsn, :checkpoint]
+
+  def format_version, do: @format_version
+
+  @doc false
+  @spec agent_key(Address.t()) :: binary()
+  def agent_key(%Address{} = address) do
+    address = Address.new!(address)
+
+    encoded =
+      {address.namespace, address.partition, address.id}
+      |> :erlang.term_to_binary()
+      |> Base.url_encode64(padding: false)
+
+    @key_prefix <> encoded
+  end
+
+  @doc false
+  @spec build_active(Agent.t(), Address.t(), non_neg_integer(), non_neg_integer(), map()) ::
+          {:ok, map()} | {:error, term()}
+  @spec build_active(Agent.t(), Address.t(), non_neg_integer(), non_neg_integer(), map(), map() | nil) ::
+          {:ok, map()} | {:error, term()}
+  def build_active(
+        %Agent{} = agent,
+        %Address{} = address,
+        revision,
+        agent_revision,
+        checkpoint,
+        server_turn \\ nil
+      ) do
+    record = %{
+      fmt: @format_version,
+      kind: :active,
+      namespace: address.namespace,
+      agent_module: agent.module,
+      vsn: agent.vsn,
+      agent_id: agent.id,
+      partition: address.partition,
+      rev: revision,
+      agent_rev: agent_revision,
+      checkpoint: checkpoint
+    }
+
+    record = if is_nil(server_turn), do: record, else: Map.put(record, :server_turn, server_turn)
+
+    with :ok <- validate(record, address, agent.module),
+         do: {:ok, record}
+  end
+
+  @doc false
+  @spec build_tombstone(Address.t(), module(), non_neg_integer(), non_neg_integer()) ::
+          {:ok, map()} | {:error, term()}
+  def build_tombstone(%Address{} = address, agent_module, revision, agent_revision) do
+    record = %{
+      fmt: @format_version,
+      kind: :tombstone,
+      namespace: address.namespace,
+      agent_module: agent_module,
+      agent_id: address.id,
+      partition: address.partition,
+      rev: revision,
+      agent_rev: agent_revision
+    }
+
+    with :ok <- validate(record, address, agent_module),
+         do: {:ok, record}
+  end
+
+  @doc false
+  @spec encode(map()) :: {:ok, binary()} | {:error, term()}
+  def encode(record), do: Jido.Persistence.Codec.Term.encode(record)
+
+  @doc false
+  @spec encode(map(), Config.t()) :: {:ok, binary()} | {:error, term()}
+  def encode(record, %Config{} = config), do: Config.encode(config, record)
+
+  @doc false
+  @spec decode(term()) :: {:ok, term()} | {:error, :invalid_persistence_record}
+  def decode(value) do
+    # Load the trusted envelope fields before safe decoding on a cold node.
+    _ = Code.ensure_loaded?(Jido.Persistence.Snapshot)
+    _ = Code.ensure_loaded?(Jido.Signal)
+
+    case Jido.Persistence.Codec.Term.decode(value, []) do
+      {:ok, record} -> {:ok, record}
+      {:error, _reason} -> {:error, :invalid_persistence_record}
+    end
+  end
+
+  @doc false
+  @spec decode(term(), Config.t(), keyword()) :: {:ok, term()} | {:error, term()}
+  def decode(value, config, opts \\ [])
+
+  def decode(value, %Config{} = config, opts) do
+    _ = Code.ensure_loaded?(Jido.Persistence.Snapshot)
+    _ = Code.ensure_loaded?(Jido.Signal)
+
+    case Config.decode(config, value, opts) do
+      {:ok, record} -> {:ok, record}
+      {:error, {:unavailable_persistence_module, _name}} = error -> error
+      {:error, _reason} -> {:error, :invalid_persistence_record}
+    end
+  end
+
+  @doc false
+  @spec validate(term(), Address.t(), module()) :: :ok | {:error, term()}
+  def validate(record, %Address{} = address, agent_module) when is_map(record) do
+    with :ok <- validate_format_and_kind(record),
+         :ok <- validate_exact_shape(record),
+         :ok <- validate_identity(record, address, agent_module),
+         :ok <- validate_revision(record),
+         :ok <- validate_kind_fields(record) do
+      validate_portable(record)
+    end
+  end
+
+  def validate(_record, _address, _agent_module), do: invalid(:shape)
+
+  @doc false
+  @spec kind(map()) :: :active | :tombstone | :unknown
+  def kind(%{fmt: @format_version, kind: kind}) when kind in [:active, :tombstone], do: kind
+  def kind(_record), do: :unknown
+
+  @doc false
+  @spec format(map()) :: term()
+  def format(record), do: Map.get(record, :fmt)
+
+  @doc false
+  @spec revision(map()) :: term()
+  def revision(record), do: Map.get(record, :rev)
+
+  @doc false
+  @spec agent_revision(map()) :: term()
+  def agent_revision(record), do: Map.get(record, :agent_rev)
+
+  @doc false
+  @spec checkpoint(map()) :: term()
+  def checkpoint(record), do: Map.get(record, :checkpoint)
+
+  @doc false
+  @spec agent_vsn(map()) :: term()
+  def agent_vsn(record), do: Map.get(record, :vsn)
+
+  def require_active(record) do
+    case kind(record) do
+      :active -> :ok
+      :tombstone -> {:error, :deleted}
+      :unknown -> {:error, {:invalid_persistence_record, :kind}}
+    end
+  end
+
+  def require_active_for_write(record) do
+    case kind(record) do
+      :active -> :ok
+      :tombstone -> {:error, :conflict}
+      :unknown -> {:error, {:invalid_persistence_record, :kind}}
+    end
+  end
+
+  defp validate_format_and_kind(record) do
+    cond do
+      Map.get(record, :fmt) != @format_version -> invalid(:fmt)
+      Map.get(record, :kind) not in [:active, :tombstone] -> invalid(:kind)
+      true -> :ok
+    end
+  end
+
+  defp validate_exact_shape(%{fmt: _, kind: :active} = record) do
+    optional = Enum.filter([:server_turn, :topology_handoffs, :topology_owner], &Map.has_key?(record, &1))
+    exact_keys(record, @active_keys ++ optional)
+  end
+
+  defp validate_exact_shape(record), do: exact_keys(record, @common_keys)
+
+  defp exact_keys(record, keys) do
+    if map_size(record) == length(keys) and Enum.all?(keys, &Map.has_key?(record, &1)),
+      do: :ok,
+      else: invalid(:shape)
+  end
+
+  defp validate_identity(record, address, agent_module) do
+    cond do
+      Map.get(record, :namespace) != address.namespace -> invalid(:namespace)
+      Map.get(record, :agent_module) != agent_module -> invalid(:agent_module)
+      Map.get(record, :agent_id) != address.id -> invalid(:agent_id)
+      Map.get(record, :partition) != address.partition -> invalid(:partition)
+      true -> :ok
+    end
+  end
+
+  defp validate_revision(record) do
+    revision = revision(record)
+    agent_revision = agent_revision(record)
+
+    if is_integer(revision) and revision >= 0 and is_integer(agent_revision) and
+         agent_revision >= 0 and agent_revision <= revision,
+       do: :ok,
+       else: invalid(:rev)
+  end
+
+  defp validate_kind_fields(%{kind: :active} = record), do: validate_active(record)
+  defp validate_kind_fields(_record), do: :ok
+
+  defp validate_active(record) do
+    with :ok <- validate_checkpoint(record),
+         :ok <- validate_agent_vsn(record),
+         :ok <- validate_server_turn(Map.get(record, :server_turn)),
+         :ok <- validate_topology_owner(record),
+         do: validate_topology_handoffs(topology_handoffs(record))
+  end
+
+  @doc false
+  def put_topology_owner(record, nil), do: record
+  def put_topology_owner(record, owner), do: Map.put(record, :topology_owner, owner)
+
+  defp validate_topology_owner(%{topology_owner: %{address: %Address{} = owner, slot: slot} = placement} = record)
+       when is_binary(slot) and map_size(placement) == 2 do
+    if match?({:ok, _}, Address.validate(owner)) and
+         owner.namespace == record.namespace and owner.partition == record.partition and
+         String.starts_with?(slot, "$topology/") and
+         String.starts_with?(record.agent_id, owner.id <> "/" <> slot <> "/"),
+       do: :ok,
+       else: invalid(:topology_owner)
+  end
+
+  defp validate_topology_owner(%{topology_owner: _}), do: invalid(:topology_owner)
+  defp validate_topology_owner(_record), do: :ok
+
+  @doc false
+  def empty_topology_handoffs, do: %{outbox: [], accepted: %{}}
+
+  @doc false
+  def topology_handoffs(record), do: Map.get(record, :topology_handoffs, empty_topology_handoffs())
+
+  @doc false
+  def put_topology_handoffs(record, %{outbox: [], accepted: accepted}) when map_size(accepted) == 0,
+    do: Map.delete(record, :topology_handoffs)
+
+  def put_topology_handoffs(record, handoffs), do: Map.put(record, :topology_handoffs, handoffs)
+
+  defp validate_topology_handoffs(%{outbox: outbox, accepted: accepted} = handoffs)
+       when map_size(handoffs) == 2 and is_list(outbox) and is_map(accepted) do
+    if Enum.all?(outbox, &valid_topology_send?/1) and
+         Enum.all?(accepted, &valid_topology_receipt?/1),
+       do: :ok,
+       else: invalid(:topology_handoffs)
+  end
+
+  defp validate_topology_handoffs(_handoffs), do: invalid(:topology_handoffs)
+
+  defp valid_topology_receipt?({id, sender}) when is_binary(id) and id != "",
+    do: sender == true or match?({:ok, _}, Address.validate(sender))
+
+  defp valid_topology_receipt?(_receipt), do: false
+
+  defp valid_topology_send?(%{id: id, to: %Address{} = to, signal: %Jido.Signal{}} = send)
+       when is_binary(id) and id != "" and map_size(send) == 3 do
+    match?({:ok, _}, Address.validate(to)) and Jido.Codec.Term.valid?(send)
+  end
+
+  defp valid_topology_send?(_send), do: false
+
+  defp validate_server_turn(nil), do: :ok
+
+  defp validate_server_turn(turn) do
+    case Jido.Durable.Continuation.validate(turn) do
+      :ok -> :ok
+      {:error, _reason} -> invalid(:server_turn)
+    end
+  end
+
+  defp validate_checkpoint(record) do
+    checkpoint = Map.get(record, :checkpoint)
+
+    if is_map(checkpoint) and not is_struct(checkpoint),
+      do: :ok,
+      else: invalid(:checkpoint)
+  end
+
+  defp validate_agent_vsn(record) do
+    case agent_vsn(record) do
+      vsn when is_integer(vsn) and vsn > 0 -> :ok
+      _ -> invalid(:vsn)
+    end
+  end
+
+  defp validate_portable(record) do
+    case Term.validate(record, :record) do
+      :ok ->
+        :ok
+
+      {:error, path} ->
+        {:error,
+         Error.validation_error("Persistence record contains a non-portable term",
+           kind: :config,
+           details: %{code: :non_portable_term, path: path}
+         )}
+    end
+  end
+
+  defp invalid(field), do: {:error, {:invalid_persistence_record, field}}
+end

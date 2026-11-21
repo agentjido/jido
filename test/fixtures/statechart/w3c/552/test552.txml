@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+
+<!-- test that src content can be used to assign a value to a var. Edit
+test552.txt to have a value that's legal for the datamodel in question -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+  <datamodel>
+    <data conf:id="1" src="file:test552.txt"/>
+    </datamodel>
+    
+   <state id="s0">
+ 
+       <transition conf:isBound="1" conf:targetpass=""/>
+       <transition  conf:targetfail=""/>
+   </state>
+
+   <conf:pass/>
+   <conf:fail/>
+   
+
+
+</scxml>

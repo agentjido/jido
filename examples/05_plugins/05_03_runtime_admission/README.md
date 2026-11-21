@@ -1,0 +1,48 @@
+# 05_03 Runtime Admission
+
+An Agent Server Plugin uses private runtime state to add one transient
+authorization input.
+
+## What you will learn
+
+- Why private runtime work belongs in `admit/3`, not pure `prepare/2`.
+- How readiness completes before admission reads private runtime state.
+- How validation rejects malformed runtime configuration before startup.
+- How portable prepared input stays separate from transient runtime input.
+- Why a live package input can contain a PID, reference, or function.
+- Why direct `cmd/3` cannot use this live-only capability.
+
+## Read the code
+
+Read [the Plugin, runtime, and Agent](runtime_admission.ex), then read the
+[behavior tests](runtime_admission_test.exs).
+
+## Run it
+
+```sh
+mix test.examples examples/05_plugins/05_03_runtime_admission --warnings-as-errors
+```
+
+Expected result: the authorization contains a transient lease reference. The Action consumes
+`context.plugin_inputs[Package].runtime` but does not copy the reference into
+Agent state. Pure preparation reports only whether a token exists. It does not
+copy the token or the runtime authorization. Direct `cmd/3` gets the prepared
+value but fails because live admission did not supply runtime input.
+
+## Important behavior
+
+The Plugin validates a nonempty, unique token table before its child starts.
+Its `await_ready/2` callback completes only after the runtime can authorize a
+request. `AgentServer.await_ready/2` exposes that boundary to callers.
+
+## Limits
+
+The token table and lease reference are local and transient. This example does
+not provide distributed authorization, token rotation, or durable leases.
+
+## Files
+
+- [Plugin, runtime, and Agent](runtime_admission.ex)
+- [Tests](runtime_admission_test.exs)
+
+Previous: [Prepared Input](../05_02_prepared_input/README.md) | Next: [State Reduction](../05_04_state_reduction/README.md)
