@@ -5917,7 +5917,7 @@
         "jido_ai.tools.I7": {
           "failing": 0,
           "kind": "security",
-          "passing": 10,
+          "passing": 12,
           "status": "active",
           "testable": true,
           "tests": [
@@ -5930,6 +5930,8 @@
             "test a search result must match both allowlists",
             "test a stalled response stops at the deadline",
             "test browser Actions require an Agent declaration and host policy",
+            "test host opt-in preserves HexDocs structure as Markdown within the fetch limits",
+            "test invalid host fetch format stops before resolving the page",
             "test the pinned address receives the request with the original host"
           ]
         }
