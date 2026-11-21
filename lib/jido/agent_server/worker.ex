@@ -2077,6 +2077,13 @@ defmodule Jido.AgentServer.Worker do
   # Without this clause a FunctionClauseError puts the data in the stacktrace.
   def handle_event(_type, _event, phase, _data), do: {:stop, {:unexpected_event, phase}}
 
+  defp public_status(
+         :saving,
+         %{active: %{operation: %{kind: :commit_state}, result_handoff: true, result: {:ok, _, _}}} = data
+       ) do
+    %{Status.new(:saving, data) | admission: :blocked}
+  end
+
   defp public_status(phase, data) do
     status = Status.new(phase, data)
 

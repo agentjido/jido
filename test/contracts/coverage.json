@@ -693,10 +693,11 @@
         "jido.agent_server.I108": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test closes admission while a retained result is already readable from storage",
             "test the provider commits canonical state and a rejected write leaves the agent usable"
           ]
         },

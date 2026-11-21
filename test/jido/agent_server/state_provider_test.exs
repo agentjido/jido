@@ -21,6 +21,17 @@ defmodule Jido.AgentServer.StateProviderTest do
     def commit(:count, _context, _before, %{state: %{count: 3}}, _save),
       do: {:error, {:rejected, :not_allowed}}
 
+    def commit(:count, _context, _before, %{state: %{count: 6}} = candidate, save) do
+      result = save.(candidate)
+      send(Process.whereis(Jido.AgentServer.StateProviderTest), {:saved, self()})
+
+      receive do
+        :complete -> result
+      after
+        4_000 -> {:error, :indeterminate}
+      end
+    end
+
     def commit(:count, _context, _before, candidate, save) do
       {:ok, canonical} = Jido.Agent.set(candidate, count: candidate.state.count * 2)
       save.(canonical)
@@ -69,6 +80,27 @@ defmodule Jido.AgentServer.StateProviderTest do
     assert %{agent: %{state: %{count: 4}}} = AgentServer.snapshot(server)
     assert {:ok, %{status: :committed}} = AgentServer.call(server, signal(4))
     assert %{agent: %{state: %{count: 8}}} = AgentServer.snapshot(server)
+  end
+
+  @tag obligation: "jido.agent_server.I108"
+  test "closes admission while a retained result is already readable from storage" do
+    Process.register(self(), __MODULE__)
+
+    start_supervised!(
+      {Jido, name: Runtime, namespace: "test/state-provider", persistence: {Jido.Persistence.ETS, table: Store}}
+    )
+
+    {:ok, address} = Jido.agent_address(Runtime, "retained-counter")
+    assert {:ok, ^address} = Jido.create_agent(Runtime, address, Counter, state: %{count: 0})
+    assert {:ok, server} = Jido.activate_agent(Runtime, address)
+    pending = Jido.submit(Runtime, address, signal(6), turn_id: "retained", result_handoff: true)
+
+    assert_receive {:saved, writer}, 2_000
+    assert {:ok, %{status: :committed}} = Jido.turn_result(Runtime, address, "retained")
+    assert %{admission: :blocked} = AgentServer.status(server)
+    assert %{agent: %{state: %{count: 0}}} = AgentServer.snapshot(server)
+    send(writer, :complete)
+    assert {:ok, %{status: :committed}} = AgentServer.await(pending)
   end
 
   defp signal(count), do: Jido.Signal.new!("count.set", %{count: count}, source: "/counter")
