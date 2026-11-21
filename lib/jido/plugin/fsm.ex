@@ -1,4 +1,4 @@
-defmodule Jido.Agent.Plugin.FSM do
+defmodule Jido.Plugin.FSM do
   alias Jido.Joi
 
   @moduledoc """
@@ -13,7 +13,7 @@ defmodule Jido.Agent.Plugin.FSM do
 
       use Jido.Agent,
         name: "setup_guide",
-        plugins: [{Jido.Agent.Plugin.FSM, %{definition_vsn: 1}}]
+        plugins: [{Jido.Plugin.FSM, %{definition_vsn: 1}}]
 
       state_machine do
         initial :idle
@@ -31,7 +31,7 @@ defmodule Jido.Agent.Plugin.FSM do
 
   alias Jido.Agent.Schema
   alias Jido.Error
-  alias Jido.Agent.Plugin.FSM.Transition
+  alias Jido.Plugin.FSM.Transition
   alias Jido.Agent.Plugin.{Preparation, Reduction, RouteSelection}
   alias Spark.Dsl.Extension, as: SparkExtension
 

@@ -182,11 +182,35 @@ Jido.Agent.Strategy, the Direct and FSM strategies, `on_before_cmd/2`, and `on_a
 | V2 responsibility | V3 location |
 | --- | --- |
 | Domain logic and branching | An Action or Flow |
-| FSM states and transitions | The `Jido.Agent.Plugin.FSM` Plugin, or a field changed by Actions |
+| FSM states and transitions | The `Jido.Plugin.FSM` Plugin, or a field changed by Actions |
 | Input checks before a command | An Action schema, or `c:Jido.Plugin.prepare/2` |
 | Checks that need live resources | `c:Jido.Plugin.admit/3` |
 | Updates after each command | `c:Jido.Plugin.reduce/2`, on the field the Plugin owns |
 | Work after commit | A Directive |
+
+## Upgrade the beta FSM Plugin
+
+Use `Jido.Plugin.FSM` in Agent declarations, direct calls, and Plugin
+lookups. When you recompile Agent source, Jido accepts
+`Jido.Agent.Plugin.FSM` in `plugins:` and records `Jido.Plugin.FSM` in
+the definition. Keep the same `state_machine` section and transition data.
+
+Encoded Agent definitions keep the same `jido.fsm` provider reference at
+version `1`. Catalog Discovery registers that reference for
+`Jido.Plugin.FSM`. If you build a Catalog yourself, change its target module
+to `Jido.Plugin.FSM` and keep its existing ID and version.
+
+Beta durable checkpoints contain the old provider module and its code
+fingerprint. To keep the saved state, settle durable Turns on the old
+release. After deployment, upgrade each inactive Agent with an explicit
+Action. Replace the saved FSM provider with `Jido.Plugin.FSM`, increase the
+Agent definition version, and build a new snapshot with
+`Jido.Persistence.snapshot/2`. Keep the Agent ID, origin module, and
+`:fsm` state. For the default Term codec, pass
+`legacy_modules: [Jido.Agent.Plugin.FSM]` to
+`Jido.Persistence.upgrade_agent/5`. Replace the provider in saved child
+definitions too if they use the beta Plugin. See
+[Checkpoints and Upgrades](../durability/checkpoints-and-data-upgrades.md).
 
 ## Plugins
 

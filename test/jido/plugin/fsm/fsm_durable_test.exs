@@ -1,9 +1,13 @@
-defmodule Jido.Agent.Plugin.FSMDurableTest do
-  use Jido.Test.Case, async: false
+defmodule Jido.Plugin.FSMDurableTest do
+  use Covenant.Case, component: "jido.plugin.fsm", async: false
+
+  import Jido.Test.Case, only: [unique_id: 1]
 
   @moduletag :tmp_dir
 
-  alias Jido.Agent.Plugin.FSM
+  alias Jido.Persistence
+  alias Jido.Persistence.{Record, Store}
+  alias Jido.Plugin.FSM
   alias Jido.AgentServer, as: Server
 
   defmodule Approval do
@@ -51,6 +55,23 @@ defmodule Jido.Agent.Plugin.FSMDurableTest do
     end
   end
 
+  defmodule UpgradeFSM do
+    use Jido.Action, name: "upgrade_beta_fsm"
+
+    @impl true
+    def run(%{snapshot: %{agent: saved}}, _context) do
+      plugins =
+        Enum.map(saved.plugins, fn
+          %{provider: Jido.Agent.Plugin.FSM} = plugin -> %{plugin | provider: FSM}
+          plugin -> plugin
+        end)
+
+      with {:ok, next} <- Persistence.snapshot(%{saved | plugins: plugins, vsn: saved.vsn + 1}),
+           do: {:ok, %{snapshot: next}}
+    end
+  end
+
+  @tag obligation: "jido.plugin.fsm.I2"
   test "a durable Flow wait keeps the source FSM state until completion", c do
     id = unique_id("fsm-wait")
     instance = String.to_atom("fsm_durable_#{System.unique_integer([:positive])}")
@@ -96,5 +117,51 @@ defmodule Jido.Agent.Plugin.FSMDurableTest do
     completed = Server.snapshot(server).agent
     assert completed.state.status == :approved
     assert completed.state.fsm == %{definition_vsn: 1, current: :ready}
+  end
+
+  @tag obligation: "jido.plugin.fsm.I3"
+  test "an inactive beta checkpoint needs an explicit upgrade and keeps its FSM state", c do
+    source = {Persistence.File, path: c.tmp_dir}
+    id = unique_id("beta-fsm")
+    opts = [namespace: "beta-fsm"]
+    address = Jido.Agent.Address.new!(namespace: opts[:namespace], id: id)
+    agent = Agent.instantiate!(id: id, state: %{status: :approved, fsm: %{current: :ready}})
+    assert {:ok, snapshot} = Persistence.snapshot(agent)
+    assert [plugin] = snapshot.agent.plugins
+
+    legacy = Jido.Agent.Plugin.FSM
+    legacy_name = Atom.to_string(legacy)
+
+    # The Term codec records loaded provider modules in its header.
+    Module.create(legacy, quote(do: nil), Macro.Env.location(__ENV__))
+
+    record =
+      try do
+        legacy_snapshot = %{
+          snapshot
+          | agent: %{snapshot.agent | plugins: [%{plugin | provider: legacy}]},
+            references: snapshot.references |> Map.delete(FSM) |> Map.put(legacy, legacy.module_info(:md5))
+        }
+
+        assert {:ok, record} = Record.build_active(agent, address, 0, 0, legacy_snapshot)
+        assert {:ok, bytes} = Record.encode(record)
+        bytes
+      after
+        :code.delete(legacy)
+        :code.purge(legacy)
+      end
+
+    assert :ok = Store.compare_and_swap(source, Record.agent_key(address), :not_found, record)
+
+    assert {:error, {:unavailable_persistence_module, ^legacy_name}} =
+             Persistence.load_agent(source, Agent, id, opts)
+
+    assert {:ok, upgraded, 1} =
+             Persistence.upgrade_agent(source, Agent, id, UpgradeFSM, opts ++ [legacy_modules: [legacy]])
+
+    assert upgraded.vsn == agent.vsn + 1
+    assert upgraded.state == %{status: :approved, fsm: %{definition_vsn: 1, current: :ready}}
+    assert upgraded.plugins == [plugin]
+    assert {:ok, ^upgraded, 1} = Persistence.load_agent_with_revision(source, Agent, id, opts)
   end
 end
