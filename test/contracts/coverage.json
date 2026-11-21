@@ -31,9 +31,9 @@
       "covered": 53
     },
     "jido_ai": {
-      "active": 48,
+      "active": 49,
       "coverage": 1.0,
-      "covered": 48
+      "covered": 49
     }
   },
   "components": {
@@ -4875,7 +4875,7 @@
         "jido_ai.agent_authoring.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 31,
+          "passing": 32,
           "status": "active",
           "testable": true,
           "tests": [
@@ -4893,6 +4893,7 @@
             "test a forged wait host cannot bypass review rejection or spend a model call",
             "test an inline reasoning block compiles to the direct root Flow",
             "test an invalid model tool request starts an output repair round",
+            "test browser restrictions round trip without references to the bundled Actions",
             "test configured reasoning defaults round-trip through Jido Authoring",
             "test inspection and preflight expose portable graph data",
             "test one model round executes multiple tool calls in one Parallel component",
@@ -5798,10 +5799,10 @@
       }
     },
     "jido_ai.tools": {
-      "active": 6,
+      "active": 7,
       "app": "jido_ai",
       "coverage": 1.0,
-      "covered": 6,
+      "covered": 7,
       "form": "light",
       "obligations": {
         "jido_ai.tools.I1": {
@@ -5912,6 +5913,25 @@
             "test tool results keep the local value separate from bounded model content",
             "test tool results preserve valid content parts and bound model content"
           ]
+        },
+        "jido_ai.tools.I7": {
+          "failing": 0,
+          "kind": "security",
+          "passing": 10,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test ReAct finds a source, reads it, and cites the final URL",
+            "test URL and address policies reject ambiguous and non-public destinations",
+            "test a blocked resolved address stops before connection",
+            "test a chunked body cannot exceed the byte limit",
+            "test a permitted redirect resolves again and returns the final URL with bounded text",
+            "test a redirect must pass policy before resolving or making another connection",
+            "test a search result must match both allowlists",
+            "test a stalled response stops at the deadline",
+            "test browser Actions require an Agent declaration and host policy",
+            "test the pinned address receives the request with the original host"
+          ]
         }
       }
     },
@@ -6014,8 +6034,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 251,
+    "active": 252,
     "coverage": 1.0,
-    "covered": 251
+    "covered": 252
   }
 }
