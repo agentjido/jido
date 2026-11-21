@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+
+<!-- test that invokeid is set correctly in events received from an invoked process.  timeout event catches the 
+case where the invoke doesn't work correctly -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1"/>
+  <data conf:id="2"/>
+  </datamodel>
+  
+   <state id="s0">
+      <onentry>
+        <send event="timeout" delay="2s"/>
+        </onentry>
+     <invoke conf:idlocation="1" type="http://www.w3.org/TR/scxml/" >
+     <content>
+       <scxml initial="sub0" version="1.0" conf:datamodel=""  name="machineName">     
+       <final id="sub0">
+         <onentry>
+            <send target="#_parent" event="event1"/>
+        </onentry>
+        </final>
+       </scxml>
+      </content>
+    </invoke>
+       <transition event="event1" target="s1">
+         <assign conf:location="2" conf:eventField="invokeid"/>
+         </transition>
+       <transition event="event0" conf:targetfail=""/>
+   </state>
+
+<state id="s1">
+  <transition conf:VarEqVar="1 2" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+  </state>
+  
+   <conf:pass/>
+   <conf:fail/>
+   
+
+
+</scxml>

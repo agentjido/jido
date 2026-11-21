@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!-- we test that #_parent works as  a target of  <send> .  a subscript is invoked and sends the event 
+childToParent to its parent session (ths session) using #_parent as the target. If we get this event, we
+pass, otherwise we fail.  The timer insures that some event is generated and that the test does not hang. -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+  
+<state id="s0" >
+    <onentry>
+      <send event="timeout" delay="5s"/>
+      </onentry>
+    <invoke type="scxml" >
+    <content>
+       <!-- send an event to the parent session using #_parent as the target -->
+        <scxml initial="sub0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+          <state id="sub0">
+            <onentry>
+             <send event="childToParent" target="#_parent"/>
+             </onentry>
+          <transition  target="subFinal"/>
+         </state>
+       <final id="subFinal"/>
+        </scxml> 
+    </content>
+    </invoke>
+    <transition event="childToParent" conf:targetpass=""/>
+    <transition event="*" conf:targetfail=""/>
+</state>
+
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

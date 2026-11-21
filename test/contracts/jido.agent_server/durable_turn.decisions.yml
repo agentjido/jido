@@ -1,0 +1,41 @@
+- id: durable-turn-boundary
+  date: 2026-10-20
+  decision: Keep accepted Flow and Handoff receipts private to AgentServer. Use Jido.Durable.Runtime for Flow checkpoint and wait recovery policy. Use AgentServer as the Agent commit, wait-timer, cron delivery, and OTP lifecycle host. Use Jido.Persistence.ContinuationStore for Runic workflow checkpoints and saved wait input receipts.
+  driver: Exec owns portable wait data. AgentServer owns its Turn receipt and live execution. Persistence owns its durable record.
+  approved_by: User-approved Jido V3 component map
+
+- id: durable-turn-code-seam
+  date: 2026-10-20
+  decision: Keep deliver_wait and durable-turn gen_statem transitions in Jido.AgentServer. Put portable wait values and workflow operations in Exec, live continuation policy in Lifecycle, and saved workflow data in Persistence. Remove DurableTurn, CheckpointStore, WaitHost, and the forwarding AgentServer Store module without compatibility delegates.
+  driver: Portable wait data belongs to Exec, AgentServer owns live admission, and Persistence owns saved acceptance.
+  approved_by: V3 aspirational module dependency map
+
+- id: durable-turn-obligation-origin
+  date: 2026-10-20
+  decision: Define durable Turn obligations from current durable Flow, checkpoint, and wait behavior instead of moving credit from general AgentServer obligations.
+  driver: The root AgentServer contract did not have a complete durable Flow obligation range.
+  approved_by: Component hardening pass
+
+- id: durable-turn-mutation-profile
+  date: 2026-10-20
+  decision: Mutate Jido.AgentServer.Lifecycle and Jido.Persistence.ContinuationStore. Do not mutate the shared AgentServer state machine in this focused profile.
+  driver: The focused profile must test the canonical live and stored durable Flow owners without restoring old seams.
+  approved_by: V3 aspirational module dependency map
+
+- id: durable-turn-full-facts
+  date: 2026-11-10
+  decision: Store each Runic produced fact value and Join completion result in full, with a digest. Do not maintain delta chains or a fact head.
+  driver: Durable correctness needs exact values and digest checks. Delta encoding is a storage optimization that adds format and recovery complexity before measurements show that it is needed.
+  approved_by: User-directed Exec and Durable simplification
+
+- id: durable-turn-frontier-hydration
+  date: 2026-10-27
+  decision: Replay durable workflow structure with Runic FactAddress values and load only the hot facts that the active frontier and pending reactions need. Add each open Jido wait input to the hot set because wait resolution runs before the Runner restarts. Represent detached Join completion results with an internal replay event that creates a FactRef.
+  driver: Long-running workflow history must not force every stored fact value into memory during each recovery or wait transition.
+  approved_by: User-requested frontier fact hydration
+
+- id: durable-turn-v3-prepare-before-agent-commit
+  date: 2026-11-13
+  decision: Prepare the execution record and each timed wake before the matching Agent receipt. Treat the Agent record as the durable commit point.
+  driver: Single-key Stores can leave safe auxiliary orphans, but they must not expose a committed timed wait without its recovery data.
+  approved_by: User-confirmed persistence design review

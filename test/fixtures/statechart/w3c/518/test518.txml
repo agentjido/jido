@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+
+<!-- test that that namelist values get encoded as POST parameters.  -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="2"/>
+  </datamodel>
+
+<state id="s0">
+  <onentry>
+    <send event="timeout" delay="30s"/>
+    <send  event="test" conf:basicHTTPAccessURITarget="" conf:namelist="1"
+    type="http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor"/>
+      </onentry>
+     
+  <transition event="test" conf:eventIdParamHasValue="1 2" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+
+ </state>
+ 
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<!-- test that a parent process can receive multiple events from a child process   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0" initial="s01">
+  <onentry>
+    <send event="timeout" delay="3s"/>
+    </onentry>
+  <invoke type="http://www.w3.org/TR/scxml/">
+    <content>
+    <scxml initial="subFinal" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+      <final id="subFinal">
+           <onentry>
+             <send target="#_parent" event="childToParent1"/> 
+               <send target="#_parent" event="childToParent2"/>
+             </onentry> 
+       </final>
+         </scxml>
+    </content>
+    </invoke>
+  <transition event="timeout" conf:targetfail=""/>
+   
+ 
+  <state id="s01">
+  <transition event="childToParent1" target="s02"/>
+ </state>
+ 
+ <state id="s02">
+   <transition event="childToParent2" target="s03"/>
+   </state>
+   
+<state id="s03">
+  <transition event="done.invoke" conf:targetpass=""/>
+  </state>   
+
+</state>
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

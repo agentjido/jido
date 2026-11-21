@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<!-- test that finalize markup runs before the event is processed.  The invoked process will
+return 2 in _event.data.aParam, so that new value should be in force when we select
+the transtitions.   -->
+
+
+<scxml initial="s0" version="1.0"  conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="1"/>
+  </datamodel>
+     
+<state id="s0">
+  <onentry>
+    <send event="timeout" delay="3s"/>
+    </onentry>
+  <invoke type="http://www.w3.org/TR/scxml/">
+     <content>
+      <scxml initial="subFinal" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+          <final id="subFinal">
+            <onentry>
+            <send target="#_parent" event="childToParent">
+            <param name="aParam" conf:expr="2"/>
+               </send> 
+          </onentry> 
+          </final>
+         </scxml>
+     </content>
+        <finalize>
+      <assign conf:location="1" conf:eventDataFieldValue="aParam"/>
+      </finalize>
+      </invoke>
+      
+  <transition event="childToParent" conf:idVal="1=2" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+</state>   
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

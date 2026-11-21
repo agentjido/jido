@@ -1,1025 +1,262 @@
 defmodule Jido.Agent.Directive do
+  alias Jido.Joi
+
   @moduledoc """
-  Typed directive structs for `Jido.Agent`.
+  Runtime work returned by an Agent executable turn.
 
-  A *directive* is a pure description of an external effect for the runtime
-  (e.g. `Jido.AgentServer`) to execute. Agents and strategies **never**
-  interpret or execute directives; they only emit them.
+  The terminal Action or Flow output is complete next Agent state. Plugin-owned
+  fields must remain unchanged until their owning Plugin reduces the batch.
+  Plugin-owned Directives can change their owner's state during reduction and
+  request runtime work after commit. `Jido.AgentServer` commits the candidate
+  before it dispatches runtime work. A dispatch failure does not undo that
+  commit. A later Agent state change must enter through a Signal.
 
-  ## Signal Integration
+  Return `{:ok, state, directives}` from an Action.
+  Flow preserves the batch from all successful executed components. A failed
+  Flow returns no executable batch. Core validates every Directive and the
+  complete state before commit. The third element is an optional proper list
+  for both direct Actions and Flow composition.
 
-  The Emit directive integrates with `Jido.Signal` and `Jido.Signal.Dispatch`:
+  Directives request runtime operations or work that must happen after commit.
+  An Action or Flow can also perform synchronous I/O before returning its
+  complete state. That I/O is outside the Agent state transaction and is not
+  undone if the Turn fails.
 
-  - `%Emit{}` - Dispatch a signal via configured adapters (pid, pubsub, bus, http, etc.)
+  A custom Directive uses this module as a behavior. `use Jido.Agent.Directive`
+  supplies a default `validate/1` callback. The default applies `schema/0` when
+  the Directive module defines it. A Directive can override `validate/1` when
+  it needs another validation rule.
+  """
 
-  ## Design
+  alias __MODULE__.{Emit, Reply}
 
-  Directives are bare structs - no tuple wrappers. This enables:
-  - Clean pattern matching on struct type
-  - Protocol-based dispatch for extensibility
-  - External packages can define custom directives
+  alias Jido.Agent.Schema
+  alias Jido.Error
+  alias Jido.Signal
+  alias Jido.Signal.Context, as: SignalContext
 
-  ## Core Directives
+  @callback validate(directive :: struct()) :: {:ok, struct()} | {:error, term()}
 
-    * `%Emit{}` - Dispatch a signal via `Jido.Signal.Dispatch`
-    * `%Error{}` - Signal an error (wraps `Jido.Error.t()`)
-    * `%Spawn{}` - Spawn a generic BEAM child process (fire-and-forget, no tracking)
-    * `%SpawnAgent{}` - Spawn a child Jido agent with full hierarchy tracking
-    * `%AdoptChild{}` - Attach an orphaned or unattached child to the current parent
-    * `%StopChild{}` - Request a tracked child agent to stop gracefully
-    * `%StartSensor{}` - Start or replace a tagged sensor runtime
-    * `%StopSensor{}` - Stop a tagged sensor runtime
-    * `%Schedule{}` - Schedule a delayed message
-    * `%RunInstruction{}` - Execute an instruction at runtime and route result to `cmd/2`
-    * `%Stop{}` - Stop the agent process (self)
+  @doc "Defines a self-validating custom Agent Directive."
+  defmacro __using__(opts) do
+    built_in? = Keyword.get(opts, :built_in, false)
 
-  ## Usage
+    quote location: :keep, bind_quoted: [built_in?: built_in?] do
+      @behaviour Jido.Agent.Directive
 
-      alias Jido.Agent.Directive
-
-      # Emit a signal (runtime will dispatch via configured adapters)
-      %Directive.Emit{signal: my_signal}
-      %Directive.Emit{signal: my_signal, dispatch: {:pubsub, topic: "events"}}
-      %Directive.Emit{signal: my_signal, dispatch: {:pid, target: pid}}
-
-      # Schedule for later
-      %Directive.Schedule{delay_ms: 5000, message: :timeout}
-
-      # Execute instruction at runtime
-      %Directive.RunInstruction{instruction: instruction, result_action: :fsm_instruction_result}
-
-  ## Extensibility
-
-  External packages can define their own directive structs:
-
-      defmodule MyApp.Directive.CallLLM do
-        defstruct [:model, :prompt, :tag]
+      if built_in? do
+        @doc false
+        def __jido_builtin_directive__, do: true
       end
 
-  The runtime dispatches on struct type, so no changes to core are needed.
-  """
+      @impl Jido.Agent.Directive
+      # `use` can precede `defstruct`; do not expand the struct here.
+      def validate(%{__struct__: __MODULE__} = directive) do
+        if function_exported?(__MODULE__, :schema, 0) do
+          Jido.Agent.Directive.parse(apply(__MODULE__, :schema, []), Map.from_struct(directive))
+        else
+          {:ok, directive}
+        end
+      end
 
-  alias __MODULE__.{
-    Emit,
-    Error,
-    Spawn,
-    SpawnAgent,
-    AdoptChild,
-    StopChild,
-    StartSensor,
-    StopSensor,
-    Schedule,
-    RunInstruction,
-    Stop,
-    Cron,
-    CronCancel
-  }
+      def validate(value) do
+        {:error,
+         Jido.Error.validation_error("Expected a #{inspect(__MODULE__)} Directive",
+           details: %{directive: value}
+         )}
+      end
 
-  @typedoc """
-  Any external directive struct (core or extension).
+      defoverridable validate: 1
+    end
+  end
 
-  This is intentionally `struct()` so external packages can define
-  their own directive structs without modifying this type.
-  """
   @type t :: struct()
 
-  @typedoc "Built-in core directives."
-  @type core ::
-          Emit.t()
-          | Error.t()
-          | Spawn.t()
-          | SpawnAgent.t()
-          | AdoptChild.t()
-          | StopChild.t()
-          | StartSensor.t()
-          | StopSensor.t()
-          | Schedule.t()
-          | RunInstruction.t()
-          | Stop.t()
-          | Cron.t()
-          | CronCancel.t()
+  @doc "Validates one built-in or custom Agent Directive."
+  @spec validate(struct()) :: {:ok, struct()} | {:error, term()}
+  def validate(%{__struct__: module, signal: %Signal{} = signal} = directive)
+      when module in [Emit, Reply] do
+    with {:ok, signal} <- parse(Signal.schema(), signal),
+         {:ok, extensions} <- normalize_context(signal.extensions),
+         {:ok, directive} <-
+           directive
+           |> Map.from_struct()
+           |> Map.put(:signal, %{signal | extensions: extensions})
+           |> then(&parse(module.schema(), &1)),
+         :ok <- validate_reply_causation(directive) do
+      {:ok, directive}
+    end
+  end
 
-  @typedoc "Restart policy for spawned AgentServer children."
-  @type restart_policy :: :permanent | :temporary | :transient
+  def validate(%{__struct__: module} = directive)
+      when module in [Emit, Reply] do
+    {:error,
+     Jido.Error.validation_error("Agent Signal Directive requires a Jido.Signal",
+       details: %{directive: directive}
+     )}
+  end
 
-  @restart_policies [:permanent, :temporary, :transient]
-  @unsupported_spawn_agent_opts [
-    :lifecycle_mod,
-    :pool,
-    :pool_key,
-    :idle_timeout,
-    :storage,
-    :restored_from_storage
-  ]
+  def validate(%{__struct__: module} = directive), do: validate_custom(module, directive)
 
-  @doc false
-  @spec valid_restart_policies() :: [restart_policy()]
-  def valid_restart_policies, do: @restart_policies
-
-  @doc false
-  @spec validate_restart_policy(term(), keyword()) :: :ok | {:error, String.t()}
-  def validate_restart_policy(restart, _opts \\ [])
-
-  def validate_restart_policy(restart, _opts) when restart in @restart_policies, do: :ok
-
-  def validate_restart_policy(restart, _opts) do
-    {:error, "restart must be one of #{inspect(@restart_policies)}, got: #{inspect(restart)}"}
+  def validate(value) do
+    {:error,
+     Jido.Error.validation_error("Unknown Agent Directive",
+       details: %{directive: value}
+     )}
   end
 
   @doc false
-  @spec validate_spawn_agent_opts(term()) :: :ok | {:error, String.t()}
-  def validate_spawn_agent_opts(opts) when is_map(opts) do
-    unsupported_opts =
-      @unsupported_spawn_agent_opts
-      |> Enum.filter(&Map.has_key?(opts, &1))
-      |> Enum.sort()
+  @spec parse(Joi.schema(), term()) :: {:ok, term()} | {:error, Exception.t()}
+  def parse(schema, value) do
+    with {:error, issues} <- Joi.parse(schema, value), do: invalid_schema(issues)
+  end
 
-    case unsupported_opts do
-      [] ->
+  defp invalid_schema(issues) do
+    issues =
+      Enum.map(issues, fn issue ->
+        %{code: Joi.error_code(issue), path: Joi.error_path(issue), message: Joi.error_message(issue)}
+      end)
+
+    Error.validation_result(:invalid_directive, [], "Agent Directive does not match its schema", %{
+      issues: issues
+    })
+  end
+
+  defp normalize_context(extensions) do
+    with {:error, reason} <- SignalContext.normalize(extensions) do
+      Error.validation_result(:invalid_directive, [:signal, :extensions], "Signal context is invalid", %{
+        reason: reason
+      })
+    end
+  end
+
+  defp validate_custom(module, directive) do
+    try do
+      case module.validate(directive) do
+        {:ok, %{__struct__: ^module} = validated} ->
+          {:ok, validated}
+
+        {:ok, %{__struct__: actual}} ->
+          {:error,
+           Jido.Error.validation_error("Agent Directive validation changed its type",
+             details: %{expected: module, actual: actual}
+           )}
+
+        {:error, [%{code: _, path: _, message: _} | _] = issues} ->
+          invalid_schema(issues)
+
+        {:error, _reason} = error ->
+          error
+
+        result ->
+          {:error,
+           Jido.Error.validation_error("Agent Directive validate/1 returned an invalid result",
+             details: %{directive: module, result: result}
+           )}
+      end
+    rescue
+      error ->
+        {:error,
+         Jido.Error.execution_error("Agent Directive validation failed",
+           details: %{directive: module, error: error}
+         )}
+    catch
+      kind, reason ->
+        {:error,
+         Jido.Error.execution_error("Agent Directive validation failed",
+           details: %{directive: module, kind: kind, reason: reason}
+         )}
+    end
+  end
+
+  @doc """
+  Creates an emission request. It does not dispatch a Signal.
+
+  The type/data form uses the owning Agent's explicit Signal source when the
+  command runs. The full-Signal form preserves its envelope.
+
+  To request durable acceptance by one declared topology member, use
+  `emit(signal, {:durable, {:agent, name, slot}})` or
+  `emit(signal, {:durable, :parent})`. The destination must be in the same
+  named Jido instance and the receiving route must prepare a durable Flow.
+  The sender commits its send request with its next state. Delivery and
+  receiver completion occur separately. See the durability guide for the
+  supported destinations, retry order, and retention rules.
+  """
+  @spec emit(Signal.t() | String.t(), term()) :: Emit.t() | map() | {:error, term()}
+  def emit(signal_or_type, dispatch_or_data \\ nil)
+
+  def emit(type, data) when is_binary(type) do
+    with :ok <- Jido.Agent.Schema.exact(type),
+         :ok <- Jido.Agent.Schema.plain_map(data),
+         do: %{kind: :emit, type: type, data: data}
+  end
+
+  def emit(%Signal{} = signal, dispatch), do: %Emit{signal: signal, dispatch: dispatch}
+
+  @doc "Creates one correlated response request. It does not dispatch the Signal."
+  @spec reply(Signal.t()) :: Reply.t()
+  def reply(%Signal{} = signal), do: %Reply{signal: signal}
+
+  @doc false
+  def directives(definition, directives) do
+    Schema.list(directives, fn
+      %{kind: :emit} = request ->
+        with {:ok, request} <- emission(request, definition),
+             {:ok, signal} <- envelope(request, definition) do
+          {:ok, emit(signal)}
+        end
+
+      directive ->
+        {:ok, directive}
+    end)
+  end
+
+  defp envelope(%{signal: signal}, _definition), do: {:ok, signal}
+
+  defp envelope(%{type: type, data: data}, definition),
+    do: Signal.new(type, data, source: definition.signal_source)
+
+  defp emission(%{kind: :emit, signal: %Signal{} = signal} = request, _definition) do
+    with {:ok, _} <- Schema.fields(request, [:kind, :signal]),
+         :ok <- emission_signal(signal),
+         do: {:ok, request}
+  end
+
+  defp emission(%{kind: :emit, type: type, data: data} = request, definition) do
+    with {:ok, _} <- Schema.fields(request, [:kind, :type, :data]),
+         :ok <- Schema.exact(type),
+         :ok <- Schema.plain_map(data),
+         :ok <- Schema.static(data),
+         :ok <- Error.prefix_result_path(Schema.nonempty(definition.signal_source), :signal_source),
+         do: {:ok, request}
+  end
+
+  defp emission(_request, _definition),
+    do: Error.validation_result(:invalid_directive, [], "Expected a registered emission directive")
+
+  defp emission_signal(signal) do
+    case Jido.Joi.validate(Signal.schema(), signal) do
+      :ok ->
+        Schema.static(signal)
+
+      {:error, issues} ->
+        Error.validation_result(:invalid_signal, [], "Invalid Signal envelope", %{issues: issues})
+    end
+  end
+
+  defp validate_reply_causation(%Reply{signal: signal} = directive) do
+    case Signal.get_context(signal, "jidocausationid") do
+      value when is_binary(value) and value != "" ->
         :ok
 
-      opts ->
+      _value ->
         {:error,
-         "SpawnAgent does not support lifecycle/persistence opts #{inspect(opts)}; use Jido.Agent.InstanceManager for storage-backed lifecycle"}
+         Jido.Error.validation_error("Agent Reply Directive requires Signal causation",
+           details: %{directive: directive}
+         )}
     end
   end
 
-  def validate_spawn_agent_opts(opts) do
-    {:error, "SpawnAgent opts must be a map, got: #{inspect(opts)}"}
-  end
-
-  # ============================================================================
-  # Error - Signal an error from cmd/2
-  # ============================================================================
-
-  defmodule Error do
-    @moduledoc """
-    Signal an error from agent command processing.
-
-    This directive carries a `Jido.Error.t()` for consistent error handling.
-    The runtime can log, emit, or handle errors based on this directive.
-
-    ## Fields
-
-    - `error` - A `Jido.Error.t()` struct
-    - `context` - Optional atom describing error context (e.g., `:normalize`, `:instruction`)
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                error: Zoi.any(description: "Jido.Error struct"),
-                context: Zoi.atom(description: "Error context") |> Zoi.optional()
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc "Returns the Zoi schema for Error."
-    @spec schema() :: Zoi.schema()
-    def schema, do: @schema
-  end
-
-  # ============================================================================
-  # Emit - Signal dispatch via Jido.Signal.Dispatch
-  # ============================================================================
-
-  defmodule Emit do
-    @moduledoc """
-    Dispatch a signal via `Jido.Signal.Dispatch`.
-
-    The runtime interprets this directive by calling:
-
-        Jido.Signal.Dispatch.dispatch(signal, dispatch_config)
-
-    ## Fields
-
-    - `signal` - A `Jido.Signal.t()` struct to dispatch
-    - `dispatch` - Dispatch config: `{adapter, opts}` or list of configs
-      - `:pid` - Direct to process
-      - `:pubsub` - Via PubSub
-      - `:bus` - To signal bus
-      - `:http` / `:webhook` - HTTP endpoints
-      - `:logger` / `:console` / `:noop` - Logging/testing
-
-    If `dispatch` is omitted and the agent has no `default_dispatch`, runtime
-    falls back to emitting to the current agent process (`self()`).
-
-    ## Examples
-
-        # Use agent's default dispatch (configured on AgentServer)
-        %Emit{signal: signal}
-
-        # Explicit dispatch to PubSub
-        %Emit{signal: signal, dispatch: {:pubsub, topic: "events"}}
-
-        # Multiple dispatch targets
-        %Emit{signal: signal, dispatch: [
-          {:pubsub, topic: "events"},
-          {:logger, level: :info}
-        ]}
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                signal: Zoi.any(description: "Jido.Signal.t() to dispatch"),
-                dispatch:
-                  Zoi.any(description: "Dispatch config: {adapter, opts} or list")
-                  |> Zoi.optional()
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc "Returns the Zoi schema for Emit."
-    @spec schema() :: Zoi.schema()
-    def schema, do: @schema
-  end
-
-  # ============================================================================
-  # Spawn - Child process spawning
-  # ============================================================================
-
-  defmodule Spawn do
-    @moduledoc """
-    Spawn a generic BEAM child process under the agent's supervisor.
-
-    This is a **low-level, fire-and-forget** directive for spawning non-agent
-    processes (Tasks, GenServers, etc.). The spawned process is **not tracked**
-    in the agent's children map and has no parent-child relationship semantics.
-
-    Use `SpawnAgent` instead if you need to spawn another Jido agent with:
-    - Parent-child hierarchy tracking
-    - Process monitoring and exit signals
-    - The ability to use `emit_to_parent/3` from the child
-    - Lifecycle management via `StopChild`
-
-    ## Fields
-
-    - `child_spec` - Supervisor child_spec for the process to spawn
-    - `tag` - Optional correlation tag for logging (not used for tracking)
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                child_spec: Zoi.any(description: "Supervisor child_spec"),
-                tag: Zoi.any(description: "Optional correlation tag") |> Zoi.optional()
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc "Returns the Zoi schema for Spawn."
-    @spec schema() :: Zoi.schema()
-    def schema, do: @schema
-  end
-
-  # ============================================================================
-  # SpawnAgent - Spawn a child agent with hierarchy tracking
-  # ============================================================================
-
-  defmodule SpawnAgent do
-    @moduledoc """
-    Spawn a child agent with parent-child hierarchy tracking.
-
-    Unlike `Spawn`, this directive specifically spawns another Jido agent
-    and sets up the logical parent-child relationship:
-
-    - Child's parent reference points to the spawning agent
-    - Parent monitors the child process
-    - Parent tracks child in its children map by tag
-    - Child exit signals are delivered to parent as `jido.agent.child.exit`
-    - Child can use `emit_to_parent/3` while attached
-
-    The logical relationship is independent from OTP supervisory ancestry. If
-    the child later becomes orphaned, the current parent ref is cleared and the
-    child must be explicitly reattached with `AdoptChild` before
-    `emit_to_parent/3` works again. The active logical binding is mirrored into
-    `Jido.RuntimeStore`, so child restarts continue to use the current parent
-    relationship instead of stale startup metadata.
-
-    ## Fields
-
-    - `agent` - Agent module (atom) or pre-built agent struct to spawn
-    - `tag` - Tag for tracking this child (used as key in children map)
-    - `opts` - Additional options passed to child AgentServer. Supports standard
-      child startup options like `:id`, `:initial_state`, and `:on_parent_death`,
-      but not InstanceManager lifecycle/persistence options like `:storage`,
-      `:idle_timeout`, `:lifecycle_mod`, `:pool`, `:pool_key`, or
-      `:restored_from_storage`
-    - `meta` - Metadata to pass to child via parent reference
-    - `restart` - Restart policy for the child under supervision (default: `:transient`)
-
-    ## Examples
-
-        # Spawn a worker agent
-        %SpawnAgent{agent: MyWorkerAgent, tag: :worker_1}
-
-        # Spawn with custom ID and initial state
-        %SpawnAgent{
-          agent: MyWorkerAgent,
-          tag: :processor,
-          opts: %{id: "custom-id", initial_state: %{batch_size: 100}}
-        }
-
-        # Spawn with metadata for the child
-        %SpawnAgent{
-          agent: MyWorkerAgent,
-          tag: :handler,
-          meta: %{assigned_topic: "events.user"}
-        }
-
-        # Override restart behavior for long-lived workers
-        %SpawnAgent{
-          agent: MyWorkerAgent,
-          tag: :supervised,
-          restart: :permanent
-        }
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                agent: Zoi.any(description: "Agent module (atom) or pre-built agent struct"),
-                tag: Zoi.any(description: "Tag for tracking this child"),
-                opts: Zoi.map(description: "Options for child AgentServer") |> Zoi.default(%{}),
-                meta: Zoi.map(description: "Metadata to pass to child") |> Zoi.default(%{}),
-                restart:
-                  Zoi.atom(description: "Restart policy for the child")
-                  |> Zoi.refine({Jido.Agent.Directive, :validate_restart_policy, []})
-                  |> Zoi.default(:transient)
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc "Returns the Zoi schema for SpawnAgent."
-    @spec schema() :: Zoi.schema()
-    def schema, do: @schema
-  end
-
-  # ============================================================================
-  # AdoptChild - Attach an orphaned or unattached child agent
-  # ============================================================================
-
-  defmodule AdoptChild do
-    @moduledoc """
-    Attach an orphaned or unattached child agent to the current parent.
-
-    This directive is the explicit reattachment path for Jido's logical
-    hierarchy. It updates the live child runtime so the child can resume
-    parent-directed communication with `emit_to_parent/3`.
-
-    Adoption is explicit. Jido does not automatically reconnect children
-    when a logical parent restarts.
-
-    Adoption updates the live runtime and the instance `Jido.RuntimeStore`
-    binding, so later child restarts rehydrate the adopted parent relationship.
-
-    ## Fields
-
-    - `child` - Child PID or child agent id to adopt
-    - `tag` - Tag for tracking this adopted child
-    - `meta` - Metadata to write into the child's new parent reference
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                child: Zoi.any(description: "Child PID or child id"),
-                tag: Zoi.any(description: "Tag for tracking this adopted child"),
-                meta:
-                  Zoi.map(description: "Metadata to pass to the adopted child")
-                  |> Zoi.default(%{})
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc "Returns the Zoi schema for AdoptChild."
-    @spec schema() :: Zoi.schema()
-    def schema, do: @schema
-  end
-
-  # ============================================================================
-  # StopChild - Stop a tracked child agent
-  # ============================================================================
-
-  defmodule StopChild do
-    @moduledoc """
-    Request that a tracked child agent stop gracefully.
-
-    This directive provides symmetric lifecycle control for child agents
-    spawned via `SpawnAgent`. It sends a shutdown signal to the child,
-    allowing it to terminate cleanly.
-
-    The child is identified by its `tag` (the key used in `SpawnAgent`).
-    If the child is not found, the directive is a no-op.
-
-    ## Fields
-
-    - `tag` - Tag of the child to stop (must match a key in the children map)
-    - `reason` - Reason for stopping (default: `:normal`)
-
-    ## Examples
-
-        # Stop a worker by tag
-        %StopChild{tag: :worker_1}
-
-        # Stop with a specific reason
-        %StopChild{tag: :processor, reason: :shutdown}
-
-    ## Behavior
-
-    The runtime sends a `jido.agent.stop` signal to the child process,
-    which triggers a graceful shutdown. The child's exit will be delivered
-    back to the parent as a `jido.agent.child.exit` signal.
-
-    `SpawnAgent` children default to `restart: :transient`, so a normal
-    `StopChild` shutdown removes the child instead of immediately restarting it.
-    Custom reasons are wrapped as `{:shutdown, reason}` so transient children
-    are still removed cleanly.
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                tag: Zoi.any(description: "Tag of the child to stop"),
-                reason: Zoi.any(description: "Reason for stopping") |> Zoi.default(:normal)
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc "Returns the Zoi schema for StopChild."
-    @spec schema() :: Zoi.schema()
-    def schema, do: @schema
-  end
-
-  # ============================================================================
-  # StartSensor - Start a tagged sensor runtime
-  # ============================================================================
-
-  defmodule StartSensor do
-    @moduledoc """
-    Start or replace a tagged sensor runtime owned by the current agent runtime.
-
-    Sensors are tracked separately from child agents under `{:sensor, tag}` and
-    do not participate in child-agent hierarchy signals.
-
-    By default sensors are unlinked but owner-monitored: a sensor crash emits
-    `jido.agent.sensor.exit` to the owning agent, and the sensor stops itself if
-    the owner exits. Use `link?: true` only for fail-fast input paths where a
-    sensor crash should also crash the owning agent runtime.
-
-    ## Fields
-
-    - `tag` - Agent-local tag for the sensor runtime
-    - `sensor` - Sensor module to run under `Jido.Sensor.Runtime`
-    - `config` - Sensor configuration map (default: `%{}`)
-    - `meta` - Metadata stored on the tracked sensor child info (default: `%{}`)
-    - `replace?` - Stop and replace an existing sensor with this tag (default: `true`)
-    - `link?` - Link the sensor to the owning AgentServer so abnormal sensor
-      exits can take the owner down (default: `false`)
-
-    ## Examples
-
-        %StartSensor{tag: :market_data, sensor: MyApp.MarketDataSensor}
-        %StartSensor{
-          tag: {:poller, "AAPL"},
-          sensor: MyApp.MarketDataSensor,
-          config: %{symbol: "AAPL", interval: 1000}
-        }
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                tag: Zoi.any(description: "Agent-local tag for the sensor runtime"),
-                sensor: Zoi.atom(description: "Sensor module to start"),
-                config: Zoi.map(description: "Sensor configuration") |> Zoi.default(%{}),
-                meta: Zoi.map(description: "Metadata for sensor tracking") |> Zoi.default(%{}),
-                replace?:
-                  Zoi.boolean(description: "Replace an existing sensor with the same tag")
-                  |> Zoi.default(true),
-                link?:
-                  Zoi.boolean(description: "Link sensor failure to owning AgentServer")
-                  |> Zoi.default(false)
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc "Returns the Zoi schema for StartSensor."
-    @spec schema() :: Zoi.schema()
-    def schema, do: @schema
-  end
-
-  # ============================================================================
-  # StopSensor - Stop a tagged sensor runtime
-  # ============================================================================
-
-  defmodule StopSensor do
-    @moduledoc """
-    Stop a tagged sensor runtime owned by the current agent runtime.
-
-    The sensor is identified by the same tag used by `StartSensor`. Missing
-    sensors are a no-op. Stopping a sensor does not emit `jido.agent.child.exit`
-    or `jido.agent.sensor.exit`; the sensor exit signal is reserved for
-    unexpected runtime exits.
-
-    ## Fields
-
-    - `tag` - Agent-local tag for the sensor runtime
-    - `reason` - Reason for stopping (default: `:normal`)
-
-    ## Examples
-
-        %StopSensor{tag: :market_data}
-        %StopSensor{tag: {:poller, "AAPL"}, reason: :reconfigured}
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                tag: Zoi.any(description: "Agent-local tag for the sensor runtime"),
-                reason: Zoi.any(description: "Reason for stopping") |> Zoi.default(:normal)
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc "Returns the Zoi schema for StopSensor."
-    @spec schema() :: Zoi.schema()
-    def schema, do: @schema
-  end
-
-  # ============================================================================
-  # Schedule - Delayed message scheduling
-  # ============================================================================
-
-  defmodule Schedule do
-    @moduledoc """
-    Schedule a delayed message to the agent.
-
-    The runtime will send the message back to the agent after the delay.
-
-    ## Fields
-
-    - `delay_ms` - Delay in milliseconds (must be >= 0)
-    - `message` - Message to send after delay
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                delay_ms: Zoi.integer(description: "Delay in milliseconds") |> Zoi.min(0),
-                message: Zoi.any(description: "Message to send after delay")
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc "Returns the Zoi schema for Schedule."
-    @spec schema() :: Zoi.schema()
-    def schema, do: @schema
-  end
-
-  # ============================================================================
-  # RunInstruction - Runtime instruction execution
-  # ============================================================================
-
-  defmodule RunInstruction do
-    @moduledoc """
-    Execute a `%Jido.Instruction{}` at runtime and route the result back to `cmd/2`.
-
-    This directive lets strategies keep `cmd/2` pure by emitting instruction execution
-    requests instead of calling `Jido.Exec.run/1` directly. The runtime executes the
-    instruction, builds a result payload, then calls:
-
-        agent_module.cmd(agent, {result_action, payload})
-
-    ## Fields
-
-    - `instruction` - The `%Jido.Instruction{}` to execute
-    - `result_action` - Internal action atom/module for result handling in `cmd/2`
-    - `meta` - Optional metadata echoed in the result payload
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                instruction: Zoi.any(description: "%Jido.Instruction{} to execute"),
-                result_action:
-                  Zoi.any(
-                    description: "Action used when routing execution result back into cmd/2"
-                  ),
-                meta:
-                  Zoi.map(Zoi.any(), Zoi.any(),
-                    description: "Optional metadata for result payload"
-                  )
-                  |> Zoi.default(%{})
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc "Returns the Zoi schema for RunInstruction."
-    @spec schema() :: Zoi.schema()
-    def schema, do: @schema
-  end
-
-  # ============================================================================
-  # Stop - Stop the agent process
-  # ============================================================================
-
-  defmodule Stop do
-    @moduledoc """
-    Request that the agent process stop.
-
-    ## Fields
-
-    - `reason` - Reason for stopping (default: `:normal`)
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                reason: Zoi.any(description: "Reason for stopping") |> Zoi.default(:normal)
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc "Returns the Zoi schema for Stop."
-    @spec schema() :: Zoi.schema()
-    def schema, do: @schema
-  end
-
-  # ============================================================================
-  # Helper Constructors
-  # ============================================================================
-
-  @doc """
-  Creates an Emit directive.
-
-  If `dispatch` is omitted, runtime will use `AgentServer` `default_dispatch`.
-  When no default is configured, runtime falls back to emitting to the current
-  agent process (`self()`).
-
-  ## Examples
-
-      Directive.emit(signal)
-      Directive.emit(signal, {:pubsub, topic: "events"})
-  """
-  @spec emit(term(), term()) :: Emit.t()
-  def emit(signal, dispatch \\ nil) do
-    %Emit{signal: signal, dispatch: dispatch}
-  end
-
-  @doc """
-  Creates an Error directive.
-
-  ## Examples
-
-      Directive.error(Jido.Error.validation_error("Invalid input"))
-      Directive.error(error, :normalize)
-  """
-  @spec error(term(), atom() | nil) :: Error.t()
-  def error(error, context \\ nil) do
-    %Error{error: error, context: context}
-  end
-
-  @doc """
-  Creates a Spawn directive.
-
-  ## Examples
-
-      Directive.spawn({MyWorker, arg: value})
-      Directive.spawn(child_spec, :worker_1)
-  """
-  @spec spawn(term(), term()) :: Spawn.t()
-  def spawn(child_spec, tag \\ nil) do
-    %Spawn{child_spec: child_spec, tag: tag}
-  end
-
-  @doc """
-  Creates a SpawnAgent directive for spawning child agents with hierarchy tracking.
-
-  ## Options
-
-  - `:opts` - Additional options for the child AgentServer (map)
-    - Supports child startup options like `:id`, `:initial_state`, and `:on_parent_death`
-    - Does not support InstanceManager lifecycle/persistence options like `:storage`,
-      `:idle_timeout`, `:lifecycle_mod`, `:pool`, `:pool_key`, or `:restored_from_storage`
-  - `:meta` - Metadata to pass to the child via parent reference (map)
-  - `:restart` - Child restart policy under supervision (default: `:transient`)
-
-  ## Examples
-
-      Directive.spawn_agent(MyWorkerAgent, :worker_1)
-      Directive.spawn_agent(MyWorkerAgent, :processor, opts: %{initial_state: %{batch_size: 100}})
-      Directive.spawn_agent(MyWorkerAgent, :handler, meta: %{assigned_topic: "events"})
-      Directive.spawn_agent(MyWorkerAgent, :durable, restart: :permanent)
-  """
-  @spec spawn_agent(term(), term(), keyword()) :: SpawnAgent.t()
-  def spawn_agent(agent, tag, options \\ []) do
-    opts = Keyword.get(options, :opts, %{})
-    meta = Keyword.get(options, :meta, %{})
-    restart = Keyword.get(options, :restart, :transient)
-
-    case validate_restart_policy(restart) do
-      :ok ->
-        case validate_spawn_agent_opts(opts) do
-          :ok ->
-            %SpawnAgent{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart}
-
-          {:error, message} ->
-            raise Jido.Error.validation_error(message, field: :opts)
-        end
-
-      {:error, message} ->
-        raise Jido.Error.validation_error(message, field: :restart)
-    end
-  end
-
-  @doc """
-  Creates an AdoptChild directive for explicitly attaching a child to the current parent.
-
-  ## Options
-
-  - `:meta` - Metadata to write into the adopted child's new parent reference (map)
-
-  ## Examples
-
-      Directive.adopt_child(child_pid, :worker_1)
-      Directive.adopt_child("child-agent-id", :worker_1, meta: %{restored: true})
-  """
-  @spec adopt_child(pid() | String.t(), term(), keyword()) :: AdoptChild.t()
-  def adopt_child(child, tag, opts \\ [])
-
-  def adopt_child(child, tag, opts) when is_pid(child) or is_binary(child) do
-    %AdoptChild{
-      child: child,
-      tag: tag,
-      meta: Keyword.get(opts, :meta, %{})
-    }
-  end
-
-  def adopt_child(child, _tag, _opts) do
-    raise Jido.Error.validation_error(
-            "child must be a PID or child id string, got: #{inspect(child)}",
-            field: :child
-          )
-  end
-
-  @doc """
-  Creates a StopChild directive to gracefully stop a tracked child agent.
-
-  ## Examples
-
-      Directive.stop_child(:worker_1)
-      Directive.stop_child(:processor, :shutdown)
-  """
-  @spec stop_child(term(), term()) :: StopChild.t()
-  def stop_child(tag, reason \\ :normal) do
-    %StopChild{tag: tag, reason: reason}
-  end
-
-  @doc """
-  Creates a StartSensor directive to start or replace a tagged sensor runtime.
-
-  ## Options
-
-  - `:config` - Sensor configuration map (default: `%{}`)
-  - `:meta` - Metadata stored with the tracked sensor (default: `%{}`)
-  - `:replace?` - Whether to replace an existing sensor for the tag (default: `true`)
-  - `:link?` - Link the sensor to the owning AgentServer so abnormal sensor
-    exits can take the owner down (default: `false`)
-
-  ## Examples
-
-      Directive.start_sensor(:market_data, MyApp.MarketDataSensor)
-      Directive.start_sensor({:poller, "AAPL"}, MyApp.MarketDataSensor,
-        config: %{symbol: "AAPL", interval: 1000}
-      )
-  """
-  @spec start_sensor(term(), module(), keyword()) :: StartSensor.t()
-  def start_sensor(tag, sensor, opts \\ []) do
-    %StartSensor{
-      tag: tag,
-      sensor: sensor,
-      config: Keyword.get(opts, :config, %{}),
-      meta: Keyword.get(opts, :meta, %{}),
-      replace?: Keyword.get(opts, :replace?, true),
-      link?: Keyword.get(opts, :link?, false)
-    }
-  end
-
-  @doc """
-  Creates a StopSensor directive to stop a tagged sensor runtime.
-
-  ## Examples
-
-      Directive.stop_sensor(:market_data)
-      Directive.stop_sensor({:poller, "AAPL"}, :reconfigured)
-  """
-  @spec stop_sensor(term(), term()) :: StopSensor.t()
-  def stop_sensor(tag, reason \\ :normal) do
-    %StopSensor{tag: tag, reason: reason}
-  end
-
-  @doc """
-  Creates a Schedule directive.
-
-  ## Examples
-
-      Directive.schedule(5000, :timeout)
-      Directive.schedule(1000, {:check, ref})
-  """
-  @spec schedule(non_neg_integer(), term()) :: Schedule.t()
-  def schedule(delay_ms, message) do
-    %Schedule{delay_ms: delay_ms, message: message}
-  end
-
-  @doc """
-  Creates a RunInstruction directive.
-
-  ## Options
-
-  - `:result_action` - Internal action atom/module to receive execution results (default: `:instruction_result`)
-  - `:meta` - Optional metadata echoed in result payload (map)
-
-  ## Examples
-
-      Directive.run_instruction(instruction)
-      Directive.run_instruction(instruction, result_action: :fsm_instruction_result)
-  """
-  @spec run_instruction(Jido.Instruction.t(), keyword()) :: RunInstruction.t()
-  def run_instruction(%Jido.Instruction{} = instruction, opts \\ []) do
-    %RunInstruction{
-      instruction: instruction,
-      result_action: Keyword.get(opts, :result_action, :instruction_result),
-      meta: Keyword.get(opts, :meta, %{})
-    }
-  end
-
-  @doc """
-  Creates a Stop directive.
-
-  ## Examples
-
-      Directive.stop()
-      Directive.stop(:shutdown)
-  """
-  @spec stop(term()) :: Stop.t()
-  def stop(reason \\ :normal) do
-    %Stop{reason: reason}
-  end
-
-  @doc """
-  Creates a Cron directive for recurring scheduled execution.
-
-  ## Options
-
-  - `:job_id` - Logical id for the job (for upsert/cancel)
-  - `:timezone` - Timezone identifier
-
-  ## Examples
-
-      Directive.cron("* * * * *", tick_signal)
-      Directive.cron("@daily", cleanup_signal, job_id: :daily_cleanup)
-      Directive.cron("0 9 * * MON", weekly_signal, job_id: :monday_9am, timezone: "America/New_York")
-  """
-  @spec cron(term(), term(), keyword()) :: Cron.t()
-  def cron(cron_expr, message, opts \\ []) do
-    %Cron{
-      cron: cron_expr,
-      message: message,
-      job_id: Keyword.get(opts, :job_id),
-      timezone: Keyword.get(opts, :timezone)
-    }
-  end
-
-  @doc """
-  Creates a CronCancel directive to stop a recurring job.
-
-  ## Examples
-
-      Directive.cron_cancel(:heartbeat)
-      Directive.cron_cancel(:daily_cleanup)
-  """
-  @spec cron_cancel(term()) :: CronCancel.t()
-  def cron_cancel(job_id) do
-    %CronCancel{job_id: job_id}
-  end
-
-  # ============================================================================
-  # Multi-Agent Communication Helpers
-  # ============================================================================
-
-  @doc """
-  Creates an Emit directive targeting a specific process by PID.
-
-  This is a convenience for sending signals directly to another agent or process.
-
-  ## Options
-
-  All options are passed to the `:pid` dispatch adapter:
-  - `:delivery_mode` - `:async` (default) or `:sync`
-  - `:timeout` - Timeout for sync delivery (default: 5000)
-
-  ## Examples
-
-      Directive.emit_to_pid(signal, some_pid)
-      Directive.emit_to_pid(signal, worker_pid, delivery_mode: :sync)
-  """
-  @spec emit_to_pid(term(), pid(), Keyword.t()) :: Emit.t()
-  def emit_to_pid(signal, pid, extra_opts \\ []) when is_pid(pid) do
-    opts = Keyword.merge([target: pid], extra_opts)
-    %Emit{signal: signal, dispatch: {:pid, opts}}
-  end
-
-  @doc """
-  Creates an Emit directive targeting the agent's parent.
-
-  The agent's state must have a `__parent__` field containing a `ParentRef` struct.
-  This field is automatically populated when an agent is spawned via the
-  `SpawnAgent` directive or explicitly reattached via `AdoptChild`.
-
-  Returns `nil` if the agent has no current parent. Orphaned agents clear
-  `__parent__` during the orphan transition, so `emit_to_parent/3` becomes
-  unavailable until the child is explicitly adopted again. Former parent
-  provenance remains available via `agent.state.__orphaned_from__`, but that
-  field is intentionally not used for routing. Use `List.wrap/1` to safely
-  handle the result when building directive lists.
-
-  ## Options
-
-  Same as `emit_to_pid/3`.
-
-  ## Examples
-
-      # In a child agent's action:
-      defmodule WorkDoneAction do
-        use Jido.Action, name: "work.done", schema: []
-
-        def run(_params, context) do
-          reply = Signal.new!("worker.result", %{answer: 42}, source: "/worker")
-          directive = Directive.emit_to_parent(context.agent, reply)
-          {:ok, %{}, List.wrap(directive)}
-        end
-      end
-
-      # With sync delivery
-      Directive.emit_to_parent(agent, signal, delivery_mode: :sync)
-  """
-  @spec emit_to_parent(struct(), term(), Keyword.t()) :: Emit.t() | nil
-  def emit_to_parent(agent, signal, extra_opts \\ [])
-
-  def emit_to_parent(
-        %{state: %{__parent__: %Jido.AgentServer.ParentRef{pid: pid}}},
-        signal,
-        extra_opts
-      )
-      when is_pid(pid) do
-    emit_to_pid(signal, pid, extra_opts)
-  end
-
-  def emit_to_parent(_agent, _signal, _extra_opts), do: nil
+  defp validate_reply_causation(_directive), do: :ok
 end

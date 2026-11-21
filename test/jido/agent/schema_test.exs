@@ -1,231 +1,212 @@
-defmodule JidoTest.Agent.SchemaTest do
-  use ExUnit.Case, async: true
+defmodule Jido.Agent.SchemaTest do
+  use Jido.Test.Case, async: true
 
-  alias Jido.Agent.Schema
+  @moduletag :basic_contract
 
-  defmodule DefaultAgent do
-    use Jido.Agent,
-      name: "zoi_default_agent",
-      schema:
-        Zoi.object(%{
-          requests: Zoi.map() |> Zoi.default(%{}),
-          enabled: Zoi.boolean() |> Zoi.default(false),
-          result: Zoi.any() |> Zoi.default(nil),
-          history: Zoi.list(Zoi.string()) |> Zoi.default([]),
-          settings:
-            Zoi.object(%{mode: Zoi.string() |> Zoi.default("auto")})
-            |> Zoi.default(%{mode: "manual"})
-        })
-  end
+  alias Jido.AgentServer, as: Server
 
-  test "generated agents retain defaults before the first request" do
-    agent = DefaultAgent.new()
+  defmodule Bounds do
+    @moduledoc false
 
-    assert agent.state.requests == %{}
-    assert agent.state.enabled == false
-    assert Map.fetch(agent.state, :result) == {:ok, nil}
-    assert agent.state.history == []
-    assert agent.state.settings == %{mode: "manual"}
-
-    assert DefaultAgent.new(state: %{enabled: true}).state.enabled == true
-  end
-
-  test "missing optional fields follow Zoi default ordering" do
-    schema =
-      Zoi.object(%{
-        skipped: Zoi.string() |> Zoi.default("skip") |> Zoi.optional(),
-        included: Zoi.string() |> Zoi.optional() |> Zoi.default("keep")
+    def schema do
+      Jido.Joi.object(%{
+        count: Jido.Joi.integer() |> Jido.Joi.default(0),
+        history: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
       })
+      |> Jido.Joi.refine({__MODULE__, :within_bound, []})
+    end
 
-    assert {:ok, expected} = Zoi.parse(schema, %{})
-    assert Schema.defaults_from_zoi_schema(schema) == expected
+    def within_bound(%{count: count}, _opts) when count <= 1, do: :ok
+    def within_bound(_state, _opts), do: {:error, "count must not exceed one"}
   end
 
-  test "nested default values retain Zoi parsing semantics" do
-    nested = Zoi.object(%{count: Zoi.integer() |> Zoi.default(7)}) |> Zoi.default(%{})
-    schema = Zoi.object(%{nested: nested})
+  defmodule OwnedState do
+    @moduledoc false
+    use Jido.Plugin
 
-    assert {:ok, expected} = Zoi.parse(schema, %{})
-    assert Schema.defaults_from_zoi_schema(schema) == expected
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Agent.SchemaTest.OwnedState.Agent
   end
 
-  describe "merge_with_plugins/2" do
-    test "nil base with no plugins returns nil" do
-      assert Schema.merge_with_plugins(nil, []) == nil
+  defmodule OwnedState.Agent do
+    @behaviour Jido.Plugin
+
+    @impl true
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
+  end
+
+  defmodule RequiredState do
+    @moduledoc false
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Agent.SchemaTest.RequiredState.Agent
+  end
+
+  defmodule RequiredState.Agent do
+    @behaviour Jido.Plugin
+
+    @impl true
+    def state_spec(_opts), do: {:owned, Jido.Joi.integer()}
+  end
+
+  defmodule ConfiguredState do
+    @moduledoc false
+    use Jido.Plugin
+
+    @impl true
+    defdelegate state_spec(opts), to: Jido.Agent.SchemaTest.ConfiguredState.Agent
+  end
+
+  defmodule ConfiguredState.Agent do
+    @behaviour Jido.Plugin
+
+    @impl true
+    def state_spec(opts), do: {:owned, Jido.Joi.integer() |> Jido.Joi.min(Keyword.fetch!(opts, :minimum))}
+  end
+
+  defmodule PlainAgent do
+    @moduledoc false
+
+    use Jido.Agent, name: "schema_contract_plain"
+
+    state do
+      schema Bounds.schema()
     end
 
-    test "base schema with no plugins returns base" do
-      base = Zoi.object(%{mode: Zoi.atom()})
-      result = Schema.merge_with_plugins(base, [])
-      assert result == base
-    end
-
-    test "nil base with plugins returns plugin fields only" do
-      plugin_spec = %Jido.Plugin.Spec{
-        module: MyPlugin,
-        name: "my_plugin",
-        state_key: :my_plugin,
-        schema: Zoi.object(%{count: Zoi.integer()}),
-        actions: [],
-        config: %{}
-      }
-
-      result = Schema.merge_with_plugins(nil, [plugin_spec])
-
-      assert result != nil
-      keys = Schema.known_keys(result)
-      assert :my_plugin in keys
-    end
-
-    test "base with plugins merges both" do
-      base = Zoi.object(%{mode: Zoi.atom()})
-
-      plugin_spec = %Jido.Plugin.Spec{
-        module: MyPlugin,
-        name: "my_plugin",
-        state_key: :plugin_data,
-        schema: Zoi.object(%{value: Zoi.integer()}),
-        actions: [],
-        config: %{}
-      }
-
-      result = Schema.merge_with_plugins(base, [plugin_spec])
-
-      keys = Schema.known_keys(result)
-      assert :mode in keys
-      assert :plugin_data in keys
-    end
-
-    test "filters out plugins without schema" do
-      plugin_with_schema = %Jido.Plugin.Spec{
-        module: PluginA,
-        name: "plugin_a",
-        state_key: :plugin_a,
-        schema: Zoi.object(%{a: Zoi.integer()}),
-        actions: [],
-        config: %{}
-      }
-
-      plugin_without_schema = %Jido.Plugin.Spec{
-        module: PluginB,
-        name: "plugin_b",
-        state_key: :plugin_b,
-        schema: nil,
-        actions: [],
-        config: %{}
-      }
-
-      result = Schema.merge_with_plugins(nil, [plugin_with_schema, plugin_without_schema])
-
-      keys = Schema.known_keys(result)
-      assert :plugin_a in keys
-      refute :plugin_b in keys
+    routes do
+      route "counter.add", Jido.Test.AgentServer.Fixtures.Add
     end
   end
 
-  describe "known_keys/1" do
-    test "returns empty list for nil" do
-      assert Schema.known_keys(nil) == []
+  defmodule PluginAgent do
+    @moduledoc false
+
+    use Jido.Agent, name: "schema_contract_plugin", plugins: [OwnedState]
+
+    state do
+      schema Bounds.schema()
     end
 
-    test "returns keys from Zoi object with map fields" do
-      schema = Zoi.object(%{status: Zoi.atom(), count: Zoi.integer()})
-      keys = Schema.known_keys(schema)
-      assert :status in keys
-      assert :count in keys
-    end
-
-    test "returns keys from Zoi Map type with map fields" do
-      schema = Zoi.map(%{name: Zoi.string(), age: Zoi.integer()})
-      keys = Schema.known_keys(schema)
-      assert :name in keys
-      assert :age in keys
-    end
-
-    test "returns keys from Zoi Struct type with map fields" do
-      schema =
-        Zoi.struct(
-          JidoTest.Agent.SchemaTest.TestStruct,
-          %{field_a: Zoi.string(), field_b: Zoi.integer()}
-        )
-
-      keys = Schema.known_keys(schema)
-      assert :field_a in keys
-      assert :field_b in keys
-    end
-
-    test "returns empty list for unknown schema type" do
-      assert Schema.known_keys("not a schema") == []
-      assert Schema.known_keys(123) == []
+    routes do
+      route "counter.add", Jido.Test.AgentServer.Fixtures.Add
     end
   end
 
-  describe "defaults_from_zoi_schema/1" do
-    test "returns empty map for nil" do
-      assert Schema.defaults_from_zoi_schema(nil) == %{}
+  test "composition preserves required Plugin fields and the root rule" do
+    definition = %{PlainAgent.definition() | plugins: [contribution(RequiredState)]}
+
+    assert {:error, %Jido.Error.ValidationError{details: %{issues: errors}}} =
+             Jido.Agent.instantiate(definition, id: Jido.Id.uuid7())
+
+    assert Enum.any?(errors, &(&1.code == :required and &1.path == [:owned]))
+
+    assert {:ok, agent} =
+             Jido.Agent.instantiate(definition,
+               id: Jido.Id.uuid7(),
+               state: %{owned: 7}
+             )
+
+    assert agent.state == %{count: 0, history: [], owned: 7}
+
+    assert {:error, %{__exception__: true}} =
+             Jido.Agent.instantiate(definition,
+               id: Jido.Id.uuid7(),
+               state: %{owned: 7, count: 2}
+             )
+  end
+
+  test "validation composes the current Plugin options and domain schema on each call" do
+    definition = %{
+      PlainAgent.definition()
+      | plugins: [contribution(ConfiguredState, %{minimum: 0})]
+    }
+
+    assert {:ok, agent} =
+             Jido.Agent.instantiate(definition,
+               id: Jido.Id.uuid7(),
+               state: %{owned: 0}
+             )
+
+    assert {:ok, ^agent} = Jido.Agent.validate(agent)
+
+    changed = %{agent | plugins: [contribution(ConfiguredState, %{minimum: 1})]}
+    assert {:error, %{__exception__: true}} = Jido.Agent.validate(changed)
+
+    changed = %{changed | state: %{changed.state | owned: 1}}
+    assert {:ok, ^changed} = Jido.Agent.validate(changed)
+
+    changed = %{
+      changed
+      | schema: Jido.Joi.object(%{count: Jido.Joi.string(), history: Jido.Joi.list(Jido.Joi.string())})
+    }
+
+    assert {:error, %{__exception__: true}} = Jido.Agent.validate(changed)
+  end
+
+  for {label, agent_module} <- [
+        {"without Plugins", PlainAgent},
+        {"with owned Plugin state", PluginAgent}
+      ] do
+    @tag agent_module: agent_module
+    test "construction enforces the root refinement #{label}", %{agent_module: agent_module} do
+      assert {:ok, %{count: 0, history: []}} =
+               Jido.Joi.parse(agent_module.definition().schema, %{count: 0, history: []})
+
+      assert {:error, [_ | _]} =
+               Jido.Joi.parse(agent_module.definition().schema, %{count: 2, history: []})
+
+      assert {:error, %{__exception__: true}} =
+               agent_module.instantiate(id: "invalid", state: %{count: 2})
     end
 
-    test "extracts defaults from Zoi object" do
-      schema =
-        Zoi.object(%{
-          status: Zoi.atom() |> Zoi.default(:idle),
-          count: Zoi.integer()
-        })
+    @tag agent_module: agent_module
+    test "cmd rejects a candidate outside the root refinement #{label}", %{
+      agent_module: agent_module
+    } do
+      agent = agent_module.instantiate!(id: unique_id())
+      command = signal("counter.add", %{by: 2, label: "invalid"})
 
-      defaults = Schema.defaults_from_zoi_schema(schema)
-      assert defaults == %{status: :idle}
+      assert {:error, %{__exception__: true}} = agent_module.cmd(agent, command)
     end
 
-    test "handles multiple defaults" do
-      schema =
-        Zoi.object(%{
-          status: Zoi.atom() |> Zoi.default(:idle),
-          count: Zoi.integer() |> Zoi.default(0),
-          name: Zoi.string()
-        })
+    @tag agent_module: agent_module
+    test "Server rejects an invalid candidate without a commit #{label}", %{
+      jido: jido,
+      agent_module: agent_module
+    } do
+      {:ok, server} =
+        Jido.Test.AgentServer.Assertions.start_agent(jido, agent_module, id: unique_id())
 
-      defaults = Schema.defaults_from_zoi_schema(schema)
-      assert defaults == %{status: :idle, count: 0}
+      before = Jido.Test.AgentServer.Assertions.committed(server)
+      command = signal("counter.add", %{by: 2, label: "invalid"})
+
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :failed}} =
+               Server.call(server, command)
+
+      assert Jido.Test.AgentServer.Assertions.committed(server) == before
     end
 
-    test "returns empty map when no defaults" do
-      schema =
-        Zoi.object(%{
-          status: Zoi.atom(),
-          count: Zoi.integer()
-        })
+    @tag agent_module: agent_module
+    test "a candidate at the root bound commits once #{label}", %{
+      jido: jido,
+      agent_module: agent_module
+    } do
+      {:ok, server} =
+        Jido.Test.AgentServer.Assertions.start_agent(jido, agent_module, id: unique_id())
 
-      defaults = Schema.defaults_from_zoi_schema(schema)
-      assert defaults == %{}
-    end
+      initial = Server.snapshot(server).agent.state
+      expected = %{initial | count: 1, history: ["valid"]}
 
-    test "extracts defaults from Zoi Map type" do
-      schema =
-        Zoi.map(%{
-          name: Zoi.string() |> Zoi.default("unknown"),
-          count: Zoi.integer()
-        })
+      assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+               Server.call(server, signal("counter.add", %{by: 1, label: "valid"}))
 
-      defaults = Schema.defaults_from_zoi_schema(schema)
-      assert defaults == %{name: "unknown"}
-    end
-
-    test "extracts defaults from Zoi Struct type" do
-      schema =
-        Zoi.struct(
-          JidoTest.Agent.SchemaTest.TestStruct,
-          %{
-            field_a: Zoi.string() |> Zoi.default("default_a"),
-            field_b: Zoi.integer()
-          }
-        )
-
-      defaults = Schema.defaults_from_zoi_schema(schema)
-      assert defaults == %{field_a: "default_a"}
-    end
-
-    test "returns empty map for unknown schema type" do
-      assert Schema.defaults_from_zoi_schema("not a schema") == %{}
+      agent = Server.snapshot(server).agent
+      assert agent.state == expected
+      assert %{agent: ^agent, state_version: 1} = Jido.Test.AgentServer.Assertions.committed(server)
     end
   end
+
+  defp contribution(provider, data \\ %{}),
+    do: %{id: provider.id(), provider: provider, vsn: provider.vsn(), data: data}
 end

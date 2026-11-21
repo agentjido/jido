@@ -1,167 +1,224 @@
 defmodule Jido.Agent.Schema do
   @moduledoc false
-  # Utilities for merging agent and plugin schemas.
-  # Handles Zoi schema introspection and merging.
 
-  alias Jido.Plugin.Spec
+  alias Jido.Error
+  alias Jido.Joi
 
-  @doc """
-  Merges the agent's base schema with plugin schemas.
+  @agent_module Module.concat(["Jido", "Agent"])
+  @agent_schema Joi.struct(@agent_module, %{
+                  id: Joi.string() |> Joi.nullable() |> Joi.default(nil),
+                  state: Joi.map() |> Joi.nullable() |> Joi.default(nil),
+                  module: Joi.atom() |> Joi.nullable() |> Joi.default(nil),
+                  name: Joi.string() |> Joi.min(1),
+                  description: Joi.string() |> Joi.nullable() |> Joi.default(nil),
+                  vsn: Joi.integer() |> Joi.min(1) |> Joi.default(1),
+                  schema: Joi.any() |> Joi.default(Joi.object(%{})),
+                  initial_state: Joi.map() |> Joi.default(%{}),
+                  metadata: Joi.map() |> Joi.default(%{}),
+                  signal_source: Joi.string() |> Joi.min(1) |> Joi.nullable() |> Joi.default(nil),
+                  routes: Joi.list(Joi.any()) |> Joi.default([]),
+                  topology: Joi.map() |> Joi.default(%{}),
+                  plugins: Joi.list(Joi.any()) |> Joi.default([])
+                })
+  @defaults Map.new(Joi.struct_fields(@agent_schema), fn
+              {key, value} -> {key, value}
+              key -> {key, nil}
+            end)
 
-  Each plugin's schema is nested under its `state_key`.
-  Returns a Zoi object schema with base fields + plugin fields.
+  @doc false
+  def agent_module, do: @agent_module
 
-  ## Examples
+  @doc false
+  def agent?(%{__struct__: @agent_module}), do: true
+  def agent?(_value), do: false
 
-      base = Zoi.object(%{mode: Zoi.atom()})
-      plugins = [%Spec{state_key: :calc, schema: Zoi.object(%{x: Zoi.integer()})}]
-      
-      # Returns:
-      # Zoi.object(%{
-      #   mode: Zoi.atom(),
-      #   calc: Zoi.object(%{x: Zoi.integer()})
-      # })
-  """
-  @spec merge_with_plugins(any(), [Spec.t()]) :: any()
-  def merge_with_plugins(nil, []), do: nil
-  def merge_with_plugins(base_schema, []), do: base_schema
+  @doc false
+  def agent_schema, do: @agent_schema
 
-  def merge_with_plugins(base_schema, plugin_specs) when is_list(plugin_specs) do
-    plugin_fields =
-      plugin_specs
-      |> Enum.filter(& &1.schema)
-      |> Enum.map(fn spec -> {spec.state_key, spec.schema} end)
-      |> Map.new()
+  @doc false
+  def defaults, do: @defaults
 
-    case base_schema do
-      nil ->
-        if map_size(plugin_fields) == 0 do
-          nil
-        else
-          Zoi.object(plugin_fields)
-        end
-
-      base ->
-        base_fields = extract_fields(base)
-        Zoi.object(Map.merge(base_fields, plugin_fields))
+  def attrs(value) do
+    case to_attrs(value, :reject) do
+      {:ok, attrs} -> {:ok, attrs}
+      :error when is_list(value) -> authoring_error("Expected unique keyword options", %{value: value})
+      :error -> authoring_error("Expected a map or keyword list", %{value: value})
     end
   end
 
-  @doc """
-  Extracts known keys from a Zoi schema.
+  # Public boundaries keep their own duplicate policy and error context.
+  def to_attrs(value, duplicates \\ :last)
+  def to_attrs(value, _duplicates) when is_map(value) and not is_struct(value), do: {:ok, value}
 
-  Returns a list of atom keys for collision detection.
-  """
-  @spec known_keys(any()) :: [atom()]
-  def known_keys(nil), do: []
-
-  def known_keys(%{__struct__: Zoi.Types.Object, fields: fields}) when is_map(fields) do
-    Map.keys(fields)
+  def to_attrs(value, duplicates) when is_list(value) do
+    if Keyword.keyword?(value) and
+         (duplicates == :last or Enum.uniq(Keyword.keys(value)) == Keyword.keys(value)),
+       do: {:ok, Map.new(value)},
+       else: :error
   end
 
-  def known_keys(%{__struct__: Zoi.Types.Object, fields: fields}) when is_list(fields) do
-    Keyword.keys(fields)
+  def to_attrs(_value, _duplicates), do: :error
+
+  def keys(map, allowed) do
+    case Map.keys(map) -- allowed do
+      [] -> :ok
+      unknown -> authoring_error("Unknown authoring fields", %{keys: unknown})
+    end
   end
 
-  def known_keys(%{__struct__: Zoi.Types.Map, fields: fields}) when is_map(fields) do
-    Map.keys(fields)
+  def traverse(values, fun), do: traverse(values, fun, [])
+  defp traverse([], _fun, acc), do: {:ok, Enum.reverse(acc)}
+
+  defp traverse([value | tail], fun, acc) do
+    case fun.(value) do
+      {:ok, result} -> traverse(tail, fun, [result | acc])
+      {:error, _error} = error -> error
+    end
   end
 
-  def known_keys(%{__struct__: Zoi.Types.Map, fields: fields}) when is_list(fields) do
-    Keyword.keys(fields)
+  defp traverse(_tail, _fun, _acc), do: authoring_error("Expected a proper list")
+
+  def authoring_error(message, details \\ %{}),
+    do: {:error, Error.validation_error(message, kind: :config, details: details)}
+
+  def fields(value, allowed, defaults \\ %{}) do
+    with :ok <- plain_map(value),
+         [] <- Map.keys(value) -- allowed do
+      {:ok, Map.merge(defaults, value)}
+    else
+      keys when is_list(keys) -> Error.validation_result(:unknown_fields, [], "Unknown fields", %{keys: keys})
+      error -> error
+    end
   end
 
-  def known_keys(%{__struct__: Zoi.Types.Struct, fields: fields}) when is_map(fields) do
-    Map.keys(fields)
+  def plain_map(value) when is_map(value) and not is_struct(value), do: :ok
+  def plain_map(_), do: Error.validation_result(:invalid_map, [], "Expected a plain Map")
+
+  def nonempty(value) when is_binary(value) and byte_size(value) > 0, do: :ok
+  def nonempty(_), do: Error.validation_result(:invalid_string, [], "Expected a nonempty string")
+
+  def name(value) when is_atom(value) and value not in [nil, true, false], do: :ok
+  def name(_), do: Error.validation_result(:invalid_name, [], "Expected a name atom")
+
+  def positive(value) when is_integer(value) and value > 0, do: :ok
+  def positive(_), do: Error.validation_result(:invalid_positive, [], "Expected a positive integer")
+
+  def list(values, fun), do: walk(values, fun, 0, [])
+  defp walk([], _fun, _index, acc), do: {:ok, Enum.reverse(acc)}
+
+  defp walk([value | tail], fun, index, acc) do
+    with {:ok, value} <- Error.prefix_result_path(fun.(value), [index]),
+         do: walk(tail, fun, index + 1, [value | acc])
   end
 
-  def known_keys(%{__struct__: Zoi.Types.Struct, fields: fields}) when is_list(fields) do
-    Keyword.keys(fields)
+  defp walk(_, _, _, _), do: Error.validation_result(:invalid_list, [], "Expected a proper list")
+
+  def unique(values, key) do
+    keys = Enum.map(values, key)
+
+    if Enum.uniq(keys) == keys,
+      do: :ok,
+      else: Error.validation_result(:duplicate, [], "Duplicate declaration", %{values: keys})
   end
 
-  def known_keys(_), do: []
+  def static(value) do
+    case Joi.validate_static(value) do
+      :ok ->
+        :ok
 
-  @doc """
-  Extracts default values from a Zoi schema.
-
-  Walks the schema and extracts defaults from fields.
-  Returns a map with default values.
-  """
-  @spec defaults_from_zoi_schema(any()) :: map()
-  def defaults_from_zoi_schema(nil), do: %{}
-
-  def defaults_from_zoi_schema(%{__struct__: Zoi.Types.Object, fields: fields})
-      when is_map(fields) do
-    extract_defaults_from_fields(fields)
+      {:error, _reason} ->
+        Error.validation_result(:live_value, [], "Authoring data cannot contain live values")
+    end
   end
 
-  def defaults_from_zoi_schema(%{__struct__: Zoi.Types.Object, fields: fields})
-      when is_list(fields) do
-    fields |> Map.new() |> extract_defaults_from_fields()
+  def schema(schema) do
+    case {Joi.Schema.kind(schema), Joi.Schema.fields(schema)} do
+      {:map, {:ok, fields}} when is_list(fields) ->
+        case Joi.Schema.validate_stored(schema) do
+          :ok -> static(schema)
+          {:error, _reason} -> Error.validation_result(:invalid_schema, [], "Invalid stored-state schema")
+        end
+
+      _ ->
+        Error.validation_result(:invalid_schema, [], "Expected a static Joi object schema")
+    end
   end
 
-  def defaults_from_zoi_schema(%{__struct__: Zoi.Types.Map, fields: fields})
-      when is_map(fields) do
-    extract_defaults_from_fields(fields)
+  def initialize(schema, state) do
+    with :ok <- plain_map(state),
+         do: parse_value(Joi.Schema.close(schema), state)
   end
 
-  def defaults_from_zoi_schema(%{__struct__: Zoi.Types.Map, fields: fields})
-      when is_list(fields) do
-    fields |> Map.new() |> extract_defaults_from_fields()
+  def parse_value(schema, input) do
+    case Joi.initialize(schema, input) do
+      {:ok, initialized} ->
+        {:ok, initialized}
+
+      {:error, issues} ->
+        if Enum.any?(issues, &(Joi.changed_value?(&1) or invalid_stored_schema?(&1))) do
+          Error.validation_result(
+            :state_conversion,
+            [],
+            "State initialization can add defaults but cannot convert supplied values"
+          )
+        else
+          Error.validation_result(:invalid_state, [], "State does not match its schema", %{issues: issues})
+        end
+    end
   end
 
-  def defaults_from_zoi_schema(%{__struct__: Zoi.Types.Struct, fields: fields})
-      when is_map(fields) do
-    extract_defaults_from_fields(fields)
-  end
+  def complete(schema, state) do
+    with :ok <- plain_map(state) do
+      case Joi.validate(Joi.Schema.close(schema), state) do
+        :ok ->
+          :ok
 
-  def defaults_from_zoi_schema(%{__struct__: Zoi.Types.Struct, fields: fields})
-      when is_list(fields) do
-    fields |> Map.new() |> extract_defaults_from_fields()
-  end
+        {:error, issues} ->
+          cond do
+            Enum.any?(issues, &(Joi.changed_value?(&1) or invalid_stored_schema?(&1))) ->
+              Error.validation_result(:state_conversion, [], "Validation cannot change stored state")
 
-  def defaults_from_zoi_schema(_), do: %{}
+            Enum.any?(issues, &(Joi.error_code(&1) == :required)) ->
+              Error.validation_result(:incomplete_state, [], "State does not match its schema", %{
+                issues: issues
+              })
 
-  # Private helpers
-
-  defp extract_fields(%{__struct__: Zoi.Types.Object, fields: fields}) when is_map(fields) do
-    fields
-  end
-
-  defp extract_fields(%{__struct__: Zoi.Types.Object, fields: fields}) when is_list(fields) do
-    Map.new(fields)
-  end
-
-  defp extract_fields(%{__struct__: Zoi.Types.Map, fields: fields}) when is_map(fields) do
-    fields
-  end
-
-  defp extract_fields(%{__struct__: Zoi.Types.Map, fields: fields}) when is_list(fields) do
-    Map.new(fields)
-  end
-
-  defp extract_fields(%{__struct__: Zoi.Types.Struct, fields: fields}) when is_map(fields) do
-    fields
-  end
-
-  defp extract_fields(%{__struct__: Zoi.Types.Struct, fields: fields}) when is_list(fields) do
-    Map.new(fields)
-  end
-
-  defp extract_fields(_), do: %{}
-
-  defp extract_defaults_from_fields(fields) when is_map(fields) do
-    Enum.reduce(fields, %{}, fn {key, field_schema}, acc ->
-      case extract_default(field_schema) do
-        {:ok, default} -> Map.put(acc, key, default)
-        :none -> acc
+            true ->
+              Error.validation_result(:invalid_state, [], "State does not match its schema", %{issues: issues})
+          end
       end
-    end)
+    end
   end
 
-  # Match the schema representation without requiring the removed wrapper module.
-  defp extract_default(%{meta: %{required: false}}), do: :none
-  defp extract_default(%{meta: %{default: {:value, value}}}), do: {:ok, value}
-  defp extract_default(%{__struct__: Zoi.Types.Default, value: value}), do: {:ok, value}
-  defp extract_default(_), do: :none
+  defp invalid_stored_schema?(issue),
+    do: Joi.error_code(issue) == :joi_invalid_stored_schema
+
+  def path(value) when is_binary(value) do
+    case Jido.Signal.Router.Route.validate_path(value, []) do
+      :ok -> :ok
+      {:error, _} -> Error.validation_result(:invalid_path, [], "Invalid Signal path", %{path: value})
+    end
+  end
+
+  def path(_), do: Error.validation_result(:invalid_path, [], "Expected a Signal path string")
+
+  def exact(value) do
+    with :ok <- path(value) do
+      if wildcard?(value),
+        do: Error.validation_result(:wildcard_type, [], "Expected an exact Signal type"),
+        else: :ok
+    end
+  end
+
+  def wildcard?(value), do: String.contains?(value, "*")
+  def matches?(type, path), do: Jido.Signal.Router.matches?(type, path)
+
+  def options(opts, allowed) when is_list(opts) do
+    if Keyword.keyword?(opts) and
+         length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts))),
+       do: fields(Map.new(opts), allowed),
+       else: Error.validation_result(:invalid_options, [], "Expected unique keyword options")
+  end
+
+  def options(opts, allowed), do: fields(opts, allowed)
 end

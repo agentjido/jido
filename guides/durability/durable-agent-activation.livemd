@@ -1,0 +1,233 @@
+# Durable Agent Activation
+
+This tutorial creates a durable Agent, activates it, stops its resident
+process, and activates it again from saved state.
+
+Creation and activation are separate operations:
+
+- `Jido.create_agent/4` writes the initial durable record. It does not start a
+  process.
+- `Jido.activate_agent/3` restores an existing record. It never creates one.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "agentjido/jido", branch: "main"}
+])
+```
+
+## Define an order Agent
+
+```elixir
+defmodule ActivationGuide.AddItem do
+  use Jido.Action,
+    name: "activation_add_item",
+    schema: Jido.Joi.object(%{sku: Jido.Joi.string()})
+
+  @impl Jido.Action
+  def run(%{sku: sku}, %{agent_state: state}) do
+    {:ok, %{state | items: [sku | state.items]}}
+  end
+end
+
+defmodule ActivationGuide.Order do
+  use Jido.Agent, name: "activation_order"
+
+  state do
+    schema Jido.Joi.object(%{
+             items: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
+           })
+  end
+
+  routes do
+    signal_source "/guides/activation"
+    route "order.add_item", ActivationGuide.AddItem, as: :add_item
+  end
+end
+```
+
+## Start one persistent Jido Instance
+
+A durable Agent needs an Instance namespace and a persistent adapter. ETS is
+useful for tests, but it does not survive a BEAM restart. This tutorial uses
+the file adapter.
+
+```elixir
+store_path =
+  Path.join(
+    System.tmp_dir!(),
+    "jido-activation-guide-#{System.unique_integer([:positive])}"
+  )
+
+{:ok, _} =
+  Jido.start_link(
+    name: ActivationGuide.Jido,
+    namespace: "guides/activation",
+    persistence: {Jido.Persistence.File, path: store_path}
+  )
+
+{:ok, order_address} = Jido.agent_address(ActivationGuide.Jido, "order-1001")
+order_address
+```
+
+The Address is the stable Agent address. It contains no process or storage handle.
+
+## Create the logical Agent
+
+Creation writes revision zero before it returns success. It does not start an
+AgentServer.
+
+```elixir
+alias ActivationGuide.Order
+
+{:ok, ^order_address} = Jido.create_agent(ActivationGuide.Jido, order_address, Order)
+{:error, :not_found} = Jido.resolve_agent(ActivationGuide.Jido, order_address)
+
+{:ok, saved, 0} =
+  Jido.Persistence.load_agent_with_revision(
+    ActivationGuide.Jido,
+    Order,
+    order_address.id
+  )
+
+saved.state
+```
+
+The cell returns `%{items: []}`.
+
+## Activate the Agent
+
+Activation restores the durable record into a resident AgentServer. Activation
+can finish asynchronously, so wait for readiness before direct use.
+
+```elixir
+alias ActivationGuide.Order
+alias Jido.AgentServer, as: Server
+
+{:ok, server} = Jido.activate_agent(ActivationGuide.Jido, order_address)
+:ok = Server.await_ready(server)
+
+snapshot = Server.snapshot(server)
+{snapshot.agent.state, snapshot.agent_revision}
+```
+
+The cell returns `{%{items: []}, 0}`.
+
+## Send work through the Address
+
+Address operations resolve the current activation for each call. Application code
+does not need to keep the AgentServer PID.
+
+```elixir
+alias ActivationGuide.Order
+
+{:ok, signal} = Order.add_item_signal(%{sku: "sku-red-mug"})
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+  Jido.call(ActivationGuide.Jido, order_address, signal)
+
+{Server.snapshot(server).agent.state, Jido.resolve_agent(ActivationGuide.Jido, order_address) == {:ok, server}}
+```
+
+The cell returns `{%{items: ["sku-red-mug"]}, true}`.
+
+## Reuse or restore the activation
+
+Activation returns the current local process when it is already active.
+
+```elixir
+alias ActivationGuide.Order
+
+{:ok, ^server} = Jido.activate_agent(ActivationGuide.Jido, order_address)
+```
+
+Stopping the resident activation does not delete the logical Agent. A later
+activation restores the same Address and state.
+
+```elixir
+alias ActivationGuide.Order
+alias Jido.AgentServer, as: Server
+
+{:ok, _snapshot} = Server.stop(server)
+{:error, :not_found} = Jido.resolve_agent(ActivationGuide.Jido, order_address)
+
+{:ok, restored_server} = Jido.activate_agent(ActivationGuide.Jido, order_address)
+:ok = Server.await_ready(restored_server)
+
+Server.snapshot(restored_server).agent.state
+```
+
+The cell returns `%{items: ["sku-red-mug"]}`.
+
+## See the strict boundaries
+
+| Function | No record | Active record | Tombstone |
+| --- | --- | --- | --- |
+| `Jido.create_agent/4` | Creates revision zero | Returns `:conflict` | Returns `:conflict` |
+| `Jido.activate_agent/3` | Fails with `:not_found` | Restores | Fails with `:deleted` |
+
+Creation errors are synchronous. Activation reads inside the new activation,
+so use `Jido.AgentServer.await_ready/2` to collect its result.
+
+```elixir
+defmodule ActivationGuide.Outcome do
+  alias Jido.AgentServer, as: Server
+
+  def of({:ok, pid}), do: Server.await_ready(pid)
+  def of({:error, reason}), do: {:error, reason}
+end
+
+alias ActivationGuide.{Order, Outcome}
+
+{:error, :conflict} = Jido.create_agent(ActivationGuide.Jido, order_address, Order)
+
+{:ok, missing_address} = Jido.agent_address(ActivationGuide.Jido, "order-missing")
+
+{:error, :not_found} =
+  Outcome.of(Jido.activate_agent(ActivationGuide.Jido, missing_address))
+```
+
+## Refuse a deleted Agent
+
+Only explicit deletion ends the logical Agent lifetime. It writes a permanent
+tombstone. Stop the resident activation before deletion.
+
+```elixir
+alias ActivationGuide.{Order, Outcome}
+
+{:ok, _snapshot} = Server.stop(restored_server)
+:ok = Jido.delete_agent(ActivationGuide.Jido, order_address)
+
+{:error, :deleted} =
+  Outcome.of(Jido.activate_agent(ActivationGuide.Jido, order_address))
+```
+
+See [Deletion and Tombstones](deletion-and-tombstones.md) for the full deletion
+contract.
+
+## Use a partition
+
+The partition is part of the Address. Each partition has a separate durable Agent
+record and activation.
+
+```elixir
+alias ActivationGuide.Order
+alias Jido.AgentServer, as: Server
+
+{:ok, eu_address} = Jido.agent_address(ActivationGuide.Jido, "order-1001", partition: "eu")
+{:ok, ^eu_address} = Jido.create_agent(ActivationGuide.Jido, eu_address, Order)
+{:ok, eu_server} = Jido.activate_agent(ActivationGuide.Jido, eu_address)
+:ok = Server.await_ready(eu_server)
+
+Server.snapshot(eu_server).agent.state
+```
+
+## Stop the tutorial Instance
+
+```elixir
+:ok = Jido.stop(ActivationGuide.Jido)
+```
+
+Stopping the Instance removes resident processes. The file-backed Agent
+records remain available for a later Instance that uses the same namespace and
+store.

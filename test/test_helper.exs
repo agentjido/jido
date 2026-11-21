@@ -1,7 +1,44 @@
-# Suppress the Discovery module's info log during startup
-# The capture_log: true option captures test logs, but Discovery logs happen
-# before tests run. We handle this by temporarily setting compile_time_purge_level.
-# However, since that's a compile-time option, we accept the Discovery log.
+Mimic.copy(ReqLLM)
+Mimic.copy(Jido.AI.Browser.Address)
+Mimic.copy(Jido.AI.Browser.Transport)
+Mimic.copy(Jido.Test.AI.Tools.Add)
 
-ExUnit.start()
-ExUnit.configure(exclude: [:skip, :flaky, :example])
+ExUnit.start(capture_log: true)
+
+{_result, _expected_warnings} =
+  Code.with_diagnostics(fn ->
+    Code.require_file("support/jido_action/fixtures/missing_callbacks.exs", __DIR__)
+  end)
+
+special_suite_tags = [
+  :authoring,
+  :load,
+  :throughput,
+  :property,
+  :fuzz,
+  :peer,
+  :bench,
+  :live,
+  :service,
+  :scxml_conformance
+]
+
+ExUnit.configure(seed: 0, exclude: [:integration, :skip, :flaky] ++ special_suite_tags)
+
+suite_selection = ExUnit.configuration()[:include]
+
+if Enum.any?(suite_selection, fn
+     tag when tag in [:property, :fuzz] -> true
+     {tag, value} when tag in [:property, :fuzz] -> value != false
+     _other -> false
+   end) do
+  Code.require_file("property/support/report.exs", __DIR__)
+  Jido.Test.Property.Report.prepare!()
+
+  ExUnit.configure(
+    formatters: [
+      ExUnit.CLIFormatter,
+      Jido.Test.Property.Report
+    ]
+  )
+end

@@ -1,0 +1,58 @@
+{
+  "definition": {
+    "description": "Answer one request with guardrails and multiple tools",
+    "plugins": [
+      {
+        "data": {
+          "config": {},
+          "reasoning": {
+            "id": "jido.ai/reasoning/react",
+            "vsn": 1
+          },
+          "tools": [
+            {
+              "id": "jido.ai/examples/tools/add",
+              "vsn": 1
+            },
+            {
+              "id": "jido.ai/examples/tools/multiply",
+              "vsn": 1
+            }
+          ]
+        },
+        "id": "jido.ai/agent",
+        "provider": {
+          "id": "jido.ai/agent",
+          "vsn": 1
+        },
+        "vsn": 1
+      }
+    ],
+    "initial_state": {
+      "$type": "map",
+      "entries": []
+    },
+    "metadata": {
+      "$type": "map",
+      "entries": []
+    },
+    "module": {
+      "id": "jido.ai/agents/simple",
+      "vsn": 3
+    },
+    "name": "jido_ai_simple_agent",
+    "routes": [],
+    "schema": {
+      "id": "jido.ai/schemas/simple-agent-state",
+      "vsn": 1
+    },
+    "signal_source": "/jido.ai/agents/simple",
+    "topology": {
+      "agents": [],
+      "connections": []
+    },
+    "vsn": 3
+  },
+  "type": "jido.agent.definition",
+  "vsn": 1
+}

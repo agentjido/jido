@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!-- test that <foreach> does a shallow copy, so that modifying the array does not change
+the iteration behavior. -->
+
+
+<scxml  conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+  <datamodel>
+    <data conf:id="1">
+      <conf:array123/>
+      </data>
+    <data conf:id="2" conf:expr="0"/>  <!-- counts the number of iterations -->
+    </datamodel>
+     
+<state id="s0">
+  <onentry>
+  <foreach conf:item="3" conf:arrayVar="1">
+    <conf:extendArray id="1"/>
+    <conf:incrementID id="2"/>
+    </foreach>
+   </onentry>
+   
+   <transition conf:idVal="2=3" conf:targetpass=""/>
+   <transition conf:targetfail=""/>
+</state>
+
+
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

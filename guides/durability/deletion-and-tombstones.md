@@ -1,0 +1,134 @@
+# Deletion and Tombstones
+
+This guide shows how to delete a durable Agent, what a tombstone blocks, and which data deletion leaves behind.
+
+## Why deletion writes a record
+
+Removing bytes would make a deleted Agent look like one that never existed. A delayed writer holding an old revision or a later `Jido.create_agent/4` call could then create a fresh Agent with the same ID.
+
+Normal deletion replaces the active record with a compact tombstone. The
+tombstone keeps the identity, Agent module, and Agent revision. Its record
+revision is one more than the active record revision. The compare-and-swap
+condition comes from the read of that active record.
+
+## Delete a stopped Agent
+
+Use `Jido.delete_agent/3` with a stable Address. It refuses while a local server for that Address is live, so stop the Agent first.
+
+```elixir
+defmodule TombstonesGuide.Order do
+  use Jido.Agent, name: "tombstones_order"
+
+  state do
+    schema Jido.Joi.object(%{status: Jido.Joi.string() |> Jido.Joi.default("open")})
+  end
+end
+
+alias Jido.AgentServer, as: Server
+alias TombstonesGuide.Order
+
+store_path =
+  Path.join(
+    System.tmp_dir!(),
+    "jido-tombstones-guide-#{System.unique_integer([:positive])}"
+  )
+
+{:ok, _} =
+  Jido.start_link(
+    name: TombstonesGuide.Jido,
+    namespace: "guides/tombstones",
+    persistence: {Jido.Persistence.File, path: store_path}
+  )
+
+{:ok, address} = Jido.agent_address(TombstonesGuide.Jido, "order-1")
+{:ok, ^address} = Jido.create_agent(TombstonesGuide.Jido, address, Order)
+{:ok, server} = Jido.activate_agent(TombstonesGuide.Jido, address)
+:ok = Server.await_ready(server)
+
+{:error, :agent_running} = Jido.delete_agent(TombstonesGuide.Jido, address)
+
+{:ok, _snapshot} = Server.stop(server)
+:ok = Jido.delete_agent(TombstonesGuide.Jido, address)
+
+{:error, :deleted} = Jido.Persistence.load_agent(TombstonesGuide.Jido, Order, "order-1")
+```
+
+The Address supplies the namespace and partition. The instance supplies the
+Store and codec.
+
+Deleting again returns `:ok`. Deleting by Address returns
+`{:error, :not_found}` when the ID has no record. To reserve an unused ID,
+call the module-qualified Persistence operation. It writes a tombstone at
+revision zero.
+
+```elixir
+alias TombstonesGuide.Order
+
+:ok = Jido.delete_agent(TombstonesGuide.Jido, address)
+
+{:ok, unused} = Jido.agent_address(TombstonesGuide.Jido, "order-never-created")
+{:error, :not_found} = Jido.delete_agent(TombstonesGuide.Jido, unused)
+:ok = Jido.Persistence.delete_agent(TombstonesGuide.Jido, Order, unused.id)
+{:error, :deleted} = Jido.Persistence.load_agent(TombstonesGuide.Jido, Order, "order-never-created")
+```
+
+## See what a tombstone blocks
+
+| Operation | Result on a tombstone |
+| --- | --- |
+| `Jido.Persistence.load_agent/4` and `Jido.Persistence.load_agent_with_revision/4` | `{:error, :deleted}` |
+| `Jido.Persistence.save_agent/3`, at any revision | `{:error, :conflict}` |
+| `Jido.Persistence.upgrade_agent/5` | `{:error, :deleted}` |
+| `Jido.thaw/4` and `Jido.activate_agent/3` | Activation fails with `:deleted` |
+| `Jido.create_agent/4` | Returns `{:error, :conflict}` |
+
+The last two rows usually return from the start call first. Wait with `Jido.AgentServer.await_ready/2` to see the reason as `{:error, reason}`. A fast failure can make the start call itself return `{:error, reason}`, so handle both forms.
+
+```elixir
+alias Jido.AgentServer, as: Server
+alias TombstonesGuide.Order
+
+late_order = Order.instantiate!(id: "order-1")
+
+{:error, :conflict} =
+  Jido.Persistence.save_agent(TombstonesGuide.Jido, late_order, revision: 99)
+
+outcome =
+  case Jido.activate_agent(TombstonesGuide.Jido, address, Order) do
+    {:ok, pid} -> Server.await_ready(pid)
+    {:error, reason} -> {:error, reason}
+  end
+
+true = outcome != :ok
+nil = Jido.whereis_agent(TombstonesGuide.Jido, "order-1")
+```
+
+A tombstone is checked against the Agent module too. Deleting with a different module returns `{:error, {:invalid_persistence_record, :agent_module}}`.
+
+## Use a new ID for a new lifetime
+
+There is no undelete and no public way to reuse a deleted ID. Treat an ID as one Agent lifetime. If the same business object can return, add a generation to the ID, such as `"order-1/2"`, or keep the old ID retired and save the new ID in your own data.
+
+## Delete directly with Persistence
+
+`Jido.Persistence.delete_agent/4` writes the same tombstone, but it does not check for a live server. It takes `:instance`, `:namespace`, and `:partition`. Use it for a store you administer from a script, when no activation can be running.
+
+If a server is running, the delete succeeds and the server finds out at its next commit. That commit conflicts, its caller gets an error, and the activation stops. Work that finished before that commit may already have run. Prefer `Jido.delete_agent/3`, which checks the local node for this reason. It cannot see a server on another node.
+
+## Know what deletion leaves behind
+
+Deletion changes one record. It leaves other data in place, so plan for each item.
+
+- **Tombstones.** They stay forever, as nothing expires them. Each adapter's `delete/2` callback removes bytes for explicit maintenance, but Jido has no public function for this. Removing a tombstone also removes its protection, so a delayed writer or an activation could recreate the Agent.
+- **Topology members.** Deleting a root does not delete its members' records. See Durable Topology.
+- **Flow graphs of a pending Turn.** Deletion is allowed while the record has a nonterminal durable Turn, and it does not remove that Turn's `jido:execution:` keys. Jido removes these keys when a Turn ends. To avoid orphaned keys, finish or cancel the Turn before you delete the Agent.
+- **Your domain data.** The tombstone replaces saved state in the current record. Signals already delivered, audit records, external systems, and store backups are outside that record, so a tombstone alone is not an erasure guarantee.
+
+```elixir
+:ok = Jido.stop(TombstonesGuide.Jido)
+```
+
+## Next steps
+
+- Revisions and Conflicts explains how the tombstone keeps the write barrier.
+- [Durable Agent Activation](durable-agent-activation.livemd) shows which start functions refuse a tombstone.

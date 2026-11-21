@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<!-- we test that states are added to the active states list as they are entered and before onentry handlers
+are executed.  When s0's onentry handler fires we should not be in s01.  But when s01's onentry handler
+fires, we should be in s01.  Therefore event1 should not fire, but event2 should.  Either event1 or
+timeout also indicates failure  -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0" initial="s01">
+  <onentry>
+    <send event="timeout" delay="1s"/>
+    <if conf:inState="s01">
+      <raise event="event1"/>
+      </if>
+    </onentry>
+  
+  <transition event="timeout" conf:targetfail=""/> 
+  <transition event="event1" conf:targetfail=""/>
+  <transition event="event2" conf:targetpass=""/>
+  
+  <state id="s01" >
+    <onentry>
+     <if conf:inState="s01">
+       <raise event="event2"/>
+       </if>
+       </onentry>
+  </state> 
+
+</state> <!-- end s0 -->
+ 
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

@@ -1,813 +1,307 @@
 defmodule Jido.Plugin do
   @moduledoc """
-  A Plugin is a composable capability that can be attached to an agent.
+  Defines one reusable Plugin through optional callbacks.
 
-  Plugins encapsulate:
-  - A set of actions the agent can perform
-  - State schema for plugin-specific data (nested under `state_key`)
-  - Configuration schema for per-agent customization
-  - Signal routing rules
-  - Optional lifecycle hooks and child processes
+      defmodule MyApp.Counter do
+        alias Jido.Joi
 
-  ## Lifecycle
+        use Jido.Plugin
 
-  1. **Compile-time**: Plugin is declared in agent's `plugins:` option
-  2. **Agent.new/1**: `mount/2` is called to initialize plugin state (pure)
-  3. **AgentServer.init/1**: `child_spec/1` processes are started and monitored
-  4. **Signal processing**: `handle_signal/2` runs before routing, can override or abort
-  5. **Prepare signal**: `prepare_signal/2` can verify/rewrite the effective signal and contribute runtime context
-  6. **Prepare action**: `prepare_action/3` can authorize the resolved action using runtime context
-  7. **Before signal emit dispatch**: `prepare_emit/2` can rewrite outbound emitted signals or dispatch
-  8. **After cmd/3 (call path)**: `transform_result/3` wraps call results
+        @impl true
+        def state_spec(_opts), do: {:turns, Joi.integer() |> Joi.default(0)}
 
-  ## Example Plugin
-
-      defmodule MyApp.ChatPlugin do
-        use Jido.Plugin,
-          name: "chat",
-          state_key: :chat,
-          actions: [MyApp.Actions.SendMessage, MyApp.Actions.ListHistory],
-          schema: Zoi.object(%{
-            messages: Zoi.list(Zoi.any()) |> Zoi.default([]),
-            model: Zoi.string() |> Zoi.default("gpt-4")
-          }),
-          signal_routes: [
-            {"send", MyApp.Actions.SendMessage},
-            {"history", MyApp.Actions.ListHistory}
-          ]
-
-        @impl Jido.Plugin
-        def mount(agent, config) do
-          # Custom initialization beyond schema defaults
-          {:ok, %{initialized_at: DateTime.utc_now()}}
-        end
+        @impl true
+        def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
       end
 
-  ## Using Plugins
+  Implement only the documented callbacks that the Plugin needs. Jido selects
+  capabilities from these callbacks at compile time. No roles or separate facet
+  modules are required. A large Plugin can delegate work to ordinary modules.
 
-      defmodule MyAgent do
-        use Jido.Agent,
-          name: "my_agent",
-          plugins: [
-            MyApp.ChatPlugin,
-            {MyApp.DatabasePlugin, %{pool_size: 5}}
-          ]
-      end
+  Core keeps callback ownership and execution order. Agent callbacks prepare
+  portable input, optionally select one declared matching route, and reduce one
+  owned field in the complete Agent state.
+  Agent Server callbacks admit live input, manage a supervised runtime, and
+  run work after commit. Persistence callbacks convert the owned state value.
 
-  ## Configuration Options
+  Configure a Plugin with `plugins: [{MyApp.Counter, %{}}]`.
+  Map definitions store the same data once in the `plugins` contribution list.
+  A Plugin can add Spark sections and imports. Set `id`
+  to give the provider a stable name and `vsn` to set its version (default 1).
+  Provider callbacks are authoring callbacks. They are not runtime callbacks
+  in this Plugin behavior.
+  Runtime callbacks receive config as keyword options. The optional `option_keys`
+  mapping can restrict those options by owner.
 
-  - `name` - Required. The plugin name (letters, numbers, underscores).
-  - `state_key` - Required. Atom key for plugin state in agent.
-  - `actions` - Required. List of action modules.
-  - `description` - Optional description.
-  - `category` - Optional category.
-  - `vsn` - Optional version string.
-  - `schema` - Optional Zoi schema for plugin state.
-  - `config_schema` - Optional Zoi schema for per-agent config.
-  - `signal_patterns` - Patterns that select which inbound signals run plugin signal hooks (default: []).
-  - `tags` - List of tag strings (default: []).
-  - `capabilities` - List of atoms describing what the plugin provides (default: []).
-  - `requires` - List of requirements like `{:config, :token}`, `{:app, :req}`, `{:plugin, :http}` (default: []).
-  - `signal_routes` - Static routes relative to the plugin route prefix, such as `{"post", ActionModule}` (default: []).
-  - `subscriptions` - List of sensor subscription tuples like `{SensorModule, config}` or `{tag, SensorModule, config}` (default: []).
-  - `schedules` - List of schedule tuples like `{"*/5 * * * *", ActionModule}` (default: []).
+  A reducer requires `state_spec/1`. Persistence requires an owned state field
+  and both `dump/3` and `load/3`. Runtime dispatch requires owned Directives.
+  Jido validates these contracts when it normalizes the declaration.
 
-  For static routes and subscriptions, prefer the compile-time `signal_routes:` and `subscriptions:` options in `use Jido.Plugin`.
-  Use the `signal_routes/1` and `subscriptions/2` callbacks only for dynamic generation based on runtime config.
+  Prepared and live inputs remain separate:
+  `context.plugin_inputs[MyApp.Counter].prepared` and
+  `context.plugin_inputs[MyApp.Counter].runtime`.
+  `after_commit/3` is a required step before Directive dispatch when defined.
+
   """
 
-  alias Jido.Plugin.Manifest
-  alias Jido.Plugin.Spec
+  alias Jido.{Error, Joi}
+  alias Jido.Plugin.Init
 
-  @plugin_config_schema Zoi.object(
-                          %{
-                            name:
-                              Zoi.string(
-                                description:
-                                  "The name of the Plugin. Must contain only letters, numbers, and underscores."
-                              )
-                              |> Zoi.refine({__MODULE__, :validate_plugin_name, []}),
-                            state_key:
-                              Zoi.atom(description: "The key for plugin state in agent state."),
-                            actions:
-                              Zoi.list(Zoi.atom(), description: "List of action modules.")
-                              |> Zoi.refine({__MODULE__, :validate_plugin_actions, []}),
-                            description:
-                              Zoi.string(description: "A description of what the Plugin does.")
-                              |> Zoi.optional(),
-                            category:
-                              Zoi.string(description: "The category of the Plugin.")
-                              |> Zoi.optional(),
-                            vsn:
-                              Zoi.string(description: "Version")
-                              |> Zoi.optional(),
-                            otp_app:
-                              Zoi.atom(
-                                description:
-                                  "OTP application for loading config from Application.get_env."
-                              )
-                              |> Zoi.optional(),
-                            schema:
-                              Zoi.any(description: "Zoi schema for plugin state.")
-                              |> Zoi.optional(),
-                            config_schema:
-                              Zoi.any(description: "Zoi schema for per-agent configuration.")
-                              |> Zoi.optional(),
-                            signal_patterns:
-                              Zoi.list(Zoi.string(),
-                                description: "Patterns that select inbound plugin signal hooks."
-                              )
-                              |> Zoi.default([]),
-                            tags:
-                              Zoi.list(Zoi.string(), description: "Tags for categorization.")
-                              |> Zoi.default([]),
-                            capabilities:
-                              Zoi.list(Zoi.atom(),
-                                description: "Capabilities provided by this plugin."
-                              )
-                              |> Zoi.default([]),
-                            requires:
-                              Zoi.list(Zoi.any(),
-                                description:
-                                  "Requirements like {:config, :token}, {:app, :req}, {:plugin, :http}."
-                              )
-                              |> Zoi.default([]),
-                            signal_routes:
-                              Zoi.list(Zoi.any(),
-                                description:
-                                  "Static routes relative to the plugin route prefix, such as {\"post\", ActionModule}."
-                              )
-                              |> Zoi.default([]),
-                            subscriptions:
-                              Zoi.list(Zoi.any(),
-                                description:
-                                  "Sensor subscription tuples like {SensorModule, config} or {tag, SensorModule, config}."
-                              )
-                              |> Zoi.default([]),
-                            schedules:
-                              Zoi.list(Zoi.any(),
-                                description:
-                                  "Schedule tuples like {\"*/5 * * * *\", ActionModule}."
-                              )
-                              |> Zoi.default([]),
-                            singleton:
-                              Zoi.boolean(
-                                description: "If true, plugin cannot be aliased or duplicated."
-                              )
-                              |> Zoi.default(false)
-                          },
-                          coerce: true
-                        )
+  @type declaration :: module() | {module(), map()}
+  @type state_spec :: :none | {atom(), Joi.schema()}
 
-  @doc false
-  @spec config_schema() :: Zoi.schema()
-  def config_schema, do: @plugin_config_schema
+  @callback prepare(Jido.Agent.Plugin.Preparation.t(), keyword()) ::
+              {:ok, term()} | {:error, term()}
+  @callback select_route(Jido.Agent.Plugin.RouteSelection.t(), keyword()) ::
+              :default | {:ok, atom()} | {:error, term()}
+  @doc """
+  Declares one owned state field and its Joi schema, or returns `:none`.
 
-  @doc false
-  @spec validate_plugin_name(String.t(), keyword()) :: :ok | {:error, String.t()}
-  def validate_plugin_name(name, _opts \\ []) do
-    case Jido.Util.validate_name(name, []) do
-      {:error, %{message: message}} when is_binary(message) ->
-        {:error, message}
-
-      _ ->
-        :ok
-    end
-  end
-
-  @doc false
-  @spec validate_plugin_actions([module()], keyword()) :: :ok | {:error, String.t()}
-  def validate_plugin_actions(actions, _opts \\ []) do
-    case Jido.Util.validate_actions(actions, []) do
-      {:error, %{message: message}} when is_binary(message) ->
-        {:error, message}
-
-      _ ->
-        :ok
-    end
-  end
-
-  # Callbacks
+  Return `{:error, reason}` to reject the declaration. When the second element
+  is a Joi schema, the tuple declares a field with the key `:error`.
+  """
+  @callback state_spec(keyword()) :: state_spec() | {:error, term()}
+  @callback directives(keyword()) :: [module()] | {:error, term()}
+  @callback reduce(Jido.Agent.Plugin.Reduction.t(), keyword()) :: {:ok, term()} | {:error, term()}
 
   @doc """
-  Returns the plugin specification with optional per-agent configuration.
+  Prepares parameters for the selected Action or Flow route.
 
-  This is the primary interface for getting plugin metadata and configuration.
+  Receives the selected route, the original request map, the parameters
+  with route defaults applied, and the Plugin options. Return
+  `{:ok, params}` to pass a parameter map to normal executable validation.
+  The callback runs during direct and live Agent commands in Plugin
+  declaration order. The Signal, target, state, and caller context stay
+  outside this callback's control.
   """
-  @callback plugin_spec(config :: map()) :: Spec.t()
+  @callback prepare_route_input(map(), map(), map(), keyword()) :: {:ok, map()} | {:error, term()}
+  @callback validate_options(keyword()) :: :ok | {:error, term()}
+  @callback admit(term() | nil, Jido.Plugin.Context.Admission.t(), keyword()) ::
+              {:ok, term()} | {:error, term()}
+  @callback prepare_outbound(
+              term() | nil,
+              Jido.Signal.t(),
+              Jido.Plugin.Context.signal_t(),
+              keyword()
+            ) ::
+              {:ok, Jido.Signal.t()} | {:error, term()}
+  @callback dispatch(term() | nil, struct(), Jido.Plugin.Context.directive_t(), keyword()) ::
+              :ok | {:error, term()}
+  @callback child_spec(Init.t()) :: Supervisor.child_spec()
+  @doc "Checks readiness of the runtime root declared by `child_spec/1`."
+  @callback await_ready(term(), keyword()) :: :ok | {:error, term()}
 
   @doc """
-  Called when the plugin is mounted to an agent during `new/1`.
+  Runs after a successful Turn commit and before Directive dispatch.
 
-  Use this to initialize plugin-specific state beyond schema defaults.
-  This is a pure function - no side effects allowed.
+  Hooks run in declaration order, including commits with unchanged state.
+  The callback receives its exact committed owned value and revision. It cannot
+  replace state or return Directives. Startup, restore, and direct Agent
+  commands do not invoke it.
 
-  ## Parameters
-
-  - `agent` - The agent struct (with state from previously mounted plugins)
-  - `config` - Per-agent configuration for this plugin
-
-  ## Returns
-
-  - `{:ok, plugin_state}` - Map to merge into plugin's state slice
-  - `{:ok, nil}` - No additional state (schema defaults only)
-  - `{:error, reason}` - Raises during agent creation
-
-  ## Example
-
-      def mount(_agent, config) do
-        {:ok, %{initialized_at: DateTime.utc_now(), api_key: config[:api_key]}}
-      end
+  Agent Server runs each hook in an owned task. All hooks of one Turn share the
+  finite `commit_timeout`. Failure or timeout skips later hooks and Directives.
+  It does not use the Server error policy, and the Server stays ready for the
+  next Turn. Read the failure from `last_effect_outcome` in
+  `Jido.AgentServer.status/2`, with stage `:after_commit`, or from the
+  `[:jido, :agent_server, :effects, :stop]` Telemetry event. The commit and the
+  result already sent to the caller stay intact.
+  Hooks are not replayed. Rebuild live state from `Jido.Plugin.Init` on startup
+  and runtime replacement. Use Telemetry for optional observation.
   """
-  @callback mount(agent :: term(), config :: map()) :: {:ok, map() | nil} | {:error, term()}
-
-  @doc """
-  Returns the signal routes for this plugin.
-
-  The signal routes determine how signals are routed to handlers.
-  Prefer compile-time `signal_routes:` in `use Jido.Plugin` for static routes,
-  and implement this callback only for dynamic route generation.
-  """
-  @callback signal_routes(config :: map()) :: term()
-
-  @doc """
-  Pre-routing hook called before signal routing in AgentServer.
-
-  Can inspect, log, transform, or override which action runs for a signal.
-  Hooks execute in plugin declaration order. The first `{:override, ...}`
-  short-circuits; the first `{:error, ...}` aborts. Plugins with non-empty
-  `signal_patterns` only receive signals matching those patterns; plugins
-  with empty patterns receive all inbound signals for this phase.
-
-  This callback remains broad for backwards compatibility and route override.
-  Prefer `prepare_signal/2` for identity, encryption, canonicalization, and
-  runtime context extraction.
-
-  ## Parameters
-
-  - `signal` - The incoming `Jido.Signal` struct (may be modified by earlier plugins)
-  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
-    `:plugin_instance`, `:config`
-
-  ## Returns
-
-  - `{:ok, nil}` or `{:ok, :continue}` - Continue to normal routing
-  - `{:ok, {:continue, %Signal{}}}` - Rewrite the signal and continue routing
-  - `{:ok, {:override, action_spec}}` - Bypass router, use this action instead
-  - `{:ok, {:override, action_spec, %Signal{}}}` - Bypass router with rewritten signal
-  - `{:error, reason}` - Abort signal processing with error
-
-  ## Example
-
-      def handle_signal(signal, _context) do
-        if signal.type == "admin.override" do
-          {:ok, {:override, MyApp.AdminAction}}
-        else
-          {:ok, :continue}
-        end
-      end
-  """
-  @callback handle_signal(signal :: term(), context :: map()) ::
-              {:ok, term()} | {:ok, {:override, term()}} | {:error, term()}
-
-  @doc """
-  Pre-routing hook called after `handle_signal/2` rewrites and before routing.
-
-  Plugins can verify, decrypt, canonicalize, or rewrite the final effective
-  signal and contribute runtime context. Returned context is merged into the
-  context given to routed actions and later plugin phases. This is the preferred
-  inbound hook for identity and encrypted communication extensions because it
-  cannot override routing and has an explicit runtime context contract. Plugins
-  may not provide reserved runtime keys such as `:state`, `:signal`, `:agent`,
-  `:agent_server_pid`, `:input_signal`, `:directive`, or `:dispatch`;
-  duplicate context keys fail closed.
-
-  ## Parameters
-
-  - `signal` - The effective `Jido.Signal` struct after `handle_signal/2`
-    hooks have run.
-  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
-    `:plugin_instance`, `:config`, `:runtime_context`
-
-  ## Returns
-
-  - `{:ok, signal, runtime_context_delta}` - Continue with possibly rewritten signal
-    and runtime context.
-  - `{:error, reason}` - Abort signal processing with error.
-  """
-  @callback prepare_signal(signal :: term(), context :: map()) ::
-              {:ok, term(), map()} | {:error, term()}
-
-  @doc """
-  Post-routing hook called after routing and before action execution.
-
-  Plugins can authorize the resolved action using the prepared signal and
-  accumulated runtime context. This hook cannot rewrite the signal or action;
-  it can only contribute additional runtime context or fail closed.
-
-  ## Parameters
-
-  - `signal` - The prepared `Jido.Signal` struct after `prepare_signal/2`
-  - `action_arg` - The resolved action argument that will be passed to the
-    agent command phase
-  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
-    `:plugin_instance`, `:config`, `:runtime_context`
-
-  ## Returns
-
-  - `{:ok, runtime_context_delta}` - Continue with additional runtime context.
-  - `{:error, reason}` - Abort signal processing with error.
-  """
-  @callback prepare_action(signal :: term(), action_arg :: term(), context :: map()) ::
-              {:ok, map()} | {:error, term()}
-
-  @doc """
-  Pre-emit hook called before an emitted signal is dispatched.
-
-  This hook is intended for outbound signal signing, trace enrichment, and other
-  signal-level transformations that must happen after an action returns an emit
-  directive but before runtime dispatch. The context includes `:input_signal`,
-  `:runtime_context`, `:directive`, `:dispatch`, plugin metadata, agent
-  metadata, `:jido_instance`, and `:partition`.
-
-  ## Returns
-
-  - `{:ok, signal}` - Continue with the prepared signal and existing dispatch.
-  - `{:ok, signal, dispatch}` - Continue with the prepared signal and rewritten
-    dispatch.
-  - `{:error, reason}` - Abort the emit through the configured error policy.
-  """
-  @callback prepare_emit(signal :: term(), context :: map()) ::
-              {:ok, term()} | {:ok, term(), term()} | {:error, term()}
-
-  @doc """
-  Caller view transform for the agent returned from `AgentServer.call/3`.
-
-  Called after signal processing on the **synchronous call path only**.
-  Does not affect `cast/2`, `handle_info`, routing, authorization, dispatch, or
-  internal server state — only the agent struct returned to the caller.
-  Transforms chain through all plugins in declaration order, so this callback is
-  display/return shaping and is not a security hook.
-
-  ## Parameters
-
-  - `action` - The resolved action module that was executed, or the signal
-    type string when no single module can be determined
-  - `result` - The agent struct to transform
-  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
-    `:plugin_instance`, `:config`, `:runtime_context`
-
-  ## Returns
-
-  The transformed agent struct (or original if no transformation needed).
-
-  ## Example
-
-      def transform_result(_action, agent, _context) do
-        # Add metadata to returned agent
-        new_state = Map.put(agent.state, :last_call_at, DateTime.utc_now())
-        Jido.Agent.StateBudget.replace!(agent, new_state)
-      end
-  """
-  @callback transform_result(action :: module() | String.t(), result :: term(), context :: map()) ::
-              term()
-
-  @doc """
-  Returns child specification(s) for supervised processes.
-
-  Called during `AgentServer.init/1`. Returned processes are
-  started and monitored. If any crash, AgentServer receives exit signals.
-
-  ## Parameters
-
-  - `config` - Per-agent configuration for this plugin
-
-  ## Returns
-
-  - `nil` - No child processes
-  - `Supervisor.child_spec()` - Single child
-  - `[Supervisor.child_spec()]` - Multiple children
-
-  ## Example
-
-      def child_spec(config) do
-        %{
-          id: {__MODULE__, :worker},
-          start: {MyWorker, :start_link, [config]}
-        }
-      end
-  """
-  @callback child_spec(config :: map()) ::
-              nil | Supervisor.child_spec() | [Supervisor.child_spec()]
-
-  @doc """
-  Returns a list of sensors to be started for this plugin.
-
-  Called during `AgentServer.init/1` to start and monitor
-  plugin-specific sensors. These sensors are managed and monitored by the
-  agent runtime and can emit signals back to it.
-
-  ## Parameters
-
-  - `config` - Per-agent configuration for this plugin
-  - `context` - A map containing:
-    - `:agent_id` - The unique identifier of the agent
-    - `:agent_ref` - A reference (PID or via-tuple) to the AgentServer
-    - `:agent_module` - The module of the agent
-    - `:plugin_spec` - The specification of the current plugin
-    - `:jido_instance` - The Jido instance name
-
-  ## Returns
-
-  List of `{sensor_module, sensor_opts}` tuples or `{tag, sensor_module, sensor_opts}`
-  tuples. Each sensor will be started under a `Jido.Sensor.Runtime`. Use the
-  tagged form when a plugin starts multiple instances of the same sensor module.
-
-  ## Example
-
-      def subscriptions(_config, context) do
-        [
-          {MyApp.Sensors.MarketData, %{symbol: "AAPL", interval: 1000}},
-          {Jido.Sensors.Heartbeat, %{interval: 5000, agent_ref: context.agent_ref}}
-        ]
-      end
-  """
-  @type sensor_subscription ::
-          {module(), keyword() | map()} | {term(), module(), keyword() | map()}
-
-  @callback subscriptions(config :: map(), context :: map()) ::
-              [sensor_subscription()]
-
-  @doc """
-  Called during checkpoint to determine how this plugin's state should be persisted.
-
-  Plugins can declare one of three strategies for their state slice:
-
-  - `:keep` — Include in checkpoint state as-is (default)
-  - `:drop` — Exclude from checkpoint (transient/ephemeral state)
-  - `{:externalize, key, pointer}` — Strip from checkpoint state and store a
-    pointer separately. The pointer is a lightweight reference (e.g., `%{id, rev}`)
-    that can be used to rehydrate the full state on restore.
-
-  ## Parameters
-
-  - `plugin_state` - The plugin's current state slice (may be nil)
-  - `context` - Map with checkpoint context (e.g., `:config`)
-
-  ## Returns
-
-  - `:keep` — Include plugin state in checkpoint (default)
-  - `:drop` — Exclude from checkpoint
-  - `{:externalize, key, pointer}` — Store pointer under `key` in checkpoint
-
-  ## Example
-
-      def on_checkpoint(%Thread{} = thread, _ctx) do
-        {:externalize, :thread, %{id: thread.id, rev: thread.rev}}
-      end
-
-      def on_checkpoint(nil, _ctx), do: :keep
-  """
-  @callback on_checkpoint(plugin_state :: term(), context :: map()) ::
-              {:externalize, key :: atom(), pointer :: term()} | :keep | :drop
-
-  @doc """
-  Called during restore to rehydrate externalized plugin state.
-
-  When a plugin's `on_checkpoint/2` returns `{:externalize, key, pointer}`,
-  the pointer is stored in the checkpoint. During restore, `on_restore/2`
-  is called with that pointer to allow the plugin to reconstruct its state.
-
-  For plugins that require IO to restore (e.g., loading a thread from storage),
-  returning `{:ok, nil}` signals that the state will be rehydrated by the
-  persistence layer (e.g., `Jido.Persist`).
-
-  ## Parameters
-
-  - `pointer` - The pointer stored during checkpoint (from `on_checkpoint/2`)
-  - `context` - Map with restore context (e.g., `:config`)
-
-  ## Returns
-
-  - `{:ok, restored_state}` — The restored plugin state
-  - `{:ok, nil}` — State will be rehydrated externally (e.g., by Persist)
-  - `{:error, reason}` — Restore failed
-  """
-  @callback on_restore(pointer :: term(), context :: map()) ::
+  @callback after_commit(term() | nil, Jido.Plugin.Context.Commit.t(), keyword()) ::
+              :ok | {:error, term()}
+  @callback dump(term(), Jido.Plugin.Context.Persistence.t(), keyword()) ::
+              {:ok, term()} | {:error, term()}
+  @callback load(term(), Jido.Plugin.Context.Persistence.t(), keyword()) ::
               {:ok, term()} | {:error, term()}
 
-  # Macro implementation
+  @owner_callbacks [
+    agent: [prepare: 2, prepare_route_input: 4, select_route: 2, state_spec: 1, directives: 1, reduce: 2],
+    agent_server: [
+      validate_options: 1,
+      admit: 3,
+      prepare_outbound: 4,
+      dispatch: 4,
+      child_spec: 1,
+      await_ready: 2,
+      after_commit: 3
+    ],
+    persistence: [dump: 3, load: 3]
+  ]
+  @optional_callbacks Enum.flat_map(@owner_callbacks, &elem(&1, 1))
+  @use_options [:vsn, :option_keys, :id, :sections, :imports]
 
   @doc false
-  defp generate_behaviour_and_validation(opts) do
-    quote location: :keep do
-      @behaviour Jido.Plugin
+  def owner_callbacks, do: @owner_callbacks
 
-      alias Jido.Plugin.Manifest
-      alias Jido.Plugin.Spec
-
-      @validated_opts (case Zoi.parse(Jido.Plugin.config_schema(), Enum.into(unquote(opts), %{})) do
-                         {:ok, validated} ->
-                           validated
-
-                         {:error, errors} ->
-                           raise CompileError,
-                             description:
-                               "Invalid plugin configuration:\n#{Zoi.prettify_errors(errors)}"
-                       end)
-    end
-  end
-
-  @doc false
-  defp generate_accessor_functions do
-    [
-      generate_core_accessors(),
-      generate_optional_accessors(),
-      generate_list_accessors()
-    ]
-  end
-
-  defp generate_core_accessors do
-    quote location: :keep do
-      @doc "Returns the plugin's name."
-      @spec name() :: String.t()
-      def name, do: @validated_opts.name
-
-      @doc "Returns the key used to store plugin state in the agent."
-      @spec state_key() :: atom()
-      def state_key, do: @validated_opts.state_key
-
-      @doc "Returns the list of action modules provided by this plugin."
-      @spec actions() :: [module()]
-      def actions, do: @validated_opts.actions
-    end
-  end
-
-  defp generate_optional_accessors do
-    quote location: :keep do
-      @doc "Returns the plugin's description."
-      @spec description() :: String.t() | nil
-      def description, do: @validated_opts[:description]
-
-      @doc "Returns the plugin's category."
-      @spec category() :: String.t() | nil
-      def category, do: @validated_opts[:category]
-
-      @doc "Returns the plugin's version."
-      @spec vsn() :: String.t() | nil
-      def vsn, do: @validated_opts[:vsn]
-
-      @doc "Returns the OTP application for config resolution."
-      @spec otp_app() :: atom() | nil
-      def otp_app, do: @validated_opts[:otp_app]
-
-      @doc "Returns the Zoi schema for plugin state."
-      @spec schema() :: Zoi.schema() | nil
-      def schema, do: @validated_opts[:schema]
-
-      @doc "Returns the Zoi schema for per-agent configuration."
-      @spec config_schema() :: Zoi.schema() | nil
-      def config_schema, do: @validated_opts[:config_schema]
-    end
-  end
-
-  defp generate_list_accessors do
-    [
-      generate_pattern_accessors(),
-      generate_requirement_accessors()
-    ]
-  end
-
-  defp generate_pattern_accessors do
-    quote location: :keep do
-      @doc "Returns the signal patterns this plugin handles."
-      @spec signal_patterns() :: [String.t()]
-      def signal_patterns, do: @validated_opts[:signal_patterns] || []
-
-      @doc "Returns the plugin's tags."
-      @spec tags() :: [String.t()]
-      def tags, do: @validated_opts[:tags] || []
-
-      @doc "Returns the capabilities provided by this plugin."
-      @spec capabilities() :: [atom()]
-      def capabilities, do: @validated_opts[:capabilities] || []
-
-      @doc "Returns whether this plugin is a singleton."
-      @spec singleton?() :: boolean()
-      def singleton?, do: @validated_opts[:singleton] || false
-    end
-  end
-
-  defp generate_requirement_accessors do
-    quote location: :keep do
-      @doc "Returns the requirements for this plugin."
-      @spec requires() :: [tuple()]
-      def requires, do: @validated_opts[:requires] || []
-
-      @doc "Returns the signal routes for this plugin."
-      @spec signal_routes() :: [tuple()]
-      def signal_routes, do: @validated_opts[:signal_routes] || []
-
-      @doc "Returns the sensor subscriptions for this plugin."
-      @spec subscriptions() :: [Jido.Plugin.sensor_subscription()]
-      def subscriptions, do: @validated_opts[:subscriptions] || []
-
-      @doc "Returns the schedules for this plugin."
-      @spec schedules() :: [tuple()]
-      def schedules, do: @validated_opts[:schedules] || []
-    end
-  end
-
-  @doc false
-  defp generate_spec_and_manifest_functions do
-    quote location: :keep do
-      @doc """
-      Returns the plugin specification with optional per-agent configuration.
-
-      ## Examples
-
-          spec = MyModule.plugin_spec(%{})
-          spec = MyModule.plugin_spec(%{custom_option: true})
-      """
-      @spec plugin_spec(map()) :: Spec.t()
-      @impl Jido.Plugin
-      def plugin_spec(config \\ %{}) do
-        %Spec{
-          module: __MODULE__,
-          name: name(),
-          state_key: state_key(),
-          description: description(),
-          category: category(),
-          vsn: vsn(),
-          schema: schema(),
-          config_schema: config_schema(),
-          config: config,
-          signal_patterns: signal_patterns(),
-          tags: tags(),
-          actions: actions()
-        }
-      end
-
-      @doc """
-      Returns the plugin manifest with all metadata.
-
-      The manifest provides compile-time metadata for discovery
-      and introspection, including capabilities, requirements,
-      signal routes, and schedules.
-      """
-      @spec manifest() :: Manifest.t()
-      def manifest do
-        %Manifest{
-          module: __MODULE__,
-          name: name(),
-          description: description(),
-          category: category(),
-          tags: tags(),
-          vsn: vsn(),
-          otp_app: otp_app(),
-          capabilities: capabilities(),
-          requires: requires(),
-          state_key: state_key(),
-          schema: schema(),
-          config_schema: config_schema(),
-          actions: actions(),
-          signal_routes: signal_routes(),
-          subscriptions: subscriptions(),
-          schedules: schedules(),
-          signal_patterns: signal_patterns(),
-          singleton: singleton?()
-        }
-      end
-
-      @doc """
-      Returns metadata for Jido.Discovery integration.
-
-      This function is used by `Jido.Discovery` to index plugins
-      for fast lookup and filtering.
-      """
-      @spec __plugin_metadata__() :: map()
-      def __plugin_metadata__ do
-        %{
-          name: name(),
-          description: description(),
-          category: category(),
-          tags: tags()
-        }
-      end
-    end
-  end
-
-  @doc false
-  defp generate_default_callbacks do
-    quote location: :keep do
-      @doc false
-      @spec mount(term(), map()) :: {:ok, map() | nil} | {:error, term()}
-      @impl Jido.Plugin
-      def mount(_agent, _config), do: {:ok, %{}}
-
-      @doc false
-      @spec signal_routes(map()) :: [tuple()]
-      @impl Jido.Plugin
-      def signal_routes(_config), do: []
-
-      @doc false
-      @spec handle_signal(term(), map()) ::
-              {:ok, term()} | {:ok, {:override, term()}} | {:error, term()}
-      @impl Jido.Plugin
-      def handle_signal(_signal, _context), do: {:ok, nil}
-
-      @doc false
-      @spec prepare_signal(term(), map()) :: {:ok, term(), map()} | {:error, term()}
-      @impl Jido.Plugin
-      def prepare_signal(signal, _context), do: {:ok, signal, %{}}
-
-      @doc false
-      @spec prepare_action(term(), term(), map()) :: {:ok, map()} | {:error, term()}
-      @impl Jido.Plugin
-      def prepare_action(_signal, _action_arg, _context), do: {:ok, %{}}
-
-      @doc false
-      @spec prepare_emit(term(), map()) ::
-              {:ok, term()} | {:ok, term(), term()} | {:error, term()}
-      @impl Jido.Plugin
-      def prepare_emit(signal, _context), do: {:ok, signal}
-
-      @doc false
-      @spec transform_result(module() | String.t(), term(), map()) :: term()
-      @impl Jido.Plugin
-      def transform_result(_action, result, _context), do: result
-
-      @doc false
-      @spec child_spec(map()) :: nil | Supervisor.child_spec() | [Supervisor.child_spec()]
-      @impl Jido.Plugin
-      def child_spec(_config), do: nil
-
-      @doc false
-      @spec subscriptions(map(), map()) :: [Jido.Plugin.sensor_subscription()]
-      @impl Jido.Plugin
-      def subscriptions(_config, _context), do: subscriptions()
-
-      @doc false
-      @spec on_checkpoint(term(), map()) ::
-              {:externalize, atom(), term()} | :keep | :drop
-      @impl Jido.Plugin
-      def on_checkpoint(_plugin_state, _context), do: :keep
-
-      @doc false
-      @spec on_restore(term(), map()) :: {:ok, term()} | {:error, term()}
-      @impl Jido.Plugin
-      def on_restore(_pointer, _context), do: {:ok, nil}
-    end
-  end
-
-  @doc false
-  defp generate_defoverridable do
-    quote location: :keep do
-      defoverridable [
-        {:mount, 2},
-        {:signal_routes, 0},
-        {:signal_routes, 1},
-        {:handle_signal, 2},
-        {:prepare_signal, 2},
-        {:prepare_action, 3},
-        {:prepare_emit, 2},
-        {:transform_result, 3},
-        {:child_spec, 1},
-        {:subscriptions, 2},
-        {:on_checkpoint, 2},
-        {:on_restore, 2},
-        {:name, 0},
-        {:state_key, 0},
-        {:actions, 0},
-        {:description, 0},
-        {:category, 0},
-        {:vsn, 0},
-        {:otp_app, 0},
-        {:schema, 0},
-        {:config_schema, 0},
-        {:signal_patterns, 0},
-        {:tags, 0},
-        {:capabilities, 0},
-        {:requires, 0},
-        {:schedules, 0},
-        {:singleton?, 0}
-      ]
-    end
-  end
-
+  @doc "Defines a Plugin. Implement only the callbacks it needs."
   defmacro __using__(opts) do
-    behaviour_and_validation = generate_behaviour_and_validation(opts)
-    accessor_functions = generate_accessor_functions()
-    spec_and_manifest = generate_spec_and_manifest_functions()
-    default_callbacks = generate_default_callbacks()
-    defoverridable_block = generate_defoverridable()
+    opts = validate_use_options!(opts)
+    option_keys = normalize_option_keys!(Keyword.get(opts, :option_keys, []))
 
-    [
-      behaviour_and_validation,
-      accessor_functions,
-      spec_and_manifest,
-      default_callbacks,
-      defoverridable_block
-    ]
+    quote location: :keep do
+      use Jido.Agent.Extension,
+        id: unquote(Keyword.get(opts, :id, Atom.to_string(__CALLER__.module))),
+        vsn: unquote(Keyword.get(opts, :vsn, 1)),
+        sections: unquote(Keyword.get(opts, :sections, [])),
+        imports: unquote(Keyword.get(opts, :imports, []))
+
+      @behaviour Jido.Plugin
+      @before_compile Jido.Plugin
+      @jido_plugin_vsn unquote(Keyword.get(opts, :vsn, 1))
+      @jido_plugin_option_keys unquote(Macro.escape(option_keys))
+    end
+  end
+
+  @doc false
+  defmacro __before_compile__(env) do
+    owners =
+      for {owner, callbacks} <- @owner_callbacks do
+        selected = Enum.any?(callbacks, &Module.defines?(env.module, &1, :def))
+        {owner, if(selected, do: env.module)}
+      end
+
+    runtime? = Enum.any?(owners, fn {_owner, module} -> not is_nil(module) end)
+
+    if runtime? do
+      quote do
+        @doc false
+        def __jido_plugin__ do
+          struct!(
+            Jido.Plugin.Manifest,
+            unquote(owners) ++
+              [
+                module: __MODULE__,
+                vsn: @jido_plugin_vsn,
+                option_keys: @jido_plugin_option_keys
+              ]
+          )
+        end
+      end
+    else
+      quote do: :ok
+    end
+  end
+
+  @doc false
+  @spec directive_owner([Jido.Plugin.Spec.t()], struct()) :: Jido.Plugin.Spec.t() | nil
+  def directive_owner(specs, %{__struct__: directive_module}) when is_list(specs) do
+    Enum.find(specs, fn
+      %{agent: %Jido.Plugin.Spec.Agent{directive_modules: modules}} ->
+        directive_module in modules
+
+      _spec ->
+        false
+    end)
+  end
+
+  def directive_owner(_specs, _directive), do: nil
+
+  @doc false
+  @spec invoke(module(), module(), atom(), [term()], String.t()) ::
+          term() | {:error, Exception.t()}
+  def invoke(package, facet, function, args, message) do
+    apply(facet, function, args)
+  rescue
+    error -> {:error, callback_error(message, package, function, :error, error)}
+  catch
+    kind, reason -> {:error, callback_error(message, package, function, kind, reason)}
+  end
+
+  @doc false
+  @spec invalid_callback(String.t(), module(), module(), map()) :: {:error, Exception.t()}
+  def invalid_callback(message, package, _facet, details \\ %{}) do
+    {:error,
+     execution_error(
+       message,
+       package,
+       Map.put_new(details, :code, :plugin_invalid_callback_result)
+     )}
+  end
+
+  @doc false
+  @spec validation_error(String.t(), map()) :: {:error, Exception.t()}
+  def validation_error(message, details) do
+    {:error, Error.validation_error(message, kind: :config, details: details)}
+  end
+
+  @doc false
+  @spec execution_error(String.t(), module(), map()) :: Exception.t()
+  def execution_error(message, package, details) do
+    Error.execution_error(message,
+      details: Map.put(details, :plugin, package)
+    )
+  end
+
+  defp callback_error(message, package, callback, :error, error) do
+    execution_error(message, package, %{
+      code: :plugin_callback_failed,
+      callback: callback,
+      error: error
+    })
+  end
+
+  defp callback_error(message, package, callback, kind, reason) do
+    execution_error(message, package, %{
+      code: :plugin_callback_failed,
+      callback: callback,
+      kind: kind,
+      reason: reason
+    })
+  end
+
+  defp validate_use_options!(opts) do
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "use Jido.Plugin options must be a keyword list"
+    end
+
+    keys = Keyword.keys(opts)
+
+    if Enum.uniq(keys) != keys do
+      raise ArgumentError, "use Jido.Plugin options must be unique"
+    end
+
+    unknown = keys -- @use_options
+
+    if unknown != [] do
+      raise ArgumentError,
+            "use Jido.Plugin does not accept options #{inspect(unknown)}; " <>
+              "define callbacks in the Plugin module without roles or facet selectors"
+    end
+
+    opts
+  end
+
+  defp normalize_option_keys!(value) do
+    if Keyword.keyword?(value) do
+      owners = Keyword.keys(value)
+
+      if Enum.uniq(owners) != owners do
+        raise ArgumentError, "use Jido.Plugin option owners must be unique"
+      end
+
+      validate_option_keys!(value, value)
+    else
+      invalid_option_keys!(value)
+    end
+  end
+
+  defp validate_option_keys!(entries, source) do
+    owners = Keyword.keys(@owner_callbacks)
+
+    valid? =
+      Enum.all?(entries, fn {owner, keys} ->
+        owner in owners and is_list(keys) and Enum.all?(keys, &is_atom/1) and
+          Enum.uniq(keys) == keys
+      end)
+
+    if valid?, do: Map.new(entries), else: invalid_option_keys!(source)
+  end
+
+  defp invalid_option_keys!(value) do
+    raise ArgumentError,
+          "use Jido.Plugin option_keys must map each callback owner to unique atom keys; " <>
+            "got: #{inspect(value)}"
   end
 end

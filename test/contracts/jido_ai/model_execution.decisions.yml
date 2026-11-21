@@ -1,0 +1,5 @@
+- id: model-execution-component-boundary
+  date: "2026-10-27"
+  decision: Keep provider calls, request contexts, budgets, usage, streaming normalization, and embeddings in jido_ai.model_execution.
+  driver: These modules control external model work and expose one normalized result to reasoning graphs.
+  approved_by: User-requested initial Covenant scaffold

@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!-- test that onexit handlers are executed in document order.  event1 should be raised before event2 -->
+
+
+<scxml  conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+
+       
+<state id="s0">
+  <onexit>
+    <raise event="event1"/>
+    </onexit>
+  <onexit>
+    <raise event="event2"/>
+    </onexit>
+    
+  <transition target="s1"/>
+ </state>
+ 
+ <state id="s1">
+    
+  <transition event="event1"  target="s2"/>
+  <transition event="*" conf:targetfail=""/>
+
+</state>
+
+<state id="s2">
+  <transition event="event2" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+</state>
+
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

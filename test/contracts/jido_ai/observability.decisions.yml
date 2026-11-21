@@ -1,0 +1,5 @@
+- id: observability-component-boundary
+  date: "2026-10-27"
+  decision: Keep AI semantic telemetry, correlation, metrics, safe logs, and optional OpenTelemetry mapping in jido_ai.observability.
+  driver: Observation must use one safe best-effort boundary and must not become part of Agent execution semantics.
+  approved_by: User-requested initial Covenant scaffold

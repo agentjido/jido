@@ -1,0 +1,117 @@
+defmodule Jido.Agent.ForwardTest do
+  use Jido.Test.Case, async: true
+
+  alias Jido.Agent
+  alias Jido.AgentServer
+  alias Jido.Signal
+
+  defmodule Increment do
+    use Jido.Action, name: "forward_increment"
+
+    @impl true
+    def run(_input, context) do
+      {:ok, %{context.agent_state | count: context.agent_state.count + 1}}
+    end
+  end
+
+  defmodule Worker do
+    use Jido.Agent, name: "forward_worker"
+
+    state do
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    end
+
+    routes do
+      route "work.request", Increment
+
+      route "work.completed" do
+        forward(to: parent())
+      end
+    end
+  end
+
+  defmodule Parent do
+    use Jido.Agent, name: "forward_parent"
+
+    state do
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    end
+
+    routes do
+      route "work.request" do
+        forward(to: agent(:worker))
+      end
+
+      route "work.completed", Increment
+    end
+
+    topology do
+      agent :worker, Worker
+    end
+  end
+
+  test "forward destinations are portable canonical data" do
+    assert [to_worker, to_parent] = [
+             hd(Parent.definition().routes),
+             List.last(Worker.definition().routes)
+           ]
+
+    assert to_worker.handler == %{
+             kind: :forward,
+             target: %{kind: :agent, name: :worker}
+           }
+
+    assert to_parent.handler == %{kind: :forward, target: %{kind: :parent}}
+  end
+
+  test "forward sends to one declared Agent without default dispatch fallback", %{jido: jido} do
+    {:ok, parent} =
+      Jido.Test.AgentServer.Assertions.start_agent(jido, Parent, default_dispatch: {:pid, target: self()})
+
+    [worker] = members(parent, :worker)
+    signal = Signal.new!("work.request", %{}, source: "/test")
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             AgentServer.call(parent, signal)
+
+    eventually(fn -> AgentServer.snapshot(worker).agent.state.count == 1 end)
+    refute_received {:signal, _signal}
+  end
+
+  test "forward sends to the current parent Agent", %{jido: jido} do
+    {:ok, parent} = Jido.Test.AgentServer.Assertions.start_agent(jido, Parent)
+    [worker] = members(parent, :worker)
+    signal = Signal.new!("work.completed", %{}, source: "/test")
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+             AgentServer.call(worker, signal)
+
+    eventually(fn -> AgentServer.snapshot(parent).agent.state.count == 1 end)
+  end
+
+  test "forward rejects missing definition and runtime targets", %{jido: jido} do
+    assert {:error, %Jido.Error.ValidationError{code: :unknown_forward_target}} =
+             Agent.define(%{
+               name: "missing_forward_target",
+               routes: [
+                 %{
+                   path: "work.request",
+                   handler: %{kind: :forward, target: %{kind: :agent, name: :missing}}
+                 }
+               ]
+             })
+
+    {:ok, worker} = Jido.Test.AgentServer.Assertions.start_agent(jido, Worker)
+    signal = Signal.new!("work.completed", %{}, source: "/test")
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :failed, error: :parent_not_found}} =
+             AgentServer.call(worker, signal)
+
+    assert AgentServer.status(worker).agent_revision == 0
+  end
+
+  defp members(server, name) do
+    {_phase, state} = :sys.get_state(server)
+    Jido.AgentServer.Topology.members(state.activation_state, name)
+  end
+end

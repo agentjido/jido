@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!-- we test that targetexpr uses the current value of var1, not its initial value
+(If it uses the initial value, it will generate an error.  If it uses the current value, event1 will be raised  -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:invalidSessionID=""/>
+  </datamodel>
+  
+<state id="s0">
+  <onentry>
+   <assign conf:location="1" conf:quoteExpr="#_internal"/>
+   <send conf:targetExpr="1" event="event1"/>
+    </onentry>
+    
+  <transition event="event1"  conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+
+   
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

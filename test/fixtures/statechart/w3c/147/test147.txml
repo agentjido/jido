@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+
+<!-- test that the first clause that evaluates to true - and only that clause - is executed.
+Only one event should be raised, and it should be bar -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="0"/>
+  </datamodel>
+  
+<state id="s0">
+  <onentry>
+  <if conf:false="">
+    <raise event="foo"/>
+    <conf:incrementID id="1"/>
+  <elseif conf:true=""/>
+    <raise event="bar"/>
+    <conf:incrementID id="1"/>
+  <else/>
+    <raise event="baz"/>
+   <conf:incrementID id="1"/>
+    </if>
+   <raise event="bat"/>
+    </onentry>
+  <transition event="bar" conf:idVal="1=1" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+   
+ </state>
+
+  
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

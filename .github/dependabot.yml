@@ -10,4 +10,4 @@ updates:
       - "elixir"
     commit-message:
       prefix: "deps"
-      include: "scope" 
+      include: "scope"

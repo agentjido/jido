@@ -1,0 +1,210 @@
+# Control Activations
+
+This tutorial reads the status of a running Agent, drains its active work, reopens admission, and sets an idle timeout.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, github: "agentjido/jido", branch: "main"}
+])
+```
+
+## Start a warehouse Agent
+
+`:count` holds its Turn until this notebook sends a message. The later cells use it to control an Agent with work in progress.
+
+```elixir
+defmodule ControlGuide.Count do
+  use Jido.Action,
+    name: "control_guide_count",
+    schema: Jido.Joi.object(%{aisle: Jido.Joi.string()})
+
+  @impl Jido.Action
+  def run(%{aisle: aisle}, %{agent_state: state, notify: notify}) do
+    send(notify, {:counting, self()})
+
+    receive do
+      :finish -> {:ok, %{state | counted: state.counted ++ [aisle]}}
+    end
+  end
+end
+
+defmodule ControlGuide.Warehouse do
+  use Jido.Agent, name: "warehouse"
+
+  state do
+    schema Jido.Joi.object(%{counted: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+  end
+
+  routes do
+    signal_source "/warehouse"
+    route "aisle.count", ControlGuide.Count, as: :count
+
+    route "aisle.note", as: :note do
+      action %{aisle: aisle},
+        schema: Jido.Joi.object(%{aisle: Jido.Joi.string()}),
+        context: context do
+        {:ok, %{context.agent_state | counted: context.agent_state.counted ++ [aisle]}}
+      end
+    end
+  end
+end
+
+{:ok, _instance} = Jido.start(name: ControlGuide.Jido)
+{:ok, warehouse} = Jido.start_agent(ControlGuide.Jido, ControlGuide.Warehouse, id: "north")
+:ok = Jido.AgentServer.await_ready(warehouse)
+
+start_count = fn aisle ->
+  signal = ControlGuide.Warehouse.count_signal!(%{aisle: aisle})
+  pending = Jido.AgentServer.submit(warehouse, signal, context: %{notify: self()})
+
+  receive do
+    {:counting, action} -> {pending, action}
+  after
+    1_000 -> raise "the Turn did not start"
+  end
+end
+```
+
+## Read the resident status
+
+Use the worker returned by `Jido.start_agent/3` to read the activation status.
+
+```elixir
+%Jido.AgentServer.Status{residency: :active, work_state: :idle, admission: :open} =
+  Jido.AgentServer.status(warehouse)
+```
+
+[Agent Lifecycle](agent-activation-control.md) describes what the activation owns.
+
+## Drain work with quiesce
+
+`Jido.AgentServer.quiesce/2` closes admission so you can act on a settled Agent, for example before a deploy step. It does three things:
+
+1. It closes admission. New Turns get `{:error, :quiesced}`.
+2. It rejects every queued Turn with `{:error, :quiesced}`.
+3. It waits for the active Turn and its effects to finish, then returns `{:ok, status}`.
+
+```elixir
+{active, action} = start_count.("a1")
+queued = Jido.AgentServer.submit(warehouse, ControlGuide.Warehouse.note_signal!(%{aisle: "a2"}))
+
+control = Task.async(fn -> Jido.AgentServer.quiesce(warehouse) end)
+
+closing =
+  Enum.find_value(1..100, fn _attempt ->
+    case Jido.AgentServer.status(warehouse).admission do
+      :open ->
+        Process.sleep(5)
+        nil
+
+      mode ->
+        mode
+    end
+  end)
+
+queued_result = Jido.AgentServer.await(queued)
+new_result = Jido.AgentServer.call(warehouse, ControlGuide.Warehouse.note_signal!(%{aisle: "a3"}))
+
+{closing, queued_result, new_result}
+# The cell returns {:quiescing, {:error, :quiesced}, {:error, :quiesced}}
+```
+
+Reads keep working during the drain. The active Turn is still allowed to commit, so finish it and collect the result.
+
+```elixir
+send(action, :finish)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.await(active)
+{:ok, %Jido.AgentServer.Status{admission: :quiesced}} = Task.await(control)
+
+{Jido.AgentServer.status(warehouse).admission, Jido.AgentServer.snapshot(warehouse).agent.state.counted}
+# The cell returns {:quiesced, ["a1"]}
+```
+
+## Reopen admission
+
+`Jido.AgentServer.resume/2` opens admission. Rejected requests do not come back, so their callers must send them again.
+
+```elixir
+{:ok, %Jido.AgentServer.Status{admission: :open}} = Jido.AgentServer.resume(warehouse)
+
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
+  Jido.AgentServer.call(warehouse, ControlGuide.Warehouse.note_signal!(%{aisle: "a2"}))
+
+Jido.AgentServer.snapshot(warehouse).agent.state.counted
+# The cell returns ["a1", "a2"]
+```
+
+`resume/2` returns `{:error, :not_quiescent}` while the server is still draining. It returns `{:error, :unsafe_resume}` after an uncertain hibernation save. See [Hibernate and Thaw](hibernate-thaw-and-activate.md).
+
+## Bound the drain
+
+The `:timeout` option is the budget for the drain, with a default of 5,000 ms. It must be finite. On expiry, `quiesce/2` returns `{:error, :quiesce_timeout}` and admission stays closed. The server finishes its work and then settles as `:quiesced`, so you can call `resume/2` after that.
+
+```elixir
+{active, action} = start_count.("a4")
+
+timed_out = Jido.AgentServer.quiesce(warehouse, timeout: 20)
+still_draining = Jido.AgentServer.resume(warehouse)
+
+send(action, :finish)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.await(active)
+
+settled =
+  Enum.find_value(1..100, fn _attempt ->
+    case Jido.AgentServer.resume(warehouse) do
+      {:ok, %Jido.AgentServer.Status{admission: :open}} ->
+        :reopened
+
+      {:error, :not_quiescent} ->
+        Process.sleep(5)
+        nil
+    end
+  end)
+
+{timed_out, still_draining, settled}
+# The cell returns {{:error, :quiesce_timeout}, {:error, :not_quiescent}, :reopened}
+```
+
+A second control request during a drain returns `{:error, :control_in_progress}`. Owned work, such as an Action in a Turn, gets `{:error, :reentrant_turn}`. During startup the result is `{:error, :not_ready}`.
+
+## Cancel instead of waiting
+
+`active: :cancel` cancels the active Turn if it has not reached commit. A save or effects already in progress still finish.
+
+```elixir
+{active, _action} = start_count.("a5")
+{:ok, %Jido.AgentServer.Status{admission: :quiesced}} =
+  Jido.AgentServer.quiesce(warehouse, active: :cancel)
+
+{:ok, %Jido.AgentServer.TurnResult{status: result}} = Jido.AgentServer.await(active)
+{:ok, %Jido.AgentServer.Status{admission: :open}} = Jido.AgentServer.resume(warehouse)
+
+result
+# The cell returns :cancelled
+```
+
+## Stop an idle Agent
+
+Set `:idle_residency_timeout` in the instance's `:activation` options. The timer starts when the worker is settled and admission is open.
+
+```elixir
+{:ok, _instance} = Jido.start(name: ControlGuide.Kiosk, activation: [idle_residency_timeout: 50])
+{:ok, kiosk} = Jido.start_agent(ControlGuide.Kiosk, ControlGuide.Warehouse, id: "kiosk")
+monitor = Process.monitor(kiosk)
+
+receive do
+  {:DOWN, ^monitor, :process, ^kiosk, reason} -> reason
+after
+  1_000 -> :still_running
+end
+# The cell returns {:shutdown, :idle_timeout}
+```
+
+The worker exits with a shutdown reason, so the activation stops and does not restart. With `idle_policy: :hibernate`, it saves before it stops. That policy needs persistence.
+
+## Next steps
+
+- [Agent Lifecycle](agent-activation-control.md) covers recovery and shutdown reasons.
+- [Shutdown and Recovery](../operations/shutdown-and-recovery.md) applies these controls to a deploy.

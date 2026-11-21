@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- test that errors go in the internal event queue.  We send ourselves an external event foo, then perform
+and operation that raises an error. Then check that the error event is processed first, even though
+it was raised second  -->
+
+
+<scxml  initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+       
+<state id="s0">
+  <onentry>
+     <send event="foo"/>
+     <!-- assigning to a non-existent location should raise an error -->
+    <assign conf:invalidLocation="" conf:expr="2"/>
+    </onentry>
+
+    
+  <transition  event="foo" conf:targetfail=""/>
+  <transition  event="error" conf:targetpass=""/>
+
+</state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

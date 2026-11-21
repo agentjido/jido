@@ -1,0 +1,731 @@
+defmodule Jido.Agent.EvaluationContractTest do
+  use Covenant.Case, component: "jido.agent_evaluation", async: true
+  alias Jido.Agent
+  alias Jido.Agent.{Directive, Runner}
+  alias Jido.AgentServer.Command
+  alias Jido.Signal
+  alias Jido.Test.Agent.Contract, as: F
+
+  defmodule ForwardChild do
+    use Jido.Agent, name: "evaluation_forward_child"
+  end
+
+  defmodule HandoffTarget do
+    use Jido.Action,
+      name: "evaluation_handoff_target",
+      schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
+
+    def run(_input, _context), do: raise("Agent.cmd/3 must not run a Handoff successor")
+  end
+
+  defmodule HandoffSelector do
+    use Jido.Action, name: "evaluation_handoff_selector"
+    def run(%{count: count}, _context), do: {:handoff, %{count: count + 1}, HandoffTarget}
+  end
+
+  defmodule HandoffFlow do
+    use Jido.Flow, name: "evaluation_handoff_flow"
+
+    flow do
+      handoff "next", selector: HandoffSelector, params: %{count: input(:count)}
+      output result("next")
+    end
+  end
+
+  defmodule PrepareFirst do
+    use Jido.Plugin
+
+    @impl true
+    def prepare_route_input(%{path: "test.run"}, %{amount: 2}, %{amount: 2}, _opts),
+      do: {:ok, %{amount: 3}}
+  end
+
+  defmodule PrepareLast do
+    use Jido.Plugin
+
+    @impl true
+    def prepare_route_input(%{path: "test.run"}, %{amount: 2}, %{amount: 3}, _opts),
+      do: {:ok, %{amount: 4}}
+  end
+
+  defp route(path, target, opts \\ []),
+    do:
+      Map.merge(
+        %{
+          path: path,
+          handler: %{kind: :action, target: target},
+          state: %{source: :output, path: []}
+        },
+        Map.new(opts)
+      )
+
+  def transform(%Jido.Signal{} = signal),
+    do: {:ok, %{signal | type: "effect.transformed", data: %{value: 2}}}
+
+  def reject_transform(_signal), do: {:error, :transform_rejected}
+  def invalid_transform(_signal), do: {:ok, %{type: "effect.transformed"}}
+  def raise_transform(_signal), do: raise("transform failure")
+
+  @tag obligation: [
+         "jido.agent_evaluation.I1",
+         "jido.agent_evaluation.I2",
+         "jido.agent_evaluation.I4"
+       ]
+  test "the first declared matching route selects one target and merges defaults shallowly" do
+    source =
+      F.instance(
+        routes: [
+          route("test.run", F.Return, defaults: %{amount: 1, nested: %{a: 1, b: 2}}),
+          route("test.*", F.Add)
+        ]
+      )
+
+    signal = F.signal(%{amount: 7, nested: %{a: 9}})
+
+    assert {:ok,
+            %Runner.Prepared{
+              instruction: %Jido.Instruction{
+                kind: :flow,
+                target: %Jido.Flow{
+                  components: %{
+                    "action" => %{call: %{kind: :action, target: F.Return}}
+                  }
+                },
+                params: %{amount: 7, nested: %{a: 9}}
+              },
+              source_signal: ^signal
+            }} = Runner.prepare(source, signal, [])
+
+    assert {:ok, ^source, []} = Agent.cmd(source, signal, context: %{observer: self()})
+    assert_receive {:executed, %{amount: 7, nested: %{a: 9}}, %{signal: ^signal}}
+    assert {:error, _} = Agent.cmd(source, F.signal(%{mode: :error}))
+    refute_received {:executed, _, _}
+
+    flow_source =
+      F.instance(
+        routes: [
+          %{
+            path: "test.run",
+            handler: %{kind: :flow, target: F.Flow},
+            state: %{source: :output, path: []}
+          }
+        ]
+      )
+
+    assert {:ok, flow_candidate, []} = Agent.cmd(flow_source, F.signal(%{amount: 2}))
+    assert flow_candidate.state.count == 2
+  end
+
+  @tag obligation: "jido.agent_evaluation.I2"
+  test "map, duplicate keyword and nil input use the original source Signal" do
+    source = F.instance(routes: [route("test.run", F.Return, defaults: %{amount: 3})])
+
+    for {data, expected} <- [
+          {%{}, %{amount: 3}},
+          {nil, %{amount: 3}},
+          {[amount: 1, amount: 0], %{amount: 0}},
+          {%{amount: false}, %{amount: false}}
+        ] do
+      signal = F.signal(data)
+      assert {:ok, ^source, []} = Agent.cmd(source, signal, context: %{observer: self()})
+      assert_receive {:executed, ^expected, %{signal: ^signal}}
+    end
+
+    for data <- [:invalid, "bad", [1, 2], [1 | :tail]] do
+      signal = F.signal(data)
+
+      assert {:error,
+              %Jido.Error.ValidationError{
+                subject: :data,
+                details: %{signal_id: signal_id, data: ^data}
+              }} = Agent.cmd(source, signal, context: %{observer: self()})
+
+      assert signal_id == signal.id
+    end
+
+    refute_received {:executed, _, _}
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I2", "jido.agent_evaluation.I6"]
+  test "route input callbacks receive the original request and run in Plugin order" do
+    source =
+      F.instance(
+        routes: [route("test.run", F.Add, defaults: %{amount: 1})],
+        plugins: Enum.map([PrepareFirst, PrepareLast], &F.contribution/1)
+      )
+
+    signal = F.signal(%{amount: 2})
+
+    assert {:ok, %Runner.Prepared{source_signal: ^signal, instruction: %{params: %{amount: 4}}}} =
+             Runner.prepare(source, signal, [])
+
+    assert {:ok, candidate, []} = Agent.cmd(source, signal)
+    assert candidate.state.count == source.state.count + 4
+  end
+
+  @tag obligation: "jido.agent_evaluation.I3"
+  test "reserved context fails and valid caller context and execution options are retained" do
+    source = F.instance()
+
+    for key <- [
+          :agent_id,
+          :agent_signal_source,
+          :agent_state,
+          :agent_topology,
+          :plugin_inputs,
+          :signal,
+          :__jido_wait_host__,
+          :__jido_wait_result__
+        ] do
+      assert {:error, _} = Agent.cmd(source, F.signal(), context: %{key => :forged})
+    end
+
+    signal = F.signal()
+
+    assert {:ok, ^source, []} = Agent.cmd(source, signal, context: nil)
+
+    assert {:ok, ^source, []} =
+             Agent.cmd(source, signal, context: [observer: self(), request: 1, request: 2])
+
+    assert_receive {:executed, %{}, keyword_context}
+    assert keyword_context.request == 2
+
+    for context <- [:invalid, "bad", [1, 2], %URI{}] do
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Agent.cmd(source, signal, context: context)
+    end
+
+    assert {:ok, ^source, []} =
+             Agent.cmd(source, signal,
+               context: %{observer: self(), request: 2},
+               timeout: 1000,
+               max_attempts: 2,
+               backoff: :none
+             )
+
+    assert_receive {:executed, %{}, context}
+    assert context.request == 2
+    assert context.signal === signal
+    state = context.agent_state
+    assert state === source.state
+    assert context.agent_id == source.id
+    assert context.agent_signal_source == source.signal_source
+    assert context.agent_topology === source.topology
+    assert context.plugin_inputs == %{}
+
+    for options <- [[timeout: -1], [max_attempts: 0], [backoff: :invalid]] do
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Agent.cmd(source, signal, options)
+    end
+  end
+
+  @tag obligation: "jido.agent_evaluation.I5"
+  test "success requires complete valid state and failure preserves the next command" do
+    source = F.instance()
+
+    for output <- [Map.delete(source.state, :count), %{source.state | count: "1"}] do
+      assert {:error, %Jido.Error.ValidationError{code: code}} =
+               Agent.cmd(source, F.signal(%{output: output}))
+
+      assert code in [:incomplete_state, :invalid_state]
+    end
+
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_state}} =
+             Agent.cmd(source, F.signal(%{output: Map.put(source.state, :extra, 1)}))
+
+    for output <- [[], nil, %URI{}] do
+      assert {:error, %{__exception__: true}} =
+               Agent.cmd(source, F.signal(%{output: output}))
+    end
+
+    assert {:error, _} = Agent.cmd(source, F.signal(%{mode: :error}))
+    output = %{source.state | count: 3, enabled: false, note: nil}
+    assert {:ok, candidate, []} = Agent.cmd(source, F.signal(%{output: output}))
+    assert candidate === %{source | state: output}
+    assert Agent.definition(candidate) === Agent.definition(source)
+    assert source.state.count == 0
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I7", "jido.agent_evaluation.I9"]
+  test "the complete Directive batch builds one candidate without dispatch" do
+    source = F.instance()
+
+    effects =
+      Enum.map(
+        ["first", "second"],
+        &Directive.emit(F.signal(%{}, "effect." <> &1), {:pid, [target: self()]})
+      )
+
+    assert {:ok, ^source, ^effects} = Agent.cmd(source, F.signal(%{directives: effects}))
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{
+                code: :agent_invalid_callback_result,
+                callback: :execute,
+                directive: :invalid
+              }
+            }} = Agent.cmd(source, F.signal(%{directives: effects ++ [:invalid]}))
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{
+                code: :agent_invalid_callback_result,
+                callback: :execute,
+                directive: %{invalid: true}
+              }
+            }} = Agent.cmd(source, F.signal(%{directives: [%{invalid: true}]}))
+
+    assert {:error, _} =
+             Agent.cmd(source, F.signal(%{directives: [%Directive.Emit{signal: :invalid}]}))
+
+    refute_received {:signal, _}
+  end
+
+  @tag obligation: "jido.agent_evaluation.I7"
+  test "one Reply must identify the current request as its cause" do
+    source = F.instance()
+    request = F.signal()
+    output = F.signal(%{}, "reply.done")
+    {:ok, correlated} = Signal.put_context(output, "jidocausationid", request.id)
+    reply = Directive.reply(correlated)
+
+    assert {:ok, ^source, [^reply]} =
+             Agent.cmd(source, %{request | data: %{directives: [reply]}})
+
+    {:ok, wrong} = Signal.put_context(output, "jidocausationid", "other-request")
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{
+                request_id: request_id,
+                causation_id: "other-request",
+                reply_id: reply_id
+              }
+            }} =
+             Agent.cmd(source, %{
+               request
+               | data: %{directives: [Directive.reply(wrong)]}
+             })
+
+    assert request_id == request.id
+    assert reply_id == wrong.id
+
+    assert {:error, %Jido.Error.ValidationError{details: %{count: 2}}} =
+             Agent.cmd(source, %{request | data: %{directives: [reply, reply]}})
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I7", "jido.agent_evaluation.I9"]
+  test "emission requests normalize once without a route output contract" do
+    source = F.instance(signal_source: "/contract")
+
+    signal = F.signal(%{value: 1}, "effect.allowed")
+
+    requests = [
+      Directive.emit("effect.allowed", %{value: 1}),
+      %{kind: :emit, signal: signal},
+      Directive.emit(signal),
+      %Directive.Emit{signal: signal, dispatch: :parent},
+      %Directive.Emit{signal: signal, dispatch: {:agent, :child}}
+    ]
+
+    for request <- requests do
+      assert {:ok, _, [_]} = Agent.cmd(source, F.signal(%{directives: [request]}))
+    end
+
+    assert {:ok, _, [%Directive.Emit{signal: output}]} =
+             Agent.cmd(
+               source,
+               F.signal(%{directives: [Directive.emit("effect.allowed", %{value: 1})]})
+             )
+
+    assert output.type == "effect.allowed"
+    assert output.source == source.signal_source
+    assert output.data == %{value: 1}
+
+    for {request, code} <- [
+          {%{kind: :emit, type: "effect.allowed", data: %{}, unknown: true}, :unknown_fields},
+          {%{kind: :emit, type: "effect.*", data: %{}}, :wildcard_type},
+          {%{kind: :emit, signal: %{type: "effect.allowed"}}, :invalid_directive}
+        ] do
+      assert {:error, %Jido.Error.ValidationError{code: ^code, path: [0]}} =
+               Agent.cmd(source, F.signal(%{directives: [request]}))
+    end
+
+    for request <- [%{signal: signal}, %{type: "effect.allowed", data: %{}}] do
+      assert {:error,
+              %Jido.Error.ValidationError{
+                details: %{
+                  code: :agent_invalid_callback_result,
+                  callback: :execute,
+                  directive: ^request
+                }
+              }} = Agent.cmd(source, F.signal(%{directives: [request]}))
+    end
+
+    invalid_signal = %{signal | type: nil}
+
+    assert {:error, %Jido.Error.ValidationError{code: :invalid_signal, path: [0], details: %{issues: issues}}} =
+             Agent.cmd(
+               source,
+               F.signal(%{directives: [%{kind: :emit, signal: invalid_signal}]})
+             )
+
+    assert issues != []
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I1", "jido.agent_evaluation.I4"]
+  test "transform routes produce one Signal without rerouting" do
+    input = F.signal(%{value: 1})
+
+    transform =
+      F.instance(
+        routes: [
+          %{
+            path: "test.run",
+            handler: %{kind: :transform, target: {__MODULE__, :transform, 1}}
+          },
+          route("effect.transformed", F.Add)
+        ]
+      )
+
+    assert {:ok, ^transform, [%Directive.Emit{signal: output}]} = Agent.cmd(transform, input)
+    assert output === %{input | type: "effect.transformed", data: %{value: 2}}
+
+    for callback <- [:reject_transform, :invalid_transform, :raise_transform] do
+      source =
+        F.instance(
+          routes: [
+            %{
+              path: "test.run",
+              handler: %{kind: :transform, target: {__MODULE__, callback, 1}}
+            }
+          ]
+        )
+
+      assert {:error, %{__exception__: true} = error} = Agent.cmd(source, input)
+
+      case callback do
+        :reject_transform ->
+          assert %Jido.Error.ExecutionError{
+                   details: %{reason: :transform_rejected}
+                 } = error
+
+        :invalid_transform ->
+          assert %Jido.Error.ValidationError{code: :invalid_result} = error
+
+        :raise_transform ->
+          assert %Jido.Error.ExecutionError{
+                   phase: :run,
+                   details: %{exception: RuntimeError}
+                 } = error
+      end
+    end
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I1", "jido.agent_evaluation.I4"]
+  test "forward routes return the unchanged Signal in one explicit Directive" do
+    signal = F.signal()
+
+    parent =
+      F.instance(
+        routes: [
+          %{
+            path: "test.run",
+            handler: %{kind: :forward, target: %{kind: :parent}}
+          }
+        ]
+      )
+
+    assert {:ok, ^parent, [%Directive.Emit{signal: ^signal, dispatch: :parent}]} =
+             Agent.cmd(parent, signal)
+
+    child =
+      F.instance(
+        routes: [
+          %{
+            path: "test.run",
+            handler: %{kind: :forward, target: %{kind: :agent, name: :worker}}
+          }
+        ],
+        topology: %{agents: [%{name: :worker, definition: ForwardChild}]}
+      )
+
+    assert {:ok, ^child, [%Directive.Emit{signal: ^signal, dispatch: {:agent, :worker}}]} =
+             Agent.cmd(child, signal)
+  end
+
+  @tag obligation: "jido.agent_evaluation.I9"
+  test "Agent.cmd returns a terminal Handoff without running its successor" do
+    source =
+      F.instance(
+        routes: [
+          %{
+            path: "test.run",
+            handler: %{kind: :flow, target: HandoffFlow},
+            state: %{source: :output, path: []}
+          }
+        ]
+      )
+
+    assert {:handoff, ^source, %Jido.Instruction{target: HandoffTarget, kind: :action, params: %{count: 5}}, []} =
+             Agent.cmd(source, F.signal(%{count: 4}))
+  end
+
+  @tag obligation: "jido.agent_evaluation.I9"
+  test "generated commands return success, errors, and the Handoff" do
+    module = Module.concat(__MODULE__, GeneratedCommand)
+
+    {:module, ^module, _beam, _} =
+      Module.create(
+        module,
+        quote do
+          use Jido.Agent, name: "generated_command_contract"
+
+          routes do
+            route "test.run", unquote(HandoffFlow) do
+              state(:unchanged)
+            end
+
+            route "test.ok", unquote(F.Return) do
+              state(:unchanged)
+            end
+          end
+        end,
+        Macro.Env.location(__ENV__)
+      )
+
+    assert {:ok, source} = module.instantiate(id: "typed-command")
+    assert {:ok, ^source, []} = module.cmd(source, F.signal(%{}, "test.ok"))
+    assert {:error, _} = module.cmd(source, F.signal(%{}, "test.missing"))
+
+    assert {:handoff, ^source, %Jido.Instruction{target: HandoffTarget, params: %{count: 5}}, []} =
+             module.cmd(source, F.signal(%{count: 4}), [])
+  end
+
+  @tag obligation: "jido.agent_evaluation.I10"
+  test "the AgentServer evaluation boundary keeps stages closed" do
+    source = F.signal()
+    agent = F.instance()
+    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.Plugin.declarations(agent))
+    {:ok, command} = Command.new(agent, source)
+    assert {:ok, prepared} = Runner.prepare_admitted(command, source, [], specs)
+    assert prepared.agent === agent
+    assert prepared.source_signal === source
+    assert {:ok, ^agent, []} = Runner.finish_for_server(prepared, {:ok, agent.state})
+
+    assert {:error, :compose,
+            %Jido.Error.ExecutionError{
+              details: %{
+                code: :agent_invalid_callback_result,
+                callback: :execute,
+                result: :invalid
+              }
+            }} =
+             Runner.finish_for_server(prepared, :invalid)
+
+    assert {:error, :compose,
+            %Jido.Error.ExecutionError{
+              details: %{
+                code: :agent_invalid_callback_result,
+                callback: :execute,
+                output: []
+              }
+            }} =
+             Runner.finish_for_server(prepared, {:ok, []})
+
+    invalid = put_in(command.context, %{agent_id: "reserved"})
+
+    assert {:error, :input, %{__exception__: true}} =
+             Runner.prepare_admitted(invalid, source, [], specs)
+
+    unrouted = F.signal(%{}, "missing")
+    {:ok, command} = Command.new(agent, unrouted)
+
+    assert {:error, :route, %Jido.Error.ValidationError{code: :unmatched_input}} =
+             Runner.prepare_admitted(command, unrouted, [], specs)
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I9", "jido.agent_evaluation.I10"]
+  test "the AgentServer Handoff boundary keeps the successor instruction and candidate complete" do
+    agent = F.instance()
+    signal = F.signal(%{count: 1})
+    {:ok, command} = Command.new(agent, signal, %{caller: :retained})
+    {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(Agent.Plugin.declarations(agent))
+    instruction = Jido.Instruction.new!(target: HandoffTarget, params: %{count: 2})
+
+    assert {:ok,
+            %Runner.Prepared{
+              agent: ^agent,
+              signal: ^signal,
+              instruction: %Jido.Instruction{
+                kind: :flow,
+                target: %Jido.Flow{
+                  components: %{
+                    "action" => %{call: %{kind: :action, target: HandoffTarget}}
+                  }
+                },
+                params: %{count: 2},
+                context: %{caller: :retained, signal: ^signal}
+              },
+              exec_opts: [timeout: 10]
+            } = prepared} =
+             Runner.prepare_admitted_handoff(
+               command,
+               signal,
+               instruction,
+               [timeout: 10],
+               specs
+             )
+
+    assert {:handoff, candidate, ^instruction, []} =
+             Runner.finish_for_server(prepared, {:handoff, instruction, []})
+
+    assert Agent.definition(candidate) == Agent.definition(agent)
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I6", "jido.agent_evaluation.I8"]
+  test "Plugin preparation and reduction preserve declaration order and state ownership" do
+    source =
+      F.instance(plugins: Enum.map([F.First, F.Second, F.Stateless, F.PreparedOnly], &F.contribution/1))
+
+    signal = F.signal()
+    assert {:ok, candidate, []} = Agent.cmd(source, signal, context: %{observer: self()})
+    assert candidate.state === %{source.state | first: 1, second: 1}
+    assert_receive {:prepare, %{plugin: F.First}}
+    assert_receive {:prepare, %{plugin: F.Second}}
+    assert_receive {:executed, _, context}
+    assert context.plugin_inputs[F.First].prepared === {0, signal.id}
+    assert context.plugin_inputs[F.Second].prepared === {0, signal.id}
+    assert context.plugin_inputs[F.PreparedOnly].prepared === nil
+    assert_receive {:reduce, first}
+    assert_receive {:reduce, second}
+    assert first.state_before === source.state
+    assert second.candidate_state === %{source.state | first: 1}
+
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              details: %{code: :plugin_state_owner_violation, keys: [:first], plugin: F.First}
+            }} = Agent.cmd(source, F.signal(%{output: %{source.state | first: 99}}))
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I6", "jido.agent_evaluation.I8"]
+  test "Plugin rejections retain application reasons and callback faults retain causes" do
+    for {opts, reason} <- [
+          {%{prepare: :reject}, :plugin_rejection},
+          {%{reduce: :reject}, :reduction_rejection}
+        ] do
+      source = F.instance(plugins: [F.contribution(F.First, opts)])
+      assert {:error, ^reason} = Agent.cmd(source, F.signal())
+    end
+
+    for {opts, code, callback} <- [
+          {%{prepare: :raise}, :plugin_callback_failed, :prepare},
+          {%{reduce: :raise}, :plugin_callback_failed, :reduce},
+          {%{prepare: :invalid}, :plugin_invalid_callback_result, nil},
+          {%{reduce: :invalid}, :plugin_invalid_callback_result, nil},
+          {%{reduce: :wrong_type}, :plugin_invalid_callback_result, nil},
+          {%{prepare: :nonportable}, :non_portable_term, nil}
+        ] do
+      source = F.instance(plugins: [F.contribution(F.First, opts)])
+
+      assert {:error, %Jido.Error.ExecutionError{details: details}} =
+               Agent.cmd(source, F.signal())
+
+      assert Jido.Error.code(%{details: details}) == code
+      assert details.plugin == F.First
+      if callback, do: assert(details.callback == callback)
+
+      case opts do
+        %{prepare: :nonportable} ->
+          assert details.path == [:plugin_inputs, F.First, :prepared]
+
+        %{prepare: :invalid} ->
+          assert details.result == :invalid
+
+        %{reduce: :invalid} ->
+          assert details.result == :invalid
+
+        %{reduce: :wrong_type} ->
+          assert details.issues != []
+
+        _ ->
+          :ok
+      end
+    end
+  end
+
+  @tag obligation: ["jido.agent_evaluation.I7", "jido.agent_evaluation.I8"]
+  test "owned custom directives validate before reduction and retain order" do
+    source = F.instance(plugins: [F.contribution(F.Effects)])
+    directives = [%F.Effect{value: 7}, Directive.emit(F.signal()), %F.Effect{value: 9}]
+    assert {:ok, candidate, ^directives} = Agent.cmd(source, F.signal(%{directives: directives}))
+    assert candidate.state.effects == 16
+    assert_receive {:effects_reduced, _}
+
+    assert {:error, %Jido.Error.ValidationError{details: %{directive: %F.Effect{value: 7}}}} =
+             Agent.cmd(F.instance(), F.signal(%{directives: directives}))
+
+    assert {:error, _} = Agent.cmd(source, F.signal(%{directives: [%F.Effect{value: -1}]}))
+    refute_received {:effects_reduced, _}
+  end
+
+  @tag obligation: [
+         "jido.agent_evaluation.I1",
+         "jido.agent_evaluation.I5",
+         "jido.agent_evaluation.I9"
+       ]
+  test "failure does not undo Action work and malformed routing remains structured" do
+    source = F.instance()
+    assert {:error, _} = Agent.cmd(source, F.signal(%{output: %{}}), context: %{observer: self()})
+    assert_receive {:executed, _, _}
+
+    assert {:error, %Jido.Error.ValidationError{code: :unmatched_input}} =
+             Agent.cmd(source, F.signal(%{}, "missing"))
+
+    assert {:error, %{__exception__: true}} = Agent.cmd(source, %{F.signal() | type: nil})
+    assert {:ok, ^source, []} = Agent.cmd(source, F.signal())
+  end
+
+  @tag obligation: "jido.agent_evaluation.I4"
+  test "Action contracts are read again after code reload" do
+    name = "Reload#{System.unique_integer([:positive])}"
+    action = Module.concat(__MODULE__, name)
+    host = Module.concat(action, Host)
+
+    source = """
+    defmodule #{inspect(action)} do
+      use Jido.Action, name: "reload_action", schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
+      def run(_, context), do: {:ok, context.agent_state}
+    end
+    defmodule #{inspect(host)} do
+      use Jido.Agent, name: "reload_host"
+      routes do
+        route "test.run", #{inspect(action)}
+      end
+    end
+    """
+
+    Jido.Test.Flow.AuthoringCompiler.with_compiled(
+      source,
+      fn _ ->
+        agent = host.instantiate!(id: "reload")
+        assert {:ok, ^agent, []} = Agent.cmd(agent, F.signal(%{value: 1}))
+        :code.purge(action)
+        :code.delete(action)
+
+        Code.compile_string("""
+        defmodule #{inspect(action)} do
+          use Jido.Action, name: "reload_action", schema: Jido.Joi.object(%{value: Jido.Joi.string()})
+          def run(_, context), do: {:ok, context.agent_state}
+        end
+        """)
+
+        assert {:error, _} = Agent.cmd(agent, F.signal(%{value: 1}))
+        assert {:ok, ^agent, []} = Agent.cmd(agent, F.signal(%{value: "current"}))
+        assert {:ok, _} = host.instantiate(id: "new")
+      end,
+      modules: [action, host]
+    )
+  end
+end

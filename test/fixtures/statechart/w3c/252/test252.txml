@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<!-- test that we don't process any events received from the invoked process once it is cancelled.  child
+process tries to send us childToParent in an onexit handler.  If we get it, we fail.  
+timeout indicates success.   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0" initial="s01">
+  <onentry>
+    <send event="timeout" conf:delay="1"/>
+    </onentry>
+    
+    <transition event="timeout" conf:targetpass=""/>
+    <transition event="childToParent" conf:targetfail=""/>
+    <transition event="done.invoke" conf:targetfail=""/>
+    
+    <state id="s01">
+      <onentry>
+        <send event="foo"/>
+        </onentry>
+   
+     <invoke type="http://www.w3.org/TR/scxml/">
+       <content>
+         <scxml initial="sub0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+              <state id="sub0">
+             <onentry>
+             <send event="timeout" conf:delay=".5"/>
+             </onentry> 
+            <transition event="timeout" target="subFinal"/>
+               <onexit>
+               <send target="#_parent" event="childToParent"/>
+            </onexit>
+          </state>  
+          <final id="subFinal"/>
+          </scxml>
+       </content>
+      </invoke>
+      
+     <!-- this transition will cause the invocation to be cancelled -->
+     <transition event="foo" target="s02"/>
+   </state>
+   
+   <state id="s02"/>
+   
+</state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

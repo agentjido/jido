@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!-- test that the invokeid is included in events returned from the invoked process.   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+ <datamodel>
+   <data conf:id="1"/>
+   </datamodel>
+     
+<state id="s0" >
+  <onentry>
+    <send event="timeout" delay="3s"/>
+    </onentry>
+ 
+  <invoke type="http://www.w3.org/TR/scxml/" id="foo">
+   <content>
+     <scxml initial="subFinal" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+      <final id="subFinal"/>
+       </scxml>
+    </content>
+    </invoke>
+
+  <transition event="done.invoke" target="s1">
+    <assign conf:location="1" conf:eventField="invokeid"/>
+    </transition>
+  <transition event="*" conf:targetfail=""/>
+</state>
+
+<state id="s1">
+  <transition conf:idQuoteVal="1=foo" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+</state>
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

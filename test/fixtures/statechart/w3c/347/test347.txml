@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+
+<!-- test that the scxml event I/O processor works by sending events back and forth between an invoked child
+and its parent process -->
+
+<scxml initial="s0" conf:datamodel="" version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+  
+<state id="s0" initial="s01">
+     <invoke  id="child" type="scxml" >
+      <content>
+      <scxml initial="sub0" version="1.0" conf:datamodel=""  name="machineName" xmlns:conf="http://www.w3.org/2005/scxml-conformance">  
+         <state id="sub0">
+           <onentry>
+             <send type="http://www.w3.org/TR/scxml/#SCXMLEventProcessor" target="#_parent" event="childToParent"/>
+         </onentry>
+      <transition event="parentToChild" target="subFinal"/>
+     </state>
+     <final id="subFinal"/>
+       </scxml>
+     </content>
+        </invoke>
+   <onentry>
+     <send delay="20s" event="timeout"/>
+     </onentry>
+  <transition event="timeout" conf:targetfail=""/>
+        
+  <state id="s01">
+      <transition event="childToParent" target="s02"/>
+      </state>
+    
+   <state id="s02">
+     <onentry>
+       <send type="http://www.w3.org/TR/scxml/#SCXMLEventProcessor" target="#_child" event="parentToChild"/>
+       </onentry>
+   <transition event="done.invoke" conf:targetpass=""/>
+   <transition event="error" conf:targetfail=""/>
+   </state>
+</state>
+  
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

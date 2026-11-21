@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- we test that cancel works.  We cancel delayed event1.  If cancel works, we get event2 first and pass.  If
+we get event1 or an error first, cancel didn't work and we fail.  -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+   
+<state id="s0">
+  <onentry>
+   <send  id="foo" event="event1" conf:delay="1"/>
+   <send event="event2" conf:delay="1.5"/>
+   <cancel sendid="foo"/>
+    </onentry>
+
+  <transition event="event2" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+ 
+ </state>
+
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<!-- test that non-existent datamodel values are not set.  Var2 is not defined in 
+invoked child's datamodel.  It will will return success if its Var2 remains unbound, failure otherwise.  -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="2" conf:expr="3"/>
+  </datamodel>
+     
+<state id="s0">
+  <onentry>
+    <send event="timeout" delay="2s"/>
+    </onentry>
+   
+     <invoke type="http://www.w3.org/TR/scxml/"  conf:namelist="2">
+       <content>
+          <scxml initial="sub0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+               <state id="sub0">
+               <transition conf:isBound="2" target="subFinal">
+                <send target="#_parent" event="failure"/>
+            </transition>
+            <transition  target="subFinal">
+              <send target="#_parent" event="success"/>
+              </transition>
+          </state>    
+           <final id="subFinal"/>
+           </scxml>
+           </content>
+          </invoke>
+          
+     <transition event="success" conf:targetpass=""/>
+     <transition event="*" conf:targetfail=""/>
+   </state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

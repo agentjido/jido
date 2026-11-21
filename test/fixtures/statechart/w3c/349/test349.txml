@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+
+<!-- test that value in origin field can be used to send an event back to the sender -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1"/>
+  </datamodel>
+  
+<state id="s0">
+
+   <onentry>
+     <send  type="http://www.w3.org/TR/scxml/#SCXMLEventProcessor" event="s0Event"/>
+     </onentry>
+  <transition event="s0Event" target="s2">
+    <assign conf:location="1" conf:eventField="origin"/>
+    </transition>
+  <transition event="*" conf:targetfail=""/>
+
+</state>
+
+<state id="s2">
+  <onentry>
+   <send type="http://www.w3.org/TR/scxml/#SCXMLEventProcessor" conf:targetVar="1" event="s0Event2"/>
+   </onentry>
+   <transition event="s0Event2" conf:targetpass=""/>
+   <transition event="*" conf:targetfail=""/>
+</state>
+  
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

@@ -1,58 +1,26 @@
 import Config
 
-config :jido, default: Jido.DefaultInstance
+if config_env() in [:dev, :test] do
+  config :covenant,
+    root: ".",
+    contracts_dir: "test/contracts",
+    test_paths: ["test"]
+end
 
-# Default scheduler time zone database
-config :jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase
+if config_env() == :test do
+  config :jido, runtime_store_timeout: 100
 
-# Logger configuration for Jido telemetry metadata
-# These metadata keys are used by Jido.Telemetry for structured logging
-config :logger, :default_formatter,
-  format: "[$level] $message $metadata\n",
-  metadata: [
-    :agent_id,
-    :agent_module,
-    :action,
-    :directive_count,
-    :directive_type,
-    :duration_μs,
-    :error,
-    :instruction_count,
-    :queue_size,
-    :result,
-    :signal_type,
-    :span_id,
-    :stacktrace,
-    :trace_id,
-    :strategy
-  ]
+  # Keep normal test output quiet. CaptureLog installs its own handler when needed.
+  config :logger, :default_handler, false
+end
 
-# Git hooks and git_ops configuration for conventional commits
-# Only enabled in dev environment (git_ops is a dev-only dependency)
 if config_env() == :dev do
-  # Worktrees use a `.git` file instead of a directory. We keep the explicit
-  # project path for git_hooks and only auto-install hooks from a normal checkout.
-  project_path = Path.expand("..", __DIR__)
-  auto_install_git_hooks? = File.dir?(Path.join(project_path, ".git"))
-
-  config :git_hooks,
-    auto_install: auto_install_git_hooks?,
-    project_path: project_path,
-    verbose: true,
-    hooks: [
-      commit_msg: [
-        tasks: [
-          {:cmd, "mix git_ops.check_message", include_hook_args: true}
-        ]
-      ]
-    ]
-
   config :git_ops,
+    no_igniter?: true,
     mix_project: Jido.MixProject,
     changelog_file: "CHANGELOG.md",
     repository_url: "https://github.com/agentjido/jido",
     manage_mix_version?: true,
-    manage_readme_version: "README.md",
     version_tag_prefix: "v",
     types: [
       feat: [header: "Features"],
@@ -64,9 +32,4 @@ if config_env() == :dev do
       chore: [hidden?: true],
       ci: [hidden?: true]
     ]
-end
-
-# Import environment specific config (test.exs only)
-if config_env() == :test do
-  import_config "test.exs"
 end

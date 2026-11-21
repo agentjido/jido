@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!-- we test that <param> uses the current value of var1, not its initial value.  If the value of
+aParam in event1 is 2 so that var2 gets set to 2, success, otherwise failure  -->
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="1"/>
+  <data conf:id="2"/>
+  </datamodel>
+  
+<state id="s0">
+  <onentry>
+   <assign conf:location="1" conf:expr="2"/>
+   <send event="event1">
+     <param name="aParam" conf:varExpr="1"/>
+     </send>
+    </onentry>
+    
+  <transition event="event1"  target="s1">
+  <assign conf:location="2" conf:eventDataFieldValue="aParam"/>
+  </transition>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+
+<state id="s1">
+  <transition conf:idVal="2=2" conf:targetpass=""/>
+  <transition conf:targetfail=""/>
+  </state>
+     
+   <conf:pass/>
+   <conf:fail/>
+
+</scxml>

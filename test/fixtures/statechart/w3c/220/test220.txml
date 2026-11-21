@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- we test that the scxml type is supported.   -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+   
+<state id="s0" >
+  <onentry>
+    <send event="timeout" delay="5s"/>
+    </onentry>
+     <invoke type="http://www.w3.org/TR/scxml/">
+     <content>
+       <!-- when invoked, terminate returning done.invoke. This proves that the invocation succeeded.   -->
+         <scxml initial="subFinal" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+           <final id="subFinal"/>
+          </scxml></content>
+     </invoke>
+  <transition event="done.invoke" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/> 
+</state>
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

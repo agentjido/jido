@@ -1,0 +1,20 @@
+<!-- test that that <send> 'event' value gets sent as the param _scxmleventname . -->
+
+<scxml initial="s0" conf:datamodel=""  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+   
+<state id="s0">
+  <onentry>
+    <send event="timeout" delay="30s"/>
+    <send  event="test" conf:basicHTTPAccessURITarget="" type="http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor">
+        </send>  
+     </onentry>
+     
+     <!-- if other end sends us back this event, we succeed -->
+  <transition event="test" conf:eventNamedParamHasValue="_scxmleventname test"  conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+  
+   <conf:pass/>
+   <conf:fail/>
+</scxml>

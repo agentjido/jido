@@ -1,37 +1,29 @@
 defmodule Jido.Application do
   @moduledoc false
+
   use Application
 
-  @doc false
+  @impl Application
   def start(_type, _args) do
-    Jido.Telemetry.setup()
+    Jido.Telemetry.attach_default_handler()
 
     children = [
-      Jido.Storage.ETS.Owner
+      {Registry, keys: :unique, name: Jido.Signal.Registry},
+      {Task.Supervisor, name: Jido.Exec.TaskSupervisor, max_children: Application.get_env(:jido, :max_exec_runs, 64)},
+      Jido.Catalog.Discovery,
+      Jido.Telemetry.AI.CorrelationStore,
+      Jido.Instance.NamespaceRegistry,
+      Jido.Persistence.ETS.Owner,
+      {Runic.Runner, name: Jido.Instance.Names.exec_runner(nil), store: Jido.Persistence.ContinuationStore}
     ]
 
-    register_signal_extensions()
-    Jido.Discovery.init_async()
+    case Supervisor.start_link(children, strategy: :one_for_one, name: Jido.Supervisor) do
+      {:ok, supervisor} ->
+        Jido.Telemetry.AI.attach_default_handlers()
+        {:ok, supervisor}
 
-    Supervisor.start_link(children, strategy: :one_for_one, name: Jido.Supervisor)
-  end
-
-  # Ensure critical signal extensions are registered
-  defp register_signal_extensions do
-    extensions = [
-      Jido.Signal.Ext.Trace,
-      Jido.Signal.Ext.Dispatch,
-      Jido.Signal.Ext.Target
-    ]
-
-    for ext <- extensions do
-      Code.ensure_loaded(ext)
-      Jido.Signal.Ext.Registry.register(ext)
+      other ->
+        other
     end
-
-    :ok
-  rescue
-    # Gracefully handle missing modules during compilation or testing
-    _ -> :ok
   end
 end

@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<!-- test that datamodel values can be specified by param.
+test240sub1 will return success ifits Var1 is set to 1, failure otherwise.  -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+     
+<state id="s0">
+  <onentry>
+    <send event="timeout" delay="2s"/>
+    </onentry>
+   
+      <invoke type="http://www.w3.org/TR/scxml/">
+          <param conf:name="1" conf:expr="1"/>
+          <content>
+            <scxml version="1.0" initial="sub0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+             <datamodel>
+              <data conf:id="1" conf:expr="0"/>
+                </datamodel>
+   
+            <state id="sub0">
+              <transition conf:idVal="1=1" target="subFinal">
+                 <send target="#_parent" event="success"/>
+                   </transition>
+                  <transition  target="subFinal">
+                   <send target="#_parent" event="failure"/>
+                    </transition>
+                 </state>
+              <final id="subFinal"/>
+               </scxml>
+               </content>
+           </invoke>
+     <transition event="success" conf:targetpass=""/>
+     <transition event="*" conf:targetfail=""/>
+   </state>
+ 
+<conf:pass/>
+<conf:fail/>
+</scxml>

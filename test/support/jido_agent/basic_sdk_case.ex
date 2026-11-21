@@ -1,0 +1,43 @@
+defmodule Jido.Test.Agent.BasicSDKCase do
+  @moduledoc "Test support for the Basic SDK integration fixtures."
+
+  use ExUnit.CaseTemplate
+
+  using do
+    quote do
+      use Jido.Test.Case, async: false
+      import Jido.Test.Agent.BasicSDKCase
+
+      @moduletag :integration
+
+      @moduletag group: :basic
+      @moduletag complexity: 1
+    end
+  end
+
+  def start_agent!(jido, agent, opts \\ []) do
+    opts = Keyword.put_new_lazy(opts, :id, &Jido.Test.Case.unique_id/0)
+    {:ok, server} = Jido.Test.AgentServer.ExampleRuntime.start_agent(jido, agent, opts)
+    server
+  end
+
+  # Error observation uses the public Server policy callback. It does not
+  # replace execution or inspect private Server state.
+  def observe_errors do
+    observer = self()
+
+    fn reason, outcome ->
+      send(observer, {:sdk_error, reason, outcome})
+      :continue
+    end
+  end
+
+  def await_idle(server) do
+    Jido.Test.Eventually.eventually(fn ->
+      case Jido.AgentServer.status(server) do
+        %{work_state: :idle, effects: :none} -> true
+        _other -> false
+      end
+    end)
+  end
+end

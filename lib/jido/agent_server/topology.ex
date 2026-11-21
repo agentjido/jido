@@ -1,0 +1,863 @@
+defmodule Jido.AgentServer.Topology do
+  @moduledoc false
+  use GenServer
+  alias Jido.Agent
+  alias Jido.Agent.Topology, as: AgentTopology
+  alias Jido.AgentServer.Worker, as: Server
+  alias Jido.AgentServer.{Lifecycle, Effects}
+  alias Jido.AgentServer.Supervisor, as: ServerSupervisor
+  alias Jido.Signal
+  alias Jido.Signal.Bus
+
+  require Logger
+
+  @self_emit_hops "jidoselfemithops"
+  @max_self_emit_hops 32
+  @handoff_attempt_timeout 1_000
+  @child_options ~w(placement on_parent_exit orphan_dispatch restart server_options meta)a
+
+  def start_link(args), do: GenServer.start_link(__MODULE__, args)
+
+  @impl true
+  def init({context, name}) do
+    bus_name =
+      "$agent/" <>
+        Base.url_encode64(:erlang.term_to_binary({context.partition, context.agent_id, name}),
+          padding: false
+        )
+
+    with {:ok, bus} <- Bus.start_link(name: bus_name, jido: context.jido),
+         {:ok, _subscription} <- Bus.subscribe(bus, "**") do
+      owner = :ets.lookup_element(context.state, :worker, 2)
+      :ets.insert(context.state, {{:topology_bus, name}, bus})
+      {:ok, %{owner: owner, name: name, bus: bus}}
+    end
+  end
+
+  @impl true
+  def handle_info({:signal, signal}, state) do
+    :gen_statem.cast(state.owner, {:topology_bus, state.name, signal})
+    {:noreply, state}
+  end
+
+  def publish(state, name, signal) do
+    case :ets.lookup(state, {:topology_bus, name}) do
+      [{_, bus}] ->
+        case Bus.publish(bus, [signal]) do
+          {:ok, _} -> :ok
+          error -> error
+        end
+
+      [] ->
+        {:error, :bus_not_ready}
+    end
+  end
+
+  def validate(%Agent{} = agent) do
+    with :ok <-
+           reduce(agent.topology.agents, fn member ->
+             with {:ok, child} <- Agent.Validation.resolve(member.definition),
+                  do: validate(child)
+           end) do
+      supported? =
+        Enum.all?(agent.topology.connections, fn edge ->
+          Enum.all?([edge.from, edge.to], fn
+            %{kind: :agent} -> true
+            %{kind: :bus, name: name} -> name in buses(agent)
+            _ -> false
+          end)
+        end)
+
+      if supported?,
+        do: :ok,
+        else:
+          Jido.Error.validation_result(
+            :unsupported_runtime_endpoint,
+            [:topology, :connections],
+            "Runtime supports Agent and declared local Bus endpoints"
+          )
+    end
+  end
+
+  def requires_activation?(agent) do
+    not AgentTopology.empty?(agent.topology) or buses(agent) != []
+  end
+
+  def remove_member(server, name, slot, opts) do
+    with :ok <- Agent.Schema.name(name),
+         :ok <- Agent.Schema.positive(slot),
+         {:ok, active, timeout} <- Lifecycle.control_options(opts),
+         deadline = System.monotonic_time(:millisecond) + timeout,
+         {:ok, context} <- child_context(server, deadline) do
+      tag = tag(name, slot)
+
+      case Map.fetch(plans(context.state), tag) do
+        {:ok, %{name: ^name, slot: ^slot}} ->
+          mark_removed(context.state, tag)
+
+          case remove_planned_child(context, tag, active, deadline) do
+            :ok ->
+              put_plans(context.state, Map.delete(plans(context.state), tag))
+              :ok
+
+            {:error, reason} ->
+              {:error, {:topology_removal_incomplete, reason}}
+          end
+
+        :error ->
+          if MapSet.member?(removed(context.state), tag),
+            do: :ok,
+            else: {:error, :topology_member_not_found}
+      end
+    end
+  rescue
+    ArgumentError -> {:error, {:topology_removal_incomplete, :topology_unavailable}}
+  end
+
+  defp remove_planned_child(context, tag, active, deadline) do
+    case :ets.lookup(context.state, {:child, tag}) do
+      [] ->
+        :ok
+
+      [{_, %{root: _root} = record}] ->
+        with {:ok, entries} <- activation_tree(context, tag, record, deadline),
+             :ok <- quiesce_tree(entries, active, deadline),
+             :ok <- stop_tree(entries, deadline) do
+          :ok
+        end
+
+      [{_, %{caller: _caller}}] ->
+        {:error, :topology_member_starting}
+    end
+  rescue
+    ArgumentError -> {:error, :topology_unavailable}
+  end
+
+  defp activation_tree(context, tag, record, deadline) do
+    root = record.root
+
+    if Process.alive?(root) do
+      case ServerSupervisor.live_worker(root) do
+        worker when is_pid(worker) ->
+          with {:ok, supervisor} <- existing_child_supervisor(context, record.placement),
+               {:ok, child_context} <- child_context(worker, deadline),
+               {:ok, descendants} <- child_entries(child_context, deadline) do
+            entry = tree_entry(context.state, tag, record, supervisor, worker)
+            {:ok, [entry | descendants]}
+          end
+
+        nil ->
+          {:error, :topology_member_unavailable}
+      end
+    else
+      with {:ok, supervisor} <- existing_child_supervisor(context, record.placement) do
+        {:ok, [tree_entry(context.state, tag, record, supervisor, nil)]}
+      end
+    end
+  end
+
+  defp child_entries(context, deadline) do
+    result =
+      context.state
+      |> ServerSupervisor.records()
+      |> Enum.reduce_while({:ok, []}, fn
+        {{:child, tag}, %{root: _root, placement: :owned} = record}, {:ok, acc} ->
+          case activation_tree(context, tag, record, deadline) do
+            {:ok, entries} -> {:cont, {:ok, Enum.reverse(entries, acc)}}
+            {:error, _reason} = error -> {:halt, error}
+          end
+
+        {{:child, _tag}, %{root: _root}}, {:ok, acc} ->
+          {:cont, {:ok, acc}}
+
+        {{:child, _tag}, %{caller: _caller}}, _acc ->
+          {:halt, {:error, :topology_member_starting}}
+      end)
+
+    case result do
+      {:ok, entries} -> {:ok, Enum.reverse(entries)}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp tree_entry(owner_state, tag, record, supervisor, worker) do
+    %{
+      owner_state: owner_state,
+      tag: tag,
+      token: record.token,
+      root: record.root,
+      supervisor: supervisor,
+      worker: worker
+    }
+  end
+
+  defp quiesce_tree(entries, active, deadline) do
+    tasks =
+      for %{worker: worker} <- entries, is_pid(worker) do
+        Task.async(fn -> quiesce_member(worker, active, deadline) end)
+      end
+
+    timeout = remaining_wait(deadline)
+
+    tasks
+    |> Task.yield_many(timeout)
+    |> Enum.reduce_while(:ok, fn {task, result}, :ok ->
+      case result do
+        {:ok, :ok} ->
+          {:cont, :ok}
+
+        {:ok, {:error, reason}} ->
+          {:halt, {:error, reason}}
+
+        {:exit, reason} ->
+          {:halt, {:error, {:topology_member_unavailable, reason}}}
+
+        nil ->
+          Task.shutdown(task, :brutal_kill)
+          {:halt, {:error, :quiesce_timeout}}
+      end
+    end)
+    |> tap(fn _result ->
+      Enum.each(tasks, fn task ->
+        if Process.alive?(task.pid), do: Task.shutdown(task, :brutal_kill)
+      end)
+    end)
+  end
+
+  defp quiesce_member(worker, active, deadline) do
+    case Server.quiesce(worker, active: active, timeout: remaining_wait(deadline)) do
+      {:ok, _status} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  catch
+    kind, reason -> {:error, {:topology_member_unavailable, {kind, reason}}}
+  end
+
+  defp stop_tree(entries, deadline) do
+    entries
+    |> Enum.reverse()
+    |> reduce(fn entry -> stop_tree_entry(entry, deadline) end)
+  end
+
+  defp stop_tree_entry(entry, deadline) do
+    result =
+      if Process.alive?(entry.root) do
+        terminate_child(entry.supervisor, entry.root, deadline)
+      else
+        :ok
+      end
+
+    with :ok <- result,
+         do:
+           release_child(
+             entry.owner_state,
+             entry.tag,
+             entry.token,
+             entry.root
+           )
+  end
+
+  defp terminate_child(supervisor, root, deadline) do
+    task =
+      Task.async(fn ->
+        try do
+          DynamicSupervisor.terminate_child(supervisor, root)
+        catch
+          kind, reason -> {:error, {:topology_shutdown_failed, {kind, reason}}}
+        end
+      end)
+
+    case Task.yield(task, remaining_wait(deadline)) do
+      {:ok, :ok} ->
+        :ok
+
+      {:ok, {:error, :not_found}} ->
+        if Process.alive?(root), do: {:error, :topology_member_changed}, else: :ok
+
+      {:ok, {:error, reason}} ->
+        {:error, reason}
+
+      {:exit, reason} ->
+        {:error, {:topology_shutdown_failed, reason}}
+
+      nil ->
+        Task.shutdown(task, :brutal_kill)
+        {:error, :topology_shutdown_timeout}
+    end
+  end
+
+  defp release_child(state, tag, token, root) do
+    case :ets.lookup(state, {:child, tag}) do
+      [{_, %{root: ^root, token: ^token}}] ->
+        ServerSupervisor.release(state, tag, token)
+
+      [] ->
+        :ok
+
+      _changed ->
+        {:error, :topology_member_changed}
+    end
+  rescue
+    ArgumentError -> {:error, :topology_unavailable}
+  end
+
+  defp existing_child_supervisor(context, :owned) do
+    case List.keyfind(Supervisor.which_children(context.activation), :owned_agents, 0) do
+      {:owned_agents, supervisor, :supervisor, _modules} when is_pid(supervisor) ->
+        {:ok, supervisor}
+
+      _other ->
+        {:error, :topology_child_supervisor_unavailable}
+    end
+  catch
+    :exit, _reason -> {:error, :topology_child_supervisor_unavailable}
+  end
+
+  defp existing_child_supervisor(context, :independent) do
+    supervisor = Jido.Instance.Names.agent_supervisor(context.jido)
+
+    if is_pid(Process.whereis(supervisor)),
+      do: {:ok, supervisor},
+      else: {:error, :topology_child_supervisor_unavailable}
+  end
+
+  defp child_context(server, deadline) do
+    {:ok, :gen_statem.call(server, :child_context, remaining_wait(deadline))}
+  catch
+    :exit, _reason -> {:error, :topology_unavailable}
+  end
+
+  defp remaining_wait(deadline),
+    do: max(0, deadline - System.monotonic_time(:millisecond))
+
+  defp spawn_child(server, agent, tag, opts) do
+    token = make_ref()
+
+    with {:ok, _agent} <- Agent.Validation.validate_instance(agent),
+         {:ok, context, parent} <- child_options(server, tag, opts, token, @child_options),
+         :ok <- :gen_statem.call(server, {:reserve_child, tag, token}) do
+      try do
+        supervisor = child_supervisor(context, parent.placement)
+
+        opts =
+          context.opts
+          |> Keyword.merge(Keyword.get(opts, :server_options, []))
+          |> Keyword.put(:agent, agent)
+
+        spec = %{
+          Server.child_spec(opts)
+          | start: ServerSupervisor.start_spec(opts, parent),
+            restart: parent.restart
+        }
+
+        case ServerSupervisor.start_activation(supervisor, spec) do
+          {:ok, worker} ->
+            {:ok, worker}
+
+          error ->
+            ServerSupervisor.release(context.state, tag, token)
+            error
+        end
+      catch
+        :exit, reason ->
+          ServerSupervisor.release(context.state, tag, token)
+          {:error, {:child_start_failed, reason}}
+      end
+    end
+  end
+
+  defp children(%{state: nil}), do: %{}
+
+  defp children(context) do
+    Map.new(
+      for {{:child, tag}, %{root: root} = record} <- ServerSupervisor.records(context.state),
+          worker = ServerSupervisor.live_worker(root),
+          is_pid(worker),
+          do: {tag, %{pid: worker, activation: root, placement: record.placement}}
+    )
+  end
+
+  defp stop_child(server, tag, reason) do
+    context = :gen_statem.call(server, :child_context)
+
+    case Map.fetch(children(context), tag) do
+      {:ok, %{pid: worker, activation: root, placement: placement}} ->
+        [{_, record}] = :ets.lookup(context.state, {:child, tag})
+
+        result =
+          if Map.get(record, :restart, :transient) == :permanent do
+            context
+            |> child_supervisor(placement)
+            |> DynamicSupervisor.terminate_child(root)
+          else
+            Server.stop(worker, reason)
+          end
+
+        with :ok <- result,
+             do: :gen_statem.call(server, {:forget_child, tag, root})
+
+      :error ->
+        {:error, :child_not_found}
+    end
+  end
+
+  def reconcile(%{agent: agent} = data) do
+    with {:ok, members} <-
+           AgentTopology.bind(agent, agent.state, &Agent.Validation.resolve/2) do
+      desired =
+        Map.new(
+          for member <- members, index <- 1..member.count do
+            tag = tag(member.name, index)
+            declaration = Enum.find(agent.topology.agents, &(&1.name == member.name))
+            default = if data.persistence, do: "initial"
+            identity = Map.get(declaration, :identities, %{}) |> Map.get(index, default)
+
+            {tag,
+             %{
+               name: member.name,
+               slot: index,
+               definition: member.definition,
+               state: member.state,
+               identity: identity
+             }}
+          end
+        )
+        |> Map.drop(MapSet.to_list(removed(data.activation_state)))
+
+      previous = plans(data.activation_state)
+      live = live_children(data.activation_state)
+
+      with :ok <- stop_changed(data.owner, previous, desired, live),
+           :ok <- start_missing(data, desired, previous, live),
+           :ok <- reconcile_buses(data) do
+        put_plans(data.activation_state, desired)
+        {:ok, desired}
+      end
+    end
+  end
+
+  defp stop_changed(owner, previous, desired, live) do
+    reduce(previous, fn {tag, old} ->
+      if Map.get(desired, tag) != old and Map.has_key?(live, tag),
+        do: stop_child(owner, tag, :shutdown),
+        else: :ok
+    end)
+  end
+
+  defp start_missing(data, desired, previous, live) do
+    reduce(desired, fn {tag, member} ->
+      if Map.get(previous, tag) == member and Map.has_key?(live, tag) do
+        Server.await_ready(Map.fetch!(live, tag), data.readiness_timeout)
+      else
+        id = member_id(data.agent.id, tag, member)
+
+        with {:ok, agent, persistence} <- member_agent(data, member, id),
+             {:ok, worker} <-
+               spawn_child(data.owner, agent, tag,
+                 restart: :permanent,
+                 server_options: persistence
+               ),
+             do: Server.await_ready(worker, data.readiness_timeout)
+      end
+    end)
+  end
+
+  defp member_agent(%{persistence: persistence} = data, member, id)
+       when persistence in [nil, false] do
+    with {:ok, agent} <- instantiate_member(data, member, id), do: {:ok, agent, []}
+  end
+
+  defp member_agent(data, member, id) do
+    options = [instance: data.jido, partition: data.partition]
+
+    case Jido.Persistence.load_agent_with_revision(
+           data.persistence,
+           member.definition.module,
+           id,
+           options
+         ) do
+      {:ok, saved, _revision} ->
+        {:ok, saved, [persistence_mode: :restore]}
+
+      {:error, :not_found} ->
+        with {:ok, agent} <- instantiate_member(data, member, id),
+             do: {:ok, agent, [persistence_mode: :create]}
+
+      error ->
+        error
+    end
+  end
+
+  defp instantiate_member(data, member, id) do
+    context = %{parent_id: data.agent.id, member: member.name, slot: member.slot}
+
+    Agent.Validation.instantiate(
+      member.definition,
+      [id: id, state: member.state],
+      context
+    )
+  end
+
+  def durable_destination(_target, %{persistence: persistence}) when persistence in [nil, false],
+    do: {:error, :persistence_required}
+
+  def durable_destination(_target, %{jido: nil}), do: {:error, :jido_instance_required}
+
+  def durable_destination(:parent, %{parent: %{tag: "$topology/" <> _, agent_id: id}} = context),
+    do: {:ok, %{context.agent_address | id: id}}
+
+  def durable_destination({:agent, name, slot}, context)
+      when (is_atom(name) or is_binary(name)) and is_integer(slot) and slot > 0 do
+    tag = tag(name, slot)
+
+    state = context.activation_state
+
+    with false <- :ets.member(state, {:topology_removed_member, tag}),
+         {:ok, %{name: ^name, identity: identity} = member} when is_binary(identity) <-
+           Map.fetch(plans(state), tag) do
+      {:ok, %{context.agent_address | id: member_id(context.agent.id, tag, member)}}
+    else
+      _other -> {:error, :durable_topology_member_not_found}
+    end
+  end
+
+  def durable_destination(_target, _context), do: {:error, :unsupported_durable_topology_target}
+
+  @doc false
+  def inactive_member_reason(instance, member, %{address: owner, slot: slot}) do
+    with pid when is_pid(pid) <- Server.whereis(instance, owner.id, partition: owner.partition),
+         {:ok, context} <- child_context(pid, System.monotonic_time(:millisecond) + @handoff_attempt_timeout) do
+      plan = Map.get(plans(context.state), slot)
+
+      cond do
+        :ets.member(context.state, {:topology_removed_member, slot}) ->
+          :topology_member_removed
+
+        plan != nil and member_id(owner.id, slot, plan) != member.id ->
+          :topology_member_retired
+
+        plan == nil and context.ready? ->
+          :topology_member_retired
+
+        true ->
+          :topology_member_unavailable
+      end
+    else
+      _ -> :topology_owner_required
+    end
+  rescue
+    ArgumentError -> :topology_owner_required
+  end
+
+  def deliver_handoff(instance, sender, %{id: id, to: address, signal: signal}) do
+    with :error <- Jido.Instance.RuntimeStore.fetch(instance, :agent_reconciliation, address),
+         pid when is_pid(pid) <- Server.whereis(instance, address.id, partition: address.partition),
+         {:ok, deadline} <- Lifecycle.admission_deadline(admission_timeout: @handoff_attempt_timeout) do
+      :gen_statem.call(pid, {:accept_topology_handoff, id, address, signal, deadline, sender}, @handoff_attempt_timeout)
+    else
+      nil -> unavailable_handoff(instance, address)
+      _unavailable -> {:error, :topology_receiver_unavailable}
+    end
+  catch
+    :exit, _reason -> {:error, :topology_receiver_unavailable}
+  end
+
+  defp unavailable_handoff(instance, address) do
+    case Jido.Persistence.topology_destination_owner(instance, address) do
+      {:ok, owner} when not is_nil(owner) ->
+        case inactive_member_reason(instance, address, owner) do
+          reason when reason in [:topology_member_removed, :topology_member_retired] -> {:discard, reason}
+          _ -> {:error, :topology_receiver_unavailable}
+        end
+
+      {:error, :deleted} ->
+        {:discard, :topology_receiver_deleted}
+
+      _ ->
+        {:error, :topology_receiver_unavailable}
+    end
+  end
+
+  defp member_id(parent_id, tag, %{identity: nil}), do: parent_id <> "/" <> tag
+  defp member_id(parent_id, tag, %{identity: identity}), do: parent_id <> "/" <> tag <> "/" <> identity
+
+  def send_agent(state, name, signal) do
+    live = live_children(state)
+    targets = members(state, name)
+
+    case targets do
+      [] ->
+        case Map.fetch(live, name) do
+          {:ok, pid} -> Server.cast(pid, signal)
+          :error -> {:error, :agent_not_found}
+        end
+
+      pids ->
+        reduce(pids, &Server.cast(&1, signal))
+    end
+  end
+
+  def members(state, name) do
+    live = live_children(state)
+    removed = removed(state)
+
+    state
+    |> plans()
+    |> Enum.filter(fn {tag, member} -> member.name == name and not MapSet.member?(removed, tag) end)
+    |> Enum.sort_by(fn {_, member} -> member.slot end)
+    |> Enum.flat_map(fn {tag, _member} ->
+      case Map.get(live, tag) do
+        nil -> []
+        pid -> [pid]
+      end
+    end)
+  end
+
+  def parent_send(nil, _), do: {:error, :parent_not_found}
+
+  def parent_send(parent, signal) do
+    case ServerSupervisor.live_worker(parent.activation) do
+      nil -> {:error, :parent_not_found}
+      pid -> Server.cast(pid, signal)
+    end
+  end
+
+  def emit(context, signal) do
+    with {:ok, edges} <-
+           AgentTopology.connections_for(
+             context.agent,
+             %{kind: :agent, name: :root},
+             signal.type
+           ) do
+      cond do
+        edges != [] ->
+          deliver(context, edges, signal)
+
+        topology_parent?(context.parent) ->
+          :gen_statem.cast(
+            ServerSupervisor.worker(context.parent.activation),
+            {:topology_output, context.parent.tag, signal}
+          )
+
+          :ok
+
+        true ->
+          case context.default_dispatch do
+            nil ->
+              emit_to_self(context, signal)
+
+            dispatch ->
+              Jido.Signal.Dispatch.dispatch(
+                signal,
+                Jido.Signal.Dispatch.inherit_bus_scope(dispatch, context.jido)
+              )
+          end
+      end
+    end
+  end
+
+  # Each self-emit counts its hops from the Signal that started the chain, so a
+  # route that re-emits a matching type ends instead of looping without limit.
+  defp emit_to_self(context, signal) do
+    hops = Signal.get_context(context[:source_signal], @self_emit_hops) || 0
+
+    if hops >= @max_self_emit_hops do
+      Logger.warning(
+        "AgentServer self emit refused: signal type #{signal.type}, reason :self_emit_limit",
+        agent_id: context.agent.id
+      )
+
+      {:error, :self_emit_limit}
+    else
+      with {:ok, signal} <- Signal.put_context(signal, @self_emit_hops, hops + 1),
+           do: Server.cast(context.server, signal)
+    end
+  end
+
+  def output(data, source, signal) do
+    with {:ok, edges} <- AgentTopology.connections_for(data.agent, source, signal.type),
+         do: deliver(data, edges, signal)
+  end
+
+  def member_output(data, tag, signal) do
+    case Map.fetch(plans(data.activation_state), tag) do
+      {:ok, %{name: name}} -> output(data, %{kind: :agent, name: name}, signal)
+      :error -> :ok
+    end
+  end
+
+  defp deliver(data, edges, signal) do
+    reduce(edges, fn
+      %{to: %{kind: :agent, name: :root}} ->
+        Server.cast(data.server, signal)
+
+      %{to: %{kind: :agent, name: name}} ->
+        send_agent(data.activation_state, name, signal)
+
+      %{to: %{kind: :bus, name: name}} ->
+        publish(data.activation_state, name, signal)
+    end)
+  end
+
+  def buses(agent) do
+    for %{provider: Jido.Plugin.Bus.DSL, data: %{buses: buses}} <- agent.plugins,
+        bus <- buses,
+        do: bus.name
+  end
+
+  defp reconcile_buses(data) do
+    names = buses(data.agent)
+    existing = if data.activation, do: Supervisor.which_children(data.activation), else: []
+
+    Enum.each(existing, fn
+      {{:topology_bus, name} = id, _, _, _} ->
+        if name not in names do
+          :ok = Supervisor.terminate_child(data.activation, id)
+          :ok = Supervisor.delete_child(data.activation, id)
+          :ets.delete(data.activation_state, {:topology_bus, name})
+        end
+
+      _ ->
+        :ok
+    end)
+
+    Enum.reduce_while(names, :ok, fn name, :ok ->
+      id = {:topology_bus, name}
+
+      if List.keymember?(existing, id, 0) do
+        {:cont, :ok}
+      else
+        context = %{
+          state: data.activation_state,
+          jido: data.jido,
+          partition: data.partition,
+          agent_id: data.agent.id
+        }
+
+        spec = %{id: id, start: {__MODULE__, :start_link, [{context, name}]}}
+
+        case Supervisor.start_child(data.activation, spec) do
+          {:ok, _} -> {:cont, :ok}
+          error -> {:halt, error}
+        end
+      end
+    end)
+  end
+
+  defp topology_parent?(%{state: state, tag: tag}), do: Map.has_key?(plans(state), tag)
+  defp topology_parent?(_parent), do: false
+  defp tag(name, index), do: "$topology/#{name}/#{index}"
+
+  defp child_supervisor(context, :owned) do
+    {:ok, supervisor} = ServerSupervisor.child_supervisor(context.activation)
+    supervisor
+  end
+
+  defp child_supervisor(context, :independent),
+    do: Jido.Instance.Names.agent_supervisor(context.jido)
+
+  defp child_options(server, tag, opts, token, allowed) do
+    if unique_options?(opts) and Keyword.keys(opts) -- allowed == [] do
+      context = :gen_statem.call(server, :child_context)
+      placement = Keyword.get(opts, :placement, :owned)
+      policy = Keyword.get(opts, :on_parent_exit, :stop)
+      dispatch = opts[:orphan_dispatch]
+      server_options = Keyword.get(opts, :server_options, [])
+      meta = Keyword.get(opts, :meta, %{})
+
+      cond do
+        is_nil(context.activation) ->
+          {:error, :activation_required}
+
+        Keyword.get(opts, :restart, :transient) not in [:permanent, :transient, :temporary] ->
+          {:error, :invalid_restart_policy}
+
+        not valid_server_options?(server_options) ->
+          {:error, :invalid_child_options}
+
+        not is_map(meta) or is_struct(meta) ->
+          {:error, :invalid_child_options}
+
+        placement not in [:owned, :independent] ->
+          {:error, :invalid_placement}
+
+        policy not in [:stop, :continue, :emit_orphan] ->
+          {:error, :invalid_parent_policy}
+
+        placement == :owned and policy != :stop ->
+          {:error, :owned_child_cannot_survive_parent}
+
+        placement == :independent and is_nil(context.jido) ->
+          {:error, :jido_instance_required}
+
+        policy == :emit_orphan and
+            (is_nil(dispatch) or Effects.validate_dispatch(dispatch) != :ok) ->
+          {:error, :invalid_orphan_dispatch}
+
+        true ->
+          {:ok, context,
+           %{
+             restart: Keyword.get(opts, :restart, :transient),
+             meta: meta,
+             activation: context.activation,
+             state: context.state,
+             token: token,
+             agent_id: context.agent_id,
+             tag: tag,
+             placement: placement,
+             policy: policy,
+             dispatch: dispatch,
+             jido: context.jido,
+             partition: context.partition
+           }}
+      end
+    else
+      {:error, :invalid_child_options}
+    end
+  end
+
+  defp unique_options?(opts) do
+    Keyword.keyword?(opts) and
+      length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts)))
+  end
+
+  defp valid_server_options?(opts) do
+    Lifecycle.unique_keyword?(opts) and Keyword.keys(opts) -- Lifecycle.runtime_keys() == []
+  end
+
+  defp plans(state) do
+    case :ets.lookup(state, :topology_members) do
+      [{_, plans}] -> plans
+      [] -> %{}
+    end
+  end
+
+  defp put_plans(state, plans), do: :ets.insert(state, {:topology_members, plans})
+
+  defp removed(state) do
+    state
+    |> :ets.match_object({{:topology_removed_member, :_}, true})
+    |> MapSet.new(fn {{:topology_removed_member, tag}, true} -> tag end)
+  end
+
+  defp mark_removed(state, tag) do
+    :ets.insert(state, {{:topology_removed_member, tag}, true})
+    :ok
+  end
+
+  defp live_children(state) do
+    Map.new(
+      for {{:child, tag}, %{root: root}} <- ServerSupervisor.records(state),
+          pid = ServerSupervisor.live_worker(root),
+          is_pid(pid),
+          do: {tag, pid}
+    )
+  end
+
+  defp reduce(values, fun) do
+    Enum.reduce_while(values, :ok, fn value, :ok ->
+      result = fun.(value)
+      {if(result == :ok, do: :cont, else: :halt), result}
+    end)
+  end
+end

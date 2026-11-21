@@ -30,7 +30,6 @@ Build reliable multi-agent systems by keeping decision logic pure and runtime ef
 ## References
 - `README.md`
 - `guides/`
-- `test/AGENTS.md`
 - `AGENTS.md`
 - https://hexdocs.pm/jido
 - https://hexdocs.pm/usage_rules/readme.html#usage-rules

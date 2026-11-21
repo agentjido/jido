@@ -1,0 +1,259 @@
+defmodule Jido.Test.AgentServer.DurableFixtures do
+  @moduledoc false
+
+  defmodule Probe do
+    use GenServer
+    def start_link(observer), do: GenServer.start_link(__MODULE__, observer, name: __MODULE__)
+    def configure(mode), do: GenServer.call(__MODULE__, {:configure, mode})
+    def enter(step), do: GenServer.call(__MODULE__, {:enter, step}, :infinity)
+    def hook, do: GenServer.call(__MODULE__, :hook, :infinity)
+    def hook_count, do: GenServer.call(__MODULE__, :hook_count)
+    def gate(kind), do: GenServer.call(__MODULE__, {:gate, kind}, :infinity)
+    def records, do: GenServer.call(__MODULE__, :records)
+    def checkpoint, do: GenServer.call(__MODULE__, :checkpoint)
+    def release(result \\ :ok), do: GenServer.call(__MODULE__, {:release, result})
+
+    def init(observer),
+      do: {:ok, %{observer: observer, started: [], hooks: 0, mode: :pass, waiter: nil}}
+
+    def handle_call({:configure, mode}, _, state), do: {:reply, :ok, %{state | mode: mode}}
+    def handle_call(:records, _, state), do: {:reply, state.started, state}
+    def handle_call(:hook_count, _, state), do: {:reply, state.hooks, state}
+
+    def handle_call(
+          :checkpoint,
+          _,
+          %{mode: :reject_checkpoint, started: [1, 2, 3, 4, 5]} = state
+        ),
+        do: {:reply, {:error, {:rejected, :offline}}, %{state | mode: :pass}}
+
+    def handle_call(:checkpoint, _, state), do: {:reply, :ok, state}
+
+    def handle_call({:enter, step}, from, state) do
+      state = %{state | started: state.started ++ [step]}
+      if step == 6, do: hold(state, from, :step_6), else: {:reply, :ok, state}
+    end
+
+    def handle_call(:hook, from, state) do
+      state = %{state | hooks: state.hooks + 1}
+
+      case state.mode do
+        :hook_gate -> hold(state, from, :hook)
+        _ -> {:reply, :ok, state}
+      end
+    end
+
+    def handle_call({:gate, {kind, module}}, from, state) do
+      if state.mode in [kind, {kind, module}],
+        do: hold(%{state | mode: :pass}, from, kind),
+        else: {:reply, :ok, state}
+    end
+
+    def handle_call({:release, result}, _, state) do
+      if state.waiter, do: GenServer.reply(state.waiter, result)
+      {:reply, :ok, %{state | waiter: nil}}
+    end
+
+    defp hold(state, from, kind) do
+      if state.observer, do: send(state.observer, {:durable_barrier, kind, elem(from, 0)})
+      {:noreply, %{state | waiter: from}}
+    end
+  end
+
+  defmodule Step do
+    use Jido.Action,
+      name: "durable_probe_step",
+      schema: Jido.Joi.object(%{step: Jido.Joi.integer(), value: Jido.Joi.integer()})
+
+    def run(input, _) do
+      :ok = Probe.enter(input.step)
+      {:ok, %{value: input.value + 1}}
+    end
+  end
+
+  defmodule Flow do
+    use Jido.Flow,
+      name: "durable_probe_flow",
+      schema:
+        Jido.Joi.object(%{
+          value: Jido.Joi.integer(),
+          blob: Jido.Joi.string() |> Jido.Joi.optional()
+        }),
+      output_schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
+
+    flow do
+      step "one", action: Step, params: %{step: 1, value: input(:value)}
+      step "two", action: Step, params: %{step: 2, value: result("one", :value)}
+      step "three", action: Step, params: %{step: 3, value: result("two", :value)}
+      step "four", action: Step, params: %{step: 4, value: result("three", :value)}
+      step "five", action: Step, params: %{step: 5, value: result("four", :value)}
+      step "six", action: Step, params: %{step: 6, value: result("five", :value)}
+      step "seven", action: Step, params: %{step: 7, value: result("six", :value)}
+      step "eight", action: Step, params: %{step: 8, value: result("seven", :value)}
+      step "nine", action: Step, params: %{step: 9, value: result("eight", :value)}
+      step "ten", action: Step, params: %{step: 10, value: result("nine", :value)}
+      output %{count: result("ten", :value)}
+    end
+  end
+
+  defmodule Hook do
+    use Jido.Plugin
+    def after_commit(_, _, _), do: Probe.hook()
+  end
+
+  defmodule BadOutput do
+    use Jido.Flow,
+      name: "durable_bad_output",
+      schema: Jido.Joi.object(%{})
+
+    flow do
+      step "pid", _input <- input() do
+        {:ok, %{pid: self()}}
+      end
+
+      output result("pid")
+    end
+  end
+
+  defmodule EffectsFlow do
+    use Jido.Flow,
+      name: "durable_effects_flow",
+      schema: Jido.Joi.object(%{})
+
+    flow do
+      step "effect", _input <- input() do
+        {:ok, %{}, [:unexpected_effect]}
+      end
+
+      output result("effect")
+    end
+  end
+
+  defmodule Corrupt do
+    @behaviour Jido.Persistence.Store
+
+    def validate_options(opts), do: Jido.Persistence.File.validate_options(opts)
+
+    def get(key, opts) do
+      case Jido.Persistence.File.get(key, opts) do
+        {:ok, bytes} = result -> corrupt(bytes, result)
+        error -> error
+      end
+    end
+
+    defp corrupt(bytes, result) do
+      case Jido.Persistence.Codec.Term.decode(bytes, trusted: true) do
+        {:ok, [_ | _]} -> Jido.Persistence.Codec.Term.encode(:invalid)
+        _ -> result
+      end
+    end
+
+    def compare_and_swap(key, expected, value, opts),
+      do: Jido.Persistence.File.compare_and_swap(key, expected, value, opts)
+
+    def delete(key, opts), do: Jido.Persistence.File.delete(key, opts)
+  end
+
+  defmodule Storage do
+    @behaviour Jido.Persistence.Store
+    def validate_options(opts), do: Jido.Persistence.File.validate_options(opts)
+    def get(key, opts), do: Jido.Persistence.File.get(key, opts)
+
+    def compare_and_swap(key, expected, value, opts) do
+      {kind, module} =
+        case Jido.Persistence.Codec.Term.decode(value, trusted: true) do
+          {:ok, %{server_turn: %{status: :completed}} = record} -> {:completion_write, record[:agent_module]}
+          {:ok, %{rev: 1} = record} -> {:intent_write, record[:agent_module]}
+          {:ok, [_ | _] = events} -> {event_write(events), nil}
+          _ -> {:other, nil}
+        end
+
+      with :ok <- Probe.checkpoint(),
+           :ok <- Jido.Persistence.File.compare_and_swap(key, expected, value, opts) do
+        Probe.gate({kind, module})
+      end
+    end
+
+    defp event_write(events) do
+      if Enum.any?(events, &match?(%Runic.Workflow.Events.FactProduced{}, &1)),
+        do: :input_write,
+        else: :other
+    end
+
+    def delete(key, opts), do: Jido.Persistence.File.delete(key, opts)
+  end
+
+  defmodule Reject do
+    @behaviour Jido.Persistence.Store
+    def validate_options(opts), do: Jido.Persistence.File.validate_options(opts)
+    def get(key, opts), do: Jido.Persistence.File.get(key, opts)
+
+    def compare_and_swap(key, expected, value, opts) do
+      case Jido.Persistence.Codec.Term.decode(value, trusted: true) do
+        {:ok, %{rev: revision}} when revision > 0 -> {:error, {:rejected, :offline}}
+        _ -> Jido.Persistence.File.compare_and_swap(key, expected, value, opts)
+      end
+    end
+
+    def delete(key, opts), do: Jido.Persistence.File.delete(key, opts)
+  end
+
+  defmodule Worker do
+    use Jido.Agent, name: "durable_probe_agent"
+
+    state do
+      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    end
+
+    routes do
+      route "request", Flow
+
+      route "bad_output", BadOutput
+
+      route "effects", EffectsFlow
+
+      route "increment" do
+        action _input, context: context do
+          {:ok, %{context.agent_state | count: context.agent_state.count + 1}}
+        end
+      end
+
+      route "mutate" do
+        action input, context: context do
+          {:ok, context.agent_state, input.directives}
+        end
+      end
+    end
+  end
+
+  defmodule Team do
+    use Jido.Agent, name: "durable_probe_team"
+
+    routes do
+      route "request" do
+        forward(to: agent(:worker))
+      end
+
+      route "mutate" do
+        action input, context: context do
+          {:ok, context.agent_state, input.directives}
+        end
+      end
+    end
+
+    topology do
+      agent :worker, Worker
+      agent :sibling, Worker
+
+      connections do
+        connect "request", from: :root, to: :worker
+      end
+    end
+  end
+
+  def member(server, name) do
+    {_phase, data} = :sys.get_state(server)
+    [pid] = Jido.AgentServer.Topology.members(data.activation_state, name)
+    pid
+  end
+end

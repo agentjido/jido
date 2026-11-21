@@ -1,0 +1,375 @@
+defmodule Jido.Agent.Route do
+  alias Jido.Joi
+  @moduledoc "Pure route normalization and selection. Selection does not run a handler."
+  alias Jido.Agent.Schema
+  alias Jido.Error
+
+  @helper_name ~r/\A[a-z][a-z0-9_]*\z/
+  @route_fields [:path, :as, :defaults, :handler, :state, :reply]
+
+  @type route_ref :: String.t() | {String.t(), atom() | nil}
+
+  @doc false
+  @spec identity(map()) :: {String.t(), atom() | nil}
+  def identity(%{path: path, as: as}), do: {path, as}
+
+  @doc false
+  @spec validate_reference(term()) :: :ok | {:error, term()}
+  def validate_reference(path) when is_binary(path), do: Schema.path(path)
+
+  def validate_reference({path, nil}) do
+    Schema.path(path)
+  end
+
+  def validate_reference({path, as}) do
+    with :ok <- Schema.path(path), do: Schema.name(as)
+  end
+
+  def validate_reference(_value),
+    do: Error.validation_result(:invalid_route_reference, [], "Expected a route path or {path, alias}")
+
+  @doc false
+  @spec resolve([map()], route_ref()) :: {:ok, map()} | {:error, term()}
+  def resolve(routes, reference) when is_list(routes) do
+    with :ok <- validate_reference(reference) do
+      matches = Enum.filter(routes, &matches_reference?(&1, reference))
+
+      case matches do
+        [route] ->
+          {:ok, route}
+
+        [] ->
+          Error.validation_result(:route_not_found, [], "Route reference does not exist", %{
+            reference: reference
+          })
+
+        _many ->
+          Error.validation_result(:ambiguous_route_reference, [], "Route path requires an alias", %{
+            reference: reference
+          })
+      end
+    end
+  end
+
+  @doc false
+  @spec index([map()], route_ref()) :: {:ok, non_neg_integer()} | {:error, term()}
+  def index(routes, reference) when is_list(routes) do
+    with {:ok, route} <- resolve(routes, reference) do
+      {:ok, Enum.find_index(routes, &(&1 === route))}
+    end
+  end
+
+  defp matches_reference?(route, {path, as}), do: identity(route) == {path, as}
+  defp matches_reference?(route, path), do: route.path == path
+
+  def normalize(value, related? \\ true) do
+    with {:ok, route} <- Schema.fields(value, @route_fields, %{as: nil, defaults: %{}, reply: nil}),
+         :ok <- Error.prefix_result_path(Schema.path(route[:path]), :path),
+         :ok <- helper(route),
+         :ok <- Error.prefix_result_path(Schema.plain_map(route.defaults), :defaults),
+         :ok <- Error.prefix_result_path(Schema.static(route.defaults), :defaults),
+         {:ok, handler} <- Error.prefix_result_path(handler(route[:handler], related?), :handler),
+         :ok <- defaults(handler, route.defaults) do
+      route
+      |> Map.put(:handler, handler)
+      |> Map.put_new(:state, default_state(handler))
+      |> mappings(related?)
+    end
+  end
+
+  def executable(target) when is_atom(target) and target not in [nil, true, false] do
+    with {:ok, executable} <- Jido.Instruction.resolve(target),
+         :ok <- Jido.Instruction.validate(executable) do
+      {:ok, %{kind: executable.kind, target: target}}
+    else
+      {:error, reason} ->
+        Error.validation_result(:invalid_executable, [], "Expected an Action or Flow module", %{
+          target: target,
+          reason: reason
+        })
+    end
+  end
+
+  def executable(value),
+    do: Error.validation_result(:invalid_executable, [], "Expected an executable module", %{target: value})
+
+  # :executable is an internal Spark draft. Public Map authoring rejects it.
+  defp handler(%{kind: kind} = value, related?)
+       when kind in [:action, :flow, :forward, :transform] or
+              (kind == :executable and related? == false) do
+    with {:ok, value} <- Schema.fields(value, [:kind, :target]),
+         {:ok, target} <- handler_target(kind, value[:target], related?) do
+      {:ok, %{kind: kind, target: target}}
+    end
+  end
+
+  defp handler(_, _),
+    do: Error.validation_result(:invalid_handler, [], "Expected one Action, Flow, transform, or forward handler")
+
+  defp handler_target(:forward, target, _related?), do: forward_target(target)
+
+  defp handler_target(kind, target, related?) when kind in [:action, :flow, :executable] do
+    with :ok <- Schema.name(target) do
+      if related? do
+        with {:ok, actual} <- executable(target) do
+          if actual.kind == kind,
+            do: {:ok, target},
+            else: Error.validation_result(:executable_kind, [], "Executable kind does not match the declared kind")
+        end
+      else
+        {:ok, target}
+      end
+    end
+  end
+
+  defp handler_target(:transform, {module, fun, 1} = target, related?)
+       when is_atom(module) and is_atom(fun) and module not in [nil, true, false] do
+    if not related? or (Code.ensure_loaded?(module) and function_exported?(module, fun, 1)),
+      do: {:ok, target},
+      else:
+        Error.validation_result(
+          :unresolved_transform,
+          [],
+          "Transform must reference a public function of arity one",
+          %{
+            target: target
+          }
+        )
+  end
+
+  defp handler_target(:transform, _target, _related?),
+    do: Error.validation_result(:invalid_transform, [], "Transform requires {module, function, 1}")
+
+  defp helper(%{as: nil}), do: :ok
+
+  defp helper(route) do
+    with :ok <- Error.prefix_result_path(Schema.name(route.as), :as),
+         do: Error.prefix_result_path(helper_name(route.as), :as)
+  end
+
+  defp helper_name(value) do
+    if Regex.match?(@helper_name, Atom.to_string(value)),
+      do: :ok,
+      else:
+        Error.validation_result(
+          :invalid_helper_name,
+          [],
+          "A helper name must start with a lowercase letter and contain only lowercase letters, digits, and underscores"
+        )
+  end
+
+  defp defaults(%{kind: kind}, defaults)
+       when kind in [:transform, :forward] and map_size(defaults) > 0,
+       do: Error.validation_result(:invalid_defaults, :defaults, "Only Action and Flow routes accept defaults")
+
+  defp defaults(_, _), do: :ok
+
+  defp mappings(%{handler: %{kind: kind}} = route, related?)
+       when kind in [:action, :flow, :executable] do
+    with {:ok, state} <- Error.prefix_result_path(state(route.state), :state),
+         {:ok, reply} <- Error.prefix_result_path(reply(route.reply), :reply) do
+      resolve_mappings(%{route | state: state, reply: reply}, related?)
+    end
+  end
+
+  defp mappings(%{handler: %{kind: kind}, state: state}, _related?)
+       when kind in [:forward, :transform] and state != :unchanged,
+       do: Error.validation_result(:terminal_state, [:state], "A terminal route cannot select output state")
+
+  defp mappings(%{handler: %{kind: kind}, reply: reply}, _related?)
+       when kind in [:forward, :transform] and not is_nil(reply),
+       do: Error.validation_result(:terminal_reply, [:reply], "A terminal route cannot declare a reply")
+
+  defp mappings(%{handler: %{kind: kind}} = route, _related?)
+       when kind in [:forward, :transform],
+       do: {:ok, Map.put(route, :state, :unchanged)}
+
+  defp default_state(%{kind: kind}) when kind in [:action, :flow, :executable],
+    do: %{source: :output, path: []}
+
+  defp default_state(%{kind: kind}) when kind in [:forward, :transform], do: :unchanged
+
+  defp state(:unchanged), do: {:ok, :unchanged}
+  defp state(value), do: selector(value)
+
+  defp reply(nil), do: {:ok, nil}
+
+  defp reply(value) do
+    with {:ok, reply} <- required_fields(value, [:type, :from], "Reply requires type and from"),
+         :ok <- Error.prefix_result_path(Schema.exact(reply.type), :type),
+         {:ok, from} <- Error.prefix_result_path(selector(reply.from), :from) do
+      {:ok, %{reply | from: from}}
+    end
+  end
+
+  defp selector(value) do
+    with {:ok, selector} <-
+           required_fields(value, [:source, :path], "Output selector requires source and path"),
+         :ok <- output_source(selector.source),
+         {:ok, path} <- Error.prefix_result_path(selector_path(selector.path), :path) do
+      {:ok, %{source: :output, path: path}}
+    end
+  end
+
+  defp output_source(:output), do: :ok
+
+  defp output_source(_value),
+    do: Error.validation_result(:invalid_selector_source, [:source], "Selector source must be output")
+
+  defp selector_path(path) do
+    Schema.list(path, fn
+      key when is_atom(key) or is_binary(key) -> {:ok, key}
+      _key -> Error.validation_result(:invalid_selector_key, [], "Output path keys must be atoms or strings")
+    end)
+  end
+
+  defp required_fields(value, fields, message) do
+    with :ok <- Schema.plain_map(value) do
+      missing = Enum.reject(fields, &Map.has_key?(value, &1))
+
+      if missing == [],
+        do: Schema.fields(value, fields),
+        else: Error.validation_result(:missing_fields, [], message, %{keys: missing})
+    end
+  end
+
+  defp resolve_mappings(route, false), do: {:ok, route}
+
+  defp resolve_mappings(%{state: :unchanged, reply: nil} = route, true), do: {:ok, route}
+
+  defp resolve_mappings(route, true) do
+    first_path = if route.state == :unchanged, do: [:reply, :from], else: [:state]
+
+    with {:ok, schema} <- Error.prefix_result_path(output_schema(route.handler), first_path),
+         {:ok, state} <- Error.prefix_result_path(resolve_selector(route.state, schema), :state),
+         {:ok, reply} <- Error.prefix_result_path(resolve_selector(route.reply, schema), :reply) do
+      {:ok, %{route | state: state, reply: reply}}
+    end
+  end
+
+  defp output_schema(%{target: target}) do
+    if function_exported?(target, :output_schema, 0),
+      do: output_schema_value(target.output_schema()),
+      else: Error.validation_result(:missing_output_schema, [], "Executable has no output schema")
+  rescue
+    reason ->
+      Error.validation_result(:invalid_output_schema, [], "Executable output schema failed", %{reason: reason})
+  end
+
+  defp output_schema_value(schema) do
+    if Joi.Schema.schema?(schema),
+      do: {:ok, schema},
+      else: Error.validation_result(:invalid_output_schema, [], "Executable output schema is invalid")
+  end
+
+  defp resolve_selector(value, _schema) when value in [:unchanged, nil], do: {:ok, value}
+
+  defp resolve_selector(%{from: from} = reply, schema) do
+    with {:ok, from} <- Error.prefix_result_path(resolve_selector(from, schema), :from),
+         do: {:ok, %{reply | from: from}}
+  end
+
+  defp resolve_selector(selector, schema) do
+    with {:ok, path} <- resolve_path(schema, selector.path, 0),
+         do: {:ok, %{selector | path: path}}
+  end
+
+  defp resolve_path(_schema, [], _index), do: {:ok, []}
+
+  defp resolve_path(schema, [key | rest], index) do
+    with {:ok, declared_key, child_schema} <- output_field(schema, key, index),
+         {:ok, rest} <- resolve_path(child_schema, rest, index + 1) do
+      {:ok, [declared_key | rest]}
+    end
+  end
+
+  defp output_field(schema, key, index) do
+    with kind when kind in [:map, :struct] <- Joi.Schema.kind(schema),
+         {:ok, fields} when is_list(fields) <- Joi.Schema.fields(schema) do
+      matches =
+        for {declared_key, child_schema} <- fields,
+            is_atom(declared_key) or is_binary(declared_key),
+            to_string(declared_key) == to_string(key),
+            do: {declared_key, child_schema}
+
+      case matches do
+        [{declared_key, child_schema}] ->
+          {:ok, declared_key, child_schema}
+
+        [] ->
+          Error.validation_result(
+            :unknown_output_field,
+            [:path, index],
+            "Output path field is not declared in the target output_schema",
+            %{
+              key: key
+            }
+          )
+
+        _many ->
+          Error.validation_result(
+            :ambiguous_output_field,
+            [:path, index],
+            "Output path field name is ambiguous",
+            %{key: key}
+          )
+      end
+    else
+      _ ->
+        Error.validation_result(
+          :unsupported_output_path,
+          [:path, index],
+          "Output paths can traverse only object or struct fields. Declare the field in the target output_schema",
+          %{key: key}
+        )
+    end
+  end
+
+  defp forward_target(%{kind: :agent} = target) do
+    with {:ok, target} <- Schema.fields(target, [:kind, :name]),
+         :ok <- Schema.name(target[:name]) do
+      if target.name == :root,
+        do: Error.validation_result(:self_forward, [], "Forward cannot target the current Agent"),
+        else: {:ok, target}
+    end
+  end
+
+  defp forward_target(%{kind: :parent} = target), do: Schema.fields(target, [:kind])
+
+  defp forward_target(_target),
+    do: Error.validation_result(:invalid_forward_target, [], "Forward requires agent(name) or parent()")
+
+  @doc "Selects the first declared route that accepts one exact Signal type."
+  @spec select(map() | [map()], String.t()) :: {:ok, map()} | {:error, term()}
+  def select(%{routes: routes}, type), do: select(routes, type)
+
+  def select(routes, type) when is_list(routes) do
+    with {:ok, candidates} <- matching(routes, type) do
+      case candidates do
+        [] ->
+          Error.validation_result(:unmatched_input, [:routes], "No route accepts this Signal type", %{
+            type: type
+          })
+
+        [route | _rest] ->
+          {:ok, route}
+      end
+    end
+  end
+
+  @doc false
+  def matching(%{routes: routes}, type), do: matching(routes, type)
+
+  def matching(routes, type) when is_list(routes) do
+    with :ok <- Schema.exact(type) do
+      {:ok, Enum.filter(routes, &Schema.matches?(type, &1.path))}
+    end
+  end
+
+  def params(%{handler: %{kind: kind}, defaults: defaults}, data) when kind in [:action, :flow] do
+    with :ok <- Schema.plain_map(data), do: {:ok, Map.merge(defaults, data)}
+  end
+
+  def params(_, _),
+    do: Error.validation_result(:invalid_handler, [:handler], "Only Action and Flow routes have parameters")
+end

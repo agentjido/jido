@@ -1,0 +1,53 @@
+- at: lib/jido/telemetry.ex:38:15
+  operator: element_removal
+  mutation: "`:off` → `(removed)`"
+  sort: equivalent
+  reason: Removing off from the accepted list does not change explicit off configuration because the fallback also returns off. Debug overrides never store off.
+
+- at: lib/jido/telemetry.ex:173:14
+  operator: clause_removal
+  mutation: "`case _other ->` → `(removed)`"
+  sort: equivalent
+  reason: An invalid log mode either selects off or raises inside the contained semantic handler. Both paths return ok without a log.
+
+- at: lib/jido/telemetry.ex:172:12
+  operator: guard_removal
+  mutation: "`when mode in @log_modes` → `(no guard)`"
+  sort: equivalent
+  reason: An invalid mode then reaches no log_semantic clause. The semantic handler contains that failure and returns ok without a log, which is the same published behavior as off.
+
+- at: lib/jido/telemetry.ex:177:67
+  operator: return_nil
+  mutation: "`false` → `nil`"
+  sort: equivalent
+  reason: The private result is used only as an if condition. False and nil both suppress the log.
+
+- at: lib/jido/telemetry.ex:197:14
+  operator: clause_removal
+  mutation: "`case :error ->` → `(removed)`"
+  sort: equivalent
+  reason: Missing duration either returns false or raises inside the contained semantic handler. Both paths return ok without a log.
+
+- at: lib/jido/telemetry.ex:277:34
+  operator: guard_removal
+  mutation: "`when is_map(config)` → `(no guard)`"
+  sort: equivalent
+  reason: A non-map and non-list configuration either returns nil or makes Map.get fail inside the contained handler. Both paths fail closed without a log.
+
+- at: lib/jido/telemetry/persistence.ex:50:61
+  operator: return_nil
+  mutation: "`%{}` → `nil`"
+  sort: equivalent
+  reason: Semantic measurement normalization converts both nil and an empty map to the same empty measurement map.
+
+- at: lib/jido/telemetry/semantic.ex:69:36
+  operator: integer_shift
+  mutation: "`1` → `2`"
+  sort: equivalent
+  reason: The semantic terminal guard uses only atomics slot 1. An unused second slot cannot change span behavior.
+
+- at: lib/jido/telemetry/semantic.ex:314:48
+  operator: integer_shift
+  mutation: "`1` → `2`"
+  sort: equivalent
+  reason: The terminal marker can be any nonzero integer. Changing it from 1 to 2 still lets only the first compare-and-exchange claim succeed.

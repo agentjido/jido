@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- we test that the processor supports the basic http event i/o processor.  This is an optional
+test since platforms are not required to support basic http event i/o -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+<state id="s0">
+  <onentry>
+   <send type="http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor" 
+   	conf:basicHTTPAccessURITarget=""
+   	event="event1"/>
+   <send event="timeout"/>
+    </onentry>
+ 
+ 
+  <transition event="event1" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+ 
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

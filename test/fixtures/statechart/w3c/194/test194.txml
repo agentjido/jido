@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!-- we test that specifying an illegal target for <send> causes the event error.execution to be raised.  If it does,
+we succeed.  Otherwise we eventually timeout and fail.  -->
+
+
+<scxml initial="s0" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+
+  
+<state id="s0">
+  <onentry>
+   <!-- should cause an error -->
+   <send conf:illegalTarget="" event="event2"/>
+   <!-- this will get added to the external event queue after the error has been raised -->
+   <send event="timeout"/>
+    </onentry>
+ 
+ <!-- once we've entered the state, we should check for internal events first -->   
+  <transition event="error.execution" conf:targetpass=""/>
+  <transition event="*" conf:targetfail=""/>
+ </state>
+ 
+
+<conf:pass/>
+<conf:fail/>
+
+</scxml>

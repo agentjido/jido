@@ -1,48 +1,70 @@
 defmodule Jido do
   use Supervisor
 
-  alias Jido.Agent.WorkerPool
-  alias Jido.Config.Defaults
-  alias Jido.RuntimeStore
+  alias Jido.Agent.Address
+  alias Jido.AgentOwnership
+  alias Jido.AgentServer
+  alias Jido.Durable.Continuation
+  alias Jido.Instance.{Names, NamespaceRegistry, Options, Ownership, RuntimeStore}
+
+  @shutdown_timeout_ms 10_000
 
   @moduledoc """
-  自動 (Jido) - An autonomous agent framework for Elixir, built for workflows and
-  multi-agent systems.
+  自動 (Jido) - A declarative actor and agent framework for Elixir, built for
+  workflows and multi-agent systems.
 
   ## Quick Start
 
   Create a Jido supervisor in your application:
 
       defmodule MyApp.Jido do
-        use Jido, otp_app: :my_app
+        use Jido,
+          otp_app: :my_app,
+          namespace: "my-app/primary"
       end
 
   Add to your supervision tree:
 
       children = [MyApp.Jido]
 
-  Start and manage agents:
+  Start and manage Agents:
 
-      {:ok, pid} = MyApp.Jido.start_agent(MyAgent, id: "agent-1")
-      pid = MyApp.Jido.whereis("agent-1")
-      agents = MyApp.Jido.list_agents()
-      :ok = MyApp.Jido.stop_agent("agent-1")
+      {:ok, pid} = Jido.start_agent(MyApp.Jido, MyAgent, id: "agent-1")
+      pid = Jido.whereis_agent(MyApp.Jido, "agent-1")
+      agents = Jido.list_agents(MyApp.Jido)
+      :ok = Jido.stop_agent(MyApp.Jido, "agent-1")
 
   ## Core Concepts
 
-  Jido agents are immutable data structures. The core operation is `cmd/2`:
+  Declare an Agent definition with its data schema, routes, Plugins, and
+  metadata. Then instantiate it with an identity and initial state. Jido Agents
+  are immutable data structures. The core operation is `cmd/2`:
 
-      {agent, directives} = MyAgent.cmd(agent, MyAction)
+      {:ok, agent, directives} = MyAgent.cmd(agent, signal)
 
-  - **Agents** — Immutable structs updated via commands
-  - **Actions** — Functions that transform agent state and may perform work
+  - **Agent definitions** — Declarative descriptions with no identity or state
+  - **Agent instances** — Immutable values updated through Signals
+  - **Actions** — Functions that transform Agent state and may perform work
   - **Directives** — Runtime-owned external effects (signals, processes, etc.)
 
-  Jido keeps agent decision logic pure. Actions may be pure or effectful.
+  Jido keeps Agent decision logic pure. Actions may be pure or effectful.
   Directives are for effects you want the runtime to own. If a step needs a
   result back now to continue reasoning or update state, an effectful action is
   acceptable; if delivery should belong to the runtime or an integration layer,
   return a directive.
+
+  ## Observe Runtime Work
+
+  Use `Jido.AgentServer.snapshot/2` for the committed Agent. Use
+  `Jido.AgentServer.status/2` for the revision and current runtime work.
+
+  `Jido.Telemetry` is the system-wide observation contract. Its semantic event
+  catalog supplies Telemetry events, standard metrics, bounded logs, and
+  optional OpenTelemetry spans. `Jido.Telemetry.set_debug/2` changes semantic
+  log detail for one instance.
+
+  See [Runtime State and Debugging](runtime-state-and-debugging.html) and
+  [Telemetry, Tracing, and Logs](telemetry-tracing-and-logs.html).
 
   ## For Tests
 
@@ -57,13 +79,11 @@ defmodule Jido do
           {:ok, jido: jido, jido_pid: jido_pid}
         end
 
-        test "agent works", %{jido: jido} do
+        test "Agent works", %{jido: jido} do
           {:ok, pid} = Jido.start_agent(jido, MyAgent)
           # ...
         end
       end
-
-  See `Jido.Agent` for defining agents and `Jido.Await` for coordination.
   """
 
   @doc """
@@ -72,11 +92,17 @@ defmodule Jido do
   ## Options
 
     - `:otp_app` - Required. Your application name (e.g., `:my_app`).
+    - `:namespace` - Nonempty binary for stable Agent Address operations.
+      Required for persistent Agents.
+      One exact namespace can be bound to one live local instance per node.
+    - `:persistence` - Optional persistence profile. A Store declaration uses
+      the compact Term codec. A profile can select the opt-in JSON codec.
+      The default is no durable persistence.
 
   ## Example
 
       defmodule MyApp.Jido do
-        use Jido, otp_app: :my_app
+        use Jido, otp_app: :my_app, namespace: "my-app/primary"
       end
 
   Then add to your supervision tree in `lib/my_app/application.ex`:
@@ -86,58 +112,31 @@ defmodule Jido do
   Optionally configure in `config/config.exs` to customize defaults:
 
       config :my_app, MyApp.Jido,
-        max_tasks: 2000,
-        agent_pools: []
+        max_tasks: 2000
   """
   defmacro __using__(opts) do
+    opts = Options.validate_definition!(opts)
     otp_app = Keyword.fetch!(opts, :otp_app)
-    storage = Keyword.get(opts, :storage, {Jido.Storage.ETS, [table: :jido_storage]})
-    default_plugins = Keyword.get(opts, :default_plugins, nil)
+    persistence = Keyword.get(opts, :persistence)
+    namespace = Keyword.get(opts, :namespace)
 
     quote location: :keep do
       @otp_app unquote(otp_app)
 
       @doc false
-      @spec __otp_app__() :: unquote(otp_app)
-      def __otp_app__, do: @otp_app
-
-      @doc "Returns the storage configuration for this Jido instance."
-      @spec __jido_storage__() :: {module(), keyword()}
-      def __jido_storage__, do: Jido.Storage.normalize_storage(unquote(storage))
-
-      require Jido.Agent.DefaultPlugins
-
-      @default_plugins Jido.Agent.DefaultPlugins.resolve_instance_defaults(
-                         @otp_app,
-                         __MODULE__,
-                         unquote(Macro.escape(default_plugins))
-                       )
-
-      # The typespec for __default_plugins__ triggers a `contract_supertype`
-      # warning from dialyzer.
-      @dialyzer {:nowarn_function, [__default_plugins__: 0]}
-      @doc "Returns the default plugins for agents bound to this Jido instance."
-      @spec __default_plugins__() :: [module() | {module(), map()}]
-      def __default_plugins__, do: @default_plugins
+      @spec __jido_persistence__() :: Jido.Persistence.Config.t() | nil
+      def __jido_persistence__, do: Jido.Persistence.Config.normalize(unquote(persistence))
 
       @doc false
+      @spec child_spec(term()) :: Supervisor.child_spec()
       def child_spec(init_arg \\ []) do
-        opts =
-          config(init_arg)
-          |> Keyword.put_new(:name, __MODULE__)
-          |> Keyword.put_new(:otp_app, @otp_app)
-
-        Jido.child_spec(opts)
+        Jido.child_spec(__jido_instance_options__(init_arg))
       end
 
       @doc false
+      @spec start_link(term()) :: Supervisor.on_start()
       def start_link(init_arg \\ []) do
-        opts =
-          config(init_arg)
-          |> Keyword.put_new(:name, __MODULE__)
-          |> Keyword.put_new(:otp_app, @otp_app)
-
-        Jido.start_link(opts)
+        Jido.start_link(__jido_instance_options__(init_arg))
       end
 
       @doc """
@@ -146,150 +145,56 @@ defmodule Jido do
       Configuration is loaded from `config :#{@otp_app}, #{inspect(__MODULE__)}` and
       overridden by any runtime options passed in.
       """
-      @spec config(keyword()) :: keyword()
+      @spec config(term()) :: term()
       def config(overrides \\ []) do
-        @otp_app
-        |> Application.get_env(__MODULE__, [])
-        |> Keyword.merge(overrides)
+        Jido.Instance.Options.merge_definition(
+          Application.get_env(@otp_app, __MODULE__, []),
+          overrides
+        )
       end
 
       defoverridable config: 1
 
-      @doc "Starts an agent under this Jido instance."
-      @spec start_agent(module() | struct(), keyword()) :: DynamicSupervisor.on_start_child()
-      def start_agent(agent, opts \\ []) do
-        Jido.start_agent(__MODULE__, agent, opts)
+      defp __jido_instance_options__(init_arg) do
+        Jido.Instance.Options.materialize(
+          config(init_arg),
+          __MODULE__,
+          @otp_app,
+          unquote(namespace),
+          __jido_persistence__()
+        )
       end
-
-      @doc "Stops an agent (by pid or id) under this Jido instance."
-      @spec stop_agent(pid() | String.t(), keyword()) :: :ok | {:error, :not_found}
-      def stop_agent(pid_or_id, opts \\ []) when is_list(opts) do
-        Jido.stop_agent(__MODULE__, pid_or_id, opts)
-      end
-
-      @doc "Looks up an agent by ID under this Jido instance."
-      @spec whereis(String.t(), keyword()) :: pid() | nil
-      def whereis(id, opts \\ []) when is_binary(id) and is_list(opts) do
-        Jido.whereis(__MODULE__, id, opts)
-      end
-
-      @doc "Lists all agents under this Jido instance."
-      @spec list_agents(keyword()) :: [{String.t(), pid()}]
-      def list_agents(opts \\ []) when is_list(opts) do
-        Jido.list_agents(__MODULE__, opts)
-      end
-
-      @doc "Returns the count of running agents under this Jido instance."
-      @spec agent_count(keyword()) :: non_neg_integer()
-      def agent_count(opts \\ []) when is_list(opts) do
-        Jido.agent_count(__MODULE__, opts)
-      end
-
-      @doc "Returns the Registry name for this Jido instance."
-      @spec registry_name() :: atom()
-      def registry_name, do: Jido.registry_name(__MODULE__)
-
-      @doc "Returns the AgentSupervisor name for this Jido instance."
-      @spec agent_supervisor_name() :: atom()
-      def agent_supervisor_name, do: Jido.agent_supervisor_name(__MODULE__)
-
-      @doc "Returns the TaskSupervisor name for this Jido instance."
-      @spec task_supervisor_name() :: atom()
-      def task_supervisor_name, do: Jido.task_supervisor_name(__MODULE__)
-
-      @doc "Returns the RuntimeStore name for this Jido instance."
-      @spec runtime_store_name() :: atom()
-      def runtime_store_name, do: Jido.runtime_store_name(__MODULE__)
-
-      @doc "Hibernate an agent to storage."
-      @spec hibernate(Jido.Agent.t(), keyword()) :: :ok | {:error, term()}
-      def hibernate(agent, opts \\ []) when is_list(opts) do
-        Jido.hibernate(__MODULE__, agent, opts)
-      end
-
-      @doc "Thaw an agent from storage."
-      @spec thaw(module(), term(), keyword()) :: {:ok, Jido.Agent.t()} | {:error, term()}
-      def thaw(agent_module, key, opts \\ []) when is_list(opts) do
-        Jido.thaw(__MODULE__, agent_module, key, opts)
-      end
-
-      @doc """
-      Controls debug mode for this Jido instance.
-
-      - `debug()` — returns current debug level
-      - `debug(:on)` — enable developer-friendly verbosity
-      - `debug(:verbose)` — enable maximum detail
-      - `debug(:off)` — disable debug overrides
-      - `debug(pid)` — toggle per-agent debug mode
-      - `debug(:on, redact: false)` — also disable redaction
-      """
-      @spec debug() :: Jido.Debug.level()
-      def debug, do: Jido.Debug.level(__MODULE__)
-
-      @spec debug(Jido.Debug.level() | pid()) :: :ok | {:error, term()} | Jido.Debug.level()
-      def debug(pid) when is_pid(pid), do: Jido.AgentServer.set_debug(pid, true)
-      def debug(level) when is_atom(level), do: Jido.Debug.enable(__MODULE__, level)
-
-      @spec debug(Jido.Debug.level(), keyword()) :: :ok
-      def debug(level, opts) when is_atom(level), do: Jido.Debug.enable(__MODULE__, level, opts)
-
-      @doc "Returns recent debug events from an agent's ring buffer."
-      @spec recent(pid(), non_neg_integer()) :: {:ok, [map()]} | {:error, term()}
-      def recent(pid, limit \\ 50), do: Jido.AgentServer.recent_events(pid, limit: limit)
-
-      @doc "Returns the current debug status for this instance."
-      @spec debug_status() :: map()
-      def debug_status, do: Jido.Debug.status(__MODULE__)
     end
   end
 
-  @type agent_id :: String.t() | atom()
   @type partition :: term()
 
   # Default instance name for scripts/Livebook
   @default_instance Jido.Default
 
-  @doc """
-  Returns the default Jido instance name.
-
-  Used by `Jido.start/1` for scripts and Livebook quick-start.
-  """
-  @spec default_instance() :: atom()
-  def default_instance, do: @default_instance
-
   # ---------------------------------------------------------------------------
-  # Debug API (default instance delegates)
+  # Generated instance configuration
   # ---------------------------------------------------------------------------
 
-  @doc """
-  Controls debug mode for the default Jido instance (`Jido.Default`).
-
-  - `debug()` — returns current debug level
-  - `debug(:on)` — enable developer-friendly verbosity
-  - `debug(:verbose)` — enable maximum detail
-  - `debug(:off)` — disable debug overrides
-  """
-  @spec debug() :: Jido.Debug.level()
-  def debug, do: Jido.Debug.level(@default_instance)
-
-  @spec debug(Jido.Debug.level()) :: :ok
-  def debug(level) when is_atom(level), do: Jido.Debug.enable(@default_instance, level)
-
-  @spec debug(Jido.Debug.level(), keyword()) :: :ok
-  def debug(level, opts) when is_atom(level),
-    do: Jido.Debug.enable(@default_instance, level, opts)
+  # ---------------------------------------------------------------------------
+  # Default instance
+  # ---------------------------------------------------------------------------
 
   @doc """
   Start the default Jido instance for scripts and Livebook.
 
   This is an idempotent convenience function - safe to call multiple times
   (returns `{:ok, pid}` even if already started).
+  Options apply only to the first successful start. A later call returns the
+  running instance PID and does not change its namespace, persistence source,
+  Task limit, or other configuration. Stop the instance before starting it
+  with new options.
 
   ## Examples
 
       # In a script or Livebook
       {:ok, _} = Jido.start()
-      {:ok, pid} = Jido.start_agent(Jido.default_instance(), MyAgent)
+      {:ok, pid} = Jido.start_agent(Jido.Default, MyAgent)
 
       # With custom options
       {:ok, _} = Jido.start(max_tasks: 2000)
@@ -298,9 +203,12 @@ defmodule Jido do
 
   Same as `start_link/1`, but `:name` defaults to `Jido.Default`.
   """
-  @spec start(keyword()) :: {:ok, pid()} | {:error, term()}
+  @spec start(term()) :: {:ok, pid()} | {:error, term()}
   def start(opts \\ []) do
-    opts = Keyword.put_new(opts, :name, @default_instance)
+    opts =
+      if is_list(opts) and Keyword.keyword?(opts),
+        do: Keyword.put_new(opts, :name, @default_instance),
+        else: opts
 
     case start_link(opts) do
       {:ok, pid} -> {:ok, pid}
@@ -328,23 +236,102 @@ defmodule Jido do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Instance supervisor
+  # ---------------------------------------------------------------------------
+
   @doc """
   Starts a Jido instance supervisor.
 
   ## Options
     - `:name` - Required. The name of this Jido instance (e.g., `MyApp.Jido`)
+    - `:namespace` - Nonempty stable namespace for Address-first functions.
+      Required for persistent Agents.
+    - `:max_tasks` - Task Supervisor child limit; defaults to `1_000`
+    - `:persistence` - Optional instance persistence profile. All Agents in the
+      instance use this one Store and codec. Persistent instances require a
+      stable namespace.
+    - `:agent_server` - Optional AgentServer runtime defaults
 
   ## Example
 
       {:ok, pid} = Jido.start_link(name: MyApp.Jido)
   """
+  @spec start_link(term()) :: Supervisor.on_start()
   def start_link(opts) do
-    name = Keyword.fetch!(opts, :name)
-    Supervisor.start_link(__MODULE__, opts, name: name)
+    with {:ok, opts} <- Options.validate(opts),
+         :ok <- await_previous_children(Keyword.fetch!(opts, :name)),
+         {:ok, claim} <-
+           NamespaceRegistry.claim(Keyword.get(opts, :namespace), Keyword.fetch!(opts, :name)) do
+      result =
+        Supervisor.start_link(
+          __MODULE__,
+          {opts, claim},
+          name: Keyword.fetch!(opts, :name)
+        )
+
+      result = await_wake_readiness(result, Keyword.fetch!(opts, :name))
+
+      if not match?({:ok, _pid}, result), do: NamespaceRegistry.release(claim)
+      result
+    end
+  end
+
+  defp await_wake_readiness({:ok, pid} = started, name) do
+    case Jido.Instance.Wake.await_ready(name) do
+      :ok ->
+        started
+
+      {:error, _reason} = error ->
+        Supervisor.stop(pid)
+        error
+    end
+  end
+
+  defp await_wake_readiness(result, _name), do: result
+
+  defp await_previous_children(name) do
+    if Process.whereis(name) do
+      :ok
+    else
+      names = [
+        Names.exec_runner(name),
+        Names.task_supervisor(name),
+        Names.registration_guard(name),
+        Names.registry(name),
+        Names.runtime_store(name),
+        Names.wake(name),
+        Names.agent_supervisor(name)
+      ]
+
+      monitors =
+        for child_name <- names,
+            pid = Process.whereis(child_name),
+            is_pid(pid),
+            do: {pid, Process.monitor(pid)}
+
+      deadline = System.monotonic_time(:millisecond) + @shutdown_timeout_ms
+
+      result =
+        Enum.reduce_while(monitors, :ok, fn {pid, monitor_ref}, :ok ->
+          remaining = max(deadline - System.monotonic_time(:millisecond), 0)
+
+          receive do
+            {:DOWN, ^monitor_ref, :process, ^pid, _reason} -> {:cont, :ok}
+          after
+            remaining -> {:halt, {:error, {:previous_instance_still_stopping, pid}}}
+          end
+        end)
+
+      for {_pid, monitor_ref} <- monitors, do: Process.demonitor(monitor_ref, [:flush])
+      result
+    end
   end
 
   @doc false
+  @spec child_spec(term()) :: Supervisor.child_spec()
   def child_spec(opts) do
+    opts = Options.validate!(opts)
     name = Keyword.fetch!(opts, :name)
 
     %{
@@ -352,415 +339,1206 @@ defmodule Jido do
       start: {__MODULE__, :start_link, [opts]},
       type: :supervisor,
       restart: :permanent,
-      shutdown: Defaults.jido_shutdown_timeout_ms()
+      shutdown: @shutdown_timeout_ms
     }
   end
 
   @impl true
-  def init(opts) do
+  def init({opts, claim}) do
     name = Keyword.fetch!(opts, :name)
-    runtime_store = runtime_store_name(name)
+    runtime_store = Names.runtime_store(name)
 
-    if otp_app = opts[:otp_app] do
-      Jido.Debug.maybe_enable_from_config(otp_app, name)
+    with :ok <-
+           NamespaceRegistry.bind(claim, Keyword.get(opts, :namespace), name, self()),
+         :ok <- RuntimeStore.ensure_table(runtime_store),
+         :ok <-
+           Jido.Persistence.NamespaceManifest.open(
+             Keyword.get(opts, :persistence),
+             Keyword.get(opts, :namespace)
+           ) do
+      Jido.Telemetry.configure_debug(name, opts[:debug])
+
+      idle_residency_timeout =
+        opts
+        |> Keyword.fetch!(:activation)
+        |> Keyword.fetch!(:idle_residency_timeout)
+
+      agent_server_defaults =
+        opts
+        |> Keyword.get(:agent_server, [])
+        |> Keyword.put(:idle_timeout, idle_residency_timeout)
+        |> Keyword.put(:idle_policy, if(opts[:persistence], do: :hibernate, else: :stop))
+
+      :ok =
+        RuntimeStore.put_instance_config(
+          runtime_store,
+          Keyword.get(opts, :persistence),
+          agent_server_defaults
+        )
+
+      base_children = [
+        {Runic.Runner,
+         name: Names.exec_runner(name), store: Jido.Persistence.ContinuationStore, store_opts: [jido: name]},
+        {Task.Supervisor, name: Names.task_supervisor(name), max_children: Keyword.fetch!(opts, :max_tasks)},
+        {Jido.AgentServer.RegistrationGuard, jido: name},
+        Jido.AgentServer.RegistrationGuard.registry_child_spec(
+          keys: :unique,
+          name: Names.registry(name)
+        ),
+        {RuntimeStore, name: runtime_store},
+        {Jido.Instance.Wake, instance: name, name: Names.wake(name)},
+        {DynamicSupervisor,
+         name: Names.agent_supervisor(name), strategy: :one_for_one, max_restarts: 1000, max_seconds: 5}
+      ]
+
+      Supervisor.init(base_children, strategy: :one_for_one)
+    else
+      {:error, reason} -> exit(reason)
     end
+  end
 
-    :ok = Jido.RuntimeStore.ensure_table(runtime_store)
+  # ---------------------------------------------------------------------------
+  # Stable Agent Address API
+  # ---------------------------------------------------------------------------
 
-    base_children = [
-      {Task.Supervisor,
-       name: task_supervisor_name(name), max_children: Keyword.get(opts, :max_tasks, 1000)},
-      {Registry, keys: :unique, name: registry_name(name)},
-      {Jido.RuntimeStore, name: runtime_store},
-      {DynamicSupervisor,
-       name: agent_supervisor_name(name),
-       strategy: :one_for_one,
-       max_restarts: 1000,
-       max_seconds: 5}
-    ]
-
-    pool_children =
-      WorkerPool.build_pool_child_specs(name, Keyword.get(opts, :agent_pools, []))
-
-    Supervisor.init(base_children ++ pool_children, strategy: :one_for_one)
+  @doc "Builds one stable Agent Address in the selected instance namespace."
+  @spec agent_address(atom(), String.t(), keyword()) ::
+          {:ok, Address.t()} | {:error, Jido.Error.ValidationError.t()}
+  def agent_address(instance, id, opts \\ []) do
+    with {:ok, namespace} <- require_instance_namespace(instance) do
+      Address.new_scoped(namespace, id, opts)
+    end
   end
 
   @doc """
-  Generate a unique identifier.
+  Resolves the current local worker for one stable Agent Address. Each operation
+  resolves the Address again; it does not retry or replay an accepted turn.
 
-  Delegates to `Jido.Util.generate_id/0`.
+  Returns `{:error, :not_found}` when there is no live registration,
+  `{:error, :recovering}` while AgentServer is registered but not ready, or
+  `{:error, :unavailable}` when the Registry cannot be read. A worker can still
+  stop after resolution. Caller timeout does not cancel an accepted turn.
   """
-  defdelegate generate_id(), to: Jido.Util
+  @spec resolve_agent(atom(), Address.t()) :: {:ok, pid()} | {:error, term()}
+  def resolve_agent(instance, %Address{} = address) do
+    with :ok <- ensure_reconciled(instance, address), do: resolve_address_target(instance, address)
+  end
 
-  @doc "Returns the Registry name for a Jido instance."
-  @spec registry_name(atom()) :: atom()
-  def registry_name(name), do: Module.concat(name, Registry)
+  @doc """
+  Returns the local runtime ownership of one resident Agent.
 
-  @doc "Returns the AgentSupervisor name for a Jido instance."
-  @spec agent_supervisor_name(atom()) :: atom()
-  def agent_supervisor_name(name), do: Module.concat(name, AgentSupervisor)
+  The result is `{:ok, nil}` when the activation has no dynamic owner. This
+  read does not activate a passivated Agent. Static topology ownership is not
+  transferable through this API.
+  """
+  @spec agent_ownership(atom(), Address.t()) ::
+          {:ok, AgentOwnership.t() | nil} | {:error, term()}
+  def agent_ownership(instance, %Address{} = address) do
+    with {:ok, target} <- ownership_target(instance, address),
+         do: Ownership.get(target.server)
+  end
 
-  @doc "Returns the TaskSupervisor name for a Jido instance."
-  @spec task_supervisor_name(atom()) :: atom()
-  def task_supervisor_name(name), do: Module.concat(name, TaskSupervisor)
+  @doc """
+  Adopts or transfers one resident Agent to another resident Agent.
 
-  @doc "Returns the RuntimeStore name for a Jido instance."
-  @spec runtime_store_name(atom()) :: atom()
-  def runtime_store_name(name), do: Module.concat(name, RuntimeStore)
+  Both Addresses must select different activations in the same Jido instance
+  and partition. Pass `expected: nil` to adopt an unowned Agent. Pass the exact
+  `Jido.AgentOwnership` value returned by the prior operation or by
+  `agent_ownership/2` to transfer an owned Agent. `request_id:` is a required
+  nonempty string. Retrying the last accepted request with the same arguments
+  returns the same ownership value without advancing its fence.
 
-  @doc "Returns the Scheduler name for a Jido instance."
-  @spec scheduler_name(atom()) :: atom()
-  def scheduler_name(name), do: Module.concat(name, Scheduler)
+  The operation does not stop, restart, cancel, or replay an accepted Turn.
+  Work that already captured runtime context keeps that context. A later Turn
+  captures the current owner. The operation releases the old owner link before
+  it returns success. The child activation stops when the current owner
+  activation stops. Ownership survives worker replacement inside those
+  activation roots, but it is not durable and does not survive child activation
+  loss, passivation, or instance shutdown.
 
-  @doc "Returns the AgentPool name for a specific pool in a Jido instance."
-  @spec agent_pool_name(atom(), atom()) :: atom()
-  def agent_pool_name(name, pool_name), do: Module.concat([name, AgentPool, pool_name])
+  A returned fence identifies one exact child activation and ownership
+  generation. A stale ownership value returns `{:error, :stale_ownership}`.
+  """
+  @spec transfer_agent_ownership(atom(), Address.t(), Address.t(), keyword()) ::
+          {:ok, AgentOwnership.t()} | {:error, term()}
+  def transfer_agent_ownership(instance, %Address{} = child, %Address{} = owner, opts) do
+    with {:ok, child} <- validate_instance_address(instance, child),
+         {:ok, owner} <- validate_instance_address(instance, owner),
+         :ok <- validate_ownership_addresses(child, owner),
+         {:ok, expected, request_id} <- validate_ownership_options(child, opts),
+         {:ok, child_target} <- ownership_target(instance, child),
+         {:ok, owner_target} <- ownership_target(instance, owner) do
+      Ownership.transfer(instance, child_target, owner_target, expected, request_id)
+    end
+  end
 
-  @doc false
-  @spec partition_key(term(), partition() | nil) :: term()
-  def partition_key(value, nil), do: value
-  def partition_key(value, partition), do: {:partition, partition, value}
+  def transfer_agent_ownership(_instance, child, owner, opts),
+    do:
+      invalid_runtime_input(:transfer_agent_ownership, %{
+        child_address: child,
+        owner_address: owner,
+        opts: opts
+      })
 
-  @doc false
-  @spec unwrap_partition_key(term()) :: {partition() | nil, term()}
-  def unwrap_partition_key({:partition, partition, value}), do: {partition, value}
-  def unwrap_partition_key(value), do: {nil, value}
+  @doc "Creates one durable Agent with an explicit stable Agent Address."
+  @spec create_agent(atom(), Address.t(), module() | Jido.Agent.t(), keyword()) ::
+          {:ok, Address.t()} | {:error, term()}
+  def create_agent(instance, %Address{} = address, agent, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         {:ok, opts} <- Address.operation_options(address, opts, "Agent Address create options"),
+         :ok <- validate_create_agent_options(opts),
+         {instance_opts, _runtime_opts} = Keyword.split(opts, [:id, :state]),
+         {:ok, agent} <- startup_agent(agent, instance_opts, []),
+         {:ok, _agent, 0, 0, nil, _handoffs} <-
+           Jido.Persistence.open_agent(instance, agent, :create,
+             instance: instance,
+             namespace: address.namespace,
+             partition: address.partition,
+             reason: :create
+           ) do
+      {:ok, address}
+    end
+  end
+
+  @doc "Activates one existing durable Agent from its stable Agent Address."
+  @spec activate_agent(atom(), Address.t(), keyword()) ::
+          DynamicSupervisor.on_start_child()
+  def activate_agent(instance, %Address{} = address, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         {:ok, opts} <- Address.operation_options(address, opts, "Agent Address activation options"),
+         :ok <- validate_activate_agent_options(opts),
+         :ok <- ensure_reconciled(instance, address) do
+      case resolve_address_target(instance, address) do
+        {:ok, pid} ->
+          {:ok, pid}
+
+        {:error, :not_found} ->
+          restore_activation(instance, address, opts)
+
+        {:error, :recovering} ->
+          await_address_activation(instance, address)
+
+        {:error, :passivating} ->
+          await_address_passivation(instance, address)
+
+        {:error, _reason} = error ->
+          error
+      end
+    end
+  end
+
+  @doc "Replaces one faulted activation from its authoritative durable record."
+  @spec reconcile_agent(atom(), Address.t(), keyword()) ::
+          DynamicSupervisor.on_start_child() | {:error, term()}
+  def reconcile_agent(instance, %Address{} = address, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         :ok <- validate_reconcile_options(opts),
+         {:ok, reason} <- reconciliation_reason(instance, address),
+         :ok <- terminate_registered_activation(instance, address),
+         {:ok, _agent, _persistence_revision, _agent_revision, _turn} <-
+           Jido.Persistence.load_agent_address(instance, address, instance: instance),
+         :ok <- RuntimeStore.delete(instance, :agent_reconciliation, address) do
+      case restore_activation(instance, address, []) do
+        {:ok, _pid} = ok ->
+          ok
+
+        {:error, activation_reason} = error ->
+          _ = RuntimeStore.put(instance, :agent_reconciliation, address, {reason, activation_reason})
+          error
+      end
+    else
+      :error -> {:error, :reconciliation_not_required}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @doc "Upgrades one inactive durable Agent and replaces its active activation."
+  @spec upgrade_agent(atom(), Address.t(), term(), keyword()) :: {:ok, Address.t()} | {:error, term()}
+  def upgrade_agent(instance, %Address{} = address, action, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         :ok <- validate_upgrade_options(opts),
+         :ok <- ensure_reconciled(instance, address),
+         {:ok, agent, reactivate?} <- prepare_definition_upgrade(instance, address),
+         {:ok, _upgraded, _persistence_revision} <-
+           Jido.Persistence.upgrade_agent(instance, agent.module, address.id, action,
+             instance: instance,
+             partition: address.partition,
+             context: Keyword.get(opts, :context, %{})
+           ),
+         :ok <- restore_after_upgrade(instance, address, reactivate?) do
+      {:ok, address}
+    end
+  end
+
+  @doc "Replaces one inactive durable Agent definition at its stable Agent Address."
+  @spec replace_agent(atom(), Address.t(), module() | Jido.Agent.t(), keyword()) ::
+          {:ok, Address.t()} | {:error, term()}
+  def replace_agent(instance, %Address{} = address, agent, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         {:ok, opts} <- Address.operation_options(address, opts, "Agent Address replace options"),
+         {:ok, state_policy, expected} <- validate_replace_options(opts),
+         :ok <- ensure_reconciled(instance, address),
+         {:error, :not_found} <- resolve_address_target(instance, address),
+         {:ok, saved, persistence_revision, agent_revision, turn} <-
+           Jido.Persistence.load_agent_address(instance, address, instance: instance),
+         :ok <- replaceable_turn(turn),
+         {:ok, replacement} <- replacement_agent(agent, address.id, saved.state, state_policy),
+         :ok <-
+           replace_agent_record(
+             instance,
+             address,
+             saved,
+             replacement,
+             expected,
+             state_policy,
+             persistence_revision,
+             agent_revision,
+             turn
+           ) do
+      {:ok, address}
+    else
+      {:ok, _pid} ->
+        {:error, :agent_running}
+
+      {:error, state} when state in [:recovering, :passivating] ->
+        {:error, :agent_running}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp restore_activation(instance, address, opts) do
+    with {:ok, agent, _revision, _agent_revision, _turn} <-
+           Jido.Persistence.load_agent_for_activation(instance, address, instance: instance) do
+      opts =
+        opts
+        |> Keyword.put(:id, address.id)
+        |> Keyword.put(:persistence, :inherit)
+        |> Keyword.put(:persistence_mode, :restore)
+
+      case start_agent(instance, agent, opts) do
+        {:error, {:already_started, _root}} -> await_address_activation(instance, address)
+        {:ok, pid} when is_pid(pid) -> await_activated(pid)
+        result -> result
+      end
+    else
+      {:error, {:topology_owned, owner}} ->
+        {:error, AgentServer.Topology.inactive_member_reason(instance, address, owner)}
+
+      error ->
+        error
+    end
+  end
+
+  defp prepare_result_acknowledgement(instance, address) do
+    case resolve_address_target(instance, address) do
+      {:ok, pid} ->
+        case AgentServer.status(pid) do
+          %{work_state: :idle, queue_depth: 0, effects: :none} ->
+            with {:ok, _snapshot} <- AgentServer.stop(pid, :result_acknowledged, 5_000),
+                 do: {:ok, true}
+
+          %{} ->
+            {:error, :agent_busy}
+
+          {:error, _reason} = error ->
+            error
+        end
+
+      {:error, :not_found} ->
+        {:ok, false}
+
+      {:error, state} when state in [:recovering, :passivating] ->
+        {:error, :agent_busy}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp acknowledge_saved_turn_result(instance, address, turn_id) do
+    with {:ok, agent, persistence_revision, agent_revision, receipt} <-
+           Jido.Persistence.load_agent_address(instance, address, instance: instance),
+         {:ok, cleared, changed?} <- Continuation.acknowledge_result(receipt, turn_id) do
+      if changed? do
+        Jido.Persistence.save_agent(instance, agent,
+          instance: instance,
+          partition: address.partition,
+          reason: :turn_result_acknowledgement,
+          revision: persistence_revision + 1,
+          expected_revision: persistence_revision,
+          agent_revision: agent_revision,
+          server_turn: cleared
+        )
+      else
+        :ok
+      end
+    end
+  end
+
+  defp restore_after_result_acknowledgement(_instance, _address, false), do: :ok
+
+  defp restore_after_result_acknowledgement(instance, address, true) do
+    case restore_activation(instance, address, []) do
+      {:ok, _pid} -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_turn_id(operation, turn_id) do
+    if byte_size(turn_id) > 0,
+      do: :ok,
+      else: invalid_runtime_input(operation, %{turn_id: turn_id})
+  end
+
+  defp await_activated(pid) do
+    case AgentServer.await_ready(pid, 5_000) do
+      :ok -> {:ok, pid}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @doc "Sends one synchronous Signal through a stable Agent Address."
+  @spec call(atom(), Address.t(), Jido.Signal.t(), timeout() | keyword()) ::
+          {:ok, Jido.AgentServer.TurnResult.t()} | {:error, term()}
+  def call(instance, %Address{} = address, signal, timeout_or_opts \\ 5_000) do
+    with_address_server(instance, address, &AgentServer.call(&1, signal, timeout_or_opts))
+  end
+
+  @doc "Sends one best-effort asynchronous Signal through a stable Agent Address."
+  @spec cast(atom(), Address.t(), Jido.Signal.t()) :: :ok | {:error, term()}
+  def cast(instance, %Address{} = address, signal) do
+    with_address_server(instance, address, &AgentServer.cast(&1, signal))
+  end
+
+  @doc "Submits one AgentServer turn through a stable Agent Address."
+  @spec submit(atom(), Address.t(), Jido.Signal.t(), keyword()) ::
+          Jido.AgentServer.Pending.t() | {:error, term()}
+  def submit(instance, %Address{} = address, signal, opts \\ []) do
+    with_address_server(instance, address, &AgentServer.submit(&1, signal, opts))
+  end
+
+  @doc """
+  Returns the exact retained terminal result for one durable Agent Turn.
+
+  The read does not activate a passivated Agent. A submission retains a result
+  only when `result_handoff: true` is set. The exact turn identifier is
+  required. A different or acknowledged identifier returns `:not_found`.
+  """
+  @spec turn_result(atom(), Address.t(), String.t()) ::
+          {:ok, Jido.AgentServer.TurnResult.t()} | {:error, term()}
+  def turn_result(instance, %Address{} = address, turn_id) when is_binary(turn_id) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         :ok <- validate_turn_id(:turn_result, turn_id),
+         {:ok, _agent, _persistence_revision, _agent_revision, receipt} <-
+           Jido.Persistence.load_agent_address(instance, address, instance: instance),
+         {:ok, %{turn_id: ^turn_id} = result} <- Continuation.terminal_result(receipt) do
+      {:ok, result}
+    else
+      :error -> {:error, :not_found}
+      {:ok, %Jido.AgentServer.TurnResult{}} -> {:error, :not_found}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  def turn_result(_instance, address, turn_id),
+    do: invalid_runtime_input(:turn_result, %{agent_address: address, turn_id: turn_id})
+
+  @doc """
+  Acknowledges and clears one exact retained terminal result.
+
+  The Agent must have no active work or pending effects. A resident Agent is
+  stopped before the compare-and-swap write and is restored after the write.
+  Repeating an acknowledgement after it is cleared is safe.
+  """
+  @spec acknowledge_turn_result(atom(), Address.t(), String.t()) :: :ok | {:error, term()}
+  def acknowledge_turn_result(instance, %Address{} = address, turn_id)
+      when is_binary(turn_id) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         :ok <- validate_turn_id(:acknowledge_turn_result, turn_id),
+         :ok <- ensure_reconciled(instance, address),
+         {:ok, reactivate?} <- prepare_result_acknowledgement(instance, address) do
+      result = acknowledge_saved_turn_result(instance, address, turn_id)
+      restore = restore_after_result_acknowledgement(instance, address, reactivate?)
+
+      case {result, restore} do
+        {:ok, :ok} -> :ok
+        {{:error, _reason} = error, :ok} -> error
+        {_result, {:error, _reason} = error} -> error
+      end
+    end
+  end
+
+  def acknowledge_turn_result(_instance, address, turn_id),
+    do:
+      invalid_runtime_input(:acknowledge_turn_result, %{
+        agent_address: address,
+        turn_id: turn_id
+      })
+
+  @doc "Writes a durable tombstone for one inactive stable Agent Address."
+  @spec delete_agent(atom(), Address.t(), keyword()) :: :ok | {:error, term()}
+  def delete_agent(instance, %Address{} = address, opts \\ []) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         {:ok, _opts} <- validate_address_delete_options(opts),
+         {:error, :not_found} <- resolve_address_target(instance, address) do
+      Jido.Persistence.delete_agent_address(instance, address, instance: instance)
+    else
+      {:ok, _pid} -> {:error, :agent_running}
+      {:error, state} when state in [:recovering, :passivating] -> {:error, :agent_running}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @doc "Cancels one matching Turn for a stable Agent Address."
+  @spec cancel_turn(atom(), Address.t(), String.t(), timeout()) :: :ok | {:error, term()}
+  def cancel_turn(instance, %Address{} = address, turn_id, timeout \\ 5_000) do
+    with_address_server(instance, address, &AgentServer.cancel_turn(&1, turn_id, timeout))
+  end
+
+  @doc "Returns Turn status through a stable Agent Address."
+  @spec status(atom(), Address.t(), timeout()) :: Jido.AgentServer.Status.t() | {:error, term()}
+  def status(instance, %Address{} = address, timeout \\ 5_000) do
+    with {:ok, address} <- validate_instance_address(instance, address) do
+      case resolve_address_target(instance, address) do
+        {:ok, pid} ->
+          AgentServer.status(pid, timeout)
+
+        {:error, state} when state in [:recovering, :passivating] ->
+          status_for_registered(instance, address, timeout)
+
+        {:error, :reconciliation_required} ->
+          status_for_registered(instance, address, timeout)
+
+        {:error, :not_found} ->
+          passivated_status(instance, address)
+
+        {:error, _reason} = error ->
+          error
+      end
+    end
+  end
+
+  defp status_for_registered(instance, address, timeout) do
+    key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
+
+    case Registry.lookup(Names.registry(instance), key) do
+      [{root, {:activation, _activation_id}}] ->
+        case Jido.AgentServer.Supervisor.live_worker(root) do
+          pid when is_pid(pid) ->
+            AgentServer.status(pid, timeout)
+
+          nil ->
+            if Process.alive?(root),
+              do: {:error, :recovering},
+              else: passivated_status(instance, address)
+        end
+
+      _ ->
+        passivated_status(instance, address)
+    end
+  end
+
+  defp passivated_status(instance, address) do
+    case Jido.Persistence.load_agent_address(instance, address, instance: instance) do
+      {:ok, _agent, persistence_revision, agent_revision, turn} ->
+        Jido.AgentServer.Status.passivated(
+          address,
+          agent_revision,
+          persistence_revision,
+          turn
+        )
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp with_address_server(instance, address, operation) do
+    with {:ok, pid} <- resolve_or_activate(instance, address) do
+      try do
+        operation.(pid)
+      catch
+        :exit, reason ->
+          if not match?({:timeout, _}, reason),
+            do: {:error, :unavailable},
+            else: exit(reason)
+      end
+    end
+  end
+
+  defp resolve_or_activate(instance, address) do
+    with :ok <- ensure_reconciled(instance, address) do
+      case resolve_address_target(instance, address) do
+        {:ok, pid} -> {:ok, pid}
+        {:error, :not_found} -> activate_agent(instance, address)
+        {:error, :recovering} -> await_address_activation(instance, address)
+        {:error, :passivating} -> await_address_passivation(instance, address)
+        {:error, _reason} = error -> error
+      end
+    end
+  end
+
+  defp await_address_activation(instance, address),
+    do: await_address_activation(instance, address, System.monotonic_time(:millisecond) + 5_000)
+
+  defp await_address_activation(instance, address, deadline) do
+    key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
+
+    case Registry.lookup(Names.registry(instance), key) do
+      [{root, {:activation, _activation_id}}] ->
+        case Jido.AgentServer.Supervisor.live_worker(root) do
+          pid when is_pid(pid) ->
+            case AgentServer.await_ready(pid, 5_000) do
+              :ok -> {:ok, pid}
+              {:error, _reason} = error -> error
+            end
+
+          nil ->
+            if System.monotonic_time(:millisecond) < deadline do
+              Process.sleep(5)
+              await_address_activation(instance, address, deadline)
+            else
+              {:error, :activation_timeout}
+            end
+        end
+
+      _ ->
+        if System.monotonic_time(:millisecond) < deadline do
+          resolve_or_activate(instance, address)
+        else
+          {:error, :activation_timeout}
+        end
+    end
+  end
+
+  defp await_address_passivation(instance, address) do
+    key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
+
+    case Registry.lookup(Names.registry(instance), key) do
+      [{root, {:activation, _activation_id}}] ->
+        monitor = Process.monitor(root)
+
+        receive do
+          {:DOWN, ^monitor, :process, ^root, _reason} -> activate_agent(instance, address)
+        after
+          5_000 ->
+            Process.demonitor(monitor, [:flush])
+            {:error, :activation_timeout}
+        end
+
+      _ ->
+        resolve_or_activate(instance, address)
+    end
+  end
+
+  defp resolve_address_target(instance, address) do
+    with {:ok, _address} <- validate_instance_address(instance, address) do
+      key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
+
+      case Registry.lookup(Names.registry(instance), key) do
+        [{root, {:activation, _activation_id}}] -> resolve_registered_agent(root)
+        _other -> {:error, :not_found}
+      end
+    end
+  rescue
+    ArgumentError -> {:error, :unavailable}
+  end
+
+  defp resolve_registered_agent(root) do
+    case Jido.AgentServer.Supervisor.live_worker(root) do
+      pid when is_pid(pid) ->
+        case AgentServer.status(pid, 100) do
+          %{work_state: :faulted} -> {:error, :reconciliation_required}
+          %{residency: :passivating} -> {:error, :passivating}
+          %{ready?: true} -> {:ok, pid}
+          %{} -> unresolved_activation(root)
+          {:error, _reason} -> unresolved_activation(root)
+        end
+
+      nil ->
+        unresolved_activation(root)
+    end
+  catch
+    :exit, _reason -> unresolved_activation(root)
+  end
+
+  defp unresolved_activation(root) do
+    # Registry cleanup can follow the activation's DOWN notification.
+    if Process.alive?(root), do: {:error, :recovering}, else: {:error, :not_found}
+  end
+
+  defp validate_instance_address(instance, address) do
+    with {:ok, namespace} <- require_instance_namespace(instance) do
+      Address.validate_namespace(address, namespace)
+    end
+  end
+
+  defp ownership_target(instance, address) do
+    with {:ok, address} <- validate_instance_address(instance, address),
+         :ok <- ensure_reconciled(instance, address) do
+      key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
+
+      case Registry.lookup(Names.registry(instance), key) do
+        [{activation, {:activation, activation_id}}] ->
+          with {:ok, server} <- resolve_registered_agent(activation) do
+            {:ok,
+             %{
+               address: address,
+               activation: activation,
+               activation_id: activation_id,
+               server: server,
+               jido: instance,
+               partition: address.partition
+             }}
+          end
+
+        _other ->
+          {:error, :not_found}
+      end
+    end
+  rescue
+    ArgumentError -> {:error, :unavailable}
+  end
+
+  defp validate_ownership_addresses(child, owner) do
+    cond do
+      child == owner -> {:error, :self_ownership}
+      child.partition != owner.partition -> {:error, :different_partition}
+      true -> :ok
+    end
+  end
+
+  defp validate_ownership_options(child, opts) do
+    keys = if Keyword.keyword?(opts), do: Keyword.keys(opts), else: []
+
+    cond do
+      not Keyword.keyword?(opts) ->
+        invalid_runtime_input(:transfer_agent_ownership, %{opts: opts})
+
+      keys != Enum.uniq(keys) or Enum.sort(keys) != [:expected, :request_id] ->
+        invalid_runtime_input(:transfer_agent_ownership, %{opts: opts})
+
+      not (is_binary(opts[:request_id]) and byte_size(opts[:request_id]) > 0) ->
+        invalid_runtime_input(:transfer_agent_ownership, %{request_id: opts[:request_id]})
+
+      is_nil(opts[:expected]) ->
+        {:ok, nil, opts[:request_id]}
+
+      match?(%AgentOwnership{}, opts[:expected]) ->
+        validate_expected_ownership(child, opts[:expected], opts[:request_id])
+
+      true ->
+        invalid_runtime_input(:transfer_agent_ownership, %{expected: opts[:expected]})
+    end
+  end
+
+  defp validate_expected_ownership(child, expected, request_id) do
+    with {:ok, expected_child} <- Address.validate(expected.agent_address),
+         {:ok, _expected_owner} <- Address.validate(expected.owner_address),
+         true <- expected_child == child,
+         true <- is_binary(expected.fence) and byte_size(expected.fence) > 0,
+         true <- is_binary(expected.request_id) and byte_size(expected.request_id) > 0 do
+      {:ok, expected, request_id}
+    else
+      _ -> invalid_runtime_input(:transfer_agent_ownership, %{expected: expected})
+    end
+  end
+
+  defp require_instance_namespace(instance) do
+    case NamespaceRegistry.namespace(instance) do
+      namespace when is_binary(namespace) ->
+        {:ok, namespace}
+
+      nil ->
+        {:error,
+         Jido.Error.validation_error("Jido instance does not have a stable namespace",
+           kind: :input,
+           subject: Jido.Agent.Address,
+           details: %{
+             code: :jido_namespace_required,
+             instance: instance
+           }
+         )}
+    end
+  end
+
+  defp validate_address_delete_options(opts) do
+    if Keyword.keyword?(opts) and length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts))) do
+      {:ok, opts}
+    else
+      {:error,
+       Jido.Error.validation_error("Agent Address delete options must be a unique keyword list",
+         kind: :input,
+         subject: Jido.Agent.Address,
+         details: %{code: :jido_instance_invalid_config, value: opts}
+       )}
+    end
+  end
+
+  defp validate_create_agent_options(opts),
+    do: validate_address_operation_options(:create_agent, opts, [:id, :partition, :state])
+
+  defp validate_activate_agent_options(opts),
+    do: validate_address_operation_options(:activate_agent, opts, [:id, :partition])
+
+  defp validate_reconcile_options(opts),
+    do: validate_address_operation_options(:reconcile_agent, opts, [])
+
+  defp validate_upgrade_options(opts),
+    do: validate_address_operation_options(:upgrade_agent, opts, [:context])
+
+  defp validate_replace_options(opts) do
+    with :ok <-
+           validate_address_operation_options(:replace_agent, opts, [
+             :expected,
+             :id,
+             :partition,
+             :state_policy
+           ]),
+         {:ok, policy} <- replace_state_policy(opts),
+         {:ok, expected} <- replace_expected_definition(opts) do
+      {:ok, policy, expected}
+    end
+  end
+
+  defp replace_state_policy(opts) do
+    case Keyword.get(opts, :state_policy, :preserve) do
+      policy when policy in [:preserve, :reset] -> {:ok, policy}
+      policy -> invalid_runtime_input(:replace_agent, %{state_policy: policy})
+    end
+  end
+
+  defp replace_expected_definition(opts) do
+    case Keyword.fetch(opts, :expected) do
+      {:ok, %Jido.Agent{id: nil, state: nil} = expected} -> {:ok, expected}
+      {:ok, expected} -> invalid_runtime_input(:replace_agent, %{expected: expected})
+      :error -> invalid_runtime_input(:replace_agent, %{expected: :required})
+    end
+  end
+
+  defp replacement_agent(source, id, saved_state, state_policy) do
+    opts =
+      case state_policy do
+        :preserve -> [id: id, state: saved_state]
+        :reset -> [id: id]
+      end
+
+    Jido.Agent.instantiate(source, opts)
+  end
+
+  defp replaceable_turn(nil), do: :ok
+
+  defp replaceable_turn(%{terminal_result: %Jido.AgentServer.TurnResult{}}),
+    do: {:error, :result_acknowledgement_required}
+
+  defp replaceable_turn(%{status: status}) when status in [:completed, :failed, :cancelled],
+    do: :ok
+
+  defp replaceable_turn(_turn), do: {:error, :turn_in_flight}
+
+  defp replace_agent_record(
+         instance,
+         address,
+         saved,
+         replacement,
+         expected,
+         state_policy,
+         persistence_revision,
+         agent_revision,
+         turn
+       ) do
+    saved_definition = Jido.Agent.definition(saved)
+    replacement_definition = Jido.Agent.definition(replacement)
+
+    cond do
+      saved_definition == replacement_definition and
+          replacement_state_applied?(saved, replacement, state_policy) ->
+        :ok
+
+      saved_definition == expected ->
+        Jido.Persistence.replace_agent(instance, replacement, saved.module,
+          instance: instance,
+          partition: address.partition,
+          reason: :definition_update,
+          revision: persistence_revision + 1,
+          expected_revision: persistence_revision,
+          agent_revision: agent_revision + 1,
+          server_turn: turn
+        )
+
+      true ->
+        {:error, {:agent_definition_conflict, address.id}}
+    end
+  end
+
+  defp replacement_state_applied?(_saved, _replacement, :preserve), do: true
+
+  defp replacement_state_applied?(saved, replacement, :reset),
+    do: saved.state == replacement.state
+
+  defp prepare_definition_upgrade(instance, address) do
+    case resolve_address_target(instance, address) do
+      {:ok, pid} ->
+        case AgentServer.status(pid) do
+          %{work_state: :idle, queue_depth: 0, effects: :none} ->
+            with {:ok, snapshot} <- AgentServer.stop(pid, :definition_upgrade, 5_000),
+                 do: {:ok, snapshot.agent, true}
+
+          %{} ->
+            {:error, :agent_busy}
+
+          {:error, _reason} = error ->
+            error
+        end
+
+      {:error, :not_found} ->
+        with {:ok, agent, _persistence_revision, _agent_revision, _turn} <-
+               Jido.Persistence.load_agent_address(instance, address, instance: instance),
+             do: {:ok, agent, false}
+
+      {:error, state} when state in [:recovering, :passivating] ->
+        {:error, :agent_busy}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp restore_after_upgrade(_instance, _address, false), do: :ok
+
+  defp restore_after_upgrade(instance, address, true) do
+    case activate_agent(instance, address) do
+      {:ok, _pid} -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp ensure_reconciled(instance, address) do
+    case reconciliation_reason(instance, address) do
+      {:ok, _reason} -> {:error, :reconciliation_required}
+      :error -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp reconciliation_reason(instance, address),
+    do: RuntimeStore.fetch(instance, :agent_reconciliation, address)
+
+  defp terminate_registered_activation(instance, address) do
+    key = AgentServer.RegistrationGuard.registry_key(address.id, address.partition)
+
+    case Registry.lookup(Names.registry(instance), key) do
+      [{root, {:activation, _activation_id}}] ->
+        case DynamicSupervisor.terminate_child(Names.agent_supervisor(instance), root) do
+          :ok -> :ok
+          {:error, :not_found} -> :ok
+        end
+
+      _other ->
+        :ok
+    end
+  catch
+    :exit, _reason -> {:error, :unavailable}
+  end
+
+  defp validate_address_operation_options(operation, opts, allowed) do
+    case Keyword.keys(opts) -- allowed do
+      [] ->
+        :ok
+
+      keys ->
+        {:error,
+         Jido.Error.validation_error("Agent Address operation options contain unknown keys",
+           kind: :input,
+           subject: Jido.Agent.Address,
+           details: %{
+             code: :jido_instance_invalid_config,
+             operation: operation,
+             keys: Enum.uniq(keys)
+           }
+         )}
+    end
+  end
 
   # ---------------------------------------------------------------------------
   # Agent Lifecycle
   # ---------------------------------------------------------------------------
 
   @doc """
-  Starts an agent under a specific Jido instance.
+  Starts one Agent under the selected Jido instance supervisor.
 
-  ## Examples
+  Pass `Jido.Default` after `Jido.start/1` in a script or Livebook:
 
-      {:ok, pid} = Jido.start_agent(MyApp.Jido, MyAgent)
-      {:ok, pid} = Jido.start_agent(MyApp.Jido, MyAgent, id: "custom-id")
+      {:ok, _jido} = Jido.start()
+      agent = MyAgent.instantiate!(id: "agent-1")
+      {:ok, server} = Jido.start_agent(Jido.Default, agent)
+
+  Pass an application instance module in a supervised application:
+
+      {:ok, server} = Jido.start_agent(MyApp.Jido, agent)
+
+  The Agent Server links to its supervisor, not to the calling process. Caller
+  exit does not stop the Agent.
+
+  Options must be a keyword list. An omitted `:id` generates a new identity;
+  an explicit ID must be a nonempty string. `:state` replaces matching
+  declared initial-state fields before the Agent module's optional
+  `initialize/2` callback runs. An existing Agent instance keeps its ID and
+  state and rejects instance overrides. A live ID is unique within its instance
+  and partition. Starting a duplicate returns an error and leaves the existing
+  Agent unchanged.
+
+  An instance with persistence uses its one configured Store and codec for all
+  Agents. Per-Agent Store overrides are not supported.
+
+  This is the standard example startup API. Domain command functions can stay
+  in the Agent module; they do not need a matching startup wrapper.
   """
-  @spec start_agent(atom(), module() | struct(), keyword()) :: DynamicSupervisor.on_start_child()
-  def start_agent(jido_instance, agent, opts \\ []) when is_atom(jido_instance) do
-    child_spec = {Jido.AgentServer, Keyword.merge(opts, agent: agent, jido: jido_instance)}
-    DynamicSupervisor.start_child(agent_supervisor_name(jido_instance), child_spec)
-  end
+  @spec start_agent(atom(), module() | Jido.Agent.t(), keyword()) ::
+          DynamicSupervisor.on_start_child()
+  def start_agent(instance, agent, opts \\ []) when is_atom(instance) do
+    if is_list(opts) and Keyword.keyword?(opts) do
+      {instance_opts, runtime_opts} = Keyword.split(opts, [:id, :state])
 
-  @doc """
-  Stops an agent by pid or id.
-
-  ## Examples
-
-      :ok = Jido.stop_agent(MyApp.Jido, pid)
-      :ok = Jido.stop_agent(MyApp.Jido, "agent-id")
-  """
-  @spec stop_agent(atom(), pid() | String.t()) :: :ok | {:error, :not_found}
-  def stop_agent(jido_instance, pid) when is_atom(jido_instance) and is_pid(pid) do
-    DynamicSupervisor.terminate_child(agent_supervisor_name(jido_instance), pid)
-  end
-
-  def stop_agent(jido_instance, id) when is_atom(jido_instance) and is_binary(id) do
-    case whereis(jido_instance, id) do
-      nil -> {:error, :not_found}
-      pid -> stop_agent(jido_instance, pid)
+      with :ok <- validate_agent_persistence_override(runtime_opts),
+           {:ok, agent} <- startup_agent(agent, instance_opts, runtime_opts) do
+        runtime_opts
+        |> inherit_instance_persistence(instance)
+        |> Keyword.merge(agent: agent, jido: instance)
+        |> Jido.AgentServer.Worker.start()
+      end
+    else
+      {:error, Jido.Error.validation_error("Agent startup options must be a keyword list", kind: :config)}
     end
   end
 
-  @spec stop_agent(atom(), pid() | String.t(), keyword()) :: :ok | {:error, :not_found}
-  def stop_agent(jido_instance, pid, _opts)
-      when is_atom(jido_instance) and is_pid(pid) do
-    stop_agent(jido_instance, pid)
-  end
+  defp validate_agent_persistence_override(opts) do
+    case Keyword.fetch(opts, :persistence) do
+      :error ->
+        :ok
 
-  def stop_agent(jido_instance, id, opts)
-      when is_atom(jido_instance) and is_binary(id) and is_list(opts) do
-    case whereis(jido_instance, id, opts) do
-      nil -> {:error, :not_found}
-      pid -> stop_agent(jido_instance, pid)
+      {:ok, value} when value in [:inherit, nil, false] ->
+        :ok
+
+      {:ok, value} ->
+        {:error,
+         Jido.Error.validation_error("Per-Agent persistence is not supported",
+           kind: :config,
+           details: %{persistence: value}
+         )}
     end
   end
 
-  @doc """
-  Looks up an agent by ID in a Jido instance's registry.
-
-  Returns the pid if found, nil otherwise.
-
-  ## Examples
-
-      pid = Jido.whereis(MyApp.Jido, "agent-123")
-  """
-  @spec whereis(atom(), String.t()) :: pid() | nil
-  def whereis(jido_instance, id) when is_atom(jido_instance) and is_binary(id) do
-    whereis(jido_instance, id, [])
-  end
-
-  @spec whereis(atom(), String.t(), keyword()) :: pid() | nil
-  def whereis(jido_instance, id, opts)
-      when is_atom(jido_instance) and is_binary(id) and is_list(opts) do
-    registry_key = partition_key(id, Keyword.get(opts, :partition))
-
-    case Registry.lookup(registry_name(jido_instance), registry_key) do
-      [{pid, _}] -> pid
-      [] -> nil
+  defp inherit_instance_persistence(opts, instance) do
+    case Jido.Instance.RuntimeStore.instance_persistence(instance) do
+      %Jido.Persistence.Config{} -> Keyword.put(opts, :persistence, :inherit)
+      nil -> Keyword.put(opts, :persistence, false)
     end
   end
 
-  @doc """
-  Fetches the persisted logical parent binding for a child agent.
+  @doc "Stops an Agent with options in the selected Jido instance."
+  @spec stop_agent(atom(), Jido.AgentServer.server() | String.t(), keyword()) ::
+          :ok | {:error, :not_found | Jido.Error.ValidationError.t()}
+  def stop_agent(instance, pid_or_id, opts \\ [])
 
-  This is the stable runtime relationship lookup API for orchestration layers
-  that need to inspect the live parent/child graph without depending on raw
-  `RuntimeStore` hive layout.
-
-  Returns `{:ok, binding}` when present, or `:error` when no binding exists.
-
-  ## Examples
-
-      {:ok, binding} = Jido.parent_binding(MyApp.Jido, "child-123")
-      assert binding.parent_id == "parent-456"
-  """
-  @spec parent_binding(atom(), String.t()) :: {:ok, map()} | :error
-  def parent_binding(jido_instance, child_id)
-      when is_atom(jido_instance) and is_binary(child_id) do
-    parent_binding(jido_instance, child_id, [])
-  end
-
-  @spec parent_binding(atom(), String.t(), keyword()) :: {:ok, map()} | :error
-  def parent_binding(jido_instance, child_id, opts)
-      when is_atom(jido_instance) and is_binary(child_id) and is_list(opts) do
-    case RuntimeStore.fetch(
-           jido_instance,
-           :relationships,
-           partition_key(child_id, Keyword.get(opts, :partition))
-         ) do
-      {:ok, binding} -> normalize_parent_binding(binding)
-      :error -> :error
+  def stop_agent(instance, id, opts)
+      when is_atom(instance) and is_binary(id) and is_list(opts) do
+    if Keyword.keyword?(opts) do
+      case whereis_agent(instance, id, opts) do
+        nil -> {:error, :not_found}
+        pid -> stop_agent(instance, pid, opts)
+      end
+    else
+      invalid_runtime_input(:stop_agent, %{id: id, opts: opts})
     end
   end
 
-  @doc """
-  Lists all agents running in a Jido instance.
-
-  Returns a list of `{id, pid}` tuples.
-
-  ## Examples
-
-      agents = Jido.list_agents(MyApp.Jido)
-      # => [{"agent-1", #PID<0.123.0>}, {"agent-2", #PID<0.124.0>}]
-  """
-  @spec list_agents(atom()) :: [{String.t(), pid()}]
-  def list_agents(jido_instance) when is_atom(jido_instance) do
-    list_agents(jido_instance, [])
+  def stop_agent(instance, server, opts)
+      when is_atom(instance) and is_list(opts) do
+    with :ok <- validate_server(server),
+         :ok <- validate_runtime_options(:stop_agent, opts),
+         {:ok, pid} <- owned_agent_server(instance, server, opts) do
+      case Jido.AgentServer.stop(pid) do
+        {:ok, _snapshot} -> :ok
+        {:error, _reason} = error -> error
+      end
+    end
+  catch
+    :exit, :noproc -> {:error, :not_found}
+    :exit, {:noproc, _details} -> {:error, :not_found}
+    :exit, {:normal, _details} -> :ok
   end
 
-  @spec list_agents(atom(), keyword()) :: [{String.t(), pid()}]
-  def list_agents(jido_instance, opts) when is_atom(jido_instance) and is_list(opts) do
-    registry_name(jido_instance)
-    |> Registry.select([{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
-    |> filter_agent_registry_entries(Keyword.get(opts, :partition))
-  end
+  def stop_agent(_instance, id, opts),
+    do: invalid_runtime_input(:stop_agent, %{id: id, opts: opts})
 
-  @doc """
-  Returns the count of running agents in a Jido instance.
+  @doc "Looks up an Agent with options in the selected Jido instance."
+  @spec whereis_agent(atom(), String.t(), keyword()) ::
+          pid() | nil | {:error, Jido.Error.ValidationError.t()}
+  def whereis_agent(instance, id, opts \\ [])
 
-  ## Examples
-
-      count = Jido.agent_count(MyApp.Jido)
-      # => 5
-  """
-  @spec agent_count(atom()) :: non_neg_integer()
-  def agent_count(jido_instance) when is_atom(jido_instance) do
-    agent_count(jido_instance, [])
-  end
-
-  @spec agent_count(atom(), keyword()) :: non_neg_integer()
-  def agent_count(jido_instance, opts) when is_atom(jido_instance) and is_list(opts) do
-    jido_instance
-    |> list_agents(opts)
-    |> length()
-  end
-
-  # ---------------------------------------------------------------------------
-  # Persistence
-  # ---------------------------------------------------------------------------
-
-  @doc "Hibernate an agent using the given Jido instance."
-  @spec hibernate(atom(), Jido.Agent.t()) :: :ok | {:error, term()}
-  def hibernate(jido_instance, agent) when is_atom(jido_instance) do
-    hibernate(jido_instance, agent, [])
-  end
-
-  @spec hibernate(atom(), Jido.Agent.t(), keyword()) :: :ok | {:error, term()}
-  def hibernate(jido_instance, agent, opts) when is_atom(jido_instance) and is_list(opts) do
-    with {:ok, agent} <- maybe_put_partition(agent, Keyword.get(opts, :partition)) do
-      Jido.Persist.hibernate(jido_instance, agent)
+  def whereis_agent(instance, id, opts)
+      when is_atom(instance) and is_binary(id) and is_list(opts) do
+    if Keyword.keyword?(opts) do
+      Jido.AgentServer.Worker.whereis(
+        instance,
+        id,
+        partition: Keyword.get(opts, :partition)
+      )
+    else
+      invalid_runtime_input(:whereis_agent, %{id: id, opts: opts})
     end
   end
 
-  @doc "Thaw an agent using the given Jido instance."
-  @spec thaw(atom(), module(), term()) :: {:ok, Jido.Agent.t()} | {:error, term()}
-  def thaw(jido_instance, agent_module, key) when is_atom(jido_instance) do
-    thaw(jido_instance, agent_module, key, [])
+  def whereis_agent(_instance, id, opts),
+    do: invalid_runtime_input(:whereis_agent, %{id: id, opts: opts})
+
+  @doc "Lists Agents with options in the selected Jido instance."
+  @spec list_agents(atom(), keyword()) ::
+          [{String.t(), pid()}] | {:error, Jido.Error.ValidationError.t()}
+  def list_agents(instance, opts \\ [])
+
+  def list_agents(instance, opts)
+      when is_atom(instance) and is_list(opts) do
+    if Keyword.keyword?(opts) do
+      partition = Keyword.get(opts, :partition)
+
+      instance
+      |> Names.registry()
+      |> Registry.select([{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2", :"$3"}}]}])
+      |> Enum.flat_map(fn
+        {{:agent, key}, root, {:activation, _activation_id}} ->
+          case Names.unwrap_partition_key(key) do
+            {^partition, id} when is_binary(id) ->
+              case Jido.AgentServer.Supervisor.live_worker(root) do
+                pid when is_pid(pid) -> [{id, pid}]
+                nil -> []
+              end
+
+            _other ->
+              []
+          end
+
+        _entry ->
+          []
+      end)
+      |> Enum.filter(fn {_id, pid} -> Process.alive?(pid) end)
+    else
+      invalid_runtime_input(:list_agents, %{opts: opts})
+    end
+  rescue
+    # Registry.select/2 raises when the instance is not running.
+    ArgumentError -> invalid_runtime_input(:list_agents, %{instance: instance})
   end
 
-  @spec thaw(atom(), module(), term(), keyword()) :: {:ok, Jido.Agent.t()} | {:error, term()}
-  def thaw(jido_instance, agent_module, key, opts)
-      when is_atom(jido_instance) and is_list(opts) do
-    partition = Keyword.get(opts, :partition)
+  def list_agents(_instance, opts), do: invalid_runtime_input(:list_agents, %{opts: opts})
 
-    jido_instance
-    |> Jido.Persist.thaw(agent_module, partition_key(key, partition))
-    |> case do
-      {:ok, agent} -> maybe_put_partition(agent, partition)
+  @doc "Counts resident Agent activations in the selected Jido instance."
+  @spec resident_agent_count(atom(), keyword()) ::
+          non_neg_integer() | {:error, Jido.Error.ValidationError.t()}
+  def resident_agent_count(instance, opts \\ []) do
+    case list_agents(instance, opts) do
+      agents when is_list(agents) -> length(agents)
       {:error, _reason} = error -> error
     end
   end
 
-  defp filter_agent_registry_entries(entries, partition) do
-    Enum.flat_map(entries, fn {registry_key, pid} ->
-      case unwrap_partition_key(registry_key) do
-        {^partition, id} when is_binary(id) ->
-          [{id, pid}]
-
-        {nil, id} when is_nil(partition) and is_binary(id) ->
-          [{id, pid}]
-
-        _other ->
-          []
-      end
-    end)
+  defp validate_runtime_options(operation, opts) do
+    if Keyword.keyword?(opts),
+      do: :ok,
+      else: invalid_runtime_input(operation, %{opts: opts})
   end
 
-  defp maybe_put_partition(%{state: state} = agent, nil) when is_map(state), do: {:ok, agent}
+  defp validate_server(server)
+       when is_pid(server) or is_atom(server) or is_tuple(server),
+       do: :ok
 
-  defp maybe_put_partition(%{state: state} = agent, partition) when is_map(state) do
-    case Map.get(state, :__partition__) do
-      nil ->
-        {:ok, %{agent | state: Map.put(state, :__partition__, partition)}}
+  defp validate_server(server),
+    do: invalid_runtime_input(:stop_agent, %{server: server})
 
-      ^partition ->
-        {:ok, agent}
+  defp invalid_runtime_input(operation, details) do
+    {:error,
+     Jido.Error.validation_error("Jido runtime input is invalid",
+       kind: :input,
+       subject: __MODULE__,
+       details: Map.put(details, :operation, operation)
+     )}
+  end
 
-      agent_partition ->
-        {:error,
-         Jido.Error.validation_error("partition does not match agent runtime state", %{
-           partition: partition,
-           agent_partition: agent_partition
-         })}
+  @doc "Thaws an Agent with options in the selected Jido instance."
+  @spec thaw(atom(), module(), String.t(), keyword()) ::
+          DynamicSupervisor.on_start_child()
+  def thaw(instance, agent_module, agent_id, opts \\ [])
+      when is_atom(instance) and is_atom(agent_module) and is_binary(agent_id) and
+             is_list(opts) do
+    opts =
+      opts
+      |> Keyword.put(:id, agent_id)
+      |> Keyword.put_new(:persistence, :inherit)
+      |> Keyword.put(:persistence_mode, :restore)
+
+    start_agent(instance, agent_module, opts)
+  end
+
+  defp startup_agent(%Jido.Agent{id: id} = agent, opts, _runtime_opts) when is_binary(id) do
+    if Keyword.delete(opts, :id) == [] and Keyword.get(opts, :id, id) == id,
+      do: {:ok, agent},
+      else: invalid_runtime_input(:start_agent, %{opts: opts})
+  end
+
+  defp startup_agent(source, opts, runtime_opts) do
+    if runtime_opts[:persistence_mode] == :restore do
+      with {:ok, definition} <- Jido.Agent.Validation.resolve(source),
+           {:ok, opts} <- Jido.Agent.Schema.options(opts, [:id]),
+           :ok <- Jido.Agent.Schema.nonempty(opts[:id]),
+           do: {:ok, %{definition | id: opts.id}}
+    else
+      Jido.Agent.instantiate(source, opts)
     end
   end
 
-  defp maybe_put_partition(agent, _partition), do: {:ok, agent}
-
-  defp normalize_parent_binding(%{parent_id: parent_id, tag: _tag} = binding)
-       when is_binary(parent_id) do
-    {:ok,
-     binding
-     |> Map.put_new(:parent_partition, nil)
-     |> Map.update(:meta, %{}, fn
-       meta when is_map(meta) -> meta
-       _other -> %{}
-     end)}
+  defp owned_agent_server(instance, server, opts) do
+    with true <- not is_nil(instance),
+         true <- Keyword.keyword?(opts),
+         pid when is_pid(pid) <- safe_whereis(server),
+         %{agent_address: %{id: agent_id, partition: partition}} <-
+           Jido.AgentServer.status(pid),
+         true <- partition_matches?(opts, partition),
+         ^pid <- owned_registry_pid(instance, agent_id, partition, pid) do
+      {:ok, pid}
+    else
+      _reason -> {:error, :not_found}
+    end
   end
 
-  defp normalize_parent_binding(_binding), do: :error
+  defp safe_whereis(server) do
+    GenServer.whereis(server)
+  rescue
+    _error -> nil
+  catch
+    _kind, _reason -> nil
+  end
 
-  # ---------------------------------------------------------------------------
-  # Discovery
-  # ---------------------------------------------------------------------------
+  defp partition_matches?(opts, partition) do
+    not Keyword.has_key?(opts, :partition) or Keyword.get(opts, :partition) === partition
+  end
 
-  @doc "Lists discovered Actions with optional filtering."
-  defdelegate list_actions(opts \\ []), to: Jido.Discovery
+  defp owned_registry_pid(instance, agent_id, partition, pid)
+       when node(pid) == node() do
+    whereis_agent(instance, agent_id, partition: partition)
+  end
 
-  @doc "Lists discovered Sensors with optional filtering."
-  defdelegate list_sensors(opts \\ []), to: Jido.Discovery
-
-  @doc "Lists discovered Plugins with optional filtering."
-  defdelegate list_plugins(opts \\ []), to: Jido.Discovery
-
-  @doc "Lists discovered Demos with optional filtering."
-  defdelegate list_demos(opts \\ []), to: Jido.Discovery
-
-  @doc "Gets an Action by its slug."
-  defdelegate get_action_by_slug(slug), to: Jido.Discovery
-
-  @doc "Gets a Sensor by its slug."
-  defdelegate get_sensor_by_slug(slug), to: Jido.Discovery
-
-  @doc "Gets a Plugin by its slug."
-  defdelegate get_plugin_by_slug(slug), to: Jido.Discovery
-
-  @doc "Refreshes the Discovery catalog."
-  defdelegate refresh_discovery(), to: Jido.Discovery, as: :refresh
-
-  # ---------------------------------------------------------------------------
-  # Agent Coordination
-  # ---------------------------------------------------------------------------
-
-  @doc """
-  Wait for an agent to reach a terminal status.
-
-  See `Jido.Await.completion/3` for details.
-  """
-  defdelegate await(server, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ []),
-    to: Jido.Await,
-    as: :completion
-
-  @doc """
-  Wait for a child agent to reach a terminal status.
-
-  See `Jido.Await.child/4` for details.
-  """
-  defdelegate await_child(
-                server,
-                child_tag,
-                timeout_ms \\ Defaults.await_child_timeout_ms(),
-                opts \\ []
-              ),
-              to: Jido.Await,
-              as: :child
-
-  @doc """
-  Wait for all agents to reach terminal status.
-
-  See `Jido.Await.all/3` for details.
-  """
-  defdelegate await_all(servers, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ []),
-    to: Jido.Await,
-    as: :all
-
-  @doc """
-  Wait for any agent to reach terminal status.
-
-  See `Jido.Await.any/3` for details.
-  """
-  defdelegate await_any(servers, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ []),
-    to: Jido.Await,
-    as: :any
-
-  @doc """
-  Get the PIDs of all children of a parent agent.
-
-  See `Jido.Await.get_children/1` for details.
-  """
-  defdelegate get_children(parent_server), to: Jido.Await
-
-  @doc """
-  Get a specific child's PID by tag.
-
-  See `Jido.Await.get_child/2` for details.
-  """
-  defdelegate get_child(parent_server, child_tag), to: Jido.Await
-
-  @doc """
-  Check if an agent process is alive and responding.
-
-  See `Jido.Await.alive?/1` for details.
-  """
-  defdelegate alive?(server), to: Jido.Await
-
-  @doc """
-  Request graceful cancellation of an agent.
-
-  See `Jido.Await.cancel/2` for details.
-  """
-  defdelegate cancel(server, opts \\ []), to: Jido.Await
+  defp owned_registry_pid(instance, agent_id, partition, pid) do
+    :erpc.call(
+      node(pid),
+      __MODULE__,
+      :whereis_agent,
+      [instance, agent_id, [partition: partition]],
+      1_000
+    )
+  catch
+    _kind, _reason -> nil
+  end
 end

@@ -1,0 +1,27 @@
+<!--  test that we can assign to any location in the datamodel. In this case, we just test that we can assign
+to a substructure (not the top level variable).  This may not be the most idiomatic way to write the test -->
+
+
+<scxml  datamodel="ecmascript"  version="1.0" xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+ <datamodel>
+   <data id="foo" expr="0"/>
+   </datamodel>
+    <script>
+    function testobject() {
+    this.bar = 0;}
+   </script>    
+<state id="s0">
+ <onentry>
+   <assign location="foo" expr="new testobject();"/>
+<!-- try to assign to foo's bar property -->
+   <assign location="foo.bar" expr="1"/>
+   <raise event="event1"/>
+   </onentry>
+<!-- test that we have assigned to foo's bar property -->  
+   <transition event="event1" cond="foo.bar == 1" conf:targetpass=""/>
+   <transition event="*" conf:targetfail=""/>
+    </state>
+
+<conf:pass/>
+<conf:fail/>
+</scxml>

@@ -1,0 +1,29 @@
+- id: durable-boundary
+  date: 2026-10-20
+  decision: Use Jido.AgentServer.Lifecycle for persistence-backed AgentServer create, restore, commit, hibernate, snapshot, and upgrade policy. Use Jido.Persistence for storage conversion and record operations.
+  driver: Durable Agent state has distinct authority and failure rules, but it is part of the same Turn lifecycle and does not need a forwarding module.
+  approved_by: V3 aspirational module dependency map
+
+- id: durable-code-seam
+  date: 2026-10-20
+  decision: Keep public APIs and gen_statem transitions in Jido.AgentServer. Put durable lifecycle validation, startup, save ordering, result, snapshot, and upgrade policy in Jido.AgentServer.Lifecycle. Put stored Agent conversion in Jido.Persistence and stable member identity assignment in Jido.Agent.Topology.
+  driver: Each operation must have one canonical owner without a durable forwarding module or a second state machine.
+  approved_by: V3 aspirational module dependency map
+
+- id: durable-obligation-migration
+  date: 2026-10-20
+  decision: Replace AgentServer I77 through I83, I91 through I93, I100, and I101 with durable I1 through I12. Composition I5 through I7 retain target validation and resource reconciliation. Activation retains memory-only checkpoints and default idle-stop behavior.
+  driver: Each durable promise needs one final owner without taking record formats, local activation state, or Flow progress from their owners.
+  approved_by: Component hardening pass
+
+- id: durable-mutation-profile
+  date: 2026-10-20
+  decision: Mutate Jido.AgentServer.Lifecycle and Jido.Persistence in the focused profile. Keep Jido.AgentServer, the activation Supervisor, and DurableTurn out of this profile.
+  driver: The focused profile must cover the canonical durable policy and conversion owners without restoring a thin durable seam.
+  approved_by: V3 aspirational module dependency map
+
+- id: durable-public-api
+  date: 2026-10-22
+  decision: Keep hibernate, atomic snapshot, and snapshot upgrade operations on Jido.AgentServer. Type snapshot and upgrade inputs. Keep Durable internal and keep persistence configuration as AgentServer options rather than a DSL.
+  driver: Durable coordination needs one public facade without exposing adapter or state-machine internals.
+  approved_by: Component hardening pass

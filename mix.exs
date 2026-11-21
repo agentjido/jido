@@ -1,438 +1,490 @@
 defmodule Jido.MixProject do
   use Mix.Project
 
-  @version "2.4.0"
-
-  def vsn do
-    @version
-  end
+  @version "3.0.0-beta.3"
+  @description "A durable actor and agent framework for Elixir"
+  @source_url "https://github.com/agentjido/jido"
+  @source_ref "v#{@version}"
 
   def project do
     [
       app: :jido,
       version: @version,
+      name: "Jido",
+      description: @description,
+      source_url: @source_url,
+      homepage_url: "https://jido.run",
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      aliases: aliases(),
       deps: deps(),
-
-      # Docs
-      name: "Jido",
-      description:
-        "An autonomous agent framework for Elixir, built for workflows and multi-agent systems.",
-      source_url: "https://github.com/agentjido/jido",
-      homepage_url: "https://github.com/agentjido/jido",
-      package: package(),
+      aliases: aliases(),
+      dialyzer: [plt_add_apps: [:ex_unit, :mix], ignore_warnings: ".dialyzer_ignore.exs"],
       docs: docs(),
-
-      # Coverage
-      test_coverage: [
-        tool: ExCoveralls,
-        summary: [threshold: 80],
-        export: "cov",
-        ignore_modules: [~r/^JidoTest\./]
-      ],
-
-      # Dialyzer
-      dialyzer: [
-        plt_add_apps: [:mix]
-      ]
+      package: package(),
+      test_ignore_filters: test_ignore_filters(),
+      test_coverage: test_coverage()
     ]
   end
 
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:crypto, :logger],
-      mod: {Jido.Application, []}
+      mod: {Jido.Application, []},
+      extra_applications: [:crypto, :inets, :logger, :public_key, :ssl, :xmerl]
     ]
   end
 
   def cli do
     [
       preferred_envs: [
+        bench: :prod,
+        "bench.ai.fresh_workflow": :prod,
+        "bench.ai.state_growth": :prod,
+        ci: :test,
         coveralls: :test,
-        "coveralls.github": :test,
-        "coveralls.lcov": :test,
-        "coveralls.detail": :test,
-        "coveralls.post": :test,
-        "coveralls.html": :test,
-        "coveralls.cobertura": :test
+        "coveralls.json": :test,
+        "jido_v3.recovery": :test,
+        quality: :test,
+        "test.authoring": :test,
+        "test.all": :test,
+        "test.bench": :test,
+        "test.ci": :test,
+        "test.contracts": :test,
+        "test.examples": :test,
+        "test.fuzz": :test,
+        "test.integration": :test,
+        "test.live": :test,
+        "test.load": :test,
+        "test.peer": :test,
+        "test.property": :test,
+        "test.services": :test
       ]
     ]
   end
 
-  # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
-  defp elixirc_paths(_), do: ["lib"]
+  defp elixirc_paths(_env), do: ["lib"]
 
   defp docs do
+    published_guides =
+      guide_toc()
+      |> Enum.map(fn {section, guides} ->
+        guides = Enum.filter(guides, fn {_title, path} -> File.regular?(path) end)
+        {section, guides}
+      end)
+      |> Enum.reject(fn {_section, guides} -> guides == [] end)
+
     [
-      main: "readme",
-      api_reference: false,
-      source_ref: "v#{@version}",
-      source_url: "https://github.com/agentjido/jido",
-      authors: ["Mike Hostetler <mike.hostetler@gmail.com>"],
-      groups_for_extras: [
-        "Start Here": [
-          "guides/getting-started.livemd",
-          "guides/core-loop.md",
-          "guides/runtime-patterns.md",
-          "guides/your-first-plugin.md",
-          "guides/your-first-sensor.md",
-          "guides/observability-intro.md"
-        ],
-        Fundamentals: [
-          "guides/storage-conformance.md",
-          "guides/agents.md",
-          "guides/actions.md",
-          "guides/signals.md",
-          "guides/directives.md",
-          "guides/state-ops.md",
-          "guides/plugins.md",
-          "guides/strategies.md",
-          "guides/runtime.md"
-        ],
-        Coordination: [
-          "guides/await.md",
-          "guides/orchestration.md",
-          "guides/pods.md",
-          "guides/multi-tenancy.md"
-        ],
-        Operations: [
-          "guides/debugging.md",
-          "guides/observability.md",
-          "guides/testing.md",
-          "guides/configuration.md",
-          "guides/storage.md",
-          "guides/worker-pools.md",
-          "guides/scheduling.md"
-        ],
-        Extending: [
-          "guides/sensors.md",
-          "guides/discovery.md",
-          "guides/custom-strategies.md"
-        ],
-        Integrations: [
-          "guides/phoenix-integration.md",
-          "guides/ash-integration.md"
-        ],
-        Advanced: [
-          "guides/orphans.md",
-          "guides/fsm-strategy.livemd",
-          "guides/errors.md"
-        ],
-        Migration: [
-          "guides/migration.md"
-        ],
-        Project: [
-          "CONTRIBUTING.md",
-          "CHANGELOG.md",
-          "LICENSE"
-        ]
-      ],
-      extras: [
-        {"README.md", title: "Home"},
-
-        # Start Here
-        {"guides/getting-started.livemd", title: "Quick Start"},
-        {"guides/core-loop.md", title: "Core Loop"},
-        {"guides/runtime-patterns.md", title: "Choosing a Runtime Pattern"},
-        {"guides/your-first-plugin.md", title: "Your First Plugin"},
-        {"guides/your-first-sensor.md", title: "Your First Sensor"},
-        {"guides/observability-intro.md", title: "Seeing What Happened"},
-
-        # Fundamentals
-        {"guides/agents.md", title: "Agents"},
-        {"guides/actions.md", title: "Actions"},
-        {"guides/signals.md", title: "Signals & Routing"},
-        {"guides/directives.md", title: "Directives"},
-        {"guides/state-ops.md", title: "State Operations"},
-        {"guides/plugins.md", title: "Plugins"},
-        {"guides/strategies.md", title: "Strategies"},
-        {"guides/runtime.md", title: "Runtime"},
-
-        # Coordination
-        {"guides/await.md", title: "Await & Coordination"},
-        {"guides/orchestration.md", title: "Multi-Agent Orchestration"},
-        {"guides/pods.md", title: "Pods"},
-        {"guides/multi-tenancy.md", title: "Multi-Tenancy"},
-
-        # Operations
-        {"guides/debugging.md", title: "Debugging"},
-        {"guides/observability.md", title: "Observability"},
-        {"guides/testing.md", title: "Testing"},
-        {"guides/configuration.md", title: "Configuration"},
-        {"guides/storage.md", title: "Persistence & Storage"},
-        {"guides/worker-pools.md", title: "Worker Pools"},
-        {"guides/scheduling.md", title: "Scheduling"},
-
-        # Extending
-        {"guides/sensors.md", title: "Sensors"},
-        {"guides/discovery.md", title: "Discovery"},
-        {"guides/custom-strategies.md", title: "Custom Strategies"},
-
-        # Integrations
-        {"guides/phoenix-integration.md", title: "Phoenix Integration"},
-        {"guides/ash-integration.md", title: "Ash Integration"},
-
-        # Advanced
-        {"guides/orphans.md", title: "Orphans & Adoption"},
-        {"guides/fsm-strategy.livemd", title: "FSM Strategy Deep Dive"},
-        {"guides/errors.md", title: "Error Handling"},
-
-        # Migration
-        {"guides/migration.md", title: "Migrating from 1.x"},
-
-        # Project
-        {"CONTRIBUTING.md", title: "Contributing"},
-        {"CHANGELOG.md", title: "Changelog"},
-        {"LICENSE", title: "Apache 2.0 License"}
-      ],
+      main: "Jido",
+      api_reference: true,
+      source_url: @source_url,
+      source_ref: @source_ref,
       extra_section: "Guides",
-      formatters: ["html", "markdown"],
-      skip_undefined_reference_warnings_on: [
-        "CHANGELOG.md",
-        "LICENSE"
-      ],
-      groups_for_modules: [
-        Core: [
-          Jido,
-          Jido.Agent,
-          Jido.AgentServer,
-          Jido.Await,
-          Jido.Pod,
-          Jido.Pod.Topology,
-          Jido.Pod.Topology.Link,
-          Jido.Pod.Topology.Node
-        ],
-        Strategies: [
-          Jido.Agent.Strategy,
-          Jido.Agent.Strategy.Direct,
-          Jido.Agent.Strategy.FSM,
-          Jido.Agent.Strategy.FSM.Machine,
-          Jido.Agent.Strategy.State,
-          Jido.Agent.Strategy.Snapshot
-        ],
-        Plugins: [
-          Jido.Plugin,
-          Jido.Plugin.Config,
-          Jido.Plugin.Instance,
-          Jido.Plugin.Manifest,
-          Jido.Plugin.Requirements,
-          Jido.Plugin.Routes,
-          Jido.Plugin.Schedules,
-          Jido.Plugin.Spec,
-          Jido.Pod.Plugin
-        ],
-        "Agent Identity": [
-          Jido.Agent.Identity,
-          Jido.Agent.Identity.Plugin,
-          Jido.Agent.Identity.Agent,
-          Jido.Agent.Identity.Profile,
-          Jido.Agent.Identity.Actions.Evolve
-        ],
-        Directives: [
-          Jido.Agent.Directive,
-          Jido.Agent.Directive.Emit,
-          Jido.Agent.Directive.Error,
-          Jido.Agent.Directive.Spawn,
-          Jido.Agent.Directive.SpawnAgent,
-          Jido.Agent.Directive.AdoptChild,
-          Jido.Agent.Directive.StopChild,
-          Jido.Agent.Directive.Schedule,
-          Jido.Agent.Directive.RunInstruction,
-          Jido.Agent.Directive.Stop,
-          Jido.Agent.Directive.Cron,
-          Jido.Agent.Directive.CronCancel
-        ],
-        "State Operations": [
-          Jido.Agent.StateOp,
-          Jido.Agent.StateOp.SetState,
-          Jido.Agent.StateOp.ReplaceState,
-          Jido.Agent.StateOp.DeleteKeys,
-          Jido.Agent.StateOp.SetPath,
-          Jido.Agent.StateOp.DeletePath,
-          Jido.Agent.StateOps
-        ],
-        "Agent Internals": [
-          Jido.Agent.DefaultPlugins,
-          Jido.Agent.State,
-          Jido.Agent.Schema,
-          Jido.AgentServer.State,
-          Jido.AgentServer.State.Lifecycle,
-          Jido.AgentServer.Status,
-          Jido.AgentServer.Options,
-          Jido.AgentServer.ErrorPolicy,
-          Jido.AgentServer.SignalRouter,
-          Jido.AgentServer.ParentRef,
-          Jido.AgentServer.ChildInfo,
-          Jido.AgentServer.DirectiveExec,
-          Jido.AgentServer.Lifecycle,
-          Jido.AgentServer.Lifecycle.Keyed,
-          Jido.AgentServer.Lifecycle.Noop,
-          Jido.AgentServer.Signal.ChildStarted,
-          Jido.AgentServer.Signal.ChildExit,
-          Jido.AgentServer.Signal.CronTick,
-          Jido.AgentServer.Signal.Orphaned,
-          Jido.AgentServer.Signal.Scheduled
-        ],
-        "Built-in Actions": [
-          Jido.Actions.Control,
-          Jido.Actions.Control.Broadcast,
-          Jido.Actions.Control.Cancel,
-          Jido.Actions.Control.Forward,
-          Jido.Actions.Control.Noop,
-          Jido.Actions.Control.Reply,
-          Jido.Actions.Lifecycle,
-          Jido.Actions.Lifecycle.NotifyParent,
-          Jido.Actions.Lifecycle.NotifyPid,
-          Jido.Actions.Lifecycle.SpawnChild,
-          Jido.Actions.Lifecycle.StopChild,
-          Jido.Actions.Lifecycle.StopSelf,
-          Jido.Actions.Scheduling,
-          Jido.Actions.Scheduling.CancelCron,
-          Jido.Actions.Scheduling.ScheduleCron,
-          Jido.Actions.Scheduling.ScheduleSignal,
-          Jido.Actions.Scheduling.ScheduleTimeout,
-          Jido.Actions.Status,
-          Jido.Actions.Status.MarkCompleted,
-          Jido.Actions.Status.MarkFailed,
-          Jido.Actions.Status.MarkIdle,
-          Jido.Actions.Status.MarkWorking,
-          Jido.Actions.Status.SetStatus
-        ],
-        Sensors: [
-          Jido.Sensor,
-          Jido.Sensor.Runtime,
-          Jido.Sensor.Spec,
-          Jido.Sensors.Heartbeat,
-          Jido.Sensors.Bus
-        ],
-        Thread: [
-          Jido.Thread,
-          Jido.Thread.Agent,
-          Jido.Thread.Entry,
-          Jido.Thread.Plugin,
-          Jido.Thread.Store,
-          Jido.Thread.Store.Adapters.InMemory,
-          Jido.Thread.Store.Adapters.JournalBacked
-        ],
-        Memory: [
-          Jido.Memory,
-          Jido.Memory.Agent,
-          Jido.Memory.Plugin,
-          Jido.Memory.Space
-        ],
-        Storage: [
-          Jido.Storage,
-          Jido.Storage.ETS,
-          Jido.Storage.File,
-          Jido.Storage.Redis,
-          Jido.Persist,
-          Jido.Agent.InstanceManager,
-          Jido.Agent.Persistence,
-          Jido.Agent.Store,
-          Jido.Agent.Store.ETS,
-          Jido.Agent.Store.File
-        ],
-        Observability: [
-          Jido.Observe,
-          Jido.Observe.Config,
-          Jido.Observe.Log,
-          Jido.Observe.Tracer,
-          Jido.Observe.NoopTracer,
-          Jido.Observe.SpanCtx,
-          Jido.Debug,
-          Jido.Telemetry,
-          Jido.Telemetry.Config,
-          Jido.Telemetry.Formatter,
-          Jido.Tracing.Context,
-          Jido.Tracing.Trace
-        ],
-        Utilities: [
-          Jido.Discovery,
-          Jido.Error,
-          Jido.Scheduler,
-          Jido.Util,
-          Jido.Agent.WorkerPool
-        ],
-        Exceptions: [
-          Jido.Error.CompensationError,
-          Jido.Error.ExecutionError,
-          Jido.Error.InternalError,
-          Jido.Error.RoutingError,
-          Jido.Error.TimeoutError,
-          Jido.Error.ValidationError
-        ]
-      ]
+      skip_code_autolink_to: &skip_internal_doc_link?/1,
+      extras: for({_section, guides} <- published_guides, {title, path} <- guides, do: {path, title: title}),
+      groups_for_extras:
+        for(
+          {section, guides} <- published_guides,
+          do: {section, Enum.map(guides, &elem(&1, 1))}
+        )
     ]
   end
 
-  defp package do
+  defp skip_internal_doc_link?("c:Jido.Agent.Extension." <> _callback), do: true
+
+  defp skip_internal_doc_link?(reference)
+       when reference in [
+              "Jido.Exec.Runtime",
+              "Jido.Exec.Fact",
+              "Jido.Exec.Frame",
+              "Jido.Instruction.Compiler",
+              "Jido.Instruction.Config",
+              "Jido.Persistence.Codec.JSON.decode/2",
+              "Jido.Persistence.Codec.JSON.encode/1",
+              "Jido.Persistence.Codec.Term.decode/2",
+              "Jido.Persistence.Codec.Term.encode/1",
+              "Jido.Persistence.Record",
+              "Jido.Telemetry.set_debug/2"
+            ],
+       do: true
+
+  defp skip_internal_doc_link?(_reference), do: false
+
+  # This exact list is the guide backlog. Add content at a listed path to
+  # publish it. Do not replace the list with a guides/ wildcard: files that are
+  # not listed here are not part of this guide set.
+  defp guide_toc do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE", "usage-rules.md"],
-      maintainers: ["Mike Hostetler"],
-      licenses: ["Apache-2.0"],
-      links: %{
-        "Documentation" => "https://hexdocs.pm/jido",
-        "GitHub" => "https://github.com/agentjido/jido",
-        "Website" => "https://jido.run",
-        "Discord" => "https://jido.run/discord",
-        "Changelog" => "https://github.com/agentjido/jido/blob/main/CHANGELOG.md"
-      }
+      {:"Start Here",
+       [
+         {"Jido Mental Model", "guides/start-here/jido-mental-model.md"},
+         {"Getting Started", "guides/start-here/getting-started.livemd"},
+         {"Start a Jido Instance", "guides/start-here/start-a-jido-instance.livemd"},
+         {"Build Your First Action", "guides/start-here/first-action.livemd"},
+         {"Build Your First Flow", "guides/start-here/build-your-first-flow.livemd"},
+         {"Build Your First Agent", "guides/start-here/first-agent.livemd"},
+         {"Test Jido Code", "guides/start-here/testing-jido-code.livemd"}
+       ]},
+      {:"From TypeScript",
+       [
+         {"Node.js and the BEAM", "guides/from-typescript/nodejs-and-the-beam.md"},
+         {"TypeScript Concept Map", "guides/from-typescript/typescript-concept-map.md"},
+         {"Types and Validation", "guides/from-typescript/types-and-validation.md"}
+       ]},
+      {:Actions,
+       [
+         {"Actions", "guides/actions/actions.md"},
+         {"Schemas and Validation", "guides/actions/schemas-validation.md"},
+         {"Outputs and Effects", "guides/actions/action-effects.livemd"},
+         {"Instructions and Targets", "guides/actions/instructions.md"},
+         {"Action Context", "guides/actions/action-context.md"},
+         {"Execution Policy", "guides/actions/action-execution-policy.md"},
+         {"Test Actions", "guides/actions/testing-actions.livemd"}
+       ]},
+      {:"Author Flows",
+       [
+         {"Flows", "guides/flows/flows.md"},
+         {"Flow DSL Tour", "guides/flows/flow-language.livemd"},
+         {"Steps and Output", "guides/flows/flow-steps.md"},
+         {"Inline Actions", "guides/flows/inline-actions.md"},
+         {"Inline Action DSLs", "guides/flows/building-dsls-with-inline-actions.md"},
+         {"References and Data", "guides/flows/flow-references.livemd"},
+         {"Expressions", "guides/flows/flow-expressions.md"},
+         {"Flow Dependencies", "guides/flows/flow-dependencies.livemd"},
+         {"Choices and Conditions", "guides/flows/flow-choices.md"},
+         {"Map and Reduce", "guides/flows/flow-collections.md"},
+         {"Iterate and State", "guides/flows/flow-iterate-state.md"},
+         {"Nested Flows", "guides/flows/nested-flows.livemd"},
+         {"Dynamic Flows", "guides/flows/dynamic-flows.md"},
+         {"Flow Extensions", "guides/flows/flow-modules.md"}
+       ]},
+      {:"Flows as Data",
+       [
+         {"Authoring Runtime Data", "guides/flow-data/authoring-runtime-data.md"},
+         {"Flow Data Definitions", "guides/flow-data/flow-data.md"},
+         {"Store Flows as JSON", "guides/flow-data/flow-storage.md"},
+         {"Inspect Flows", "guides/flow-data/flow-inspection.md"},
+         {"Flow Identity", "guides/flow-data/flow-identity-and-versioning.md"}
+       ]},
+      {:"Run Flows",
+       [
+         {"Execution", "guides/flow-runtime/execution.md"},
+         {"Execute Flows", "guides/flow-runtime/flow-execution.livemd"},
+         {"Managed Execution", "guides/flow-runtime/managed-execution.md"},
+         {"Flow Errors", "guides/flow-runtime/flow-errors.md"},
+         {"Debug Flows", "guides/flow-runtime/debugging-flows.md"},
+         {"Test Flows", "guides/flow-runtime/testing-flows.livemd"},
+         {"Flow Security", "guides/flow-runtime/flow-security.md"}
+       ]},
+      {:"Author Agents",
+       [
+         {"Define an Agent", "guides/agents/define-and-instantiate-an-agent.livemd"},
+         {"Agent State and Schemas", "guides/agents/agent-state-and-schemas.md"},
+         {"Routes and Handlers", "guides/agents/build-agent-routes.livemd"},
+         {"Documents and Views", "guides/agents/agent-documents-and-views.md"},
+         {"Agent Callbacks", "guides/agents/agent-callbacks.md"},
+         {"Test Agent Definitions", "guides/agents/testing-agent-definitions.livemd"}
+       ]},
+      {:Signals,
+       [
+         {"Custom Signals", "guides/signals/signals-and-custom-types.md"},
+         {"CloudEvents Context", "guides/signals/cloudevents-envelope-and-context.md"},
+         {"Signal Data Schemas", "guides/signals/signal-data-schemas.md"},
+         {"Signal Wire Format", "guides/signals/signal-codecs.md"},
+         {"Signal Routing", "guides/signals/routing-and-router-dsl.md"},
+         {"Signal Dispatch Adapters", "guides/signals/dispatch-adapters.md"},
+         {"Signal Bus", "guides/signals/signal-bus-and-subscriptions.md"},
+         {"Durable Subscriptions", "guides/signals/durable-subscriptions.md"},
+         {"Signal Boundaries", "guides/signals/signal-boundaries.md"}
+       ]},
+      {:"Build Plugins",
+       [
+         {"Plugin Design", "guides/plugins/plugin-design.md"}
+       ]},
+      {:"Built-In Plugins",
+       [
+         {"Behavior Trees", "guides/built-in-plugins/behavior-trees.md"},
+         {"Signal Bus Plugin", "guides/built-in-plugins/signal-bus-plugin.livemd"},
+         {"Statecharts", "guides/built-in-plugins/statecharts.md"},
+         {"Timers", "guides/built-in-plugins/timers.livemd"},
+         {"Periodic Timer Signals", "guides/built-in-plugins/heartbeats.livemd"}
+       ]},
+      {:"Run Agent Servers",
+       [
+         {"Start and Address Agents", "guides/agent-servers/start-and-address-live-agents.livemd"},
+         {"Status and Snapshots", "guides/agent-servers/status-and-history.md"}
+       ]},
+      {:Durability,
+       [
+         {"Durable Agent Activation", "guides/durability/durable-agent-activation.livemd"},
+         {"Deletion and Tombstones", "guides/durability/deletion-and-tombstones.md"}
+       ]},
+      {:Storage,
+       [
+         {"Storage Model", "guides/storage/persistence-storage-model.md"},
+         {"Local Stores", "guides/storage/local-persistence-adapters.md"},
+         {"Ecto Storage", "guides/storage/ecto-persistence.md"},
+         {"Redis and S3 Stores", "guides/storage/redis-and-s3-persistence.md"}
+       ]},
+      {:"AI Agents",
+       [
+         {"Graph-First AI Agents", "guides/ai/graph-first-ai-agents.livemd"},
+         {"Reasoning Setup", "guides/ai/reasoning-flows-models-and-limits.md"},
+         {"AI Requests and Sessions", "guides/ai/requests-responses-and-sessions.livemd"},
+         {"Model Context Lifecycle", "guides/ai/model-context-lifecycle.md"},
+         {"Thread Projection", "guides/ai/thread-projection.md"},
+         {"Inference Clients", "guides/ai/inference-clients.md"},
+         {"Configure ReqLLM", "guides/ai/req-llm-configuration.livemd"},
+         {"Model Capabilities", "guides/ai/model-capabilities.md"},
+         {"Tools and Toolsets", "guides/ai/tools-skills-and-toolsets.livemd"},
+         {"Search and Read Web Pages", "guides/ai/basic-web-browser.livemd"},
+         {"Tool Calls and Results", "guides/ai/tool-calls-and-results.md"},
+         {"Model Budgets and Usage", "guides/ai/budgets-and-usage.md"},
+         {"ReAct Reasoning", "guides/ai/react-reasoning.livemd"},
+         {"Reasoning Strategies", "guides/ai/reasoning-strategies.md"},
+         {"Custom Reasoning Flows", "guides/ai/custom-reasoning-flows.livemd"},
+         {"Test AI Agents", "guides/ai/testing-ai-agents.livemd"}
+       ]},
+      {:"Data and Contracts",
+       [
+         {"Jido.Joi Validation", "guides/data/joi-validation.md"},
+         {"Jido.Codec Documents", "guides/data/versioned-documents.md"},
+         {"Portable Values", "guides/data/portable-values-and-references.md"},
+         {"Catalog and Discovery", "guides/data/catalog.md"},
+         {"Sessions and Threads", "guides/data/sessions-and-threads.md"},
+         {"Identifiers and UUIDv7", "guides/data/identifiers.md"},
+         {"Jido Error Contracts", "guides/data/error-contracts.md"},
+         {"Trace Context", "guides/data/trace-context.md"}
+       ]},
+      {:"Operate Jido",
+       [
+         {"Instances and Tenants", "guides/operations/configuration-and-tenant-isolation.md"},
+         {"Production Setup", "guides/operations/production-configuration.md"},
+         {"Deployment and Sizing", "guides/operations/deployment-and-performance.md"},
+         {"Security Model", "guides/operations/security.md"},
+         {"Jido v3 Recovery Gate", "guides/operations/jido-v3-recovery.md"}
+       ]},
+      {:Reference,
+       [
+         {"Behavior Tree Migration", "guides/reference/behavior-tree-migration.md"},
+         {"Public API Guide", "guides/reference/public-api-reference.md"},
+         {"Module and Namespace Map", "guides/reference/module-and-namespace-map.md"},
+         {"Telemetry Events", "guides/reference/telemetry-event-reference.md"},
+         {"Persistence Matrix", "guides/reference/persistence-adapter-matrix.md"},
+         {"Reasoning Matrix", "guides/reference/reasoning-strategy-matrix.md"}
+       ]}
+    ]
+  end
+
+  defp test_coverage do
+    [
+      tool: ExCoveralls,
+      output: "cover",
+      ignore_modules: [
+        ~r/^Inspect\.Jido/,
+        ~r/^Jido\.Test\./,
+        ~r/^Jido\.Flow\.DSL\.Forms\.Flow\./,
+        ~r/^Jido\.Flow\.DSL\.(?:Entity|Step|Output)$/,
+        ~r/^Jido\.Flow\.DSL\.Forms\.(?:Map|Reduce|Choice(?:\.Option|\.Otherwise)?|Parallel(?:\.Action)?|Iterate(?:\.State)?|Invoke|Wait\.(?:Await|Timer|Selection(?:\.Await|\.Timer)?))$/,
+        ~r/^Jido\.Action\.Generated\.Inline\./
+      ],
+      summary: [threshold: 90]
     ]
   end
 
   defp deps do
     [
-      # Jido Ecosystem
-      {:jido_action, "~> 2.3"},
-      {:jido_signal, "~> 2.3 and >= 2.3.1"},
-
-      # Jido Deps
-      {:zoi, "~> 0.18.11"},
-      {:nimble_options, "~> 1.1"},
+      # Runtime
+      {:multigraph, "~> 0.16.1-mg.5"},
+      {:mint, "~> 1.11"},
+      {:req, "~> 0.7"},
+      {:req_llm, "~> 1.30"},
+      {:runic, "~> 0.1.0-alpha.13"},
+      {:sched_ex, "~> 1.2.1"},
+      {:spark, "~> 2.7.3"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
-      {:poolboy, "~> 1.5"},
-      {:telemetry_metrics, "~> 1.1"},
-      {:crontab, "~> 1.2"},
-      {:time_zone_info, "~> 0.7"},
+      {:telemetry_metrics, "~> 1.2"},
+      {:yaml_elixir, "~> 2.12"},
+      {:zoi, "~> 0.19.0"},
 
-      # Development & Test Dependencies
-      {:git_ops, "~> 2.9", only: :dev, runtime: false},
-      {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
-      {:credo, "~> 1.7", only: [:dev, :test]},
+      # Optional integrations
+      {:ecto_sql, "~> 3.14", optional: true},
+      {:html2markdown, "~> 0.3.2", optional: true},
+      {:opentelemetry_api, "~> 1.0", optional: true},
+      {:phoenix_pubsub, "~> 2.1", optional: true},
+
+      # Development and test tools
+      {:covenant, "~> 0.2.0", only: [:dev, :test], runtime: false},
+      {:credence, "~> 0.8.1", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:doctor, "~> 0.21", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.40.4", only: :dev, runtime: false},
-      {:excoveralls, "~> 0.18.3", only: [:dev, :test]},
-      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:ex_dna, "~> 1.5", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
+      {:excoveralls, "~> 0.18.5", only: [:dev, :test]},
+      {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
+      {:git_ops, "~> 2.12", only: :dev, runtime: false},
+      {:phoenix_playground, "~> 0.1.9", only: [:dev, :test]},
+      {:reach, "~> 2.8", only: [:dev, :test], runtime: false},
 
-      # Code generation
-      {:igniter, "~> 0.7", optional: true}
+      # Test support
+      {:ecto_sqlite3, "~> 0.24.1", only: :test},
+      {:ex_aws, "~> 2.7", only: :test},
+      {:ex_aws_s3, "~> 2.5", only: :test},
+      {:mimic, "~> 2.0", only: :test},
+      {:opentelemetry, "~> 1.0", only: :test, runtime: false},
+      {:plug, "~> 1.0", only: [:dev, :test]},
+      {:postgrex, "~> 0.19 or ~> 1.0", only: :test},
+      {:stream_data, "~> 1.4", only: :test, runtime: false},
+      {:sweet_xml, "~> 0.7", only: :test}
     ]
   end
 
   defp aliases do
     [
-      # Helper to run tests with trace when needed
-      # test: "test --trace --exclude flaky",
-      test: "test --exclude flaky",
-
-      # Helper to run docs
-      docs: "docs --open",
-
-      # Run to check the quality of your code
-      q: ["quality"],
-      quality: [
-        "format --check-formatted",
+      bench: "run test/perf/jido_ai/react_memory.exs",
+      "bench.ai.fresh_workflow": "run test/perf/jido_ai/react_fresh_workflow.exs",
+      "bench.ai.state_growth": "run test/perf/jido_ai/react_state_growth.exs",
+      ci: [
         "compile --warnings-as-errors",
-        "credo --min-priority higher",
-        "dialyzer"
-      ]
+        "format --check-formatted",
+        "test.ci",
+        "credo --strict --min-priority higher",
+        "credo --strict --mute-exit-status",
+        "dialyzer --list-unused-filters",
+        "ex_dna --max-clones 17",
+        "reach.check --arch --smells"
+      ],
+      quality: [
+        "compile --warnings-as-errors",
+        "format --check-formatted",
+        "credo --strict --min-priority higher",
+        "credo --strict --mute-exit-status",
+        "dialyzer --list-unused-filters",
+        "ex_dna --max-clones 17",
+        "reach.check --arch --smells"
+      ],
+      "jido_v3.recovery":
+        "test --seed 0 test/jido/agent_server/durable_activation_contract_test.exs test/jido/plugin/timer/runtime_contract_test.exs",
+      "test.authoring": test_alias("test/authoring", :authoring),
+      "test.all": "test.ci",
+      "test.bench": test_alias("test/perf", :bench),
+      "test.ci": &run_test_ci/1,
+      "test.contracts": "covenant.check",
+      "test.examples": test_alias("examples", :integration),
+      "test.fuzz": fn args ->
+        run_tagged_tests("test/property", :fuzz, args)
+        check_property_report!(args, :fuzz)
+      end,
+      "test.integration": test_alias(["test", "examples"], :integration),
+      "test.live": test_alias("test/external/jido_ai", :live),
+      "test.load": test_alias("test/perf", :load),
+      "test.peer": test_alias("test", :peer),
+      "test.property": fn args ->
+        run_tagged_tests("test/property", :property, args)
+        check_property_report!(args, :property)
+      end,
+      "test.services": test_alias("test/external", :service)
+    ]
+  end
+
+  defp test_alias(default_paths, tag) do
+    fn args -> run_tagged_tests(default_paths, tag, args) end
+  end
+
+  defp run_tagged_tests(default_paths, tag, args) do
+    explicit_path? = Enum.any?(args, &test_path?/1)
+    existing_paths = default_paths |> List.wrap() |> Enum.filter(&File.exists?/1)
+
+    if existing_paths != [] or explicit_path? do
+      paths = if explicit_path?, do: [], else: existing_paths
+      Mix.Task.run("test", ["--only", Atom.to_string(tag), "--seed", "0"] ++ paths ++ args)
+    else
+      Mix.shell().info("No #{tag} tests found under #{Enum.join(List.wrap(default_paths), ", ")}")
+    end
+  end
+
+  defp run_test_ci([]) do
+    [
+      ["test", "--seed", "0"],
+      ["test.authoring"],
+      ["test.contracts"],
+      ["test.integration"],
+      ["test.property"],
+      ["test.fuzz"],
+      ["test.load"],
+      ["test.peer"],
+      ["test.bench"]
+    ]
+    |> Enum.each(&run_mix_task!/1)
+  end
+
+  defp run_test_ci(args), do: Mix.raise("mix test.ci does not accept arguments: #{inspect(args)}")
+
+  defp run_mix_task!(args) do
+    mix = System.find_executable("mix") || Mix.raise("mix executable is not available")
+    Mix.shell().info("test.ci: mix #{Enum.join(args, " ")}")
+
+    case System.cmd(mix, args, env: [{"MIX_ENV", "test"}], stderr_to_stdout: true) do
+      {output, 0} -> IO.write(output)
+      {output, status} -> Mix.raise("mix #{Enum.join(args, " ")} failed with status #{status}\n#{output}")
+    end
+  end
+
+  defp test_path?(argument) do
+    not String.starts_with?(argument, "-") and File.exists?(argument)
+  end
+
+  defp check_property_report!(args, suite) do
+    paths = Enum.filter(args, &test_path?/1)
+    all? = paths == [] or Enum.any?(paths, &(Path.expand(&1) == Path.expand("test/property")))
+
+    Code.require_file("test/property/support/report.exs")
+    Jido.Test.Property.Report.check!(full: all?, suite: suite)
+  end
+
+  defp test_ignore_filters do
+    [
+      ~r/^test\/consumers\//,
+      ~r/^test\/contracts\//,
+      ~r/^test\/authoring\/support\//,
+      fn path ->
+        String.starts_with?(path, "examples/") and not String.ends_with?(path, "_test.exs")
+      end,
+      ~r{^test/perf/(?:jido_ai/(?:react_fresh_workflow|react_memory|react_state_growth|react_stress|react_support)|jido_exec/flow_run|jido_flow/(?:dsl_compile|flow_compile)|jido_signal/run)\.exs$},
+      ~r{^test/perf/(?:jido_signal/support|support)/},
+      ~r{^test/property/(?:support|[^/]+/support)/},
+      ~r{^test/external/(?:support|(?:minio|redis)/support\.exs)}
+    ]
+  end
+
+  defp package do
+    guide_files =
+      for {_section, guides} <- guide_toc(),
+          {_title, path} <- guides,
+          File.regular?(path),
+          do: path
+
+    [
+      files:
+        [
+          ".formatter.exs",
+          "CHANGELOG.md",
+          "LICENSE",
+          "README.md",
+          "lib",
+          "mix.exs",
+          "usage-rules.md"
+        ] ++ guide_files,
+      maintainers: ["Mike Hostetler"],
+      licenses: ["Apache-2.0"],
+      links: %{
+        "Changelog" => "#{@source_url}/blob/#{@source_ref}/CHANGELOG.md",
+        "Documentation" => "https://hexdocs.pm/jido",
+        "GitHub" => @source_url,
+        "Website" => "https://jido.run"
+      }
     ]
   end
 end

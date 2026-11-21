@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+
+<!-- test that an internal transition does not exit its source state -->
+
+<scxml  initial="s1" version="1.0" conf:datamodel=""  xmlns="http://www.w3.org/2005/07/scxml" xmlns:conf="http://www.w3.org/2005/scxml-conformance">
+<datamodel>
+  <data conf:id="1" conf:expr="0"/>  <!-- how often we have exited s1 -->
+  <data conf:id="2" conf:expr="0"/>  <!-- how often we have exited s11 -->
+  <data conf:id="3" conf:expr="0"/>  <!-- how often the transition for foo has been taken -->
+  </datamodel>
+    
+ <state id="s1">
+   <onentry>
+    <raise event="foo"/>
+    <raise event="bar"/>
+    </onentry>
+  <onexit>
+    <conf:incrementID id="1"/>
+    </onexit>
+  <transition event="foo" type="internal" target="s11">
+     <conf:incrementID id="3"/>
+     </transition>
+     
+   <!-- make sure the transition on foo was actually taken --> 
+  <transition event="bar" conf:idVal="3=1" target="s2"/>
+  <transition event="bar" conf:targetfail=""/>
+  
+ <state id="s11">
+   <onexit>
+   <conf:incrementID id="2"/>
+   </onexit>
+  </state>
+ </state>
+  
+<state id="s2">
+  <!-- make sure that s1 was exited once -->
+    <transition conf:idVal="1=1" target="s3"/>
+    <transition conf:targetfail=""/>
+ </state> 
+ 
+  
+<state id="s3">
+  <!-- make sure that s11 was exited twice -->
+    <transition conf:idVal="2=2" conf:targetpass=""/>
+    <transition conf:targetfail=""/>
+ </state>
+  
+<conf:pass/>
+<conf:fail/>
+     
+</scxml>

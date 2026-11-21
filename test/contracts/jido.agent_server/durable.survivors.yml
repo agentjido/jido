@@ -1,0 +1,47 @@
+- at: lib/jido/agent_server/durable.ex:11:17
+  operator: string_empty
+  mutation: "`\"persistence requires a Jido instance with a stable namespace\"` → `\"\"`"
+  sort: log-only
+  reason: The contract requires a structured configuration failure. It does not fix the human-readable message.
+
+- at: lib/jido/agent_server/durable.ex:15:17
+  operator: string_empty
+  mutation: "`\"invalid persistence_timeout\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the accepted finite range and structured failure, not the human-readable message.
+
+- at: lib/jido/agent_server/durable.ex:18:17
+  operator: string_empty
+  mutation: "`\"invalid persistence_mode\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes create and restore as the accepted modes, not the human-readable message.
+
+- at: lib/jido/agent_server/durable.ex:21:17
+  operator: string_empty
+  mutation: "`\"invalid idle_policy\"` → `\"\"`"
+  sort: log-only
+  reason: The contract fixes the persistence requirement for idle hibernation, not the human-readable message.
+
+- at: lib/jido/agent_server/durable.ex:46:11
+  operator: element_removal
+  mutation: "`server_turn: server_turn` → `(removed)`"
+  sort: unpromised
+  reason: The stored Flow receipt belongs to jido.agent_server.durable_turn. This component owns the Agent revision write and only passes the receipt through.
+
+- at: lib/jido/agent_server/durable.ex:52:44
+  operator: comparison_swap
+  mutation: "`>=` → `>`"
+  sort: evaluation-gap
+  reason: Public storage tasks cannot be made to complete at the exact same monotonic millisecond as the private deadline without replacing the runtime clock. Tests cover completion before and after the deadline.
+
+- at: lib/jido/agent_server/durable.ex:73:88
+  operator: boolean_flip
+  mutation: "`true` → `false`"
+  sort: equivalent
+  reason: Only presence of the private durable_started ETS key is read. Its value is never read, so either Boolean produces the same mode selection.
+
+- at: lib/jido/agent_server/durable.ex:98:45
+  operator: element_removal
+  mutation: "`nil` → `(removed)`"
+  sort: equivalent
+  reason: AgentServer runtime option normalization converts a disabled persistence value to false before this function runs. Valid component calls do not receive nil.

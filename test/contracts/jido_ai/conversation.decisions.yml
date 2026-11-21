@@ -1,0 +1,10 @@
+- id: conversation-component-boundary
+  date: "2026-10-27"
+  decision: Keep Session, Thread, entries, and ReqLLM conversation projection in one jido_ai.conversation component.
+  driver: These modules define one portable append-only record and one model-context view of that record.
+  approved_by: User-requested initial Covenant scaffold
+- id: thread-proof-ownership
+  date: "2026-11-19"
+  decision: Move Thread and Entry obligations to jido.thread. Keep Session and projection obligations here.
+  driver: Thread has a complete portable contract in value_model. Session and projection consume its ordered history.
+  approved_by: Jido.Thread implementation phase in review queue 453

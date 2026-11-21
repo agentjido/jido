@@ -1,0 +1,9 @@
+{
+  "format": 1,
+  "property": "durable_store_faults",
+  "input": {
+    "fault": "error",
+    "time": "2026-09-29T01:00:00+01:00"
+  },
+  "description": "Fixed review regression. Construct process values at test time."
+}

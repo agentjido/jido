@@ -1,0 +1,134 @@
+defmodule Jido.AI.Reasoning.Actions.StartRequest do
+  alias Jido.Joi
+  @moduledoc "Initializes one request and appends its user message to the Session."
+
+  alias Jido.AI.Agent.Plugin
+  alias Jido.AI.Reasoning.ReAct.Guards
+  alias Jido.AI.{RequestPolicy, Thread.Projection, Toolset, ToolSource, Usage}
+  alias Jido.Session
+
+  use Jido.Action,
+    id: "jido.ai/reasoning/actions/start-request",
+    vsn: 1,
+    name: "jido_ai_start_request",
+    description: "Load conversation state and start one graph request",
+    schema: Joi.map(),
+    output_schema: Joi.map()
+
+  @impl Jido.Action
+  def run(params, context) do
+    params = RequestPolicy.narrow_start(params, context)
+    now = System.system_time(:millisecond)
+    static_tools = Plugin.prepared_tools(context)
+    agent_state = Map.get(context, :agent_state, %{session: nil})
+    request_id = request_id(context)
+    run_id = "run_#{Jido.Id.uuid7()}"
+    refs = %{request_id: request_id, run_id: run_id}
+
+    with {:ok, guards} <- Guards.capture(Map.get(params, :flow), context),
+         {:ok, session, session_owner} <- session(agent_state, context, now),
+         :ok <- validate_retained_session(agent_state, session_owner),
+         {:ok, dynamic_tools} <- ToolSource.load(context),
+         {:ok, selection} <-
+           Toolset.select(static_tools ++ dynamic_tools, Map.get(params, :tool_policy, %{})),
+         {:ok, session} <-
+           Projection.append(session, %{role: :user, content: params.input}, refs, now),
+         {:ok, document} <- Session.encode_for_runic(session) do
+      review_tools =
+        if Map.get(params, :review_tools, false), do: selection.visible, else: selection.review
+
+      review_required = Map.get(params, :review_tools, false) or review_tools != []
+
+      turn = %{
+        agent_state: turn_agent_state(agent_state, session_owner),
+        session: document,
+        session_owner: session_owner,
+        session_entry_count: session.thread.rev - 1,
+        request_id: request_id,
+        run_id: run_id,
+        flow: Map.get(params, :flow),
+        started_at_ms: now,
+        input: params.input,
+        instructions: params.instructions,
+        models: [params.model | Map.get(params, :fallback_models, [])],
+        model_index: 0,
+        model_attempt: 0,
+        model_calls: 0,
+        max_model_calls: params.max_model_calls,
+        max_elapsed_ms: Map.get(params, :max_elapsed_ms),
+        max_input_tokens: Map.get(params, :max_input_tokens),
+        max_output_tokens: Map.get(params, :max_output_tokens),
+        max_total_tokens: Map.get(params, :max_total_tokens),
+        max_total_cost: Map.get(params, :max_total_cost),
+        max_output_chars: Map.get(params, :max_output_chars, 32_000),
+        max_retries: Map.get(params, :max_retries, 0),
+        retries: 0,
+        options: params.options,
+        output_schema: Map.get(params, :output_schema),
+        prompt_cache: Map.get(params, :prompt_cache, %{enabled: false}),
+        stream: Map.get(params, :stream, false),
+        review_required: review_required,
+        review_tools: review_tools,
+        review_id: nil,
+        repair_instruction: nil,
+        context_window: params.context_window,
+        tool_rounds: 0,
+        max_tool_rounds: Map.get(params, :max_tool_rounds, 0),
+        tool_call_count: 0,
+        tool_error_count: 0,
+        tool_cycle_count: 0,
+        previous_tool_signature: nil,
+        max_tool_calls: Map.get(params, :max_tool_calls, 0),
+        max_tool_output_bytes: Map.get(params, :max_tool_output_bytes, 16_384),
+        tools: selection.tools,
+        tool_selection:
+          selection
+          |> Map.drop([:actions, :tools])
+          |> Map.put(:review, review_tools),
+        tool_requirement: selection.requirement,
+        model_outcome: nil,
+        usage: Usage.zero(),
+        model_attempts: [],
+        tool_attempts: []
+      }
+
+      {:ok, if(map_size(guards) == 0, do: turn, else: Map.put(turn, :react_guards, guards))}
+    end
+  end
+
+  defp session(_agent_state, %{jido_ai_session: value}, _now),
+    do: open_session(value, :caller)
+
+  defp session(%{session: %Session{} = session}, _context, _now),
+    do: open_session(session, :agent)
+
+  defp session(%{session: value}, _context, _now) when not is_nil(value),
+    do: {:error, :invalid_session}
+
+  defp session(_state, context, now) do
+    agent_id = Map.get(context, :agent_id, Jido.Id.uuid7())
+    {:ok, Session.new(id: "session:#{agent_id}", now: now), :agent}
+  end
+
+  defp open_session(value, owner) do
+    with {:ok, session} <- Session.decode(value),
+         true <- Session.open?(session) do
+      {:ok, session, owner}
+    else
+      false -> {:error, :closed_session}
+      {:error, _reason} -> {:error, :invalid_session}
+    end
+  end
+
+  defp validate_retained_session(%{session: %Session{} = session}, :caller) do
+    with {:ok, _document} <- Session.encode_for_runic(session), do: :ok
+  end
+
+  defp validate_retained_session(_agent_state, _owner), do: :ok
+
+  defp turn_agent_state(agent_state, :agent), do: Map.delete(agent_state, :session)
+  defp turn_agent_state(agent_state, :caller), do: agent_state
+
+  defp request_id(%{signal: %{id: id}}) when is_binary(id), do: id
+  defp request_id(_context), do: "request_#{Jido.Id.uuid7()}"
+end
