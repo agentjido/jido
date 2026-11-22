@@ -79,6 +79,15 @@ request = JidoDocsReader.request_signal!(%{input: "Read https://jido.hexdocs.pm/
 reply.data.output
 ```
 
+## Run the browser tool offline
+
+The [release-note example](../../examples/15_ai_agents/15_15_browser_release_notes/README.md)
+runs the browser tool with an in-memory page transport and a scripted model.
+The host can select a trusted `:page_transport` that implements
+`Jido.AI.Browser`. Jido checks the URL before asking the transport to resolve
+it and checks the returned IP address before asking it for the page. The
+transport must use that address and return any redirect to Jido.
+
 ## Find and read a page with Brave
 
 Use the Brave setup above. Add `fetch_format: :markdown` to that same

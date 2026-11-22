@@ -54,7 +54,12 @@ defmodule Jido.Examples.ExplorerPreview do
 
   defp highlight(body, language, line_numbers) do
     Lumis.highlight(body,
-      formatter: {:html_inline, [language: language, theme: "github_light", line_numbers: line_numbers]}
+      formatter:
+        {:html_multi_themes,
+         language: language,
+         themes: [light: "github_light", dark: "github_dark"],
+         default_theme: "light-dark()",
+         line_numbers: line_numbers}
     )
   end
 
@@ -63,20 +68,31 @@ defmodule Jido.Examples.ExplorerPreview do
       %URI{scheme: nil, host: nil, path: path, query: nil, fragment: fragment}
       when is_binary(path) ->
         target = Path.expand(URI.decode(path), Path.join([@examples, example.chapter, example.id]))
-        filename = Path.basename(target)
 
-        lesson =
-          Enum.find(catalog, fn entry ->
-            Path.join([@examples, entry.chapter, entry.id]) == Path.dirname(target)
+        lesson_file =
+          Enum.find_value(catalog, fn entry ->
+            directory = Path.join([@examples, entry.chapter, entry.id])
+
+            if String.starts_with?(target, directory <> "/") do
+              {entry, Path.relative_to(target, directory)}
+            end
           end)
 
         suffix = if fragment, do: "#" <> fragment, else: ""
 
-        cond do
-          lesson && filename == "README.md" -> lesson_url(mode, lesson.id) <> suffix
-          lesson && filename in lesson.files -> lesson_url(mode, lesson.id, filename) <> suffix
-          String.starts_with?(target, @root <> "/") -> @source <> Path.relative_to(target, @root) <> suffix
-          true -> url
+        case lesson_file do
+          {lesson, "README.md"} ->
+            lesson_url(mode, lesson.id) <> suffix
+
+          {lesson, filename} ->
+            if filename in lesson.files or filename in lesson.support_files,
+              do: lesson_url(mode, lesson.id, filename) <> suffix,
+              else: @source <> Path.relative_to(target, @root) <> suffix
+
+          nil ->
+            if String.starts_with?(target, @root <> "/"),
+              do: @source <> Path.relative_to(target, @root) <> suffix,
+              else: url
         end
 
       _ ->

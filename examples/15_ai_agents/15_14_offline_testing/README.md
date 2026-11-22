@@ -53,3 +53,5 @@ boilerplate.
 
 Previous: [Skills and Tool Sources](../15_13_skills_and_tool_sources/README.md) |
 Next: [Guardrail Flows](../../16_guardrail_flows/README.md)
+
+Next lesson [Read a release note with an AI Agent](../15_15_browser_release_notes/README.md)

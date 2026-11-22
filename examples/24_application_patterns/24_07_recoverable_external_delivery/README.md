@@ -40,6 +40,9 @@ delivery. Delivery can repeat. Confirmation is a later Agent Turn. Compensation
 must use its own stable operation ID and only start after outcome reconciliation;
 the separate compensation lesson proves that branch.
 
+For a retry inside an interrupted Flow step, see
+[External Uncertainty](../../13_durable_execution/13_07_external_uncertainty/README.md).
+
 ## Limits
 
 The memory sink is not durable and cannot reproduce a real network partition.

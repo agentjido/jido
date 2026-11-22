@@ -167,8 +167,8 @@ Proposed lessons:
 2. Sequential work.
 3. Choice and fallback.
 4. Parallel work and ordered joins.
-5. Map and Reduce.
-6. Bounded Iterate.
+5. Map and Reduce, including one ordered batch with a concurrency bound.
+6. Bounded Iterate with Action and child Flow bodies.
 7. Nested Flows.
 8. Invoke and Handoff.
 9. Wait and resume.
@@ -308,12 +308,11 @@ Proposed lessons:
 
 1. Start and configure a Jido instance.
 2. Namespaces and partitions.
-3. Stable Agent Addresses.
-4. Logical Agent identity and current process identity.
-5. Catalog discovery and package contributions.
-6. Portable values and forbidden runtime values.
-7. Codec documents, stable references, and term limits.
-8. Installed definitions and application supervision.
+3. Stable Agent Addresses, portable documents, and process replacement.
+4. Catalog discovery and package contributions.
+5. Portable values and forbidden runtime values.
+6. Codec documents, stable references, and term limits.
+7. Installed definitions and application supervision.
 
 A stable Agent Address identifies the logical Agent. A PID identifies only
 the process for the current activation. For a durable Agent, the logical
@@ -423,6 +422,7 @@ Proposed lessons:
 7. Standalone approval chart.
 8. Chart Plugin with a named guard and a separate Agent route.
 9. Behavior Tree continuation and Action effects.
+10. Statechart deadline delivery and cancellation.
 
 Primary coverage:
 
@@ -476,10 +476,9 @@ Proposed lessons:
 4. Durable Approval Agent.
 5. Durable Agent activation.
 6. Passive Agent Fleet.
-7. Process recovery drill.
-8. BEAM recovery drill.
-9. External uncertainty and idempotency.
-10. Durable topology and current limits.
+7. Crash recovery drills for Agent process loss and BEAM restart.
+8. External uncertainty and idempotency.
+9. Durable topology and current limits.
 
 The chapter has two named API sections and one shared recovery section:
 
@@ -565,6 +564,7 @@ Proposed lessons:
 12. Tool sources and the offline MCP boundary.
 13. JSON AI Agents.
 14. Offline testing.
+15. Host-scoped browser fetch and a cited answer.
 
 Primary coverage:
 
@@ -697,7 +697,7 @@ Proposed lessons:
 9. Semantic recall through an application-supplied Action.
 10. Agent, Session, resource, and tenant scope.
 11. Provider prompt caching and cache observations.
-12. Long-running Session rollover and archival.
+12. Long-running Session rollover, archival, and rejection of malformed history.
 13. Persistence and concurrent update behavior.
 14. Provenance, replay, and compaction limits.
 15. Long-running ReAct with a bounded Session, archived transcript, and tool recall.

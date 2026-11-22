@@ -62,6 +62,8 @@ Actions. The example uses a zero-duration Wait so that the second tick always
 completes it. An application that needs periodic ticks can use the Timer
 Plugin or send tick Signals from its own scheduler.
 
+Next lesson [Cancel a Statechart deadline](../11_10_statechart_deadline/README.md)
+
 ## Files
 
 - [Tree and Agent](behavior_tree.ex)

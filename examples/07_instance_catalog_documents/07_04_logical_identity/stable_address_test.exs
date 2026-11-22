@@ -109,6 +109,13 @@ defmodule Jido.Examples.Runtime.StableAddressTest do
     assert decoded == c.address
   end
 
+  test "an Address rejects unknown fields and empty identity values", c do
+    document = Address.to_map!(c.address)
+
+    assert {:error, %Jido.Error.ValidationError{}} = Address.from_map(Map.put(document, "pid", "temporary"))
+    assert {:error, %Jido.Error.ValidationError{}} = Address.from_map(%{document | "id" => ""})
+  end
+
   test "an Address survives rebinding its namespace to another local instance", c do
     first = create_and_activate(c.primary, c.address)
 

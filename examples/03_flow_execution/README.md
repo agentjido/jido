@@ -21,11 +21,10 @@ with the small example and continue to the application.
 - [Wait and signal](03_12_wait_and_signal/README.md). Pause and resume through a host.
 - [Direct Runic execution](03_13_compile_to_runic/README.md). Inspect and execute the compiled workflow. Continue with [Runic Runner](03_14_runic_runner/README.md) to dispatch the workflow one Runic unit at a time.
 - [Human approval](03_15_human_approval/README.md). Address one approval event.
-- [Batch processing](03_16_batch_processing/README.md). Bound concurrent Map work and Reduce it.
 - [Sequential flow](03_17_sequential_flow/README.md). Connect ordered steps.
 - [Effectful steps](03_18_effectful_steps/README.md). Pass an application service in execution context.
-- [Ordered batch](03_21_ordered_batch/README.md). Preserve source order through Map and Reduce.
-- [Bounded iteration](03_22_bounded_iteration/README.md). Stop a repair loop at an explicit limit.
+- [Ordered batch](03_21_ordered_batch/README.md). Bound concurrent Map work and preserve source order through Reduce.
+- [Bounded iteration](03_22_bounded_iteration/README.md). Call a child Flow on each pass of a bounded repair loop.
 - [Executable continuation](03_24_executable_continuation/README.md). Continue with an Action or Flow.
 - [Flow directives](03_25_flow_directives/README.md). Return ordered Directives with Flow output.
 

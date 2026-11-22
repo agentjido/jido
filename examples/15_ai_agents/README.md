@@ -18,6 +18,7 @@ contract. All inference is deterministic and offline.
 13. [Skills and ToolSources](15_13_skills_and_tool_sources/README.md), including
     the offline MCP boundary.
 14. [Offline testing](15_14_offline_testing/README.md)
+15. [Read a release note with an AI Agent](15_15_browser_release_notes/README.md)
 
 All tests are offline. They use deterministic inference clients and local
 fixtures. They do not call a model provider or MCP server.

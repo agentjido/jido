@@ -1,5 +1,5 @@
-defmodule Jido.Examples.Patterns.BatchProcessing.Normalize do
-  use Jido.Action, name: "example_batch_normalize"
+defmodule Jido.Examples.OrderedBatch.ConcurrencyProbe.Normalize do
+  use Jido.Action, name: "example_batch_probe_normalize"
 
   @impl true
   def run(%{value: value, index: index}, context) do
@@ -12,23 +12,25 @@ defmodule Jido.Examples.Patterns.BatchProcessing.Normalize do
 
     receive do
       {:release_batch, ^gate} -> :ok
+    after
+      5_000 -> exit(:batch_release_timeout)
     end
   end
 
   defp coordinate(_index, _context), do: :ok
 end
 
-defmodule Jido.Examples.Patterns.BatchProcessing.Total do
-  use Jido.Action, name: "example_batch_total"
+defmodule Jido.Examples.OrderedBatch.ConcurrencyProbe.Total do
+  use Jido.Action, name: "example_batch_probe_total"
 
   @impl true
   def run(%{total: total, item: item}, _context), do: {:ok, %{total: total + item.value}}
 end
 
-defmodule Jido.Examples.Patterns.BatchProcessing do
-  use Jido.Flow, name: "example_batch_processing"
+defmodule Jido.Examples.OrderedBatch.ConcurrencyProbe do
+  use Jido.Flow, name: "example_batch_probe_processing"
 
-  alias Jido.Examples.Patterns.BatchProcessing.{Normalize, Total}
+  alias Jido.Examples.OrderedBatch.ConcurrencyProbe.{Normalize, Total}
 
   flow do
     map "items",

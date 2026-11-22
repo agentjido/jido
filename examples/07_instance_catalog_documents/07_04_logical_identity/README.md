@@ -1,4 +1,4 @@
-# 07_04 Stable Address
+# 07_04 Stable Address and Process Replacement
 
 A stable Agent Address resolves the current conversation process after replacement.
 
@@ -31,13 +31,22 @@ are also different identities. Rebinding a namespace to a new local Jido
 instance keeps the durable identity when both instances use the same
 persistence record.
 
-The public map has exact string keys for version, namespace, partition, and ID.
-Decode it with `Address.from_map/1` before use. A Address is an identifier, not a
-credential.
+An Address identifies the Agent. Use separate authorization for access.
+
+```elixir
+alias Jido.Agent.Address
+
+address = Address.new!(namespace: "support", partition: "team-a", id: "case-42")
+document = Address.to_map!(address)
+{:ok, ^address} = Address.from_map(document)
+```
+
+The document has exact string keys for version, namespace, partition, and ID.
+Decoding rejects unknown keys and empty identity fields.
 
 ## Limits
 
-The test store is local and in memory. A Address does not provide cluster-wide
+The test store is local and in memory. An Address does not provide cluster-wide
 ownership, routing, or fencing.
 
 ## Files
@@ -45,5 +54,5 @@ ownership, routing, or fencing.
 - [Source](stable_address.ex)
 - [Tests](stable_address_test.exs)
 
-Previous: [Stable Addresses](../07_03_stable_addresses/README.md) |
+Previous: [Namespaces and partitions](../07_02_namespaces_and_partitions/README.md) |
 Next: [Catalog discovery](../07_05_catalog_discovery/README.md)

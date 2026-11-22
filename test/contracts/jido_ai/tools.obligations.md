@@ -67,6 +67,6 @@ model-visible results. It does not own ReAct routing or approval waits.
 ### jido_ai.tools.I7 — Bounded browser access
 
 - **scope:** `Jido.AI.Browser`, `Jido.AI.Browser.Policy`, `Jido.AI.Browser.Address`, `Jido.AI.Browser.Transport`
-- **must:** Expose browser Actions through the Agent tool path. Filter search results by the host and Agent allowlists. Check the destination before each page connection and redirect. Connect to the address checked by the policy and bound the response by time and bytes. Use plain text by default and apply the same limits when the host opts into Markdown.
+- **must:** Expose browser Actions through the Agent tool path. Filter search results by the host and Agent allowlists. Check the destination before each page connection and redirect. Pass only a checked public address to the page transport. The default transport connects to that address. A custom page transport comes from trusted host configuration and must honor the checked address. Bound responses by time and bytes. Use plain text by default and apply the same limits when the host opts into Markdown.
 - **kind:** security
 - **status:** active
