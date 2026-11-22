@@ -55,15 +55,14 @@ defmodule Jido.Persistence.EctoStateSourceTest do
     def startup_id(CounterRow, _id), do: {:error, :counter_id_required}
 
     @impl true
-    def open(CounterRow, context, :create, agent, create) do
-      with {:ok, row} <- read(context, agent.id), do: create.(project(row))
+    def load(CounterRow, _context, _mode, agent, repo) do
+      true = repo.in_transaction?()
+      read(repo, agent.id)
     end
 
-    def open(CounterRow, _context, :restore, _agent, restore), do: restore.(fn _, _ -> {:ok, %{}} end)
-
     @impl true
-    def refresh(CounterRow, context, agent) do
-      with {:ok, row} <- read(context, agent.id), do: {:ok, project(row)}
+    def refresh(CounterRow, %{persistence: %{store: {_, opts}}}, agent) do
+      read(Keyword.fetch!(opts, :repo), agent.id)
     end
 
     @impl true
@@ -99,11 +98,9 @@ defmodule Jido.Persistence.EctoStateSourceTest do
 
     defp notify(owner, repo, _count), do: send(owner, {:post_commit, repo.in_transaction?()})
 
-    defp read(%{persistence: %{store: {_, opts}}}, id) do
-      repo = Keyword.fetch!(opts, :repo)
-
+    defp read(repo, id) do
       case repo.get(CounterRow, id) do
-        %CounterRow{} = row -> {:ok, row}
+        %CounterRow{} = row -> {:ok, project(row)}
         nil -> {:error, :counter_not_found}
       end
     end

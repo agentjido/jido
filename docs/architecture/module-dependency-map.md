@@ -727,7 +727,7 @@ Disposition terms:
 
 | Current module | Disposition | Target or reason |
 |---|---|---|
-| `Jido.Persistence` | Keep | Public checkpoint save and restore facade |
+| `Jido.Persistence` | Keep | Coordinates checkpoint operations and state-source activation and commit |
 | `Jido.Persistence.Adapter` | Removed | The byte-store behavior now belongs to `Jido.Persistence.Store` |
 | `Jido.Persistence.AdapterOps` | Removed | Safe adapter invocation now belongs to `Jido.Persistence.Store` |
 | `Jido.Persistence.AgentCheckpoint` | Removed | Agent dump, load, identity, and state-conversion policy now belong to `Jido.Persistence.Checkpoint` |
@@ -738,8 +738,8 @@ Disposition terms:
 | `Jido.Persistence.Codec.Term` | Added | Compact default codec for compatible application releases |
 | `Jido.Persistence.Codec.JSON` | Added | Opt-in bounded tagged JSON codec |
 | `Jido.Persistence.Config` | Added | One validated Store and codec profile for an instance namespace |
-| `Jido.Persistence.StateSource` | Experimental | Resolves a Plugin's domain-state binding and applies its conditional write |
-| `Jido.Persistence.TurnTransaction` | Experimental | Selects and invokes a compatible adapter's Turn transaction |
+| `Jido.Persistence.StateSource` | Experimental | Loads and validates a Plugin's domain state and applies its conditional write |
+| `Jido.Persistence.TurnTransaction` | Experimental | Runs state-source activation and commit through a compatible adapter |
 | `Jido.Persistence.ContinuationStore` | Keep | Runic workflow checkpoints, facts, wait receipts, and read-only checkpoint projection |
 | `Jido.Persistence.Ecto` | Keep | Ecto adapter |
 | `Jido.Persistence.ETS` | Keep | ETS adapter |

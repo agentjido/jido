@@ -1,4 +1,4 @@
-# Save provider-owned state and the Jido checkpoint at one commit boundary
+# Coordinate state-source activation and commit in Persistence
 
 Status: Proposed
 
@@ -13,17 +13,20 @@ storage and cannot validate or normalize domain fields.
 
 ## Decision
 
-Add an optional state provider to module-defined durable Agents. It supplies
-one schema. The provider owns its domain transaction and invokes a Jido
-callback that prepares and saves the canonical state and the Turn receipt.
-The instance still owns the checkpoint profile. AgentServer owns revision
-control, lifecycle transitions, publication, and effects. Keep the provider
-descriptor in executable module code. Keep snapshots and direct commands
-independent of the provider's database code.
+Add an optional state source to module-defined durable Agents. A Plugin
+declares its schema and descriptor. Persistence uses the instance's adapter
+to open the transaction for activation and successful Turn commits. The
+source loads or writes domain fields inside that transaction. Persistence
+selects the state to restore and saves the canonical checkpoint and Turn
+receipt. A pending Turn keeps the state saved at admission.
+
+AgentServer owns revision control, lifecycle transitions, publication, and
+effects. Keep the source descriptor in executable module code. Keep
+snapshots and direct commands independent of the source's database code.
 
 ## Consequences
 
-The provider must verify that its writes and the checkpoint can share one
-transaction. A rollback gives Jido a failed Turn. An uncertain result uses
-the existing durable reconciliation path. Unbound Agents continue to use the
-standard checkpoint path.
+The adapter checks that domain writes and the checkpoint can share one
+transaction. A confirmed rejection fails the Turn. An uncertain result uses
+the existing durable reconciliation path. Unbound Agents use the standard
+checkpoint path.

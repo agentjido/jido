@@ -516,14 +516,12 @@ defmodule Jido do
   end
 
   defp create_addressed_agent(instance, address, agent, config) do
-    Jido.Persistence.StateSource.open(agent, %{address: address, persistence: config}, :create, fn initial ->
-      Jido.Persistence.open_agent(instance, initial, :create,
-        instance: instance,
-        namespace: address.namespace,
-        partition: address.partition,
-        reason: :create
-      )
-    end)
+    Jido.Persistence.open_agent(%{address: address, persistence: config}, agent, :create,
+      instance: instance,
+      namespace: address.namespace,
+      partition: address.partition,
+      reason: :create
+    )
   end
 
   @doc "Activates one existing durable Agent from its stable Agent Address."

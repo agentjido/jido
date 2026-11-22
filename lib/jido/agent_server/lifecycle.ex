@@ -370,9 +370,7 @@ defmodule Jido.AgentServer.Lifecycle do
   defp open_agent(data, config, mode) do
     opts = [reason: :activate, topology_owner: topology_owner(data)] ++ persistence_options(data)
 
-    Jido.Persistence.StateSource.open(data.agent, provider_context(data, config), mode, fn agent ->
-      Jido.Persistence.open_agent(config, agent, mode, opts)
-    end)
+    Jido.Persistence.open_agent(provider_context(data, config), data.agent, mode, opts)
   end
 
   def refresh_state(data) do

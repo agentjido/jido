@@ -31,11 +31,9 @@ defmodule Jido.AgentServer.StateProviderTest do
     end
 
     @impl true
-    def open(:count, %{forge_activation: true}, :restore, agent, _open), do: {:ok, agent, 1, 1, nil, %{}}
-    def open(:count, %{projection: projection}, :create, _agent, open), do: open.(projection)
-    def open(:count, %{projection: projection}, :restore, _agent, open), do: open.(fn _, _ -> {:ok, projection} end)
-    def open(:count, _context, :create, _agent, open), do: open.(%{})
-    def open(:count, _context, :restore, _agent, open), do: open.(fn _, _ -> {:ok, %{}} end)
+    def load(:count, %{forge_activation: true}, :restore, agent, :test), do: {:ok, agent, 1, 1, nil, %{}}
+    def load(:count, %{projection: projection}, _mode, _agent, :test), do: {:ok, projection}
+    def load(:count, _context, _mode, _agent, :test), do: {:ok, %{}}
 
     @impl true
     def refresh(:count, %{projection: projection}, _agent), do: {:ok, projection}
@@ -74,16 +72,16 @@ defmodule Jido.AgentServer.StateProviderTest do
     def startup_id(:count, _), do: {:error, :row_id_required}
 
     @impl true
-    def open(:count, _context, :create, %{id: "slow"}, open) do
+    def load(:count, _context, :create, %{id: "slow"}, :test) do
       send(Process.whereis(Jido.AgentServer.StateProviderTest), {:opening, self()})
 
       receive do
-        :open -> open.(%{count: 0})
+        :open -> {:ok, %{count: 0}}
       end
     end
 
-    def open(:count, _context, :create, _agent, open), do: open.(%{count: 0})
-    def open(:count, _context, :restore, _agent, open), do: open.(fn _, _ -> {:ok, %{}} end)
+    def load(:count, _context, :create, _agent, :test), do: {:ok, %{count: 0}}
+    def load(:count, _context, :restore, _agent, :test), do: {:ok, %{}}
 
     @impl true
     defdelegate refresh(option, context, agent), to: Provider
@@ -124,27 +122,21 @@ defmodule Jido.AgentServer.StateProviderTest do
     alias Jido.Persistence.StateSource
 
     agent = Counter.instantiate!(id: "projected", state: %{count: 0})
-    persistence = %Jido.Persistence.Config{store: {StoreAdapter, []}, codec: Jido.Persistence.Codec.Term}
-    context = %{persistence: persistence, projection: %{foreign: 1}}
+    binding = StateSource.binding(agent)
+    context = %{projection: %{foreign: 1}}
     reason = {:state_source_undeclared_fields, [:foreign]}
 
     assert {:error, ^reason} =
-             StateSource.open(%{agent | state: nil}, context, :create, fn _ ->
-               flunk("An invalid projection reached checkpoint creation")
-             end)
+             StateSource.load(binding, context, :create, %{agent | state: nil}, :test, true)
 
     assert {:error, ^reason} =
-             StateSource.open(%{agent | state: nil}, context, :restore, fn _ ->
-               {:ok, agent, 1, 1, nil, %{}}
-             end)
+             StateSource.load(binding, context, :restore, agent, :test, true)
 
     assert {:error, ^reason} = StateSource.refresh(agent, context)
     assert {:error, :invalid_provider_state} = StateSource.refresh(agent, %{context | projection: %{agent | id: "bad"}})
 
-    assert {:error, :invalid_state_source_activation} =
-             StateSource.open(%{agent | state: nil}, Map.put(context, :forge_activation, true), :restore, fn _ ->
-               flunk("The provider bypassed checkpoint restoration")
-             end)
+    assert {:error, :invalid_provider_state} =
+             StateSource.load(binding, %{forge_activation: true}, :restore, agent, :test, true)
   end
 
   @tag obligation: "jido.agent_server.I108"

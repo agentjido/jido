@@ -26,7 +26,7 @@ defmodule Jido.Agent.DSL.State do
   def compile!(provider, options, env) do
     with {:module, ^provider} <- Code.ensure_compiled(provider),
          true <-
-           Enum.all?([state_source: 2, open: 5, refresh: 3, apply_state: 5], fn {name, arity} ->
+           Enum.all?([state_source: 2, load: 5, refresh: 3, apply_state: 5], fn {name, arity} ->
              function_exported?(provider, name, arity)
            end) do
       {schema, descriptor} = provider.state_source(options, env)

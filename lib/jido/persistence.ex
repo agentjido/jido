@@ -740,7 +740,37 @@ defmodule Jido.Persistence do
   end
 
   @doc false
-  def open_agent(source, %Agent{} = agent, :create, opts) do
+  def open_agent(%{persistence: config} = context, %Agent{} = agent, mode, opts) do
+    case StateSource.binding(agent) do
+      nil ->
+        open_checkpoint(config, agent, mode, opts)
+
+      {provider, descriptor, _schema} = binding ->
+        result =
+          TurnTransaction.run(config, {provider, descriptor}, fn tx ->
+            case open_bound_checkpoint(binding, context, agent, mode, opts, tx) do
+              {:ok, _, _, _, _, _} = activated -> {:ok, activated}
+              {:error, _reason} = error -> error
+            end
+          end)
+
+        with {:ok, activated} <- result, do: activated
+    end
+  end
+
+  defp open_bound_checkpoint(binding, %{persistence: config} = context, agent, :create, opts, tx) do
+    with {:ok, initial} <- StateSource.load(binding, context, :create, agent, tx, true),
+         do: open_checkpoint(config, initial, :create, opts)
+  end
+
+  defp open_bound_checkpoint(binding, %{persistence: config} = context, agent, :restore, opts, tx) do
+    with {:ok, saved, revision, agent_revision, receipt, handoffs} <- open_checkpoint(config, agent, :restore, opts),
+         {:ok, restored} <- StateSource.load(binding, context, :restore, saved, tx, inactive_turn?(receipt)) do
+      {:ok, restored, revision, agent_revision, receipt, handoffs}
+    end
+  end
+
+  defp open_checkpoint(source, agent, :create, opts) do
     {owner, opts} = Keyword.pop(opts, :topology_owner)
 
     with {:ok, _members} <-
@@ -751,24 +781,22 @@ defmodule Jido.Persistence do
          do: {:ok, agent, 0, 0, nil, Record.empty_topology_handoffs()}
   end
 
-  def open_agent(source, %Agent{} = agent, :restore, opts),
+  defp open_checkpoint(source, agent, :restore, opts),
     do: open_load(source, agent, opts)
 
   defp require_inactive_turn(record) do
     case Map.get(record, :server_turn) do
-      nil ->
-        :ok
-
       %{terminal_result: %Jido.AgentServer.TurnResult{}} ->
         {:error, :result_acknowledgement_required}
 
-      %{status: status} when status in [:completed, :failed, :cancelled] ->
-        :ok
-
-      _turn ->
-        {:error, :turn_in_flight}
+      turn ->
+        if inactive_turn?(turn), do: :ok, else: {:error, :turn_in_flight}
     end
   end
+
+  defp inactive_turn?(nil), do: true
+  defp inactive_turn?(%{status: status}), do: status in [:completed, :failed, :cancelled]
+  defp inactive_turn?(_turn), do: false
 
   defp stored_upgrade_context(context, instance, address, revision) do
     Map.merge(context, %{

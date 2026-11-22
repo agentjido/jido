@@ -6,20 +6,16 @@ defmodule Jido.Persistence.StateSource do
   with `state_source Provider, options` in the Agent's `state` block.
   In-memory Agent commands use the state already present on the Agent.
 
-  The provider can use the trusted activation address and persistence profile.
-  `open/5` can wrap activation in a transaction. On create, call the supplied
-  function with the initial projection. On restore, pass a function that receives
-  the saved Agent and Turn receipt and returns an updated projection. Return
-  the supplied function's opaque success value after activation succeeds.
-  `refresh/3` runs before new work. A durable continuation uses the state
-  saved at its admission.
+  `load/5` returns a projection in the activation transaction opened by
+  Persistence. On restore, it receives the saved Agent so it can verify the
+  binding. Persistence selects the state to restore. A durable continuation
+  uses the state saved at its admission. `refresh/3` runs before new work.
 
   A provider can implement `startup_id/2` to accept a `Source` as the
   `:state` option. Return the stable ID without loading row state. During
-  creation, `open/5` receives the Agent definition with that ID and a nil
-  state. Load its projection before calling the supplied function. Jido
-  initializes the instance and validates its state. The startup callback receives
-  nil when the caller omits the source.
+  creation, `load/5` receives the Agent definition with that ID and a nil
+  state. Jido initializes the instance and validates its state. The startup
+  callback receives nil when the caller omits the source.
 
   `apply_state/5` runs in the transaction opened by the compatible persistence
   adapter. It returns a state projection and an optional notification function.
@@ -31,7 +27,7 @@ defmodule Jido.Persistence.StateSource do
   """
 
   alias Jido.Agent
-  alias Jido.Persistence.{Config, TurnTransaction}
+  alias Jido.Persistence.Config
 
   defmodule Source do
     @moduledoc "A provider-owned input for the Agent startup state."
@@ -40,19 +36,9 @@ defmodule Jido.Persistence.StateSource do
   end
 
   @type context :: %{address: Agent.Address.t(), persistence: Config.t()}
-  @type activation :: {:ok, Agent.t(), non_neg_integer(), non_neg_integer(), term(), map()} | {:error, term()}
   @type projection :: {:ok, map()} | {:error, term()}
-  @type restore_projection :: (Agent.t(), term() -> projection())
 
-  @type activation_result :: {:ok, reference()} | {:error, term()}
-
-  @callback open(
-              term(),
-              context(),
-              :create | :restore,
-              Agent.t(),
-              (map() | restore_projection() -> activation_result())
-            ) :: activation_result()
+  @callback load(term(), context(), :create | :restore, Agent.t(), transaction :: term()) :: projection()
   @callback refresh(term(), context(), Agent.t()) :: projection()
   @callback apply_state(term(), context(), Agent.t(), Agent.t(), transaction :: term()) ::
               {:ok, map(), (-> term()) | nil} | {:error, term()}
@@ -137,75 +123,20 @@ defmodule Jido.Persistence.StateSource do
   def configured?(agent), do: declaration(agent) != nil
 
   @doc false
-  @spec open(Agent.t(), context(), :create | :restore, (Agent.t() -> activation())) :: activation()
-  def open(agent, context, mode, fun) do
-    case declaration(agent) do
-      nil ->
-        fun.(agent)
-
-      {provider, descriptor, schema} ->
-        with :ok <- TurnTransaction.supported(context.persistence) do
-          open_projection(provider, descriptor, context, mode, agent, activation(mode, agent, schema, fun))
-        end
-    end
-  end
-
-  defp open_projection(provider, descriptor, context, mode, agent, activate) do
-    ref = make_ref()
-    owner = self()
-
-    # Only Jido can publish the activation record. The source returns a
-    # receipt from the same process that owns its activation transaction.
-    try do
-      case provider.open(descriptor, context, mode, agent, &activate_once(ref, owner, activate, &1)) do
-        {:ok, ^ref} -> Process.get(ref, {:error, :invalid_state_source_activation})
-        {:error, _reason} = error -> error
-        _other -> {:error, :invalid_state_source_activation}
-      end
-    after
-      Process.delete(ref)
-    end
-  end
-
-  defp activate_once(ref, owner, activate, projection) when owner == self() do
-    if Process.get(ref) do
-      {:error, :invalid_state_source_activation}
-    else
-      Process.put(ref, :activating)
-
-      case activate.(projection) do
-        {:ok, _, _, _, _, _} = result ->
-          Process.put(ref, result)
-          {:ok, ref}
-
-        {:error, _reason} = error ->
-          error
-      end
-    end
-  end
-
-  defp activate_once(_ref, _owner, _activate, _projection), do: {:error, :invalid_state_source_activation}
-
-  defp activation(:create, agent, schema, fun) do
-    fn projection ->
-      with :ok <- check_projection(projection, schema),
-           {:ok, agent} <- initialize(agent, projection),
-           {:ok, agent} <- project(agent, projection, schema),
-           do: fun.(agent)
-    end
-  end
-
-  defp activation(:restore, agent, schema, fun) do
-    fn
-      refresh when is_function(refresh, 2) ->
-        with {:ok, saved, revision, agent_revision, receipt, handoffs} <- fun.(agent),
-             {:ok, projection} <- refresh.(saved, receipt),
-             {:ok, restored} <- project(saved, projection, schema) do
-          {:ok, restored, revision, agent_revision, receipt, handoffs}
+  def load({provider, descriptor, schema}, context, mode, agent, tx, use_projection?) do
+    case provider.load(descriptor, context, mode, agent, tx) do
+      {:ok, projection} ->
+        with :ok <- check_projection(projection, schema),
+             projection = if(use_projection?, do: projection, else: %{}),
+             {:ok, agent} <- initialize(agent, projection) do
+          merge_projection(agent, projection)
         end
 
-      _ ->
-        {:error, :invalid_state_source_activation}
+      {:error, _reason} = error ->
+        error
+
+      _other ->
+        {:error, :invalid_provider_state}
     end
   end
 
@@ -249,11 +180,13 @@ defmodule Jido.Persistence.StateSource do
   defp rejected(reason), do: {:error, {:state_provider_rejected, reason}}
 
   defp project(agent, projection, schema) do
-    with :ok <- check_projection(projection, schema) do
-      case Agent.Validation.transition(agent, Map.merge(agent.state, projection)) do
-        {:ok, agent} -> {:ok, agent}
-        {:error, _error} -> {:error, :invalid_provider_state}
-      end
+    with :ok <- check_projection(projection, schema), do: merge_projection(agent, projection)
+  end
+
+  defp merge_projection(agent, projection) do
+    case Agent.Validation.transition(agent, Map.merge(agent.state, projection)) do
+      {:ok, agent} -> {:ok, agent}
+      {:error, _error} -> {:error, :invalid_provider_state}
     end
   end
 

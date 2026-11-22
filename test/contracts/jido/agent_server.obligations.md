@@ -443,7 +443,7 @@ authoring surface.
 ### jido.agent_server.I109 — State provider binding and startup
 
 - **scope:** Authoring, startup, and restoration of a durable Agent with a declared state provider
-- **must:** Use the schema declared by the provider. Reject a different schema in a loaded definition. Accept only source fields in creation, restore and refresh projections. Keep Jido in control of the activated Agent and its identity. Validate provider startup sources and addressed creation against the derived identity. Reject duplicate startup options. Wait according to both effective startup budgets and identify a still-pending activation by its Address. Preserve provider identity and verify provider and Agent code when restoring a checkpoint.
+- **must:** Use the schema declared by the provider. Reject a different schema in a loaded definition. Accept only source fields in creation, restore and refresh projections. Load the source and open the checkpoint in one adapter transaction. Keep Jido in control of the activated Agent and its identity. Validate provider startup sources and addressed creation against the derived identity. Reject duplicate startup options. Wait according to both effective startup budgets and identify a still-pending activation by its Address. Preserve provider identity and verify provider and Agent code when restoring a checkpoint.
 - **why:** A durable Agent must retain its state and identity contract through definition import, startup, and restore.
 - **kind:** persisted-format
 - **status:** active
