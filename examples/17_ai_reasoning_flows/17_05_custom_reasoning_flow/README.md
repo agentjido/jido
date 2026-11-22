@@ -1,4 +1,4 @@
-# 17_05 Custom reasoning Flow
+# 17_05 Define a Custom Reasoning Flow
 
 Use a normal Flow schema to define and override application reasoning input.
 
@@ -41,4 +41,5 @@ core SDK gap.
 - [Source](schema_driven_overrides.ex)
 - [Tests](schema_driven_overrides_test.exs)
 
-[Previous: Revision and adaptive reasoning](../17_04_revision_and_adaptive/README.md)
+[Previous: Revision and adaptive reasoning](../17_04_revision_and_adaptive/README.md) |
+[Next: Support Desk](../../24_application_patterns/24_09_support_desk/README.md)

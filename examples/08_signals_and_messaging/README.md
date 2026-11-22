@@ -20,8 +20,16 @@ delivery, replay, acknowledgement, and trace propagation.
 8. [Follow One Signal](08_08_follow_one_signal/README.md) traces a correlated
    request through coordinator and worker Turns, uncertain delivery, retry,
    deduplication, and reply.
-9. [Delivery Guarantees](08_09_delivery_guarantees/README.md) compares
-   acceptance, retention, acknowledgement, retry, and duplicate boundaries.
+## Delivery guarantees
+
+| Path and behavior test | Acceptance and acknowledgement | Replay and retry |
+| --- | --- | --- |
+| [Agent call](../06_agent_server/06_03_request_modes/request_modes_test.exs) | Turn result. A caller timeout can occur while a Turn is active. | The caller owns retries. |
+| [Local PID and PubSub dispatch](08_04_dispatch_adapters/dispatch_adapters_test.exs) | The adapter accepts the dispatch or local publication. | No retained replay. The application owns retries. |
+| [Bus publication](08_05_bus_publish_and_replay/bus_publish_and_replay_test.exs) | The Bus records the Signal before delivery. | The subscriber can replay recorded Signals. |
+| [Durable subscription](08_06_durable_subscription/durable_subscription_test.exs) | Explicit acknowledgement advances the cursor. | An unacknowledged Signal can repeat after subscriber loss. |
+
+Use a domain idempotency key when a retry can repeat an operation.
 
 Run the current chapter with:
 

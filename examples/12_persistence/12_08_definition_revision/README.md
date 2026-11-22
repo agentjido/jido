@@ -52,5 +52,5 @@ checkpoint for member state.
 - [Tests](definition_revision_test.exs)
 - [Schema and state upgrade](../12_09_state_migration/README.md)
 
-Previous: [Recoverable Delivery](../12_07_recoverable_delivery/README.md) |
+Previous: [Indeterminate Write](../12_06_indeterminate_write/README.md) |
 Next: [Durable Agents](../../13_durable_execution/README.md)

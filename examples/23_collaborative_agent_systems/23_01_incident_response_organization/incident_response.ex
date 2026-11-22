@@ -134,18 +134,24 @@ defmodule Jido.Examples.Collaboration.IncidentResponse.Coordinator do
             fail_audit: Jido.Joi.boolean()
           }),
         context: context do
-        triage =
-          Jido.Signal.new!("examples.incident.triage.request", input, source: "/examples/incident/coordinator")
+        state = context.agent_state
 
-        state = %{
-          context.agent_state
-          | incident_id: input.incident_id,
-            status: :triaging,
-            severity: input.severity,
-            events: [%{event: :reported, incident_id: input.incident_id}]
-        }
+        if state.incident_id == input.incident_id do
+          {:error, Jido.Error.validation_error("incident report was already accepted")}
+        else
+          triage =
+            Jido.Signal.new!("examples.incident.triage.request", input, source: "/examples/incident/coordinator")
 
-        {:ok, state, [Jido.Agent.Directive.emit(triage)]}
+          state = %{
+            state
+            | incident_id: input.incident_id,
+              status: :triaging,
+              severity: input.severity,
+              events: [%{event: :reported, incident_id: input.incident_id}]
+          }
+
+          {:ok, state, [Jido.Agent.Directive.emit(triage)]}
+        end
       end
     end
 
@@ -160,7 +166,7 @@ defmodule Jido.Examples.Collaboration.IncidentResponse.Coordinator do
         context: context do
         state = context.agent_state
 
-        if state.incident_id == input.incident_id do
+        if state.status == :triaging and state.incident_id == input.incident_id do
           {:ok,
            %{
              state

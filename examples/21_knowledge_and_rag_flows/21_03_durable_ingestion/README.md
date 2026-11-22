@@ -19,8 +19,10 @@ Read [the ingestion Flow](durable_ingestion.ex) first.
 
 `mix test.examples examples/21_knowledge_and_rag_flows/21_03_durable_ingestion --warnings-as-errors`
 
-Expected result: revision 2 creates two upserts, deletes the revision 1 chunk,
-waits for index revision 41, and returns `:committed`.
+Expected result: revision 2 plans two upserts and one deletion. The offline
+index saves the plan, loses its first acknowledgement, and returns the same
+acknowledgement on retry. The restarted Jido instance rejects a stale revision
+and completes the original Wait when it receives the matching acknowledgement.
 
 ## Important behavior
 
@@ -31,8 +33,8 @@ safe for an idempotent index adapter.
 
 ## Limits
 
-ETS does not survive BEAM loss. The example produces an index plan but does not
-implement a vector store. An index can acknowledge and later lose data. The
+ETS does not survive BEAM loss. The [offline index](index.ex) keeps one applied plan per revision key in memory.
+The integration test drives the application side of that boundary. An index can acknowledge and later lose data. The
 parent durable checkpoint is not an atomic checkpoint with the index.
 
 ## Core Fit and Gaps
@@ -50,7 +52,7 @@ atomicity, acknowledgement, retry, and cleanup for its index.
   acknowledgement.
 - Retry boundary: idempotent index upsert under one document-revision key.
 - Idempotency rule: stable chunk IDs and `document_id:revision` key.
-- Injected failure: process suspension at the Wait.
+- Injected failure: the index loses its first acknowledgement and the Jido instance restarts at the Wait.
 - Recovery result: the saved plan resumes from the same Wait.
 - Limits and non-guarantees: no atomic checkpoint spans Jido and the index.
 

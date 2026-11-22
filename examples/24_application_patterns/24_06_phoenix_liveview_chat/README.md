@@ -24,11 +24,13 @@ Run the normal offline integration proof:
 
 Run the real LiveView check with cached Hex packages and no network access:
 
-`HEX_OFFLINE=1 MIX_ENV=test mix run examples/24_application_patterns/24_06_phoenix_liveview_chat/playground_check.exs`
+First install the optional browser dependencies with `JIDO_PLAYGROUND=1 mix deps.get`.
+
+`JIDO_PLAYGROUND=1 HEX_OFFLINE=1 MIX_ENV=test mix run examples/24_application_patterns/24_06_phoenix_liveview_chat/playground_check.exs`
 
 Start the interactive Playground:
 
-`HEX_OFFLINE=1 mix run examples/24_application_patterns/24_06_phoenix_liveview_chat/playground.exs`
+`JIDO_PLAYGROUND=1 HEX_OFFLINE=1 mix run examples/24_application_patterns/24_06_phoenix_liveview_chat/playground.exs`
 
 Expected result: a normal exchange renders ordered start, chunk, and completion
 Signals. A new LiveView process rebuilds the same committed conversation. The

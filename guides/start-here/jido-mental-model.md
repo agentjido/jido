@@ -128,3 +128,5 @@ An AI Agent uses the same pieces. `Jido.AI` defines a normal Agent whose request
 - [Getting Started](getting-started.livemd) installs Jido and runs this path in a new project.
 - Life of a Signal follows a Signal through each runtime stage.
 - Pure or Live Execution compares the two ways to run a Turn.
+
+Practice these boundaries in the [Jido examples catalog](https://github.com/agentjido/jido/blob/main/examples/README.md).

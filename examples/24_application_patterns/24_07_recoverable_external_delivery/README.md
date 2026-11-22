@@ -30,6 +30,8 @@ Expected result: delivery intent commits while the sink is unavailable. After
 process replacement, the sink writes once but reports an uncertain result. A
 retry with the same effect ID succeeds, and the Agent commits acknowledgement.
 
+Run the [demo](demo.exs) with `mix run examples/24_application_patterns/24_07_recoverable_external_delivery/demo.exs`. The [sink-unavailable test](sink_unavailable_test.exs) covers restoration before the sink accepts the first delivery.
+
 ## Important behavior
 
 The Agent record is the canonical owner of pending delivery intent. The sink is

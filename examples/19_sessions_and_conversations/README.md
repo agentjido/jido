@@ -8,9 +8,12 @@ process mechanics.
 3. [AI conversation projection](19_03_session_agent/README.md)
 4. [Conversation history and public UI projection](19_04_conversation_history/README.md)
 5. [Failed and incomplete exchanges](19_05_request_modes/README.md)
-6. [Concurrent request modes](19_06_request_modes/README.md)
+6. [Reply ownership with call, submit, and cast](19_06_request_modes/README.md)
 7. [Persistence and restoration](19_07_persistence_and_restoration/README.md)
 8. [Non-AI Session use](19_08_non_ai_session/README.md)
+
+For concurrent admission, ordering, and timeout, see
+[AgentServer request modes](../06_agent_server/06_03_request_modes/README.md).
 
 Run the chapter offline:
 

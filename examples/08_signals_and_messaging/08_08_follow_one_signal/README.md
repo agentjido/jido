@@ -56,4 +56,4 @@ APIs. Application code still owns child routing and its retry policy.
 - [Source](signal_journey.ex)
 - [Tests](signal_journey_test.exs)
 
-Previous: [Trace and causation](../08_07_trace_and_causation/README.md) | Next: [Delivery guarantees](../08_09_delivery_guarantees/README.md)
+Previous: [Trace and causation](../08_07_trace_and_causation/README.md) | Next: [Delivery guarantees](../README.md#delivery-guarantees)

@@ -41,4 +41,4 @@ and user-visible error text remain application concerns.
 
 [Previous: Conversation history](../19_04_conversation_history/README.md)
 
-[Next: Concurrent request modes](../19_06_request_modes/README.md)
+[Next: Reply ownership with call, submit, and cast](../19_06_request_modes/README.md)

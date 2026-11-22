@@ -344,7 +344,7 @@ Proposed lessons:
 6. Durable subscriptions, acknowledgement, and retry.
 7. Trace and causation propagation.
 8. Follow One Signal.
-9. Delivery guarantees and limits.
+The chapter ends with a delivery guarantees reference table linked to behavior tests.
 
 **Follow One Signal** traces one request from a stable Agent target through
 routing, a Turn, correlated child work, and the final reply. The example shows
@@ -668,7 +668,7 @@ Proposed lessons:
 3. AI conversation projection.
 4. Conversation history and public UI projection.
 5. Failed and incomplete exchanges.
-6. Concurrent request modes.
+6. Reply ownership with call, submit, and cast.
 7. Persistence and restoration.
 8. Non-AI Session use.
 
@@ -828,6 +828,7 @@ Proposed lessons:
 6. Phoenix Playground LiveView chat.
 7. Recoverable external delivery.
 8. Controlled Agent Upgrade.
+9. Support Desk with a custom AI reasoning Flow.
 
 These lessons must not introduce new core API concepts. They should show how
 the earlier contracts work together.

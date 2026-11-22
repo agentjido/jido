@@ -22,8 +22,8 @@ Read [the organization definitions](incident_response.ex), then read the
 `mix test.examples examples/23_collaborative_agent_systems/23_01_incident_response_organization --warnings-as-errors`
 
 Expected result: six Agents become resident. The injected audit failure leaves
-that Agent at revision zero. Remediation reaches the coordinator, approval
-resolves the incident, root shutdown removes all six processes, and activation
+that Agent at revision zero. Remediation reaches the coordinator, coordinator replacement retains pending approval without repeating containment,
+and approval resolves the incident, root shutdown removes all six processes, and activation
 restores resolved state with a new activation ID.
 
 ## Important behavior
@@ -54,8 +54,8 @@ observer can turn it into a domain Signal when required.
 - Commit point: each AgentServer Turn commits independently.
 - Persisted data: coordinator and team Agent state in separate records.
 - Retry boundary: each Signal delivery and Agent Turn.
-- Idempotency rule: the incident ID correlates triage, remediation, and
-  approval; this first version does not deduplicate a repeated report.
+- Idempotency rule: the coordinator rejects a repeated report for its current
+  incident and a repeated approval after resolution. It stores one current incident.
 - Injected failure: audit team Action failure.
 - Recovery result: remediation and approval complete; coordinator state
   restores under a new activation ID.
