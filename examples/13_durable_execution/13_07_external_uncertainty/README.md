@@ -37,6 +37,9 @@ Crash barriers remain in
 [test support](../support/durable_publication_probe.exs).
 The provider lives outside the killed Agent tree.
 
+Continue with [Recoverable External Delivery](../../24_application_patterns/24_07_recoverable_external_delivery/README.md)
+to retry a delivery effect after its Turn commits.
+
 ## Limits
 
 The local provider keeps data in memory. This test proves Agent process loss,

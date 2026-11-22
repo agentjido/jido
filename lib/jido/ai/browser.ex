@@ -4,6 +4,11 @@ defmodule Jido.AI.Browser do
 
   Configure the host allowlist in the `:jido, :browser` application environment.
   The Agent allowlist restricts that host policy further.
+  Set `:page_transport` to a trusted module that implements this behaviour to
+  supply a different page transport. Jido checks both allowlists before each
+  request, including redirects. Jido checks the resolved address and passes
+  that address to the transport. The transport must use it for the connection.
+
   Set `:fetch_format` to `:markdown` and install `:html2markdown` to read HTML as Markdown.
   """
 
@@ -17,6 +22,18 @@ defmodule Jido.AI.Browser do
   @max_text 6_000
   @max_redirects 3
   @brave_url "https://api.search.brave.com/res/v1/web/search"
+
+  @doc "Resolves the policy-approved hostname to one public IP address."
+  @callback resolve(String.t()) :: {:ok, :inet.ip_address()} | {:error, term()}
+
+  @doc """
+  Reads one policy-approved URI using the checked IP address. Return one
+  response without following redirects. Use the monotonic deadline in
+  milliseconds and the maximum body size in bytes.
+  """
+  @callback get(URI.t(), :inet.ip_address(), [{String.t(), String.t()}], integer(), pos_integer()) ::
+              {:ok, %{status: pos_integer(), headers: [{String.t(), String.t()}], body: binary()}}
+              | {:error, term()}
 
   @doc false
   def normalize(%{"allow" => rules, "expose" => expose} = config) when map_size(config) == 2 do
@@ -63,14 +80,18 @@ defmodule Jido.AI.Browser do
   def fetch(url, context) do
     with {:ok, agent_rules, host_rules, config} <- policies(context, "fetch"),
          {:ok, format} <- fetch_format(config),
+         {:ok, transport} <- page_transport(config),
          {:ok, uri} <- Policy.parse(url) do
-      bounded(&read_page(uri, agent_rules, host_rules, format, &1, @max_redirects))
+      bounded(&read_page(uri, agent_rules, host_rules, {format, transport}, &1, @max_redirects))
     end
   end
 
-  defp read_page(uri, agent_rules, host_rules, format, deadline, redirects) do
+  defp read_page(uri, agent_rules, host_rules, {format, transport} = fetch_options, deadline, redirects) do
     if Policy.allowed?(uri, agent_rules, host_rules) do
-      case request(uri, [{"accept", "text/html, text/plain"}], deadline) do
+      case page_request(uri, transport, deadline) do
+        {:ok, %{body: body}} when byte_size(body) > @max_body ->
+          {:error, :response_too_large}
+
         {:ok, %{status: 200} = response} ->
           with :ok <- unencoded(response),
                {:ok, text} <- readable(response, format) do
@@ -82,7 +103,7 @@ defmodule Jido.AI.Browser do
             {:error, :redirect_limit}
           else
             with {:ok, destination} <- Policy.redirect(uri, header(headers, "location")) do
-              read_page(destination, agent_rules, host_rules, format, deadline, redirects - 1)
+              read_page(destination, agent_rules, host_rules, fetch_options, deadline, redirects - 1)
             end
           end
 
@@ -94,6 +115,16 @@ defmodule Jido.AI.Browser do
       end
     else
       {:error, :destination_blocked}
+    end
+  end
+
+  defp page_request(uri, transport, deadline) do
+    with {:ok, address} <- transport.resolve(uri.host),
+         true <- :inet.is_ip_address(address) and Address.public?(address) do
+      transport.get(uri, address, [{"accept", "text/html, text/plain"}], deadline, @max_body)
+    else
+      false -> {:error, :destination_blocked}
+      {:error, _reason} = error -> error
     end
   end
 
@@ -169,6 +200,17 @@ defmodule Jido.AI.Browser do
 
   defp unencoded(%{headers: headers}) do
     if header(headers, "content-encoding") in [nil, "identity"], do: :ok, else: {:error, :unsupported_encoding}
+  end
+
+  defp page_transport(config) do
+    transport = Keyword.get(config, :page_transport, Transport)
+
+    if is_atom(transport) and Code.ensure_loaded?(transport) and function_exported?(transport, :resolve, 1) and
+         function_exported?(transport, :get, 5) do
+      {:ok, transport}
+    else
+      {:error, :invalid_page_transport}
+    end
   end
 
   defp fetch_format(config) do

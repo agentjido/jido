@@ -56,4 +56,23 @@ defmodule Jido.Examples.ContextMemory.SessionRolloverTest do
                summary: "unsupported"
              })
   end
+
+  test "rejects conflicting keys in an archived Thread before rollover" do
+    session = Jido.Session.new(id: "session-current", now: 1_000)
+
+    document =
+      session
+      |> Jido.Session.encode()
+      |> update_in(["thread"], &Map.put(&1, :id, "conflicting-thread"))
+
+    assert {:error, :invalid_session} = Jido.Session.decode(document)
+
+    assert {:error, %Jido.Error.ValidationError{message: "session document is invalid"}} =
+             Jido.Exec.run(SessionRollover, %{
+               session: document,
+               expected_rev: session.rev,
+               new_session_id: "session-never-created",
+               summary: "The archive must decode first."
+             })
+  end
 end

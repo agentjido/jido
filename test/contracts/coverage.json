@@ -6089,7 +6089,7 @@
         "jido_ai.tools.I7": {
           "failing": 0,
           "kind": "security",
-          "passing": 12,
+          "passing": 13,
           "status": "active",
           "testable": true,
           "tests": [
@@ -6097,6 +6097,7 @@
             "test URL and address policies reject ambiguous and non-public destinations",
             "test a blocked resolved address stops before connection",
             "test a chunked body cannot exceed the byte limit",
+            "test a host page transport must return a checked public address",
             "test a permitted redirect resolves again and returns the final URL with bounded text",
             "test a redirect must pass policy before resolving or making another connection",
             "test a search result must match both allowlists",

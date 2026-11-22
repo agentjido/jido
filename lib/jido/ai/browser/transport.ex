@@ -1,8 +1,15 @@
 defmodule Jido.AI.Browser.Transport do
   @moduledoc false
 
+  @behaviour Jido.AI.Browser
+
+  alias Jido.AI.Browser.Address
   alias Mint.HTTP1
 
+  @impl true
+  defdelegate resolve(host), to: Address
+
+  @impl true
   def get(uri, address, headers, deadline, max_bytes) do
     with {:ok, timeout} <- remaining(deadline),
          {:ok, conn} <-

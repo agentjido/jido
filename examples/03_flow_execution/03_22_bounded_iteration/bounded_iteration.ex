@@ -18,11 +18,26 @@ end
 
 defmodule Jido.Examples.BoundedIteration.Repair do
   @moduledoc false
-  use Jido.Action,
-    name: "workflow_iteration_repair"
+  alias Jido.Joi
 
-  def run(%{current: current, repair_size: repair_size}, _context) do
-    {:ok, %{current | missing: current.missing - repair_size, repairs: current.repairs + 1}}
+  use Jido.Flow,
+    name: "workflow_iteration_repair",
+    schema:
+      Joi.object(%{
+        current: Joi.object(%{missing: Joi.integer(), repairs: Joi.integer()}),
+        repair_size: Joi.integer() |> Joi.min(1)
+      })
+
+  flow do
+    step "normalize", params <- input() do
+      {:ok, %{missing: params.current.missing - params.repair_size, repairs: params.current.repairs}}
+    end
+
+    step "record", current <- result("normalize") do
+      {:ok, %{current | repairs: current.repairs + 1}}
+    end
+
+    output result("record")
   end
 end
 
@@ -56,7 +71,7 @@ defmodule Jido.Examples.BoundedIteration.Pipeline do
     iterate "repair" do
       state @state_schema, initial: %{missing: input(:missing), repairs: 0}
 
-      action Jido.Examples.BoundedIteration.Repair
+      flow Jido.Examples.BoundedIteration.Repair
       params %{current: state(), repair_size: input(:repair_size)}
 
       update body_result()

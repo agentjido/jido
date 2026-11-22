@@ -18,7 +18,8 @@ Read [the rollover Action and Flow](session_rollover.ex) first.
 `mix test.examples examples/20_context_and_memory_flows/20_04_session_rollover --warnings-as-errors`
 
 Expected result: the old Session is closed with full history, the new Session
-has one summary entry and lineage, and a stale expected revision is rejected.
+has one summary entry and lineage, and a stale revision or malformed archive
+returns an error before the Flow creates a replacement Session.
 
 ## Important behavior
 

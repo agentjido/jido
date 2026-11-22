@@ -7,17 +7,15 @@ definition boundaries.
    named Jido supervision tree with bounded runtime options.
 2. [Namespaces and Partitions](07_02_namespaces_and_partitions/README.md)
    isolates equal Agent IDs by application and tenant scope.
-3. [Stable Addresses](07_03_stable_addresses/README.md) defines the exact
-   portable Agent address.
-4. [Logical Identity](07_04_logical_identity/README.md) separates one durable
-   Agent identity from its current process identity.
-5. [Catalog Discovery](07_05_catalog_discovery/README.md) publishes one static
+3. [Stable Address and process replacement](07_04_logical_identity/README.md)
+   defines a portable Address and uses it to reach a replacement process.
+4. [Catalog Discovery](07_05_catalog_discovery/README.md) publishes one static
    package inventory atomically.
-6. [Portable Values](07_06_portable_values/README.md) rejects process-local
+5. [Portable Values](07_06_portable_values/README.md) rejects process-local
    values at a storage boundary.
-7. [Codec Documents](07_07_codec_documents/README.md) combines trusted
+6. [Codec Documents](07_07_codec_documents/README.md) combines trusted
    definition codecs, stable references, and document limits.
-8. [Application Supervision](07_08_application_supervision/README.md) places
+7. [Application Supervision](07_08_application_supervision/README.md) places
    Jido and application bootstrap in one host OTP tree.
 
 Run the current chapter with:

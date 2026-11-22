@@ -4,7 +4,7 @@ Map processes a collection while Reduce builds one ordered Agent result.
 
 ## What you will learn
 
-- How Map keeps results in input order.
+- How `max_concurrency` bounds active Map items while results keep input order.
 - How collected and fail-fast error policies differ.
 - How Reduce consumes successful Map output and handles an empty collection.
 
@@ -20,22 +20,24 @@ mix test.examples examples/03_flow_execution/03_21_ordered_batch --warnings-as-e
 ```
 
 Expected result: results keep source order, collected errors keep their
-positions, and fail-fast input does not commit.
+positions, fail-fast input does not commit, and a fifth item waits for one
+of four active items to complete.
 
 ## Important behavior
 
-`Convert` is named because both batch Flows reuse it. The reducer is used once,
-so it stays inline and uses its generated name. Empty Map and Reduce components
-produce an empty result without special application code.
+`Convert` is shared by both batch Flows. Empty Map and Reduce components
+produce an empty result. Pass `max_concurrency` in the execution options when
+starting an Agent or calling `Jido.Exec.run/4`. The concurrency test uses a local
+probe to hold workers until the test releases them.
 
 ## Limits
 
-This example does not prove scheduler start or completion order. Those details
-belong to Jido Flow core tests.
+The proof covers the local concurrency bound for one Map execution.
 
 ## Files
 
 - [Source](ordered_batch.ex)
-- [Tests](ordered_batch_test.exs)
+- [Agent tests](ordered_batch_test.exs)
+- [Concurrency test](concurrency_test.exs) and its [probe](support/concurrency_probe.exs)
 
 Previous: [Parallel Join](../03_20_parallel_join/README.md) | Next: [Bounded Iteration](../03_22_bounded_iteration/README.md)

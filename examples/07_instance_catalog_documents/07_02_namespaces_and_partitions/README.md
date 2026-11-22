@@ -33,4 +33,4 @@ tenant authorization.
 - [Source](isolation.ex)
 - [Tests](isolation_test.exs)
 
-Previous: [Instance configuration](../07_01_instance_configuration/README.md) | Next: [Stable Addresses](../07_03_stable_addresses/README.md)
+Previous: [Instance configuration](../07_01_instance_configuration/README.md) | Next: [Stable Address and process replacement](../07_04_logical_identity/README.md)

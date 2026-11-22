@@ -19,14 +19,22 @@ Flow wait and recovery contracts without an Agent domain owner.
 ## AgentServer recovery proofs
 
 1. [Saved Agent State](13_01_saved_agent/README.md) restores committed state.
-2. [Saved Progress](13_02_saved_progress/README.md) resumes one Flow step after process loss.
-3. [VM Recovery](13_03_vm_recovery/README.md) restores the same Turn in a fresh BEAM.
+2. [Saved Progress](13_02_saved_progress/README.md) recovers from an Agent process crash.
+3. [VM Recovery](13_03_vm_recovery/README.md) recovers after a BEAM restart.
 4. [Accepted Work](13_04_accepted_work/README.md) runs durable work in a topology member.
 5. [Saved Completion](13_05_saved_completion/README.md) restores a completion after a lost write reply.
 6. [Durable Approval Agent](13_06_durable_wait/README.md) passivates, resumes,
    and deduplicates one approval Turn.
-7. [External Uncertainty](13_07_external_uncertainty/README.md) repeats one operation ID after uncertain I/O.
+7. [External Uncertainty](13_07_external_uncertainty/README.md) repeats one operation ID after uncertain I/O. Continue with
+   [Recoverable External Delivery](../24_application_patterns/24_07_recoverable_external_delivery/README.md)
+   to retry an effect after its Turn commits.
 8. [Waterpark](13_08_waterpark/README.md) activates and passivates a bounded Agent fleet.
+
+### Recover after a crash
+
+Compare [Agent process loss](13_02_saved_progress/README.md) with a
+[full BEAM restart](13_03_vm_recovery/README.md). Both examples resume
+saved Flow progress. VM Recovery also starts a separate BEAM and reopens storage.
 
 ## `Jido.Durable` Flow proofs
 

@@ -160,6 +160,14 @@ defmodule Jido.AI.BrowserTest do
     assert {:error, :destination_blocked} = Fetch.run(%{url: @source}, context)
   end
 
+  test "a host page transport must return a checked public address", %{context: context} do
+    Application.put_env(:jido, :browser, allow: @host_rules, page_transport: Transport)
+    expect(Address, :resolve, fn "hexdocs.pm" -> {:ok, {127, 0, 0, 1}} end)
+    reject(&Transport.get/5)
+
+    assert {:error, :destination_blocked} = Fetch.run(%{url: @source}, context)
+  end
+
   test "host opt-in preserves HexDocs structure as Markdown within the fetch limits", %{context: context} do
     expect(Address, :resolve, 2, fn "hexdocs.pm" -> {:ok, @ip} end)
 

@@ -20,12 +20,15 @@ JIDO_PLAYGROUND=1 mix run examples/playground/playground.exs
 ```
 
 Open [the Example Explorer](http://localhost:4011). Use **Learn** for the six
-onboarding lessons or **Browse** to search the full catalog by task or chapter.
+onboarding lessons or **Browse** to see the full catalog grouped by chapter.
+Search by a task, lesson, or chapter name.
 Open a lesson to read its highlighted source and tests. Select **Run test** to
 see the result and output in the lesson pane. The first test run can take
 time to compile dependencies. Open **Hosted Agent** to try an expense
 submission. Submit 12,500 cents to commit a Turn, then zero to see a failed
-Turn leave the committed state at the same revision.
+Turn leave the committed state at the same revision. Open
+[Read a release note with an AI Agent](15_ai_agents/15_15_browser_release_notes/README.md)
+to try a permitted page and a host denial.
 
 The flag enables Phoenix Playground, MDEx, and Lumis. Normal Core setup and
 the offline example suite run without these dependencies.
@@ -37,9 +40,13 @@ the offline example suite run without these dependencies.
   and the [complete Support Desk](24_application_patterns/24_09_support_desk/README.md).
 - [Build a chat UI](24_application_patterns/24_06_phoenix_liveview_chat/README.md).
 - [Resume an approval](13_durable_execution/13_06_durable_wait/README.md).
-- [Recover an external delivery](24_application_patterns/24_07_recoverable_external_delivery/README.md).
+- Recover an external write. Start with [an interrupted Flow step](13_durable_execution/13_07_external_uncertainty/README.md)
+  or [a committed delivery effect](24_application_patterns/24_07_recoverable_external_delivery/README.md).
+- [Process an ordered batch](03_flow_execution/03_21_ordered_batch/README.md).
+- [Cancel a Statechart deadline](11_built_in_capabilities/11_10_statechart_deadline/README.md).
+- [Read a release note with an AI Agent](15_ai_agents/15_15_browser_release_notes/README.md).
 - [Upgrade a running Agent](24_application_patterns/24_08_controlled_agent_upgrade/README.md).
-- Understand recovery after [process loss](13_durable_execution/13_02_saved_progress/README.md)
+- Recover after a crash. Compare [Agent process loss](13_durable_execution/13_02_saved_progress/README.md)
   or [BEAM loss](13_durable_execution/13_03_vm_recovery/README.md).
 - [Run a durable Agent fleet](13_durable_execution/13_08_waterpark/README.md)
   or [measure it](25_operations_and_integrations/25_05_passive_fleet_measurement/README.md).

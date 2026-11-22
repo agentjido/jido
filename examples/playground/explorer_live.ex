@@ -4,12 +4,31 @@ defmodule Jido.Examples.ExplorerLive do
   alias Phoenix.LiveView.AsyncResult
 
   alias Jido.AgentServer
+  alias Jido.Examples.AI.BrowserReleaseNotes
+  alias Jido.Examples.AI.BrowserReleaseNotes.{OfflineBrowser, ScriptedClient}
   alias Jido.Examples.Patterns.SupportDesk
   alias Jido.Examples.{ExplorerPreview, ExplorerRuntime, ExplorerTestRunner, StartHere.HostedExpense}
 
   @examples Path.expand("..", __DIR__)
   @first "00_01_validated_state"
   @first_chapter "00_start_here"
+  @last "00_06_runtime_inspection"
+  @retired %{
+    "03_16_batch_processing" => "03_21_ordered_batch",
+    "07_03_stable_addresses" => "07_04_logical_identity"
+  }
+  @topics %{
+    "11_02_scheduled_signals" => "Schedule a Signal",
+    "11_03_keyed_timers" => "Schedule a Signal",
+    "11_04_heartbeat" => "Schedule a Signal",
+    "13_02_saved_progress" => "Recover after a crash",
+    "13_03_vm_recovery" => "Recover after a crash"
+  }
+  @next_tasks [
+    {"Run a batch", "03_21_ordered_batch"},
+    {"Recover a saved completion", "13_05_saved_completion"},
+    {"Build a Support Desk", "24_09_support_desk"}
+  ]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -22,6 +41,7 @@ defmodule Jido.Examples.ExplorerLive do
         %{
           id: Path.basename(directory),
           chapter: Path.basename(Path.dirname(directory)),
+          topic: Map.get(@topics, Path.basename(directory)),
           title: String.replace(heading, ~r/^#\s+(?:\d{2}_\d{2}\s+)?/, ""),
           body: String.trim(body),
           summary:
@@ -29,7 +49,8 @@ defmodule Jido.Examples.ExplorerLive do
             |> Enum.drop_while(&(String.trim(&1) == ""))
             |> Enum.take_while(&(String.trim(&1) != ""))
             |> Enum.join(" "),
-          files: File.ls!(directory) |> Enum.filter(&String.ends_with?(&1, [".ex", ".exs", ".livemd"])) |> Enum.sort()
+          files: source_files(directory, "*.{ex,exs,livemd}"),
+          support_files: source_files(directory, "support/**/*.{ex,exs,livemd}")
         }
       end
 
@@ -44,6 +65,7 @@ defmodule Jido.Examples.ExplorerLive do
        desk_agent: nil,
        desk_reply: nil,
        desk_status: :open,
+       browser_reply: nil,
        revision: 0,
        preview: nil,
        test_run: nil,
@@ -53,7 +75,9 @@ defmodule Jido.Examples.ExplorerLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    selected = Enum.find(socket.assigns.catalog, &(&1.id == Map.get(params, "lesson", @first)))
+    requested = Map.get(params, "lesson", @first)
+    lesson = Map.get(@retired, requested, requested)
+    selected = Enum.find(socket.assigns.catalog, &(&1.id == lesson))
 
     mode =
       if params["mode"] == "browse" or (selected && selected.chapter != @first_chapter),
@@ -61,9 +85,9 @@ defmodule Jido.Examples.ExplorerLive do
         else: :learn
 
     file =
-      with %{files: files} <- selected,
+      with %{files: files, support_files: support_files} <- selected,
            filename when is_binary(filename) <- params["file"],
-           true <- filename in files do
+           true <- filename in files or filename in support_files do
         filename
       else
         _ -> nil
@@ -82,7 +106,12 @@ defmodule Jido.Examples.ExplorerLive do
           nil
       end
 
-    {:noreply, assign(socket, selected: selected, file: file, preview: preview, mode: mode)}
+    query =
+      if (mode == :browse and selected) && matches?(selected, socket.assigns.query),
+        do: socket.assigns.query,
+        else: ""
+
+    {:noreply, assign(socket, selected: selected, file: file, preview: preview, mode: mode, query: query)}
   end
 
   @impl true
@@ -90,10 +119,13 @@ defmodule Jido.Examples.ExplorerLive do
     {:noreply, assign(socket, :query, query)}
   end
 
-  def handle_event("chapter", %{"chapter" => chapter}, socket) do
-    case Enum.find(socket.assigns.catalog, &(&1.chapter == chapter)) do
-      nil -> {:noreply, socket}
-      example -> {:noreply, push_patch(assign(socket, :query, ""), to: ExplorerPreview.lesson_url(:browse, example.id))}
+  def handle_event("read_release_note", %{"page" => page}, socket) do
+    with {index, ""} when index >= 0 <- Integer.parse(page),
+         {_label, url} <- Enum.at(OfflineBrowser.pages(), index),
+         {:ok, %{status: :completed, output: output}} <- BrowserReleaseNotes.read(url, ScriptedClient) do
+      {:noreply, assign(socket, :browser_reply, output)}
+    else
+      _ -> {:noreply, assign(socket, :browser_reply, "The example could not complete this request.")}
     end
   end
 
@@ -220,8 +252,20 @@ defmodule Jido.Examples.ExplorerLive do
   defp desk_reply_label(:failed), do: "Support request failed"
 
   defp matches?(example, query) do
-    searchable = String.downcase("#{example.title} #{example.summary} #{String.replace(example.chapter, "_", " ")}")
+    searchable =
+      String.downcase(
+        "#{example.title} #{example.summary} #{example.topic} #{String.replace(example.chapter, "_", " ")}"
+      )
+
     Enum.all?(String.split(String.downcase(query)), &String.contains?(searchable, &1))
+  end
+
+  defp source_files(directory, pattern) do
+    directory
+    |> Path.join(pattern)
+    |> Path.wildcard()
+    |> Enum.filter(&File.regular?/1)
+    |> Enum.map(&Path.relative_to(&1, directory))
   end
 
   defp lesson_path(example), do: "examples/#{example.chapter}/#{example.id}"
@@ -245,17 +289,25 @@ defmodule Jido.Examples.ExplorerLive do
     browse_lesson = if selected, do: selected.id, else: @first
 
     lessons =
-      cond do
-        learn? -> Enum.filter(assigns.catalog, &(&1.chapter == @first_chapter))
-        String.trim(assigns.query) != "" -> Enum.filter(assigns.catalog, &matches?(&1, assigns.query))
-        true -> Enum.filter(assigns.catalog, &(&1.chapter == chapter))
-      end
+      if learn?,
+        do: Enum.filter(assigns.catalog, &(&1.chapter == @first_chapter)),
+        else: Enum.filter(assigns.catalog, &matches?(&1, assigns.query))
+
+    chapters =
+      lessons
+      |> Enum.group_by(& &1.chapter)
+      |> Enum.sort()
+      |> Enum.map(fn {chapter, entries} -> {chapter, Enum.chunk_by(entries, & &1.topic)} end)
 
     assigns =
       assign(assigns,
         chapter: chapter,
-        chapters: assigns.catalog |> Enum.map(& &1.chapter) |> Enum.uniq(),
+        chapters: chapters,
         lessons: lessons,
+        search_active?: String.trim(assigns.query) != "",
+        next_tasks: @next_tasks,
+        last_lesson: @last,
+        browser_pages: Enum.with_index(OfflineBrowser.pages()),
         learn?: learn?,
         learn_lesson: learn_lesson,
         browse_lesson: browse_lesson
@@ -263,9 +315,41 @@ defmodule Jido.Examples.ExplorerLive do
 
     ~H"""
     <style>
-      :root { color-scheme:light; --ink:#1f2a24; --muted:#5b6660; --line:#e2ddd0; --accent:#2f6b4f; --selected:#e3ede6; --fail:#a3412e; }
+      :root {
+        color-scheme:light dark;
+        --canvas:#faf8f3;
+        --panel:#fff;
+        --sidebar:#f2efe6;
+        --ink:#1f2a24;
+        --muted:#5b6660;
+        --line:#e2ddd0;
+        --control:#728a80;
+        --code:#f2f4ef;
+        --accent:#2f6b4f;
+        --selected:#e3ede6;
+        --button:#2f6b4f;
+        --button-hover:#275a42;
+        --fail:#a3412e;
+      }
+      @media (prefers-color-scheme:dark) {
+        :root {
+          --canvas:#111827;
+          --panel:#1b2537;
+          --sidebar:#182337;
+          --ink:#e8effa;
+          --muted:#aabbd1;
+          --line:#364760;
+          --control:#7488a8;
+          --code:#121d2e;
+          --accent:#9cc6ff;
+          --selected:#284364;
+          --button:#2f5f9e;
+          --button-hover:#346eaf;
+          --fail:#f6a892;
+        }
+      }
       * { box-sizing:border-box; }
-      body { margin:0; background:#faf8f3; color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
+      body { margin:0; background:var(--canvas); color:var(--ink); font:16px/1.6 system-ui,sans-serif; }
       main { max-width:1150px; margin:auto; padding:1.5rem clamp(1rem,4vw,3rem) 3rem; }
       h1,h2,h3,p { margin-top:0; }
       h1 { margin:0; font-size:clamp(1.75rem,4vw,2.4rem); line-height:1.15; letter-spacing:-.04em; }
@@ -274,30 +358,35 @@ defmodule Jido.Examples.ExplorerLive do
       :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
       .brand { display:inline-block; color:var(--ink); text-decoration:none; font-weight:750; margin-bottom:1.15rem; }
       .layout { display:grid; grid-template-columns:minmax(220px,260px) minmax(0,1fr); gap:1.4rem; align-items:start; }
-      .panel { min-width:0; background:white; border:1px solid var(--line); border-radius:.75rem; padding:clamp(1rem,3vw,2rem); }
-      .sidebar { position:sticky; top:1rem; padding:1rem; background:#f2efe6; }
+      .panel { min-width:0; background:var(--panel); border:1px solid var(--line); border-radius:.75rem; padding:clamp(1rem,3vw,2rem); }
+      .sidebar { position:sticky; top:1rem; padding:1rem; background:var(--sidebar); }
       .modes { display:flex; gap:3px; padding:3px; border-radius:8px; background:var(--line); }
       .modes a { flex:1; padding:.3rem .5rem; border-radius:6px; color:var(--muted); text-align:center; text-decoration:none; font-size:.9rem; font-weight:650; }
-      .modes a[aria-current=page] { color:var(--ink); background:white; box-shadow:0 1px 2px #0001; }
+      .modes a[aria-current=page] { color:var(--ink); background:var(--panel); box-shadow:0 1px 2px #0001; }
       .path-label { margin:1rem 0 .4rem; font-weight:650; font-size:.9rem; }
       .browse-controls { margin-top:1rem; }
+      .catalog-chapters { max-height:65vh; overflow:auto; margin-top:.75rem; }
+      .catalog-chapters details { border-top:1px solid var(--line); padding:.35rem 0; }
+      .catalog-chapters summary { cursor:pointer; font-size:.9rem; font-weight:600; }
+      .catalog-chapters .lesson-list { max-height:none; margin:.25rem 0 .35rem .5rem; }
+      .catalog-topic { color:var(--muted); font-size:.8rem; font-weight:650; padding:.35rem .55rem 0; }
       .no-results { margin:.8rem 0 0; color:var(--muted); font-size:.9rem; }
       .sidebar label { font-size:.85rem; margin-top:.8rem; }
       .sidebar label[for=query] { margin-top:0; }
       .lesson-list { list-style:none; margin:.8rem 0 0; padding:0; }
       .lesson-list a { display:block; color:var(--ink); text-decoration:none; padding:.4rem .55rem; border-radius:.35rem; }
-      .lesson-list a:hover { background:white; }
+      .lesson-list a:hover { background:var(--panel); }
       .learn-list { list-style:decimal; padding-left:1.35rem; margin-top:0; }
       .learn-list li::marker { color:var(--muted); font-size:.85rem; }
       .lesson-list a[aria-current=page] { font-weight:700; color:var(--accent); background:var(--selected); }
       label { display:block; font-weight:650; }
-      input,select,textarea { width:100%; padding:.45rem .5rem; border:1px solid #879d97; border-radius:.4rem; background:white; color:inherit; font:inherit; }
+      input,select,textarea { width:100%; padding:.45rem .5rem; border:1px solid var(--control); border-radius:.4rem; background:var(--panel); color:inherit; font:inherit; }
       .lesson-list { max-height:24rem; overflow:auto; }
       .lesson-title { display:flex; align-items:center; justify-content:space-between; gap:.75rem 1rem; flex-wrap:wrap; }
       .lesson-title button { flex-shrink:0; }
-      pre { background:#f2f4ef; padding:.8rem; border-radius:.4rem; white-space:pre-wrap; overflow-wrap:anywhere; max-width:100%; }
-      button { padding:.45rem .75rem; border:0; border-radius:.4rem; background:var(--accent); color:white; font:inherit; cursor:pointer; }
-      button:hover { background:#275a42; }
+      pre { background:var(--code); padding:.8rem; border-radius:.4rem; white-space:pre-wrap; overflow-wrap:anywhere; max-width:100%; }
+      button { padding:.45rem .75rem; border:0; border-radius:.4rem; background:var(--button); color:#fff; font:inherit; cursor:pointer; }
+      button:hover { background:var(--button-hover); }
       button:disabled { opacity:.65; cursor:wait; }
       .demo { border:1px solid var(--line); padding:1rem; margin:1rem 0; border-radius:.6rem; }
       .demo input { max-width:14rem; margin:.3rem .3rem .3rem 0; }
@@ -341,14 +430,6 @@ defmodule Jido.Examples.ExplorerLive do
               <label for="query">Search examples</label>
               <input id="query" name="query" type="search" value={@query} placeholder="Approval, recovery…" phx-debounce="150" />
             </form>
-            <form phx-change="chapter">
-              <label for="chapter">Chapter</label>
-              <select id="chapter" name="chapter">
-                <option :for={chapter <- @chapters} value={chapter} selected={chapter == @chapter}>
-                  {chapter_title(chapter)}
-                </option>
-              </select>
-            </form>
             <p :if={@lessons == []} class="no-results" role="status">No examples match.</p>
           </div>
           <ol :if={@learn?} class="lesson-list learn-list">
@@ -358,13 +439,19 @@ defmodule Jido.Examples.ExplorerLive do
               </.link>
             </li>
           </ol>
-          <ul :if={!@learn?} class="lesson-list">
-            <li :for={example <- @lessons}>
-              <.link patch={ExplorerPreview.lesson_url(:browse, example.id)} aria-current={if @selected && @selected.id == example.id, do: "page"}>
-                {example.title}
-              </.link>
-            </li>
-          </ul>
+          <div :if={!@learn?} class="catalog-chapters">
+            <details :for={{chapter, entries} <- @chapters} id={"catalog-#{chapter}"} open={@search_active? || chapter == @chapter}>
+              <summary>{chapter_title(chapter)}</summary>
+              <ul :for={[first | _] = group <- entries} class="lesson-list" aria-label={first.topic}>
+                <li :if={first.topic} class="catalog-topic">{first.topic}</li>
+                <li :for={example <- group}>
+                  <.link patch={ExplorerPreview.lesson_url(:browse, example.id)} aria-current={if @selected && @selected.id == example.id, do: "page"}>
+                    {example.title}
+                  </.link>
+                </li>
+              </ul>
+            </details>
+          </div>
         </nav>
         <article :if={@selected} class="panel">
           <div class="lesson-title">
@@ -375,6 +462,7 @@ defmodule Jido.Examples.ExplorerLive do
           </div>
           <nav class="links" aria-label="Lesson files">
             <.link patch={ExplorerPreview.lesson_url(@mode, @selected.id)} aria-current={if !@file, do: "page"}>Lesson</.link>
+            <.link :if={@file in @selected.support_files} patch={ExplorerPreview.lesson_url(@mode, @selected.id, @file)} aria-current="page">{@file}</.link>
             <.link :for={file <- @selected.files} patch={ExplorerPreview.lesson_url(@mode, @selected.id, file)} aria-current={if @file == file, do: "page"}>{file}</.link>
           </nav>
           <div :if={@test_lesson == @selected.id && @test_run} class="test-result"
@@ -401,6 +489,17 @@ defmodule Jido.Examples.ExplorerLive do
               <pre>Revision {@revision}{"\n"}{inspect(@result.state, pretty: true)}</pre>
             </div>
           </section>
+          <section :if={!@file && @selected.id == "15_15_browser_release_notes"} class="demo">
+            <h2>Try the browser tool</h2>
+            <form phx-submit="read_release_note">
+              <label for="release-note-page">Page</label>
+              <select id="release-note-page" name="page">
+                <option :for={{{label, _url}, index} <- @browser_pages} value={index}>{label}</option>
+              </select>
+              <button>Read page</button>
+            </form>
+            <p :if={@browser_reply} id="browser-reply" aria-live="polite">{@browser_reply}</p>
+          </section>
           <section :if={!@file && @selected.id == "24_09_support_desk"} class="demo">
             <h2>Try the Support Desk</h2>
             <p id="desk-status">Ticket status: {String.capitalize(to_string(@desk_status))}</p>
@@ -425,6 +524,14 @@ defmodule Jido.Examples.ExplorerLive do
             </div>
           </section>
           <div class="preview">{@preview}</div>
+          <section :if={!@file && @learn? && @selected.id == @last_lesson}>
+            <h2>Choose your next task</h2>
+            <ul>
+              <li :for={{label, id} <- @next_tasks}>
+                <.link patch={ExplorerPreview.lesson_url(:browse, id)}>{label}</.link>
+              </li>
+            </ul>
+          </section>
           <details class="terminal">
             <summary>Run from the terminal</summary>
             <pre id="test-command">{command(@selected)}</pre>

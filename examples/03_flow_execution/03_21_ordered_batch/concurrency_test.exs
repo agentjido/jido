@@ -1,6 +1,6 @@
-Code.require_file("batch_processing.ex", __DIR__)
+Code.require_file("support/concurrency_probe.exs", __DIR__)
 
-defmodule Jido.Examples.Patterns.BatchProcessingTest do
+defmodule Jido.Examples.Workflow.OrderedBatchConcurrencyTest do
   use ExUnit.Case, async: false
   @moduletag :integration
 
@@ -12,7 +12,7 @@ defmodule Jido.Examples.Patterns.BatchProcessingTest do
     task =
       Task.async(fn ->
         Jido.Exec.run(
-          Jido.Examples.Patterns.BatchProcessing,
+          Jido.Examples.OrderedBatch.ConcurrencyProbe,
           %{items: input},
           %{gate: gate, observer: owner},
           max_concurrency: 4

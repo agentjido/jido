@@ -1,4 +1,4 @@
-# 11_04 Heartbeat
+# 11_04 Declare a recurring Timer
 
 A static Timer interval sends periodic Signals to its Agent. Heartbeat is the
 application meaning of the Signal, not a separate timer engine.

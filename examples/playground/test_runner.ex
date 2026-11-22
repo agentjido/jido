@@ -16,7 +16,7 @@ defmodule Jido.Examples.ExplorerTestRunner do
             :binary,
             :exit_status,
             :stderr_to_stdout,
-            args: ["test.examples", path, "--warnings-as-errors"],
+            args: ["test.examples", path, "--warnings-as-errors", "--trace"],
             cd: @root,
             env: [{~c"MIX_ENV", ~c"test"}, {~c"JIDO_PLAYGROUND", false}, {~c"NO_COLOR", ~c"1"}]
           ])
