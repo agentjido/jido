@@ -715,6 +715,7 @@ Disposition terms:
 | `Jido.Plugin` | Keep | Public Plugin behavior and package macro |
 | `Jido.Plugin.Audit` | Keep | Included audit Plugin; no runtime process |
 | `Jido.Plugin.Bus` | Removed | Empty namespace module added no contract; Manager, Client, and DSL remain canonical owners |
+| `Jido.Plugin.EctoState` | Added | Optional capability that loads the application row at admission and saves version-checked changes before commit. Agent authoring passes a provider declaration. |
 | `Jido.Plugin.Config` | Added | Deferred Plugin option references and runtime-owner resolution in the definitions layer; does not load env files or own instance configuration |
 | `Jido.Plugin.DirectiveContext` | Removed | Directive callbacks use the explicit `:directive` phase of `Jido.Plugin.Context` |
 | `Jido.Plugin.Error` | Removed | Callback policy now belongs to `Jido.Plugin`; failures use `Jido.Error` values |

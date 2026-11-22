@@ -77,7 +77,11 @@ defmodule Jido.Catalog.Discovery do
 
   @doc "Lists the first-party Plugin modules included in this Jido release."
   @spec included_plugins() :: [module()]
-  def included_plugins, do: @included_plugins
+  def included_plugins do
+    if Code.ensure_loaded?(Jido.Plugin.EctoState),
+      do: @included_plugins ++ [Jido.Plugin.EctoState],
+      else: @included_plugins
+  end
 
   @doc """
   Returns the bundled codec for one exact document type and version.

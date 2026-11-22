@@ -826,6 +826,19 @@ defmodule Jido.AgentServer.Worker do
   end
 
   defp initialize_bound_plugins(data) do
+    case PluginCallbacks.before_commit_specs(data.plugin_specs) do
+      [] ->
+        start_bound_plugins(data)
+
+      [%{agent: %{state_key: key}}] when not is_nil(key) ->
+        start_bound_plugins(data)
+
+      _ ->
+        {:stop, :before_commit_requires_one_state_owner}
+    end
+  end
+
+  defp start_bound_plugins(data) do
     if not Jido.Agent.Topology.empty?(data.agent.topology) or
          Topology.buses(data.agent) != [] or
          ServerSupervisor.execution(data.activation_state) != nil or
@@ -1418,6 +1431,17 @@ defmodule Jido.AgentServer.Worker do
 
   def handle_event(:info, {:turn_timeout, _id}, :waiting, %{admission_mode: :blocked}),
     do: :keep_state_and_data
+
+  def handle_event(
+        :info,
+        {:before_commit_timeout, id},
+        :saving,
+        %{active: %{turn_id: id, operation: %{kind: :before_commit}, storage: {_timer, deadline}}} = data
+      ) do
+    if System.monotonic_time(:millisecond) >= deadline,
+      do: before_commit_timed_out(data),
+      else: :keep_state_and_data
+  end
 
   def handle_event(:info, {:persistence_timeout, id}, :saving, %{active: %{turn_id: id}} = data),
     do: stop_durable(data, :indeterminate)
@@ -2169,6 +2193,7 @@ defmodule Jido.AgentServer.Worker do
     case initialize_plugins(data) do
       {:ok, phase, next} -> {:next_state, phase, next}
       {:ok, phase, next, actions} -> {:next_state, phase, next, actions}
+      {:stop, reason} -> finish_bootstrap({:error, reason}, data)
     end
   end
 
@@ -2551,6 +2576,7 @@ defmodule Jido.AgentServer.Worker do
       settle: :settling,
       cleanup: :cleaning,
       save: :saving,
+      before_commit: :saving,
       commit_hook: :effects,
       effect: :effects
     }
@@ -2864,6 +2890,21 @@ defmodule Jido.AgentServer.Worker do
 
       {:error, reason} ->
         stop_durable(data, reason)
+    end
+  end
+
+  defp operation_result(:before_commit, result, data) do
+    {timer, deadline} = data.active.storage
+    Process.cancel_timer(timer)
+
+    if System.monotonic_time(:millisecond) >= deadline do
+      before_commit_timed_out(data)
+    else
+      case result do
+        :ok -> commit_candidate(data, data.active.result)
+        {:error, :indeterminate} -> stop_durable(data, :indeterminate)
+        {:error, reason} -> reject_commit(data, reason)
+      end
     end
   end
 
@@ -3232,7 +3273,68 @@ defmodule Jido.AgentServer.Worker do
     end)
   end
 
-  defp finish(%{persistence: persistence} = data, {:ok, candidate, _} = result)
+  defp finish(
+         %{
+           active: %{turn_id: turn_id, result_handoff: true},
+           server_turn: %{terminal_result: %{turn_id: turn_id}}
+         } = data,
+         {:error, _} = result
+       ),
+       do: finish_result(data, result)
+
+  defp finish(
+         %{persistence: persistence, active: %{result_handoff: true}} = data,
+         {:error, _} = result
+       )
+       when persistence not in [nil, false] do
+    cancel_timer(data.active)
+    deadline = System.monotonic_time(:millisecond) + data.persistence_timeout
+
+    timer =
+      Process.send_after(
+        self(),
+        {:persistence_timeout, data.active.turn_id},
+        data.persistence_timeout
+      )
+
+    active = Map.merge(data.active, %{result: result, storage: {timer, deadline}})
+    projected = projected_turn_result(data, result, data.agent_revision, data.state_version + 1)
+    receipt = Continuation.retain_result!(data.server_turn, projected)
+    data = %{data | server_turn: receipt, active: active}
+
+    operation(:save, data, fn ->
+      Lifecycle.save(
+        data,
+        data.agent,
+        data.state_version + 1,
+        data.state_version,
+        receipt,
+        agent_revision: data.agent_revision
+      )
+    end)
+  end
+
+  defp finish(data, {:ok, candidate, _} = result) do
+    case PluginCallbacks.before_commit_specs(data.plugin_specs) do
+      [] ->
+        commit_candidate(data, result)
+
+      [plugin] ->
+        cancel_timer(data.active)
+        deadline = System.monotonic_time(:millisecond) + data.commit_timeout
+        timer = Process.send_after(self(), {:before_commit_timeout, data.active.turn_id}, data.commit_timeout)
+        active = Map.merge(data.active, %{result: result, storage: {timer, deadline}})
+
+        operation(:before_commit, %{data | active: active}, fn ->
+          Plugin.before_commit(data, candidate, plugin)
+        end)
+    end
+  end
+
+  defp finish(data, {:handoff, _, _, _} = result), do: publish_commit(data, result)
+  defp finish(data, result), do: finish_result(data, result)
+
+  defp commit_candidate(%{persistence: persistence} = data, {:ok, candidate, _} = result)
        when persistence not in [nil, false] do
     cancel_timer(data.active)
     deadline = System.monotonic_time(:millisecond) + data.persistence_timeout
@@ -3278,50 +3380,18 @@ defmodule Jido.AgentServer.Worker do
     end)
   end
 
-  defp finish(
-         %{
-           active: %{turn_id: turn_id, result_handoff: true},
-           server_turn: %{terminal_result: %{turn_id: turn_id}}
-         } = data,
-         {:error, _} = result
-       ),
-       do: finish_result(data, result)
+  defp commit_candidate(data, result), do: publish_commit(data, result)
 
-  defp finish(
-         %{persistence: persistence, active: %{result_handoff: true}} = data,
-         {:error, _} = result
-       )
-       when persistence not in [nil, false] do
-    cancel_timer(data.active)
-    deadline = System.monotonic_time(:millisecond) + data.persistence_timeout
+  defp reject_commit(data, reason),
+    do: finish(put_in(data.active.failure_stage, :commit), {:error, reason})
 
-    timer =
-      Process.send_after(
-        self(),
-        {:persistence_timeout, data.active.turn_id},
-        data.persistence_timeout
-      )
+  defp before_commit_timed_out(%{persistence: persistence} = data) when persistence in [nil, false],
+    do: stop_durable(data, :indeterminate)
 
-    active = Map.merge(data.active, %{result: result, storage: {timer, deadline}})
-    projected = projected_turn_result(data, result, data.agent_revision, data.state_version + 1)
-    receipt = Continuation.retain_result!(data.server_turn, projected)
-    data = %{data | server_turn: receipt, active: active}
-
-    operation(:save, data, fn ->
-      Lifecycle.save(
-        data,
-        data.agent,
-        data.state_version + 1,
-        data.state_version,
-        receipt,
-        agent_revision: data.agent_revision
-      )
-    end)
+  defp before_commit_timed_out(data) do
+    if data.active.operation, do: Task.shutdown(data.active.operation.task, :brutal_kill)
+    reject_commit(put_in(data.active.operation, nil), :before_commit_timeout)
   end
-
-  defp finish(data, {:ok, _, _} = result), do: publish_commit(data, result)
-  defp finish(data, {:handoff, _, _, _} = result), do: publish_commit(data, result)
-  defp finish(data, result), do: finish_result(data, result)
 
   defp commit_topology_options(data) do
     opts = [agent_revision: data.agent_revision + 1]

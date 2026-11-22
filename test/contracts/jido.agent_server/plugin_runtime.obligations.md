@@ -114,3 +114,11 @@ This component has no DSL or forwarding facade.
 - **why:** Plugin authors need stable callback data and one direct state-read owner.
 - **kind:** functional
 - **status:** active
+
+### jido.agent_server.plugin_runtime.I14 — Terminal commit approval
+
+- **scope:** `Jido.Plugin.before_commit/3` and the terminal AgentServer Turn
+- **must:** Run the single state owner's callback with its validated proposed value, next revision, transient admission input, and Jido persistence flag before the terminal save or publish. A rejection keeps the prior Agent state and skips post-commit hooks. A durable Flow records the failed Turn. An external write requires Jido persistence to be disabled.
+- **why:** The caller needs to know whether the proposed state passed validation or the authoritative state write succeeded.
+- **kind:** ordering
+- **status:** active

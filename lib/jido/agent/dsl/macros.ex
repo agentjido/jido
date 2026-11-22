@@ -16,7 +16,7 @@ defmodule Jido.Agent.DSL.Macros do
 
     settings =
       case name do
-        :state -> [:schema, :initial_state]
+        :state -> [:schema, :ecto, :initial_state]
         :routes -> [:signal_source]
         _ -> []
       end
@@ -26,8 +26,17 @@ defmodule Jido.Agent.DSL.Macros do
     if Enum.uniq(keys) != keys,
       do: error!(caller, "Agent field can be declared only once")
 
+    if :ecto in keys, do: validate_ecto!(block, caller)
+
     quote do
       unquote(internal)(do: unquote(block))
+    end
+  end
+
+  defp validate_ecto!(block, caller) do
+    case Enum.find(expressions(block), &match?({:ecto, _, _}, &1)) do
+      {:ecto, _, [_schema]} -> :ok
+      _ -> error!(caller, "Agent state accepts only ecto SchemaModule")
     end
   end
 

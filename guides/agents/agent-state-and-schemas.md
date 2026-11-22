@@ -4,7 +4,7 @@ This guide shows how to declare Agent state, set its starting values, change it 
 
 ## Declare the schema
 
-The `state` section accepts a `schema` and an `initial_state`. The schema is a `Jido.Joi.object/2` value.
+For Jido-owned state, the `state` section accepts a `schema` and an `initial_state`. The schema is a `Jido.Joi.object/2` value.
 
 ```elixir
 defmodule StateGuide.TicketAgent do
@@ -123,6 +123,68 @@ Use `set/2` for setup and tests. Use a route when the change is a command to the
 ```
 
 `Jido.Agent.definition?/1` and `Jido.Agent.instance?/1` check shape only.
+
+## Use an Ecto row as Agent state
+
+Add `:ecto_sql` and an Ecto adapter to your application. Start the Repo
+before you run a live Turn. The schema must export `repo/0` and
+`changeset/2`. Give the row one primary key and a non-null integer
+`lock_version`. Create the row before the first Turn. Its primary key must
+match the Agent ID.
+
+```elixir
+defmodule MyApp.CounterState do
+  use Ecto.Schema
+
+  @primary_key {:id, :string, autogenerate: false}
+  schema "counter_state" do
+    field :count, :integer
+    field :lock_version, :integer, default: 1
+  end
+
+  def repo, do: MyApp.Repo
+
+  def changeset(row, attrs), do: Ecto.Changeset.cast(row, attrs, [:count])
+end
+
+defmodule MyApp.CounterAgent do
+  use Jido.Agent, name: "counter"
+  alias Jido.Plugin.EctoState
+
+  state do
+    ecto MyApp.CounterState
+  end
+
+  routes do
+    signal_source "/my_app/counter"
+
+    route "counter.increment" do
+      action _input, context: context do
+        row = context.plugin_inputs[EctoState].runtime.row
+        changes = %{count: row.count + 1}
+        {:ok, changes, [EctoState.update(changes)]}
+      end
+
+      state :unchanged
+      reply "counter.incremented", from: output()
+    end
+  end
+end
+```
+
+Use only `ecto SchemaModule` in this state block. The compiler rejects
+`schema`, `initial_state`, and options on the `ecto` declaration.
+
+Each live Turn reads the current row. The Action reads the row from its
+Plugin input and can return one update Directive. Any reply comes from the
+route's own output. The Plugin uses the schema's changeset and checks
+`lock_version` when it saves. A stale row fails the Turn before the caller
+receives success. A Turn with no update Directive only reads the row.
+
+Run the Agent with Jido persistence disabled to write to the Ecto row.
+When Jido persistence is enabled, the Plugin rejects update proposals and
+permits read-only Turns. If another writer changes the row, it must also
+advance `lock_version`.
 
 ## Plugin-owned fields
 

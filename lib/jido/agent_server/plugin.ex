@@ -81,19 +81,32 @@ defmodule Jido.AgentServer.Plugin do
   end
 
   @doc false
+  def before_commit(data, candidate, plugin) do
+    active = data.active
+    commit = commit_context(data, active, plugin, candidate, data.state_version + 1)
+    input = Map.get(active.prepared.instruction.context.plugin_inputs, plugin.module, %Jido.Plugin.Input{})
+    commit = %{commit | runtime_input: input.runtime}
+    Callbacks.before_commit(plugin, Map.get(data.plugin_refs, plugin.module), commit)
+  end
+
+  @doc false
   def after_commit(data, active, plugin) do
-    commit = %Commit{
+    commit = commit_context(data, active, plugin, data.agent, data.state_version)
+    Callbacks.after_commit(plugin, Map.get(data.plugin_refs, plugin.module), commit)
+  end
+
+  defp commit_context(data, active, plugin, agent, version) do
+    %Commit{
       plugin: plugin.module,
       turn_id: active.turn_id,
-      agent_id: data.agent.id,
-      agent_module: data.agent.module,
-      plugin_state: owned_state(data.agent, plugin),
-      state_version: data.state_version,
+      agent_id: agent.id,
+      agent_module: agent.module,
+      plugin_state: owned_state(agent, plugin),
+      state_version: version,
       jido: data.jido,
-      partition: data.partition
+      partition: data.partition,
+      jido_persistence?: data.persistence not in [nil, false]
     }
-
-    Callbacks.after_commit(plugin, Map.get(data.plugin_refs, plugin.module), commit)
   end
 
   @doc false

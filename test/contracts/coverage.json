@@ -6,14 +6,14 @@
       "covered": 102
     },
     "jido.agent_server": {
-      "active": 15,
+      "active": 16,
       "coverage": 1.0,
-      "covered": 15
+      "covered": 16
     },
     "jido.plugin": {
-      "active": 41,
+      "active": 42,
       "coverage": 1.0,
-      "covered": 41
+      "covered": 42
     },
     "jido.telemetry": {
       "active": 2,
@@ -284,7 +284,7 @@
         "jido.agent.I3": {
           "failing": 0,
           "kind": "functional",
-          "passing": 14,
+          "passing": 15,
           "status": "active",
           "testable": true,
           "tests": [
@@ -294,6 +294,7 @@
             "test authoring traversal preserves order and stops at one structured error",
             "test collection errors retain the failed field, declaration, and index",
             "test definitions are neutral and instances need explicit identity and complete stored state",
+            "test ecto state accepts one schema module and rejects another state declaration",
             "test field validation follows one fixed order",
             "test initial state must be a plain static Map",
             "test neutral definitions use explicit canonical defaults",
@@ -1664,10 +1665,10 @@
       }
     },
     "jido.agent_server.plugin_runtime": {
-      "active": 6,
+      "active": 7,
       "app": "jido.agent_server",
       "coverage": 1.0,
-      "covered": 6,
+      "covered": 7,
       "form": "light",
       "obligations": {
         "jido.agent_server.plugin_runtime.I1": {
@@ -1707,6 +1708,23 @@
             "test the live Plugin API exposes only its state owner"
           ]
         },
+        "jido.agent_server.plugin_runtime.I14": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 8,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a changeset validation failure writes no row or ledger entry",
+            "test a read-only Turn uses the row and does not advance its version",
+            "test a stale row fails the Turn and leaves the ledger empty",
+            "test an unchanged proposal still fails when its row is stale",
+            "test before_commit can reject a durable Turn and retain the last approved checkpoint",
+            "test each Turn reads the canonical row, including after restart",
+            "test the Ecto Plugin rejects writes with Jido persistence and allows reads",
+            "test the built-in Plugin can commit without a ledger Plugin"
+          ]
+        },
         "jido.agent_server.plugin_runtime.I2": {
           "failing": 0,
           "kind": "ordering",
@@ -1726,10 +1744,11 @@
         "jido.agent_server.plugin_runtime.I4": {
           "failing": 0,
           "kind": "functional",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test admission fails when the canonical row is missing",
             "test callback adapters preserve explicit errors and report invalid or raised results"
           ]
         },
@@ -1744,10 +1763,11 @@
         "jido.agent_server.plugin_runtime.I6": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 1,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a ledger insert failure leaves the committed Counter row intact",
             "test callback adapters preserve explicit errors and report invalid or raised results"
           ]
         },
@@ -2929,6 +2949,25 @@
             "test Client ignores foreign lifecycle and durable delivery messages",
             "test Client runtime death stops its pending delivery worker",
             "test delivery-worker failure retries without stopping the Client runtime"
+          ]
+        }
+      }
+    },
+    "jido.plugin.ecto_state": {
+      "active": 1,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 1,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.ecto_state.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the declaration selects the bundled provider and excludes a Joi domain schema"
           ]
         }
       }
@@ -6208,8 +6247,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 263,
+    "active": 265,
     "coverage": 1.0,
-    "covered": 263
+    "covered": 265
   }
 }

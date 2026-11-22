@@ -182,6 +182,7 @@ defmodule Jido.Plugin.NormalizerTest do
                dispatch: 4,
                child_spec: 1,
                await_ready: 2,
+               before_commit: 3,
                after_commit: 3
              ],
              persistence: [dump: 3, load: 3]

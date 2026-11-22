@@ -118,6 +118,8 @@
       "Jido.Plugin.Audit*",
       "Jido.Plugin.BehaviorTree*",
       "Jido.Plugin.Bus.*",
+      "Jido.Plugin.EctoState",
+      "Jido.Plugin.EctoState.*",
       "Jido.Plugin.FSM",
       "Jido.Plugin.FSM.*",
       "Jido.Plugin.Timer*",

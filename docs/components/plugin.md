@@ -30,12 +30,16 @@ data and routes without a runtime marker.
 | Owner | Optional callbacks and results |
 | --- | --- |
 | Agent | `prepare/2` and `reduce/2` return `{:ok, value}` or `{:error, reason}`. `select_route/2` also accepts `:default` and can select one declared matching route. `state_spec/1` declares no state or one atom field with a static Joi schema. `directives/1` declares the owned Directive modules. Both declaration callbacks can return an error. A Joi schema in `{:error, schema}` declares the field `:error`. |
-| AgentServer | `validate_options/1`, `await_ready/2`, `after_commit/3`, and `dispatch/4` return `:ok` or an error. `admit/3` returns transient input or an error. `prepare_outbound/4` returns a validated Signal or an error. `child_spec/1` receives an Init and returns a permanent OTP child specification. `await_ready/2` requires `child_spec/1`. |
+| AgentServer | `validate_options/1`, `await_ready/2`, `before_commit/3`, `after_commit/3`, and `dispatch/4` return `:ok` or an error. `admit/3` returns transient input or an error. `prepare_outbound/4` returns a validated Signal or an error. `child_spec/1` receives an Init and returns a permanent OTP child specification. `await_ready/2` requires `child_spec/1`. |
 | Persistence | `dump/3` and `load/3` form a pair. They return `{:ok, value}` or `{:error, reason}` for the owned state field. |
 
 `Input` keeps portable prepared input and transient runtime input separate.
 The public handoff records are `Init`, the phase-tagged `Context`, and the
-Admission, Commit, and Persistence contexts. `Init` gives a runtime generation
+Admission, Commit, and Persistence contexts. `before_commit/3` receives the
+same Plugin's transient admission input in the Commit context. If
+`jido_persistence?` is true, use the hook to validate the terminal state
+proposal before Jido saves it.
+`Init` gives a runtime generation
 the activation-local server handle, Agent identity, owned value and revision,
 instance, partition, and AgentServer options. `Jido.Plugin.Config.env/1` creates
 a deferred environment reference. The runtime calls `resolve/1` to read it.

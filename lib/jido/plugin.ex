@@ -92,6 +92,20 @@ defmodule Jido.Plugin do
   @callback await_ready(term(), keyword()) :: :ok | {:error, term()}
 
   @doc """
+  Checks one Plugin-owned state proposal before a terminal Turn commits.
+
+  The context contains the proposed owned state, next state version, and the
+  Plugin's transient admission input from this Turn.
+  Return `:ok` to proceed or `{:error, reason}` to fail the Turn.
+  Return `{:error, :indeterminate}` when the write outcome is unknown.
+  An activation supports one state-owning callback and uses `commit_timeout`.
+  With Jido persistence enabled, this callback may validate the proposal.
+  Make external writes here only when Jido persistence is disabled.
+  """
+  @callback before_commit(term() | nil, Jido.Plugin.Context.Commit.t(), keyword()) ::
+              :ok | {:error, term()}
+
+  @doc """
   Runs after a successful Turn commit and before Directive dispatch.
 
   Hooks run in declaration order, including commits with unchanged state.
@@ -125,6 +139,7 @@ defmodule Jido.Plugin do
       dispatch: 4,
       child_spec: 1,
       await_ready: 2,
+      before_commit: 3,
       after_commit: 3
     ],
     persistence: [dump: 3, load: 3]

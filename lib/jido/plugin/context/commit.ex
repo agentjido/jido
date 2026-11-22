@@ -1,19 +1,20 @@
 defmodule Jido.Plugin.Context.Commit do
   @moduledoc """
-  Read-only committed view for one Plugin notification.
+  Read-only view for one Plugin commit callback.
 
-  `plugin_state` and `state_version` describe the same completed Turn commit.
-  The view contains only the selected Plugin-owned field and identity context.
-  It contains no complete Agent, runtime handle, storage adapter, caller
-  context, or callback return path for changing committed state.
+  For `before_commit/3`, the values describe the validated proposal and its
+  next state version. That callback also receives the Plugin's transient
+  admission input. For `after_commit/3`, the values describe the completed
+  commit and `runtime_input` is nil.
+  `jido_persistence?` reports whether Jido stores its own checkpoints.
 
   Startup and restore use `Jido.Plugin.Init`, not this notification.
   """
 
   @enforce_keys [:plugin, :turn_id, :agent_id, :agent_module, :plugin_state, :state_version]
-  defstruct @enforce_keys ++ [jido: nil, partition: nil]
+  defstruct @enforce_keys ++ [jido: nil, partition: nil, runtime_input: nil, jido_persistence?: false]
 
-  @typedoc "Read-only context for one successful Turn commit notification."
+  @typedoc "Read-only context for one Plugin commit callback."
   @type t :: %__MODULE__{
           plugin: module(),
           turn_id: String.t(),
@@ -22,6 +23,8 @@ defmodule Jido.Plugin.Context.Commit do
           plugin_state: term(),
           state_version: non_neg_integer(),
           jido: atom() | nil,
-          partition: term()
+          partition: term(),
+          runtime_input: term(),
+          jido_persistence?: boolean()
         }
 end
