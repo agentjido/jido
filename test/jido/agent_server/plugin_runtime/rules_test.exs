@@ -2,7 +2,8 @@ defmodule Jido.AgentServer.PluginRuntime.RulesTest do
   use Jido.Test.Case, async: true
   use Covenant.Case, component: "jido.agent_server.plugin_runtime", async: true
 
-  alias Jido.AgentServer.Plugin
+  alias Jido.AgentServer
+  alias Jido.AgentServer.{Plugin, TurnResult}
   alias Jido.AgentServer.Plugin.Callbacks
   alias Jido.Plugin.Context.Commit
   alias Jido.Plugin.{Context, Init}
@@ -15,6 +16,42 @@ defmodule Jido.AgentServer.PluginRuntime.RulesTest do
   defmodule NoRuntime do
     use Jido.Plugin
     def after_commit(_, _, _), do: :ok
+  end
+
+  defmodule CountValidator do
+    use Jido.Plugin
+
+    @impl true
+    def state_spec(_opts), do: {:count, Jido.Joi.integer() |> Jido.Joi.default(0)}
+
+    @impl true
+    def reduce(reduction, _opts), do: {:ok, reduction.signal.data.count}
+
+    @impl true
+    def before_commit(_runtime, %Commit{jido_persistence?: true, plugin_state: count}, _opts)
+        when count <= 3,
+        do: :ok
+
+    def before_commit(_runtime, %Commit{jido_persistence?: true}, _opts),
+      do: {:error, :count_above_limit}
+  end
+
+  defmodule ValidatedCounter do
+    use Jido.Agent, name: "validated_counter", plugins: [CountValidator]
+
+    routes do
+      route "validation.set" do
+        flow schema: Jido.Joi.object(%{count: Jido.Joi.integer()}) do
+          step "count", [count <- input(:count)] do
+            {:ok, %{count: count}}
+          end
+
+          output result("count")
+        end
+
+        state(:unchanged)
+      end
+    end
   end
 
   defmodule CallbackPlugin do
@@ -105,6 +142,25 @@ defmodule Jido.AgentServer.PluginRuntime.RulesTest do
     assert Plugin.directive_owner([owner], %Effect{}) == owner
     assert Plugin.directive_owner([%{owner | agent_server: nil}], %Effect{}) == nil
     assert Plugin.directive_owner([put_in(owner.agent_server.dispatch?, false)], %Effect{}) == nil
+  end
+
+  @tag :tmp_dir
+  @tag obligation: "jido.agent_server.plugin_runtime.I14"
+  test "before_commit can reject a durable Turn and retain the last approved checkpoint", context do
+    %{jido: jido} = restart_jido!(context, {Jido.Persistence.File, path: context.tmp_dir})
+    assert {:ok, server} = Jido.start_agent(jido, ValidatedCounter, id: "validator")
+    assert :ok = AgentServer.await_ready(server)
+
+    assert {:ok, %TurnResult{status: :committed, durability: :durable, agent_revision: 1}} =
+             AgentServer.call(server, signal("validation.set", %{count: 2}))
+
+    assert {:ok, %TurnResult{status: :failed, durability: :durable, error: :count_above_limit, turn_id: failed_id}} =
+             AgentServer.call(server, signal("validation.set", %{count: 9}))
+
+    assert %{agent: %{state: %{count: 2}}, agent_revision: 1} = AgentServer.snapshot(server)
+
+    assert {:ok, %{state: %{count: 2}}, _revision, 1, %{id: ^failed_id, status: :failed}} =
+             Jido.Persistence.load_agent_with_server_turn(jido, ValidatedCounter, "validator", [])
   end
 
   @tag obligation: "jido.agent_server.plugin_runtime.I8"

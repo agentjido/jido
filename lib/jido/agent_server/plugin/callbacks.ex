@@ -11,6 +11,12 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
   @spec commit_specs([Jido.Plugin.Spec.t()]) :: [Jido.Plugin.Spec.t()]
   def commit_specs(specs), do: callback_specs(specs, :after_commit, 3)
 
+  def before_commit_specs(specs), do: callback_specs(specs, :before_commit, 3)
+
+  def before_commit(%{agent_server: %Spec{} = spec}, runtime_ref, %Commit{} = commit) do
+    run_commit(spec, :before_commit, runtime_ref, commit, "Agent Server Plugin before_commit/3 failed")
+  end
+
   @doc false
   @spec after_commit(Jido.Plugin.Spec.t(), term(), Commit.t()) :: :ok | {:error, term()}
   def after_commit(
@@ -18,16 +24,20 @@ defmodule Jido.AgentServer.Plugin.Callbacks do
         runtime_ref,
         %Commit{} = commit
       ) do
+    run_commit(spec, :after_commit, runtime_ref, commit, "Agent Server Plugin commit notification failed")
+  end
+
+  defp run_commit(spec, callback, runtime_ref, commit, message) do
     PluginBoundary.invoke(
       spec.package,
       spec.module,
-      :after_commit,
+      callback,
       [runtime_ref, commit, spec.options],
-      "Agent Server Plugin commit notification failed"
+      message
     )
     |> validate_status_result(
       spec,
-      "Agent Server Plugin after_commit/3 returned an invalid result"
+      "Agent Server Plugin #{callback}/3 returned an invalid result"
     )
   end
 

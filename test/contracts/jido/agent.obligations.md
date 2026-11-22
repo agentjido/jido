@@ -59,7 +59,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I3 — Declaration guards
 
 - **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
-- **must:** Definition construction rejects unknown fields or use options, invalid stable authoring IDs, non-positive versions, invalid schemas, and repeated core sections or fields. A Signal source can be nil. An explicit source must satisfy the Signal URI-reference rule.
+- **must:** Definition construction rejects unknown fields or use options, invalid stable authoring IDs, non-positive versions, invalid schemas, and repeated core sections or fields. An Ecto state declaration takes one schema module and excludes the Joi schema and initial state. A Signal source can be nil. An explicit source must satisfy the Signal URI-reference rule.
 - **kind:** functional
 - **status:** active
 

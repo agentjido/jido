@@ -7,6 +7,8 @@ defmodule Jido.Agent.DSL do
   alias Jido.Error
   alias Spark.Dsl.Extension, as: E
 
+  @ecto_state_provider Jido.Plugin.EctoState
+
   use Spark.Dsl,
     many_extension_kinds: [:plugin_providers],
     untyped_extensions?: false,
@@ -241,6 +243,7 @@ defmodule Jido.Agent.DSL do
 
   def build!(dsl, opts, module) do
     body_plugins = module |> Module.get_attribute(:__jido_body_plugins__, []) |> Enum.reverse()
+    body_plugins = ecto_declaration(dsl, module) ++ body_plugins
 
     result =
       with {:ok, declarations} <- Declaration.append(opts[:plugin_declarations], body_plugins),
@@ -275,6 +278,32 @@ defmodule Jido.Agent.DSL do
           module: module,
           path: error.path,
           message: Exception.message(error)
+    end
+  end
+
+  defp ecto_declaration(dsl, module) do
+    case E.fetch_opt(dsl, [:__state__], :ecto) do
+      {:ok, schema} ->
+        if Enum.any?([:schema, :initial_state], &match?({:ok, _}, E.fetch_opt(dsl, [:__state__], &1))) do
+          raise Spark.Error.DslError,
+            module: module,
+            path: [:state, :ecto],
+            message: "Agent state cannot combine ecto with schema or initial_state"
+        end
+
+        case Code.ensure_compiled(@ecto_state_provider) do
+          {:module, provider} ->
+            [{provider, %{schema: schema}}]
+
+          {:error, _reason} ->
+            raise Spark.Error.DslError,
+              module: module,
+              path: [:state, :ecto],
+              message: "Ecto Agent state requires the optional ecto_sql dependency"
+        end
+
+      :error ->
+        []
     end
   end
 

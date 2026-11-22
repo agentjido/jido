@@ -4,7 +4,7 @@ defmodule Jido.Agent.DSL.Extension do
 
   @state %Spark.Dsl.Section{
     name: :__state__,
-    schema: [schema: [type: :any], initial_state: [type: :any, default: %{}]]
+    schema: [schema: [type: :any], ecto: [type: :atom], initial_state: [type: :any]]
   }
   @route %Spark.Dsl.Entity{
     name: :__route__,

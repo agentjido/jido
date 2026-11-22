@@ -321,6 +321,32 @@ defmodule Jido.Agent.DSLAuthoringContractTest do
     end
   end
 
+  @tag obligation: "jido.agent.I3"
+  test "ecto state accepts one schema module and rejects another state declaration" do
+    for declaration <- [
+          "ecto CounterState; schema Jido.Joi.object(%{})",
+          "schema Jido.Joi.object(%{}); ecto CounterState",
+          "if true do schema Jido.Joi.object(%{}) end; ecto CounterState",
+          "ecto CounterState; initial_state %{}"
+        ] do
+      assert_raise Spark.Error.DslError, ~r/cannot combine ecto/, fn ->
+        F.with_agent("state do #{declaration} end", fn _module -> :ok end)
+      end
+    end
+
+    assert_raise CompileError, ~r/only ecto SchemaModule/, fn ->
+      F.with_agent("state do ecto CounterState, repo: OtherRepo end", fn _module -> :ok end)
+    end
+
+    assert_raise CompileError, ~r/can be declared only once/, fn ->
+      F.with_agent("state do ecto CounterState; ecto OtherState end", fn _module -> :ok end)
+    end
+
+    assert_raise Spark.Error.DslError, ~r/invalid_ecto_state_schema/, fn ->
+      F.with_agent("state do ecto String end", fn _module -> :ok end)
+    end
+  end
+
   @tag obligation: "jido.agent.I8"
   test "initialization uses Joi defaults and preserves supplied values" do
     definition =

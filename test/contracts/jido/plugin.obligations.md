@@ -99,7 +99,7 @@ or what a bundled Plugin does.
 ### jido.plugin.I9 — Generic Plugin context values
 
 - **scope:** `Jido.Plugin.Input`, `Jido.Plugin.Init`, `Jido.Plugin.Context`, `Jido.Plugin.Context.Admission`, `Jido.Plugin.Context.Commit`, `Jido.Plugin.Context.Persistence`
-- **must:** Keep prepared and runtime input separate. Validate exact runtime initialization and narrow Signal, Directive, admission, commit, and persistence contexts with their required identity, Signal, version, owned-state, option, instance, partition, and format fields. Supply only documented empty defaults. Permit the owning AgentServer PID only in Init and transient handles only in runtime input and Turn context. Do not place complete Agent values in these generic structs.
+- **must:** Keep prepared and runtime input separate. Validate exact runtime initialization and narrow Signal, Directive, admission, commit, and persistence contexts with their required identity, Signal, version, owned-state, option, instance, partition, and format fields. Supply only documented empty defaults. The Commit context reports whether Jido persistence is enabled and has an optional runtime input field for the pre-commit callback. Permit the owning AgentServer PID only in Init and transient handles only in runtime input and Turn context. Do not place complete Agent values in these generic structs.
 - **why:** Consumers need narrow handoff values that do not create a second Agent state or leak full runtime ownership.
 - **kind:** functional
 - **status:** active

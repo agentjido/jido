@@ -52,9 +52,11 @@ defmodule Jido.Plugin.ApiTest do
              :agent_id,
              :agent_module,
              :jido,
+             :jido_persistence?,
              :partition,
              :plugin,
              :plugin_state,
+             :runtime_input,
              :state_version,
              :turn_id
            ]
@@ -67,6 +69,7 @@ defmodule Jido.Plugin.ApiTest do
         {:admit, 3},
         {:after_commit, 3},
         {:await_ready, 2},
+        {:before_commit, 3},
         {:child_spec, 1},
         {:directives, 1},
         {:dispatch, 4},
