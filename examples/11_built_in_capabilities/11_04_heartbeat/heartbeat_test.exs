@@ -1,6 +1,8 @@
 Code.require_file("heartbeat.ex", __DIR__)
 
 defmodule Jido.Examples.Runtime.HeartbeatTest do
+  alias Jido.Joi
+
   use Jido.Test.Case, async: false
   @moduletag :integration
 
@@ -47,7 +49,7 @@ defmodule Jido.Examples.Runtime.HeartbeatTest do
     assert {:error, %Jido.Error.ValidationError{} = error} =
              Agent.define(%{
                name: "runtime_heartbeat_invalid",
-               schema: Jido.Joi.object(%{}),
+               schema: Joi.object(%{}),
                plugins: [
                  %{
                    id: Timer.id(),

@@ -1,17 +1,19 @@
 defmodule Jido.Examples.AI.MediaOperations.GenerateImage do
   @moduledoc "Runs one application-owned image-generation operation."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_ai_media_generate_image",
     schema:
-      Jido.Joi.object(%{
-        model: Jido.Joi.string(),
-        prompt: Jido.Joi.string()
+      Joi.object(%{
+        model: Joi.string(),
+        prompt: Joi.string()
       }),
     output_schema:
-      Jido.Joi.object(%{
-        bytes: Jido.Joi.integer() |> Jido.Joi.min(0),
-        kind: Jido.Joi.enum([:image])
+      Joi.object(%{
+        bytes: Joi.integer() |> Joi.min(0),
+        kind: Joi.enum([:image])
       })
 
   @impl true
@@ -27,17 +29,19 @@ end
 defmodule Jido.Examples.AI.MediaOperations.ReadDocument do
   @moduledoc "Runs OCR through the selected inference client."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_ai_media_read_document",
     schema:
-      Jido.Joi.object(%{
-        document: Jido.Joi.string(),
-        model: Jido.Joi.string()
+      Joi.object(%{
+        document: Joi.string(),
+        model: Joi.string()
       }),
     output_schema:
-      Jido.Joi.object(%{
-        bytes: Jido.Joi.integer() |> Jido.Joi.min(0),
-        text: Jido.Joi.string()
+      Joi.object(%{
+        bytes: Joi.integer() |> Joi.min(0),
+        text: Joi.string()
       })
 
   @impl true
@@ -50,17 +54,19 @@ end
 defmodule Jido.Examples.AI.MediaOperations.SpeechRoundTrip do
   @moduledoc "Creates speech, then transcribes the local result."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_ai_media_speech_round_trip",
     schema:
-      Jido.Joi.object(%{
-        model: Jido.Joi.string(),
-        text: Jido.Joi.string()
+      Joi.object(%{
+        model: Joi.string(),
+        text: Joi.string()
       }),
     output_schema:
-      Jido.Joi.object(%{
-        audio_bytes: Jido.Joi.integer() |> Jido.Joi.min(0),
-        transcript: Jido.Joi.string()
+      Joi.object(%{
+        audio_bytes: Joi.integer() |> Joi.min(0),
+        transcript: Joi.string()
       })
 
   @impl true
@@ -77,17 +83,19 @@ end
 defmodule Jido.Examples.AI.MediaOperations.GenerateVideo do
   @moduledoc "Starts, waits for, and retrieves one video operation."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_ai_media_generate_video",
     schema:
-      Jido.Joi.object(%{
-        model: Jido.Joi.string(),
-        prompt: Jido.Joi.string()
+      Joi.object(%{
+        model: Joi.string(),
+        prompt: Joi.string()
       }),
     output_schema:
-      Jido.Joi.object(%{
-        bytes: Jido.Joi.integer() |> Jido.Joi.min(0),
-        task_id: Jido.Joi.string()
+      Joi.object(%{
+        bytes: Joi.integer() |> Joi.min(0),
+        task_id: Joi.string()
       })
 
   @impl true

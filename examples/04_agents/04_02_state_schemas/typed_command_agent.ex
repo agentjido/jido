@@ -8,17 +8,19 @@ defmodule Jido.Examples.TypedCommandAgent do
   entire nested map before the Action validates its input.
   """
 
+  alias Jido.Joi
+
   defmodule Contract do
     def schema do
-      Jido.Joi.object(%{
-        count: Jido.Joi.integer() |> Jido.Joi.default(0),
-        minimum: Jido.Joi.integer() |> Jido.Joi.default(0),
-        maximum: Jido.Joi.integer() |> Jido.Joi.default(5),
+      Joi.object(%{
+        count: Joi.integer() |> Joi.default(0),
+        minimum: Joi.integer() |> Joi.default(0),
+        maximum: Joi.integer() |> Joi.default(5),
         profile:
-          Jido.Joi.object(%{name: Jido.Joi.string(), email: Jido.Joi.boolean(), push: Jido.Joi.boolean()})
-          |> Jido.Joi.default(%{name: "Initial", email: true, push: false})
+          Joi.object(%{name: Joi.string(), email: Joi.boolean(), push: Joi.boolean()})
+          |> Joi.default(%{name: "Initial", email: true, push: false})
       })
-      |> Jido.Joi.refine({__MODULE__, :within_bounds, []})
+      |> Joi.refine({__MODULE__, :within_bounds, []})
     end
 
     def within_bounds(%{count: count, minimum: minimum, maximum: maximum}, _opts) do
@@ -42,10 +44,10 @@ defmodule Jido.Examples.TypedCommandAgent do
       defaults: %{patch: %{name: "Route default", push: true}} do
       action %{patch: patch},
         schema:
-          Jido.Joi.object(%{
+          Joi.object(%{
             patch:
-              Jido.Joi.object(
-                %{name: Jido.Joi.string() |> Jido.Joi.optional(), push: Jido.Joi.boolean() |> Jido.Joi.optional()},
+              Joi.object(
+                %{name: Joi.string() |> Joi.optional(), push: Joi.boolean() |> Joi.optional()},
                 unrecognized_keys: :error
               )
           }),
@@ -58,7 +60,7 @@ defmodule Jido.Examples.TypedCommandAgent do
 
     route "basic.typed_command.set_count", as: :set_count do
       action %{count: count},
-        schema: Jido.Joi.object(%{count: Jido.Joi.integer()}),
+        schema: Joi.object(%{count: Joi.integer()}),
         context: context do
         # Complete Agent validation owns this bound check.
         {:ok, %{context.agent_state | count: count}}

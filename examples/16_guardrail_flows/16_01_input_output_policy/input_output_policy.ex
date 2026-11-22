@@ -1,10 +1,12 @@
 defmodule Jido.Examples.Guardrails.InputOutputPolicy.CheckInput do
+  alias Jido.Joi
+
   use Jido.Action,
     name: "example_guardrail_check_input",
     schema:
-      Jido.Joi.object(%{
-        input: Jido.Joi.string() |> Jido.Joi.min(1),
-        failure_mode: Jido.Joi.enum([:fail_open, :fail_closed])
+      Joi.object(%{
+        input: Joi.string() |> Joi.min(1),
+        failure_mode: Joi.enum([:fail_open, :fail_closed])
       })
 
   @impl true
@@ -113,12 +115,14 @@ defmodule Jido.Examples.Guardrails.InputOutputPolicy.RecordAudit do
 end
 
 defmodule Jido.Examples.Guardrails.InputOutputPolicy do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_guardrail_input_output_policy",
     schema:
-      Jido.Joi.object(%{
-        input: Jido.Joi.string() |> Jido.Joi.min(1),
-        failure_mode: Jido.Joi.enum([:fail_open, :fail_closed])
+      Joi.object(%{
+        input: Joi.string() |> Joi.min(1),
+        failure_mode: Joi.enum([:fail_open, :fail_closed])
       })
 
   alias Jido.Examples.Guardrails.InputOutputPolicy.{

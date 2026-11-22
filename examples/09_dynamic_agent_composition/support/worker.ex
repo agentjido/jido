@@ -1,11 +1,13 @@
 defmodule Jido.Examples.Worker do
   @moduledoc "A durable worker that records one correlated calculation per Turn."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_worker"
 
   state do
-    schema Jido.Joi.object(%{
-             completed: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])
+    schema Joi.object(%{
+             completed: Joi.list(Joi.map()) |> Joi.default([])
            })
   end
 
@@ -15,9 +17,9 @@ defmodule Jido.Examples.Worker do
     route "examples.multi_agent.worker.calculate", as: :calculate do
       action input,
         schema:
-          Jido.Joi.object(%{
-            request_id: Jido.Joi.string() |> Jido.Joi.min(1),
-            value: Jido.Joi.integer()
+          Joi.object(%{
+            request_id: Joi.string() |> Joi.min(1),
+            value: Joi.integer()
           }),
         context: context do
         result = %{request_id: input.request_id, value: input.value * 2}

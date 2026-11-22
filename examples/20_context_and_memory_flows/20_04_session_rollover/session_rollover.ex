@@ -57,14 +57,16 @@ defmodule Jido.Examples.ContextMemory.SessionRollover.RollOver do
 end
 
 defmodule Jido.Examples.ContextMemory.SessionRollover do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_context_session_rollover",
     schema:
-      Jido.Joi.object(%{
-        session: Jido.Joi.map(),
-        expected_rev: Jido.Joi.integer() |> Jido.Joi.min(0),
-        new_session_id: Jido.Joi.string() |> Jido.Joi.min(1),
-        summary: Jido.Joi.string() |> Jido.Joi.min(1)
+      Joi.object(%{
+        session: Joi.map(),
+        expected_rev: Joi.integer() |> Joi.min(0),
+        new_session_id: Joi.string() |> Joi.min(1),
+        summary: Joi.string() |> Joi.min(1)
       })
 
   flow do

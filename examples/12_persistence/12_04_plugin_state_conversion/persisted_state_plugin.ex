@@ -1,9 +1,12 @@
 defmodule Jido.Examples.Persistence.PluginStateConversion.Package do
   @moduledoc "Owns one state value and converts it for persistence."
+
+  alias Jido.Joi
+
   use Jido.Plugin
 
   @impl true
-  def state_spec(_opts), do: {:owned, Jido.Joi.integer() |> Jido.Joi.default(0)}
+  def state_spec(_opts), do: {:owned, Joi.integer() |> Joi.default(0)}
 
   @owned_prefix "owned:"
 

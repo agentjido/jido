@@ -1,10 +1,12 @@
 defmodule Jido.Examples.Operations.RuntimeAgent do
   @moduledoc "A small Agent used to prove supervised startup and shutdown."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "operations_runtime_agent"
 
   state do
-    schema Jido.Joi.object(%{checks: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{checks: Joi.integer() |> Joi.default(0)})
   end
 
   routes do

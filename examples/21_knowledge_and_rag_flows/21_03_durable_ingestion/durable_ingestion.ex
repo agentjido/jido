@@ -69,12 +69,14 @@ defmodule Jido.Examples.RAG.DurableIngestion.Finalize do
 end
 
 defmodule Jido.Examples.RAG.DurableIngestion do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_durable_rag_ingestion",
     schema:
-      Jido.Joi.object(%{
-        document: Jido.Joi.map(),
-        previous_chunk_ids: Jido.Joi.list(Jido.Joi.string())
+      Joi.object(%{
+        document: Joi.map(),
+        previous_chunk_ids: Joi.list(Joi.string())
       })
 
   alias Jido.Examples.RAG.DurableIngestion.{EmbedAndPlan, Finalize, LoadAndChunk}

@@ -1,8 +1,10 @@
 defmodule Jido.Examples.Collaboration.ResearchTeam.Researcher do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_research_team_researcher"
 
   state do
-    schema Jido.Joi.object(%{completed: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{completed: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -11,13 +13,13 @@ defmodule Jido.Examples.Collaboration.ResearchTeam.Researcher do
     route "examples.collaboration.research.gather", as: :gather do
       action input,
         schema:
-          Jido.Joi.object(%{
-            mission_id: Jido.Joi.string(),
-            topic: Jido.Joi.string(),
-            source_id: Jido.Joi.string(),
-            fail: Jido.Joi.boolean()
+          Joi.object(%{
+            mission_id: Joi.string(),
+            topic: Joi.string(),
+            source_id: Joi.string(),
+            fail: Joi.boolean()
           }),
-        output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), reply: Jido.Joi.map()}),
+        output_schema: Joi.object(%{state: Joi.map(), reply: Joi.map()}),
         context: context do
         if input.fail do
           {:error, Jido.Error.execution_error("injected research failure")}
@@ -41,6 +43,8 @@ defmodule Jido.Examples.Collaboration.ResearchTeam.Researcher do
 end
 
 defmodule Jido.Examples.Collaboration.ResearchTeam.Analyst do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_research_team_analyst"
 
   routes do
@@ -49,11 +53,11 @@ defmodule Jido.Examples.Collaboration.ResearchTeam.Analyst do
     route "examples.collaboration.research.analyze", as: :analyze do
       action input,
         schema:
-          Jido.Joi.object(%{
-            mission_id: Jido.Joi.string(),
-            evidence: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.min(1)
+          Joi.object(%{
+            mission_id: Joi.string(),
+            evidence: Joi.list(Joi.map()) |> Joi.min(1)
           }),
-        output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), reply: Jido.Joi.map()}),
+        output_schema: Joi.object(%{state: Joi.map(), reply: Joi.map()}),
         context: context do
         {:ok,
          %{
@@ -73,6 +77,8 @@ defmodule Jido.Examples.Collaboration.ResearchTeam.Analyst do
 end
 
 defmodule Jido.Examples.Collaboration.ResearchTeam.Writer do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_research_team_writer"
 
   routes do
@@ -81,13 +87,13 @@ defmodule Jido.Examples.Collaboration.ResearchTeam.Writer do
     route "examples.collaboration.research.write", as: :write do
       action input,
         schema:
-          Jido.Joi.object(%{
-            mission_id: Jido.Joi.string(),
-            finding: Jido.Joi.string(),
-            revision: Jido.Joi.integer(),
-            feedback: Jido.Joi.string()
+          Joi.object(%{
+            mission_id: Joi.string(),
+            finding: Joi.string(),
+            revision: Joi.integer(),
+            feedback: Joi.string()
           }),
-        output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), reply: Jido.Joi.map()}),
+        output_schema: Joi.object(%{state: Joi.map(), reply: Joi.map()}),
         context: context do
         suffix = if input.feedback == "", do: "", else: " Revised for: #{input.feedback}."
 
@@ -109,6 +115,8 @@ defmodule Jido.Examples.Collaboration.ResearchTeam.Writer do
 end
 
 defmodule Jido.Examples.Collaboration.ResearchTeam.Critic do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_research_team_critic"
 
   routes do
@@ -117,12 +125,12 @@ defmodule Jido.Examples.Collaboration.ResearchTeam.Critic do
     route "examples.collaboration.research.review", as: :review do
       action input,
         schema:
-          Jido.Joi.object(%{
-            mission_id: Jido.Joi.string(),
-            draft: Jido.Joi.string(),
-            revision: Jido.Joi.integer()
+          Joi.object(%{
+            mission_id: Joi.string(),
+            draft: Joi.string(),
+            revision: Joi.integer()
           }),
-        output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), reply: Jido.Joi.map()}),
+        output_schema: Joi.object(%{state: Joi.map(), reply: Joi.map()}),
         context: context do
         decision = if input.revision == 0, do: :revise, else: :approve
         feedback = if decision == :revise, do: "name the evidence count", else: ""

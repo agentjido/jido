@@ -1,10 +1,12 @@
 defmodule Jido.Examples.PureCounter do
   @moduledoc "Evaluates one Agent Turn without a process or state commit."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "pure_execution_counter"
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -12,7 +14,7 @@ defmodule Jido.Examples.PureCounter do
 
     route "examples.agents.pure_counter.add", as: :add do
       action %{amount: amount},
-        schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}),
+        schema: Joi.object(%{amount: Joi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end

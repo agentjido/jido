@@ -5,10 +5,13 @@ defmodule Jido.Examples.Persistence.IndeterminateWrite do
   The stored candidate proves Action execution. The output Signal records
   post-commit dispatch. AgentServer supplies its temporary destination.
   """
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "examples_indeterminate_write"
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -16,7 +19,7 @@ defmodule Jido.Examples.Persistence.IndeterminateWrite do
 
     route "examples.persistence.indeterminate_write.increment", as: :increment do
       action input,
-        schema: Jido.Joi.object(%{request_id: Jido.Joi.string() |> Jido.Joi.min(1), amount: Jido.Joi.integer()}),
+        schema: Joi.object(%{request_id: Joi.string() |> Joi.min(1), amount: Joi.integer()}),
         context: context do
         next = %{context.agent_state | count: context.agent_state.count + input.amount}
 

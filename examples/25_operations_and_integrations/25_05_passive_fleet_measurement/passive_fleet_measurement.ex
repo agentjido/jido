@@ -1,10 +1,12 @@
 defmodule Jido.Examples.Operations.MeasuredFleetAgent do
   @moduledoc "A small durable Agent for a bounded passive-fleet measurement."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "operations_measured_fleet_agent"
 
   state do
-    schema Jido.Joi.object(%{activations: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{activations: Joi.integer() |> Joi.default(0)})
   end
 
   routes do

@@ -1,13 +1,15 @@
 defmodule Jido.Examples.AI.CapabilityPreflight.Check do
   @moduledoc "Validates requirements against application-owned model metadata."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_ai_capability_preflight_check",
     schema:
-      Jido.Joi.object(%{
-        model: Jido.Joi.string() |> Jido.Joi.min(1),
-        profile: Jido.Joi.map(),
-        required: Jido.Joi.list(Jido.Joi.atom())
+      Joi.object(%{
+        model: Joi.string() |> Joi.min(1),
+        profile: Joi.map(),
+        required: Joi.list(Joi.atom())
       })
 
   @impl true
@@ -32,13 +34,15 @@ end
 defmodule Jido.Examples.AI.CapabilityPreflight.Generate do
   @moduledoc "Calls the selected inference client after preflight succeeds."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_ai_capability_preflight_generate",
     schema:
-      Jido.Joi.object(%{
-        checked: Jido.Joi.list(Jido.Joi.atom()),
-        model: Jido.Joi.string(),
-        prompt: Jido.Joi.string()
+      Joi.object(%{
+        checked: Joi.list(Joi.atom()),
+        model: Joi.string(),
+        prompt: Joi.string()
       })
 
   @impl true

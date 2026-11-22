@@ -1,12 +1,15 @@
 defmodule Jido.Examples.Durable.ExternalUncertainty do
   @moduledoc "Reuses an operation ID when a provider call runs again after recovery."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "durable_external_uncertainty"
 
   state do
-    schema Jido.Joi.object(%{
-             operation_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             report: Jido.Joi.string() |> Jido.Joi.default(""),
-             status: Jido.Joi.enum([:idle, :published, :needs_attention]) |> Jido.Joi.default(:idle)
+    schema Joi.object(%{
+             operation_id: Joi.string() |> Joi.default(""),
+             report: Joi.string() |> Joi.default(""),
+             status: Joi.enum([:idle, :published, :needs_attention]) |> Joi.default(:idle)
            })
   end
 
@@ -22,13 +25,16 @@ end
 
 defmodule Jido.Examples.Durable.ExternalUncertainty.Publish do
   @moduledoc "Saves intent at a step boundary before it calls an idempotent provider."
+
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "durable_publish_report",
     schema:
-      Jido.Joi.object(%{
-        operation_id: Jido.Joi.string() |> Jido.Joi.min(1),
-        report: Jido.Joi.string() |> Jido.Joi.min(1),
-        policy: Jido.Joi.enum([:idempotent, :manual])
+      Joi.object(%{
+        operation_id: Joi.string() |> Joi.min(1),
+        report: Joi.string() |> Joi.min(1),
+        policy: Joi.enum([:idempotent, :manual])
       })
 
   flow do

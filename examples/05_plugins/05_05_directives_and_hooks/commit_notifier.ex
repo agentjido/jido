@@ -1,27 +1,32 @@
 defmodule Jido.Examples.Plugins.CommitNotifier.Notify do
   @moduledoc "Requests one notification after a successful state commit."
+
+  alias Jido.Joi
+
   use Jido.Agent.Directive
 
-  @schema Jido.Joi.struct(
+  @schema Joi.struct(
             __MODULE__,
-            %{message: Jido.Joi.string() |> Jido.Joi.min(1)},
+            %{message: Joi.string() |> Joi.min(1)},
             coerce: true
           )
 
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
   def schema, do: @schema
 end
 
 defmodule Jido.Examples.Plugins.CommitNotifier.Plugin do
   @moduledoc "Owns a commit counter, a post-commit hook, and Notify dispatch."
 
+  alias Jido.Joi
+
   use Jido.Plugin, option_keys: [agent_server: [:observer]]
 
   alias Jido.Examples.Plugins.CommitNotifier.Notify
 
   @impl true
-  def state_spec(_opts), do: {:notifications, Jido.Joi.integer() |> Jido.Joi.default(0)}
+  def state_spec(_opts), do: {:notifications, Joi.integer() |> Joi.default(0)}
 
   @impl true
   def directives(_opts), do: [Notify]
@@ -61,6 +66,8 @@ end
 defmodule Jido.Examples.Plugins.CommitNotifier.Agent do
   @moduledoc "Commits a message before the Plugin notification runs."
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "plugin_commit_notifier",
     plugins: [Jido.Examples.Plugins.CommitNotifier.Plugin]
@@ -68,7 +75,7 @@ defmodule Jido.Examples.Plugins.CommitNotifier.Agent do
   alias Jido.Examples.Plugins.CommitNotifier.Notify
 
   state do
-    schema Jido.Joi.object(%{last_message: Jido.Joi.string() |> Jido.Joi.default("")})
+    schema Joi.object(%{last_message: Joi.string() |> Joi.default("")})
   end
 
   routes do
@@ -76,7 +83,7 @@ defmodule Jido.Examples.Plugins.CommitNotifier.Agent do
 
     route "examples.plugins.commit_notifier.send", as: :send_notification do
       action %{message: message},
-        schema: Jido.Joi.object(%{message: Jido.Joi.string()}),
+        schema: Joi.object(%{message: Joi.string()}),
         context: context do
         {:ok, %{context.agent_state | last_message: message}, [%Notify{message: message}]}
       end

@@ -7,12 +7,14 @@ defmodule Jido.Examples.PluginStateAgent do
   paths preserve the prior Agent state.
   """
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "basic_sdk_plugin_state",
     plugins: [Jido.Examples.PluginStateAgent.CountTurns]
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -20,14 +22,14 @@ defmodule Jido.Examples.PluginStateAgent do
 
     route "basic.plugin_state.increment", as: :increment do
       action %{amount: amount},
-        schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}),
+        schema: Joi.object(%{amount: Joi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end
     end
 
     route "basic.plugin_state.overwrite", as: :overwrite_plugin_state do
-      action _input, schema: Jido.Joi.object(%{}), context: context do
+      action _input, schema: Joi.object(%{}), context: context do
         {:ok, %{context.agent_state | turns: context.agent_state.turns + 1}}
       end
     end

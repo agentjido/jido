@@ -1,12 +1,15 @@
 defmodule Jido.Examples.Durable.SavedAgent do
   @moduledoc "A report request remains committed after the entire BEAM stops."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "durable_saved_agent"
 
   state do
-    schema Jido.Joi.object(%{
-             report_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             topic: Jido.Joi.string() |> Jido.Joi.default(""),
-             status: Jido.Joi.enum([:idle, :requested]) |> Jido.Joi.default(:idle)
+    schema Joi.object(%{
+             report_id: Joi.string() |> Joi.default(""),
+             topic: Joi.string() |> Joi.default(""),
+             status: Joi.enum([:idle, :requested]) |> Joi.default(:idle)
            })
   end
 

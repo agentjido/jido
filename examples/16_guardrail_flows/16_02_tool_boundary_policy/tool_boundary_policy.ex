@@ -1,10 +1,12 @@
 defmodule Jido.Examples.Guardrails.ToolBoundaryPolicy.CheckCall do
+  alias Jido.Joi
+
   use Jido.Action,
     name: "example_guardrail_check_tool_call",
     schema:
-      Jido.Joi.object(%{
-        tool: Jido.Joi.string() |> Jido.Joi.min(1),
-        arguments: Jido.Joi.map()
+      Joi.object(%{
+        tool: Joi.string() |> Joi.min(1),
+        arguments: Joi.map()
       })
 
   @impl true
@@ -58,12 +60,14 @@ defmodule Jido.Examples.Guardrails.ToolBoundaryPolicy.CheckResult do
 end
 
 defmodule Jido.Examples.Guardrails.ToolBoundaryPolicy do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_guardrail_tool_boundary_policy",
     schema:
-      Jido.Joi.object(%{
-        tool: Jido.Joi.string() |> Jido.Joi.min(1),
-        arguments: Jido.Joi.map()
+      Joi.object(%{
+        tool: Joi.string() |> Joi.min(1),
+        arguments: Joi.map()
       })
 
   alias Jido.Examples.Guardrails.ToolBoundaryPolicy.{CheckCall, CheckResult, ExecuteLocalTool}

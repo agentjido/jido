@@ -1,10 +1,12 @@
 defmodule Jido.Examples.Persistence.HibernateAndThaw do
   @moduledoc "A counter that can stop after a durable save and start from that save."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "examples_hibernate_and_thaw"
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -12,7 +14,7 @@ defmodule Jido.Examples.Persistence.HibernateAndThaw do
 
     route "examples.persistence.hibernate_and_thaw.increment", as: :increment do
       action %{amount: amount},
-        schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}),
+        schema: Joi.object(%{amount: Joi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end

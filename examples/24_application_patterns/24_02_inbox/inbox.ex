@@ -1,5 +1,8 @@
 defmodule Jido.Examples.Applications.Inbox.Agent do
   @moduledoc "Accepts unique events from a managed, tagged input sensor."
+
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "application_inbox_agent",
     plugins: [{Jido.Plugin.SensorManager, %{retry_delay_ms: 10}}]
@@ -8,9 +11,9 @@ defmodule Jido.Examples.Applications.Inbox.Agent do
   alias Jido.Plugin.SensorManager
 
   state do
-    schema Jido.Joi.object(%{
-             accepted: Jido.Joi.integer() |> Jido.Joi.default(0),
-             seen: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])
+    schema Joi.object(%{
+             accepted: Joi.integer() |> Joi.default(0),
+             seen: Joi.list(Joi.string()) |> Joi.default([])
            })
   end
 
@@ -20,7 +23,7 @@ defmodule Jido.Examples.Applications.Inbox.Agent do
 
     route "examples.applications.inbox.event", as: :event do
       action %{event_id: event_id},
-        schema: Jido.Joi.object(%{event_id: Jido.Joi.string() |> Jido.Joi.min(1)}),
+        schema: Joi.object(%{event_id: Joi.string() |> Joi.min(1)}),
         context: context do
         if event_id in context.agent_state.seen do
           {:ok, context.agent_state}
@@ -41,9 +44,9 @@ defmodule Jido.Examples.Applications.Inbox.Agent do
     use Jido.Action,
       name: "application_inbox_manage_sensor",
       schema:
-        Jido.Joi.object(%{
-          operation: Jido.Joi.enum([:start, :stop]),
-          tag: Jido.Joi.string() |> Jido.Joi.min(1)
+        Joi.object(%{
+          operation: Joi.enum([:start, :stop]),
+          tag: Joi.string() |> Joi.min(1)
         })
 
     def run(%{operation: :start, tag: tag}, context) do

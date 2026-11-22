@@ -1,10 +1,12 @@
 defmodule Jido.Examples.ChildLifecycle do
   @moduledoc "A durable worker whose logical identity is separate from its activation."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_child_lifecycle"
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do

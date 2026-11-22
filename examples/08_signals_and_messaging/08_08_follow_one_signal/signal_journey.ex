@@ -19,16 +19,18 @@ end
 defmodule Jido.Examples.Signals.SignalJourney.Coordinator do
   @moduledoc "Plans child work and owns canonical request completion state."
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "signal_journey_coordinator",
     plugins: [Jido.Examples.Signals.SignalJourney.Correlation]
 
   state do
     schema(
-      Jido.Joi.object(%{
-        request_id: Jido.Joi.string() |> Jido.Joi.default(""),
-        status: Jido.Joi.enum([:idle, :waiting, :completed]) |> Jido.Joi.default(:idle),
-        result: Jido.Joi.integer() |> Jido.Joi.nullable() |> Jido.Joi.default(nil)
+      Joi.object(%{
+        request_id: Joi.string() |> Joi.default(""),
+        status: Joi.enum([:idle, :waiting, :completed]) |> Joi.default(:idle),
+        result: Joi.integer() |> Joi.nullable() |> Joi.default(nil)
       })
     )
   end
@@ -39,15 +41,15 @@ defmodule Jido.Examples.Signals.SignalJourney.Coordinator do
     route "examples.signals.journey.request", as: :request do
       action %{request_id: request_id, value: value, reply_to: reply_to},
         schema:
-          Jido.Joi.object(%{
-            request_id: Jido.Joi.string() |> Jido.Joi.min(1),
-            value: Jido.Joi.integer(),
-            reply_to: Jido.Joi.map()
+          Joi.object(%{
+            request_id: Joi.string() |> Joi.min(1),
+            value: Joi.integer(),
+            reply_to: Joi.map()
           }),
         output_schema:
-          Jido.Joi.object(%{
-            state: Jido.Joi.map(),
-            child: Jido.Joi.map()
+          Joi.object(%{
+            state: Joi.map(),
+            child: Joi.map()
           }),
         context: context do
         state = %{context.agent_state | request_id: request_id, status: :waiting, result: nil}
@@ -61,16 +63,16 @@ defmodule Jido.Examples.Signals.SignalJourney.Coordinator do
     route "examples.signals.journey.child.completed", as: :complete do
       action %{request_id: request_id, result: result},
         schema:
-          Jido.Joi.object(%{
-            request_id: Jido.Joi.string() |> Jido.Joi.min(1),
-            result: Jido.Joi.integer(),
-            reply_to: Jido.Joi.map(),
-            duplicate: Jido.Joi.boolean()
+          Joi.object(%{
+            request_id: Joi.string() |> Joi.min(1),
+            result: Joi.integer(),
+            reply_to: Joi.map(),
+            duplicate: Joi.boolean()
           }),
         output_schema:
-          Jido.Joi.object(%{
-            state: Jido.Joi.map(),
-            reply: Jido.Joi.map()
+          Joi.object(%{
+            state: Joi.map(),
+            reply: Joi.map()
           }),
         context: context do
         state = %{context.agent_state | request_id: request_id, status: :completed, result: result}
@@ -86,12 +88,14 @@ end
 defmodule Jido.Examples.Signals.SignalJourney.Worker do
   @moduledoc "Runs idempotent child work under one stable logical identity."
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "signal_journey_worker",
     plugins: [Jido.Examples.Signals.SignalJourney.Correlation]
 
   state do
-    schema Jido.Joi.object(%{results: Jido.Joi.map() |> Jido.Joi.default(%{})})
+    schema Joi.object(%{results: Joi.map() |> Joi.default(%{})})
   end
 
   routes do
@@ -100,15 +104,15 @@ defmodule Jido.Examples.Signals.SignalJourney.Worker do
     route "examples.signals.journey.child.request", as: :calculate do
       action %{request_id: request_id, value: value, reply_to: reply_to},
         schema:
-          Jido.Joi.object(%{
-            request_id: Jido.Joi.string() |> Jido.Joi.min(1),
-            value: Jido.Joi.integer(),
-            reply_to: Jido.Joi.map()
+          Joi.object(%{
+            request_id: Joi.string() |> Joi.min(1),
+            value: Joi.integer(),
+            reply_to: Joi.map()
           }),
         output_schema:
-          Jido.Joi.object(%{
-            state: Jido.Joi.map(),
-            reply: Jido.Joi.map()
+          Joi.object(%{
+            state: Joi.map(),
+            reply: Joi.map()
           }),
         context: context do
         case Map.fetch(context.agent_state.results, request_id) do

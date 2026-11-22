@@ -1,10 +1,12 @@
 defmodule Jido.Examples.PublicAgentView.UpdateTitle do
   @moduledoc "A named operation that can appear in a public Agent view."
 
+  alias Jido.Joi
+
   use Jido.Action,
     id: "examples/agent-view/update-title",
     name: "agent_view_update_title",
-    schema: Jido.Joi.object(%{title: Jido.Joi.string()})
+    schema: Joi.object(%{title: Joi.string()})
 
   @impl true
   def run(%{title: title}, %{agent_state: state}), do: {:ok, %{state | title: title}}
@@ -13,6 +15,8 @@ end
 defmodule Jido.Examples.PublicAgentView.Agent do
   @moduledoc "An Agent with private state, metadata, and route defaults."
 
+  alias Jido.Joi
+
   use Jido.Agent,
     id: "examples/agent-view/agent",
     name: "public_agent_view",
@@ -20,7 +24,7 @@ defmodule Jido.Examples.PublicAgentView.Agent do
     metadata: %{internal_owner: "operations"}
 
   state do
-    schema Jido.Joi.object(%{title: Jido.Joi.string() |> Jido.Joi.default("private")})
+    schema Joi.object(%{title: Joi.string() |> Joi.default("private")})
   end
 
   routes do

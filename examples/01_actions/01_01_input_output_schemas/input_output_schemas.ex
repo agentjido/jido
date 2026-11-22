@@ -1,15 +1,17 @@
 defmodule Jido.Examples.Actions.InputOutputSchemas.NormalizeProfile do
+  alias Jido.Joi
+
   use Jido.Action,
     name: "example_action_normalize_profile",
     schema:
-      Jido.Joi.object(%{
-        name: Jido.Joi.string() |> Jido.Joi.min(1),
-        age: Jido.Joi.integer() |> Jido.Joi.min(0)
+      Joi.object(%{
+        name: Joi.string() |> Joi.min(1),
+        age: Joi.integer() |> Joi.min(0)
       }),
     output_schema:
-      Jido.Joi.object(%{
-        display_name: Jido.Joi.string() |> Jido.Joi.min(1),
-        adult?: Jido.Joi.boolean()
+      Joi.object(%{
+        display_name: Joi.string() |> Joi.min(1),
+        adult?: Joi.boolean()
       })
 
   @impl true

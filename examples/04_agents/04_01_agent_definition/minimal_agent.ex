@@ -6,12 +6,14 @@ defmodule Jido.Examples.MinimalAgent do
   Start with `state: %{count: value}`. Server calls return `{:ok, agent, []}`.
   """
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "examples_minimal_agent",
     description: "Counts increment Signals"
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -19,7 +21,7 @@ defmodule Jido.Examples.MinimalAgent do
 
     route "basic.minimal.increment", as: :increment, defaults: %{amount: 1} do
       action %{amount: amount},
-        schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}),
+        schema: Joi.object(%{amount: Joi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end

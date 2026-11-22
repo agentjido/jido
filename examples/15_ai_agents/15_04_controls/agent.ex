@@ -1,11 +1,13 @@
 defmodule Jido.Examples.AI.Controls.MemberOnly do
   @moduledoc "Allows requests from members."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "member_only",
     description: "Allow requests from members",
-    schema: Jido.Joi.object(%{input: Jido.Joi.string()}),
-    output_schema: Jido.Joi.object(%{allowed: Jido.Joi.boolean()})
+    schema: Joi.object(%{input: Joi.string()}),
+    output_schema: Joi.object(%{allowed: Joi.boolean()})
 
   @impl Jido.Action
   def run(_params, %{role: :member}), do: {:ok, %{allowed: true}}

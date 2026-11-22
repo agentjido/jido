@@ -21,9 +21,11 @@ defmodule Jido.Examples.Execution.StepsAndReferences.Label do
 end
 
 defmodule Jido.Examples.Execution.StepsAndReferences do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_exec_steps_and_references",
-    schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
+    schema: Joi.object(%{value: Joi.integer()})
 
   alias Jido.Examples.Execution.StepsAndReferences.{AddOne, Double, Label}
 

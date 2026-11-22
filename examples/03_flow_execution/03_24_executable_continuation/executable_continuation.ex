@@ -1,11 +1,14 @@
 defmodule Jido.Examples.ExecutableContinuation do
   @moduledoc "One Turn owns Invoke selection and bounded Flow execution."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "workflow_continuation_agent"
 
   state do
-    schema Jido.Joi.object(%{
-             value: Jido.Joi.integer() |> Jido.Joi.default(0),
-             request: Jido.Joi.string() |> Jido.Joi.default("")
+    schema Joi.object(%{
+             value: Joi.integer() |> Joi.default(0),
+             request: Joi.string() |> Joi.default("")
            })
   end
 
@@ -20,12 +23,14 @@ end
 defmodule Jido.Examples.ExecutableContinuation.Expand do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "workflow_continuation_expand",
     schema:
-      Jido.Joi.object(%{
-        value: Jido.Joi.integer() |> Jido.Joi.min(0),
-        remaining: Jido.Joi.integer() |> Jido.Joi.min(0)
+      Joi.object(%{
+        value: Joi.integer() |> Joi.min(0),
+        remaining: Joi.integer() |> Joi.min(0)
       })
 
   @impl true
@@ -42,12 +47,14 @@ end
 defmodule Jido.Examples.ExecutableContinuation.Add do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "workflow_continuation_add",
     schema:
-      Jido.Joi.object(%{
-        value: Jido.Joi.integer() |> Jido.Joi.min(0),
-        remaining: Jido.Joi.integer() |> Jido.Joi.min(1)
+      Joi.object(%{
+        value: Joi.integer() |> Joi.min(0),
+        remaining: Joi.integer() |> Joi.min(1)
       })
 
   @impl true
@@ -67,12 +74,15 @@ end
 
 defmodule Jido.Examples.ExecutableContinuation.Repeat do
   @moduledoc "The selected Flow permits at most three additions before one terminal result."
+
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "workflow_continuation_repeat"
 
   flow do
     iterate "add" do
-      state Jido.Joi.object(%{value: Jido.Joi.integer(), remaining: Jido.Joi.integer() |> Jido.Joi.min(0)}),
+      state Joi.object(%{value: Joi.integer(), remaining: Joi.integer() |> Joi.min(0)}),
         initial: input()
 
       action Jido.Examples.ExecutableContinuation.Add
@@ -100,11 +110,13 @@ end
 
 defmodule Jido.Examples.ExecutableContinuation.Pipeline do
   @moduledoc "Invoke selects an Action or bounded Flow in the same Exec call."
+
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "workflow_continuation",
-    schema:
-      Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.min(0), remaining: Jido.Joi.integer() |> Jido.Joi.min(0)}),
-    output_schema: Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.min(0), request: Jido.Joi.string()})
+    schema: Joi.object(%{value: Joi.integer() |> Joi.min(0), remaining: Joi.integer() |> Joi.min(0)}),
+    output_schema: Joi.object(%{value: Joi.integer() |> Joi.min(0), request: Joi.string()})
 
   flow do
     invoke "next",

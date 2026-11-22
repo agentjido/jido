@@ -1,10 +1,12 @@
 defmodule Jido.Examples.AI.ToolFlow.Multiply do
   @moduledoc "Multiplies two integers."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "multiply",
     description: "Multiply two integers",
-    schema: Jido.Joi.object(%{left: Jido.Joi.integer(), right: Jido.Joi.integer()})
+    schema: Joi.object(%{left: Joi.integer(), right: Joi.integer()})
 
   @impl Jido.Action
   def run(%{left: left, right: right}, context) do
@@ -16,10 +18,12 @@ end
 defmodule Jido.Examples.AI.ToolFlow.MultiplyFlow do
   @moduledoc "Runs the multiply Action through a Flow."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "multiply_flow",
     description: "Multiply two integers through a Flow",
-    schema: Jido.Joi.object(%{left: Jido.Joi.integer(), right: Jido.Joi.integer()})
+    schema: Joi.object(%{left: Joi.integer(), right: Joi.integer()})
 
   flow do
     step "multiply", action: Jido.Examples.AI.ToolFlow.Multiply, params: input()

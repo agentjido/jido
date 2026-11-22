@@ -1,17 +1,20 @@
 defmodule Jido.Examples.Durable.SavedAgent.RequestReport do
   @moduledoc "Normalizes, validates, and accepts a report request in one Agent Turn."
+
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "durable_request_report",
     schema:
-      Jido.Joi.object(%{
-        report_id: Jido.Joi.string() |> Jido.Joi.min(1),
-        topic: Jido.Joi.string() |> Jido.Joi.min(1)
+      Joi.object(%{
+        report_id: Joi.string() |> Joi.min(1),
+        topic: Joi.string() |> Joi.min(1)
       }),
     output_schema:
-      Jido.Joi.object(%{
-        report_id: Jido.Joi.string(),
-        topic: Jido.Joi.string(),
-        status: Jido.Joi.enum([:idle, :requested])
+      Joi.object(%{
+        report_id: Joi.string(),
+        topic: Joi.string(),
+        status: Joi.enum([:idle, :requested])
       })
 
   flow do

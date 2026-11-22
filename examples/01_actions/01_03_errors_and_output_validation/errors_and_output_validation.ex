@@ -1,8 +1,10 @@
 defmodule Jido.Examples.Actions.ErrorsAndOutputValidation.CheckShipment do
+  alias Jido.Joi
+
   use Jido.Action,
     name: "example_action_check_shipment",
-    schema: Jido.Joi.object(%{weight_kg: Jido.Joi.integer() |> Jido.Joi.min(1)}),
-    output_schema: Jido.Joi.object(%{status: Jido.Joi.enum([:accepted])})
+    schema: Joi.object(%{weight_kg: Joi.integer() |> Joi.min(1)}),
+    output_schema: Joi.object(%{status: Joi.enum([:accepted])})
 
   @impl true
   def run(_params, %{mode: :reject}) do

@@ -1,15 +1,18 @@
 defmodule Jido.Examples.Plugins.RuntimeResource.Inspect do
   @moduledoc "Requests one post-commit report from the Plugin runtime."
+
+  alias Jido.Joi
+
   use Jido.Agent.Directive
 
-  @schema Jido.Joi.struct(
+  @schema Joi.struct(
             __MODULE__,
-            %{label: Jido.Joi.string() |> Jido.Joi.min(1)},
+            %{label: Joi.string() |> Joi.min(1)},
             coerce: true
           )
 
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
   def schema, do: @schema
 end
 
@@ -81,6 +84,8 @@ end
 defmodule Jido.Examples.Plugins.RuntimeResource.Agent do
   @moduledoc "Uses a Directive to contact its Plugin-owned runtime after commit."
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "plugin_runtime_resource",
     plugins: [Jido.Examples.Plugins.RuntimeResource.Plugin]
@@ -88,7 +93,7 @@ defmodule Jido.Examples.Plugins.RuntimeResource.Agent do
   alias Jido.Examples.Plugins.RuntimeResource.Inspect
 
   state do
-    schema Jido.Joi.object(%{requests: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{requests: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -96,7 +101,7 @@ defmodule Jido.Examples.Plugins.RuntimeResource.Agent do
 
     route "examples.plugins.runtime_resource.inspect", as: :inspect_runtime do
       action %{label: label},
-        schema: Jido.Joi.object(%{label: Jido.Joi.string() |> Jido.Joi.min(1)}),
+        schema: Joi.object(%{label: Joi.string() |> Joi.min(1)}),
         context: context do
         {:ok, %{context.agent_state | requests: context.agent_state.requests + 1}, [%Inspect{label: label}]}
       end

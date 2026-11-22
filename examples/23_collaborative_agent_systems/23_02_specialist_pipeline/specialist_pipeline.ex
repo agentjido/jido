@@ -1,8 +1,10 @@
 defmodule Jido.Examples.Collaboration.SpecialistPipeline.Classifier do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_pipeline_classifier"
 
   state do
-    schema Jido.Joi.object(%{handled: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{handled: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -11,14 +13,14 @@ defmodule Jido.Examples.Collaboration.SpecialistPipeline.Classifier do
     route "examples.collaboration.pipeline.classify", as: :classify do
       action %{mission_id: mission_id, report: report},
         schema:
-          Jido.Joi.object(%{
-            mission_id: Jido.Joi.string(),
-            report: Jido.Joi.string()
+          Joi.object(%{
+            mission_id: Joi.string(),
+            report: Joi.string()
           }),
         output_schema:
-          Jido.Joi.object(%{
-            state: Jido.Joi.map(),
-            reply: Jido.Joi.map()
+          Joi.object(%{
+            state: Joi.map(),
+            reply: Joi.map()
           }),
         context: context do
         category = if String.contains?(String.downcase(report), "database"), do: "database", else: "general"
@@ -37,6 +39,8 @@ defmodule Jido.Examples.Collaboration.SpecialistPipeline.Classifier do
 end
 
 defmodule Jido.Examples.Collaboration.SpecialistPipeline.Diagnostician do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_pipeline_diagnostician"
 
   routes do
@@ -45,12 +49,12 @@ defmodule Jido.Examples.Collaboration.SpecialistPipeline.Diagnostician do
     route "examples.collaboration.pipeline.diagnose", as: :diagnose do
       action input,
         schema:
-          Jido.Joi.object(%{
-            mission_id: Jido.Joi.string(),
-            category: Jido.Joi.string(),
-            fail: Jido.Joi.boolean()
+          Joi.object(%{
+            mission_id: Joi.string(),
+            category: Joi.string(),
+            fail: Joi.boolean()
           }),
-        output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), reply: Jido.Joi.map()}),
+        output_schema: Joi.object(%{state: Joi.map(), reply: Joi.map()}),
         context: context do
         if input.fail do
           {:error, Jido.Error.execution_error("injected diagnostician failure")}
@@ -74,6 +78,8 @@ defmodule Jido.Examples.Collaboration.SpecialistPipeline.Diagnostician do
 end
 
 defmodule Jido.Examples.Collaboration.SpecialistPipeline.Responder do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_pipeline_responder"
 
   routes do
@@ -82,11 +88,11 @@ defmodule Jido.Examples.Collaboration.SpecialistPipeline.Responder do
     route "examples.collaboration.pipeline.respond", as: :respond do
       action input,
         schema:
-          Jido.Joi.object(%{
-            mission_id: Jido.Joi.string(),
-            cause: Jido.Joi.string()
+          Joi.object(%{
+            mission_id: Joi.string(),
+            cause: Joi.string()
           }),
-        output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), reply: Jido.Joi.map()}),
+        output_schema: Joi.object(%{state: Joi.map(), reply: Joi.map()}),
         context: context do
         {:ok,
          %{

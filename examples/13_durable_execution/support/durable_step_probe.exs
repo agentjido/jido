@@ -54,10 +54,13 @@ end
 
 defmodule Jido.Test.Examples.Durable.ObservedStep do
   @moduledoc false
+
+  alias Jido.Joi
+
   use Jido.Action,
     name: "observed_durable_step",
-    schema: Jido.Joi.object(%{step: Jido.Joi.integer(), value: Jido.Joi.integer()}),
-    output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
+    schema: Joi.object(%{step: Joi.integer(), value: Joi.integer()}),
+    output_schema: Joi.object(%{value: Joi.integer()})
 
   alias Jido.Test.Examples.Durable.StepProbe
 

@@ -26,9 +26,11 @@ defmodule Jido.Examples.Evaluation.RunChecks.Check do
 end
 
 defmodule Jido.Examples.Evaluation.RunChecks do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_evaluation_run_checks",
-    schema: Jido.Joi.object(%{run: Jido.Joi.map(), expected: Jido.Joi.map()})
+    schema: Joi.object(%{run: Joi.map(), expected: Joi.map()})
 
   flow do
     step "check",

@@ -18,13 +18,15 @@ end
 defmodule Jido.Examples.Operations.Deliver do
   @moduledoc "Calls the application-owned adapter from temporary execution context."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "operations_external_deliver",
     schema:
-      Jido.Joi.object(
+      Joi.object(
         %{
-          idempotency_key: Jido.Joi.string(),
-          payload: Jido.Joi.map()
+          idempotency_key: Joi.string(),
+          payload: Joi.map()
         },
         unrecognized_keys: :error
       )
@@ -37,13 +39,15 @@ end
 defmodule Jido.Examples.Operations.ExternalDeliveryFlow do
   @moduledoc "Keeps the external adapter behind one normal application Flow."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "operations_external_delivery_flow",
     schema:
-      Jido.Joi.object(
+      Joi.object(
         %{
-          idempotency_key: Jido.Joi.string(),
-          payload: Jido.Joi.map()
+          idempotency_key: Joi.string(),
+          payload: Joi.map()
         },
         unrecognized_keys: :error
       )

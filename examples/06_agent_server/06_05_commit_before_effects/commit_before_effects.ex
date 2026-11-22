@@ -1,14 +1,16 @@
 defmodule Jido.Examples.AgentServer.CommitBeforeEffects.FailingDelivery do
+  alias Jido.Joi
+
   use Jido.Agent.Directive
 
-  @schema Jido.Joi.struct(
+  @schema Joi.struct(
             __MODULE__,
-            %{delivery_id: Jido.Joi.string() |> Jido.Joi.min(1)},
+            %{delivery_id: Joi.string() |> Joi.min(1)},
             coerce: true
           )
 
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   def schema, do: @schema
 end
@@ -31,6 +33,8 @@ defmodule Jido.Examples.AgentServer.CommitBeforeEffects.DeliveryPlugin do
 end
 
 defmodule Jido.Examples.AgentServer.CommitBeforeEffects.Counter do
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "example_commit_before_effects",
     plugins: [Jido.Examples.AgentServer.CommitBeforeEffects.DeliveryPlugin]
@@ -38,7 +42,7 @@ defmodule Jido.Examples.AgentServer.CommitBeforeEffects.Counter do
   alias Jido.Examples.AgentServer.CommitBeforeEffects.FailingDelivery
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -46,7 +50,7 @@ defmodule Jido.Examples.AgentServer.CommitBeforeEffects.Counter do
 
     route "examples.agent_server.commit_before_effects.increment", as: :increment do
       action %{delivery_id: delivery_id},
-        schema: Jido.Joi.object(%{delivery_id: Jido.Joi.string() |> Jido.Joi.min(1)}),
+        schema: Joi.object(%{delivery_id: Joi.string() |> Joi.min(1)}),
         context: context do
         state = %{context.agent_state | count: context.agent_state.count + 1}
         {:ok, state, [%FailingDelivery{delivery_id: delivery_id}]}

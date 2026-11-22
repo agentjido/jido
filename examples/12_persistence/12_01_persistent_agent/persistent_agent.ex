@@ -7,22 +7,24 @@ defmodule Jido.Examples.Persistence.PersistentAgent do
   the count twice.
   """
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "examples_persistent_agent",
     description: "Creates, commits, and restores one persistent Agent"
 
   state do
-    schema Jido.Joi.object(%{
-             count: Jido.Joi.integer() |> Jido.Joi.default(0),
-             handled_signal_ids: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
-             last_command: Jido.Joi.map() |> Jido.Joi.nullable() |> Jido.Joi.default(nil)
+    schema Joi.object(%{
+             count: Joi.integer() |> Joi.default(0),
+             handled_signal_ids: Joi.list(Joi.string()) |> Joi.default([]),
+             last_command: Joi.map() |> Joi.nullable() |> Joi.default(nil)
            })
   end
 
   routes do
     route "examples.persistence.persistent_agent.increment" do
       action %{amount: amount},
-        schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}),
+        schema: Joi.object(%{amount: Joi.integer()}),
         context: context do
         state = context.agent_state
         signal_id = context.signal.id

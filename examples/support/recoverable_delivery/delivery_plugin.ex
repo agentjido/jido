@@ -1,37 +1,43 @@
 defmodule Jido.Examples.RecoverableDelivery.Deliver do
   @moduledoc "Portable intent to deliver one value under a stable effect ID."
 
-  @schema Jido.Joi.struct(__MODULE__, %{
-            effect_id: Jido.Joi.string() |> Jido.Joi.min(1),
-            value: Jido.Joi.integer()
+  alias Jido.Joi
+
+  @schema Joi.struct(__MODULE__, %{
+            effect_id: Joi.string() |> Joi.min(1),
+            value: Joi.integer()
           })
 
-  @type t :: unquote(Jido.Joi.type_spec(@schema))
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   def schema, do: @schema
-  def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, directive)
+  def validate(%__MODULE__{} = directive), do: Joi.parse(@schema, directive)
 end
 
 defmodule Jido.Examples.RecoverableDelivery.Confirm do
   @moduledoc "Portable intent to acknowledge one completed delivery."
 
-  @schema Jido.Joi.struct(__MODULE__, %{
-            effect_id: Jido.Joi.string() |> Jido.Joi.min(1),
-            value: Jido.Joi.integer()
+  alias Jido.Joi
+
+  @schema Joi.struct(__MODULE__, %{
+            effect_id: Joi.string() |> Joi.min(1),
+            value: Joi.integer()
           })
 
-  @type t :: unquote(Jido.Joi.type_spec(@schema))
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   def schema, do: @schema
-  def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, directive)
+  def validate(%__MODULE__{} = directive), do: Joi.parse(@schema, directive)
 end
 
 defmodule Jido.Examples.RecoverableDelivery.Output do
   @moduledoc "A delivery Plugin with pending and completed work in Agent state."
+
+  alias Jido.Joi
 
   use Jido.Plugin
 
@@ -39,11 +45,11 @@ defmodule Jido.Examples.RecoverableDelivery.Output do
 
   @impl true
   def state_spec(_opts) do
-    entries = Jido.Joi.map(Jido.Joi.string() |> Jido.Joi.min(1), Jido.Joi.integer())
+    entries = Joi.map(Joi.string() |> Joi.min(1), Joi.integer())
 
     {:delivery,
-     Jido.Joi.object(%{pending: entries, completed: entries})
-     |> Jido.Joi.default(%{pending: %{}, completed: %{}})}
+     Joi.object(%{pending: entries, completed: entries})
+     |> Joi.default(%{pending: %{}, completed: %{}})}
   end
 
   @impl true

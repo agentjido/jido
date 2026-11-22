@@ -3,13 +3,16 @@ defmodule Jido.Examples.AuthoringPlugin do
 
   defmodule Labels do
     @moduledoc "Stores a validated owner label in its own Agent contribution."
+
+    alias Jido.Joi
+
     alias Spark.Dsl.Extension, as: SparkExtension
 
     @section %Spark.Dsl.Section{
       name: :labels,
       schema: [owner: [type: :string, required: true]]
     }
-    @schema Jido.Joi.object(%{owner: Jido.Joi.string() |> Jido.Joi.min(1)}, unrecognized_keys: :error)
+    @schema Joi.object(%{owner: Joi.string() |> Joi.min(1)}, unrecognized_keys: :error)
 
     use Jido.Plugin, id: "examples.labels", vsn: 1, sections: [@section]
 
@@ -19,17 +22,20 @@ defmodule Jido.Examples.AuthoringPlugin do
     end
 
     @impl true
-    def normalize(data), do: Jido.Joi.parse(@schema, data)
+    def normalize(data), do: Joi.parse(@schema, data)
   end
 
   defmodule Agent do
     @moduledoc "Keeps Plugin data separate from core metadata and Agent state."
+
+    alias Jido.Joi
+
     use Jido.Agent,
       name: "basic_authoring_plugin",
       plugins: [Labels]
 
     state do
-      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+      schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
     end
 
     labels do
@@ -41,7 +47,7 @@ defmodule Jido.Examples.AuthoringPlugin do
 
       route "examples.basic.authoring_plugin.add", as: :add do
         action %{amount: amount},
-          schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}),
+          schema: Joi.object(%{amount: Joi.integer()}),
           context: context do
           {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
         end

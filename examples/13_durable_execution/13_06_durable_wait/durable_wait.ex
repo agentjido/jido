@@ -1,11 +1,14 @@
 defmodule Jido.Examples.Durable.DurableWait do
   @moduledoc "Runs one durable approval Flow that releases its Worker while it waits."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "durable_approval_wait"
 
   state do
-    schema Jido.Joi.object(%{
-             request_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             status: Jido.Joi.enum([:idle, :approved, :expired, :cancelled]) |> Jido.Joi.default(:idle)
+    schema Joi.object(%{
+             request_id: Joi.string() |> Joi.default(""),
+             status: Joi.enum([:idle, :approved, :expired, :cancelled]) |> Joi.default(:idle)
            })
   end
 
@@ -25,9 +28,12 @@ end
 
 defmodule Jido.Examples.Durable.DurableWait.Approval do
   @moduledoc "Waits for approval, cancellation, or a one-hour deadline in the same Turn."
+
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "durable_wait_approval",
-    schema: Jido.Joi.object(%{request_id: Jido.Joi.string() |> Jido.Joi.min(1)})
+    schema: Joi.object(%{request_id: Joi.string() |> Joi.min(1)})
 
   flow do
     step "request", request <- input(), inline: [context: context] do

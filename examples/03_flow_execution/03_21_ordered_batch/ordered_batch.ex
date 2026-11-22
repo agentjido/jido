@@ -1,9 +1,12 @@
 defmodule Jido.Examples.OrderedBatch do
   @moduledoc "One batch fixture for Map order, error policy, empty input, and serial Reduce."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "workflow_batch_agent"
 
   state do
-    schema Jido.Joi.object(%{items: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])})
+    schema Joi.object(%{items: Joi.list(Joi.map()) |> Joi.default([])})
   end
 
   routes do
@@ -18,9 +21,11 @@ end
 defmodule Jido.Examples.OrderedBatch.Convert do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "workflow_batch_convert",
-    schema: Jido.Joi.object(%{value: Jido.Joi.integer(), index: Jido.Joi.integer() |> Jido.Joi.min(0)})
+    schema: Joi.object(%{value: Joi.integer(), index: Joi.integer() |> Joi.min(0)})
 
   @impl true
   def run(input, _context) do
@@ -33,10 +38,12 @@ end
 defmodule Jido.Examples.OrderedBatch.Collected do
   @moduledoc "Collected errors retain one result per input position."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "workflow_batch_collect",
-    schema: Jido.Joi.object(%{values: Jido.Joi.list(Jido.Joi.integer())}),
-    output_schema: Jido.Joi.object(%{items: Jido.Joi.list(Jido.Joi.map())})
+    schema: Joi.object(%{values: Joi.list(Joi.integer())}),
+    output_schema: Joi.object(%{items: Joi.list(Joi.map())})
 
   flow do
     map "convert",
@@ -60,10 +67,12 @@ end
 defmodule Jido.Examples.OrderedBatch.Strict do
   @moduledoc "An ordered Map feeds a serial Reduce; any item failure rejects the Turn."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "workflow_batch_strict",
-    schema: Jido.Joi.object(%{values: Jido.Joi.list(Jido.Joi.integer())}),
-    output_schema: Jido.Joi.object(%{items: Jido.Joi.list(Jido.Joi.map())})
+    schema: Joi.object(%{values: Joi.list(Joi.integer())}),
+    output_schema: Joi.object(%{items: Joi.list(Joi.map())})
 
   flow do
     map "convert",

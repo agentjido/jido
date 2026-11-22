@@ -1,10 +1,12 @@
 defmodule Jido.Examples.InstanceIsolation.Counter do
   @moduledoc "A counter used to prove namespace and partition isolation."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "instance_isolation_counter"
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do

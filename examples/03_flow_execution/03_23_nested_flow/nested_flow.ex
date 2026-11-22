@@ -1,9 +1,12 @@
 defmodule Jido.Examples.NestedFlow do
   @moduledoc "Nested Flow contracts run within one Agent Turn and one commit."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "workflow_nested_agent"
 
   state do
-    schema Jido.Joi.object(%{result: Jido.Joi.map() |> Jido.Joi.default(%{})})
+    schema Joi.object(%{result: Joi.map() |> Joi.default(%{})})
   end
 
   routes do
@@ -15,14 +18,17 @@ end
 
 defmodule Jido.Examples.NestedFlow.Child do
   @moduledoc "A reusable child Flow with its own input and output contract."
+
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "workflow_nested_child",
     schema:
-      Jido.Joi.object(%{
-        text: Jido.Joi.string() |> Jido.Joi.min(1),
-        role: Jido.Joi.enum([:writer, :editor])
+      Joi.object(%{
+        text: Joi.string() |> Joi.min(1),
+        role: Joi.enum([:writer, :editor])
       }),
-    output_schema: Jido.Joi.object(%{text: Jido.Joi.string() |> Jido.Joi.min(1), request: Jido.Joi.string()})
+    output_schema: Joi.object(%{text: Joi.string() |> Joi.min(1), request: Joi.string()})
 
   flow do
     step "write", [text <- input(:text), role <- input(:role)], inline: [context: context] do
@@ -40,12 +46,14 @@ end
 defmodule Jido.Examples.NestedFlow.Pipeline do
   @moduledoc "Two instances of the same child Flow have separate result scopes."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "workflow_nested_parent",
-    schema: Jido.Joi.object(%{text: Jido.Joi.string()}),
+    schema: Joi.object(%{text: Joi.string()}),
     output_schema:
-      Jido.Joi.object(%{
-        result: Jido.Joi.object(%{text: Jido.Joi.string() |> Jido.Joi.min(1), request: Jido.Joi.string()})
+      Joi.object(%{
+        result: Joi.object(%{text: Joi.string() |> Joi.min(1), request: Joi.string()})
       })
 
   flow do

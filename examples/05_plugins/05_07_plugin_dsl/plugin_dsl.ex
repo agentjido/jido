@@ -1,11 +1,14 @@
 defmodule Jido.Examples.Plugins.DSL.Agent do
   @moduledoc "Uses a Plugin to add a threshold language to the Agent DSL."
+
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "plugin_dsl_agent",
     plugins: [Jido.Examples.Plugins.DSL.Thresholds]
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   thresholds do
@@ -19,7 +22,7 @@ defmodule Jido.Examples.Plugins.DSL.Agent do
 
     route "examples.plugins.dsl.add", as: :add do
       action %{amount: amount},
-        schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}),
+        schema: Joi.object(%{amount: Joi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end

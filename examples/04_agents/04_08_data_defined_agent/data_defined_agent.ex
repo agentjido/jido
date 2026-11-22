@@ -1,6 +1,8 @@
 defmodule Jido.Examples.DataDefinedAgent do
   @moduledoc "Builds, encodes, and runs one neutral Agent definition."
 
+  alias Jido.Joi
+
   alias Jido.Agent
   alias Jido.Catalog
   alias Jido.Plugin.Timer
@@ -9,7 +11,7 @@ defmodule Jido.Examples.DataDefinedAgent do
     @moduledoc "Adds one validated amount to the current count."
     use Jido.Action,
       name: "basic_data_defined_add",
-      schema: Jido.Joi.object(%{amount: Jido.Joi.integer()})
+      schema: Joi.object(%{amount: Joi.integer()})
 
     def run(%{amount: amount}, %{agent_state: state}),
       do: {:ok, %{state | count: state.count + amount}}
@@ -19,7 +21,7 @@ defmodule Jido.Examples.DataDefinedAgent do
     @moduledoc "Requests a later count change through the Timer Plugin."
     use Jido.Action,
       name: "basic_data_defined_schedule",
-      schema: Jido.Joi.object(%{delay_ms: Jido.Joi.integer() |> Jido.Joi.min(0)})
+      schema: Joi.object(%{delay_ms: Joi.integer() |> Joi.min(0)})
 
     def run(%{delay_ms: delay_ms}, %{agent_state: state}) do
       tick = Jido.Examples.DataDefinedAgent.signal!(1)
@@ -32,7 +34,7 @@ defmodule Jido.Examples.DataDefinedAgent do
     use Jido.Plugin
 
     @impl true
-    def state_spec(_opts), do: {:turns, Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(0)}
+    def state_spec(_opts), do: {:turns, Joi.integer() |> Joi.min(0) |> Joi.default(0)}
 
     @impl true
     def reduce(reduction, _opts), do: {:ok, reduction.plugin_state + 1}
@@ -42,7 +44,7 @@ defmodule Jido.Examples.DataDefinedAgent do
   def definition do
     Agent.define!(%{
       name: "basic_data_defined_agent",
-      schema: Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)}),
+      schema: Joi.object(%{count: Joi.integer() |> Joi.default(0)}),
       plugins: [
         %{id: CountTurns.id(), provider: CountTurns, vsn: CountTurns.vsn(), data: %{}},
         %{

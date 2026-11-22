@@ -1,10 +1,12 @@
 defmodule Jido.Examples.Signals.DispatchAdapters.Capture do
+  alias Jido.Joi
+
   @behaviour Jido.Signal.Dispatch.Adapter
 
   @impl true
   def options_schema do
-    Jido.Joi.keyword(
-      [target: Jido.Joi.any() |> Jido.Joi.required()],
+    Joi.keyword(
+      [target: Joi.any() |> Joi.required()],
       unrecognized_keys: :error
     )
   end

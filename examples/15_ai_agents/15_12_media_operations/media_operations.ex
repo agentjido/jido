@@ -1,20 +1,22 @@
 defmodule Jido.Examples.AI.MediaOperations do
   @moduledoc "Runs image, OCR, speech, transcription, and video as normal Flow work."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "examples_ai_media_operations",
     schema:
-      Jido.Joi.object(%{
-        document: Jido.Joi.string(),
-        model: Jido.Joi.string() |> Jido.Joi.min(1),
-        prompt: Jido.Joi.string() |> Jido.Joi.min(1)
+      Joi.object(%{
+        document: Joi.string(),
+        model: Joi.string() |> Joi.min(1),
+        prompt: Joi.string() |> Joi.min(1)
       }),
     output_schema:
-      Jido.Joi.object(%{
-        image: Jido.Joi.map(),
-        ocr: Jido.Joi.map(),
-        speech: Jido.Joi.map(),
-        video: Jido.Joi.map()
+      Joi.object(%{
+        image: Joi.map(),
+        ocr: Joi.map(),
+        speech: Joi.map(),
+        video: Joi.map()
       })
 
   flow do

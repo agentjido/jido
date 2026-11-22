@@ -1,9 +1,12 @@
 defmodule Jido.Examples.Topology.Swarm do
   @moduledoc "A declared local Bus broadcasts each work output to three members."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "topology_bus_swarm", plugins: [Jido.Plugin.Bus.DSL]
 
   state do
-    schema Jido.Joi.object(%{sent: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{sent: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -11,7 +14,7 @@ defmodule Jido.Examples.Topology.Swarm do
 
     route "examples.topology.cell.work", as: :work do
       action %{value: _value},
-        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+        schema: Joi.object(%{value: Joi.integer()}),
         context: context do
         {:ok, %{context.agent_state | sent: context.agent_state.sent + 1}, [Jido.Agent.Directive.emit(context.signal)]}
       end

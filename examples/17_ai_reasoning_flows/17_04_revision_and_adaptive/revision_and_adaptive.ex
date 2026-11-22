@@ -1,13 +1,15 @@
 defmodule Jido.Examples.AI.Reasoning.RevisionAndAdaptive do
   @moduledoc "Compares a fixed revision cycle with locally selected reasoning."
 
+  alias Jido.Joi
+
   alias Jido.AI.Reasoning.{Adaptive, TRM}
 
   use Jido.Flow,
     name: "examples_ai_revision_and_adaptive",
     schema:
-      Jido.Joi.object(
-        %{input: Jido.Joi.string()},
+      Joi.object(
+        %{input: Joi.string()},
         unrecognized_keys: :error
       )
 

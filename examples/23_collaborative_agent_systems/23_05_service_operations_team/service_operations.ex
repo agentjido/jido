@@ -40,13 +40,15 @@ defmodule Jido.Examples.Collaboration.ServiceOperations.Finalize do
 end
 
 defmodule Jido.Examples.Collaboration.ServiceOperations do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_service_operations_team",
     schema:
-      Jido.Joi.object(%{
-        request_id: Jido.Joi.string(),
-        description: Jido.Joi.string() |> Jido.Joi.min(1),
-        priority: Jido.Joi.enum([:normal, :high])
+      Joi.object(%{
+        request_id: Joi.string(),
+        description: Joi.string() |> Joi.min(1),
+        priority: Joi.enum([:normal, :high])
       })
 
   alias Jido.Examples.Collaboration.ServiceOperations.{Assign, Finalize, Intake, QualityReview}

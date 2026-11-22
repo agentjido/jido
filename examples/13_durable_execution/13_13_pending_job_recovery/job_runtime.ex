@@ -35,23 +35,27 @@ end
 defmodule Jido.Examples.PendingJobRecovery.JobRuntime.Submit do
   @moduledoc "Portable intent to start one managed job."
 
-  @schema Jido.Joi.struct(__MODULE__, %{job_id: Jido.Joi.string(), value: Jido.Joi.integer()})
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  alias Jido.Joi
+
+  @schema Joi.struct(__MODULE__, %{job_id: Joi.string(), value: Joi.integer()})
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   def schema, do: @schema
-  def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, directive)
+  def validate(%__MODULE__{} = directive), do: Joi.parse(@schema, directive)
 end
 
 defmodule Jido.Examples.PendingJobRecovery.JobRuntime.Cancel do
   @moduledoc "Portable intent to cancel one managed job."
 
-  @schema Jido.Joi.struct(__MODULE__, %{job_id: Jido.Joi.string()})
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  alias Jido.Joi
+
+  @schema Joi.struct(__MODULE__, %{job_id: Joi.string()})
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   def schema, do: @schema
-  def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, directive)
+  def validate(%__MODULE__{} = directive), do: Joi.parse(@schema, directive)
 end
 
 defmodule Jido.Examples.PendingJobRecovery.JobRuntime do

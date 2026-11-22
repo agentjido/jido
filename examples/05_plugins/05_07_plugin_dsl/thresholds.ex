@@ -5,6 +5,9 @@ end
 
 defmodule Jido.Examples.Plugins.DSL.Thresholds do
   @moduledoc "Adds Agent syntax and reduces a field from its validated configuration."
+
+  alias Jido.Joi
+
   alias Spark.Dsl.Extension, as: DSL
 
   @threshold %Spark.Dsl.Entity{
@@ -40,15 +43,15 @@ defmodule Jido.Examples.Plugins.DSL.Thresholds do
     end
   end
 
-  @config_schema Jido.Joi.object(
+  @config_schema Joi.object(
                    %{
-                     on: Jido.Joi.string() |> Jido.Joi.min(1),
+                     on: Joi.string() |> Joi.min(1),
                      thresholds:
-                       Jido.Joi.list(
-                         Jido.Joi.object(
+                       Joi.list(
+                         Joi.object(
                            %{
-                             name: Jido.Joi.atom(),
-                             at: Jido.Joi.integer() |> Jido.Joi.min(1)
+                             name: Joi.atom(),
+                             at: Joi.integer() |> Joi.min(1)
                            },
                            unrecognized_keys: :error
                          )
@@ -59,7 +62,7 @@ defmodule Jido.Examples.Plugins.DSL.Thresholds do
 
   @impl true
   def normalize(data) do
-    with {:ok, data} <- Jido.Joi.parse(@config_schema, data) do
+    with {:ok, data} <- Joi.parse(@config_schema, data) do
       names = Enum.map(data.thresholds, & &1.name)
       if names == Enum.uniq(names), do: {:ok, data}, else: {:error, :duplicate_threshold_names}
     end
@@ -73,7 +76,7 @@ defmodule Jido.Examples.Plugins.DSL.Thresholds do
   end
 
   @impl Jido.Plugin
-  def state_spec(_opts), do: {:reached, Jido.Joi.list(Jido.Joi.atom()) |> Jido.Joi.default([])}
+  def state_spec(_opts), do: {:reached, Joi.list(Joi.atom()) |> Joi.default([])}
 
   @impl Jido.Plugin
   def reduce(reduction, opts) do

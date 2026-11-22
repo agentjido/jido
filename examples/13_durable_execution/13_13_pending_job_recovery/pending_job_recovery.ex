@@ -7,6 +7,8 @@ defmodule Jido.Examples.PendingJobRecovery do
   still exists. A running record does not prove that a task is still alive.
   """
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "example_pending_job_recovery",
     plugins: [Jido.Examples.PendingJobRecovery.JobRuntime]
@@ -15,17 +17,17 @@ defmodule Jido.Examples.PendingJobRecovery do
   alias Jido.Examples.PendingJobRecovery.JobRuntime.{Cancel, Submit}
 
   state do
-    schema Jido.Joi.object(%{
-             job_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             value: Jido.Joi.integer() |> Jido.Joi.default(0),
+    schema Joi.object(%{
+             job_id: Joi.string() |> Joi.default(""),
+             value: Joi.integer() |> Joi.default(0),
              status:
-               Jido.Joi.enum([:idle, :awaiting_approval, :running, :completed, :failed, :cancelled])
-               |> Jido.Joi.default(:idle),
-             approved?: Jido.Joi.boolean() |> Jido.Joi.default(false),
-             attempt_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             attempts: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
-             seen: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
-             result: Jido.Joi.string() |> Jido.Joi.default("")
+               Joi.enum([:idle, :awaiting_approval, :running, :completed, :failed, :cancelled])
+               |> Joi.default(:idle),
+             approved?: Joi.boolean() |> Joi.default(false),
+             attempt_id: Joi.string() |> Joi.default(""),
+             attempts: Joi.list(Joi.string()) |> Joi.default([]),
+             seen: Joi.list(Joi.string()) |> Joi.default([]),
+             result: Joi.string() |> Joi.default("")
            })
   end
 
@@ -34,7 +36,7 @@ defmodule Jido.Examples.PendingJobRecovery do
 
     route "examples.runtime.pending_jobs.request", as: :request_job do
       action input,
-        schema: Jido.Joi.object(%{job_id: Jido.Joi.string() |> Jido.Joi.min(1), value: Jido.Joi.integer()}),
+        schema: Joi.object(%{job_id: Joi.string() |> Joi.min(1), value: Joi.integer()}),
         context: context do
         state = context.agent_state
 
@@ -59,9 +61,9 @@ defmodule Jido.Examples.PendingJobRecovery do
     route "examples.runtime.pending_jobs.approve", as: :approve_job do
       action input,
         schema:
-          Jido.Joi.object(%{
-            job_id: Jido.Joi.string() |> Jido.Joi.min(1),
-            attempt_id: Jido.Joi.string() |> Jido.Joi.min(1)
+          Joi.object(%{
+            job_id: Joi.string() |> Joi.min(1),
+            attempt_id: Joi.string() |> Joi.min(1)
           }),
         context: context do
         state = context.agent_state
@@ -79,9 +81,9 @@ defmodule Jido.Examples.PendingJobRecovery do
     route "examples.runtime.pending_jobs.retry", as: :retry_job do
       action input,
         schema:
-          Jido.Joi.object(%{
-            job_id: Jido.Joi.string() |> Jido.Joi.min(1),
-            attempt_id: Jido.Joi.string() |> Jido.Joi.min(1)
+          Joi.object(%{
+            job_id: Joi.string() |> Joi.min(1),
+            attempt_id: Joi.string() |> Joi.min(1)
           }),
         context: context do
         state = context.agent_state
@@ -101,7 +103,7 @@ defmodule Jido.Examples.PendingJobRecovery do
 
     route "examples.runtime.pending_jobs.cancel", as: :cancel_job do
       action %{job_id: job_id},
-        schema: Jido.Joi.object(%{job_id: Jido.Joi.string()}),
+        schema: Joi.object(%{job_id: Joi.string()}),
         context: context do
         state = context.agent_state
 
@@ -122,10 +124,10 @@ defmodule Jido.Examples.PendingJobRecovery do
     route "examples.runtime.jobs.settle", as: :settle_attempt do
       action input,
         schema:
-          Jido.Joi.object(%{
-            job_id: Jido.Joi.string(),
-            status: Jido.Joi.enum([:completed, :failed]),
-            result: Jido.Joi.string()
+          Joi.object(%{
+            job_id: Joi.string(),
+            status: Joi.enum([:completed, :failed]),
+            result: Joi.string()
           }),
         context: context do
         state = context.agent_state

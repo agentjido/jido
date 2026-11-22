@@ -23,8 +23,8 @@ defmodule Jido.Examples.Guardrails.SupportDesk do
     use Jido.Action,
       name: "read_ticket",
       description: "Read the current support ticket status",
-      schema: Jido.Joi.object(%{}),
-      output_schema: Jido.Joi.object(%{status: Jido.Joi.atom()})
+      schema: Joi.object(%{}),
+      output_schema: Joi.object(%{status: Joi.atom()})
 
     @impl true
     def run(_params, %{agent_state: %{ticket_status: status}}), do: {:ok, %{status: status}}

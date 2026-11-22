@@ -1,8 +1,10 @@
 defmodule Jido.Examples.Collaboration.NestedOrganization.Worker do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_nested_organization_worker"
 
   state do
-    schema Jido.Joi.object(%{completed: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{completed: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -10,7 +12,7 @@ defmodule Jido.Examples.Collaboration.NestedOrganization.Worker do
 
     route "examples.organization.work", as: :work do
       action input,
-        schema: Jido.Joi.object(%{fail: Jido.Joi.boolean()}),
+        schema: Joi.object(%{fail: Joi.boolean()}),
         context: context do
         if input.fail do
           {:error, Jido.Error.execution_error("injected worker failure")}

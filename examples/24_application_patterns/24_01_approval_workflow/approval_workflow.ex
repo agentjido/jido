@@ -8,21 +8,23 @@ defmodule Jido.Examples.ApprovalWorkflow do
   after commit and sends one result Signal back to the Agent.
   """
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "examples_flight_booking",
     description: "Runs a structured flight search and approval process",
     plugins: [Jido.Examples.ApprovalWorkflow.BookingPlugin]
 
   state do
-    schema Jido.Joi.object(%{
-             trip_constraints: Jido.Joi.map() |> Jido.Joi.default(%{}),
-             search_revision: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(0),
-             offered_options: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([]),
-             selection: Jido.Joi.map() |> Jido.Joi.default(%{}),
-             passenger_ref: Jido.Joi.string() |> Jido.Joi.default(""),
-             approval: Jido.Joi.enum([:not_requested, :pending, :approved]) |> Jido.Joi.default(:not_requested),
+    schema Joi.object(%{
+             trip_constraints: Joi.map() |> Joi.default(%{}),
+             search_revision: Joi.integer() |> Joi.min(0) |> Joi.default(0),
+             offered_options: Joi.list(Joi.map()) |> Joi.default([]),
+             selection: Joi.map() |> Joi.default(%{}),
+             passenger_ref: Joi.string() |> Joi.default(""),
+             approval: Joi.enum([:not_requested, :pending, :approved]) |> Joi.default(:not_requested),
              booking_status:
-               Jido.Joi.enum([
+               Joi.enum([
                  :idle,
                  :awaiting_selection,
                  :awaiting_approval,
@@ -31,10 +33,10 @@ defmodule Jido.Examples.ApprovalWorkflow do
                  :failed,
                  :cancelled
                ])
-               |> Jido.Joi.default(:idle),
-             booking_key: Jido.Joi.string() |> Jido.Joi.default(""),
-             booking_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             last_error: Jido.Joi.string() |> Jido.Joi.default("")
+               |> Joi.default(:idle),
+             booking_key: Joi.string() |> Joi.default(""),
+             booking_id: Joi.string() |> Joi.default(""),
+             last_error: Joi.string() |> Joi.default("")
            })
   end
 

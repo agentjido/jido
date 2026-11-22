@@ -1,11 +1,14 @@
 defmodule Jido.Examples.EffectfulSteps do
   @moduledoc "Synchronous effects and transient clients in one Agent Turn."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "workflow_effectful_agent"
 
   state do
-    schema Jido.Joi.object(%{
-             key: Jido.Joi.string() |> Jido.Joi.default(""),
-             result: Jido.Joi.map() |> Jido.Joi.default(%{})
+    schema Joi.object(%{
+             key: Joi.string() |> Joi.default(""),
+             result: Joi.map() |> Joi.default(%{})
            })
   end
 
@@ -22,13 +25,15 @@ end
 defmodule Jido.Examples.EffectfulSteps.Read do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "workflow_effect_read",
     schema:
-      Jido.Joi.object(%{
-        key: Jido.Joi.string() |> Jido.Joi.min(1),
-        allowed: Jido.Joi.boolean(),
-        expected_revision: Jido.Joi.string()
+      Joi.object(%{
+        key: Joi.string() |> Joi.min(1),
+        allowed: Joi.boolean(),
+        expected_revision: Joi.string()
       })
 
   @impl true
@@ -60,15 +65,17 @@ end
 defmodule Jido.Examples.EffectfulSteps.Pipeline do
   @moduledoc "Guards an external read and selects the state that can commit."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "workflow_effects",
     schema:
-      Jido.Joi.object(%{
-        key: Jido.Joi.string() |> Jido.Joi.min(1),
-        allowed: Jido.Joi.boolean(),
-        expected_revision: Jido.Joi.string()
+      Joi.object(%{
+        key: Joi.string() |> Joi.min(1),
+        allowed: Joi.boolean(),
+        expected_revision: Joi.string()
       }),
-    output_schema: Jido.Joi.object(%{key: Jido.Joi.string() |> Jido.Joi.min(1), result: Jido.Joi.map()})
+    output_schema: Joi.object(%{key: Joi.string() |> Joi.min(1), result: Joi.map()})
 
   flow do
     step "guard", params <- input() do

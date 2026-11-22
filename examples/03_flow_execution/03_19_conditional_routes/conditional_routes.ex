@@ -1,11 +1,14 @@
 defmodule Jido.Examples.ConditionalRoutes do
   @moduledoc "Explicit provider policy composed with ordered SDK Choice execution."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "workflow_routes_agent"
 
   state do
-    schema Jido.Joi.object(%{
-             route: Jido.Joi.atom() |> Jido.Joi.default(:none),
-             result: Jido.Joi.map() |> Jido.Joi.default(%{})
+    schema Joi.object(%{
+             route: Joi.atom() |> Joi.default(:none),
+             result: Joi.map() |> Joi.default(%{})
            })
   end
 
@@ -19,12 +22,14 @@ end
 defmodule Jido.Examples.ConditionalRoutes.Select do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "workflow_route_select",
     schema:
-      Jido.Joi.object(%{
-        route: Jido.Joi.enum([:primary, :second, :fallback, :reject]),
-        value: Jido.Joi.map() |> Jido.Joi.optional()
+      Joi.object(%{
+        route: Joi.enum([:primary, :second, :fallback, :reject]),
+        value: Joi.map() |> Joi.optional()
       })
 
   @impl true
@@ -53,10 +58,12 @@ end
 defmodule Jido.Examples.ConditionalRoutes.Pipeline do
   @moduledoc "The first matching Choice runs; expected failure capture is explicit."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "workflow_routes",
-    schema: Jido.Joi.object(%{}),
-    output_schema: Jido.Joi.object(%{route: Jido.Joi.atom(), result: Jido.Joi.map()})
+    schema: Joi.object(%{}),
+    output_schema: Joi.object(%{route: Joi.atom(), result: Joi.map()})
 
   flow do
     step "fetch", [params <- input(), ctx <- context()] do

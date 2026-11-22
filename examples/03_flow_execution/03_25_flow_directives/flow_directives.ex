@@ -1,12 +1,14 @@
 defmodule Jido.Examples.FlowDirectives do
   @moduledoc "Collects ordered Directives from a complete multi-step Flow."
 
+  alias Jido.Joi
+
   alias Jido.Examples.FlowDirectives.Effects
 
   use Jido.Agent, name: "workflow_flow_directives_agent", plugins: [Effects]
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -21,7 +23,7 @@ defmodule Jido.Examples.FlowDirectives do
     @moduledoc false
     use Jido.Action,
       name: "workflow_flow_directives_record_step",
-      schema: Jido.Joi.object(%{label: Jido.Joi.string() |> Jido.Joi.min(1), count: Jido.Joi.integer()})
+      schema: Joi.object(%{label: Joi.string() |> Joi.min(1), count: Joi.integer()})
 
     def run(input, context) do
       {:ok, %{context.agent_state | count: input.count}, [%Effects.Record{label: input.label}]}
@@ -32,7 +34,7 @@ defmodule Jido.Examples.FlowDirectives do
     @moduledoc false
     use Jido.Action,
       name: "workflow_flow_directives_reject",
-      schema: Jido.Joi.object(%{})
+      schema: Joi.object(%{})
 
     def run(_input, _context), do: {:error, :flow_rejected}
   end
@@ -41,8 +43,8 @@ defmodule Jido.Examples.FlowDirectives do
     @moduledoc "Three ordered components whose last result is the Agent candidate."
     use Jido.Flow,
       name: "workflow_flow_directives_success",
-      schema: Jido.Joi.object(%{}),
-      output_schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
+      schema: Joi.object(%{}),
+      output_schema: Joi.object(%{count: Joi.integer()})
 
     flow do
       step "first", action: RecordStep, params: %{label: "first", count: 1}
@@ -56,8 +58,8 @@ defmodule Jido.Examples.FlowDirectives do
     @moduledoc "A later failure discards Directives from earlier successful components."
     use Jido.Flow,
       name: "workflow_flow_directives_failure",
-      schema: Jido.Joi.object(%{}),
-      output_schema: Jido.Joi.object(%{count: Jido.Joi.integer()})
+      schema: Joi.object(%{}),
+      output_schema: Joi.object(%{count: Joi.integer()})
 
     flow do
       step "first", action: RecordStep, params: %{label: "first", count: 1}

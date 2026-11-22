@@ -1,8 +1,10 @@
 defmodule Jido.Examples.Patterns.ControlledUpgrade.AccountV1 do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_controlled_upgrade_account", vsn: 1
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -17,12 +19,14 @@ defmodule Jido.Examples.Patterns.ControlledUpgrade.AccountV1 do
 end
 
 defmodule Jido.Examples.Patterns.ControlledUpgrade.AccountV2 do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_controlled_upgrade_account", vsn: 2
 
   state do
-    schema Jido.Joi.object(%{
-             total: Jido.Joi.integer(),
-             currency: Jido.Joi.string()
+    schema Joi.object(%{
+             total: Joi.integer(),
+             currency: Joi.string()
            })
   end
 
@@ -38,10 +42,12 @@ defmodule Jido.Examples.Patterns.ControlledUpgrade.AccountV2 do
 end
 
 defmodule Jido.Examples.Patterns.ControlledUpgrade.AccountRollbackV3 do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_controlled_upgrade_account", vsn: 3
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do

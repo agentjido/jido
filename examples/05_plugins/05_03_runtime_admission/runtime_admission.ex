@@ -95,14 +95,17 @@ end
 
 defmodule Jido.Examples.Plugins.RuntimeAdmission.Agent do
   @moduledoc "Requires live Plugin admission before it accepts a command."
+
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "plugin_runtime_admission_agent",
     plugins: [{Jido.Examples.Plugins.RuntimeAdmission.Plugin, %{tokens: [{"allow", "operator"}]}}]
 
   state do
-    schema Jido.Joi.object(%{
-             accepted: Jido.Joi.integer() |> Jido.Joi.default(0),
-             principal: Jido.Joi.string() |> Jido.Joi.default("")
+    schema Joi.object(%{
+             accepted: Joi.integer() |> Joi.default(0),
+             principal: Joi.string() |> Joi.default("")
            })
   end
 
@@ -111,7 +114,7 @@ defmodule Jido.Examples.Plugins.RuntimeAdmission.Agent do
 
     route "examples.plugins.runtime_admission.accept" do
       action %{token: _token},
-        schema: Jido.Joi.object(%{token: Jido.Joi.string()}),
+        schema: Joi.object(%{token: Joi.string()}),
         context: context do
         case context.plugin_inputs[Jido.Examples.Plugins.RuntimeAdmission.Plugin] do
           %{

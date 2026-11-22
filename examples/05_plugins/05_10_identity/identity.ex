@@ -1,5 +1,8 @@
 defmodule Jido.Examples.Plugins.Identity.Agent do
   @moduledoc "Verifies signed input before routing and signs replies after execution."
+
+  alias Jido.Joi
+
   alias Jido.Examples.Plugins.Crypto
   alias Jido.Examples.Plugins.Identity.Plugin
 
@@ -10,9 +13,9 @@ defmodule Jido.Examples.Plugins.Identity.Agent do
     ]
 
   state do
-    schema Jido.Joi.object(%{
-             accepted: Jido.Joi.integer() |> Jido.Joi.default(0),
-             last_public_key: Jido.Joi.string() |> Jido.Joi.default("")
+    schema Joi.object(%{
+             accepted: Joi.integer() |> Joi.default(0),
+             last_public_key: Joi.string() |> Joi.default("")
            })
   end
 
@@ -21,11 +24,11 @@ defmodule Jido.Examples.Plugins.Identity.Agent do
 
     route "examples.plugins.identity.challenge" do
       action %{"challenge" => challenge},
-        schema: Jido.Joi.object(%{"challenge" => Jido.Joi.string() |> Jido.Joi.min(1)}),
+        schema: Joi.object(%{"challenge" => Joi.string() |> Joi.min(1)}),
         output_schema:
-          Jido.Joi.object(%{
-            state: Jido.Joi.map(),
-            reply: Jido.Joi.object(%{"challenge" => Jido.Joi.string()})
+          Joi.object(%{
+            state: Joi.map(),
+            reply: Joi.object(%{"challenge" => Joi.string()})
           }),
         context: context do
         next_state = %{

@@ -1,8 +1,10 @@
 defmodule Jido.Examples.ModelResilience.FailureTool do
+  alias Jido.Joi
+
   use Jido.Action,
     name: "resilience_failure_tool",
     description: "Return one deterministic retryable tool failure.",
-    schema: Jido.Joi.object(%{item: Jido.Joi.string() |> Jido.Joi.min(1)})
+    schema: Joi.object(%{item: Joi.string() |> Joi.min(1)})
 
   @impl true
   def run(_params, _context) do

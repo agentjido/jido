@@ -1,10 +1,12 @@
 defmodule Jido.Examples.Observability.OpenTelemetry.Agent do
   @moduledoc "Produces one Jido Turn that the host OpenTelemetry tracer observes."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "examples_observability_open_telemetry_agent"
 
   state do
-    schema Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{value: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -12,7 +14,7 @@ defmodule Jido.Examples.Observability.OpenTelemetry.Agent do
 
     route "examples.observability.open_telemetry.record", as: :record do
       action %{value: value},
-        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+        schema: Joi.object(%{value: Joi.integer()}),
         context: context do
         {:ok, %{context.agent_state | value: value}}
       end

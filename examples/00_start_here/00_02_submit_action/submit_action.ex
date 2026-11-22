@@ -1,18 +1,20 @@
 defmodule Jido.Examples.StartHere.SubmitExpense do
   @moduledoc "Validates and prepares one submitted expense."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "start_here_submit_expense",
     schema:
-      Jido.Joi.object(%{
-        report_id: Jido.Joi.string() |> Jido.Joi.min(1),
-        amount_cents: Jido.Joi.integer() |> Jido.Joi.min(1)
+      Joi.object(%{
+        report_id: Joi.string() |> Joi.min(1),
+        amount_cents: Joi.integer() |> Joi.min(1)
       }),
     output_schema:
-      Jido.Joi.object(%{
-        report_id: Jido.Joi.string(),
-        amount_cents: Jido.Joi.integer(),
-        status: Jido.Joi.enum([:submitted])
+      Joi.object(%{
+        report_id: Joi.string(),
+        amount_cents: Joi.integer(),
+        status: Joi.enum([:submitted])
       })
 
   @impl true

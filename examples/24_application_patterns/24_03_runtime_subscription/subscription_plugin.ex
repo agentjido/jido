@@ -1,32 +1,39 @@
 defmodule Jido.Examples.Applications.Subscription.Subscribe do
   @moduledoc "Adds or replaces one desired external subscription."
 
-  @schema Jido.Joi.struct(
+  alias Jido.Joi
+
+  @schema Joi.struct(
             __MODULE__,
-            %{topic: Jido.Joi.string(), config: Jido.Joi.map() |> Jido.Joi.default(%{})},
+            %{topic: Joi.string(), config: Joi.map() |> Joi.default(%{})},
             coerce: true
           )
 
-  @type t :: unquote(Jido.Joi.type_spec(@schema))
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
   def schema, do: @schema
-  def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, Map.from_struct(directive))
+  def validate(%__MODULE__{} = directive), do: Joi.parse(@schema, Map.from_struct(directive))
 end
 
 defmodule Jido.Examples.Applications.Subscription.Unsubscribe do
   @moduledoc "Removes one desired external subscription."
 
-  @schema Jido.Joi.struct(__MODULE__, %{topic: Jido.Joi.string()}, coerce: true)
-  @type t :: unquote(Jido.Joi.type_spec(@schema))
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  alias Jido.Joi
+
+  @schema Joi.struct(__MODULE__, %{topic: Joi.string()}, coerce: true)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
   def schema, do: @schema
-  def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, Map.from_struct(directive))
+  def validate(%__MODULE__{} = directive), do: Joi.parse(@schema, Map.from_struct(directive))
 end
 
 defmodule Jido.Examples.Applications.Subscription.Plugin do
   @moduledoc "Owns desired subscription state and reconciles a runtime projection."
+
+  alias Jido.Joi
+
   use Jido.Plugin
 
   alias Jido.Examples.Applications.Subscription.{Subscribe, Unsubscribe}
@@ -36,8 +43,8 @@ defmodule Jido.Examples.Applications.Subscription.Plugin do
   def subscribe(topic, config \\ %{}), do: %Subscribe{topic: topic, config: config}
   def unsubscribe(topic), do: %Unsubscribe{topic: topic}
 
-  @state_schema Jido.Joi.object(%{desired: Jido.Joi.map() |> Jido.Joi.default(%{})})
-                |> Jido.Joi.default(%{desired: %{}})
+  @state_schema Joi.object(%{desired: Joi.map() |> Joi.default(%{})})
+                |> Joi.default(%{desired: %{}})
 
   @impl true
   def state_spec(_opts), do: {:subscriptions, @state_schema}

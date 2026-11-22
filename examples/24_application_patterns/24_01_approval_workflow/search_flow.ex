@@ -1,9 +1,11 @@
 defmodule Jido.Examples.ApprovalWorkflow.ValidateRequest do
   @moduledoc "Validates one flight-search request."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_flight_booking_validate_request",
-    schema: Jido.Joi.object(%{constraints: Jido.Joi.map()})
+    schema: Joi.object(%{constraints: Joi.map()})
 
   alias Jido.Error
 
@@ -27,9 +29,11 @@ end
 defmodule Jido.Examples.ApprovalWorkflow.SearchFlights do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_flight_booking_search",
-    schema: Jido.Joi.object(%{constraints: Jido.Joi.map()})
+    schema: Joi.object(%{constraints: Joi.map()})
 
   alias Jido.Error
 
@@ -53,12 +57,14 @@ end
 defmodule Jido.Examples.ApprovalWorkflow.PrepareOptions do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_flight_booking_prepare_options",
     schema:
-      Jido.Joi.object(%{
-        constraints: Jido.Joi.map(),
-        options: Jido.Joi.list(Jido.Joi.map())
+      Joi.object(%{
+        constraints: Joi.map(),
+        options: Joi.list(Joi.map())
       })
 
   alias Jido.Error
@@ -100,9 +106,11 @@ end
 defmodule Jido.Examples.ApprovalWorkflow.SearchFlow do
   @moduledoc "Validates, searches, filters, and commits one offer revision."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "examples_flight_booking_search_flow",
-    schema: Jido.Joi.object(%{constraints: Jido.Joi.map()})
+    schema: Joi.object(%{constraints: Joi.map()})
 
   flow do
     step "validate",

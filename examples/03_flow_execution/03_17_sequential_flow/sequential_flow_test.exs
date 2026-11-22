@@ -1,6 +1,8 @@
 Code.require_file("sequential_flow.ex", __DIR__)
 
 defmodule Jido.Examples.Workflow.SequentialFlowTest do
+  alias Jido.Joi
+
   use Jido.Test.Agent.WorkflowSDKCase
   @moduletag :integration
 
@@ -12,7 +14,7 @@ defmodule Jido.Examples.Workflow.SequentialFlowTest do
     assert {:ok, flow} =
              Jido.Flow.new(%{
                name: "workflow_inline_reuse",
-               schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}),
+               schema: Joi.object(%{amount: Joi.integer()}),
                components: [
                  %{
                    kind: :step,

@@ -1,9 +1,12 @@
 defmodule Jido.Examples.ParallelJoin do
   @moduledoc "Two independent Flow branches join before one Agent commit."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "workflow_parallel_agent"
 
   state do
-    schema Jido.Joi.object(%{result: Jido.Joi.map() |> Jido.Joi.default(%{})})
+    schema Joi.object(%{result: Joi.map() |> Joi.default(%{})})
   end
 
   routes do
@@ -16,13 +19,15 @@ end
 defmodule Jido.Examples.ParallelJoin.Fetch do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "workflow_parallel_fetch",
     schema:
-      Jido.Joi.object(%{
-        side: Jido.Joi.enum([:left, :right]),
-        value: Jido.Joi.integer(),
-        fail: Jido.Joi.enum([:none, :left, :right])
+      Joi.object(%{
+        side: Joi.enum([:left, :right]),
+        value: Joi.integer(),
+        fail: Joi.enum([:none, :left, :right])
       })
 
   @impl true
@@ -38,16 +43,18 @@ end
 defmodule Jido.Examples.ParallelJoin.Pipeline do
   @moduledoc "Two independent reads and one join with inferred dependencies."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "workflow_parallel",
     schema:
-      Jido.Joi.object(%{
-        value: Jido.Joi.integer(),
-        fail: Jido.Joi.enum([:none, :left, :right]) |> Jido.Joi.default(:none)
+      Joi.object(%{
+        value: Joi.integer(),
+        fail: Joi.enum([:none, :left, :right]) |> Joi.default(:none)
       }),
     output_schema:
-      Jido.Joi.object(%{
-        result: Jido.Joi.object(%{left: Jido.Joi.map(), right: Jido.Joi.map()})
+      Joi.object(%{
+        result: Joi.object(%{left: Joi.map(), right: Joi.map()})
       })
 
   flow do

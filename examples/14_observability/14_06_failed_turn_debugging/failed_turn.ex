@@ -1,10 +1,12 @@
 defmodule Jido.Examples.Observability.FailedTurn.Agent do
   @moduledoc "Validates one value before it can change committed state."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "examples_observability_failed_turn_agent"
 
   state do
-    schema Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{value: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -12,7 +14,7 @@ defmodule Jido.Examples.Observability.FailedTurn.Agent do
 
     route "examples.observability.failed_turn.set", as: :set do
       action %{value: value},
-        schema: Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.min(0)}),
+        schema: Joi.object(%{value: Joi.integer() |> Joi.min(0)}),
         context: context do
         {:ok, %{context.agent_state | value: value}}
       end

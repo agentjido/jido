@@ -3,20 +3,22 @@ defmodule Jido.Examples.Collaboration.IncidentResponse.Analyst do
 end
 
 defmodule Jido.Examples.Collaboration.IncidentResponse.TriageTeam do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_incident_triage_team"
 
   state do
-    schema Jido.Joi.object(%{triaged: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{triaged: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
     route "examples.incident.triage.request" do
       action input,
         schema:
-          Jido.Joi.object(%{
-            incident_id: Jido.Joi.string(),
-            severity: Jido.Joi.string(),
-            fail_audit: Jido.Joi.boolean()
+          Joi.object(%{
+            incident_id: Joi.string(),
+            severity: Joi.string(),
+            fail_audit: Joi.boolean()
           }),
         context: context do
         completed =
@@ -44,21 +46,23 @@ defmodule Jido.Examples.Collaboration.IncidentResponse.TriageTeam do
 end
 
 defmodule Jido.Examples.Collaboration.IncidentResponse.RemediationTeam do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_incident_remediation_team"
 
   state do
-    schema Jido.Joi.object(%{contained: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{contained: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
     route "examples.incident.triage.completed" do
       action input,
         schema:
-          Jido.Joi.object(%{
-            incident_id: Jido.Joi.string(),
-            severity: Jido.Joi.string(),
-            fail_audit: Jido.Joi.boolean(),
-            finding: Jido.Joi.string()
+          Joi.object(%{
+            incident_id: Joi.string(),
+            severity: Joi.string(),
+            fail_audit: Joi.boolean(),
+            finding: Joi.string()
           }),
         context: context do
         contained =
@@ -79,21 +83,23 @@ defmodule Jido.Examples.Collaboration.IncidentResponse.RemediationTeam do
 end
 
 defmodule Jido.Examples.Collaboration.IncidentResponse.AuditTeam do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_incident_audit_team"
 
   state do
-    schema Jido.Joi.object(%{records: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])})
+    schema Joi.object(%{records: Joi.list(Joi.map()) |> Joi.default([])})
   end
 
   routes do
     route "examples.incident.triage.completed" do
       action input,
         schema:
-          Jido.Joi.object(%{
-            incident_id: Jido.Joi.string(),
-            severity: Jido.Joi.string(),
-            fail_audit: Jido.Joi.boolean(),
-            finding: Jido.Joi.string()
+          Joi.object(%{
+            incident_id: Joi.string(),
+            severity: Joi.string(),
+            fail_audit: Joi.boolean(),
+            finding: Joi.string()
           }),
         context: context do
         if input.fail_audit do
@@ -108,17 +114,19 @@ defmodule Jido.Examples.Collaboration.IncidentResponse.AuditTeam do
 end
 
 defmodule Jido.Examples.Collaboration.IncidentResponse.Coordinator do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_incident_response_coordinator"
 
   state do
-    schema Jido.Joi.object(%{
-             incident_id: Jido.Joi.string() |> Jido.Joi.default(""),
+    schema Joi.object(%{
+             incident_id: Joi.string() |> Joi.default(""),
              status:
-               Jido.Joi.enum([:idle, :triaging, :awaiting_approval, :resolved])
-               |> Jido.Joi.default(:idle),
-             severity: Jido.Joi.string() |> Jido.Joi.default(""),
-             remediation: Jido.Joi.string() |> Jido.Joi.default(""),
-             events: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])
+               Joi.enum([:idle, :triaging, :awaiting_approval, :resolved])
+               |> Joi.default(:idle),
+             severity: Joi.string() |> Joi.default(""),
+             remediation: Joi.string() |> Joi.default(""),
+             events: Joi.list(Joi.map()) |> Joi.default([])
            })
   end
 
@@ -128,10 +136,10 @@ defmodule Jido.Examples.Collaboration.IncidentResponse.Coordinator do
     route "examples.incident.reported", as: :report do
       action input,
         schema:
-          Jido.Joi.object(%{
-            incident_id: Jido.Joi.string() |> Jido.Joi.min(1),
-            severity: Jido.Joi.string() |> Jido.Joi.min(1),
-            fail_audit: Jido.Joi.boolean()
+          Joi.object(%{
+            incident_id: Joi.string() |> Joi.min(1),
+            severity: Joi.string() |> Joi.min(1),
+            fail_audit: Joi.boolean()
           }),
         context: context do
         state = context.agent_state
@@ -158,10 +166,10 @@ defmodule Jido.Examples.Collaboration.IncidentResponse.Coordinator do
     route "examples.incident.remediation.contained" do
       action input,
         schema:
-          Jido.Joi.object(%{
-            incident_id: Jido.Joi.string(),
-            action: Jido.Joi.string(),
-            finding: Jido.Joi.string()
+          Joi.object(%{
+            incident_id: Joi.string(),
+            action: Joi.string(),
+            finding: Joi.string()
           }),
         context: context do
         state = context.agent_state
@@ -182,7 +190,7 @@ defmodule Jido.Examples.Collaboration.IncidentResponse.Coordinator do
 
     route "examples.incident.approved", as: :approve do
       action %{incident_id: incident_id},
-        schema: Jido.Joi.object(%{incident_id: Jido.Joi.string()}),
+        schema: Joi.object(%{incident_id: Joi.string()}),
         context: context do
         state = context.agent_state
 

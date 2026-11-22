@@ -7,20 +7,22 @@ defmodule Jido.Examples.BurstBuncher do
   flush commits the empty buffer before it emits the batch Signal.
   """
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "examples_burst_buncher",
     description: "Collects ordered items and flushes stable batches",
     plugins: [Jido.Examples.BurstBuncher.Timer]
 
   state do
-    schema Jido.Joi.object(%{
-             buffer: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([]),
-             handled_item_ids: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
-             max_size: Jido.Joi.integer() |> Jido.Joi.min(1) |> Jido.Joi.default(3),
-             flush_delay_ms: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(50),
-             timer_generation: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(0),
-             next_batch_number: Jido.Joi.integer() |> Jido.Joi.min(1) |> Jido.Joi.default(1),
-             last_flush_reason: Jido.Joi.enum([:size, :timeout]) |> Jido.Joi.nullable() |> Jido.Joi.default(nil)
+    schema Joi.object(%{
+             buffer: Joi.list(Joi.map()) |> Joi.default([]),
+             handled_item_ids: Joi.list(Joi.string()) |> Joi.default([]),
+             max_size: Joi.integer() |> Joi.min(1) |> Joi.default(3),
+             flush_delay_ms: Joi.integer() |> Joi.min(0) |> Joi.default(50),
+             timer_generation: Joi.integer() |> Joi.min(0) |> Joi.default(0),
+             next_batch_number: Joi.integer() |> Joi.min(1) |> Joi.default(1),
+             last_flush_reason: Joi.enum([:size, :timeout]) |> Joi.nullable() |> Joi.default(nil)
            })
   end
 
@@ -30,9 +32,9 @@ defmodule Jido.Examples.BurstBuncher do
     route "examples.runtime.burst_buncher.add", as: :add_item do
       action input,
         schema:
-          Jido.Joi.object(%{
-            item_id: Jido.Joi.string() |> Jido.Joi.min(1),
-            item: Jido.Joi.any()
+          Joi.object(%{
+            item_id: Joi.string() |> Joi.min(1),
+            item: Joi.any()
           }),
         context: context do
         state = context.agent_state
@@ -86,7 +88,7 @@ defmodule Jido.Examples.BurstBuncher do
 
     route "examples.runtime.burst_buncher.flush", as: :flush do
       action %{generation: generation},
-        schema: Jido.Joi.object(%{generation: Jido.Joi.integer() |> Jido.Joi.min(0)}),
+        schema: Joi.object(%{generation: Joi.integer() |> Joi.min(0)}),
         context: context do
         state = context.agent_state
 

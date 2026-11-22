@@ -9,6 +9,8 @@ defmodule Jido.Examples.Compilation.AuthoringEquivalence.Echo do
 end
 
 defmodule Jido.Examples.Compilation.AuthoringEquivalence do
+  alias Jido.Joi
+
   use Jido.Flow, name: "example_authoring_equivalence"
 
   alias Jido.Examples.Compilation.AuthoringEquivalence.Echo
@@ -33,7 +35,7 @@ defmodule Jido.Examples.Compilation.AuthoringEquivalence do
     Jido.Catalog.from_targets!(__MODULE__, :jido, %{
       {"jido/examples/compilation/equivalent_echo", 1} => Echo,
       {"jido/examples/compilation/message", 1} => :message,
-      {"jido/examples/compilation/empty_schema", 1} => Jido.Joi.map()
+      {"jido/examples/compilation/empty_schema", 1} => Joi.map()
     })
   end
 

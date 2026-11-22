@@ -7,6 +7,8 @@ defmodule Jido.Examples.RecoverableDelivery do
   Ordinary Directives have no automatic replay guarantee.
   """
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "example_recoverable_delivery",
     plugins: [
@@ -16,7 +18,7 @@ defmodule Jido.Examples.RecoverableDelivery do
   alias Jido.Examples.RecoverableDelivery.{Confirm, Deliver}
 
   state do
-    schema Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{value: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -24,7 +26,7 @@ defmodule Jido.Examples.RecoverableDelivery do
 
     route "examples.persistence.delivery.record", as: :record_and_deliver do
       action %{effect_id: effect_id, value: value},
-        schema: Jido.Joi.object(%{effect_id: Jido.Joi.string() |> Jido.Joi.min(1), value: Jido.Joi.integer()}),
+        schema: Joi.object(%{effect_id: Joi.string() |> Joi.min(1), value: Joi.integer()}),
         context: context do
         directive = struct!(Deliver, effect_id: effect_id, value: value)
         {:ok, %{context.agent_state | value: value}, [directive]}
@@ -33,7 +35,7 @@ defmodule Jido.Examples.RecoverableDelivery do
 
     route "examples.persistence.delivery.confirm", as: :confirm_delivery do
       action %{effect_id: effect_id, value: value},
-        schema: Jido.Joi.object(%{effect_id: Jido.Joi.string() |> Jido.Joi.min(1), value: Jido.Joi.integer()}),
+        schema: Joi.object(%{effect_id: Joi.string() |> Joi.min(1), value: Joi.integer()}),
         context: context do
         confirmation = struct!(Confirm, effect_id: effect_id, value: value)
         {:ok, context.agent_state, [confirmation]}

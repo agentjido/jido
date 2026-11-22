@@ -43,25 +43,27 @@ defmodule Jido.Examples.ContextMemory.ContextAssembly.Project do
 end
 
 defmodule Jido.Examples.ContextMemory.ContextAssembly do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_context_assembly",
     schema:
-      Jido.Joi.object(%{
-        instructions: Jido.Joi.string() |> Jido.Joi.min(1),
-        request: Jido.Joi.string() |> Jido.Joi.min(1),
+      Joi.object(%{
+        instructions: Joi.string() |> Joi.min(1),
+        request: Joi.string() |> Joi.min(1),
         agent:
-          Jido.Joi.object(%{
-            name: Jido.Joi.string() |> Jido.Joi.min(1),
-            plan: Jido.Joi.string() |> Jido.Joi.min(1)
+          Joi.object(%{
+            name: Joi.string() |> Joi.min(1),
+            plan: Joi.string() |> Joi.min(1)
           }),
-        session: Jido.Joi.object(%{summary: Jido.Joi.string()}),
+        session: Joi.object(%{summary: Joi.string()}),
         resource:
-          Jido.Joi.object(%{
-            title: Jido.Joi.string() |> Jido.Joi.min(1),
-            excerpt: Jido.Joi.string()
+          Joi.object(%{
+            title: Joi.string() |> Joi.min(1),
+            excerpt: Joi.string()
           }),
-        tenant: Jido.Joi.object(%{policy: Jido.Joi.string()}),
-        cache_observation: Jido.Joi.map()
+        tenant: Joi.object(%{policy: Joi.string()}),
+        cache_observation: Joi.map()
       })
 
   flow do

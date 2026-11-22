@@ -93,13 +93,15 @@ defmodule Jido.Examples.RAG.TwoStep.CheckAnswer do
 end
 
 defmodule Jido.Examples.RAG.TwoStep do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_two_step_rag",
     schema:
-      Jido.Joi.object(%{
-        query: Jido.Joi.string() |> Jido.Joi.min(1),
-        documents: Jido.Joi.list(Jido.Joi.map()),
-        top_k: Jido.Joi.integer() |> Jido.Joi.min(1)
+      Joi.object(%{
+        query: Joi.string() |> Joi.min(1),
+        documents: Joi.list(Joi.map()),
+        top_k: Joi.integer() |> Joi.min(1)
       })
 
   alias Jido.Examples.RAG.TwoStep.{CheckAnswer, Generate, Retrieve}

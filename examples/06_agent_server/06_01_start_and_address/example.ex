@@ -1,9 +1,12 @@
 defmodule Jido.Examples.OTPSupervision.Counter do
   @moduledoc "A counter placed directly in an application supervision tree."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "otp_supervision_counter", plugins: [Jido.Plugin.Timer]
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
 
     # This standard Plugin makes Agent-owned runtime cleanup visible in the
     # process tree. This example does not schedule work.
@@ -14,7 +17,7 @@ defmodule Jido.Examples.OTPSupervision.Counter do
 
     route "examples.basic.otp_supervision.increment", as: :increment, defaults: %{amount: 1} do
       action %{amount: amount},
-        schema: Jido.Joi.object(%{amount: Jido.Joi.integer()}),
+        schema: Joi.object(%{amount: Joi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
       end

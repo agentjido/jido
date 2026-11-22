@@ -21,9 +21,12 @@ defmodule Jido.Examples.DefinitionChanges do
 
   defmodule Migrate do
     @moduledoc false
+
+    alias Jido.Joi
+
     use Jido.Action,
       name: "runtime_definition_migrate",
-      schema: Jido.Joi.object(%{state: Jido.Joi.map()})
+      schema: Joi.object(%{state: Joi.map()})
 
     @impl true
     def run(%{state: %{count: count}}, _context), do: {:ok, %{total: count + 10}}
@@ -41,10 +44,13 @@ defmodule Jido.Examples.DefinitionChanges do
 
   defmodule V1 do
     @moduledoc "The active version before the upgrade."
+
+    alias Jido.Joi
+
     use Jido.Agent, name: "runtime_definition_v1", vsn: 1
 
     state do
-      schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+      schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
     end
 
     routes do
@@ -54,10 +60,13 @@ defmodule Jido.Examples.DefinitionChanges do
 
   defmodule V2 do
     @moduledoc "The complete replacement definition."
+
+    alias Jido.Joi
+
     use Jido.Agent, name: "runtime_definition_v2", vsn: 2
 
     state do
-      schema Jido.Joi.object(%{total: Jido.Joi.integer()})
+      schema Joi.object(%{total: Joi.integer()})
     end
 
     routes do

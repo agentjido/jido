@@ -1,10 +1,12 @@
 defmodule Jido.Examples.CausalTrace.Worker do
   @moduledoc "A temporary child Agent that reports one computed value to its parent."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_causal_worker"
 
   state do
-    schema Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{value: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -13,10 +15,10 @@ defmodule Jido.Examples.CausalTrace.Worker do
     route "examples.runtime.causal_trace.compute", as: :compute do
       action input,
         schema:
-          Jido.Joi.object(%{
-            request_id: Jido.Joi.string(),
-            slot: Jido.Joi.enum([:left, :right]),
-            value: Jido.Joi.integer()
+          Joi.object(%{
+            request_id: Joi.string(),
+            slot: Joi.enum([:left, :right]),
+            value: Joi.integer()
           }),
         context: context do
         value = input.value * 2

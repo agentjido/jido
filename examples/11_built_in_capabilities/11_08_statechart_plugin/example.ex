@@ -1,6 +1,8 @@
 defmodule Jido.Examples.Statechart.Release do
   @moduledoc "Uses a chart to control release approval alongside a separate Agent route."
 
+  alias Jido.Joi
+
   defmodule Chart do
     @moduledoc "Approves a release after the review Signal reports passing checks."
 
@@ -24,7 +26,7 @@ defmodule Jido.Examples.Statechart.Release do
     plugins: [{Jido.Plugin.Statechart, %{chart: Chart}}]
 
   state do
-    schema Jido.Joi.object(%{notes: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{notes: Joi.integer() |> Joi.default(0)})
   end
 
   routes do

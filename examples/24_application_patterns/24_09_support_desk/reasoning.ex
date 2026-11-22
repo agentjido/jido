@@ -5,7 +5,9 @@ defmodule Jido.Examples.Patterns.SupportDesk.Reasoning do
   alias Jido.AI.Reasoning.Result
 
   defmodule Reject do
-    use Jido.Action, name: "examples_support_desk_reject", schema: Jido.Joi.map()
+    alias Jido.Joi
+
+    use Jido.Action, name: "examples_support_desk_reject", schema: Joi.map()
 
     @impl true
     def run(_params, %{agent_state: state}) do
@@ -14,7 +16,9 @@ defmodule Jido.Examples.Patterns.SupportDesk.Reasoning do
   end
 
   defmodule Admit do
-    use Jido.Action, name: "examples_support_desk_admit", schema: Jido.Joi.map()
+    alias Jido.Joi
+
+    use Jido.Action, name: "examples_support_desk_admit", schema: Joi.map()
 
     @impl true
     def run(%{input: input} = request, _context) when is_binary(input) do
@@ -32,7 +36,9 @@ defmodule Jido.Examples.Patterns.SupportDesk.Reasoning do
   end
 
   defmodule Expand do
-    use Jido.Action, name: "examples_support_desk_expand", schema: Jido.Joi.map()
+    alias Jido.Joi
+
+    use Jido.Action, name: "examples_support_desk_expand", schema: Joi.map()
 
     @impl true
     def run(%{request: request}, _context), do: {:continue, request, ReAct}

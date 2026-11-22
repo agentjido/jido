@@ -7,6 +7,8 @@ defmodule Jido.Examples.ManagedJobs do
   pending-job recovery example when an application must recover lost work.
   """
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "example_managed_jobs",
     plugins: [Jido.Examples.ManagedJobs.JobRuntime]
@@ -15,11 +17,11 @@ defmodule Jido.Examples.ManagedJobs do
   alias Jido.Examples.ManagedJobs.JobRuntime.{Cancel, Submit}
 
   state do
-    schema Jido.Joi.object(%{
-             job_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             seen: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
-             status: Jido.Joi.enum([:idle, :running, :completed, :failed, :cancelled]) |> Jido.Joi.default(:idle),
-             result: Jido.Joi.string() |> Jido.Joi.default("")
+    schema Joi.object(%{
+             job_id: Joi.string() |> Joi.default(""),
+             seen: Joi.list(Joi.string()) |> Joi.default([]),
+             status: Joi.enum([:idle, :running, :completed, :failed, :cancelled]) |> Joi.default(:idle),
+             result: Joi.string() |> Joi.default("")
            })
   end
 
@@ -28,7 +30,7 @@ defmodule Jido.Examples.ManagedJobs do
 
     route "examples.runtime.jobs.start", as: :start_job do
       action input,
-        schema: Jido.Joi.object(%{job_id: Jido.Joi.string() |> Jido.Joi.min(1), value: Jido.Joi.integer()}),
+        schema: Joi.object(%{job_id: Joi.string() |> Joi.min(1), value: Joi.integer()}),
         context: context do
         state = context.agent_state
 
@@ -52,7 +54,7 @@ defmodule Jido.Examples.ManagedJobs do
 
     route "examples.runtime.jobs.cancel", as: :cancel_job do
       action %{job_id: job_id},
-        schema: Jido.Joi.object(%{job_id: Jido.Joi.string()}),
+        schema: Joi.object(%{job_id: Joi.string()}),
         context: context do
         state = context.agent_state
 
@@ -67,10 +69,10 @@ defmodule Jido.Examples.ManagedJobs do
     route "examples.runtime.jobs.settle", as: :settle do
       action input,
         schema:
-          Jido.Joi.object(%{
-            job_id: Jido.Joi.string(),
-            status: Jido.Joi.enum([:completed, :failed]),
-            result: Jido.Joi.string()
+          Joi.object(%{
+            job_id: Joi.string(),
+            status: Joi.enum([:completed, :failed]),
+            result: Joi.string()
           }),
         context: context do
         state = context.agent_state

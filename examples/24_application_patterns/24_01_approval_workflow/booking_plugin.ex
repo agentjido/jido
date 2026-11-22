@@ -1,23 +1,25 @@
 defmodule Jido.Examples.ApprovalWorkflow.SubmitBooking do
   @moduledoc "A portable post-commit request owned by the application booking Plugin."
 
-  @schema Jido.Joi.struct(
+  alias Jido.Joi
+
+  @schema Joi.struct(
             __MODULE__,
             %{
-              request: Jido.Joi.map(),
-              idempotency_key: Jido.Joi.string() |> Jido.Joi.min(1)
+              request: Joi.map(),
+              idempotency_key: Joi.string() |> Joi.min(1)
             },
             coerce: true
           )
 
-  @type t :: unquote(Jido.Joi.type_spec(@schema))
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc false
   def schema, do: @schema
 
-  def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, Map.from_struct(directive))
+  def validate(%__MODULE__{} = directive), do: Joi.parse(@schema, Map.from_struct(directive))
 end
 
 defmodule Jido.Examples.ApprovalWorkflow.BookingPlugin do

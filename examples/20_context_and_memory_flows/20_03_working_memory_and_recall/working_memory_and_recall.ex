@@ -63,17 +63,19 @@ defmodule Jido.Examples.ContextMemory.WorkingMemoryRecall.Combine do
 end
 
 defmodule Jido.Examples.ContextMemory.WorkingMemoryRecall do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_working_memory_and_recall",
     schema:
-      Jido.Joi.object(%{
-        plan: Jido.Joi.string(),
-        facts: Jido.Joi.list(Jido.Joi.string()),
-        preferences: Jido.Joi.map(),
-        query: Jido.Joi.string() |> Jido.Joi.min(1),
-        scope: Jido.Joi.map(),
-        memories: Jido.Joi.list(Jido.Joi.map()),
-        limit: Jido.Joi.integer() |> Jido.Joi.min(1)
+      Joi.object(%{
+        plan: Joi.string(),
+        facts: Joi.list(Joi.string()),
+        preferences: Joi.map(),
+        query: Joi.string() |> Joi.min(1),
+        scope: Joi.map(),
+        memories: Joi.list(Joi.map()),
+        limit: Joi.integer() |> Joi.min(1)
       })
 
   alias Jido.Examples.ContextMemory.WorkingMemoryRecall.{

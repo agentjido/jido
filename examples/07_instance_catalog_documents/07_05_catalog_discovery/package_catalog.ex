@@ -1,12 +1,14 @@
 defmodule Jido.Examples.PackageCatalog.NormalizeName do
   @moduledoc "A package Action that contributes itself and its schemas."
 
+  alias Jido.Joi
+
   use Jido.Action,
     id: "examples/catalog/normalize-name",
     vsn: 1,
     name: "example_catalog_normalize_name",
-    schema: Jido.Joi.object(%{name: Jido.Joi.string()}),
-    output_schema: Jido.Joi.object(%{name: Jido.Joi.string()})
+    schema: Joi.object(%{name: Joi.string()}),
+    output_schema: Joi.object(%{name: Joi.string()})
 
   @impl true
   def run(%{name: name}, _context), do: {:ok, %{name: name |> String.trim() |> String.downcase()}}

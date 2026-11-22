@@ -3,13 +3,15 @@ Code.require_file("agent_live_debugger.ex", __DIR__)
 defmodule Jido.Test.Examples.Runtime.InspectionFixture do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "test_runtime_inspection", plugins: [Jido.Plugin.Timer]
 
   state do
-    schema Jido.Joi.object(%{
-             status: Jido.Joi.string() |> Jido.Joi.default("idle"),
-             secret_token: Jido.Joi.string() |> Jido.Joi.default("hidden"),
-             result: Jido.Joi.string() |> Jido.Joi.default("")
+    schema Joi.object(%{
+             status: Joi.string() |> Joi.default("idle"),
+             secret_token: Joi.string() |> Joi.default("hidden"),
+             result: Joi.string() |> Joi.default("")
            })
   end
 
@@ -18,7 +20,7 @@ defmodule Jido.Test.Examples.Runtime.InspectionFixture do
 
     route "test.runtime.inspect", as: :record_result do
       action %{result: result},
-        schema: Jido.Joi.object(%{result: Jido.Joi.string()}),
+        schema: Joi.object(%{result: Joi.string()}),
         context: context do
         Jido.Test.AgentServer.RuntimeBarrier.wait()
         {:ok, %{context.agent_state | status: "complete", result: result}}

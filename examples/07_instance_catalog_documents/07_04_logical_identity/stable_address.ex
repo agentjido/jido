@@ -5,13 +5,16 @@ defmodule Jido.Examples.StableAddress do
   Each operation resolves the current Agent Server process. Application code
   keeps the Address and does not keep a process identifier.
   """
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "runtime_stable_address"
 
   alias Jido.Agent.Address
   alias Jido.Signal
 
   state do
-    schema Jido.Joi.object(%{messages: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+    schema Joi.object(%{messages: Joi.list(Joi.string()) |> Joi.default([])})
   end
 
   routes do
@@ -19,7 +22,7 @@ defmodule Jido.Examples.StableAddress do
 
     route "examples.runtime.stable_address.append", as: :append do
       action %{text: text},
-        schema: Jido.Joi.object(%{text: Jido.Joi.string()}),
+        schema: Joi.object(%{text: Joi.string()}),
         context: context do
         {:ok, %{context.agent_state | messages: context.agent_state.messages ++ [text]}}
       end

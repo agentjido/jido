@@ -1,23 +1,25 @@
 defmodule Jido.Examples.DirectiveAgent.Record do
   @moduledoc false
 
-  @schema Jido.Joi.struct(
+  alias Jido.Joi
+
+  @schema Joi.struct(
             __MODULE__,
             %{
-              label: Jido.Joi.string() |> Jido.Joi.min(1),
-              fail?: Jido.Joi.boolean() |> Jido.Joi.default(false)
+              label: Joi.string() |> Joi.min(1),
+              fail?: Joi.boolean() |> Joi.default(false)
             },
             coerce: true
           )
 
-  @type t :: unquote(Jido.Joi.type_spec(@schema))
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   def schema, do: @schema
 
   def validate(%__MODULE__{} = directive) do
-    case Jido.Joi.parse(@schema, Map.from_struct(directive)) do
+    case Joi.parse(@schema, Map.from_struct(directive)) do
       {:ok, validated} -> {:ok, validated}
       {:error, errors} -> {:error, Jido.Error.validation_error("invalid record", details: errors)}
     end

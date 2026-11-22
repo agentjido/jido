@@ -1,22 +1,24 @@
 defmodule Jido.Examples.Operations.CredentialPreflight do
   @moduledoc "Checks credential availability without returning credential material."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "operations_credential_preflight",
     schema:
-      Jido.Joi.object(
+      Joi.object(
         %{
-          provider: Jido.Joi.enum([:example_ai]),
-          tenant: Jido.Joi.string()
+          provider: Joi.enum([:example_ai]),
+          tenant: Joi.string()
         },
         unrecognized_keys: :error
       ),
     output_schema:
-      Jido.Joi.object(%{
-        provider: Jido.Joi.string(),
-        tenant: Jido.Joi.string(),
-        ready: Jido.Joi.boolean(),
-        reason: Jido.Joi.string() |> Jido.Joi.nullable()
+      Joi.object(%{
+        provider: Joi.string(),
+        tenant: Joi.string(),
+        ready: Joi.boolean(),
+        reason: Joi.string() |> Joi.nullable()
       })
 
   @impl true

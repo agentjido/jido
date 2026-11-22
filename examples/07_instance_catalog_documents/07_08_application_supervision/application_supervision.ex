@@ -1,10 +1,12 @@
 defmodule Jido.Examples.ApplicationSupervision.InstalledAgent do
   @moduledoc "An installed Agent definition started by application bootstrap."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "application_supervision_installed_agent"
 
   state do
-    schema Jido.Joi.object(%{ready: Jido.Joi.boolean() |> Jido.Joi.default(true)})
+    schema Joi.object(%{ready: Joi.boolean() |> Joi.default(true)})
   end
 end
 

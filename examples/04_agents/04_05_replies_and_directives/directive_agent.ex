@@ -6,12 +6,14 @@ defmodule Jido.Examples.DirectiveAgent do
   supervised runtime. Invalid and failing batches test the commit boundary.
   """
 
+  alias Jido.Joi
+
   alias Jido.Examples.DirectiveAgent.{Effects, Record}
 
   use Jido.Agent, name: "basic_sdk_directives", plugins: [Effects]
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -20,9 +22,9 @@ defmodule Jido.Examples.DirectiveAgent do
     route "basic.directive.set_count", as: :set_count do
       action %{count: count, batch: batch},
         schema:
-          Jido.Joi.object(%{
-            count: Jido.Joi.integer(),
-            batch: Jido.Joi.enum([:valid, :invalid, :dispatch_failure])
+          Joi.object(%{
+            count: Joi.integer(),
+            batch: Joi.enum([:valid, :invalid, :dispatch_failure])
           }),
         context: context do
         second =

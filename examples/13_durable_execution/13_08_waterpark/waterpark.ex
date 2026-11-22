@@ -1,14 +1,16 @@
 defmodule Jido.Examples.Durable.Waterpark.Guest do
   @moduledoc "A durable park guest that is addressed only by Agent Address."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "waterpark_guest"
 
   state do
-    schema Jido.Joi.object(%{
-             visits: Jido.Joi.integer() |> Jido.Joi.default(0),
+    schema Joi.object(%{
+             visits: Joi.integer() |> Joi.default(0),
              status:
-               Jido.Joi.enum([:idle, :approved, :timer_done])
-               |> Jido.Joi.default(:idle)
+               Joi.enum([:idle, :approved, :timer_done])
+               |> Joi.default(:idle)
            })
   end
 
@@ -29,9 +31,11 @@ end
 defmodule Jido.Examples.Durable.Waterpark.Approval do
   @moduledoc "Waits for one matching approval Signal."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "waterpark_approval",
-    schema: Jido.Joi.object(%{request_id: Jido.Joi.string()})
+    schema: Joi.object(%{request_id: Joi.string()})
 
   flow do
     await "approved",

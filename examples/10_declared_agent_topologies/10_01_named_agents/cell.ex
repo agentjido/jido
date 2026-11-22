@@ -1,14 +1,17 @@
 defmodule Jido.Examples.Topology.Independent.Cell do
   @moduledoc "A small Agent for topology startup, ownership, and Bus examples."
+
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "topology_independent_cell",
     plugins: [{Jido.Plugin.Timer, %{retry_delay_ms: 25}}]
 
   state do
-    schema Jido.Joi.object(%{
-             label: Jido.Joi.string() |> Jido.Joi.default("cell"),
-             received: Jido.Joi.integer() |> Jido.Joi.default(0),
-             total: Jido.Joi.integer() |> Jido.Joi.default(0)
+    schema Joi.object(%{
+             label: Joi.string() |> Joi.default("cell"),
+             received: Joi.integer() |> Joi.default(0),
+             total: Joi.integer() |> Joi.default(0)
            })
   end
 
@@ -17,7 +20,7 @@ defmodule Jido.Examples.Topology.Independent.Cell do
 
     route "examples.topology.cell.schedule", as: :schedule do
       action %{value: value},
-        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+        schema: Joi.object(%{value: Joi.integer()}),
         context: context do
         {:ok, signal} = Jido.Examples.Topology.Independent.Cell.work_signal(%{value: value})
         {:ok, context.agent_state, [Jido.Plugin.Timer.schedule(0, signal)]}
@@ -26,7 +29,7 @@ defmodule Jido.Examples.Topology.Independent.Cell do
 
     route "examples.topology.cell.work", as: :work do
       action %{value: value},
-        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+        schema: Joi.object(%{value: Joi.integer()}),
         context: context do
         {:ok,
          %{

@@ -1,9 +1,12 @@
 defmodule Jido.Examples.BoundedIteration do
   @moduledoc "Local repair state is separate from the Agent's committed state."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "workflow_iteration_agent"
 
   state do
-    schema Jido.Joi.object(%{result: Jido.Joi.map() |> Jido.Joi.default(%{})})
+    schema Joi.object(%{result: Joi.map() |> Joi.default(%{})})
   end
 
   routes do
@@ -26,23 +29,25 @@ end
 defmodule Jido.Examples.BoundedIteration.Pipeline do
   @moduledoc "A while loop validates each replacement state and permits at most three repairs."
 
-  @state_schema Jido.Joi.object(%{
-                  missing: Jido.Joi.integer() |> Jido.Joi.min(0),
-                  repairs: Jido.Joi.integer() |> Jido.Joi.min(0)
+  alias Jido.Joi
+
+  @state_schema Joi.object(%{
+                  missing: Joi.integer() |> Joi.min(0),
+                  repairs: Joi.integer() |> Joi.min(0)
                 })
 
   use Jido.Flow,
     name: "workflow_iteration",
     schema:
-      Jido.Joi.object(%{
-        missing: Jido.Joi.integer() |> Jido.Joi.min(0),
-        repair_size: Jido.Joi.integer() |> Jido.Joi.min(1) |> Jido.Joi.default(1)
+      Joi.object(%{
+        missing: Joi.integer() |> Joi.min(0),
+        repair_size: Joi.integer() |> Joi.min(1) |> Joi.default(1)
       }),
     output_schema:
-      Jido.Joi.object(%{
+      Joi.object(%{
         result:
-          Jido.Joi.object(%{
-            iterations: Jido.Joi.integer() |> Jido.Joi.min(0),
+          Joi.object(%{
+            iterations: Joi.integer() |> Joi.min(0),
             state: @state_schema
           })
       })

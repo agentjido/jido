@@ -24,16 +24,19 @@ end
 
 defmodule Jido.Examples.Plugins.PreparedInput.Agent do
   @moduledoc "Uses portable data prepared from the unchanged source Signal."
+
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "plugin_prepared_input_agent",
     plugins: [{Jido.Examples.Plugins.PreparedInput.Plugin, %{subject_prefix: "tenant/"}}]
 
   state do
-    schema Jido.Joi.object(%{
-             accepted: Jido.Joi.integer() |> Jido.Joi.default(0),
-             last_signal_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             last_subject: Jido.Joi.string() |> Jido.Joi.default(""),
-             tenant: Jido.Joi.string() |> Jido.Joi.default("")
+    schema Joi.object(%{
+             accepted: Joi.integer() |> Joi.default(0),
+             last_signal_id: Joi.string() |> Joi.default(""),
+             last_subject: Joi.string() |> Joi.default(""),
+             tenant: Joi.string() |> Joi.default("")
            })
   end
 
@@ -41,7 +44,7 @@ defmodule Jido.Examples.Plugins.PreparedInput.Agent do
     signal_source "/examples/plugins/prepared_input"
 
     route "examples.plugins.prepared_input.accept" do
-      action _input, schema: Jido.Joi.object(%{}), context: context do
+      action _input, schema: Joi.object(%{}), context: context do
         prepared = context.plugin_inputs[Jido.Examples.Plugins.PreparedInput.Plugin].prepared
 
         {:ok,

@@ -7,9 +7,12 @@ defmodule Jido.Examples.Heartbeat do
 
   defmodule Record do
     @moduledoc false
+
+    alias Jido.Joi
+
     use Jido.Action,
       name: "runtime_heartbeat_record",
-      schema: Jido.Joi.object(%{kind: Jido.Joi.string() |> Jido.Joi.min(1)})
+      schema: Joi.object(%{kind: Joi.string() |> Joi.min(1)})
 
     def run(input, context) do
       event = %{
@@ -24,12 +27,15 @@ defmodule Jido.Examples.Heartbeat do
 
   defmodule DefaultAgent do
     @moduledoc "Receives the default Heartbeat Signal."
+
+    alias Jido.Joi
+
     use Jido.Agent,
       name: "runtime_heartbeat_default_agent",
       plugins: [{Timer, %{interval: 20, signal_data: %{kind: "default"}}}]
 
     state do
-      schema Jido.Joi.object(%{events: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])})
+      schema Joi.object(%{events: Joi.list(Joi.map()) |> Joi.default([])})
     end
 
     routes do
@@ -39,6 +45,9 @@ defmodule Jido.Examples.Heartbeat do
 
   defmodule CustomAgent do
     @moduledoc "Receives one application-defined Heartbeat Signal."
+
+    alias Jido.Joi
+
     use Jido.Agent,
       name: "runtime_heartbeat_custom_agent",
       plugins: [
@@ -52,7 +61,7 @@ defmodule Jido.Examples.Heartbeat do
       ]
 
     state do
-      schema Jido.Joi.object(%{events: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])})
+      schema Joi.object(%{events: Joi.list(Joi.map()) |> Joi.default([])})
     end
 
     routes do

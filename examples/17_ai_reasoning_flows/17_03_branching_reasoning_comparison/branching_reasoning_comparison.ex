@@ -1,13 +1,15 @@
 defmodule Jido.Examples.AI.Reasoning.BranchingComparison do
   @moduledoc "Runs Tree of Thoughts and Graph of Thoughts over one input."
 
+  alias Jido.Joi
+
   alias Jido.AI.Reasoning.{GraphOfThoughts, TreeOfThoughts}
 
   use Jido.Flow,
     name: "examples_ai_branching_reasoning_comparison",
     schema:
-      Jido.Joi.object(
-        %{input: Jido.Joi.string()},
+      Joi.object(
+        %{input: Joi.string()},
         unrecognized_keys: :error
       )
 

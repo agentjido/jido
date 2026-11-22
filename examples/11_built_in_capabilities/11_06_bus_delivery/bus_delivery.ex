@@ -5,6 +5,9 @@ defmodule Jido.Examples.BusDelivery do
   The Bus and its cursor are local memory; this does not prove disk durability.
   The Agent owns the Bus Manager before it starts the durable Client.
   """
+
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "example_bus_delivery",
     plugins: [
@@ -20,9 +23,9 @@ defmodule Jido.Examples.BusDelivery do
     ]
 
   state do
-    schema Jido.Joi.object(%{
-             seen: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
-             values: Jido.Joi.list(Jido.Joi.integer()) |> Jido.Joi.default([])
+    schema Joi.object(%{
+             seen: Joi.list(Joi.string()) |> Joi.default([]),
+             values: Joi.list(Joi.integer()) |> Joi.default([])
            })
   end
 
@@ -31,7 +34,7 @@ defmodule Jido.Examples.BusDelivery do
 
     route "examples.runtime.bus_delivery.record", as: :record do
       action %{value: value},
-        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+        schema: Joi.object(%{value: Joi.integer()}),
         context: context do
         state = context.agent_state
         signal_id = context.signal.id

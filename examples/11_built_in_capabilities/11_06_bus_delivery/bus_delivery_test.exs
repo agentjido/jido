@@ -3,6 +3,8 @@ Code.require_file("bus_delivery.ex", __DIR__)
 defmodule Jido.Test.Examples.Runtime.BusDeliveryFixture do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "test_bus_delivery",
     plugins: [
@@ -18,9 +20,9 @@ defmodule Jido.Test.Examples.Runtime.BusDeliveryFixture do
     ]
 
   state do
-    schema Jido.Joi.object(%{
-             seen: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
-             values: Jido.Joi.list(Jido.Joi.integer()) |> Jido.Joi.default([])
+    schema Joi.object(%{
+             seen: Joi.list(Joi.string()) |> Joi.default([]),
+             values: Joi.list(Joi.integer()) |> Joi.default([])
            })
   end
 
@@ -29,7 +31,7 @@ defmodule Jido.Test.Examples.Runtime.BusDeliveryFixture do
 
     route "examples.runtime.bus_delivery.record", as: :record do
       action %{value: value},
-        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+        schema: Joi.object(%{value: Joi.integer()}),
         context: context do
         context.plugin_inputs[Jido.Test.Agent.FeatureObserver].runtime.on_delivery.(%{
           value: value

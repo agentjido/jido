@@ -1,12 +1,14 @@
 defmodule Jido.Examples.Observability.RuntimeTimeline.Agent do
   @moduledoc "Waits for one matching release Signal."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "examples_observability_runtime_timeline_agent"
 
   state do
-    schema Jido.Joi.object(%{
-             request_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             status: Jido.Joi.enum([:idle, :completed]) |> Jido.Joi.default(:idle)
+    schema Joi.object(%{
+             request_id: Joi.string() |> Joi.default(""),
+             status: Joi.enum([:idle, :completed]) |> Joi.default(:idle)
            })
   end
 
@@ -31,9 +33,11 @@ end
 defmodule Jido.Examples.Observability.RuntimeTimeline.ReleaseFlow do
   @moduledoc "Keeps the wait and completion in one Turn."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "examples_observability_runtime_timeline_release",
-    schema: Jido.Joi.object(%{request_id: Jido.Joi.string() |> Jido.Joi.min(1)})
+    schema: Joi.object(%{request_id: Joi.string() |> Joi.min(1)})
 
   flow do
     step "request", request <- input() do

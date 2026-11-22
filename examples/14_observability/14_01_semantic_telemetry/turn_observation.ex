@@ -6,12 +6,14 @@ defmodule Jido.Examples.TurnObservation do
   public SDK events and filters them by Agent ID.
   """
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_turn_observation"
 
   state do
-    schema Jido.Joi.object(%{
-             value: Jido.Joi.integer() |> Jido.Joi.default(0),
-             secret: Jido.Joi.string() |> Jido.Joi.default("private-agent-state")
+    schema Joi.object(%{
+             value: Joi.integer() |> Joi.default(0),
+             secret: Joi.string() |> Joi.default("private-agent-state")
            })
   end
 
@@ -20,7 +22,7 @@ defmodule Jido.Examples.TurnObservation do
 
     route "examples.runtime.observation.record", as: :record do
       action %{value: value},
-        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+        schema: Joi.object(%{value: Joi.integer()}),
         context: context do
         {:ok, %{context.agent_state | value: value}}
       end
@@ -28,7 +30,7 @@ defmodule Jido.Examples.TurnObservation do
 
     route "examples.runtime.observation.missing_child", as: :send_to_missing_child do
       action %{value: value},
-        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+        schema: Joi.object(%{value: Joi.integer()}),
         context: _context do
         {:error, Jido.Error.validation_error("delivery target is not available", %{value: value})}
       end

@@ -1,18 +1,20 @@
 defmodule Jido.Examples.StartHere.ObservedExpense do
   @moduledoc "Waits for an expense decision and emits one post-commit notification."
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "start_here_observed_expense",
     description: "Exposes one complete AgentServer lifecycle",
     plugins: [Jido.Examples.StartHere.ExpenseNotifications]
 
   state do
-    schema Jido.Joi.object(%{
-             report_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             amount_cents: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(0),
+    schema Joi.object(%{
+             report_id: Joi.string() |> Joi.default(""),
+             amount_cents: Joi.integer() |> Joi.min(0) |> Joi.default(0),
              status:
-               Jido.Joi.enum([:draft, :approved, :rejected, :expired])
-               |> Jido.Joi.default(:draft)
+               Joi.enum([:draft, :approved, :rejected, :expired])
+               |> Joi.default(:draft)
            })
   end
 
@@ -37,14 +39,16 @@ end
 defmodule Jido.Examples.StartHere.ObservedExpense.Approval do
   @moduledoc false
 
+  alias Jido.Joi
+
   alias Jido.Examples.StartHere.ExpenseNotification
 
   use Jido.Flow,
     name: "start_here_observed_expense_approval",
     schema:
-      Jido.Joi.object(%{
-        report_id: Jido.Joi.string() |> Jido.Joi.min(1),
-        amount_cents: Jido.Joi.integer() |> Jido.Joi.min(1)
+      Joi.object(%{
+        report_id: Joi.string() |> Joi.min(1),
+        amount_cents: Joi.integer() |> Joi.min(1)
       })
 
   flow do

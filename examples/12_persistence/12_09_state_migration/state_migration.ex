@@ -1,17 +1,19 @@
 defmodule Jido.Examples.StateMigration do
   @moduledoc "Migrates one portable wallet snapshot while the Agent is inactive."
 
+  alias Jido.Joi
+
   defmodule WalletV1ToV2 do
     @moduledoc "Converts a version 1 wallet snapshot to version 2."
     use Jido.Action,
       name: "wallet_v1_to_v2"
 
-    @schema Jido.Joi.object(%{
+    @schema Joi.object(%{
               wallet:
-                Jido.Joi.object(%{
-                  format: Jido.Joi.literal(2),
-                  amount: Jido.Joi.integer(),
-                  currency: Jido.Joi.enum(["USD", "EUR"])
+                Joi.object(%{
+                  format: Joi.literal(2),
+                  amount: Joi.integer(),
+                  currency: Joi.enum(["USD", "EUR"])
                 })
             })
 
@@ -43,10 +45,10 @@ defmodule Jido.Examples.StateMigration do
   use Jido.Agent, name: "runtime_wallet", vsn: 1
 
   state do
-    schema Jido.Joi.object(%{
+    schema Joi.object(%{
              wallet:
-               Jido.Joi.object(%{format: Jido.Joi.literal(1), balance: Jido.Joi.integer()})
-               |> Jido.Joi.default(%{format: 1, balance: 100})
+               Joi.object(%{format: Joi.literal(1), balance: Joi.integer()})
+               |> Joi.default(%{format: 1, balance: 100})
            })
   end
 end

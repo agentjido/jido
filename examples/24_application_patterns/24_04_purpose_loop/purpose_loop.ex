@@ -1,28 +1,31 @@
 defmodule Jido.Examples.Applications.PurposeLoop.Agent do
   @moduledoc "Runs bounded scheduled work and supports pause, resume, and drain controls."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "application_purpose_loop_agent", plugins: [Jido.Plugin.Timer]
 
   alias Jido.Examples.Applications.PurposeLoop.State
 
   state do
-    schema Jido.Joi.object(%{
-             purpose: Jido.Joi.string() |> Jido.Joi.default(""),
+    schema Joi.object(%{
+             purpose: Joi.string() |> Joi.default(""),
              phase:
-               Jido.Joi.enum([:new, :running, :idle, :paused, :draining, :drained, :exhausted])
-               |> Jido.Joi.default(:new),
-             generation: Jido.Joi.integer() |> Jido.Joi.default(0),
-             next_sequence: Jido.Joi.integer() |> Jido.Joi.default(0),
-             remaining: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
-             completed: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
-             last_completed: Jido.Joi.string() |> Jido.Joi.default(""),
-             budget: Jido.Joi.integer() |> Jido.Joi.default(0),
-             budget_remaining: Jido.Joi.integer() |> Jido.Joi.default(0),
-             turns: Jido.Joi.integer() |> Jido.Joi.default(0),
-             idle_ticks: Jido.Joi.integer() |> Jido.Joi.default(0),
-             ignored_ticks: Jido.Joi.integer() |> Jido.Joi.default(0),
-             rejected_work: Jido.Joi.integer() |> Jido.Joi.default(0),
-             work_delay_ms: Jido.Joi.integer() |> Jido.Joi.default(20),
-             idle_delay_ms: Jido.Joi.integer() |> Jido.Joi.default(100)
+               Joi.enum([:new, :running, :idle, :paused, :draining, :drained, :exhausted])
+               |> Joi.default(:new),
+             generation: Joi.integer() |> Joi.default(0),
+             next_sequence: Joi.integer() |> Joi.default(0),
+             remaining: Joi.list(Joi.string()) |> Joi.default([]),
+             completed: Joi.list(Joi.string()) |> Joi.default([]),
+             last_completed: Joi.string() |> Joi.default(""),
+             budget: Joi.integer() |> Joi.default(0),
+             budget_remaining: Joi.integer() |> Joi.default(0),
+             turns: Joi.integer() |> Joi.default(0),
+             idle_ticks: Joi.integer() |> Joi.default(0),
+             ignored_ticks: Joi.integer() |> Joi.default(0),
+             rejected_work: Joi.integer() |> Joi.default(0),
+             work_delay_ms: Joi.integer() |> Joi.default(20),
+             idle_delay_ms: Joi.integer() |> Joi.default(100)
            })
   end
 
@@ -32,12 +35,12 @@ defmodule Jido.Examples.Applications.PurposeLoop.Agent do
     route "examples.applications.purpose_loop.start" do
       action input,
         schema:
-          Jido.Joi.object(%{
-            purpose: Jido.Joi.string() |> Jido.Joi.min(1),
-            work: Jido.Joi.list(Jido.Joi.string()),
-            work_delay_ms: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.optional(),
-            idle_delay_ms: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.optional(),
-            budget: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.optional()
+          Joi.object(%{
+            purpose: Joi.string() |> Joi.min(1),
+            work: Joi.list(Joi.string()),
+            work_delay_ms: Joi.integer() |> Joi.min(0) |> Joi.optional(),
+            idle_delay_ms: Joi.integer() |> Joi.min(0) |> Joi.optional(),
+            budget: Joi.integer() |> Joi.min(0) |> Joi.optional()
           }),
         context: context do
         State.start(input, context.agent_state)
@@ -46,7 +49,7 @@ defmodule Jido.Examples.Applications.PurposeLoop.Agent do
 
     route "examples.applications.purpose_loop.tick" do
       action input,
-        schema: Jido.Joi.object(%{generation: Jido.Joi.integer(), sequence: Jido.Joi.integer()}),
+        schema: Joi.object(%{generation: Joi.integer(), sequence: Joi.integer()}),
         context: context do
         State.tick(input, context.agent_state)
       end
@@ -54,7 +57,7 @@ defmodule Jido.Examples.Applications.PurposeLoop.Agent do
 
     route "examples.applications.purpose_loop.enqueue" do
       action input,
-        schema: Jido.Joi.object(%{work: Jido.Joi.list(Jido.Joi.string())}),
+        schema: Joi.object(%{work: Joi.list(Joi.string())}),
         context: context do
         State.enqueue(input, context.agent_state)
       end

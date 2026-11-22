@@ -1,16 +1,21 @@
 defmodule Jido.Examples.Plugins.StateMiddleware.Note do
   @moduledoc "A validated fact that the state middleware records."
+
+  alias Jido.Joi
+
   use Jido.Agent.Directive
 
-  @schema Jido.Joi.struct(__MODULE__, %{label: Jido.Joi.string() |> Jido.Joi.min(1)}, coerce: true)
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  @schema Joi.struct(__MODULE__, %{label: Joi.string() |> Joi.min(1)}, coerce: true)
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   def schema, do: @schema
 end
 
 defmodule Jido.Examples.Plugins.StateMiddleware.Plugin do
   @moduledoc "Observes each successful candidate and reduces one owned audit field."
+
+  alias Jido.Joi
 
   use Jido.Plugin
 
@@ -20,13 +25,13 @@ defmodule Jido.Examples.Plugins.StateMiddleware.Plugin do
   @impl true
   def state_spec(_opts) do
     {:audit,
-     Jido.Joi.object(%{
-       count_after: Jido.Joi.integer(),
-       count_before: Jido.Joi.integer(),
-       label: Jido.Joi.string(),
-       turns: Jido.Joi.integer() |> Jido.Joi.min(0)
+     Joi.object(%{
+       count_after: Joi.integer(),
+       count_before: Joi.integer(),
+       label: Joi.string(),
+       turns: Joi.integer() |> Joi.min(0)
      })
-     |> Jido.Joi.default(%{count_after: 0, count_before: 0, label: "", turns: 0})}
+     |> Joi.default(%{count_after: 0, count_before: 0, label: "", turns: 0})}
   end
 
   @impl true
@@ -56,12 +61,15 @@ end
 
 defmodule Jido.Examples.Plugins.StateMiddleware.Agent do
   @moduledoc "Changes domain state while a Plugin reduces its separate owned field."
+
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "plugin_state_middleware_agent",
     plugins: [Jido.Examples.Plugins.StateMiddleware.Plugin]
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -69,7 +77,7 @@ defmodule Jido.Examples.Plugins.StateMiddleware.Agent do
 
     route "examples.plugins.state_middleware.add" do
       action %{amount: amount, label: label},
-        schema: Jido.Joi.object(%{amount: Jido.Joi.integer(), label: Jido.Joi.string() |> Jido.Joi.min(1)}),
+        schema: Joi.object(%{amount: Joi.integer(), label: Joi.string() |> Joi.min(1)}),
         context: context do
         next_state = %{context.agent_state | count: context.agent_state.count + amount}
         note = %Jido.Examples.Plugins.StateMiddleware.Note{label: label}

@@ -1,15 +1,18 @@
 defmodule Jido.Examples.Topology.PipelineWorker do
   @moduledoc "Commits the work result and explicitly emits completion."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "topology_pipeline_worker"
 
   state do
-    schema Jido.Joi.object(%{total: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{total: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
     route "examples.topology.pipeline.request" do
       action %{value: value},
-        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+        schema: Joi.object(%{value: Joi.integer()}),
         context: context do
         output =
           Jido.Signal.new!("examples.topology.pipeline.completed", %{value: value * 2},

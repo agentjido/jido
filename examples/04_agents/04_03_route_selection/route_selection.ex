@@ -1,11 +1,13 @@
 defmodule Jido.Examples.RouteSelection do
   @moduledoc "Shows route declaration order with exact, wildcard, and fallback routes."
 
+  alias Jido.Joi
+
   defmodule Record do
     @moduledoc "Stores the selected handler name."
     use Jido.Action,
       name: "basic_route_selection_record",
-      schema: Jido.Joi.object(%{handler: Jido.Joi.string()})
+      schema: Joi.object(%{handler: Joi.string()})
 
     def run(%{handler: handler}, %{agent_state: state}),
       do: {:ok, %{state | handler: handler}}
@@ -16,7 +18,7 @@ defmodule Jido.Examples.RouteSelection do
   alias __MODULE__.Record
 
   state do
-    schema Jido.Joi.object(%{handler: Jido.Joi.string() |> Jido.Joi.default("")})
+    schema Joi.object(%{handler: Joi.string() |> Joi.default("")})
   end
 
   routes do
@@ -45,17 +47,20 @@ end
 
 defmodule Jido.Examples.RouteSelection.Strict do
   @moduledoc "Has no fallback route, so unmatched input returns an unmatched_input error."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "basic_strict_route_selection"
 
   state do
-    schema Jido.Joi.object(%{handled: Jido.Joi.boolean() |> Jido.Joi.default(false)})
+    schema Joi.object(%{handled: Joi.boolean() |> Joi.default(false)})
   end
 
   routes do
     signal_source "/examples/basic/route_selection"
 
     route "examples.basic.route_selection.order.create" do
-      action _input, schema: Jido.Joi.object(%{}), context: context do
+      action _input, schema: Joi.object(%{}), context: context do
         {:ok, %{context.agent_state | handled: true}}
       end
     end

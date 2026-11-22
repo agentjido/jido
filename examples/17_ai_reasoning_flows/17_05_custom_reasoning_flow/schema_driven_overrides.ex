@@ -1,20 +1,22 @@
 defmodule Jido.Examples.AI.SchemaOverrides.Reasoning do
   @moduledoc "A small reasoning Flow with application-defined input fields."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     id: "jido.ai/examples/reasoning/schema-overrides",
     vsn: 1,
     name: "schema_driven_overrides",
     schema:
-      Jido.Joi.object(
+      Joi.object(
         %{
-          input: Jido.Joi.string(),
-          greeting: Jido.Joi.string() |> Jido.Joi.default("Hello"),
-          punctuation: Jido.Joi.string() |> Jido.Joi.default(".")
+          input: Joi.string(),
+          greeting: Joi.string() |> Joi.default("Hello"),
+          punctuation: Joi.string() |> Joi.default(".")
         },
         unrecognized_keys: :error
       ),
-    output_schema: Jido.Joi.object(%{state: Jido.Joi.map(), response: Jido.Joi.map()})
+    output_schema: Joi.object(%{state: Joi.map(), response: Joi.map()})
 
   flow do
     step "answer",

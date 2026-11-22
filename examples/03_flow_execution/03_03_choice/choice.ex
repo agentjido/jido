@@ -6,9 +6,11 @@ defmodule Jido.Examples.Execution.Choice.Label do
 end
 
 defmodule Jido.Examples.Execution.Choice do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_exec_choice",
-    schema: Jido.Joi.object(%{score: Jido.Joi.integer()})
+    schema: Joi.object(%{score: Joi.integer()})
 
   alias Jido.Examples.Execution.Choice.Label
 

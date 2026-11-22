@@ -1,13 +1,15 @@
 defmodule Jido.Examples.RAG.Agentic.LookupPolicy do
+  alias Jido.Joi
+
   use Jido.Action,
     name: "rag_lookup_policy",
     description: "Retrieve policy evidence for one query.",
-    schema: Jido.Joi.object(%{query: Jido.Joi.string() |> Jido.Joi.min(1)}),
+    schema: Joi.object(%{query: Joi.string() |> Joi.min(1)}),
     output_schema:
-      Jido.Joi.object(%{
-        source_id: Jido.Joi.string(),
-        revision: Jido.Joi.integer(),
-        text: Jido.Joi.string()
+      Joi.object(%{
+        source_id: Joi.string(),
+        revision: Joi.integer(),
+        text: Joi.string()
       })
 
   @impl true

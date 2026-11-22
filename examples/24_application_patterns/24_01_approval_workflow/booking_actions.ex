@@ -1,13 +1,15 @@
 defmodule Jido.Examples.ApprovalWorkflow.SelectFare do
   @moduledoc "Selects one current fare for later approval."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_flight_booking_select",
     schema:
-      Jido.Joi.object(%{
-        option_id: Jido.Joi.string() |> Jido.Joi.min(1),
-        search_revision: Jido.Joi.integer() |> Jido.Joi.min(1),
-        passenger_ref: Jido.Joi.string() |> Jido.Joi.min(1)
+      Joi.object(%{
+        option_id: Joi.string() |> Joi.min(1),
+        search_revision: Joi.integer() |> Joi.min(1),
+        passenger_ref: Joi.string() |> Joi.min(1)
       })
 
   alias Jido.Error
@@ -49,9 +51,11 @@ end
 defmodule Jido.Examples.ApprovalWorkflow.ApproveBooking do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_flight_booking_approve",
-    schema: Jido.Joi.object(%{})
+    schema: Joi.object(%{})
 
   alias Jido.Error
   alias Jido.Examples.ApprovalWorkflow.BookingPlugin
@@ -84,7 +88,7 @@ defmodule Jido.Examples.ApprovalWorkflow.ApproveBooking do
   end
 
   defp booking_adapter(context) do
-    case Jido.Joi.parse(Jido.Joi.tuple({Jido.Joi.atom(), Jido.Joi.any()}), Map.get(context, :booking_adapter)) do
+    case Joi.parse(Joi.tuple({Joi.atom(), Joi.any()}), Map.get(context, :booking_adapter)) do
       {:ok, adapter} ->
         {:ok, adapter}
 
@@ -97,12 +101,14 @@ end
 defmodule Jido.Examples.ApprovalWorkflow.BookingSucceeded do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_flight_booking_succeeded",
     schema:
-      Jido.Joi.object(%{
-        booking_key: Jido.Joi.string() |> Jido.Joi.min(1),
-        booking_id: Jido.Joi.string() |> Jido.Joi.min(1)
+      Joi.object(%{
+        booking_key: Joi.string() |> Joi.min(1),
+        booking_id: Joi.string() |> Joi.min(1)
       })
 
   @impl true
@@ -118,9 +124,11 @@ end
 defmodule Jido.Examples.ApprovalWorkflow.BookingFailed do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_flight_booking_failed",
-    schema: Jido.Joi.object(%{booking_key: Jido.Joi.string() |> Jido.Joi.min(1), reason: Jido.Joi.string()})
+    schema: Joi.object(%{booking_key: Joi.string() |> Joi.min(1), reason: Joi.string()})
 
   @impl true
   def run(%{booking_key: key, reason: reason}, %{
@@ -135,9 +143,11 @@ end
 defmodule Jido.Examples.ApprovalWorkflow.Cancel do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "examples_flight_booking_cancel",
-    schema: Jido.Joi.object(%{})
+    schema: Joi.object(%{})
 
   alias Jido.Error
 

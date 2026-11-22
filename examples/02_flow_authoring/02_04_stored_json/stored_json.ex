@@ -9,6 +9,8 @@ defmodule Jido.Examples.Compilation.StoredJSON.Echo do
 end
 
 defmodule Jido.Examples.Compilation.StoredJSON do
+  alias Jido.Joi
+
   alias Jido.Catalog.Discovery
   alias Jido.Examples.Compilation.StoredJSON.Echo
   alias Jido.Flow.Ref
@@ -27,7 +29,7 @@ defmodule Jido.Examples.Compilation.StoredJSON do
   def catalog do
     Jido.Catalog.from_targets!(__MODULE__, :jido, %{
       {"jido/examples/compilation/json_echo", 1} => Echo,
-      {"jido/examples/compilation/empty_schema", 1} => Jido.Joi.map()
+      {"jido/examples/compilation/empty_schema", 1} => Joi.map()
     })
   end
 

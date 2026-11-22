@@ -1,9 +1,12 @@
 defmodule Jido.Examples.DurableDelete do
   @moduledoc "A deleted order challenged by a delayed writer from its initial revision."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "examples_durable_delete"
 
   state do
-    schema Jido.Joi.object(%{status: Jido.Joi.string() |> Jido.Joi.default("open")})
+    schema Joi.object(%{status: Joi.string() |> Joi.default("open")})
   end
 
   def delayed_write(store, order) do

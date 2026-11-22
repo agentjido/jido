@@ -1,12 +1,14 @@
 defmodule Jido.Examples.Actions.ActionContext.CalculateQuote do
+  alias Jido.Joi
+
   use Jido.Action,
     name: "example_action_calculate_quote",
-    schema: Jido.Joi.object(%{subtotal_cents: Jido.Joi.integer() |> Jido.Joi.min(0)}),
+    schema: Joi.object(%{subtotal_cents: Joi.integer() |> Joi.min(0)}),
     output_schema:
-      Jido.Joi.object(%{
-        subtotal_cents: Jido.Joi.integer(),
-        tax_cents: Jido.Joi.integer(),
-        total_cents: Jido.Joi.integer()
+      Joi.object(%{
+        subtotal_cents: Joi.integer(),
+        tax_cents: Joi.integer(),
+        total_cents: Joi.integer()
       })
 
   @impl true

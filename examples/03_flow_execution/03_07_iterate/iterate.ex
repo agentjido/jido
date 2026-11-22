@@ -6,12 +6,14 @@ defmodule Jido.Examples.Execution.Iterate.Advance do
 end
 
 defmodule Jido.Examples.Execution.Iterate do
+  alias Jido.Joi
+
   use Jido.Flow, name: "example_exec_iterate"
   alias Jido.Examples.Execution.Iterate.Advance
 
   flow do
     iterate "counter" do
-      state Jido.Joi.object(%{count: Jido.Joi.integer()}), initial: %{count: input(:start)}
+      state Joi.object(%{count: Joi.integer()}), initial: %{count: input(:start)}
       action Advance
       params %{count: state(:count)}
       update body_result()

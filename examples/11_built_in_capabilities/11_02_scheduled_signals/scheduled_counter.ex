@@ -9,16 +9,18 @@ defmodule Jido.Examples.ScheduledCounter do
   state commit.
   """
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "examples_scheduled_counter",
     description: "Changes Timer runtime state with Action Directives",
     plugins: [Jido.Plugin.Timer]
 
   state do
-    schema Jido.Joi.object(%{
-             count: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(0),
-             schedule_requests: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.default(0),
-             cron_enabled: Jido.Joi.boolean() |> Jido.Joi.default(false)
+    schema Joi.object(%{
+             count: Joi.integer() |> Joi.min(0) |> Joi.default(0),
+             schedule_requests: Joi.integer() |> Joi.min(0) |> Joi.default(0),
+             cron_enabled: Joi.boolean() |> Joi.default(false)
            })
   end
 
@@ -27,7 +29,7 @@ defmodule Jido.Examples.ScheduledCounter do
 
     route "examples.runtime.scheduled_counter.schedule_once", as: :schedule_once do
       action %{delay_ms: delay_ms},
-        schema: Jido.Joi.object(%{delay_ms: Jido.Joi.integer() |> Jido.Joi.min(0)}),
+        schema: Joi.object(%{delay_ms: Joi.integer() |> Joi.min(0)}),
         context: context do
         tick =
           Jido.Signal.new!("examples.runtime.scheduled_counter.tick", %{source: :once},
@@ -44,7 +46,7 @@ defmodule Jido.Examples.ScheduledCounter do
       as: :enable_cron,
       defaults: %{expression: "* * * * * * *"} do
       action %{job_id: job_id, expression: expression},
-        schema: Jido.Joi.object(%{job_id: Jido.Joi.any(), expression: Jido.Joi.string()}),
+        schema: Joi.object(%{job_id: Joi.any(), expression: Joi.string()}),
         context: context do
         tick =
           Jido.Signal.new!("examples.runtime.scheduled_counter.tick", %{source: job_id},
@@ -58,7 +60,7 @@ defmodule Jido.Examples.ScheduledCounter do
 
     route "examples.runtime.scheduled_counter.disable_cron", as: :disable_cron do
       action %{job_id: job_id},
-        schema: Jido.Joi.object(%{job_id: Jido.Joi.any()}),
+        schema: Joi.object(%{job_id: Joi.any()}),
         context: context do
         directive = Jido.Plugin.Timer.cancel(job_id)
         {:ok, %{context.agent_state | cron_enabled: false}, [directive]}
@@ -67,7 +69,7 @@ defmodule Jido.Examples.ScheduledCounter do
 
     route "examples.runtime.scheduled_counter.tick" do
       action _input,
-        schema: Jido.Joi.object(%{source: Jido.Joi.any()}),
+        schema: Joi.object(%{source: Joi.any()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + 1}}
       end

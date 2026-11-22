@@ -1,10 +1,12 @@
 defmodule Jido.Examples.AI.RequestContract.Lookup do
   @moduledoc "Looks up one value for the request-contract example."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "request_contract_lookup",
     description: "Look up one named value",
-    schema: Jido.Joi.object(%{name: Jido.Joi.string()})
+    schema: Joi.object(%{name: Joi.string()})
 
   @impl Jido.Action
   def run(%{name: name}, _context), do: {:ok, %{name: name, value: "known"}}
@@ -13,10 +15,12 @@ end
 defmodule Jido.Examples.AI.RequestContract.Calculate do
   @moduledoc "Adds two integers for the request-contract example."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "request_contract_calculate",
     description: "Add two integers",
-    schema: Jido.Joi.object(%{left: Jido.Joi.integer(), right: Jido.Joi.integer()})
+    schema: Joi.object(%{left: Joi.integer(), right: Joi.integer()})
 
   @impl Jido.Action
   def run(%{left: left, right: right}, _context), do: {:ok, %{sum: left + right}}

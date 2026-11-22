@@ -36,11 +36,13 @@ defmodule Jido.Examples.Actions.InlineActions.Host do
 end
 
 defmodule Jido.Examples.Actions.InlineActions.Greeting do
+  alias Jido.Joi
+
   use Jido.Examples.Actions.InlineActions.Host
 
   inline_action "greet", %{name: name},
-    schema: Jido.Joi.object(%{name: Jido.Joi.string() |> Jido.Joi.min(1)}),
-    output_schema: Jido.Joi.object(%{message: Jido.Joi.string()}),
+    schema: Joi.object(%{name: Joi.string() |> Joi.min(1)}),
+    output_schema: Joi.object(%{message: Joi.string()}),
     context: context do
     {:ok, %{message: context.prefix <> name}}
   end

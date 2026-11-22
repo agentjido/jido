@@ -71,13 +71,15 @@ defmodule Jido.Examples.ContextMemory.TrimAndCompact.CompactDropped do
 end
 
 defmodule Jido.Examples.ContextMemory.TrimAndCompact do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_context_trim_and_compact",
     schema:
-      Jido.Joi.object(%{
-        history: Jido.Joi.list(Jido.Joi.map()),
-        max_messages: Jido.Joi.integer() |> Jido.Joi.min(1),
-        max_bytes: Jido.Joi.integer() |> Jido.Joi.min(1)
+      Joi.object(%{
+        history: Joi.list(Joi.map()),
+        max_messages: Joi.integer() |> Joi.min(1),
+        max_bytes: Joi.integer() |> Joi.min(1)
       })
 
   alias Jido.Examples.ContextMemory.TrimAndCompact.{CompactDropped, TrimHistory}

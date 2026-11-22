@@ -2,9 +2,12 @@ Code.require_file("turn_control.ex", __DIR__)
 
 defmodule Jido.Test.Examples.Runtime.TurnControlBlockingAction do
   @moduledoc false
+
+  alias Jido.Joi
+
   use Jido.Action,
     name: "test_runtime_turn_control_blocking_action",
-    schema: Jido.Joi.object(%{name: Jido.Joi.string() |> Jido.Joi.min(1)})
+    schema: Joi.object(%{name: Joi.string() |> Joi.min(1)})
 
   alias Jido.Test.AgentServer.RuntimeBarrier
 
@@ -16,10 +19,13 @@ end
 
 defmodule Jido.Test.Examples.Runtime.TurnControlBlockingAgent do
   @moduledoc false
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "test_runtime_turn_control_blocking_agent"
 
   state do
-    schema Jido.Joi.object(%{completed: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+    schema Joi.object(%{completed: Joi.list(Joi.string()) |> Joi.default([])})
   end
 
   routes do

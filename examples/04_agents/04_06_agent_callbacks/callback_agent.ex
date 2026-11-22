@@ -1,13 +1,15 @@
 defmodule Jido.Examples.CallbackAgent do
   @moduledoc "Uses the public initialize, checkpoint, and restore callbacks."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "agent_callback_example", vsn: 2
 
   state do
     schema(
-      Jido.Joi.object(%{
-        count: Jido.Joi.integer(),
-        initialized_for: Jido.Joi.string()
+      Joi.object(%{
+        count: Joi.integer(),
+        initialized_for: Joi.string()
       })
     )
 

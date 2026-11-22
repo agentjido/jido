@@ -1,13 +1,15 @@
 defmodule Jido.Examples.AI.Reasoning.LinearComparison do
   @moduledoc "Runs three one-call structured reasoning Flows over the same input."
 
+  alias Jido.Joi
+
   alias Jido.AI.Reasoning.{AlgorithmOfThoughts, ChainOfDraft, ChainOfThought}
 
   use Jido.Flow,
     name: "examples_ai_linear_reasoning_comparison",
     schema:
-      Jido.Joi.object(
-        %{input: Jido.Joi.string()},
+      Joi.object(
+        %{input: Joi.string()},
         unrecognized_keys: :error
       )
 

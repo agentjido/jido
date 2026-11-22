@@ -2,9 +2,12 @@ Code.require_file("request_modes.ex", __DIR__)
 
 defmodule Jido.Test.Examples.Runtime.RequestModesBlockingAction do
   @moduledoc false
+
+  alias Jido.Joi
+
   use Jido.Action,
     name: "test_runtime_request_modes_blocking_action",
-    schema: Jido.Joi.object(%{label: Jido.Joi.string() |> Jido.Joi.min(1)})
+    schema: Joi.object(%{label: Joi.string() |> Joi.min(1)})
 
   alias Jido.Test.AgentServer.RuntimeBarrier
 
@@ -16,10 +19,13 @@ end
 
 defmodule Jido.Test.Examples.Runtime.RequestModesBlockingAgent do
   @moduledoc false
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "test_runtime_request_modes_blocking_agent"
 
   state do
-    schema Jido.Joi.object(%{history: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+    schema Joi.object(%{history: Joi.list(Joi.string()) |> Joi.default([])})
   end
 
   routes do

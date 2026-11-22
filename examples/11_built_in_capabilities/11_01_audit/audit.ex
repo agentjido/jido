@@ -1,11 +1,14 @@
 defmodule Jido.Examples.Applications.Audit.Agent do
   @moduledoc "Commits domain and built-in Audit Plugin state in one Turn."
+
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "application_audit_agent",
     plugins: [{Jido.Plugin.Audit, %{max_entries: 2}}]
 
   state do
-    schema Jido.Joi.object(%{successes: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{successes: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -15,13 +18,16 @@ end
 
 defmodule Jido.Examples.Applications.Audit.Flow do
   @moduledoc "Validates an event before one domain and Audit state commit."
+
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "application_audit_flow",
-    schema: Jido.Joi.object(%{event: Jido.Joi.map(), fail?: Jido.Joi.boolean()}),
+    schema: Joi.object(%{event: Joi.map(), fail?: Joi.boolean()}),
     output_schema:
-      Jido.Joi.object(%{
-        successes: Jido.Joi.integer(),
-        audit: Jido.Joi.object(%{records: Jido.Joi.list(Jido.Joi.struct(Jido.Plugin.Audit.Record))})
+      Joi.object(%{
+        successes: Joi.integer(),
+        audit: Joi.object(%{records: Joi.list(Joi.struct(Jido.Plugin.Audit.Record))})
       })
 
   flow do

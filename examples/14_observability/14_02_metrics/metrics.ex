@@ -1,10 +1,12 @@
 defmodule Jido.Examples.Observability.Metrics.Agent do
   @moduledoc "Produces one successful Turn for a local metrics reporter."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "examples_observability_metrics_agent"
 
   state do
-    schema Jido.Joi.object(%{count: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{count: Joi.integer() |> Joi.default(0)})
   end
 
   routes do

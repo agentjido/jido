@@ -1,13 +1,15 @@
 defmodule Jido.Examples.Operations.AuthorizeOperation do
   @moduledoc "Applies application authorization before a sensitive operation."
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "operations_authorize_operation",
     schema:
-      Jido.Joi.object(
+      Joi.object(
         %{
-          operation: Jido.Joi.enum([:read_status, :restart_service]),
-          tenant: Jido.Joi.string()
+          operation: Joi.enum([:read_status, :restart_service]),
+          tenant: Joi.string()
         },
         unrecognized_keys: :error
       )
@@ -38,13 +40,15 @@ end
 defmodule Jido.Examples.Operations.SecureOperationFlow do
   @moduledoc "Authorizes one allowlisted application operation before execution."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "operations_secure_operation_flow",
     schema:
-      Jido.Joi.object(
+      Joi.object(
         %{
-          operation: Jido.Joi.enum([:read_status, :restart_service]),
-          tenant: Jido.Joi.string()
+          operation: Joi.enum([:read_status, :restart_service]),
+          tenant: Joi.string()
         },
         unrecognized_keys: :error
       )

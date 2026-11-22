@@ -45,39 +45,43 @@ end
 defmodule Jido.Examples.BurstBuncher.Timer.Replace do
   @moduledoc "Replaces one keyed timer and its pending Signal."
 
-  @schema Jido.Joi.struct(
+  alias Jido.Joi
+
+  @schema Joi.struct(
             __MODULE__,
             %{
-              timer_id: Jido.Joi.any(),
-              delay_ms: Jido.Joi.integer() |> Jido.Joi.min(0),
-              signal: Jido.Joi.struct(Jido.Signal)
+              timer_id: Joi.any(),
+              delay_ms: Joi.integer() |> Joi.min(0),
+              signal: Joi.struct(Jido.Signal)
             },
             coerce: true
           )
 
-  @type t :: unquote(Jido.Joi.type_spec(@schema))
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc false
   def schema, do: @schema
 
-  def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, Map.from_struct(directive))
+  def validate(%__MODULE__{} = directive), do: Joi.parse(@schema, Map.from_struct(directive))
 end
 
 defmodule Jido.Examples.BurstBuncher.Timer.Cancel do
   @moduledoc "Cancels one keyed timer."
 
-  @schema Jido.Joi.struct(__MODULE__, %{timer_id: Jido.Joi.any()}, coerce: true)
+  alias Jido.Joi
 
-  @type t :: unquote(Jido.Joi.type_spec(@schema))
-  @enforce_keys Jido.Joi.enforce_keys(@schema)
-  defstruct Jido.Joi.struct_fields(@schema)
+  @schema Joi.struct(__MODULE__, %{timer_id: Joi.any()}, coerce: true)
+
+  @type t :: unquote(Joi.type_spec(@schema))
+  @enforce_keys Joi.enforce_keys(@schema)
+  defstruct Joi.struct_fields(@schema)
 
   @doc false
   def schema, do: @schema
 
-  def validate(%__MODULE__{} = directive), do: Jido.Joi.parse(@schema, Map.from_struct(directive))
+  def validate(%__MODULE__{} = directive), do: Joi.parse(@schema, Map.from_struct(directive))
 end
 
 defmodule Jido.Examples.BurstBuncher.Timer.Runtime do

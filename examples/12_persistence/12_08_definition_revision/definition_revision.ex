@@ -1,6 +1,8 @@
 defmodule Jido.Examples.DefinitionRevision do
   @moduledoc "A saved definition retains its version and checks its executable references."
 
+  alias Jido.Joi
+
   defmodule Add do
     use Jido.Action,
       name: "definition_revision_add"
@@ -27,7 +29,7 @@ defmodule Jido.Examples.DefinitionRevision do
   use Jido.Agent, name: "examples_versioned_cart", vsn: 1
 
   state do
-    schema Jido.Joi.object(%{total: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{total: Joi.integer() |> Joi.default(0)})
   end
 
   routes do

@@ -31,13 +31,15 @@ defmodule Jido.Examples.Evaluation.OfflineJudge.Judge do
 end
 
 defmodule Jido.Examples.Evaluation.OfflineJudge do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_evaluation_offline_judge_flow",
     schema:
-      Jido.Joi.object(%{
-        case_id: Jido.Joi.string() |> Jido.Joi.min(1),
-        state: Jido.Joi.map(),
-        questions: Jido.Joi.map()
+      Joi.object(%{
+        case_id: Joi.string() |> Joi.min(1),
+        state: Joi.map(),
+        questions: Joi.map()
       })
 
   flow do

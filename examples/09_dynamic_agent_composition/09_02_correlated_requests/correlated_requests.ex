@@ -1,13 +1,15 @@
 defmodule Jido.Examples.CorrelatedRequests do
   @moduledoc "Coordinates two durable Agents with explicit stable Addresses."
 
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_correlated_requests"
 
   state do
-    schema Jido.Joi.object(%{
-             request_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             status: Jido.Joi.enum([:idle, :waiting, :completed]) |> Jido.Joi.default(:idle),
-             result: Jido.Joi.integer() |> Jido.Joi.nullable() |> Jido.Joi.default(nil)
+    schema Joi.object(%{
+             request_id: Joi.string() |> Joi.default(""),
+             status: Joi.enum([:idle, :waiting, :completed]) |> Joi.default(:idle),
+             result: Joi.integer() |> Joi.nullable() |> Joi.default(nil)
            })
   end
 
@@ -16,7 +18,7 @@ defmodule Jido.Examples.CorrelatedRequests do
 
     route "examples.multi_agent.requests.start", as: :request do
       action %{request_id: request_id},
-        schema: Jido.Joi.object(%{request_id: Jido.Joi.string() |> Jido.Joi.min(1)}),
+        schema: Joi.object(%{request_id: Joi.string() |> Joi.min(1)}),
         context: context do
         if context.agent_state.status == :waiting do
           {:error, Jido.Error.validation_error("a request is already waiting")}
@@ -29,9 +31,9 @@ defmodule Jido.Examples.CorrelatedRequests do
     route "examples.multi_agent.requests.complete", as: :complete do
       action %{request_id: request_id, value: value},
         schema:
-          Jido.Joi.object(%{
-            request_id: Jido.Joi.string() |> Jido.Joi.min(1),
-            value: Jido.Joi.integer()
+          Joi.object(%{
+            request_id: Joi.string() |> Joi.min(1),
+            value: Joi.integer()
           }),
         context: context do
         state = context.agent_state

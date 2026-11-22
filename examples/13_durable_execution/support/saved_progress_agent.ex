@@ -1,9 +1,12 @@
 defmodule Jido.Examples.Durable.SavedProgress do
   @moduledoc "A sequential ten-step Flow with one Action per recovery boundary."
+
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "durable_saved_progress",
-    schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
-    output_schema: Jido.Joi.object(%{value: Jido.Joi.integer()})
+    schema: Joi.object(%{value: Joi.integer()}),
+    output_schema: Joi.object(%{value: Joi.integer()})
 
   alias Jido.Examples.Durable.SavedProgress.Advance
 
@@ -25,10 +28,13 @@ end
 
 defmodule Jido.Examples.Durable.SavedProgress.Agent do
   @moduledoc "Runs the ten-step Flow as one serial AgentServer Turn."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "durable_saved_progress_agent"
 
   state do
-    schema Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{value: Joi.integer() |> Joi.default(0)})
   end
 
   routes do

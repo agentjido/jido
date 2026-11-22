@@ -1,10 +1,12 @@
 defmodule Jido.Examples.Guardrails.HumanReview.Prepare do
+  alias Jido.Joi
+
   use Jido.Action,
     name: "example_guardrail_prepare_review",
     schema:
-      Jido.Joi.object(%{
-        request_id: Jido.Joi.string() |> Jido.Joi.min(1),
-        content_digest: Jido.Joi.string() |> Jido.Joi.min(1)
+      Joi.object(%{
+        request_id: Joi.string() |> Joi.min(1),
+        content_digest: Joi.string() |> Joi.min(1)
       })
 
   @impl true
@@ -27,12 +29,14 @@ defmodule Jido.Examples.Guardrails.HumanReview.Finalize do
 end
 
 defmodule Jido.Examples.Guardrails.HumanReview do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_guardrail_human_review",
     schema:
-      Jido.Joi.object(%{
-        request_id: Jido.Joi.string() |> Jido.Joi.min(1),
-        content_digest: Jido.Joi.string() |> Jido.Joi.min(1)
+      Joi.object(%{
+        request_id: Joi.string() |> Joi.min(1),
+        content_digest: Joi.string() |> Joi.min(1)
       })
 
   alias Jido.Examples.Guardrails.HumanReview.{Finalize, Prepare}

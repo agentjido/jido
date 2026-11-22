@@ -1,5 +1,8 @@
 defmodule Jido.Examples.Plugins.Composition.Agent do
   @moduledoc "Combines one pure input Plugin with one live input Plugin."
+
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "plugin_composition_agent",
     plugins: [
@@ -8,9 +11,9 @@ defmodule Jido.Examples.Plugins.Composition.Agent do
     ]
 
   state do
-    schema Jido.Joi.object(%{
-             accepted: Jido.Joi.integer() |> Jido.Joi.default(0),
-             owner: Jido.Joi.string() |> Jido.Joi.default("")
+    schema Joi.object(%{
+             accepted: Joi.integer() |> Joi.default(0),
+             owner: Joi.string() |> Joi.default("")
            })
   end
 
@@ -19,7 +22,7 @@ defmodule Jido.Examples.Plugins.Composition.Agent do
 
     route "examples.plugins.composition.accept" do
       action %{token: _token},
-        schema: Jido.Joi.object(%{token: Jido.Joi.string()}),
+        schema: Joi.object(%{token: Joi.string()}),
         context: context do
         tenant = context.plugin_inputs[Jido.Examples.Plugins.Composition.Tenant].prepared
 

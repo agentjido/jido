@@ -1,8 +1,10 @@
 defmodule Jido.Examples.Collaboration.ManagerPool.Worker do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_manager_pool_worker"
 
   state do
-    schema Jido.Joi.object(%{completed: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([])})
+    schema Joi.object(%{completed: Joi.list(Joi.string()) |> Joi.default([])})
   end
 
   routes do
@@ -11,15 +13,15 @@ defmodule Jido.Examples.Collaboration.ManagerPool.Worker do
     route "examples.collaboration.pool.execute", as: :execute do
       action input,
         schema:
-          Jido.Joi.object(%{
-            task_id: Jido.Joi.string(),
-            value: Jido.Joi.integer(),
-            fail: Jido.Joi.boolean()
+          Joi.object(%{
+            task_id: Joi.string(),
+            value: Joi.integer(),
+            fail: Joi.boolean()
           }),
         output_schema:
-          Jido.Joi.object(%{
-            state: Jido.Joi.map(),
-            reply: Jido.Joi.map()
+          Joi.object(%{
+            state: Joi.map(),
+            reply: Joi.map()
           }),
         context: context do
         if input.fail do
@@ -40,13 +42,15 @@ defmodule Jido.Examples.Collaboration.ManagerPool.Worker do
 end
 
 defmodule Jido.Examples.Collaboration.ManagerPool.Manager do
+  alias Jido.Joi
+
   use Jido.Agent, name: "example_manager_pool_manager"
 
   state do
-    schema Jido.Joi.object(%{
-             mission_id: Jido.Joi.string() |> Jido.Joi.default(""),
-             expected: Jido.Joi.list(Jido.Joi.string()) |> Jido.Joi.default([]),
-             results: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])
+    schema Joi.object(%{
+             mission_id: Joi.string() |> Joi.default(""),
+             expected: Joi.list(Joi.string()) |> Joi.default([]),
+             results: Joi.list(Joi.map()) |> Joi.default([])
            })
   end
 
@@ -56,9 +60,9 @@ defmodule Jido.Examples.Collaboration.ManagerPool.Manager do
     route "examples.collaboration.pool.started", as: :start do
       action input,
         schema:
-          Jido.Joi.object(%{
-            mission_id: Jido.Joi.string(),
-            task_ids: Jido.Joi.list(Jido.Joi.string())
+          Joi.object(%{
+            mission_id: Joi.string(),
+            task_ids: Joi.list(Joi.string())
           }),
         context: context do
         {:ok, %{context.agent_state | mission_id: input.mission_id, expected: input.task_ids, results: []}}
@@ -68,11 +72,11 @@ defmodule Jido.Examples.Collaboration.ManagerPool.Manager do
     route "examples.collaboration.pool.result", as: :collect do
       action input,
         schema:
-          Jido.Joi.object(%{
-            mission_id: Jido.Joi.string(),
-            task_id: Jido.Joi.string(),
-            status: Jido.Joi.enum([:completed, :failed]),
-            value: Jido.Joi.integer() |> Jido.Joi.nullable()
+          Joi.object(%{
+            mission_id: Joi.string(),
+            task_id: Joi.string(),
+            status: Joi.enum([:completed, :failed]),
+            value: Joi.integer() |> Joi.nullable()
           }),
         context: context do
         state = context.agent_state

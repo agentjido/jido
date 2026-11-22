@@ -27,9 +27,11 @@ defmodule Jido.Examples.Evaluation.DeterministicCase.Score do
 end
 
 defmodule Jido.Examples.Evaluation.DeterministicCase do
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "example_evaluation_deterministic_case",
-    schema: Jido.Joi.object(%{case: Jido.Joi.map()})
+    schema: Joi.object(%{case: Joi.map()})
 
   flow do
     step "score",

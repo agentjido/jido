@@ -1,5 +1,8 @@
 defmodule Jido.Examples.Plugins.SecureSignal.Agent do
   @moduledoc "Verifies and decrypts secure input, then encrypts and signs its correlated reply."
+
+  alias Jido.Joi
+
   alias Jido.Examples.Plugins.Crypto
   alias Jido.Examples.Plugins.SecureSignal.Identity.Plugin, as: IdentityPlugin
   alias Jido.Examples.Plugins.SecureSignal.Plugin, as: SecureSignalPlugin
@@ -12,9 +15,9 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
     ]
 
   state do
-    schema Jido.Joi.object(%{
-             accepted: Jido.Joi.integer() |> Jido.Joi.default(0),
-             peer: Jido.Joi.string() |> Jido.Joi.default("")
+    schema Joi.object(%{
+             accepted: Joi.integer() |> Joi.default(0),
+             peer: Joi.string() |> Joi.default("")
            })
   end
 
@@ -23,14 +26,14 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
 
     route "examples.plugins.secure_signal.request" do
       action %{"message_id" => message_id},
-        schema: Jido.Joi.object(%{"message_id" => Jido.Joi.string() |> Jido.Joi.min(1)}),
+        schema: Joi.object(%{"message_id" => Joi.string() |> Joi.min(1)}),
         output_schema:
-          Jido.Joi.object(%{
-            state: Jido.Joi.map(),
+          Joi.object(%{
+            state: Joi.map(),
             reply:
-              Jido.Joi.object(%{
-                "message_id" => Jido.Joi.string(),
-                "secure" => Jido.Joi.map()
+              Joi.object(%{
+                "message_id" => Joi.string(),
+                "secure" => Joi.map()
               })
           }),
         context: context do

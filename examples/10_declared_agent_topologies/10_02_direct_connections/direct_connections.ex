@@ -1,9 +1,12 @@
 defmodule Jido.Examples.Topology.DirectConnections do
   @moduledoc "Explicit outputs connect a root, a worker, and a receipt Agent."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "topology_direct_connections"
 
   state do
-    schema Jido.Joi.object(%{completed: Jido.Joi.integer() |> Jido.Joi.default(0)})
+    schema Joi.object(%{completed: Joi.integer() |> Joi.default(0)})
   end
 
   routes do
@@ -15,7 +18,7 @@ defmodule Jido.Examples.Topology.DirectConnections do
 
     route "examples.topology.pipeline.receipt", as: :receipt do
       action %{value: value},
-        schema: Jido.Joi.object(%{value: Jido.Joi.integer()}),
+        schema: Joi.object(%{value: Joi.integer()}),
         context: context do
         {:ok, %{context.agent_state | completed: context.agent_state.completed + value}}
       end

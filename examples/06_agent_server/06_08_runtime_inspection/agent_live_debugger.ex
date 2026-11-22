@@ -1,16 +1,18 @@
 defmodule Jido.Examples.AgentLiveDebugger do
   @moduledoc "A small observed Agent plus a read-only redacted inspection view."
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "examples_agent_live_debugger",
     description: "Provides public state for a safe debugger snapshot",
     plugins: [Jido.Plugin.Timer]
 
   state do
-    schema Jido.Joi.object(%{
-             status: Jido.Joi.string() |> Jido.Joi.default("idle"),
-             secret_token: Jido.Joi.string() |> Jido.Joi.default("hidden"),
-             result: Jido.Joi.string() |> Jido.Joi.default("")
+    schema Joi.object(%{
+             status: Joi.string() |> Joi.default("idle"),
+             secret_token: Joi.string() |> Joi.default("hidden"),
+             result: Joi.string() |> Joi.default("")
            })
   end
 
@@ -19,7 +21,7 @@ defmodule Jido.Examples.AgentLiveDebugger do
 
     route "examples.runtime.inspection.record", as: :record_result do
       action %{result: result},
-        schema: Jido.Joi.object(%{result: Jido.Joi.string()}),
+        schema: Joi.object(%{result: Joi.string()}),
         context: context do
         {:ok, %{context.agent_state | status: "complete", result: result}}
       end

@@ -1,6 +1,8 @@
 defmodule Jido.Examples.Capabilities.SensorManager.Agent do
   @moduledoc "Owns a tagged reading sensor through Sensor Manager Directives."
 
+  alias Jido.Joi
+
   use Jido.Agent,
     name: "examples_capabilities_sensor_manager_agent",
     plugins: [{Jido.Plugin.SensorManager, %{retry_delay_ms: 10}}]
@@ -9,8 +11,8 @@ defmodule Jido.Examples.Capabilities.SensorManager.Agent do
   alias Jido.Plugin.SensorManager
 
   state do
-    schema Jido.Joi.object(%{
-             readings: Jido.Joi.list(Jido.Joi.map()) |> Jido.Joi.default([])
+    schema Joi.object(%{
+             readings: Joi.list(Joi.map()) |> Joi.default([])
            })
   end
 
@@ -20,9 +22,9 @@ defmodule Jido.Examples.Capabilities.SensorManager.Agent do
     route "examples.capabilities.sensor_manager.start", as: :start_sensor do
       action %{multiplier: multiplier, tag: tag},
         schema:
-          Jido.Joi.object(%{
-            multiplier: Jido.Joi.integer(),
-            tag: Jido.Joi.string() |> Jido.Joi.min(1)
+          Joi.object(%{
+            multiplier: Joi.integer(),
+            tag: Joi.string() |> Joi.min(1)
           }),
         context: context do
         directive =
@@ -37,7 +39,7 @@ defmodule Jido.Examples.Capabilities.SensorManager.Agent do
 
     route "examples.capabilities.sensor_manager.stop", as: :stop_sensor do
       action %{tag: tag},
-        schema: Jido.Joi.object(%{tag: Jido.Joi.string() |> Jido.Joi.min(1)}),
+        schema: Joi.object(%{tag: Joi.string() |> Joi.min(1)}),
         context: context do
         {:ok, context.agent_state, [SensorManager.stop(tag)]}
       end
@@ -46,9 +48,9 @@ defmodule Jido.Examples.Capabilities.SensorManager.Agent do
     route "examples.capabilities.sensor_manager.reading" do
       action reading,
         schema:
-          Jido.Joi.object(%{
-            tag: Jido.Joi.string() |> Jido.Joi.min(1),
-            value: Jido.Joi.integer()
+          Joi.object(%{
+            tag: Joi.string() |> Joi.min(1),
+            value: Joi.integer()
           }),
         context: context do
         {:ok, %{context.agent_state | readings: context.agent_state.readings ++ [reading]}}

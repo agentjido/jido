@@ -1,11 +1,14 @@
 defmodule Jido.Examples.Durable.SavedCompletion do
   @moduledoc "Saves the report and the completed Turn in one persistence write."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "durable_saved_completion"
 
   state do
-    schema Jido.Joi.object(%{
-             report: Jido.Joi.string() |> Jido.Joi.default(""),
-             completed: Jido.Joi.integer() |> Jido.Joi.default(0)
+    schema Joi.object(%{
+             report: Joi.string() |> Joi.default(""),
+             completed: Joi.integer() |> Joi.default(0)
            })
   end
 
@@ -21,10 +24,13 @@ end
 
 defmodule Jido.Examples.Durable.SavedCompletion.Report do
   @moduledoc "Builds a report; AgentServer owns the final save and recovery."
+
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "durable_completion_report",
-    schema: Jido.Joi.object(%{topic: Jido.Joi.string() |> Jido.Joi.min(1)}),
-    output_schema: Jido.Joi.object(%{report: Jido.Joi.string(), completed: Jido.Joi.integer()})
+    schema: Joi.object(%{topic: Joi.string() |> Joi.min(1)}),
+    output_schema: Joi.object(%{report: Joi.string(), completed: Joi.integer()})
 
   flow do
     step "render", topic <- input(:topic) do

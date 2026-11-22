@@ -1,11 +1,14 @@
 defmodule Jido.Examples.SequentialFlow do
   @moduledoc "A typed Flow produces one complete candidate; the Server commits it once."
+
+  alias Jido.Joi
+
   use Jido.Agent, name: "workflow_sequential_agent"
 
   state do
-    schema Jido.Joi.object(%{
-             value: Jido.Joi.integer() |> Jido.Joi.min(0) |> Jido.Joi.max(100) |> Jido.Joi.default(0),
-             label: Jido.Joi.string() |> Jido.Joi.default("kept")
+    schema Joi.object(%{
+             value: Joi.integer() |> Joi.min(0) |> Joi.max(100) |> Joi.default(0),
+             label: Joi.string() |> Joi.default("kept")
            })
   end
 
@@ -19,12 +22,14 @@ end
 defmodule Jido.Examples.SequentialFlow.Finish do
   @moduledoc false
 
+  alias Jido.Joi
+
   use Jido.Action,
     name: "workflow_finish",
     schema:
-      Jido.Joi.object(%{
-        value: Jido.Joi.integer(),
-        failure: Jido.Joi.enum([:none, :middle, :output, :candidate])
+      Joi.object(%{
+        value: Joi.integer(),
+        failure: Joi.enum([:none, :middle, :output, :candidate])
       })
 
   @impl true
@@ -43,14 +48,16 @@ end
 defmodule Jido.Examples.SequentialFlow.Pipeline do
   @moduledoc "Input, result dependencies, a control dependency, and output validation."
 
+  alias Jido.Joi
+
   use Jido.Flow,
     name: "workflow_sequential",
     schema:
-      Jido.Joi.object(%{
-        value: Jido.Joi.integer() |> Jido.Joi.min(0),
-        failure: Jido.Joi.enum([:none, :middle, :output, :candidate]) |> Jido.Joi.default(:none)
+      Joi.object(%{
+        value: Joi.integer() |> Joi.min(0),
+        failure: Joi.enum([:none, :middle, :output, :candidate]) |> Joi.default(:none)
       }),
-    output_schema: Jido.Joi.object(%{value: Jido.Joi.integer() |> Jido.Joi.min(0), label: Jido.Joi.string()})
+    output_schema: Joi.object(%{value: Joi.integer() |> Joi.min(0), label: Joi.string()})
 
   flow do
     step "double", value <- input(:value) do
