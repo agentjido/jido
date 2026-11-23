@@ -46,3 +46,5 @@ test uses one short real deadline.
 - [Tests](reservation_test.exs)
 
 Previous lesson [Behavior Tree continuation](../11_09_behavior_tree/README.md)
+
+Next lesson [Share an inventory count](../11_11_shared_blackboard/README.md)

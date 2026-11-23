@@ -557,6 +557,18 @@ Stores bounded domain audit records in portable Agent state.
 | --- | --- |
 | `Jido.Plugin.Audit.record/3` | Creates one domain audit Directive. |
 
+### `Jido.Blackboard`
+
+Use `Jido.Plugin.Blackboard.Server` to start a named board and
+`Jido.Plugin.Blackboard.Client` to connect member Agents. Return a
+`Jido.Plugin.Blackboard.Client.Patch` Directive to write after the turn
+commits. [Shared Blackboard](../built-in-plugins/shared-blackboard.md).
+
+| Function | Summary |
+| --- | --- |
+| `Jido.Blackboard.read/3` | Reads the board's current values and revision. |
+| `Jido.Blackboard.patch/6` | Sets and removes keys in one conditional update. |
+
 ### `Jido.Statechart`
 
 Use `Jido.Plugin.Statechart` to run an SCXML chart on an Agent. Route its

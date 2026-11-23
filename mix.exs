@@ -206,6 +206,7 @@ defmodule Jido.MixProject do
       {:"Built-In Plugins",
        [
          {"Behavior Trees", "guides/built-in-plugins/behavior-trees.md"},
+         {"Shared Blackboard", "guides/built-in-plugins/shared-blackboard.md"},
          {"Signal Bus Plugin", "guides/built-in-plugins/signal-bus-plugin.livemd"},
          {"Statecharts", "guides/built-in-plugins/statecharts.md"},
          {"Timers", "guides/built-in-plugins/timers.livemd"},

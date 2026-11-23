@@ -423,6 +423,7 @@ Proposed lessons:
 8. Chart Plugin with a named guard and a separate Agent route.
 9. Behavior Tree continuation and Action effects.
 10. Statechart deadline delivery and cancellation.
+11. Shared blackboard reads, conditional writes, and result Signals.
 
 Primary coverage:
 
@@ -434,6 +435,7 @@ Primary coverage:
 - `Jido.Statechart`
 - `Jido.Plugin.Statechart`
 - `Jido.Plugin.BehaviorTree`
+- `Jido.Blackboard` and `Jido.Plugin.Blackboard.*`
 
 ### 12 Persistence
 

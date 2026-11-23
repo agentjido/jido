@@ -71,6 +71,7 @@ This evidence is a baseline, not a permanent status report. Re-run the checks af
 ```text
 Jido.Application
 ├── Jido.Signal.Registry
+├── Jido.Blackboard.Registry
 ├── Jido.Exec.TaskSupervisor
 ├── Jido.Catalog.Discovery temporary initialization task
 ├── Jido.Telemetry.AI.CorrelationStore
@@ -111,6 +112,11 @@ post-commit dispatch. The Tree DSL uses the shared inline Action compiler
 and the `Jido.Expr` parser and evaluator. The tree engine has no application
 startup entry. See
 [ADR 0017](../adr/0017-behavior-tree-turn-ownership.md).
+
+`Jido.Blackboard` and `Jido.Plugin.Blackboard.*` are capabilities. They use
+the existing Plugin lifecycle and post-commit dispatch. The application
+supervises the board registry. Each board belongs to its owning activation.
+See [ADR 0021](../adr/0021-shared-blackboard-ownership.md).
 
 ### Covenant ownership rule
 

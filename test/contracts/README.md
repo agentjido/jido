@@ -41,6 +41,7 @@ tests with its obligation tags.
 | `jido.thread` | Thread and Entry sequence rules and portable maps | `test/contracts/jido/thread.*` |
 | `jido.plugin.audit` | Bundled Audit Plugin behavior | `test/contracts/jido.plugin/audit.*` |
 | `jido.plugin.bus` | Bundled Bus Plugin behavior | `test/contracts/jido.plugin/bus.*` |
+| `jido.plugin.blackboard` | Shared board ownership, revisions, and Plugin effects | `test/contracts/jido.plugin/blackboard.*` |
 | `jido.plugin.fsm` | Bundled FSM authoring, route control, and state | `test/contracts/jido.plugin/fsm.*` |
 | `jido.plugin.statechart` | SCXML compilation and Agent chart sessions | `test/contracts/jido.plugin/statechart.*` |
 | `jido.plugin.ecto_state` | Optional Ecto row state for Agents | `test/contracts/jido.plugin/ecto_state.*` |

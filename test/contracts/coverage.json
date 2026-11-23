@@ -11,9 +11,9 @@
       "covered": 17
     },
     "jido.plugin": {
-      "active": 42,
+      "active": 46,
       "coverage": 1.0,
-      "covered": 42
+      "covered": 46
     },
     "jido.telemetry": {
       "active": 2,
@@ -2876,6 +2876,55 @@
             "test rejects unsupported calls in expressions at compile time",
             "test state references distinguish an unavailable state from a missing state key",
             "test the tool wrapper uses a DSL tree and emits named node paths"
+          ]
+        }
+      }
+    },
+    "jido.plugin.blackboard": {
+      "active": 4,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 4,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.blackboard.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the name is unique within an instance and released when the owner stops"
+          ]
+        },
+        "jido.plugin.blackboard.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test changes and removals apply together, with portable values and a fresh revision"
+          ]
+        },
+        "jido.plugin.blackboard.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test selected live reads fail when the board is absent and pure turns use explicit data"
+          ]
+        },
+        "jido.plugin.blackboard.I4": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test invalid Directives cannot patch and a committed timeout can have applied a write"
           ]
         }
       }
@@ -6278,8 +6327,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 267,
+    "active": 271,
     "coverage": 1.0,
-    "covered": 267
+    "covered": 271
   }
 }
