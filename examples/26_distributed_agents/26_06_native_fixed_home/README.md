@@ -25,8 +25,10 @@ reconnect, the accepted Turn's change is visible once.
 
 Ingress starts before the home and without a usable local Store. A direct
 activation or child startup on ingress fails. The test also refuses an
-externally supervised activation on the home. One bounded fault gate holds
-an accepted Turn while the test cuts the link or waits for the caller timeout.
+externally supervised activation on the home. A fault gate holds an accepted
+Turn while the test cuts the link or waits for the caller timeout. Another
+test stops the Runner after the Store commits and before the caller receives
+the reply. The caller can read the saved result by Turn ID.
 
 ## Limits
 

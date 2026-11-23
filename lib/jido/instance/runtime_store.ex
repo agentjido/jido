@@ -63,19 +63,29 @@ defmodule Jido.Instance.RuntimeStore do
   end
 
   @doc false
+  @spec instance_cluster(atom()) :: false | :unavailable | {pid(), map()}
   def instance_cluster(instance) when is_atom(instance) do
-    table = Jido.Instance.Names.runtime_store(instance)
-    owner = Process.whereis(instance)
+    case Process.whereis(instance) do
+      nil -> false
+      owner -> cluster_entry(Jido.Instance.Names.runtime_store(instance), owner)
+    end
+  end
 
-    case :ets.lookup(table, {@instance_config_hive, :cluster}) do
-      [{_, cluster}] when is_pid(owner) ->
-        if :ets.info(table, :owner) == owner, do: cluster, else: false
+  defp cluster_entry(name, owner) do
+    table = :ets.whereis(name)
 
-      _ ->
-        false
+    with ^owner <- :ets.info(table, :owner),
+         [{_, cluster}] <- :ets.lookup(table, {@instance_config_hive, :cluster}) do
+      case cluster do
+        false -> false
+        %{home: _, namespace: _, generation: _, rpc_timeout: _} -> {owner, cluster}
+        _ -> :unavailable
+      end
+    else
+      _ -> :unavailable
     end
   rescue
-    ArgumentError -> false
+    ArgumentError -> :unavailable
   end
 
   @doc false

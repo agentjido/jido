@@ -155,9 +155,11 @@ defmodule Jido.AgentServer.Worker do
   defp require_unclustered_worker(nil), do: :ok
 
   defp require_unclustered_worker(instance) do
-    if Jido.Instance.RuntimeStore.instance_cluster(instance),
-      do: {:error, :cluster_requires_managed_activation},
-      else: :ok
+    case Jido.Instance.RuntimeStore.instance_cluster(instance) do
+      false -> :ok
+      :unavailable -> {:error, :cluster_unavailable}
+      {_owner, _cluster} -> {:error, :cluster_requires_managed_activation}
+    end
   end
 
   @doc false
@@ -725,7 +727,7 @@ defmodule Jido.AgentServer.Worker do
     runner = Keyword.fetch!(opts, :runner)
 
     case register_instance(agent.id, opts) do
-      {:ok, monitors} -> init_registered(agent, runner, opts, monitors)
+      {:ok, monitors, owner} -> init_registered(agent, runner, opts, monitors, owner)
       {:error, reason} -> {:stop, reason}
     end
   end
@@ -733,29 +735,36 @@ defmodule Jido.AgentServer.Worker do
   defp register_instance(id, opts) do
     case opts[:jido] do
       nil ->
-        {:ok, %{}}
+        {:ok, %{}, nil}
 
       jido ->
         registry = Jido.Instance.Names.registry(jido)
         key = RegistrationGuard.registry_key(id, opts[:partition])
 
+        dependencies =
+          for name <- [jido, registry, Jido.Instance.Names.registration_guard(jido)],
+              do: {name, Process.whereis(name)}
+
         with :ok <- Jido.Instance.Cluster.require_managed_activation(jido),
+             {:ok, owner} <- cluster_owner(jido),
+             true <- Enum.all?(dependencies, fn {_name, pid} -> is_pid(pid) end),
              [{root, {:activation, activation_id}}] <- Registry.lookup(registry, key),
              true <- root == opts[:activation],
              true <- activation_id == opts[:activation_id] do
-          {:ok,
-           Map.new(
-             [jido, registry, Jido.Instance.Names.registration_guard(jido)],
-             fn name -> {Process.monitor(Process.whereis(name)), name} end
-           )}
+          monitors = Map.new(dependencies, fn {name, pid} -> {Process.monitor(pid), {name, pid}} end)
+          {:ok, monitors, owner}
+        else
+          {:error, _reason} = error -> error
+          _ -> {:error, :instance_unavailable}
         end
     end
   catch
     :exit, _ -> {:error, :instance_unavailable}
   end
 
-  defp init_registered(agent, runner, opts, monitors) do
+  defp init_registered(agent, runner, opts, monitors, cluster_owner) do
     AgentServerTelemetry.lifecycle(:start, agent.id)
+    runner_pid = Process.whereis(runner)
 
     {:ok, specs} =
       Jido.Plugin.Normalizer.normalize_runtime(
@@ -776,7 +785,7 @@ defmodule Jido.AgentServer.Worker do
           ),
         runner: runner,
         jido: opts[:jido],
-        cluster_owner: cluster_owner(opts[:jido]),
+        cluster_owner: cluster_owner,
         partition: opts[:partition],
         instance_monitors: monitors,
         plugin_specs: specs,
@@ -789,7 +798,8 @@ defmodule Jido.AgentServer.Worker do
         child_monitors: monitor_children(opts[:activation_state]),
         bootstrap: nil,
         ready_waiters: [],
-        runner_ref: Process.monitor(Process.whereis(runner)),
+        runner_ref: Process.monitor(runner_pid),
+        runner_pid: runner_pid,
         state_version: Keyword.get(opts, :state_version, 0),
         active: nil,
         server_turn: nil,
@@ -812,18 +822,22 @@ defmodule Jido.AgentServer.Worker do
     end
   end
 
-  defp cluster_owner(nil), do: nil
-
   defp cluster_owner(instance) do
-    if Jido.Instance.RuntimeStore.instance_cluster(instance), do: Process.whereis(instance)
+    case Jido.Instance.RuntimeStore.instance_cluster(instance) do
+      false -> {:ok, nil}
+      :unavailable -> {:error, :cluster_unavailable}
+      {owner, _cluster} -> {:ok, owner}
+    end
   end
 
   defp cluster_admission_status(%{cluster_owner: nil}), do: :ok
 
-  defp cluster_admission_status(%{jido: instance, cluster_owner: owner}) do
-    if Jido.Instance.Cluster.ready?(instance, owner),
-      do: :ok,
-      else: {:error, :cluster_unavailable}
+  defp cluster_admission_status(%{jido: instance, cluster_owner: owner} = data) do
+    if Jido.Instance.Cluster.ready?(instance, owner) and
+         Process.whereis(data.runner) == data.runner_pid and
+         Enum.all?(data.instance_monitors, fn {_ref, {name, pid}} -> Process.whereis(name) == pid end),
+       do: :ok,
+       else: {:error, :cluster_unavailable}
   end
 
   defp agent_address(agent, opts) do
@@ -3200,12 +3214,18 @@ defmodule Jido.AgentServer.Worker do
         else: data
 
     replies =
-      if data.active,
-        do:
-          reply(data.active.from, {:error, error}) ++
-            reply(data.active.wait_from, {:error, error}) ++
-            cancel_replies(data.active, {:error, error}),
-        else: []
+      if data.active do
+        failure =
+          if data.cluster_owner,
+            do: Jido.Instance.Cluster.transport_failure(:call, :worker_unavailable),
+            else: {:error, error}
+
+        reply(data.active.from, failure) ++
+          reply(data.active.wait_from, {:error, error}) ++
+          cancel_replies(data.active, {:error, error})
+      else
+        []
+      end
 
     {:stop_and_reply, {:shutdown, :execution_lifecycle_failed}, replies, data}
   end

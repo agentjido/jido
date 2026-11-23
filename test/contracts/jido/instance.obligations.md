@@ -110,7 +110,7 @@ downstream operation results stay with their owning components.
 ### jido.instance.I12 — Fixed-home namespace routing
 
 - **scope:** `cluster:`, `Jido.change_cluster_home/4`, `Jido.check_cluster_home/3`, and routed Address operations
-- **must:** Start only ingress on peers, require the exact canonical record before a durable home starts, and keep activation on the configured home's tree. Route supported operations at most once. Preserve a known result and report an ambiguous mutation without replay or promotion. Change the record with an exact comparison.
+- **must:** Start only ingress on peers, require the exact canonical record before a durable home starts, and keep activation on the configured home's tree. Refuse admission if the home role is missing or a Worker has lost a monitored dependency. Route supported operations at most once. Bound the wait for activation before dispatch. Preserve a known result and report an ambiguous mutation without replay or promotion. Change the record with an exact comparison.
 - **why:** Reachability cannot authorize a second Agent activation.
 - **kind:** functional
 - **status:** active

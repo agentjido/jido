@@ -12,6 +12,7 @@ defmodule Jido.Examples.DistributedAgents.FixedHomeTest do
   alias Jido.AgentServer
   alias Jido.AgentServer.{Status, TurnResult}
   alias Jido.Examples.DistributedAgents.{Counter, FixedHome, PeerHosts, TurnStartGate}
+  alias Jido.Instance.Names
 
   @sources [
     Path.expand("example.ex", __DIR__),
@@ -156,6 +157,34 @@ defmodule Jido.Examples.DistributedAgents.FixedHomeTest do
         peer_call(c.peer_b, Jido, :turn_result, [FixedHome, c.address, "known-turn"])
       )
     end)
+  end
+
+  test "a Worker lost after durable commit leaves an unknown reply and a readable result", c do
+    turn_id = "saved-before-worker-exit"
+    assert :ok = peer_call(c.peer_a, TurnStartGate, :attach_terminal, [FixedHome, c.address, turn_id])
+
+    call =
+      Task.async(fn ->
+        peer_call(c.peer_b, Jido, :call, [
+          FixedHome,
+          c.address,
+          Counter.add(7),
+          [turn_id: turn_id, result_handoff: true]
+        ])
+      end)
+
+    writer = peer_eventually(fn -> peer_call(c.peer_a, Process, :whereis, [TurnStartGate]) end)
+    runner = peer_call(c.peer_a, Process, :whereis, [Names.exec_runner(FixedHome)])
+    children = peer_call(c.peer_a, Supervisor, :which_children, [FixedHome])
+    assert {runner_id, ^runner, _, _} = List.keyfind(children, runner, 1)
+
+    assert :ok = peer_call(c.peer_a, Supervisor, :terminate_child, [FixedHome, runner_id])
+    assert {:error, {:cluster_outcome_unknown, :worker_unavailable}} = Task.await(call)
+    assert :ok = peer_call(c.peer_a, TurnStartGate, :release, [writer])
+    assert {:ok, _pid} = peer_call(c.peer_a, Supervisor, :restart_child, [FixedHome, runner_id])
+
+    assert {:ok, %TurnResult{status: :committed, agent_revision: 1}} =
+             peer_call(c.peer_b, Jido, :turn_result, [FixedHome, c.address, turn_id])
   end
 
   defp start(peer, opts) do

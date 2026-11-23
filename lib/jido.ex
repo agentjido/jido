@@ -129,6 +129,9 @@ defmodule Jido do
       def __jido_persistence__, do: Jido.Persistence.Config.normalize(unquote(persistence))
 
       @doc false
+      def __jido_compiled_store__, do: Jido.Instance.Options.compiled_store?(unquote(persistence))
+
+      @doc false
       @spec child_spec(term()) :: Supervisor.child_spec()
       def child_spec(init_arg \\ []) do
         Jido.child_spec(__jido_instance_options__(init_arg))
@@ -932,21 +935,22 @@ defmodule Jido do
   end
 
   defp route_address(instance, address, operation, args) when is_atom(instance) do
-    owner = Process.whereis(instance)
-
     case RuntimeStore.instance_cluster(instance) do
       false ->
         local_address_operation(operation, instance, address, args)
 
-      cluster ->
-        with {:ok, address} <- validate_instance_address(instance, address),
+      :unavailable ->
+        {:error, :cluster_unavailable}
+
+      {owner, cluster} ->
+        with {:ok, address} <- Address.validate_namespace(address, cluster.namespace),
              {:ok, args, timeout} <- cluster_request(operation, args, cluster.rpc_timeout),
              :ok <- Cluster.portable({address, args}, :cluster_nonportable_request) do
           if Cluster.ingress?(cluster) do
             request = [:jido_cluster_v1, instance, cluster.home, cluster.generation, address, operation, args]
             Cluster.remote(cluster.home, __MODULE__, request, operation, timeout)
           else
-            serve_cluster_address(instance, address, operation, args, owner)
+            serve_cluster_address(instance, address, operation, args, timeout, owner)
           end
         end
     end
@@ -958,15 +962,13 @@ defmodule Jido do
   @doc false
   def __cluster_dispatch__(:jido_cluster_v1, instance, home, generation, %Address{} = address, operation, args)
       when is_atom(instance) and operation in [:call, :cast, :status, :turn_result] do
-    owner = Process.whereis(instance)
-
     result =
-      with %{home: ^home, generation: ^generation} = cluster when home == node() <-
+      with {owner, %{home: ^home, generation: ^generation} = cluster} when home == node() <-
              RuntimeStore.instance_cluster(instance),
-           {:ok, address} <- validate_instance_address(instance, address),
-           {:ok, args, _timeout} <- cluster_request(operation, args, cluster.rpc_timeout),
+           {:ok, address} <- Address.validate_namespace(address, cluster.namespace),
+           {:ok, args, timeout} <- cluster_request(operation, args, cluster.rpc_timeout),
            :ok <- Cluster.portable({address, args}, :cluster_nonportable_request) do
-        serve_cluster_address(instance, address, operation, args, owner)
+        serve_cluster_address(instance, address, operation, args, timeout, owner)
       else
         {:error, _reason} = error -> error
         _ -> {:error, :cluster_unavailable}
@@ -1003,9 +1005,9 @@ defmodule Jido do
 
   defp cluster_request(_operation, _args, _limit), do: {:error, :invalid_cluster_request}
 
-  defp serve_cluster_address(instance, address, operation, args, owner) do
+  defp serve_cluster_address(instance, address, operation, args, timeout, owner) do
     if Cluster.ready?(instance, owner) do
-      result = cluster_address_operation(operation, instance, address, args, owner)
+      result = cluster_address_operation(operation, instance, address, args, timeout, owner)
 
       case Cluster.portable(result, :cluster_nonportable_reply) do
         :ok -> result
@@ -1018,41 +1020,62 @@ defmodule Jido do
     :exit, _reason -> {:error, :cluster_unavailable}
   end
 
-  defp cluster_address_operation(operation, instance, address, args, owner)
+  defp cluster_address_operation(operation, instance, address, args, timeout, owner)
        when operation in [:call, :cast] do
     started_at = System.monotonic_time(:millisecond)
+    {budget, expired} = cluster_resolution_budget(operation, args, timeout)
 
-    with {:ok, pid} <- resolve_or_activate(instance, address) do
-      if Cluster.ready?(instance, owner) do
-        try do
-          send_cluster_operation(operation, pid, args, started_at)
-        catch
-          :exit, {:timeout, _} -> Cluster.transport_failure(operation, :timeout)
-          :exit, _reason -> Cluster.transport_failure(operation, :worker_unavailable)
-        end
-      else
+    with true <- budget > 0,
+         {:ok, pid} <- Cluster.before_dispatch(budget, fn -> resolve_or_activate(instance, address) end, expired),
+         true <- Cluster.ready?(instance, owner) do
+      dispatch_cluster_signal(operation, pid, args, timeout, started_at)
+    else
+      false when budget == 0 ->
+        {:error, expired}
+
+      {:error, reason}
+      when reason in [:timeout, :not_running, :unavailable, :activation_timeout, :instance_unavailable] ->
         {:error, :cluster_unavailable}
-      end
+
+      {:error, _reason} = error ->
+        error
+
+      false ->
+        {:error, :cluster_unavailable}
     end
   end
 
-  defp cluster_address_operation(operation, instance, address, args, _owner),
-    do: local_address_operation(operation, instance, address, args)
+  defp cluster_address_operation(operation, instance, address, args, timeout, _owner) do
+    Cluster.before_dispatch(timeout, fn -> local_address_operation(operation, instance, address, args) end)
+  end
 
-  defp send_cluster_operation(:call, pid, [signal, opts], started_at) do
+  defp cluster_resolution_budget(:call, [_signal, opts], timeout) do
+    admission = Keyword.get(opts, :admission_timeout, 5_000)
+    if admission <= timeout, do: {admission, :admission_timeout}, else: {timeout, :cluster_unavailable}
+  end
+
+  defp cluster_resolution_budget(:cast, _args, timeout), do: {timeout, :cluster_unavailable}
+
+  defp dispatch_cluster_signal(operation, pid, args, timeout, started_at) do
     elapsed = System.monotonic_time(:millisecond) - started_at
-    timeout = Keyword.fetch!(opts, :timeout)
+    send_cluster_operation(operation, pid, args, timeout - elapsed, elapsed)
+  catch
+    :exit, {:timeout, _} -> Cluster.transport_failure(operation, :timeout)
+    :exit, _reason -> Cluster.transport_failure(operation, :worker_unavailable)
+  end
+
+  defp send_cluster_operation(:call, pid, [signal, opts], remaining, elapsed) do
     admission_timeout = Keyword.get(opts, :admission_timeout, 5_000)
 
     cond do
       elapsed >= admission_timeout ->
         {:error, :admission_timeout}
 
-      elapsed >= timeout ->
+      remaining <= 0 ->
         {:error, :cluster_unavailable}
 
       true ->
-        opts = Keyword.put(opts, :timeout, timeout - elapsed)
+        opts = Keyword.put(opts, :timeout, remaining)
 
         opts =
           if admission_timeout == :infinity,
@@ -1063,7 +1086,10 @@ defmodule Jido do
     end
   end
 
-  defp send_cluster_operation(:cast, pid, [signal], _started_at), do: AgentServer.cast(pid, signal)
+  defp send_cluster_operation(:cast, pid, [signal], remaining, _elapsed) when remaining > 0,
+    do: AgentServer.cast(pid, signal)
+
+  defp send_cluster_operation(:cast, _pid, _args, _remaining, _elapsed), do: {:error, :cluster_unavailable}
 
   defp local_address_operation(:call, instance, address, [signal, opts]),
     do: with_address_server(instance, address, &AgentServer.call(&1, signal, opts))

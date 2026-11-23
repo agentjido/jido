@@ -29,7 +29,7 @@ defmodule Jido.Instance.Cluster do
          true <- valid_generation?(generation, persistence),
          timeout when is_integer(timeout) and timeout in 1..@max_timeout <-
            Keyword.get(opts, :rpc_timeout, @default_timeout) do
-      {:ok, %{home: home, generation: generation, rpc_timeout: timeout}}
+      {:ok, %{home: home, namespace: namespace, generation: generation, rpc_timeout: timeout}}
     else
       _ ->
         {:error, Jido.Error.validation_error("Invalid Jido cluster configuration", kind: :config)}
@@ -37,10 +37,12 @@ defmodule Jido.Instance.Cluster do
   end
 
   def ingress?(%{home: home}), do: home != node()
+  def ingress?({_owner, cluster}), do: ingress?(cluster)
   def ingress?(_), do: false
 
   def ready?(instance, owner) do
-    is_pid(owner) and Process.whereis(instance) == owner and RuntimeStore.wake_ready?(instance) and
+    match?({^owner, %{home: home}} when home == node(), RuntimeStore.instance_cluster(instance)) and
+      RuntimeStore.wake_ready?(instance) and
       Enum.all?(
         [
           Names.agent_supervisor(instance),
@@ -54,34 +56,25 @@ defmodule Jido.Instance.Cluster do
       )
   end
 
-  def require_home(instance) when is_atom(instance) do
+  def require_home(instance), do: require_home(instance, false)
+  def require_ready_home(instance), do: require_home(instance, true)
+
+  defp require_home(instance, ready?) when is_atom(instance) do
     case RuntimeStore.instance_cluster(instance) do
-      %{home: home} when home == node() ->
-        :ok
-
-      %{home: _home} ->
-        {:error, :cluster_not_home}
-
-      _ ->
-        :ok
+      false -> :ok
+      {owner, %{home: home}} when home == node() -> check_ready(instance, owner, ready?)
+      {_owner, _cluster} -> {:error, :cluster_not_home}
+      :unavailable -> {:error, :cluster_unavailable}
     end
   end
 
-  def require_home(_instance), do: :ok
+  defp require_home(_instance, _ready?), do: :ok
 
-  def require_ready_home(instance) when is_atom(instance) do
-    with :ok <- require_home(instance) do
-      case RuntimeStore.instance_cluster(instance) do
-        false ->
-          :ok
+  defp check_ready(_instance, _owner, false), do: :ok
 
-        _cluster ->
-          if ready?(instance, Process.whereis(instance)), do: :ok, else: {:error, :cluster_unavailable}
-      end
-    end
+  defp check_ready(instance, owner, true) do
+    if ready?(instance, owner), do: :ok, else: {:error, :cluster_unavailable}
   end
-
-  def require_ready_home(_instance), do: :ok
 
   def require_managed_activation(nil), do: :ok
 
@@ -90,12 +83,11 @@ defmodule Jido.Instance.Cluster do
       false ->
         :ok
 
-      %{home: home} when home == node() ->
+      {owner, %{home: home}} when home == node() ->
         supervisor = Process.whereis(Names.agent_supervisor(instance))
-        ready? = ready?(instance, Process.whereis(instance))
 
         cond do
-          not ready? ->
+          not ready?(instance, owner) ->
             {:error, :cluster_unavailable}
 
           not is_pid(supervisor) or
@@ -106,8 +98,11 @@ defmodule Jido.Instance.Cluster do
             :ok
         end
 
-      _ ->
+      {_owner, _cluster} ->
         {:error, :cluster_not_home}
+
+      :unavailable ->
+        {:error, :cluster_unavailable}
     end
   end
 
@@ -214,6 +209,17 @@ defmodule Jido.Instance.Cluster do
 
     _kind, _reason ->
       transport_failure(operation, :remote_dispatch_failed)
+  end
+
+  # This work can open persistence or wait for an activation. It must never
+  # send a Signal. A timeout here proves that the Signal was not dispatched.
+  def before_dispatch(timeout, fun, timeout_error \\ :cluster_unavailable) do
+    :erpc.call(node(), fun, timeout)
+  catch
+    :error, {:erpc, :timeout} -> {:error, timeout_error}
+    :error, {:erpc, _reason} -> {:error, :cluster_unavailable}
+    :exit, {:exception, _reason} -> {:error, :cluster_unavailable}
+    :exit, {:signal, _reason} -> {:error, :cluster_unavailable}
   end
 
   def transport_failure(operation, reason) when operation in [:call, :cast],

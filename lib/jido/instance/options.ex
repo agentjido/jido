@@ -46,12 +46,14 @@ defmodule Jido.Instance.Options do
   def materialize(config, _name, _otp_app, _namespace, _persistence), do: config
 
   defp materialize_persistence(config, persistence) do
-    case {Keyword.get(config, :cluster, false), persistence} do
-      {false, _} -> Keyword.put_new(config, :persistence, persistence)
-      {_, value} when value in [nil, false] -> config
-      _ -> Keyword.put(config, :persistence, :cluster_requires_runtime_persistence)
-    end
+    if Jido.Instance.Cluster.configured?(config),
+      do: config,
+      else: Keyword.put_new(config, :persistence, persistence)
   end
+
+  @doc false
+  @spec compiled_store?(term()) :: boolean()
+  def compiled_store?(declaration), do: declaration not in [nil, false]
 
   @doc false
   @spec validate_definition!(term()) :: keyword() | no_return()
@@ -92,6 +94,7 @@ defmodule Jido.Instance.Options do
          :ok <- validate_max_tasks(Keyword.get(opts, :max_tasks, @default_max_tasks)),
          {:ok, cluster} <-
            Jido.Instance.Cluster.validate(Keyword.get(opts, :cluster, false), opts[:namespace], opts[:persistence]),
+         :ok <- validate_cluster_store(opts[:name], cluster),
          {:ok, persistence} <- validate_persistence(opts[:persistence], cluster, phase),
          :ok <- validate_persistence_namespace(persistence, Keyword.get(opts, :namespace)),
          :ok <- validate_inherited_persistence(agent_server, persistence) do
@@ -200,8 +203,16 @@ defmodule Jido.Instance.Options do
     end
   end
 
-  defp validate_persistence(:cluster_requires_runtime_persistence, _cluster, _phase),
-    do: invalid("Clustered instances require runtime persistence configuration", %{})
+  defp validate_cluster_store(_name, false), do: :ok
+
+  defp validate_cluster_store(name, _cluster) do
+    if Code.ensure_loaded?(name) and function_exported?(name, :__jido_compiled_store__, 0) and
+         name.__jido_compiled_store__() do
+      invalid("Clustered instances require runtime persistence configuration", %{})
+    else
+      :ok
+    end
+  end
 
   defp validate_persistence(:inherit, cluster, _phase) when is_map(cluster),
     do: invalid("Clustered instances require an explicit persistence profile", %{})

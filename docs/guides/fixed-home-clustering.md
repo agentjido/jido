@@ -69,8 +69,10 @@ Jido.turn_result(MyApp.Tickets, address, turn_id)
 Use `Jido.status/3` for observation and `Jido.cast/3` for best-effort dispatch.
 A verified unavailable endpoint returns `:cluster_unavailable`. A mutating
 request that may have reached the home can return `{:cluster_outcome_unknown, reason}`.
-The router makes one attempt. A timeout leaves accepted work running. Look up
-or reconcile the outcome before resending. A retained result remains readable
+The router makes one attempt. The home limits the wait for activation before
+it sends the Signal. A transport failure can occur before or after admission.
+A caller timeout leaves accepted work running. Look up or reconcile the
+outcome before resending. A retained result remains readable
 until you acknowledge it on the home. An absent result can mean work is still
 running. A repeated Turn ID does not deduplicate submissions.
 
