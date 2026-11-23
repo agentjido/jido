@@ -705,7 +705,7 @@ Disposition terms:
 | `Jido.Agent.Schema` | Keep | Canonical generic Agent authoring checks, struct schema, defaults, and schema traversal |
 | `Jido.Agent.Topology` | Keep | Static logical members and output connections in an Agent definition |
 | `Jido.Agent.Turn` | Removed | Runner owns one private prepared execution value; the public Agent model needs no second command container |
-| `Jido.Agent.StateSource` | Internal | Identifies external state fields and keeps them out of Jido-owned state |
+| `Jido.Agent.StateSource` | Internal | Projects external fields into Snapshots and Turn context and keeps them out of Jido-owned state |
 | `Jido.Agent.Validation` | Keep | Absorbs Authoring and Data checks |
 | `Jido.Agent.View` | Keep | Safe framework-neutral Agent view |
 

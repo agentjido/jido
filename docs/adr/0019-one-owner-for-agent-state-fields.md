@@ -13,14 +13,14 @@ rejected the write. An external writer can change the row after admission.
 
 Give each Agent state field one authoritative owner. Ordinary Agent state
 belongs to Jido. The built-in Plugin uses `ecto CounterState` to declare that
-Ecto owns the Agent's domain fields. The Agent uses a row snapshot for a Turn.
-On the next Turn or after recovery, read those fields from the row. Any copy
-in Agent state or a checkpoint is derived. Agent authoring rejects a Joi
-schema or initial state in the same declaration.
+Ecto owns the Agent's domain fields. Each new Turn reads the row at admission.
+Actions and Flow steps see those fields in `context.agent_state`. A resumed
+Turn uses its admitted row from the continuation checkpoint. Agent authoring
+rejects a Joi schema or initial state in the same declaration.
 
 A live snapshot reads the current row into the observed Agent state. An
 external write can change the observed fields independently of the Jido
-revisions. Jido checkpoints retain only the fields it owns.
+revisions. Checkpoints of Agent state retain only Jido-owned fields.
 
 Read the row version with its values. Save a proposal only if the version
 still matches. If the version changed, keep the newer row. A caller who

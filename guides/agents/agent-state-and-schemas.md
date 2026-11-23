@@ -160,8 +160,7 @@ defmodule MyApp.CounterAgent do
 
     route "counter.increment" do
       action _input, context: context do
-        row = context.plugin_inputs[EctoState].runtime.row
-        changes = %{count: row.count + 1}
+        changes = %{count: context.agent_state.count + 1}
         {:ok, changes, [EctoState.update(changes)]}
       end
 
@@ -175,9 +174,13 @@ end
 Use only `ecto SchemaModule` in this state block. The compiler rejects
 `schema`, `initial_state`, and options on the `ecto` declaration.
 
-Each live Turn reads the current row. The Action reads the row from its
-Plugin input and can return one update Directive. Any reply comes from the
-route's own output. The Plugin uses the schema's changeset and checks
+Each live Turn reads the current row at admission. Actions and Flow steps
+read these fields through `context.agent_state`. The row stays fixed for
+that Turn. The next Turn reads the row again.
+
+Return an `EctoState.update/1` Directive to change the row. Jido removes
+unchanged SQL fields from the candidate state and rejects changes to those
+fields in the candidate. The Plugin uses the schema's changeset and checks
 `lock_version` when it saves. A stale row fails the Turn before the caller
 receives success. A Turn with no update Directive only reads the row.
 

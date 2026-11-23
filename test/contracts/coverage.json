@@ -1728,10 +1728,13 @@
         "jido.agent_server.plugin_runtime.I15": {
           "failing": 0,
           "kind": "functional",
-          "passing": 2,
+          "passing": 5,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a restored Flow reads the row admitted before it waited",
+            "test normal Action state stays fixed after Turn admission",
+            "test returning observed state does not copy SQL fields into Jido state or write to SQL",
             "test snapshot reports a missing row or unavailable Repo",
             "test snapshot returns the current Ecto fields through agent.state"
           ]

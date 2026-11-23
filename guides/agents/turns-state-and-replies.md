@@ -132,7 +132,7 @@ Jido merges these keys into the execution context:
 | `:agent_id` | The instance ID |
 | `:agent_module` | The Agent module, or `nil` |
 | `:agent_signal_source` | The definition's `signal_source` |
-| `:agent_state` | The state at the start of the Turn |
+| `:agent_state` | The state at the start of the Turn, including any Ecto fields read at admission |
 | `:agent_topology` | The definition's topology data |
 | `:plugin_inputs` | Plugin preparation results for this Turn |
 | `:signal` | The source Signal |

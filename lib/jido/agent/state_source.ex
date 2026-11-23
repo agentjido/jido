@@ -10,8 +10,37 @@ defmodule Jido.Agent.StateSource do
     end)
   end
 
-  # Snapshot reads can include SQL fields. Only Jido-owned fields can enter
-  # the runtime or a Jido checkpoint.
+  def observe(agent, %{__struct__: schema} = row) do
+    row
+    |> Map.take(schema.__schema__(:fields))
+    |> Map.merge(agent.state)
+  end
+
+  def turn_state(agent, plugin_inputs) do
+    case Map.get(plugin_inputs, Jido.Plugin.EctoState) do
+      %{runtime: %{row: row}} -> observe(agent, row)
+      _ -> agent.state
+    end
+  end
+
+  # A handler can return the state it read. Remove unchanged SQL fields
+  # before validating the candidate. A changed field must fail validation.
+  def drop_copied_fields(candidate, stored, observed)
+      when stored === observed or candidate === stored,
+      do: candidate
+
+  def drop_copied_fields(candidate, stored, observed) do
+    copied =
+      for {key, value} <- observed,
+          not Map.has_key?(stored, key),
+          Map.fetch(candidate, key) === {:ok, value},
+          do: key
+
+    Map.drop(candidate, copied)
+  end
+
+  # Snapshot reads can include SQL fields. Keep only Jido-owned fields when
+  # using an observed Agent as input or writing a Jido checkpoint.
   def stored_state(agent, schema) do
     with state when is_map(state) and not is_struct(state) <- agent.state,
          ecto when not is_nil(ecto) <- ecto_schema(agent),

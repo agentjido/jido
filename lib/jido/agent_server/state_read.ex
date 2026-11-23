@@ -11,9 +11,7 @@ defmodule Jido.AgentServer.StateRead do
 
       schema ->
         with {:ok, row} <- fetch_row(schema, agent.id) do
-          fields = Map.take(row, schema.__schema__(:fields))
-          agent = %{agent | state: Map.merge(fields, agent.state)}
-          %{snapshot | agent: agent}
+          %{snapshot | agent: %{agent | state: StateSource.observe(agent, row)}}
         end
     end
   end
