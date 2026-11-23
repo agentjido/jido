@@ -9,6 +9,8 @@ defmodule Jido.Persistence.Mnesia do
 
   Reads and writes use Mnesia transactions. A compare-and-swap takes a write
   lock on the key and commits the comparison and replacement together.
+  Set `:sync_writes` to `true` to wait for the commit and its disk log on
+  participating disk nodes before a write returns.
   Mnesia transaction aborts return an error. The Store treats an unclassified
   write error as indeterminate, so a record owner must reload before retrying.
   """
@@ -19,7 +21,9 @@ defmodule Jido.Persistence.Mnesia do
   @spec validate_options(keyword()) :: :ok | {:error, term()}
   def validate_options(opts) do
     with true <- is_list(opts) and Keyword.keyword?(opts),
-         [:table] <- Keyword.keys(opts),
+         keys = Keyword.keys(opts),
+         true <- keys == Enum.uniq(keys) and keys -- [:table, :sync_writes] == [],
+         true <- is_boolean(Keyword.get(opts, :sync_writes, false)),
          table when is_atom(table) and not is_nil(table) <- Keyword.get(opts, :table),
          [:key, :value] <- :mnesia.table_info(table, :attributes),
          :set <- :mnesia.table_info(table, :type),
@@ -37,7 +41,7 @@ defmodule Jido.Persistence.Mnesia do
   @spec get(binary(), keyword()) :: {:ok, binary()} | {:error, term()}
   def get(key, opts) when is_binary(key) do
     with :ok <- validate_options(opts) do
-      transaction(fn -> read_value(Keyword.fetch!(opts, :table), key) end)
+      transaction(false, fn -> read_value(Keyword.fetch!(opts, :table), key) end)
     end
   end
 
@@ -45,7 +49,9 @@ defmodule Jido.Persistence.Mnesia do
   @spec put(binary(), binary(), keyword()) :: :ok | {:error, term()}
   def put(key, value, opts) when is_binary(key) and is_binary(value) do
     with :ok <- validate_options(opts) do
-      transaction(fn -> :mnesia.write({Keyword.fetch!(opts, :table), key, value}) end)
+      transaction(Keyword.get(opts, :sync_writes, false), fn ->
+        :mnesia.write({Keyword.fetch!(opts, :table), key, value})
+      end)
     end
   end
 
@@ -55,7 +61,9 @@ defmodule Jido.Persistence.Mnesia do
   def compare_and_swap(key, expected, value, opts)
       when is_binary(key) and (expected == :not_found or is_binary(expected)) and is_binary(value) do
     with :ok <- validate_options(opts) do
-      transaction(fn -> swap_value(Keyword.fetch!(opts, :table), key, expected, value) end)
+      transaction(Keyword.get(opts, :sync_writes, false), fn ->
+        swap_value(Keyword.fetch!(opts, :table), key, expected, value)
+      end)
     end
   end
 
@@ -63,7 +71,7 @@ defmodule Jido.Persistence.Mnesia do
   @spec delete(binary(), keyword()) :: :ok | {:error, term()}
   def delete(key, opts) when is_binary(key) do
     with :ok <- validate_options(opts) do
-      transaction(fn -> :mnesia.delete({Keyword.fetch!(opts, :table), key}) end)
+      transaction(Keyword.get(opts, :sync_writes, false), fn -> :mnesia.delete({Keyword.fetch!(opts, :table), key}) end)
     end
   end
 
@@ -88,11 +96,13 @@ defmodule Jido.Persistence.Mnesia do
     end
   end
 
-  defp transaction(fun) do
+  defp transaction(sync?, fun) do
     if :mnesia.is_transaction() do
       {:error, {:rejected, :nested_transaction}}
     else
-      case :mnesia.transaction(fun) do
+      result = if sync?, do: :mnesia.sync_transaction(fun), else: :mnesia.transaction(fun)
+
+      case result do
         {:atomic, result} -> result
         {:aborted, reason} -> {:error, {:mnesia_aborted, reason}}
       end

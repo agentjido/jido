@@ -788,6 +788,7 @@ Disposition terms:
 | `Jido.AgentServer.Lifecycle` | Keep | Canonical Turn, wait, cancellation, commit, effect, and recovery policy owner |
 | `Jido.AgentServer.Status` | Keep | Public typed process-neutral status view for state, active Turn, waits, effects, revision, and last failure |
 | `Jido.AgentOwnership` | Keep | Public process-neutral fence for one local activation ownership relation |
+| `Jido.Instance.Cluster` | Keep internal | Fixed-home configuration, durable startup record, and native RPC transport |
 | `Jido.Instance.Names` | Keep internal | Canonical per-instance runtime naming and partition-key policy |
 | `Jido.Instance.NamespaceRegistry` | Keep | Instance namespace ownership process |
 | `Jido.Instance.Options` | Keep | Instance option materialization and validation |

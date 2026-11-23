@@ -45,3 +45,5 @@ secret retrieval, rotation, least privilege, and tenant scope.
 - [Shared offline client](../../support/offline_inference_client.ex)
 
 [Previous: Distribution boundaries](../25_07_distribution_boundaries/README.md)
+
+[Next chapter](../../26_distributed_agents/README.md)

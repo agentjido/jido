@@ -17,7 +17,9 @@ defmodule Jido.AgentServer do
   Returns a child specification for one complete Agent activation.
 
   Pass a complete Agent instance as `:agent`. Pass `:jido` to register the
-  activation with a Jido instance and use its Runner. A standalone
+  activation with a local Jido instance and use its Runner. Start Agents on
+  a clustered instance with `Jido.start_agent/3` or `Jido.activate_agent/3`
+  so the home owns their supervision. A standalone
   activation needs a compatible named `:runner`.
   """
   @spec child_spec(keyword()) :: Supervisor.child_spec()
@@ -28,6 +30,8 @@ defmodule Jido.AgentServer do
 
   The third argument is a caller timeout or a keyword list with `:timeout`,
   `:admission_timeout`, and `:context`. Both timeouts default to 5,000 ms.
+  For a durable Agent, use `:turn_id` and `result_handoff: true` to retain
+  the exact terminal result for lookup by Address.
   The admission timeout limits the wait before execution starts. A finite
   admission deadline requires a caller on the worker's node. Pass
   `admission_timeout: :infinity` for a caller on a different node.

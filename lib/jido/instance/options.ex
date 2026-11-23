@@ -5,6 +5,7 @@ defmodule Jido.Instance.Options do
 
   @allowed_keys [
     :activation,
+    :cluster,
     :agent_server,
     :debug,
     :max_tasks,
@@ -31,17 +32,28 @@ defmodule Jido.Instance.Options do
   @spec materialize(term(), atom(), atom(), String.t() | nil, term()) :: term()
   def materialize(config, name, otp_app, namespace, persistence) when is_list(config) do
     if Keyword.keyword?(config) do
+      config = materialize_persistence(config, persistence)
+
       config
       |> Keyword.put(:name, name)
       |> Keyword.put_new(:otp_app, otp_app)
       |> Keyword.put_new(:namespace, namespace)
-      |> Keyword.put_new(:persistence, persistence)
     else
       config
     end
   end
 
   def materialize(config, _name, _otp_app, _namespace, _persistence), do: config
+
+  defp materialize_persistence(config, persistence) do
+    if Jido.Instance.Cluster.configured?(config),
+      do: config,
+      else: Keyword.put_new(config, :persistence, persistence)
+  end
+
+  @doc false
+  @spec compiled_store?(term()) :: boolean()
+  def compiled_store?(declaration), do: declaration not in [nil, false]
 
   @doc false
   @spec validate_definition!(term()) :: keyword() | no_return()
@@ -62,7 +74,12 @@ defmodule Jido.Instance.Options do
 
   @doc false
   @spec validate(term()) :: {:ok, keyword()} | {:error, Error.ValidationError.t()}
+  @spec validate(term(), :start | :child_spec) :: {:ok, keyword(), false | map()} | {:error, Error.ValidationError.t()}
   def validate(opts) do
+    with {:ok, validated, _cluster} <- validate(opts, :start), do: {:ok, validated}
+  end
+
+  def validate(opts, phase) do
     agent_server = if Keyword.keyword?(opts), do: Keyword.get(opts, :agent_server, []), else: []
 
     with true <- Keyword.keyword?(opts),
@@ -75,7 +92,10 @@ defmodule Jido.Instance.Options do
          {:ok, activation} <- validate_activation(Keyword.get(opts, :activation, @default_activation)),
          :ok <- Jido.AgentServer.Worker.validate_defaults(agent_server),
          :ok <- validate_max_tasks(Keyword.get(opts, :max_tasks, @default_max_tasks)),
-         {:ok, persistence} <- validate_persistence(Keyword.get(opts, :persistence)),
+         {:ok, cluster} <-
+           Jido.Instance.Cluster.validate(Keyword.get(opts, :cluster, false), opts[:namespace], opts[:persistence]),
+         :ok <- validate_cluster_store(opts[:name], cluster),
+         {:ok, persistence} <- validate_persistence(opts[:persistence], cluster, phase),
          :ok <- validate_persistence_namespace(persistence, Keyword.get(opts, :namespace)),
          :ok <- validate_inherited_persistence(agent_server, persistence) do
       validated =
@@ -84,7 +104,7 @@ defmodule Jido.Instance.Options do
         |> Keyword.put(:activation, activation)
         |> Keyword.put(:persistence, persistence)
 
-      {:ok, validated}
+      {:ok, validated, cluster}
     else
       false -> invalid("Jido instance options must be a keyword list", %{value: opts})
       {:error, _error} = error -> error
@@ -94,8 +114,8 @@ defmodule Jido.Instance.Options do
   @doc false
   @spec validate!(term()) :: keyword() | no_return()
   def validate!(opts) do
-    case validate(opts) do
-      {:ok, validated} -> validated
+    case validate(opts, :child_spec) do
+      {:ok, validated, _cluster} -> validated
       {:error, error} -> raise error
     end
   end
@@ -183,7 +203,27 @@ defmodule Jido.Instance.Options do
     end
   end
 
-  defp validate_persistence(persistence) do
+  defp validate_cluster_store(_name, false), do: :ok
+
+  defp validate_cluster_store(name, _cluster) do
+    if Code.ensure_loaded?(name) and function_exported?(name, :__jido_compiled_store__, 0) and
+         name.__jido_compiled_store__() do
+      invalid("Clustered instances require runtime persistence configuration", %{})
+    else
+      :ok
+    end
+  end
+
+  defp validate_persistence(:inherit, cluster, _phase) when is_map(cluster),
+    do: invalid("Clustered instances require an explicit persistence profile", %{})
+
+  defp validate_persistence(persistence, cluster, :child_spec) when is_map(cluster),
+    do: {:ok, persistence}
+
+  defp validate_persistence(persistence, %{home: home}, :start) when home != node(),
+    do: {:ok, persistence}
+
+  defp validate_persistence(persistence, _cluster, _phase) do
     case Jido.Persistence.resolve_config(persistence, nil) do
       {:ok, config} -> {:ok, config}
       {:error, reason} -> invalid("Jido instance persistence is invalid", %{reason: reason})
@@ -203,7 +243,7 @@ defmodule Jido.Instance.Options do
   defp validate_inherited_persistence(_agent_server, _persistence), do: :ok
 
   defp validate_persistence_namespace(nil, _namespace), do: :ok
-  defp validate_persistence_namespace(%Jido.Persistence.Config{}, namespace) when is_binary(namespace), do: :ok
+  defp validate_persistence_namespace(_persistence, namespace) when is_binary(namespace), do: :ok
 
   defp validate_persistence_namespace(%Jido.Persistence.Config{}, _namespace) do
     invalid("Persistent Jido instances require a stable namespace", %{

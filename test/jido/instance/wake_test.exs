@@ -49,6 +49,93 @@ defmodule Jido.Instance.WakeTest do
     defp delegate_options(opts), do: Keyword.take(opts, [:table])
   end
 
+  defmodule Finish do
+    use Jido.Action, name: "wake_test_finish"
+
+    def run(_params, _context), do: {:ok, %{finished: true}}
+  end
+
+  defmodule ConsecutiveTimers do
+    use Jido.Flow, name: "wake_test_consecutive_timers"
+
+    flow do
+      timer "first", after_ms: 40
+      timer "second", after_ms: 40, needs: ["first"]
+      step "finish", action: Finish, params: %{}, needs: ["second"]
+      output result("finish")
+    end
+  end
+
+  defmodule TimedAgent do
+    use Jido.Agent, name: "wake_test_timed_agent"
+
+    state do
+      schema Jido.Joi.object(%{finished: Jido.Joi.boolean() |> Jido.Joi.default(false)})
+    end
+
+    routes do
+      route "test.wake.start", ConsecutiveTimers do
+      end
+    end
+  end
+
+  @tag obligation: "jido.persistence.I17"
+  test "a wake can register the next wait in the same durable Turn" do
+    {instance, address} = start_timed_agent()
+    signal = Jido.Signal.new!("test.wake.start", %{}, source: "/test/wake")
+
+    assert {:ok, %{status: :waiting, durability: :durable}} =
+             Jido.call(instance, address, signal, turn_id: "two-wakes", result_handoff: true)
+
+    assert_eventually(
+      fn ->
+        match?({:ok, _result}, Jido.turn_result(instance, address, "two-wakes"))
+      end,
+      160
+    )
+
+    assert {:ok, %{status: :committed, agent_revision: 1}} = Jido.turn_result(instance, address, "two-wakes")
+    assert_eventually(fn -> WakeStore.list(instance) == {:ok, []} end)
+  end
+
+  @tag obligation: "jido.persistence.I17"
+  test "a failed wake index write cannot acknowledge a durable wait" do
+    {instance, address, control} = start_timed_agent_with_fault()
+    index = "jido:wake:v3:" <> Base.url_encode64(address.namespace, padding: false) <> ":index"
+    FaultAdapter.configure(control, {:write_error, index, :temporary})
+    signal = Jido.Signal.new!("test.wake.start", %{}, source: "/test/wake")
+    result = Jido.call(instance, address, signal, turn_id: "failed-wake", result_handoff: true)
+    refute match?({:ok, %{status: :waiting, durability: :durable}}, result)
+  end
+
+  @tag obligation: "jido.persistence.I17"
+  test "an orphan wake does not start a new Turn on an idle Agent" do
+    {instance, address} = start_timed_agent()
+
+    orphan =
+      Jido.Signal.new!("jido.durable.wake", %{turn_id: "lost", wait_id: "lost", deadline: 0}, source: "/test/wake")
+
+    assert {:error, :stale_wait} = Jido.call(instance, address, orphan)
+    assert %{agent_revision: 0, work_state: :idle} = Jido.status(instance, address)
+  end
+
+  defp start_timed_agent do
+    {instance, address, _control} = start_timed_agent_with_fault()
+    {instance, address}
+  end
+
+  defp start_timed_agent_with_fault do
+    suffix = System.unique_integer([:positive])
+    instance = :"jido_two_wakes_#{suffix}"
+    namespace = "two-wakes-#{suffix}"
+    {:ok, control} = start_supervised(FaultAdapter)
+    profile = {FaultAdapter, delegate: {ETS, table: :"jido_two_wakes_store_#{suffix}"}, control: control}
+    start_supervised!({Jido, name: instance, namespace: namespace, persistence: profile})
+    {:ok, address} = Jido.agent_address(instance, "timer")
+    assert {:ok, ^address} = Jido.create_agent(instance, address, TimedAgent)
+    {instance, address, control}
+  end
+
   @tag obligation: "jido.persistence.I17"
   test "instance readiness waits for a retried wake recovery read" do
     suffix = System.unique_integer([:positive])

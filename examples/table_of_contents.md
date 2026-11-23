@@ -921,6 +921,29 @@ External integration examples use deterministic local services behind the
 same application ports. They must state what a real adapter must supply. They
 must not contact a network service.
 
+### 26 Distributed Agents
+
+Use two local BEAM nodes to test Agent identity, routing, and ownership.
+
+1. One pinned Agent for two nodes. Route calls to the configured host and
+   inspect the outcome after a link failure.
+2. Move a durable Agent. Resume a waiting Turn on a new host after the
+   original host stops.
+3. Shared storage and Agent ownership. Reproduce two live activations of
+   the same Agent against one shared store.
+4. Recover a ticket deadline after a crash. Kill the BEAM and start the
+   namespace on the surviving host. Confirm the same Turn commits.
+5. Split the BEAM link with SQL still available. Restore an Agent on the
+   second node while the original activation is still able to commit.
+
+6. Route to one fixed home. Start ingress first, route calls once and recover
+   the saved outcome after a lost reply.
+7. Recover a ticket with native OTP. Confirm the old home stopped, then recover
+   an overdue deadline from Mnesia on the survivor.
+
+The [chapter](26_distributed_agents/README.md) links the runnable tests and
+the automatic takeover evidence gate.
+
 ## Structure decisions
 
 The outline uses these decisions:

@@ -133,6 +133,7 @@ defmodule Jido.AgentServer.Worker do
   @spec start_link(keyword()) :: :gen_statem.start_ret()
   def start_link(opts) when is_list(opts) do
     with {:ok, opts} <- activation_options(opts),
+         :ok <- require_unclustered_worker(opts[:jido]),
          {:ok, specs} <-
            Jido.Plugin.Normalizer.normalize_runtime(
              Jido.Agent.Plugin.declarations(opts[:agent]),
@@ -150,6 +151,16 @@ defmodule Jido.AgentServer.Worker do
   end
 
   def start_link(_opts), do: invalid_options("options must be a keyword list")
+
+  defp require_unclustered_worker(nil), do: :ok
+
+  defp require_unclustered_worker(instance) do
+    case Jido.Instance.RuntimeStore.instance_cluster(instance) do
+      false -> :ok
+      :unavailable -> {:error, :cluster_unavailable}
+      {_owner, _cluster} -> {:error, :cluster_requires_managed_activation}
+    end
+  end
 
   @doc false
   def activation_options(opts) when is_list(opts) do
@@ -211,7 +222,8 @@ defmodule Jido.AgentServer.Worker do
           else: invalid_options("partition requires a Jido instance")
 
       jido when is_atom(jido) ->
-        with pid when is_pid(pid) <- Process.whereis(jido),
+        with :ok <- Jido.Instance.Cluster.require_home(jido),
+             pid when is_pid(pid) <- Process.whereis(jido),
              {:supervisor, Jido, 1} <- :proc_lib.translate_initial_call(pid),
              true <- instance_children_live?(pid, jido),
              runner = Jido.Instance.Names.exec_runner(jido),
@@ -228,6 +240,7 @@ defmodule Jido.AgentServer.Worker do
 
           {:ok, merged}
         else
+          {:error, _reason} = error -> error
           _ -> invalid_options("invalid Jido instance, partition, or Runner ownership")
         end
 
@@ -443,25 +456,24 @@ defmodule Jido.AgentServer.Worker do
   Caller timeout exits the caller, as with OTP calls; it does not cancel work.
   Finite waits must be in `0..4_294_967_295` ms. Context accepts a
   map, keyword list, or nil. It is not stored in Agent state or Signal data.
-  `:turn_id` and the Agent command context keys are reserved.
+  Context keys `:turn_id` and the Agent command keys are reserved.
+  A durable caller can select a known `:turn_id` option and retain the result
+  with `result_handoff: true`, as with `submit/3`.
   """
   @spec call(server(), Signal.t(), timeout() | keyword()) :: signal_result()
   def call(server, signal, timeout_or_opts \\ 5_000) do
-    opts = if is_list(timeout_or_opts), do: timeout_or_opts, else: [timeout: timeout_or_opts]
-
     with {:ok, signal} <- Validation.normalize_signal(signal),
-         {:ok, context} <- Lifecycle.turn_context(opts, [:timeout, :admission_timeout, :context]),
-         timeout = Keyword.get(opts, :timeout, 5_000),
-         :ok <- Lifecycle.validate_wait(timeout),
+         {:ok, opts, context} <- call_options(timeout_or_opts),
          {:ok, deadline} <- Lifecycle.admission_deadline(opts) do
+      timeout = Keyword.get(opts, :timeout, 5_000)
+      turn_id = Keyword.get(opts, :turn_id) || Jido.Id.uuid7()
       reply_gate = ReplyGate.start(self(), server)
-      turn_id = Jido.Id.uuid7()
 
       try do
         result =
           :gen_statem.call(
             server,
-            turn_event(turn_id, signal, context, deadline, reply_gate),
+            turn_event(turn_id, signal, context, deadline, reply_gate, Keyword.get(opts, :result_handoff, false)),
             timeout
           )
 
@@ -472,6 +484,19 @@ defmodule Jido.AgentServer.Worker do
           ReplyGate.abandon(reply_gate)
           :erlang.raise(kind, reason, __STACKTRACE__)
       end
+    end
+  end
+
+  @doc false
+  def call_options(timeout_or_opts) do
+    opts = if is_list(timeout_or_opts), do: timeout_or_opts, else: [timeout: timeout_or_opts]
+
+    with {:ok, context} <-
+           Lifecycle.turn_context(opts, [:timeout, :admission_timeout, :context, :turn_id, :result_handoff]),
+         :ok <- validate_result_options(opts),
+         :ok <- Lifecycle.validate_wait(Keyword.get(opts, :timeout, 5_000)),
+         {:ok, _timeout} <- Lifecycle.admission_timeout(opts) do
+      {:ok, opts, context}
     end
   end
 
@@ -504,9 +529,9 @@ defmodule Jido.AgentServer.Worker do
              :result_handoff,
              :turn_id
            ]),
-         :ok <- validate_result_handoff(opts),
-         {:ok, turn_id} <- submit_turn_id(opts),
+         :ok <- validate_result_options(opts),
          {:ok, deadline} <- Lifecycle.admission_deadline(opts) do
+      turn_id = Keyword.get(opts, :turn_id) || Jido.Id.uuid7()
       reply_gate = ReplyGate.start(self(), server)
       public_request_id = Jido.Id.uuid7()
 
@@ -552,9 +577,6 @@ defmodule Jido.AgentServer.Worker do
     end
   end
 
-  defp turn_event(turn_id, signal, context, deadline, reply_gate),
-    do: turn_event(turn_id, signal, context, deadline, reply_gate, false)
-
   defp turn_event(turn_id, signal, context, deadline, reply_gate, false),
     do: {:turn, {turn_id, make_ref()}, signal, context, deadline, reply_gate}
 
@@ -567,11 +589,13 @@ defmodule Jido.AgentServer.Worker do
       else: Lifecycle.invalid_options("result_handoff must be a boolean")
   end
 
-  defp submit_turn_id(opts) do
-    case Keyword.get(opts, :turn_id) do
-      nil -> {:ok, Jido.Id.uuid7()}
-      turn_id when is_binary(turn_id) and byte_size(turn_id) > 0 -> {:ok, turn_id}
-      _turn_id -> Lifecycle.invalid_options("turn_id must be a nonempty string")
+  defp validate_result_options(opts) do
+    with :ok <- validate_result_handoff(opts) do
+      case Keyword.get(opts, :turn_id) do
+        nil -> :ok
+        turn_id when is_binary(turn_id) and byte_size(turn_id) > 0 -> :ok
+        _turn_id -> Lifecycle.invalid_options("turn_id must be a nonempty string")
+      end
     end
   end
 
@@ -703,7 +727,7 @@ defmodule Jido.AgentServer.Worker do
     runner = Keyword.fetch!(opts, :runner)
 
     case register_instance(agent.id, opts) do
-      {:ok, monitors} -> init_registered(agent, runner, opts, monitors)
+      {:ok, monitors, owner} -> init_registered(agent, runner, opts, monitors, owner)
       {:error, reason} -> {:stop, reason}
     end
   end
@@ -711,28 +735,36 @@ defmodule Jido.AgentServer.Worker do
   defp register_instance(id, opts) do
     case opts[:jido] do
       nil ->
-        {:ok, %{}}
+        {:ok, %{}, nil}
 
       jido ->
         registry = Jido.Instance.Names.registry(jido)
         key = RegistrationGuard.registry_key(id, opts[:partition])
 
-        with [{root, {:activation, activation_id}}] <- Registry.lookup(registry, key),
+        dependencies =
+          for name <- [jido, registry, Jido.Instance.Names.registration_guard(jido)],
+              do: {name, Process.whereis(name)}
+
+        with :ok <- Jido.Instance.Cluster.require_managed_activation(jido),
+             {:ok, owner} <- cluster_owner(jido),
+             true <- Enum.all?(dependencies, fn {_name, pid} -> is_pid(pid) end),
+             [{root, {:activation, activation_id}}] <- Registry.lookup(registry, key),
              true <- root == opts[:activation],
              true <- activation_id == opts[:activation_id] do
-          {:ok,
-           Map.new(
-             [jido, registry, Jido.Instance.Names.registration_guard(jido)],
-             fn name -> {Process.monitor(Process.whereis(name)), name} end
-           )}
+          monitors = Map.new(dependencies, fn {name, pid} -> {Process.monitor(pid), {name, pid}} end)
+          {:ok, monitors, owner}
+        else
+          {:error, _reason} = error -> error
+          _ -> {:error, :instance_unavailable}
         end
     end
   catch
     :exit, _ -> {:error, :instance_unavailable}
   end
 
-  defp init_registered(agent, runner, opts, monitors) do
+  defp init_registered(agent, runner, opts, monitors, cluster_owner) do
     AgentServerTelemetry.lifecycle(:start, agent.id)
+    runner_pid = Process.whereis(runner)
 
     {:ok, specs} =
       Jido.Plugin.Normalizer.normalize_runtime(
@@ -753,6 +785,7 @@ defmodule Jido.AgentServer.Worker do
           ),
         runner: runner,
         jido: opts[:jido],
+        cluster_owner: cluster_owner,
         partition: opts[:partition],
         instance_monitors: monitors,
         plugin_specs: specs,
@@ -765,7 +798,8 @@ defmodule Jido.AgentServer.Worker do
         child_monitors: monitor_children(opts[:activation_state]),
         bootstrap: nil,
         ready_waiters: [],
-        runner_ref: Process.monitor(Process.whereis(runner)),
+        runner_ref: Process.monitor(runner_pid),
+        runner_pid: runner_pid,
         state_version: Keyword.get(opts, :state_version, 0),
         active: nil,
         server_turn: nil,
@@ -786,6 +820,24 @@ defmodule Jido.AgentServer.Worker do
     else
       initialize_plugins(data)
     end
+  end
+
+  defp cluster_owner(instance) do
+    case Jido.Instance.RuntimeStore.instance_cluster(instance) do
+      false -> {:ok, nil}
+      :unavailable -> {:error, :cluster_unavailable}
+      {owner, _cluster} -> {:ok, owner}
+    end
+  end
+
+  defp cluster_admission_status(%{cluster_owner: nil}), do: :ok
+
+  defp cluster_admission_status(%{jido: instance, cluster_owner: owner} = data) do
+    if Jido.Instance.Cluster.ready?(instance, owner) and
+         Process.whereis(data.runner) == data.runner_pid and
+         Enum.all?(data.instance_monitors, fn {_ref, {name, pid}} -> Process.whereis(name) == pid end),
+       do: :ok,
+       else: {:error, :cluster_unavailable}
   end
 
   defp agent_address(agent, opts) do
@@ -1530,7 +1582,8 @@ defmodule Jido.AgentServer.Worker do
         {:keep_state_and_data, reply(from, {:error, :topology_receiver_busy})}
 
       true ->
-        with :ok <- Lifecycle.admission_status(deadline),
+        with :ok <- cluster_admission_status(data),
+             :ok <- Lifecycle.admission_status(deadline),
              {:ok, signal} <- Validation.normalize_signal(signal),
              {:ok, accepted} <- topology_acceptance(data.topology_handoffs.accepted, id, sender) do
           start_turn(:cast, signal, %{}, data, {:topology, id, {from, accepted}})
@@ -1573,10 +1626,14 @@ defmodule Jido.AgentServer.Worker do
       when type == :cast or (is_tuple(type) and elem(type, 0) == :call) do
     data = %{data | postponed: Map.delete(data.postponed, token)}
 
-    with :ok <- Lifecycle.admission_status(deadline),
+    with :ok <- cluster_admission_status(data),
+         :ok <- Lifecycle.admission_status(deadline),
          :ok <- result_handoff_status(result_handoff, data),
          :error <- Continuation.terminal_result(data.server_turn) do
       case Continuation.retry(data.server_turn, signal) do
+        :new when signal.type == "jido.durable.wake" ->
+          reject_turn(type, :stale_wait, data, reply_gate)
+
         :new ->
           start_turn(
             type,
@@ -1622,7 +1679,8 @@ defmodule Jido.AgentServer.Worker do
       when type == :cast or (is_tuple(type) and elem(type, 0) == :call) do
     data = %{data | postponed: Map.delete(data.postponed, token)}
 
-    with :ok <- Lifecycle.admission_status(deadline),
+    with :ok <- cluster_admission_status(data),
+         :ok <- Lifecycle.admission_status(deadline),
          false <- durable_wake?(signal),
          %Jido.Exec.Wait{} = wait <-
            Enum.find(data.active.waits, &Jido.Exec.Wait.matches?(&1, signal.type, signal.data)),
@@ -3156,12 +3214,18 @@ defmodule Jido.AgentServer.Worker do
         else: data
 
     replies =
-      if data.active,
-        do:
-          reply(data.active.from, {:error, error}) ++
-            reply(data.active.wait_from, {:error, error}) ++
-            cancel_replies(data.active, {:error, error}),
-        else: []
+      if data.active do
+        failure =
+          if data.cluster_owner,
+            do: Jido.Instance.Cluster.transport_failure(:call, :worker_unavailable),
+            else: {:error, error}
+
+        reply(data.active.from, failure) ++
+          reply(data.active.wait_from, {:error, error}) ++
+          cancel_replies(data.active, {:error, error})
+      else
+        []
+      end
 
     {:stop_and_reply, {:shutdown, :execution_lifecycle_failed}, replies, data}
   end

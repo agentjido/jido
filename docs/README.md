@@ -36,6 +36,8 @@ This page is the index for Jido project documentation.
 - [Telemetry component](components/telemetry.md)
 - [Persistence component](components/persistence.md)
 - [Bundled Ecto Agent state Plugin plan](plans/2026-11-21-2106-ecto-agent-state-plan.md)
+- [Fixed-home clustering and migration](guides/fixed-home-clustering.md)
+- [Native OTP clustering plan](plans/2026-11-23-native-otp-clustering-plan.md)
 - [Signal component and sub-components](components/signal.md)
 - [Durable Agent activation plan](architecture/durable-agent-activation.md)
 - [Module dependency map](architecture/module-dependency-map.md)
