@@ -1,9 +1,9 @@
 {
   "apps": {
     "jido": {
-      "active": 102,
+      "active": 103,
       "coverage": 1.0,
-      "covered": 102
+      "covered": 103
     },
     "jido.agent_server": {
       "active": 16,
@@ -2066,10 +2066,10 @@
       }
     },
     "jido.instance": {
-      "active": 11,
+      "active": 12,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 11,
+      "covered": 12,
       "form": "light",
       "obligations": {
         "jido.instance.I1": {
@@ -2120,6 +2120,19 @@
           "tests": [
             "test a stopped activation does not block immediate Address replacement before Registry cleanup",
             "test inactive Address replacement preserves or resets state without creating identity"
+          ]
+        },
+        "jido.instance.I12": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 4,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a stopped clustered module cannot select its compiled persistence directly",
+            "test clustering is opt-in and validates the deployment configuration before storage",
+            "test the RPC entry rejects unknown protocols and never falls back to a local instance",
+            "test the durable home record uses exact CAS and can be confirmed independently"
           ]
         },
         "jido.instance.I2": {
@@ -2423,10 +2436,13 @@
         "jido.persistence.I17": {
           "failing": 0,
           "kind": "ordering",
-          "passing": 4,
+          "passing": 7,
           "status": "active",
           "testable": true,
           "tests": [
+            "test a failed wake index write cannot acknowledge a durable wait",
+            "test a wake can register the next wait in the same durable Turn",
+            "test an orphan wake does not start a new Turn on an idle Agent",
             "test instance readiness waits for a retried wake recovery read",
             "test wake cleanup preserves index membership for a concurrent shard write",
             "test wake cleanup retries a temporary Store failure",
@@ -6248,8 +6264,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 265,
+    "active": 266,
     "coverage": 1.0,
-    "covered": 265
+    "covered": 266
   }
 }

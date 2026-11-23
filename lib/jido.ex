@@ -5,6 +5,7 @@ defmodule Jido do
   alias Jido.AgentOwnership
   alias Jido.AgentServer
   alias Jido.Durable.Continuation
+  alias Jido.Instance.Cluster
   alias Jido.Instance.{Names, NamespaceRegistry, Options, Ownership, RuntimeStore}
 
   @shutdown_timeout_ms 10_000
@@ -153,6 +154,11 @@ defmodule Jido do
         )
       end
 
+      @doc false
+      def __jido_cluster_configured__ do
+        Jido.Instance.Cluster.configured?(config())
+      end
+
       defoverridable config: 1
 
       defp __jido_instance_options__(init_arg) do
@@ -161,7 +167,7 @@ defmodule Jido do
           __MODULE__,
           @otp_app,
           unquote(namespace),
-          __jido_persistence__()
+          unquote(persistence)
         )
       end
     end
@@ -252,6 +258,9 @@ defmodule Jido do
       instance use this one Store and codec. Persistent instances require a
       stable namespace.
     - `:agent_server` - Optional AgentServer runtime defaults
+    - `:cluster` - Opt in to fixed-home routing with `[home: node_name]`.
+      A durable namespace also requires a provisioned `:generation`.
+      Set a finite `:rpc_timeout` in milliseconds to override the 5,000 ms default.
 
   ## Example
 
@@ -259,18 +268,21 @@ defmodule Jido do
   """
   @spec start_link(term()) :: Supervisor.on_start()
   def start_link(opts) do
-    with {:ok, opts} <- Options.validate(opts),
+    with {:ok, opts, cluster} <- Options.validate(opts, :start),
          :ok <- await_previous_children(Keyword.fetch!(opts, :name)),
          {:ok, claim} <-
            NamespaceRegistry.claim(Keyword.get(opts, :namespace), Keyword.fetch!(opts, :name)) do
       result =
         Supervisor.start_link(
           __MODULE__,
-          {opts, claim},
+          {opts, claim, cluster},
           name: Keyword.fetch!(opts, :name)
         )
 
-      result = await_wake_readiness(result, Keyword.fetch!(opts, :name))
+      result =
+        if Cluster.ingress?(cluster),
+          do: result,
+          else: await_wake_readiness(result, Keyword.fetch!(opts, :name))
 
       if not match?({:ok, _pid}, result), do: NamespaceRegistry.release(claim)
       result
@@ -344,58 +356,81 @@ defmodule Jido do
   end
 
   @impl true
-  def init({opts, claim}) do
+  def init({opts, claim, cluster}) do
     name = Keyword.fetch!(opts, :name)
-    runtime_store = Names.runtime_store(name)
+    namespace = opts[:namespace]
+    store = Names.runtime_store(name)
 
-    with :ok <-
-           NamespaceRegistry.bind(claim, Keyword.get(opts, :namespace), name, self()),
-         :ok <- RuntimeStore.ensure_table(runtime_store),
-         :ok <-
-           Jido.Persistence.NamespaceManifest.open(
-             Keyword.get(opts, :persistence),
-             Keyword.get(opts, :namespace)
-           ) do
+    with :ok <- NamespaceRegistry.bind(claim, namespace, name, self()),
+         :ok <- RuntimeStore.ensure_table(store),
+         {:ok, children} <- instance_children(opts, cluster, store) do
       Jido.Telemetry.configure_debug(name, opts[:debug])
-
-      idle_residency_timeout =
-        opts
-        |> Keyword.fetch!(:activation)
-        |> Keyword.fetch!(:idle_residency_timeout)
-
-      agent_server_defaults =
-        opts
-        |> Keyword.get(:agent_server, [])
-        |> Keyword.put(:idle_timeout, idle_residency_timeout)
-        |> Keyword.put(:idle_policy, if(opts[:persistence], do: :hibernate, else: :stop))
-
-      :ok =
-        RuntimeStore.put_instance_config(
-          runtime_store,
-          Keyword.get(opts, :persistence),
-          agent_server_defaults
-        )
-
-      base_children = [
-        {Runic.Runner,
-         name: Names.exec_runner(name), store: Jido.Persistence.ContinuationStore, store_opts: [jido: name]},
-        {Task.Supervisor, name: Names.task_supervisor(name), max_children: Keyword.fetch!(opts, :max_tasks)},
-        {Jido.AgentServer.RegistrationGuard, jido: name},
-        Jido.AgentServer.RegistrationGuard.registry_child_spec(
-          keys: :unique,
-          name: Names.registry(name)
-        ),
-        {RuntimeStore, name: runtime_store},
-        {Jido.Instance.Wake, instance: name, name: Names.wake(name)},
-        {DynamicSupervisor,
-         name: Names.agent_supervisor(name), strategy: :one_for_one, max_restarts: 1000, max_seconds: 5}
-      ]
-
-      Supervisor.init(base_children, strategy: :one_for_one)
+      Supervisor.init(children, strategy: :one_for_one)
     else
       {:error, reason} -> exit(reason)
     end
   end
+
+  defp instance_children(opts, cluster, store) do
+    if Cluster.ingress?(cluster) do
+      :ok = RuntimeStore.put_instance_config(store, nil, [], cluster)
+      {:ok, [{RuntimeStore, name: store}]}
+    else
+      home_children(opts, cluster, store)
+    end
+  end
+
+  defp home_children(opts, cluster, store) do
+    name = opts[:name]
+    persistence = opts[:persistence]
+
+    with :ok <- Cluster.require_record(cluster, persistence, opts[:namespace]),
+         :ok <- Jido.Persistence.NamespaceManifest.open(persistence, opts[:namespace]) do
+      defaults =
+        opts
+        |> Keyword.get(:agent_server, [])
+        |> Keyword.put(:idle_timeout, opts[:activation][:idle_residency_timeout])
+        |> Keyword.put(:idle_policy, if(persistence, do: :hibernate, else: :stop))
+
+      :ok = RuntimeStore.put_instance_config(store, persistence, defaults, cluster)
+
+      {:ok,
+       [
+         {Runic.Runner,
+          name: Names.exec_runner(name), store: Jido.Persistence.ContinuationStore, store_opts: [jido: name]},
+         {Task.Supervisor, name: Names.task_supervisor(name), max_children: opts[:max_tasks]},
+         {Jido.AgentServer.RegistrationGuard, jido: name},
+         Jido.AgentServer.RegistrationGuard.registry_child_spec(keys: :unique, name: Names.registry(name)),
+         {RuntimeStore, name: store},
+         {DynamicSupervisor,
+          name: Names.agent_supervisor(name), strategy: :one_for_one, max_restarts: 1000, max_seconds: 5},
+         {Jido.Instance.Wake, instance: name, name: Names.wake(name)}
+       ]}
+    end
+  end
+
+  @doc """
+  Sets the fixed home of a durable namespace in its canonical Store.
+
+  Use this offline with all old home processes stopped and their restarts
+  blocked. Pass `:not_found` only to provision a new namespace. For a move,
+  pass the exact prior `{node, generation}` and a fresh generation string.
+  This compare-and-swap controls startup. It does not stop a running home.
+  """
+  @spec change_cluster_home(term(), String.t(), :not_found | {node(), String.t()}, {node(), String.t()}) ::
+          :ok | {:error, term()}
+  def change_cluster_home(profile, namespace, expected, next),
+    do: Cluster.change_home(profile, namespace, expected, next)
+
+  @doc """
+  Checks the exact configured home and generation in the canonical Store.
+
+  Use this check to confirm the offline decision after an uncertain
+  `change_cluster_home/4` response.
+  """
+  @spec check_cluster_home(term(), String.t(), {node(), String.t()}) :: :ok | {:error, term()}
+  def check_cluster_home(profile, namespace, expected),
+    do: Cluster.check_home(profile, namespace, expected)
 
   # ---------------------------------------------------------------------------
   # Stable Agent Address API
@@ -421,7 +456,13 @@ defmodule Jido do
   """
   @spec resolve_agent(atom(), Address.t()) :: {:ok, pid()} | {:error, term()}
   def resolve_agent(instance, %Address{} = address) do
-    with :ok <- ensure_reconciled(instance, address), do: resolve_address_target(instance, address)
+    with {:ok, address} <- validate_instance_address(instance, address) do
+      if Cluster.ingress?(RuntimeStore.instance_cluster(instance)) do
+        {:error, :not_found}
+      else
+        with :ok <- ensure_reconciled(instance, address), do: resolve_address_target(instance, address)
+      end
+    end
   end
 
   @doc """
@@ -462,7 +503,8 @@ defmodule Jido do
   @spec transfer_agent_ownership(atom(), Address.t(), Address.t(), keyword()) ::
           {:ok, AgentOwnership.t()} | {:error, term()}
   def transfer_agent_ownership(instance, %Address{} = child, %Address{} = owner, opts) do
-    with {:ok, child} <- validate_instance_address(instance, child),
+    with :ok <- Cluster.require_ready_home(instance),
+         {:ok, child} <- validate_instance_address(instance, child),
          {:ok, owner} <- validate_instance_address(instance, owner),
          :ok <- validate_ownership_addresses(child, owner),
          {:ok, expected, request_id} <- validate_ownership_options(child, opts),
@@ -484,7 +526,8 @@ defmodule Jido do
   @spec create_agent(atom(), Address.t(), module() | Jido.Agent.t(), keyword()) ::
           {:ok, Address.t()} | {:error, term()}
   def create_agent(instance, %Address{} = address, agent, opts \\ []) do
-    with {:ok, address} <- validate_instance_address(instance, address),
+    with :ok <- Cluster.require_ready_home(instance),
+         {:ok, address} <- validate_instance_address(instance, address),
          {:ok, opts} <- Address.operation_options(address, opts, "Agent Address create options"),
          :ok <- validate_create_agent_options(opts),
          {instance_opts, _runtime_opts} = Keyword.split(opts, [:id, :state]),
@@ -504,7 +547,8 @@ defmodule Jido do
   @spec activate_agent(atom(), Address.t(), keyword()) ::
           DynamicSupervisor.on_start_child()
   def activate_agent(instance, %Address{} = address, opts \\ []) do
-    with {:ok, address} <- validate_instance_address(instance, address),
+    with :ok <- Cluster.require_ready_home(instance),
+         {:ok, address} <- validate_instance_address(instance, address),
          {:ok, opts} <- Address.operation_options(address, opts, "Agent Address activation options"),
          :ok <- validate_activate_agent_options(opts),
          :ok <- ensure_reconciled(instance, address) do
@@ -531,7 +575,8 @@ defmodule Jido do
   @spec reconcile_agent(atom(), Address.t(), keyword()) ::
           DynamicSupervisor.on_start_child() | {:error, term()}
   def reconcile_agent(instance, %Address{} = address, opts \\ []) do
-    with {:ok, address} <- validate_instance_address(instance, address),
+    with :ok <- Cluster.require_ready_home(instance),
+         {:ok, address} <- validate_instance_address(instance, address),
          :ok <- validate_reconcile_options(opts),
          {:ok, reason} <- reconciliation_reason(instance, address),
          :ok <- terminate_registered_activation(instance, address),
@@ -555,7 +600,8 @@ defmodule Jido do
   @doc "Upgrades one inactive durable Agent and replaces its active activation."
   @spec upgrade_agent(atom(), Address.t(), term(), keyword()) :: {:ok, Address.t()} | {:error, term()}
   def upgrade_agent(instance, %Address{} = address, action, opts \\ []) do
-    with {:ok, address} <- validate_instance_address(instance, address),
+    with :ok <- Cluster.require_ready_home(instance),
+         {:ok, address} <- validate_instance_address(instance, address),
          :ok <- validate_upgrade_options(opts),
          :ok <- ensure_reconciled(instance, address),
          {:ok, agent, reactivate?} <- prepare_definition_upgrade(instance, address),
@@ -574,7 +620,8 @@ defmodule Jido do
   @spec replace_agent(atom(), Address.t(), module() | Jido.Agent.t(), keyword()) ::
           {:ok, Address.t()} | {:error, term()}
   def replace_agent(instance, %Address{} = address, agent, opts \\ []) do
-    with {:ok, address} <- validate_instance_address(instance, address),
+    with :ok <- Cluster.require_ready_home(instance),
+         {:ok, address} <- validate_instance_address(instance, address),
          {:ok, opts} <- Address.operation_options(address, opts, "Agent Address replace options"),
          {:ok, state_policy, expected} <- validate_replace_options(opts),
          :ok <- ensure_reconciled(instance, address),
@@ -699,24 +746,42 @@ defmodule Jido do
     end
   end
 
-  @doc "Sends one synchronous Signal through a stable Agent Address."
+  @doc """
+  Sends one synchronous Signal through a stable Agent Address.
+
+  For a durable Agent, pass a known `:turn_id` and `result_handoff: true`
+  to retain its terminal result for `turn_result/3`. A repeated ID does not
+  deduplicate submissions.
+
+  A clustered instance sends at most one request to its configured home.
+  `{:error, {:cluster_outcome_unknown, reason}}` means the work may have
+  been accepted. Reconcile from a saved result before submitting again.
+  """
   @spec call(atom(), Address.t(), Jido.Signal.t(), timeout() | keyword()) ::
           {:ok, Jido.AgentServer.TurnResult.t()} | {:error, term()}
   def call(instance, %Address{} = address, signal, timeout_or_opts \\ 5_000) do
-    with_address_server(instance, address, &AgentServer.call(&1, signal, timeout_or_opts))
+    route_address(instance, address, :call, [signal, timeout_or_opts])
+  end
+
+  @doc false
+  def __deliver_wake__(instance, address, signal) do
+    with :ok <- Cluster.require_home(instance) do
+      with_address_server(instance, address, &AgentServer.call(&1, signal))
+    end
   end
 
   @doc "Sends one best-effort asynchronous Signal through a stable Agent Address."
   @spec cast(atom(), Address.t(), Jido.Signal.t()) :: :ok | {:error, term()}
   def cast(instance, %Address{} = address, signal) do
-    with_address_server(instance, address, &AgentServer.cast(&1, signal))
+    route_address(instance, address, :cast, [signal])
   end
 
   @doc "Submits one AgentServer turn through a stable Agent Address."
   @spec submit(atom(), Address.t(), Jido.Signal.t(), keyword()) ::
           Jido.AgentServer.Pending.t() | {:error, term()}
   def submit(instance, %Address{} = address, signal, opts \\ []) do
-    with_address_server(instance, address, &AgentServer.submit(&1, signal, opts))
+    with :ok <- Cluster.require_ready_home(instance),
+         do: with_address_server(instance, address, &AgentServer.submit(&1, signal, opts))
   end
 
   @doc """
@@ -729,6 +794,13 @@ defmodule Jido do
   @spec turn_result(atom(), Address.t(), String.t()) ::
           {:ok, Jido.AgentServer.TurnResult.t()} | {:error, term()}
   def turn_result(instance, %Address{} = address, turn_id) when is_binary(turn_id) do
+    route_address(instance, address, :turn_result, [turn_id])
+  end
+
+  def turn_result(_instance, address, turn_id),
+    do: invalid_runtime_input(:turn_result, %{agent_address: address, turn_id: turn_id})
+
+  defp local_turn_result(instance, address, turn_id) do
     with {:ok, address} <- validate_instance_address(instance, address),
          :ok <- validate_turn_id(:turn_result, turn_id),
          {:ok, _agent, _persistence_revision, _agent_revision, receipt} <-
@@ -742,9 +814,6 @@ defmodule Jido do
     end
   end
 
-  def turn_result(_instance, address, turn_id),
-    do: invalid_runtime_input(:turn_result, %{agent_address: address, turn_id: turn_id})
-
   @doc """
   Acknowledges and clears one exact retained terminal result.
 
@@ -755,7 +824,8 @@ defmodule Jido do
   @spec acknowledge_turn_result(atom(), Address.t(), String.t()) :: :ok | {:error, term()}
   def acknowledge_turn_result(instance, %Address{} = address, turn_id)
       when is_binary(turn_id) do
-    with {:ok, address} <- validate_instance_address(instance, address),
+    with :ok <- Cluster.require_ready_home(instance),
+         {:ok, address} <- validate_instance_address(instance, address),
          :ok <- validate_turn_id(:acknowledge_turn_result, turn_id),
          :ok <- ensure_reconciled(instance, address),
          {:ok, reactivate?} <- prepare_result_acknowledgement(instance, address) do
@@ -780,7 +850,8 @@ defmodule Jido do
   @doc "Writes a durable tombstone for one inactive stable Agent Address."
   @spec delete_agent(atom(), Address.t(), keyword()) :: :ok | {:error, term()}
   def delete_agent(instance, %Address{} = address, opts \\ []) do
-    with {:ok, address} <- validate_instance_address(instance, address),
+    with :ok <- Cluster.require_ready_home(instance),
+         {:ok, address} <- validate_instance_address(instance, address),
          {:ok, _opts} <- validate_address_delete_options(opts),
          {:error, :not_found} <- resolve_address_target(instance, address) do
       Jido.Persistence.delete_agent_address(instance, address, instance: instance)
@@ -794,12 +865,17 @@ defmodule Jido do
   @doc "Cancels one matching Turn for a stable Agent Address."
   @spec cancel_turn(atom(), Address.t(), String.t(), timeout()) :: :ok | {:error, term()}
   def cancel_turn(instance, %Address{} = address, turn_id, timeout \\ 5_000) do
-    with_address_server(instance, address, &AgentServer.cancel_turn(&1, turn_id, timeout))
+    with :ok <- Cluster.require_ready_home(instance),
+         do: with_address_server(instance, address, &AgentServer.cancel_turn(&1, turn_id, timeout))
   end
 
   @doc "Returns Turn status through a stable Agent Address."
   @spec status(atom(), Address.t(), timeout()) :: Jido.AgentServer.Status.t() | {:error, term()}
   def status(instance, %Address{} = address, timeout \\ 5_000) do
+    route_address(instance, address, :status, [timeout])
+  end
+
+  defp local_status(instance, address, timeout) do
     with {:ok, address} <- validate_instance_address(instance, address) do
       case resolve_address_target(instance, address) do
         {:ok, pid} ->
@@ -854,6 +930,152 @@ defmodule Jido do
         error
     end
   end
+
+  defp route_address(instance, address, operation, args) when is_atom(instance) do
+    owner = Process.whereis(instance)
+
+    case RuntimeStore.instance_cluster(instance) do
+      false ->
+        local_address_operation(operation, instance, address, args)
+
+      cluster ->
+        with {:ok, address} <- validate_instance_address(instance, address),
+             {:ok, args, timeout} <- cluster_request(operation, args, cluster.rpc_timeout),
+             :ok <- Cluster.portable({address, args}, :cluster_nonportable_request) do
+          if Cluster.ingress?(cluster) do
+            request = [:jido_cluster_v1, instance, cluster.home, cluster.generation, address, operation, args]
+            Cluster.remote(cluster.home, __MODULE__, request, operation, timeout)
+          else
+            serve_cluster_address(instance, address, operation, args, owner)
+          end
+        end
+    end
+  end
+
+  defp route_address(instance, address, operation, args),
+    do: local_address_operation(operation, instance, address, args)
+
+  @doc false
+  def __cluster_dispatch__(:jido_cluster_v1, instance, home, generation, %Address{} = address, operation, args)
+      when is_atom(instance) and operation in [:call, :cast, :status, :turn_result] do
+    owner = Process.whereis(instance)
+
+    result =
+      with %{home: ^home, generation: ^generation} = cluster when home == node() <-
+             RuntimeStore.instance_cluster(instance),
+           {:ok, address} <- validate_instance_address(instance, address),
+           {:ok, args, _timeout} <- cluster_request(operation, args, cluster.rpc_timeout),
+           :ok <- Cluster.portable({address, args}, :cluster_nonportable_request) do
+        serve_cluster_address(instance, address, operation, args, owner)
+      else
+        {:error, _reason} = error -> error
+        _ -> {:error, :cluster_unavailable}
+      end
+
+    {:jido_cluster_v1, result}
+  end
+
+  def __cluster_dispatch__(_protocol, _instance, _home, _generation, _address, _operation, _args),
+    do: {:jido_cluster_v1, {:error, :cluster_unavailable}}
+
+  defp cluster_request(:call, [signal, opts], limit) do
+    with {:ok, signal} <- Jido.Agent.Validation.normalize_signal(signal),
+         {:ok, opts, _context} <- AgentServer.Worker.call_options(opts) do
+      timeout = min(Keyword.get(opts, :timeout, 5_000), limit)
+      {:ok, [signal, Keyword.put(opts, :timeout, timeout)], timeout}
+    end
+  end
+
+  defp cluster_request(:status, [timeout], limit) do
+    with :ok <- Jido.AgentServer.Lifecycle.validate_wait(timeout) do
+      timeout = min(timeout, limit)
+      {:ok, [timeout], timeout}
+    end
+  end
+
+  defp cluster_request(:cast, [signal], limit) do
+    with {:ok, signal} <- Jido.Agent.Validation.normalize_signal(signal),
+         do: {:ok, [signal], limit}
+  end
+
+  defp cluster_request(:turn_result, [id], limit) when is_binary(id) and byte_size(id) > 0,
+    do: {:ok, [id], limit}
+
+  defp cluster_request(_operation, _args, _limit), do: {:error, :invalid_cluster_request}
+
+  defp serve_cluster_address(instance, address, operation, args, owner) do
+    if Cluster.ready?(instance, owner) do
+      result = cluster_address_operation(operation, instance, address, args, owner)
+
+      case Cluster.portable(result, :cluster_nonportable_reply) do
+        :ok -> result
+        {:error, reason} -> Cluster.transport_failure(operation, reason)
+      end
+    else
+      {:error, :cluster_unavailable}
+    end
+  catch
+    :exit, _reason -> {:error, :cluster_unavailable}
+  end
+
+  defp cluster_address_operation(operation, instance, address, args, owner)
+       when operation in [:call, :cast] do
+    started_at = System.monotonic_time(:millisecond)
+
+    with {:ok, pid} <- resolve_or_activate(instance, address) do
+      if Cluster.ready?(instance, owner) do
+        try do
+          send_cluster_operation(operation, pid, args, started_at)
+        catch
+          :exit, {:timeout, _} -> Cluster.transport_failure(operation, :timeout)
+          :exit, _reason -> Cluster.transport_failure(operation, :worker_unavailable)
+        end
+      else
+        {:error, :cluster_unavailable}
+      end
+    end
+  end
+
+  defp cluster_address_operation(operation, instance, address, args, _owner),
+    do: local_address_operation(operation, instance, address, args)
+
+  defp send_cluster_operation(:call, pid, [signal, opts], started_at) do
+    elapsed = System.monotonic_time(:millisecond) - started_at
+    timeout = Keyword.fetch!(opts, :timeout)
+    admission_timeout = Keyword.get(opts, :admission_timeout, 5_000)
+
+    cond do
+      elapsed >= admission_timeout ->
+        {:error, :admission_timeout}
+
+      elapsed >= timeout ->
+        {:error, :cluster_unavailable}
+
+      true ->
+        opts = Keyword.put(opts, :timeout, timeout - elapsed)
+
+        opts =
+          if admission_timeout == :infinity,
+            do: opts,
+            else: Keyword.put(opts, :admission_timeout, admission_timeout - elapsed)
+
+        AgentServer.call(pid, signal, opts)
+    end
+  end
+
+  defp send_cluster_operation(:cast, pid, [signal], _started_at), do: AgentServer.cast(pid, signal)
+
+  defp local_address_operation(:call, instance, address, [signal, opts]),
+    do: with_address_server(instance, address, &AgentServer.call(&1, signal, opts))
+
+  defp local_address_operation(:cast, instance, address, [signal]),
+    do: with_address_server(instance, address, &AgentServer.cast(&1, signal))
+
+  defp local_address_operation(:status, instance, address, [timeout]),
+    do: local_status(instance, address, timeout)
+
+  defp local_address_operation(:turn_result, instance, address, [turn_id]),
+    do: local_turn_result(instance, address, turn_id)
 
   defp with_address_server(instance, address, operation) do
     with {:ok, pid} <- resolve_or_activate(instance, address) do
@@ -1302,7 +1524,8 @@ defmodule Jido do
     if is_list(opts) and Keyword.keyword?(opts) do
       {instance_opts, runtime_opts} = Keyword.split(opts, [:id, :state])
 
-      with :ok <- validate_agent_persistence_override(runtime_opts),
+      with :ok <- Cluster.require_ready_home(instance),
+           :ok <- validate_agent_persistence_override(runtime_opts),
            {:ok, agent} <- startup_agent(agent, instance_opts, runtime_opts) do
         runtime_opts
         |> inherit_instance_persistence(instance)
@@ -1346,9 +1569,11 @@ defmodule Jido do
   def stop_agent(instance, id, opts)
       when is_atom(instance) and is_binary(id) and is_list(opts) do
     if Keyword.keyword?(opts) do
-      case whereis_agent(instance, id, opts) do
-        nil -> {:error, :not_found}
-        pid -> stop_agent(instance, pid, opts)
+      with :ok <- Cluster.require_ready_home(instance) do
+        case whereis_agent(instance, id, opts) do
+          nil -> {:error, :not_found}
+          pid -> stop_agent(instance, pid, opts)
+        end
       end
     else
       invalid_runtime_input(:stop_agent, %{id: id, opts: opts})
@@ -1357,7 +1582,8 @@ defmodule Jido do
 
   def stop_agent(instance, server, opts)
       when is_atom(instance) and is_list(opts) do
-    with :ok <- validate_server(server),
+    with :ok <- Cluster.require_ready_home(instance),
+         :ok <- validate_server(server),
          :ok <- validate_runtime_options(:stop_agent, opts),
          {:ok, pid} <- owned_agent_server(instance, server, opts) do
       case Jido.AgentServer.stop(pid) do
@@ -1402,38 +1628,47 @@ defmodule Jido do
 
   def list_agents(instance, opts)
       when is_atom(instance) and is_list(opts) do
-    if Keyword.keyword?(opts) do
-      partition = Keyword.get(opts, :partition)
+    cond do
+      not Keyword.keyword?(opts) ->
+        invalid_runtime_input(:list_agents, %{opts: opts})
 
-      instance
-      |> Names.registry()
-      |> Registry.select([{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2", :"$3"}}]}])
-      |> Enum.flat_map(fn
-        {{:agent, key}, root, {:activation, _activation_id}} ->
-          case Names.unwrap_partition_key(key) do
-            {^partition, id} when is_binary(id) ->
-              case Jido.AgentServer.Supervisor.live_worker(root) do
-                pid when is_pid(pid) -> [{id, pid}]
-                nil -> []
-              end
+      Cluster.ingress?(RuntimeStore.instance_cluster(instance)) ->
+        []
 
-            _other ->
-              []
-          end
-
-        _entry ->
-          []
-      end)
-      |> Enum.filter(fn {_id, pid} -> Process.alive?(pid) end)
-    else
-      invalid_runtime_input(:list_agents, %{opts: opts})
+      true ->
+        list_local_agents(instance, opts)
     end
+  end
+
+  def list_agents(_instance, opts), do: invalid_runtime_input(:list_agents, %{opts: opts})
+
+  defp list_local_agents(instance, opts) do
+    partition = Keyword.get(opts, :partition)
+
+    instance
+    |> Names.registry()
+    |> Registry.select([{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2", :"$3"}}]}])
+    |> Enum.flat_map(fn
+      {{:agent, key}, root, {:activation, _activation_id}} ->
+        case Names.unwrap_partition_key(key) do
+          {^partition, id} when is_binary(id) ->
+            case Jido.AgentServer.Supervisor.live_worker(root) do
+              pid when is_pid(pid) -> [{id, pid}]
+              nil -> []
+            end
+
+          _other ->
+            []
+        end
+
+      _entry ->
+        []
+    end)
+    |> Enum.filter(fn {_id, pid} -> Process.alive?(pid) end)
   rescue
     # Registry.select/2 raises when the instance is not running.
     ArgumentError -> invalid_runtime_input(:list_agents, %{instance: instance})
   end
-
-  def list_agents(_instance, opts), do: invalid_runtime_input(:list_agents, %{opts: opts})
 
   @doc "Counts resident Agent activations in the selected Jido instance."
   @spec resident_agent_count(atom(), keyword()) ::

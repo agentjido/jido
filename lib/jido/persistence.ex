@@ -813,22 +813,31 @@ defmodule Jido.Persistence do
   end
 
   defp resolve_instance_config(jido) do
-    config =
+    with :ok <- Jido.Instance.Cluster.require_home(jido) do
       cond do
         live_instance?(jido) ->
-          Jido.Instance.RuntimeStore.instance_persistence(jido)
+          Config.open(Jido.Instance.RuntimeStore.instance_persistence(jido))
+
+        offline_cluster?(jido) ->
+          {:error, :cluster_unavailable}
 
         is_atom(jido) and function_exported?(jido, :__jido_persistence__, 0) ->
-          jido.__jido_persistence__()
+          Config.open(jido.__jido_persistence__())
 
         true ->
-          nil
+          {:ok, nil}
       end
-
-    Config.open(config)
+    end
   rescue
     error -> {:error, {:invalid_persistence_config, error}}
   end
+
+  defp offline_cluster?(instance) when is_atom(instance) and not is_nil(instance) do
+    Jido.Instance.RuntimeStore.instance_cluster(instance) != false or
+      (function_exported?(instance, :__jido_cluster_configured__, 0) and instance.__jido_cluster_configured__())
+  end
+
+  defp offline_cluster?(_instance), do: false
 
   defp live_instance?(source) when is_atom(source) and not is_nil(source) do
     is_pid(Process.whereis(source)) and

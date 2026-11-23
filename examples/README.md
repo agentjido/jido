@@ -50,6 +50,7 @@ the offline example suite run without these dependencies.
   or [BEAM loss](13_durable_execution/13_03_vm_recovery/README.md).
 - [Run a durable Agent fleet](13_durable_execution/13_08_waterpark/README.md)
   or [measure it](25_operations_and_integrations/25_05_passive_fleet_measurement/README.md).
+- [Share a Jido Agent across two BEAM nodes](26_distributed_agents/README.md).
 
 ## Run the examples
 
@@ -66,10 +67,10 @@ mix test.examples examples/00_start_here --warnings-as-errors
 mix test.examples examples/03_flow_execution/03_03_choice --warnings-as-errors
 ```
 
-All supported examples run without network access, credentials, paid APIs, or
-live providers. Deterministic local adapters preserve external application
-boundaries.
+All supported examples use local resources. The distributed examples connect
+BEAM peers on loopback TCP. Deterministic local adapters preserve external
+application boundaries.
 
-Chapters `00` through `25` now follow the table-of-contents structure. Some
+The numbered chapters follow the table-of-contents structure. Some
 chapters combine closely related bullets into one comparison or application
 lesson. The chapter README states that mapping and the limits of each proof.

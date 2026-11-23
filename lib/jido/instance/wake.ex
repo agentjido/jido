@@ -49,6 +49,7 @@ defmodule Jido.Instance.Wake do
     state = %{
       instance: Keyword.fetch!(opts, :instance),
       timers: %{},
+      delivery: nil,
       ready?: false,
       recovery_attempt: 0,
       ready_waiters: []
@@ -107,18 +108,34 @@ defmodule Jido.Instance.Wake do
     key = entry_key(entry)
     state = %{state | timers: Map.delete(state.timers, key)}
 
-    if entry.deadline > System.system_time(:millisecond) do
-      {:noreply, schedule(entry, state)}
-    else
-      case deliver(state.instance, entry) do
-        result when result in [:ok, :stale] ->
-          cleanup_wake(state, entry)
+    cond do
+      entry.deadline > System.system_time(:millisecond) ->
+        {:noreply, schedule(entry, state)}
 
-        {:error, _reason} ->
-          timer = Process.send_after(self(), {:wake, entry}, @retry_ms)
-          {:noreply, put_in(state.timers[key], timer)}
-      end
+      state.delivery != nil ->
+        {:noreply, retry_delivery(state, entry)}
+
+      true ->
+        # A resumed Flow can register its next wait while this delivery is in flight.
+        # The link stops this bounded task if Wake is shut down or crashes.
+        task = Task.async(fn -> deliver(state.instance, entry) end)
+        {:noreply, %{state | delivery: {task.ref, entry}}}
     end
+  end
+
+  def handle_info({ref, result}, %{delivery: {ref, entry}} = state) do
+    Process.demonitor(ref, [:flush])
+    state = %{state | delivery: nil}
+
+    case result do
+      result when result in [:ok, :stale] -> cleanup_wake(state, entry)
+      {:error, _reason} -> {:noreply, retry_delivery(state, entry)}
+    end
+  end
+
+  defp retry_delivery(state, entry) do
+    timer = Process.send_after(self(), {:wake, entry}, @retry_ms)
+    put_in(state.timers[entry_key(entry)], timer)
   end
 
   defp complete_turn(state, address, turn_id) do
@@ -179,6 +196,11 @@ defmodule Jido.Instance.Wake do
   defp recover(state) do
     case WakeStore.list(state.instance) do
       {:ok, entries} ->
+        state =
+          state
+          |> schedule_all(entries)
+
+        :ok = Jido.Instance.RuntimeStore.mark_wake_ready(state.instance)
         Enum.each(state.ready_waiters, &GenServer.reply(&1, :ok))
 
         state =
@@ -186,7 +208,6 @@ defmodule Jido.Instance.Wake do
           |> Map.put(:ready?, true)
           |> Map.put(:recovery_attempt, 0)
           |> Map.put(:ready_waiters, [])
-          |> schedule_all(entries)
 
         {:noreply, state}
 
@@ -229,11 +250,27 @@ defmodule Jido.Instance.Wake do
         source: "/jido/instance/wake"
       )
 
-    case Jido.call(instance, entry.agent_address, signal) do
-      {:ok, %Jido.AgentServer.TurnResult{}} -> :ok
-      {:error, reason} when reason in [:stale_wait, :wait_not_matched, :deleted, :not_found] -> :stale
-      {:error, _reason} = error -> error
+    case Jido.__deliver_wake__(instance, entry.agent_address, signal) do
+      {:ok, %Jido.AgentServer.TurnResult{durability: :durable, status: status}} when status != :uncertain ->
+        :ok
+
+      {:error, :result_acknowledgement_required} ->
+        case Jido.turn_result(instance, entry.agent_address, entry.turn_id) do
+          {:ok, %Jido.AgentServer.TurnResult{}} -> :stale
+          {:error, _reason} = error -> error
+        end
+
+      {:error, reason} when reason in [:stale_wait, :wait_not_matched, :deleted, :not_found] ->
+        :stale
+
+      {:error, _reason} = error ->
+        error
+
+      {:ok, _result} ->
+        {:error, :wake_outcome_unknown}
     end
+  catch
+    :exit, _reason -> {:error, :wake_delivery_unavailable}
   end
 
   defp wake_id(entry) do

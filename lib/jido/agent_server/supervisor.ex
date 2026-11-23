@@ -9,9 +9,14 @@ defmodule Jido.AgentServer.Supervisor do
     do: {__MODULE__, :start_link, [opts, parent, :atomics.new(1, [])]}
 
   def start_link(opts, parent \\ nil, lifetime \\ :atomics.new(1, [])) do
-    with {:ok, opts} <- Server.activation_options(opts) do
+    with :ok <- managed_start(opts),
+         {:ok, opts} <- Server.activation_options(opts) do
       Supervisor.start_link(__MODULE__, {opts, parent, lifetime}) |> finish_start(parent)
     end
+  end
+
+  defp managed_start(opts) do
+    if Keyword.keyword?(opts), do: Jido.Instance.Cluster.require_managed_activation(opts[:jido]), else: :ok
   end
 
   defp finish_start({:ok, root} = result, parent) do
@@ -83,7 +88,8 @@ defmodule Jido.AgentServer.Supervisor do
         key = Jido.AgentServer.RegistrationGuard.registry_key(opts[:agent].id, opts[:partition])
         registry = Jido.Instance.Names.registry(jido)
 
-        with :ok <- Jido.AgentServer.RegistrationGuard.claim(jido, key, self(), self()),
+        with :ok <- Jido.Instance.Cluster.require_managed_activation(jido),
+             :ok <- Jido.AgentServer.RegistrationGuard.claim(jido, key, self(), self()),
              {:ok, _owner} <- Registry.register(registry, key, {:activation, activation_id}) do
           :ok
         end

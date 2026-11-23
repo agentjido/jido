@@ -25,6 +25,7 @@ This directory records decisions that constrain the Jido V3 architecture. The [m
 | [0017](0017-behavior-tree-turn-ownership.md) | Proposed | Run Behavior Trees through v3 Agent Turns |
 | [0018](0018-stateless-ai-browser-tools.md) | Accepted | Use the AI Plugin for stateless browser tools |
 | [0019](0019-one-owner-for-agent-state-fields.md) | Accepted | Give each Agent state field one authoritative owner |
+| [0020](0020-fixed-home-instance-clustering.md) | Accepted | Configure one home per clustered Jido instance namespace |
 
 ## Backlog
 

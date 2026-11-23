@@ -34,6 +34,9 @@ The Address contract is distribution-safe identity data. Node placement and remo
 delivery require an explicit application or ecosystem topology. Jido does not
 claim transparent distributed AgentServer ownership.
 
+The [Distributed Agents chapter](../../26_distributed_agents/README.md) tests
+this boundary with two connected BEAM nodes.
+
 ## Files
 
 - [Source](distribution_boundaries.ex)

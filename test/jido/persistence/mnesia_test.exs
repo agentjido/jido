@@ -21,6 +21,16 @@ defmodule Jido.Persistence.MnesiaTest do
     assert :ok = AdapterConformance.assert_binary_get_and_cas(Mnesia, opts, :mnesia)
   end
 
+  test "synchronous writes preserve the same binary Store contract", %{opts: opts} do
+    sync = [sync_writes: true] ++ opts
+    assert :ok = AdapterConformance.assert_binary_get_and_cas(Mnesia, sync, :mnesia_sync)
+    assert :ok = Mnesia.put("sync", "value", sync)
+    assert {:ok, "value"} = Mnesia.get("sync", opts)
+    assert :ok = Mnesia.delete("sync", sync)
+    assert {:error, :not_found} = Mnesia.get("sync", opts)
+    assert {:error, :invalid_mnesia_options} = Mnesia.validate_options([sync_writes: :invalid] ++ opts)
+  end
+
   test "works through the shared Store and supports explicit maintenance", %{opts: opts} do
     assert {:ok, store} = Store.open({Mnesia, opts})
     assert {:error, :not_found} = Store.read(store, "record")

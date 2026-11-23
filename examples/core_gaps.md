@@ -221,3 +221,36 @@ that makes the problem clear.
   importer gap without adding higher-layer Agent or Flow dependencies to
   `Jido.Codec`.
 - Follow-up question: None.
+
+### EX-014 Forward work by Agent Address
+
+- Example [26_01 One pinned Agent for two nodes](26_distributed_agents/26_01_pinned_singleton/README.md).
+- Classification is a candidate Jido core change.
+- The application selects a host and forwards calls with `:erpc`. Cold calls
+  from both nodes run on one activation when only the configured host runs
+  the instance. A lost connection can hide a successful commit.
+- [26_06](26_distributed_agents/26_06_native_fixed_home/README.md) covers fixed-home routing and unknown outcomes in core. Dynamic placement remains a separate decision.
+
+### EX-015 Enforce ownership when two hosts share a namespace
+
+- Example [26_03 Shared storage and Agent ownership](26_distributed_agents/26_03_shared_store_ownership/README.md).
+- Classification is a candidate Jido core change.
+- Two instances use one Mnesia table. The second host reads the first host's
+  committed record and starts a second live activation for the same Address.
+- Enforce the owner decision at activation. For automatic takeover, add an
+  authority that prevents a former owner from admitting work, committing,
+  or delivering a wake. See the [acceptance cases](26_distributed_agents/README.md#next-core-contracts).
+- In [26_05 Split the BEAM link with SQL still available](26_distributed_agents/26_05_partition_without_ownership/README.md),
+  both peers retain access to SQL after a BEAM partition. The first host
+  can still commit after the second host activates the same Address.
+
+### EX-016 Start the survivor after host loss
+
+- Example [26_04 Recover a ticket deadline after a crash](26_distributed_agents/26_04_recover_a_ticket_deadline/README.md).
+- Classification is a candidate Jido core change.
+- Once the test confirms that the first BEAM has exited, it starts the
+  second instance against the same SQL store. Jido resumes the deadline and
+  commits the original Turn.
+- [26_07](26_distributed_agents/26_07_native_ticket_recovery/README.md)
+  covers verified startup on the survivor. Unattended takeover still requires
+  a write authority.

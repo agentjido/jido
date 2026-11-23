@@ -18,3 +18,5 @@ mix test.examples examples/25_operations_and_integrations --warnings-as-errors
 ```
 
 No lesson contacts a network service or accepts a live credential.
+
+[Next chapter](../26_distributed_agents/README.md)

@@ -50,15 +50,49 @@ defmodule Jido.Instance.RuntimeStore do
   end
 
   @doc false
-  @spec put_instance_config(atom(), term(), keyword()) :: :ok
-  def put_instance_config(table, persistence, agent_server) when is_atom(table) do
+  @spec put_instance_config(atom(), term(), keyword(), false | map()) :: :ok
+  def put_instance_config(table, persistence, agent_server, cluster \\ false) when is_atom(table) do
     true =
       :ets.insert(table, [
         {{@instance_config_hive, :persistence}, persistence},
-        {{@instance_config_hive, :agent_server}, agent_server}
+        {{@instance_config_hive, :agent_server}, agent_server},
+        {{@instance_config_hive, :cluster}, cluster}
       ])
 
     :ok
+  end
+
+  @doc false
+  def instance_cluster(instance) when is_atom(instance) do
+    table = Jido.Instance.Names.runtime_store(instance)
+    owner = Process.whereis(instance)
+
+    case :ets.lookup(table, {@instance_config_hive, :cluster}) do
+      [{_, cluster}] when is_pid(owner) ->
+        if :ets.info(table, :owner) == owner, do: cluster, else: false
+
+      _ ->
+        false
+    end
+  rescue
+    ArgumentError -> false
+  end
+
+  @doc false
+  def mark_wake_ready(instance) do
+    true = :ets.insert(Jido.Instance.Names.runtime_store(instance), {{@instance_config_hive, :wake_ready}, self()})
+    :ok
+  end
+
+  @doc false
+  def wake_ready?(instance) do
+    table = Jido.Instance.Names.runtime_store(instance)
+    wake = Process.whereis(Jido.Instance.Names.wake(instance))
+
+    is_pid(wake) and
+      :ets.lookup(table, {@instance_config_hive, :wake_ready}) == [{{@instance_config_hive, :wake_ready}, wake}]
+  rescue
+    ArgumentError -> false
   end
 
   @doc false
