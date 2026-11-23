@@ -1,6 +1,7 @@
 ---
 modules:
   - Jido.AgentServer.Lifecycle
+  - Jido.AgentServer.StateRead
   - Jido.AgentServer.Status
 ---
 

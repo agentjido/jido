@@ -1,5 +1,5 @@
 defmodule Jido.AgentServer.Snapshot do
-  @moduledoc "The complete committed Agent view for one resident activation."
+  @moduledoc "The Agent state and Jido revisions observed for one resident activation."
 
   alias Jido.Agent
   alias Jido.Agent.Address

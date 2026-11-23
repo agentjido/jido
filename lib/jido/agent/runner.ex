@@ -1,7 +1,7 @@
 defmodule Jido.Agent.Runner do
   @moduledoc false
 
-  alias Jido.Agent.{Plugin, Validation}
+  alias Jido.Agent.{Plugin, StateSource, Validation}
   alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
   alias Jido.Error
   alias Jido.Signal
@@ -186,7 +186,7 @@ defmodule Jido.Agent.Runner do
         agent_id: agent.id,
         agent_module: agent.module,
         agent_signal_source: agent.signal_source,
-        agent_state: agent.state,
+        agent_state: StateSource.turn_state(agent, plugin_inputs),
         agent_topology: agent.topology,
         plugin_inputs: plugin_inputs,
         signal: signal
@@ -238,6 +238,9 @@ defmodule Jido.Agent.Runner do
   end
 
   defp settle_candidate(prepared, state, directives) do
+    context = prepared.instruction.context
+    state = StateSource.drop_copied_fields(state, prepared.agent.state, context.agent_state)
+
     with {:ok, state, directives} <-
            at(
              :compose,
@@ -245,7 +248,7 @@ defmodule Jido.Agent.Runner do
                {:ok, state, directives},
                prepared.agent,
                prepared.source_signal,
-               prepared.instruction.context.plugin_inputs,
+               context.plugin_inputs,
                prepared.plugin_specs
              )
            ),

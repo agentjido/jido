@@ -1,6 +1,6 @@
 defmodule Jido.Agent.Validation do
   @moduledoc false
-  alias Jido.Agent.{Extension, Plugin, Route, Topology}
+  alias Jido.Agent.{Extension, Plugin, Route, StateSource, Topology}
   alias Jido.Error
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext
@@ -351,6 +351,7 @@ defmodule Jido.Agent.Validation do
       with :ok <- Error.prefix_result_path(nonempty(value.id), :id),
            {:ok, definition} <- validate_definition(definition, plugin_schema?: false),
            {:ok, specs, schema} <- dependencies(definition),
+           value = %{value | state: StateSource.stored_state(value, schema)},
            :ok <- Error.prefix_result_path(complete(schema, value.state), :state),
            {:ok, _} <- Topology.bind(definition, value.state, &__MODULE__.resolve/2),
            do: {:ok, value, specs, schema}

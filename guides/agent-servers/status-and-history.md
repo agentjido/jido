@@ -4,8 +4,10 @@
 port, reference, callback, timer, task, or Runic value. Use it for control
 logic, logs, and dashboards.
 
-`Jido.AgentServer.snapshot/2` returns the complete committed Agent value and
-its revisions from the same server event.
+`Jido.AgentServer.snapshot/2` returns the Agent and its Jido revisions. For an
+Ecto-backed Agent, it queries the Repo and includes the current row fields in
+`snapshot.agent.state`. Jido-owned fields keep their values. An external write
+can change the observed row while both Jido revisions stay the same.
 
 ## Status fields
 

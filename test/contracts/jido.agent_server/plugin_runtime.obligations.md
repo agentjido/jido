@@ -122,3 +122,11 @@ This component has no DSL or forwarding facade.
 - **why:** The caller needs to know whether the proposed state passed validation or the authoritative state write succeeded.
 - **kind:** ordering
 - **status:** active
+
+### jido.agent_server.plugin_runtime.I15 — Read Ecto-backed Agent state
+
+- **scope:** Snapshots and Action or Flow context for Ecto-backed Agents
+- **must:** Query the row by Agent ID for each snapshot. Report a missing row or unavailable Repo. Start no Turn and advance neither Jido revision. Expose the row read at admission in `context.agent_state` for the entire Turn, including after recovery. Give Jido-owned fields precedence. Exclude observed SQL fields from committed Jido Agent state and checkpoints of that state. A candidate state can carry unchanged SQL fields. Require an update Directive to change SQL fields.
+- **why:** Expose Ecto state through the normal state interfaces and keep each Turn consistent.
+- **kind:** functional
+- **status:** active

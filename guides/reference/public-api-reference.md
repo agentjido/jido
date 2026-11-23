@@ -157,7 +157,7 @@ Runs one serialized Agent Turn at a time.
 | `Jido.AgentServer.quiesce/2` | Closes admission and returns a stable `Status`. |
 | `Jido.AgentServer.remove_topology_member/4` | Drains and removes one declared member slot from this activation. |
 | `Jido.AgentServer.resume/2` | Reopens admission when the activation is safe. |
-| `Jido.AgentServer.snapshot/2` | Returns the complete committed `Snapshot`. |
+| `Jido.AgentServer.snapshot/2` | Returns the Agent state and Jido revisions, with current row fields for an Ecto-backed Agent. |
 | `Jido.AgentServer.status/2` | Returns the process-neutral semantic `Status`. |
 | `Jido.AgentServer.stop/3` | Stops one resident activation and returns its final `Snapshot`. |
 | `Jido.AgentServer.submit/3` | Submits one Signal and returns an owner-bound `Pending` value. |

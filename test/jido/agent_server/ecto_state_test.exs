@@ -85,9 +85,22 @@ defmodule Jido.AgentServer.EctoStateTest do
 
     @impl true
     def run(%{by: by}, context) do
-      row = context.plugin_inputs[EctoState].runtime.row
-      attrs = %{count: row.count + by}
+      attrs = %{count: context.agent_state.count + by}
       {:ok, attrs, [EctoState.update(attrs)]}
+    end
+  end
+
+  defmodule ReadAfterSignal do
+    use Jido.Flow, name: "ecto_state_read_after_signal"
+
+    flow do
+      await "resume", event: "ecto_state.resume"
+
+      step "read", _signal <- result("resume"), inline: [context: context] do
+        {:ok, %{count: context.agent_state.count}}
+      end
+
+      output result("read")
     end
   end
 
@@ -111,9 +124,26 @@ defmodule Jido.AgentServer.EctoStateTest do
 
       route "ecto_state.read", as: :read do
         action _params, context: context do
-          {:ok, %{count: context.plugin_inputs[EctoState].runtime.row.count}}
+          {:ok, %{count: context.agent_state.count}}
         end
 
+        state(:unchanged)
+        reply("ecto_state.current", from: output())
+      end
+
+      route "ecto_state.copy", as: :copy do
+        action _params, context: context do
+          {:ok, context.agent_state}
+        end
+      end
+
+      route "ecto_state.overwrite", as: :overwrite do
+        action _params, context: context do
+          {:ok, Map.put(context.agent_state, :count, 999)}
+        end
+      end
+
+      route "ecto_state.wait", ReadAfterSignal, as: :wait do
         state(:unchanged)
         reply("ecto_state.current", from: output())
       end
@@ -240,6 +270,104 @@ defmodule Jido.AgentServer.EctoStateTest do
 
     assert {:ok, %TurnResult{status: :committed, durability: :durable, reply: %{data: %{count: 10}}}} =
              AgentServer.call(server, Counter.read_signal!())
+  end
+
+  @tag obligation: "jido.agent_server.plugin_runtime.I15"
+  test "snapshot returns the current Ecto fields through agent.state", %{server: server} do
+    before_edit = AgentServer.snapshot(server)
+    assert %{agent: %{state: %{count: 10, lock_version: 1, ledger_count: nil}}} = before_edit
+    edit_count(40)
+
+    handler = {__MODULE__, make_ref()}
+    query_event = EctoRepo.config()[:telemetry_prefix] ++ [:query]
+    :ok = :telemetry.attach(handler, query_event, &__MODULE__.forward_query/4, self())
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    assert %{agent: %{state: %{count: 40, lock_version: 2, ledger_count: nil}}} =
+             snapshot = AgentServer.snapshot(server)
+
+    assert_receive {:sql_query, "SELECT " <> query}
+    assert query =~ ~s("counter_state")
+    assert snapshot.agent_revision == before_edit.agent_revision
+    assert snapshot.persistence_revision == before_edit.persistence_revision
+    assert EctoRepo.all(LedgerEntry) == []
+
+    assert {:ok, persisted} = Jido.Persistence.snapshot(snapshot.agent)
+    refute Map.has_key?(persisted.agent.state, :count)
+    assert {:ok, _agent} = Jido.Persistence.restore(persisted)
+  end
+
+  @tag obligation: "jido.agent_server.plugin_runtime.I15"
+  test "snapshot reports a missing row or unavailable Repo", %{server: server} do
+    EctoRepo.delete!(EctoRepo.get!(CounterState, "counter"))
+    assert {:error, :ecto_state_not_found} = AgentServer.snapshot(server)
+
+    assert :ok = stop_supervised(EctoRepo)
+    assert {:error, :ecto_state_unavailable} = AgentServer.snapshot(server)
+    assert %{agent_revision: 0} = AgentServer.status(server)
+  end
+
+  def forward_query(_event, _measurements, metadata, receiver),
+    do: send(receiver, {:sql_query, metadata.query})
+
+  @tag obligation: "jido.agent_server.plugin_runtime.I15"
+  test "normal Action state stays fixed after Turn admission", %{server: server} do
+    edit_count(40)
+    pending = AgentServer.submit(server, Counter.read_signal!(), context: %{writer: self()})
+    assert_receive {:row_loaded, admission}, 2_000
+
+    edit_count(80)
+    assert %{agent: %{state: %{count: 80}}} = AgentServer.snapshot(server)
+    send(admission, :write_finished)
+
+    assert {:ok, %TurnResult{status: :committed, reply: %{data: %{count: 40}}}} =
+             AgentServer.await(pending)
+
+    assert {:ok, %TurnResult{status: :committed, reply: %{data: %{count: 80}}}} =
+             AgentServer.call(server, Counter.read_signal!())
+  end
+
+  @tag obligation: "jido.agent_server.plugin_runtime.I15"
+  test "returning observed state does not copy SQL fields into Jido state or write to SQL", %{server: server} do
+    assert {:ok, %TurnResult{status: :committed}} =
+             AgentServer.call(server, Counter.copy_signal!())
+
+    assert {:ok, %TurnResult{status: :failed, error: %Jido.Error.ValidationError{code: :invalid_state}}} =
+             AgentServer.call(server, Counter.overwrite_signal!())
+
+    assert %CounterState{count: 10, lock_version: 1} = EctoRepo.get!(CounterState, "counter")
+  end
+
+  @tag obligation: "jido.agent_server.plugin_runtime.I15"
+  @tag :tmp_dir
+  test "a restored Flow reads the row admitted before it waited", %{tmp_dir: path} do
+    instance = __MODULE__.WaitingInstance
+    namespace = "test/ecto-state/waiting"
+
+    config = [
+      name: instance,
+      namespace: namespace,
+      persistence: {Jido.Persistence.File, path: path}
+    ]
+
+    address = Jido.Agent.Address.new!(namespace: namespace, id: "counter")
+    start_supervised!({Jido, config}, id: instance)
+    assert {:ok, ^address} = Jido.create_agent(instance, address, Counter)
+
+    assert {:ok, %TurnResult{status: :waiting, turn_id: turn_id}} =
+             Jido.call(instance, address, Counter.wait_signal!())
+
+    assert :ok = stop_supervised(instance)
+    edit_count(40)
+    start_supervised!({Jido, config}, id: instance)
+
+    resume = Jido.Signal.new!("ecto_state.resume", %{}, source: "/test/ecto-state")
+
+    assert {:ok, %TurnResult{status: :committed, turn_id: ^turn_id, reply: %{data: %{count: 10}}}} =
+             Jido.call(instance, address, resume)
+
+    assert {:ok, %TurnResult{status: :committed, reply: %{data: %{count: 40}}}} =
+             Jido.call(instance, address, Counter.read_signal!())
   end
 
   @tag obligation: "jido.agent_server.plugin_runtime.I14"

@@ -8,6 +8,7 @@ modules:
   - Jido.Agent.DSL.Entry
   - Jido.Agent.Directive.Emit
   - Jido.Agent.Schema
+  - Jido.Agent.StateSource
   - Jido.Agent.Topology
   - Jido.Agent.Validation
   - Jido.Agent.View

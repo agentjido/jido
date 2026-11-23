@@ -160,8 +160,7 @@ defmodule MyApp.CounterAgent do
 
     route "counter.increment" do
       action _input, context: context do
-        row = context.plugin_inputs[EctoState].runtime.row
-        changes = %{count: row.count + 1}
+        changes = %{count: context.agent_state.count + 1}
         {:ok, changes, [EctoState.update(changes)]}
       end
 
@@ -175,16 +174,35 @@ end
 Use only `ecto SchemaModule` in this state block. The compiler rejects
 `schema`, `initial_state`, and options on the `ecto` declaration.
 
-Each live Turn reads the current row. The Action reads the row from its
-Plugin input and can return one update Directive. Any reply comes from the
-route's own output. The Plugin uses the schema's changeset and checks
+Each live Turn reads the current row at admission. Actions and Flow steps
+read these fields through `context.agent_state`. The row stays fixed for
+that Turn. The next Turn reads the row again.
+
+Return an `EctoState.update/1` Directive to change the row. Jido removes
+unchanged SQL fields from the candidate state and rejects changes to those
+fields in the candidate. The Plugin uses the schema's changeset and checks
 `lock_version` when it saves. A stale row fails the Turn before the caller
 receives success. A Turn with no update Directive only reads the row.
 
 Run the Agent with Jido persistence disabled to write to the Ecto row.
 When Jido persistence is enabled, the Plugin rejects update proposals and
-permits read-only Turns. If another writer changes the row, it must also
-advance `lock_version`.
+permits read-only Turns. A durable Flow saves its admitted row in the
+continuation checkpoint and uses that input when it resumes. If another
+writer changes the SQL row, it must also advance `lock_version`.
+
+The usual live snapshot reads the current row without starting a Turn.
+
+```elixir
+%{agent: %{state: %{count: count}}} = Jido.AgentServer.snapshot(server)
+```
+
+The read includes persisted schema fields. If a field has the same key as a
+Jido-owned field, the Jido-owned value takes precedence. The Jido revisions
+track Jido commits, and the row's `lock_version` tracks external changes.
+
+The query uses the Agent ID as the primary key in the schema's Repo. Give
+Agents different IDs to keep separate rows in the same table and prefix, even
+when the Agents use different Jido namespaces or partitions.
 
 ## Plugin-owned fields
 

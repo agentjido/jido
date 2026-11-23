@@ -7,7 +7,7 @@ defmodule Jido.AgentServer do
   Instance when work must survive passivation or worker replacement.
   """
 
-  alias Jido.AgentServer.{Pending, Snapshot, Status, Topology, TurnResult, Worker}
+  alias Jido.AgentServer.{Pending, Snapshot, StateRead, Status, Topology, TurnResult, Worker}
   alias Jido.Signal
 
   @typedoc "A local handle for one resident Agent activation."
@@ -153,7 +153,7 @@ defmodule Jido.AgentServer do
   @doc """
   Closes admission and finishes accepted work before stopping the activation.
 
-  Returns the final committed snapshot after the activation exits. The
+  Returns the final Jido commit snapshot after the activation exits. The
   default reason is `:shutdown`. Pass a finite timeout in milliseconds.
   The default is 5,000 ms. If the drain times out, admission stays closed.
   """
@@ -161,9 +161,24 @@ defmodule Jido.AgentServer do
   def stop(server, reason \\ :shutdown, timeout \\ 5_000),
     do: Worker.stop(server, reason, timeout)
 
-  @doc "Returns the committed Agent and both revisions in one read. The default wait is 5,000 ms."
+  @doc """
+  Returns the Agent and both Jido revisions for a resident activation.
+
+  For an Ecto-backed Agent, reads the current row into `snapshot.agent.state`.
+  Jido-owned fields keep their values. The SQL read does not start a Turn or
+  advance either revision. It uses the Repo's timeout in the caller's process.
+
+  Returns `{:error, :ecto_state_not_found}` for a missing row or
+  `{:error, :ecto_state_unavailable}` if the Repo read fails. The server wait
+  defaults to 5,000 ms.
+  """
   @spec snapshot(server(), timeout()) :: Snapshot.t() | {:error, term()}
-  def snapshot(server, timeout \\ 5_000), do: Worker.snapshot(server, timeout)
+  def snapshot(server, timeout \\ 5_000) do
+    case Worker.snapshot(server, timeout) do
+      %Snapshot{} = snapshot -> StateRead.populate(snapshot)
+      {:error, _reason} = error -> error
+    end
+  end
 
   @doc "Returns the semantic state of the resident activation. The default wait is 5,000 ms."
   @spec status(server(), timeout()) :: Status.t() | {:error, term()}

@@ -705,6 +705,7 @@ Disposition terms:
 | `Jido.Agent.Schema` | Keep | Canonical generic Agent authoring checks, struct schema, defaults, and schema traversal |
 | `Jido.Agent.Topology` | Keep | Static logical members and output connections in an Agent definition |
 | `Jido.Agent.Turn` | Removed | Runner owns one private prepared execution value; the public Agent model needs no second command container |
+| `Jido.Agent.StateSource` | Internal | Projects external fields into Snapshots and Turn context and keeps them out of Jido-owned state |
 | `Jido.Agent.Validation` | Keep | Absorbs Authoring and Data checks |
 | `Jido.Agent.View` | Keep | Safe framework-neutral Agent view |
 
@@ -786,6 +787,7 @@ Disposition terms:
 | `Jido.AgentServer.TopologyBus` | Removed | Bus lifecycle and publication now belong to `Jido.AgentServer.Topology` |
 | `Jido.AgentServer.TopologyRuntime` | Removed | Static topology startup and explicit runtime child operations belong to `Jido.AgentServer.Topology` |
 | `Jido.AgentServer.Lifecycle` | Keep | Canonical Turn, wait, cancellation, commit, effect, and recovery policy owner |
+| `Jido.AgentServer.StateRead` | Internal | Loads external state for the resident snapshot |
 | `Jido.AgentServer.Status` | Keep | Public typed process-neutral status view for state, active Turn, waits, effects, revision, and last failure |
 | `Jido.AgentOwnership` | Keep | Public process-neutral fence for one local activation ownership relation |
 | `Jido.Instance.Cluster` | Keep internal | Fixed-home configuration, durable startup record, and native RPC transport |
