@@ -99,7 +99,6 @@ defmodule Jido.Instance.AddressTest do
     agent_count: [0, 1],
     agent_address: [1, 2],
     resolve_agent: [1],
-    fetch_state: [1, 2],
     create_agent: [2, 3],
     activate_agent: [2, 3],
     call: [2, 3],
@@ -315,20 +314,16 @@ defmodule Jido.Instance.AddressTest do
              Jido.AgentServer.await(pending)
 
     assert Jido.AgentServer.snapshot(server).agent.state.count == 9
-    assert {:ok, %{count: 9}} = Jido.fetch_state(instance, address)
 
     missing = %{address | id: "missing"}
     assert {:error, :not_found} = Jido.resolve_agent(instance, missing)
     assert {:error, :not_found} = Jido.call(instance, missing, signal(1))
-    assert {:error, :not_found} = Jido.fetch_state(instance, missing)
 
     wrong = %{address | namespace: namespace <> "/other"}
     assert {:error, %Error.ValidationError{} = error} = Jido.call(instance, wrong, signal(1))
     assert Error.code(error) == :jido_namespace_mismatch
     assert error.details.expected == namespace
     assert error.details.actual == wrong.namespace
-    assert {:error, %Error.ValidationError{} = read_error} = Jido.fetch_state(instance, wrong)
-    assert read_error.details == error.details
 
     foreign = %{address | id: "foreign"}
     key = Jido.AgentServer.RegistrationGuard.registry_key(foreign.id, foreign.partition)
@@ -721,8 +716,6 @@ defmodule Jido.Instance.AddressTest do
 
     assert {:ok, %Jido.AgentServer.Snapshot{}} = Jido.AgentServer.stop(server)
     eventually(fn -> Jido.status(instance, address).residency == :passivated end)
-    assert {:ok, %{count: 0}} = Jido.fetch_state(instance, address)
-    assert %{residency: :passivated} = Jido.status(instance, address)
     assert Jido.cancel_turn(instance, address, "absent") == {:error, :not_running}
   end
 

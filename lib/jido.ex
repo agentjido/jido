@@ -56,9 +56,8 @@ defmodule Jido do
 
   ## Observe Runtime Work
 
-  Use `Jido.AgentServer.fetch_state/2` for authoritative Agent state,
-  `Jido.AgentServer.snapshot/2` for the committed Agent and its revisions, and
-  `Jido.AgentServer.status/2` for current runtime work.
+  Use `Jido.AgentServer.snapshot/2` for the committed Agent. Use
+  `Jido.AgentServer.status/2` for the revision and current runtime work.
 
   `Jido.Telemetry` is the system-wide observation contract. Its semantic event
   catalog supplies Telemetry events, standard metrics, bounded logs, and
@@ -873,33 +872,6 @@ defmodule Jido do
          do: with_address_server(instance, address, &AgentServer.cancel_turn(&1, turn_id, timeout))
   end
 
-  @doc """
-  Reads the authoritative state through a stable Agent Address.
-
-  For a resident Agent, this has the same result as
-  `Jido.AgentServer.fetch_state/2`. A passivated Agent uses its durable
-  checkpoint to find its state source. The read does not activate the
-  Agent. In a fixed-home instance, the read runs on the home node and the
-  cluster timeout also applies. The result must be process-neutral.
-  """
-  @spec fetch_state(atom(), Address.t(), timeout()) :: {:ok, map()} | {:error, term()}
-  def fetch_state(instance, %Address{} = address, timeout \\ 5_000) do
-    route_address(instance, address, :fetch_state, [timeout])
-  end
-
-  defp local_fetch_state(instance, address, timeout) do
-    with :ok <- AgentServer.Lifecycle.validate_wait(timeout) do
-      case resolve_agent(instance, address) do
-        {:ok, pid} -> AgentServer.fetch_state(pid, timeout)
-        {:error, :not_found} -> fetch_passivated_state(instance, address)
-        {:error, _reason} = error -> error
-      end
-    end
-  catch
-    :exit, {:timeout, _call} = reason -> exit(reason)
-    :exit, _reason -> {:error, :unavailable}
-  end
-
   @doc "Returns Turn status through a stable Agent Address."
   @spec status(atom(), Address.t(), timeout()) :: Jido.AgentServer.Status.t() | {:error, term()}
   def status(instance, %Address{} = address, timeout \\ 5_000) do
@@ -947,19 +919,6 @@ defmodule Jido do
     end
   end
 
-  defp fetch_passivated_state(instance, address) do
-    case Jido.Persistence.load_agent_address(instance, address, instance: instance) do
-      {:ok, agent, _persistence_revision, _agent_revision, _turn} ->
-        AgentServer.StateRead.fetch(agent)
-
-      {:error, :persistence_not_configured} ->
-        {:error, :not_found}
-
-      {:error, _reason} = error ->
-        error
-    end
-  end
-
   defp passivated_status(instance, address) do
     case Jido.Persistence.load_agent_address(instance, address, instance: instance) do
       {:ok, _agent, persistence_revision, agent_revision, turn} ->
@@ -1002,7 +961,7 @@ defmodule Jido do
 
   @doc false
   def __cluster_dispatch__(:jido_cluster_v1, instance, home, generation, %Address{} = address, operation, args)
-      when is_atom(instance) and operation in [:call, :cast, :fetch_state, :status, :turn_result] do
+      when is_atom(instance) and operation in [:call, :cast, :status, :turn_result] do
     result =
       with {owner, %{home: ^home, generation: ^generation} = cluster} when home == node() <-
              RuntimeStore.instance_cluster(instance),
@@ -1029,7 +988,7 @@ defmodule Jido do
     end
   end
 
-  defp cluster_request(operation, [timeout], limit) when operation in [:fetch_state, :status] do
+  defp cluster_request(:status, [timeout], limit) do
     with :ok <- Jido.AgentServer.Lifecycle.validate_wait(timeout) do
       timeout = min(timeout, limit)
       {:ok, [timeout], timeout}
@@ -1137,9 +1096,6 @@ defmodule Jido do
 
   defp local_address_operation(:cast, instance, address, [signal]),
     do: with_address_server(instance, address, &AgentServer.cast(&1, signal))
-
-  defp local_address_operation(:fetch_state, instance, address, [timeout]),
-    do: local_fetch_state(instance, address, timeout)
 
   defp local_address_operation(:status, instance, address, [timeout]),
     do: local_status(instance, address, timeout)

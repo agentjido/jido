@@ -153,7 +153,7 @@ defmodule Jido.AgentServer do
   @doc """
   Closes admission and finishes accepted work before stopping the activation.
 
-  Returns the final committed snapshot after the activation exits. The
+  Returns the final Jido commit snapshot after the activation exits. The
   default reason is `:shutdown`. Pass a finite timeout in milliseconds.
   The default is 5,000 ms. If the drain times out, admission stays closed.
   """
@@ -162,33 +162,23 @@ defmodule Jido.AgentServer do
     do: Worker.stop(server, reason, timeout)
 
   @doc """
-  Reads the authoritative state for a resident Agent on this node.
+  Returns the Agent and both Jido revisions for a resident activation.
 
-  Returns `{:ok, state}` with the committed state map for an ordinary Agent.
-  For an Ecto-backed Agent, returns `{:ok, row}` with the current schema struct
-  from the Repo. A missing row returns `{:error, :ecto_state_not_found}`.
-  A failed Repo read returns `{:error, :ecto_state_unavailable}`.
+  For an Ecto-backed Agent, reads the current row into `snapshot.agent.state`.
+  Jido-owned fields keep their values. The SQL read does not start a Turn or
+  advance either revision. It uses the Repo's timeout in the caller's process.
 
-  This read starts no Turn and advances no revision. The timeout applies to
-  the AgentServer call and defaults to 5,000 ms. Repo queries use the Repo's
-  timeout and run in the caller's process.
+  Returns `{:error, :ecto_state_not_found}` for a missing row or
+  `{:error, :ecto_state_unavailable}` if the Repo read fails. The server wait
+  defaults to 5,000 ms.
   """
-  @spec fetch_state(server(), timeout()) :: {:ok, map()} | {:error, term()}
-  def fetch_state(server, timeout \\ 5_000) do
-    case snapshot(server, timeout) do
-      %Snapshot{agent: agent} -> StateRead.fetch(agent)
+  @spec snapshot(server(), timeout()) :: Snapshot.t() | {:error, term()}
+  def snapshot(server, timeout \\ 5_000) do
+    case Worker.snapshot(server, timeout) do
+      %Snapshot{} = snapshot -> StateRead.populate(snapshot)
       {:error, _reason} = error -> error
     end
   end
-
-  @doc """
-  Returns the committed Jido Agent and both revisions in one read.
-
-  The snapshot contains the state held by Jido. Use `fetch_state/2` to load
-  the current row of an Ecto-backed Agent. The default wait is 5,000 ms.
-  """
-  @spec snapshot(server(), timeout()) :: Snapshot.t() | {:error, term()}
-  def snapshot(server, timeout \\ 5_000), do: Worker.snapshot(server, timeout)
 
   @doc "Returns the semantic state of the resident activation. The default wait is 5,000 ms."
   @spec status(server(), timeout()) :: Status.t() | {:error, term()}

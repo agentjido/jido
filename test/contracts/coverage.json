@@ -585,10 +585,10 @@
       }
     },
     "jido.agent_server": {
-      "active": 16,
+      "active": 15,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 16,
+      "covered": 15,
       "form": "light",
       "obligations": {
         "jido.agent_server.I1": {
@@ -689,16 +689,6 @@
             "test a call to an absent registered name leaves no reply gate",
             "test a submission to an absent registered name leaves no reply gate",
             "test quiesce closes the reply gates for a queued call and submission"
-          ]
-        },
-        "jido.agent_server.I108": {
-          "failing": 0,
-          "kind": "functional",
-          "passing": 1,
-          "status": "active",
-          "testable": true,
-          "tests": [
-            "test fetch_state returns the committed state during a Turn"
           ]
         },
         "jido.agent_server.I11": {
@@ -1738,13 +1728,12 @@
         "jido.agent_server.plugin_runtime.I15": {
           "failing": 0,
           "kind": "functional",
-          "passing": 3,
+          "passing": 2,
           "status": "active",
           "testable": true,
           "tests": [
-            "test fetch_state by Address reads the row before and after passivation",
-            "test fetch_state queries the current row without running a Turn",
-            "test fetch_state reports a missing row or unavailable Repo"
+            "test snapshot reports a missing row or unavailable Repo",
+            "test snapshot returns the current Ecto fields through agent.state"
           ]
         },
         "jido.agent_server.plugin_runtime.I2": {
@@ -6286,8 +6275,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 268,
+    "active": 267,
     "coverage": 1.0,
-    "covered": 268
+    "covered": 267
   }
 }

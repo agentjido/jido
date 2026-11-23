@@ -224,7 +224,7 @@ Logger.configure(level: :info)
 
 These lines use bounded fields, so they hold no Agent state or Signal data. See [Telemetry and Tracing](telemetry-tracing-and-logs.md#log-modes).
 
-Call `Jido.AgentServer.fetch_state/2` to read the Agent's state from its authoritative source. Use `Jido.AgentServer.snapshot/2` when you need the committed Jido Agent and its revisions. Both results can contain sensitive state.
+Use `Jido.AgentServer.snapshot/2` to read Agent state and Jido revisions. The snapshot reads the current row for an Ecto-backed Agent. Treat its state as sensitive.
 
 ## Next steps
 

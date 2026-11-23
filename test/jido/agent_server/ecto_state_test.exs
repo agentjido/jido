@@ -243,59 +243,38 @@ defmodule Jido.AgentServer.EctoStateTest do
   end
 
   @tag obligation: "jido.agent_server.plugin_runtime.I15"
-  test "fetch_state queries the current row without running a Turn", %{server: server} do
-    snapshot = AgentServer.snapshot(server)
+  test "snapshot returns the current Ecto fields through agent.state", %{server: server} do
+    before_edit = AgentServer.snapshot(server)
+    assert %{agent: %{state: %{count: 10, lock_version: 1, ledger_count: nil}}} = before_edit
     edit_count(40)
+
     handler = {__MODULE__, make_ref()}
     query_event = EctoRepo.config()[:telemetry_prefix] ++ [:query]
-
     :ok = :telemetry.attach(handler, query_event, &__MODULE__.forward_query/4, self())
     on_exit(fn -> :telemetry.detach(handler) end)
 
-    assert AgentServer.snapshot(server) == snapshot
-    refute_received {:sql_query, _}
-
-    assert {:ok, %CounterState{id: "counter", count: 40, lock_version: 2}} =
-             AgentServer.fetch_state(server)
+    assert %{agent: %{state: %{count: 40, lock_version: 2, ledger_count: nil}}} =
+             snapshot = AgentServer.snapshot(server)
 
     assert_receive {:sql_query, "SELECT " <> query}
     assert query =~ ~s("counter_state")
-    assert AgentServer.snapshot(server) == snapshot
+    assert snapshot.agent_revision == before_edit.agent_revision
+    assert snapshot.persistence_revision == before_edit.persistence_revision
     assert EctoRepo.all(LedgerEntry) == []
+
+    assert {:ok, persisted} = Jido.Persistence.snapshot(snapshot.agent)
+    refute Map.has_key?(persisted.agent.state, :count)
+    assert {:ok, _agent} = Jido.Persistence.restore(persisted)
   end
 
   @tag obligation: "jido.agent_server.plugin_runtime.I15"
-  test "fetch_state reports a missing row or unavailable Repo", %{server: server} do
+  test "snapshot reports a missing row or unavailable Repo", %{server: server} do
     EctoRepo.delete!(EctoRepo.get!(CounterState, "counter"))
-    assert {:error, :ecto_state_not_found} = AgentServer.fetch_state(server)
+    assert {:error, :ecto_state_not_found} = AgentServer.snapshot(server)
 
     assert :ok = stop_supervised(EctoRepo)
-    assert {:error, :ecto_state_unavailable} = AgentServer.fetch_state(server)
-    assert %{agent_revision: 0} = AgentServer.snapshot(server)
-  end
-
-  @tag obligation: "jido.agent_server.plugin_runtime.I15"
-  @tag :tmp_dir
-  test "fetch_state by Address reads the row before and after passivation", %{config: config, tmp_dir: path} do
-    config =
-      Keyword.merge(config,
-        name: __MODULE__.DurableReadInstance,
-        namespace: config[:namespace] <> "/durable-read",
-        persistence: {Jido.Persistence.File, path: path}
-      )
-
-    server = start_counter(config)
-    instance = config[:name]
-    {:ok, address} = Jido.agent_address(instance, "counter")
-    assert {:ok, %CounterState{count: 10}} = Jido.fetch_state(instance, address)
-
-    assert {:ok, %AgentServer.Snapshot{}} = AgentServer.stop(server)
-    assert %{residency: :passivated} = Jido.status(instance, address)
-    edit_count(40)
-
-    assert {:ok, %CounterState{count: 40, lock_version: 2}} = Jido.fetch_state(instance, address)
-    assert %{residency: :passivated} = Jido.status(instance, address)
-    assert {:error, :not_found} = Jido.resolve_agent(instance, address)
+    assert {:error, :ecto_state_unavailable} = AgentServer.snapshot(server)
+    assert %{agent_revision: 0} = AgentServer.status(server)
   end
 
   def forward_query(_event, _measurements, metadata, receiver),

@@ -1,18 +1,24 @@
 defmodule Jido.AgentServer.StateRead do
   @moduledoc false
 
-  alias Jido.Agent
+  alias Jido.Agent.StateSource
+  alias Jido.AgentServer.Snapshot
 
-  @ecto_state_provider Jido.Plugin.EctoState
+  def populate(%Snapshot{agent: agent} = snapshot) do
+    case StateSource.ecto_schema(agent) do
+      nil ->
+        snapshot
 
-  def fetch(%Agent{plugins: plugins, id: id, state: state}) do
-    case Enum.find(plugins, &(&1.provider == @ecto_state_provider)) do
-      %{data: %{schema: schema}} -> fetch_ecto(schema, id)
-      nil -> {:ok, state}
+      schema ->
+        with {:ok, row} <- fetch_row(schema, agent.id) do
+          fields = Map.take(row, schema.__schema__(:fields))
+          agent = %{agent | state: Map.merge(fields, agent.state)}
+          %{snapshot | agent: agent}
+        end
     end
   end
 
-  defp fetch_ecto(schema, id) do
+  defp fetch_row(schema, id) do
     repo = schema.repo()
 
     case repo.get(schema, id) do
