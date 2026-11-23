@@ -166,7 +166,7 @@ The handler context now holds `:agent_state`, `:signal`, `:plugin_inputs`, and t
 
 ### Run
 
-Jido compiles the Flow to a `Runic.Workflow` and starts it as a Worker under the instance's Runner. The server moves to `:running` and waits for a message from the Worker. It does not block, so `Jido.AgentServer.status/2`, `Jido.AgentServer.agent/2`, and `Jido.AgentServer.cancel/2` still work.
+Jido compiles the Flow to a `Runic.Workflow` and starts it as a Worker under the instance's Runner. The server moves to `:running` and waits for a message from the Worker. While the Worker runs, the AgentServer can still handle status reads, state reads, and cancellation requests.
 
 `:exec_opts` sets the policy for this run, including retries and the timeout for each Action. See [Execution Policy](../actions/action-execution-policy.md).
 

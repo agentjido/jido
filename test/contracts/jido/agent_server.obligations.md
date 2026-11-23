@@ -1,6 +1,7 @@
 ---
 modules:
   - Jido.AgentServer.Lifecycle
+  - Jido.AgentServer.StateRead
   - Jido.AgentServer.Status
 ---
 
@@ -88,7 +89,7 @@ authoring surface.
 ### jido.agent_server.I9 — Public API boundary
 
 - **scope:** documented `Jido.AgentServer` functions and types
-- **must:** Keep the documented 14-function facade exact, including controlled declared-topology member removal. Keep `Pending`, `Snapshot`, `Status`, and `TurnResult` public and typed. Keep workers, supervisors, state-machine callbacks, Plugin roots, and coordinator data internal. Do not add a second AgentServer DSL.
+- **must:** Keep the documented 15-function facade exact, including controlled declared-topology member removal. Keep `Pending`, `Snapshot`, `Status`, and `TurnResult` public and typed. Keep workers, supervisors, state-machine callbacks, Plugin roots, and coordinator data internal. Do not add a second AgentServer DSL.
 - **why:** Users need one stable runtime entry point without OTP implementation data.
 - **kind:** functional
 - **status:** active
@@ -429,5 +430,13 @@ authoring surface.
 - **scope:** `Jido.AgentServer.call/3`, `submit/3`, `await/2`, `abandon/1`, and `quiesce/2`
 - **must:** Release reply gates after quiesce rejects queued requests and after the caller ends reply tracking on transport failure. Preserve owner-only collection. A wait timeout permits another await, and abandonment does not cancel accepted work.
 - **why:** A rejected or undelivered request must release its reply process while the caller stays alive.
+- **kind:** functional
+- **status:** active
+
+### jido.agent_server.I108 — Read authoritative Agent state
+
+- **scope:** `Jido.AgentServer.fetch_state/2`
+- **must:** Read the current committed state map for an ordinary live Agent, including while a Turn is active. Validate the caller timeout. Keep the snapshot and both revisions independent of the read.
+- **why:** Callers need the state from its authoritative owner without submitting a Turn.
 - **kind:** functional
 - **status:** active

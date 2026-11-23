@@ -6,9 +6,9 @@
       "covered": 103
     },
     "jido.agent_server": {
-      "active": 16,
+      "active": 17,
       "coverage": 1.0,
-      "covered": 16
+      "covered": 17
     },
     "jido.plugin": {
       "active": 42,
@@ -585,10 +585,10 @@
       }
     },
     "jido.agent_server": {
-      "active": 15,
+      "active": 16,
       "app": "jido",
       "coverage": 1.0,
-      "covered": 15,
+      "covered": 16,
       "form": "light",
       "obligations": {
         "jido.agent_server.I1": {
@@ -689,6 +689,16 @@
             "test a call to an absent registered name leaves no reply gate",
             "test a submission to an absent registered name leaves no reply gate",
             "test quiesce closes the reply gates for a queued call and submission"
+          ]
+        },
+        "jido.agent_server.I108": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test fetch_state returns the committed state during a Turn"
           ]
         },
         "jido.agent_server.I11": {
@@ -1665,10 +1675,10 @@
       }
     },
     "jido.agent_server.plugin_runtime": {
-      "active": 7,
+      "active": 8,
       "app": "jido.agent_server",
       "coverage": 1.0,
-      "covered": 7,
+      "covered": 8,
       "form": "light",
       "obligations": {
         "jido.agent_server.plugin_runtime.I1": {
@@ -1723,6 +1733,18 @@
             "test each Turn reads the canonical row, including after restart",
             "test the Ecto Plugin rejects writes with Jido persistence and allows reads",
             "test the built-in Plugin can commit without a ledger Plugin"
+          ]
+        },
+        "jido.agent_server.plugin_runtime.I15": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 3,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test fetch_state by Address reads the row before and after passivation",
+            "test fetch_state queries the current row without running a Turn",
+            "test fetch_state reports a missing row or unavailable Repo"
           ]
         },
         "jido.agent_server.plugin_runtime.I2": {
@@ -6264,8 +6286,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 266,
+    "active": 268,
     "coverage": 1.0,
-    "covered": 266
+    "covered": 268
   }
 }

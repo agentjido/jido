@@ -179,6 +179,23 @@ defmodule Jido.AgentServer.ApiTest do
     refute_eventually(Process.alive?(gate))
   end
 
+  @tag obligation: "jido.agent_server.I108"
+  test "fetch_state returns the committed state during a Turn", c do
+    assert {:ok, server} = Jido.start_agent(c.jido, QueueAgent, id: "queue")
+    assert :ok = AgentServer.await_ready(server)
+
+    pending =
+      AgentServer.submit(server, signal("queue.work", %{block: true}), context: %{observer: self()})
+
+    assert_receive {:queue_gate, action}, 1_000
+    assert {:ok, %{count: 0}} = AgentServer.fetch_state(server)
+    assert {:error, %Jido.Error.ValidationError{}} = AgentServer.fetch_state(server, -1)
+
+    send(action, :release)
+    assert {:ok, %TurnResult{status: :committed}} = AgentServer.await(pending)
+    assert {:ok, %{count: 1}} = AgentServer.fetch_state(server)
+  end
+
   @tag obligation: "jido.agent_server.I9"
   test "the documented AgentServer API and public types are exact" do
     assert documented_api(AgentServer) == [
@@ -189,6 +206,7 @@ defmodule Jido.AgentServer.ApiTest do
              {:function, :cancel_turn, 3},
              {:function, :cast, 3},
              {:function, :child_spec, 1},
+             {:function, :fetch_state, 2},
              {:function, :quiesce, 2},
              {:function, :remove_topology_member, 4},
              {:function, :resume, 2},

@@ -4,6 +4,25 @@ defmodule Jido.Instance.ClusterPeerTest do
   alias Jido.Instance.Names
   alias Jido.Test.AgentServer.RuntimeFixtures.RuntimeAgent
 
+  test "ingress fetches state at the home without activating a passivated Agent", c do
+    {instance, address, worker, signal} = start_home(c)
+
+    opts = [
+      name: instance,
+      namespace: address.namespace,
+      cluster: [home: c.node_a, generation: "generation"]
+    ]
+
+    assert {:ok, _pid} = peer_call(c.peer_b, Supervisor, :start_child, [Jido.Supervisor, {Jido, opts}])
+
+    assert {:ok, %{ticks: 0}} = peer_call(c.peer_b, Jido, :fetch_state, [instance, address])
+    assert {:ok, %{status: :committed}} = peer_call(c.peer_a, Jido.AgentServer, :call, [worker, signal])
+    assert {:ok, %Jido.AgentServer.Snapshot{}} = peer_call(c.peer_a, Jido.AgentServer, :stop, [worker])
+
+    assert {:ok, %{ticks: 1}} = peer_call(c.peer_b, Jido, :fetch_state, [instance, address])
+    assert %{residency: :passivated} = peer_call(c.peer_a, Jido, :status, [instance, address])
+  end
+
   test "a cached Worker refuses admission while an instance dependency is down", c do
     {instance, address, worker, signal} = start_home(c)
 

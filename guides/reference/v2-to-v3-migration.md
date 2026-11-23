@@ -152,20 +152,21 @@ Jido checks routes in declaration order and runs the first match. See [Routes an
 {:ok, pid} = Jido.start_agent(MigrationGuide.Jido, MigrationGuide.Counter, id: "counter-2")
 ^pid = Jido.whereis_agent(MigrationGuide.Jido, "counter-2")
 
-{:ok, %{state: %{count: 2}}, []} =
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} =
   Jido.AgentServer.call(pid, MigrationGuide.Counter.increment_signal!(%{amount: 2}))
 
-%{state: %{count: 2}} = Jido.AgentServer.snapshot(pid).agent
+{:ok, %{count: 2}} = Jido.AgentServer.fetch_state(pid)
 
 pending = Jido.AgentServer.submit(pid, MigrationGuide.Counter.increment_signal!(%{amount: 1}))
-{:ok, %{state: %{count: 3}}, []} = Jido.AgentServer.await(pending)
+{:ok, %Jido.AgentServer.TurnResult{status: :committed}} = Jido.AgentServer.await(pending)
+{:ok, %{count: 3}} = Jido.AgentServer.fetch_state(pid)
 ```
 
 | V2 | V3 |
 | --- | --- |
-| `Jido.AgentServer.call/3` returns `{:ok, agent}` | `{:ok, agent, directives}`. It confirms the commit, not that Directives finished. |
+| `Jido.AgentServer.call/3` returns `{:ok, agent}` | `{:ok, %Jido.AgentServer.TurnResult{}}` for an accepted Turn. Check its `status` for the outcome. |
 | `call("agent-id", signal)` | Find the PID with `Jido.whereis_agent/3`, or use an Address with `Jido.call/4` |
-| `state(server)` | `Jido.AgentServer.agent/2` for the Agent, `Jido.AgentServer.status/2` for runtime state, `Jido.AgentServer.snapshot/2` for both from one event |
+| `state(server)` | `Jido.AgentServer.fetch_state/2` for authoritative state and `Jido.AgentServer.status/2` for runtime status |
 | `await_completion/2`, Jido.Await | `Jido.AgentServer.submit/3` and `Jido.AgentServer.await/2` for one Turn |
 | `stream_status/2`, `recent_events/2` | Start with `debug: true`, then read `Jido.AgentServer.history/1` |
 | `set_debug/2`, Jido.debug, Jido.Debug | The `:debug` AgentServer option for history, and the `:debug` instance option for logs. A hidden `set_debug/2` on `Jido.Telemetry` changes log detail for persistence events at run time. |
@@ -173,7 +174,7 @@ pending = Jido.AgentServer.submit(pid, MigrationGuide.Counter.increment_signal!(
 | `MyApp.Jido.whereis(id)` | `Jido.whereis_agent(MyApp.Jido, id)` |
 | `attach/2`, `detach/2`, `touch/1` | Kept. `Jido.AgentServer.attach/3` and `Jido.AgentServer.detach/3` add a timeout. |
 | `adopt_child/4`, `stop_child/3` | Kept on `Jido.AgentServer` |
-| Jido.AgentServer.State and `:sys.get_state` | `Jido.AgentServer.agent/2`, `Jido.AgentServer.status/2`, `Jido.AgentServer.snapshot/2`, and `Jido.AgentServer.children/2` |
+| Jido.AgentServer.State and `:sys.get_state` | `Jido.AgentServer.snapshot/2` for the committed Agent and its revisions, and `Jido.AgentServer.status/2` for runtime status |
 
 A caller timeout does not cancel a Turn. Use `Jido.AgentServer.cancel/2` or `Jido.AgentServer.cancel_turn/3`. See [Call, Cast, and Await](../agent-servers/send-signals-to-live-agents.livemd).
 

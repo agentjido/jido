@@ -183,8 +183,22 @@ receives success. A Turn with no update Directive only reads the row.
 
 Run the Agent with Jido persistence disabled to write to the Ecto row.
 When Jido persistence is enabled, the Plugin rejects update proposals and
-permits read-only Turns. If another writer changes the row, it must also
-advance `lock_version`.
+permits read-only Turns. A durable Flow saves its admitted row in the
+continuation checkpoint and uses that input when it resumes. If another
+writer changes the SQL row, it must also advance `lock_version`.
+
+Use `Jido.AgentServer.fetch_state/2` to read the current row without starting
+a Turn. It returns the Ecto schema struct. Use `Jido.fetch_state/3` when you
+have a stable Address. It can also read the row of a passivated durable Agent.
+The runtime snapshot contains Jido's committed state and its revisions.
+
+```elixir
+{:ok, %MyApp.CounterState{count: count}} = Jido.AgentServer.fetch_state(server)
+```
+
+The query uses the Agent ID as the primary key in the schema's Repo. If
+Agents must have separate rows in the same table and prefix, give them
+different IDs even when they use different Jido namespaces or partitions.
 
 ## Plugin-owned fields
 

@@ -66,7 +66,9 @@ Jido.call(MyApp.Tickets, address, signal, turn_id: turn_id, result_handoff: true
 Jido.turn_result(MyApp.Tickets, address, turn_id)
 ```
 
-Use `Jido.status/3` for observation and `Jido.cast/3` for best-effort dispatch.
+Use `Jido.status/3` for runtime status and `Jido.fetch_state/3` for the
+Agent's state. For an Ecto-backed Agent, the home queries its Repo.
+Use `Jido.cast/3` for best-effort dispatch.
 A verified unavailable endpoint returns `:cluster_unavailable`. A mutating
 request that may have reached the home can return `{:cluster_outcome_unknown, reason}`.
 The router makes one attempt. The home limits the wait for activation before

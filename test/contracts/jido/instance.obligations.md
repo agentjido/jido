@@ -78,7 +78,7 @@ downstream operation results stay with their owning components.
 ### jido.instance.I8 — Address operation routing
 
 - **scope:** `Jido.call/4`, `Jido.cast/3`, `Jido.submit/4`, committed reads, and controls
-- **must:** Route each supported Address function to the currently resolved AgentServer and preserve its public result and caller-wait contract. Return an AgentServer pending value from submit. Keep await and abandon with `Jido.AgentServer`. Return an explicit error for a missing target. Keep caller timeout separate from execution cancellation.
+- **must:** Route each supported Address function to the currently resolved AgentServer and preserve its public result and caller-wait contract. Return an AgentServer pending value from submit. Keep await and abandon with `Jido.AgentServer`. Return an explicit error for a missing target. Fetch state from the current activation or, for a passivated Agent, use its durable checkpoint to find the state source without activating it. Keep caller timeout separate from execution cancellation.
 - **why:** The Address API must not change downstream runtime semantics.
 - **kind:** functional
 - **status:** active

@@ -120,6 +120,7 @@ Guides: [Instances and Tenants](../operations/configuration-and-tenant-isolation
 | `Jido.cast/3` | Sends one best-effort asynchronous Signal through a stable Agent Address. |
 | `Jido.create_agent/4` | Creates one durable Agent with an explicit stable Agent Address. |
 | `Jido.delete_agent/3` | Writes a durable tombstone for one inactive stable Agent Address. |
+| `Jido.fetch_state/3` | Reads the authoritative state through a stable Agent Address. |
 | `Jido.list_agents/2` | Lists Agents with options in the selected Jido instance. |
 | `Jido.reconcile_agent/3` | Replaces one faulted activation from its authoritative durable record. |
 | `Jido.replace_agent/4` | Replaces one exact inactive durable Agent definition with preserve or reset state policy. |
@@ -154,10 +155,11 @@ Runs one serialized Agent Turn at a time.
 | `Jido.AgentServer.cancel_turn/3` | Cancels the matching active or waiting Turn, including a pending Handoff in its chain. |
 | `Jido.AgentServer.cast/3` | Sends one Signal through the same Turn path and discards its reply. |
 | `Jido.AgentServer.child_spec/1` | Returns a child specification for one complete activation. |
+| `Jido.AgentServer.fetch_state/2` | Reads the authoritative state for a resident Agent on this node. |
 | `Jido.AgentServer.quiesce/2` | Closes admission and returns a stable `Status`. |
 | `Jido.AgentServer.remove_topology_member/4` | Drains and removes one declared member slot from this activation. |
 | `Jido.AgentServer.resume/2` | Reopens admission when the activation is safe. |
-| `Jido.AgentServer.snapshot/2` | Returns the complete committed `Snapshot`. |
+| `Jido.AgentServer.snapshot/2` | Returns the committed Jido Agent and both revisions in one read. |
 | `Jido.AgentServer.status/2` | Returns the process-neutral semantic `Status`. |
 | `Jido.AgentServer.stop/3` | Stops one resident activation and returns its final `Snapshot`. |
 | `Jido.AgentServer.submit/3` | Submits one Signal and returns an owner-bound `Pending` value. |

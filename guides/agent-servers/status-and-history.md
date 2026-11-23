@@ -7,6 +7,11 @@ logic, logs, and dashboards.
 `Jido.AgentServer.snapshot/2` returns the complete committed Agent value and
 its revisions from the same server event.
 
+`Jido.AgentServer.fetch_state/2` reads the authoritative state. For an ordinary
+Agent, it returns the committed state map. For an Ecto-backed Agent, it
+queries the Repo for the current schema struct. An external update can change
+the row while both Jido revisions stay the same.
+
 ## Status fields
 
 `Jido.AgentServer.Status` separates three state axes:
@@ -66,6 +71,9 @@ passivated status even when no AgentServer process is resident.
   ready?: false
 } = Jido.status(MyApp.Jido, agent_address)
 ```
+
+Use `Jido.fetch_state/3` for the Agent's state. It can read a durable Agent
+without activating it.
 
 Use `Jido.activate_agent/3` when you need a direct AgentServer handle. Address
 Signal operations activate the Agent when required.

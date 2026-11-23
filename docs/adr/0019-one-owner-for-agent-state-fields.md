@@ -18,6 +18,10 @@ On the next Turn or after recovery, read those fields from the row. Any copy
 in Agent state or a checkpoint is derived. Agent authoring rejects a Joi
 schema or initial state in the same declaration.
 
+Fetch the current Ecto row through the state-read API. A Jido snapshot
+pairs the committed Agent value with its Jido revisions. External row changes
+can occur independently of those revisions.
+
 Read the row version with its values. Save a proposal only if the version
 still matches. If the version changed, keep the newer row. A caller who
 requires confirmation of the row update must receive success only after the

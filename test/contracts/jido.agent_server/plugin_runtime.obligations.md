@@ -122,3 +122,11 @@ This component has no DSL or forwarding facade.
 - **why:** The caller needs to know whether the proposed state passed validation or the authoritative state write succeeded.
 - **kind:** ordering
 - **status:** active
+
+### jido.agent_server.plugin_runtime.I15 — Read current external state
+
+- **scope:** `Jido.AgentServer.fetch_state/2` and `Jido.fetch_state/3` for Ecto-backed Agents
+- **must:** Read the row by Agent ID when state is requested. Report a missing row or unavailable Repo. Start no Turn, advance neither revision, and keep a passivated activation stopped.
+- **why:** Read the current application state without changing the Agent lifecycle.
+- **kind:** functional
+- **status:** active

@@ -786,6 +786,7 @@ Disposition terms:
 | `Jido.AgentServer.TopologyBus` | Removed | Bus lifecycle and publication now belong to `Jido.AgentServer.Topology` |
 | `Jido.AgentServer.TopologyRuntime` | Removed | Static topology startup and explicit runtime child operations belong to `Jido.AgentServer.Topology` |
 | `Jido.AgentServer.Lifecycle` | Keep | Canonical Turn, wait, cancellation, commit, effect, and recovery policy owner |
+| `Jido.AgentServer.StateRead` | Internal | Selects the authoritative state source for public reads |
 | `Jido.AgentServer.Status` | Keep | Public typed process-neutral status view for state, active Turn, waits, effects, revision, and last failure |
 | `Jido.AgentOwnership` | Keep | Public process-neutral fence for one local activation ownership relation |
 | `Jido.Instance.Cluster` | Keep internal | Fixed-home configuration, durable startup record, and native RPC transport |
