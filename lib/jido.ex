@@ -452,6 +452,11 @@ defmodule Jido do
   Resolves the current local worker for one stable Agent Address. Each operation
   resolves the Address again; it does not retry or replay an accepted turn.
 
+  The instance must have a stable `:namespace` that matches the Address,
+  including when the Address comes from `Jido.AgentServer.snapshot/2`.
+  An instance without a stable namespace returns a validation error with code
+  `:jido_namespace_required`.
+
   Returns `{:error, :not_found}` when there is no live registration,
   `{:error, :recovering}` while AgentServer is registered but not ready, or
   `{:error, :unavailable}` when the Registry cannot be read. A worker can still

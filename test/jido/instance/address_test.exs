@@ -231,7 +231,7 @@ defmodule Jido.Instance.AddressTest do
     end
   end
 
-  @tag obligation: "jido.instance.I6"
+  @tag obligation: ["jido.instance.I6", "jido.instance.I7"]
   test "an Address-first operation requires a stable instance namespace" do
     instance = unique_instance("namespace-required")
     start_supervised!({Jido, name: instance}, id: instance)
@@ -239,6 +239,27 @@ defmodule Jido.Instance.AddressTest do
     assert {:error, %Error.ValidationError{} = error} = Jido.agent_address(instance, "counter")
     assert Error.code(error) == :jido_namespace_required
     assert error.details.instance == instance
+
+    assert {:ok, server} = Jido.start_agent(instance, Counter, id: "counter")
+    snapshot = Jido.AgentServer.snapshot(server)
+    assert %Address{namespace: "jido.local", id: "counter"} = snapshot.agent_address
+
+    assert {:error, %Error.ValidationError{} = error} = Jido.resolve_agent(instance, snapshot.agent_address)
+    assert Error.code(error) == :jido_namespace_required
+    assert Jido.whereis_agent(instance, snapshot.agent.id) == server
+  end
+
+  @tag obligation: "jido.instance.I7"
+  test "a memory-only Agent snapshot address resolves with a stable instance namespace" do
+    instance = unique_instance("snapshot-address")
+    namespace = unique_namespace("snapshot-address")
+    start_supervised!({Jido, name: instance, namespace: namespace})
+
+    assert {:ok, server} = Jido.start_agent(instance, Counter, id: "counter")
+    snapshot = Jido.AgentServer.snapshot(server)
+    assert snapshot.durability == :memory
+    assert %Address{namespace: ^namespace, id: "counter"} = snapshot.agent_address
+    assert Jido.resolve_agent(instance, snapshot.agent_address) == {:ok, server}
   end
 
   @tag obligation: "jido.instance.I6"
