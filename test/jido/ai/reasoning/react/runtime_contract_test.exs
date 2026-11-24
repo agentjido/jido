@@ -1498,6 +1498,49 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
   end
 
   @tag :tmp_dir
+  @tag obligation: "jido_ai.react.I4"
+  test "restart collects a committed ReAct execution whose deletion was interrupted", c do
+    start_supervised!({Probe, self()})
+
+    {instance, server, {Storage, opts} = persistence, address} =
+      start_persisted_agent(c.tmp_dir, "interrupted-collection", [], LargeOutputAgent, Storage)
+
+    file = {Jido.Persistence.File, opts}
+    payload = String.duplicate("A saved result. ", 512)
+
+    expect(Tools.LargeOutput, :run, fn %{}, _context -> {:ok, %{content: payload}} end)
+
+    expect(ReqLLM, :generate_text, 2, fn model, llm_context, _options ->
+      case roles(llm_context) do
+        [:system, :user] ->
+          call = ReqLLM.ToolCall.new("collection-tool", "large_output", "{}")
+          {:ok, tool_response(model, llm_context, [call], "call-tool")}
+
+        [:system, :user, :assistant, :tool] ->
+          assert List.last(llm_context.messages).metadata.tool_output == %{"content" => payload}
+          {:ok, response(model, llm_context, "Result saved.", "final-answer")}
+      end
+    end)
+
+    assert :ok = Probe.configure(:execution_fact_delete)
+    pending = Server.submit(server, LargeOutputAgent.request_signal!(%{input: "Run the tool"}), result_handoff: true)
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed} = result} = Server.await(pending, 10_000)
+    assert_receive {:durable_barrier, :execution_fact_delete, collector}, 5_000
+    assert {:ok, [_ | _], nil} = Jido.Persistence.Store.scan(file, "jido:execution:", limit: 256)
+
+    monitor = Process.monitor(collector)
+    assert :ok = stop_supervised(instance)
+    assert_receive {:DOWN, ^monitor, :process, ^collector, _reason}
+    assert {:ok, [_ | _], nil} = Jido.Persistence.Store.scan(file, "jido:execution:", limit: 256)
+
+    start_supervised!({Jido, name: instance, namespace: address.namespace, persistence: persistence}, id: instance)
+    assert {:ok, restored} = Jido.activate_agent(instance, address)
+    assert :ok = Server.await_ready(restored)
+    assert {:ok, ^result} = Jido.turn_result(instance, address, result.turn_id)
+    assert {:ok, [], nil} = Jido.Persistence.Store.scan(file, "jido:execution:", limit: 256)
+  end
+
+  @tag :tmp_dir
   test "a later ReAct Turn restores earlier tools from its preparation", c do
     {_instance, server, persistence, _address} =
       start_persisted_agent(c.tmp_dir, "tool-history", [], LargeOutputAgent)

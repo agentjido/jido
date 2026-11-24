@@ -46,6 +46,7 @@ defmodule Jido.AgentServer.Lifecycle do
   alias Jido.AgentServer.Supervisor, as: ServerSupervisor
   alias Jido.Durable.Continuation
   alias Jido.Durable.Runtime, as: DurableRuntime
+  alias Jido.Persistence.ContinuationStore
   alias Jido.Persistence.ETS, as: ETSStore
   alias Jido.Trace.Context, as: TraceContext
 
@@ -370,6 +371,7 @@ defmodule Jido.AgentServer.Lifecycle do
          {:ok, revision, turn} <- settle_unreleased_handoff(data, config, agent, revision, turn),
          :ok <- validate_continuation(agent, turn),
          :ok <- reconcile_owned_member(data) do
+      _ = collect_terminal_execution(data, config, turn)
       {:ok, agent, revision, agent_revision, config, turn, handoffs}
     end
   end
@@ -539,10 +541,17 @@ defmodule Jido.AgentServer.Lifecycle do
 
   def validate_continuation(_agent, _receipt), do: :ok
 
-  def execution_identity(data),
-    do:
-      {:jido_execution, Jido.Instance.NamespaceRegistry.namespace(data.jido), data.partition, data.agent.id,
-       data.active.turn_id}
+  defp collect_terminal_execution(data, config, %{id: turn_id, status: status, expires_at: _})
+       when status in [:completed, :failed, :cancelled] do
+    ContinuationStore.collect_committed(data.jido, execution_identity(data, turn_id), config)
+  end
+
+  defp collect_terminal_execution(_data, _config, _turn), do: :ok
+
+  def execution_identity(data), do: execution_identity(data, data.active.turn_id)
+
+  defp execution_identity(data, turn_id),
+    do: {:jido_execution, Jido.Instance.NamespaceRegistry.namespace(data.jido), data.partition, data.agent.id, turn_id}
 
   def prepare_execution(data, receipt, owner) do
     id = execution_identity(data)
@@ -555,8 +564,8 @@ defmodule Jido.AgentServer.Lifecycle do
         do: %{topology_handoff_id: receipt.id, signal: receipt.signal},
         else: receipt
 
-    with :ok <- Jido.Persistence.ContinuationStore.register(data.jido, id, data.persistence, owner),
-         do: Jido.Persistence.ContinuationStore.prepare(data.jido, id, preparation)
+    with :ok <- ContinuationStore.register(data.jido, id, data.persistence, owner),
+         do: ContinuationStore.prepare(data.jido, id, preparation)
   end
 
   def start_execution(data, owner, hooks, policy) do

@@ -181,7 +181,17 @@ defmodule Jido.Test.AgentServer.DurableFixtures do
         else: :other
     end
 
-    def delete(key, opts), do: Jido.Persistence.File.delete(key, opts)
+    def delete(key, opts) do
+      with :ok <- gate_fact_delete(key), do: Jido.Persistence.File.delete(key, opts)
+    end
+
+    defp gate_fact_delete("jido:execution:" <> _ = key) do
+      if String.contains?(key, ":facts:") and not String.ends_with?(key, ":facts:index"),
+        do: Probe.gate({:execution_fact_delete, nil}),
+        else: :ok
+    end
+
+    defp gate_fact_delete(_key), do: :ok
   end
 
   defmodule Reject do

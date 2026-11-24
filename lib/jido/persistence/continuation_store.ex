@@ -41,18 +41,22 @@ defmodule Jido.Persistence.ContinuationStore do
 
   def register(jido, id, config, owner \\ self()) do
     with {:ok, %Config{} = profile} <- Config.open(config) do
-      case RuntimeStore.fetch(jido, __MODULE__, id) do
-        {:ok, {^owner, %{config: ^profile}}} ->
-          :ok
+      with_collection_lock(jido, id, fn -> register_execution(jido, id, profile, owner) end)
+    end
+  end
 
-        _unregistered ->
-          with {:ok, hashes, _condition} <- read_fact_index(profile, id),
-               {:ok, catalogue} <- restore_tool_catalogue(profile, id, hashes),
-               {:ok, catalogue} <- restore_prepared_catalogue(profile, id, catalogue) do
-            entry = %{config: profile, catalogue: catalogue, facts: Map.from_keys(hashes, :indexed)}
-            RuntimeStore.put(jido, __MODULE__, id, {owner, entry})
-          end
-      end
+  defp register_execution(jido, id, profile, owner) do
+    case RuntimeStore.fetch(jido, __MODULE__, id) do
+      {:ok, {^owner, %{config: ^profile}}} ->
+        :ok
+
+      _unregistered ->
+        with {:ok, hashes, _condition} <- read_fact_index(profile, id),
+             {:ok, catalogue} <- restore_tool_catalogue(profile, id, hashes),
+             {:ok, catalogue} <- restore_prepared_catalogue(profile, id, catalogue) do
+          entry = %{config: profile, catalogue: catalogue, facts: Map.from_keys(hashes, :indexed)}
+          RuntimeStore.put(jido, __MODULE__, id, {owner, entry})
+        end
     end
   end
 
@@ -241,7 +245,7 @@ defmodule Jido.Persistence.ContinuationStore do
         with :ok <- RuntimeStore.delete_owned(jido, __MODULE__, id, owner),
              {:ok, _pid} <-
                Task.Supervisor.start_child(Jido.Instance.Names.task_supervisor(jido), fn ->
-                 delete_execution(config, id)
+                 collect_committed(jido, id, config)
                end),
              do: :ok
 
@@ -252,6 +256,30 @@ defmodule Jido.Persistence.ContinuationStore do
         {:error, :execution_store_unavailable}
     end
   end
+
+  def collect_committed(jido, id, %Config{} = config) do
+    with_collection_lock(jido, id, fn ->
+      case RuntimeStore.fetch(jido, __MODULE__, id) do
+        :error ->
+          delete_execution(config, id)
+
+        {:ok, {owner, _entry}} ->
+          if Process.alive?(owner) do
+            {:error, :execution_owner_replaced}
+          else
+            with :ok <- RuntimeStore.delete_owned(jido, __MODULE__, id, owner),
+                 do: delete_execution(config, id)
+          end
+
+        error ->
+          error
+      end
+    end)
+  end
+
+  # A collector must finish before another owner can register the same execution.
+  defp with_collection_lock(jido, id, fun),
+    do: :global.trans({{__MODULE__, jido, id}, self()}, fun, [node()])
 
   @impl true
   def append(id, events, {id, jido}), do: append(id, events, jido)
@@ -957,19 +985,38 @@ defmodule Jido.Persistence.ContinuationStore do
   end
 
   defp delete_execution(config, id) do
-    with {:ok, batch_count, _condition} <- read_batch_count(config, id),
-         {:ok, indexed_hashes, _condition} <- read_fact_index(config, id) do
+    with {:ok, batch_count, batch_condition} <- read_batch_count(config, id, :read),
+         {:ok, indexed_hashes, fact_condition} <- read_fact_index(config, id) do
+      # Keep the indexes until the batch and fact deletes finish. A restart can
+      # then retry the same keys without adapter support for scans.
       batch_keys = for index <- batch_count..1//-1, batch_count > 0, do: batch_key(id, index)
       fact_keys = for hash <- Enum.uniq(indexed_hashes), do: fact_key(id, hash)
+      prepared = prepared_key(id)
 
-      Enum.each(
-        [key(id), prepared_key(id), fact_index_key(id) | batch_keys ++ fact_keys],
-        &delete_record(config, &1)
-      )
+      case {batch_keys, fact_keys, batch_condition, fact_condition} do
+        {[], [], :not_found, :not_found} ->
+          # No indexes may also mean that this Turn only prepared an execution.
+          case Store.read(config.store, prepared) do
+            {:error, :not_found} -> :ok
+            {:ok, _bytes, _condition} -> delete_records(config, [prepared])
+            error -> error
+          end
+
+        _has_checkpoints ->
+          delete_records(config, batch_keys ++ fact_keys ++ [prepared, key(id), fact_index_key(id)])
+      end
     end
   end
 
-  defp delete_record(config, key), do: Store.delete(config.store, key)
+  defp delete_records(config, keys) do
+    Enum.reduce_while(keys, :ok, fn key, :ok ->
+      case Store.delete(config.store, key) do
+        :ok -> {:cont, :ok}
+        {:error, :not_found} -> {:cont, :ok}
+        error -> {:halt, error}
+      end
+    end)
+  end
 
   defp key(id), do: @prefix <> Base.url_encode64(:erlang.term_to_binary(id), padding: false)
 

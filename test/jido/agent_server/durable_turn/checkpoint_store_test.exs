@@ -913,6 +913,8 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
 
     assert_receive :registered
     assert {:error, :execution_owner_replaced} = Store.collect(c.jido, c.id)
+    assert {:ok, config} = Jido.Persistence.Config.open(c.config)
+    assert {:error, :execution_owner_replaced} = Store.collect_committed(c.jido, c.id, config)
     send(replacement.pid, :check)
     assert {:ok, events} = Task.await(replacement)
     assert Enum.to_list(events) == [:replacement_graph]
