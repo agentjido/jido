@@ -463,6 +463,7 @@ Jido.AI.Reasoning.ReAct = MigrationGuide.MathAgent.reasoning()
 | --- | --- |
 | `use Jido.AI.Agent, model: :fast, tools: [...], system_prompt: "..."` | An `ai do` block with `reasoning` and `tools`, as above |
 | `MathAgent.ask_sync(pid, text)` | `Jido.AgentServer.call/3` with `request_signal!/1`. The reply is a Directive. |
+| `MathAgent.ask_sync(pid, text, tool_context: %{locale: "en"})` | `Jido.AgentServer.call(pid, signal, context: %{locale: "en"})` |
 | Jido.AI.CoTAgent, CoDAgent, AoTAgent, ToTAgent, GoTAgent, TRMAgent, AdaptiveAgent | `use Jido.AI.Agent` with the matching [reasoning Flow](reasoning-strategy-matrix.md) |
 | Jido.AI.Reasoning.*.Strategy, Machine, CLIAdapter | The Flow modules, such as `Jido.AI.Reasoning.ChainOfThought` |
 | `config :jido_ai, model_aliases: ...`, Jido.AI.ModelAliases | A model string on each Flow, for example `"openai:gpt-4o-mini"` |
@@ -471,6 +472,15 @@ Jido.AI.Reasoning.ReAct = MigrationGuide.MathAgent.reasoning()
 | Jido.AI.Actions.LLM.Embed | `Jido.AI.Actions.Embed`. The other Jido.AI.Actions.* modules are removed. |
 | Jido.AI.Skill.Registry, Loader, and their error modules | `Jido.AI.Skill` |
 | Jido.AI.Test, TestCase | A local `Jido.AI.InferenceClient`. See [Test AI Agents](../ai/testing-ai-agents.livemd). |
+
+In V3, give `request_signal!/1` the reasoning Flow input. Pass tool context
+as a separate option to `Jido.AgentServer.call/3`. The tool Action can read
+`context.locale` in its `run/2` callback.
+
+```elixir
+signal = MigrationGuide.MathAgent.request_signal!(%{input: "What is 19 + 23?"})
+{:ok, _turn} = Jido.AgentServer.call(pid, signal, context: %{locale: "en"})
+```
 
 ## Browser tools
 
