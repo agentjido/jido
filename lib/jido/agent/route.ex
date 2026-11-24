@@ -240,8 +240,14 @@ defmodule Jido.Agent.Route do
   defp resolve_mappings(route, true) do
     first_path = if route.state == :unchanged, do: [:reply, :from], else: [:state]
 
-    with {:ok, schema} <- Error.prefix_result_path(output_schema(route.handler), first_path),
-         {:ok, state} <- Error.prefix_result_path(resolve_selector(route.state, schema), :state),
+    with {:ok, schema} <- Error.prefix_result_path(output_schema(route.handler), first_path) do
+      resolve_output_mappings(route, schema)
+    end
+  end
+
+  @doc false
+  def resolve_output_mappings(route, schema) do
+    with {:ok, state} <- Error.prefix_result_path(resolve_selector(route.state, schema), :state),
          {:ok, reply} <- Error.prefix_result_path(resolve_selector(route.reply, schema), :reply) do
       {:ok, %{route | state: state, reply: reply}}
     end

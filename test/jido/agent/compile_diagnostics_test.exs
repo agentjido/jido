@@ -214,6 +214,83 @@ defmodule Jido.Agent.CompileDiagnosticsTest do
     assert Exception.message(error) =~ ":unknown_output_field"
   end
 
+  @tag obligation: "jido.agent.I4"
+  test "an inline output projection uses the current declaration before the Agent is emitted", %{
+    tmp_dir: tmp_dir
+  } do
+    module = Module.concat(Jido.Test, "InlineOutputRetry#{suffix()}")
+
+    source = """
+    defmodule #{inspect(module)} do
+      use Jido.Agent, name: "inline_output_retry"
+
+      routes do
+        signal_source "/test"
+
+        route "test.project" do
+          action _params do
+            {:ok, %{state: %{}, reply: %{}}}
+          end
+
+          state from: output("state")
+          reply "test.project.done", from: output("reply")
+        end
+      end
+    end
+    """
+
+    {file, result} = compile_failure(tmp_dir, source)
+    assert {^file, 1, message} = diagnostic(result)
+    assert message =~ ":unsupported_output_path"
+    assert message =~ "[:routes, 0, :state, :path, 0]"
+    refute Code.loaded?(module)
+
+    corrected =
+      String.replace(
+        source,
+        "action _params do",
+        "action _params, output_schema: Jido.Joi.object(%{state: Jido.Joi.object(%{}), reply: Jido.Joi.object(%{})}) do"
+      )
+
+    File.write!(file, corrected)
+    assert {:ok, _modules, _info} = Kernel.ParallelCompiler.compile([file], return_diagnostics: true)
+
+    assert %{routes: [%{state: %{path: [:state]}, reply: %{from: %{path: [:reply]}}}]} =
+             module.definition()
+  end
+
+  @tag obligation: "jido.agent.I4"
+  test "a declared reply requires a Signal source before the Agent is emitted", %{tmp_dir: tmp_dir} do
+    module = Module.concat(Jido.Test, "ReplySourceRetry#{suffix()}")
+
+    source = """
+    defmodule #{inspect(module)} do
+      use Jido.Agent, name: "reply_source_retry"
+
+      routes do
+        route "test.reply" do
+          action _params do
+            {:ok, %{}}
+          end
+
+          state :unchanged
+          reply "test.reply.done", from: output()
+        end
+      end
+    end
+    """
+
+    {file, result} = compile_failure(tmp_dir, source)
+    assert {^file, 1, message} = diagnostic(result)
+    assert message =~ ":reply_source_required"
+    assert message =~ "[:signal_source]"
+    refute Code.loaded?(module)
+
+    File.write!(file, String.replace(source, "routes do", "routes do\n    signal_source \"/test\""))
+    assert {:ok, _modules, _info} = Kernel.ParallelCompiler.compile([file], return_diagnostics: true)
+    assert %{signal_source: "/test", routes: [%{reply: %{type: "test.reply.done"}}]} = module.definition()
+  end
+
   test "a repeated member that is not a cycle still compiles", %{tmp_dir: tmp_dir} do
     id = suffix()
 

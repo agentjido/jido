@@ -67,7 +67,7 @@ not restore or claim the retired standalone `jido.topology` component.
 ### jido.agent.I4 — Route declaration policy
 
 - **scope:** `Jido.Agent.define/1`, `Jido.Agent.__using__/1`
-- **must:** Authoring rejects duplicate route paths or helper names. An Action or Flow route that omits `state` uses its complete validated output as the next state. An explicit route state can select another output path or keep the current state unchanged. A generated helper requires an exact route and a lowercase atom that starts with a letter and contains only letters, digits, and underscores. Map authoring rejects keyword declarations in place of a plain Map.
+- **must:** Authoring rejects duplicate route paths or helper names. An Action or Flow route that omits `state` uses its complete validated output as the next state. An explicit route state can select another output path or keep the current state unchanged. Before it emits the Agent module, the DSL checks inline Action projections against the declared output schema and requires a Signal source for each reply declared by the Agent. A generated helper requires an exact route and a lowercase atom that starts with a letter and contains only letters, digits, and underscores. Map authoring rejects keyword declarations in place of a plain Map.
 - **kind:** functional
 - **status:** active
 

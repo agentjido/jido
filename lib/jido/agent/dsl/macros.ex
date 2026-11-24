@@ -215,8 +215,9 @@ defmodule Jido.Agent.DSL.RouteMacros do
     identity = quote do: [host: Jido.Agent, route: unquote(path), role: :action]
 
     compiled =
-      InlineAction.compile!(identity, parsed, caller,
+      InlineAction.Compiler.compile!(identity, parsed, caller,
         default_name: path,
+        emit: {Jido.Agent.DSL, :emit_inline_action!},
         remove_imports: [
           {__MODULE__, [route: 1, route: 2, route: 3, route: 4]}
         ]

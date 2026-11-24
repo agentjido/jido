@@ -50,7 +50,7 @@ defmodule Jido.Agent.DSL do
       @agent_definition Jido.Agent.DSL.build!(
                           @spark_dsl_config,
                           unquote(Macro.escape(opts)),
-                          __MODULE__
+                          __ENV__
                         )
       @behaviour Jido.Agent
 
@@ -180,23 +180,21 @@ defmodule Jido.Agent.DSL do
   def verify!(module) do
     case module.__jido_definition__(related?: true) do
       {:ok, _} -> :ok
-      {:error, error} -> compile_error!(module, error)
+      {:error, error} -> raise compile_error(module, module.__jido_location__(), error)
     end
   rescue
-    error in Error.ValidationError -> compile_error!(module, error)
+    error in Error.ValidationError -> raise compile_error(module, module.__jido_location__(), error)
   end
 
-  # Elixir runs @after_verify after compilation, so report the source location here.
-  defp compile_error!(module, error) do
-    {file, line} = module.__jido_location__()
-
-    raise CompileError,
+  defp compile_error(module, {file, line}, error) do
+    CompileError.exception(
       file: file,
       line: line,
       description:
         "#{inspect(module)}: #{Exception.message(error)} " <>
           "(code: #{inspect(Map.get(error, :code))}, path: #{inspect(Map.get(error, :path))}, " <>
           "details: #{inspect(Map.get(error, :details))})"
+    )
   end
 
   @doc false
@@ -241,7 +239,17 @@ defmodule Jido.Agent.DSL do
     Module.put_attribute(caller.module, :__jido_body_plugins__, declaration)
   end
 
-  def build!(dsl, opts, module) do
+  @doc false
+  def emit_inline_action!([target, function, path, config, caller]) do
+    Jido.Action.Inline.Compiler.create_action!(target, function, path, config, caller)
+
+    # Validate against this declaration without consulting a loaded Action module.
+    schemas = Module.get_attribute(caller.module, :__jido_inline_route_schemas__, %{})
+    Module.put_attribute(caller.module, :__jido_inline_route_schemas__, Map.put(schemas, target, config.output_schema))
+  end
+
+  def build!(dsl, opts, caller) do
+    module = caller.module
     body_plugins = module |> Module.get_attribute(:__jido_body_plugins__, []) |> Enum.reverse()
     body_plugins = ecto_declaration(dsl, module) ++ body_plugins
 
@@ -266,18 +274,35 @@ defmodule Jido.Agent.DSL do
             plugins: entries
           })
 
-        Validation.define(input, related?: false)
+        with {:ok, definition} <- Validation.define(input, related?: false) do
+          {:ok, definition, length(input.routes)}
+        end
       end
 
     case result do
-      {:ok, definition} ->
-        definition
+      {:ok, definition, declared_route_count} ->
+        validate_declared_routes!(definition, declared_route_count, caller)
 
       {:error, error} ->
         raise Spark.Error.DslError,
           module: module,
           path: error.path,
           message: Exception.message(error)
+    end
+  end
+
+  defp validate_declared_routes!(definition, declared_route_count, caller) do
+    # Plugin routes are appended after routes declared by the Agent.
+    routes = Enum.take(definition.routes, declared_route_count)
+    schemas = Module.get_attribute(caller.module, :__jido_inline_route_schemas__, %{})
+
+    case Validation.validate_declared_routes(routes, definition.signal_source, schemas) do
+      :ok ->
+        definition
+
+      {:error, error} ->
+        details = Map.put_new(error.details, :definition, definition.name)
+        raise compile_error(caller.module, {caller.file, caller.line}, %{error | details: details})
     end
   end
 
