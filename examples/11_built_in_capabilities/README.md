@@ -19,6 +19,7 @@ same Agent, Plugin, Signal, and AgentServer contracts as an application Plugin.
 7. [Behavior Tree](11_09_behavior_tree/README.md) resumes a running tree and
    dispatches an Action effect.
 8. [Cancel a Statechart deadline](11_10_statechart_deadline/README.md) removes a pending send when checkout confirms stock.
+9. [Share an inventory count](11_11_shared_blackboard/README.md) uses a named board and conditional writes in a topology.
 
 ```sh
 mix test.examples examples/11_built_in_capabilities --warnings-as-errors

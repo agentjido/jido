@@ -1,0 +1,10 @@
+- id: shared-blackboard-ownership
+  date: 2026-11-23
+  decision: Give the shared board and both Plugins to jido.plugin.blackboard in the capabilities layer.
+  driver: Board data and revisions have one owner. AgentServer owns turn commit and post-commit dispatch.
+  approved_by: Jido core shared blackboard implementation plan
+- id: inherit-instance-store
+  date: 2026-11-23
+  decision: Give an opt-in board its own versioned record in the instance Store.
+  driver: Restore board values independently of the Agent checkpoint. Use the Store's atomic write and indeterminate-write contract.
+  approved_by: Jido core shared blackboard persistence follow-up

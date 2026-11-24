@@ -291,6 +291,10 @@ Each row is generated from the module's own document. `Jido.Persistence.Ecto.Rec
 | `Jido.Plugin` | Defines one reusable Plugin through optional callbacks. |
 | `Jido.Plugin.Audit` | Stores bounded domain audit records in portable Agent state. |
 | `Jido.Plugin.Audit.Record` | One portable domain audit record. |
+| `Jido.Blackboard` | Reads and changes a named board in a local Jido instance. |
+| `Jido.Plugin.Blackboard.Server` | Starts a board under the owning Agent's activation. |
+| `Jido.Plugin.Blackboard.Client` | Reads board snapshots on selected Signals and dispatches patches after commit. |
+| `Jido.Plugin.Blackboard.Client.Patch` | Requests one conditional board patch. |
 | `Jido.Plugin.Bus.Client` | Subscribes an Agent to one `Jido.Signal.Bus` path. |
 | `Jido.Plugin.Bus.DSL` | Declares one local Signal bus and validates its connection endpoints. |
 | `Jido.Plugin.Bus.Manager` | Starts and owns one `Jido.Signal.Bus` for an Agent. |

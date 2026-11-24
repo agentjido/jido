@@ -11,9 +11,9 @@
       "covered": 17
     },
     "jido.plugin": {
-      "active": 42,
+      "active": 48,
       "coverage": 1.0,
-      "covered": 42
+      "covered": 48
     },
     "jido.telemetry": {
       "active": 2,
@@ -2876,6 +2876,75 @@
             "test rejects unsupported calls in expressions at compile time",
             "test state references distinguish an unavailable state from a missing state key",
             "test the tool wrapper uses a DSL tree and emits named node paths"
+          ]
+        }
+      }
+    },
+    "jido.plugin.blackboard": {
+      "active": 6,
+      "app": "jido.plugin",
+      "coverage": 1.0,
+      "covered": 6,
+      "form": "light",
+      "obligations": {
+        "jido.plugin.blackboard.I1": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test the name is unique within an instance and released when the owner stops"
+          ]
+        },
+        "jido.plugin.blackboard.I2": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test changes and removals apply together, with portable values and a fresh revision"
+          ]
+        },
+        "jido.plugin.blackboard.I3": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test selected live reads fail when the board is absent and pure turns use explicit data"
+          ]
+        },
+        "jido.plugin.blackboard.I4": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test invalid Directives cannot patch and a committed timeout can have applied a write"
+          ]
+        },
+        "jido.plugin.blackboard.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a saved board keeps its identity on reopen and explicit deletion retires it"
+          ]
+        },
+        "jido.plugin.blackboard.I6": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a client sees an indeterminate write and the next read loads the committed snapshot"
           ]
         }
       }
@@ -6278,8 +6347,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 267,
+    "active": 273,
     "coverage": 1.0,
-    "covered": 267
+    "covered": 273
   }
 }
