@@ -178,7 +178,12 @@ defmodule Jido.Persistence.Record do
   end
 
   defp validate_exact_shape(%{fmt: _, kind: :active} = record) do
-    optional = Enum.filter([:server_turn, :topology_handoffs, :topology_owner], &Map.has_key?(record, &1))
+    optional =
+      Enum.filter(
+        [:server_turn, :topology_handoffs, :topology_owner, :pending_execution_cleanup],
+        &Map.has_key?(record, &1)
+      )
+
     exact_keys(record, @active_keys ++ optional)
   end
 
@@ -218,8 +223,60 @@ defmodule Jido.Persistence.Record do
          :ok <- validate_agent_vsn(record),
          :ok <- validate_server_turn(Map.get(record, :server_turn)),
          :ok <- validate_topology_owner(record),
-         do: validate_topology_handoffs(topology_handoffs(record))
+         :ok <- validate_topology_handoffs(topology_handoffs(record)),
+         do: validate_execution_cleanup(Map.get(record, :pending_execution_cleanup, []))
   end
+
+  @doc false
+  def execution_cleanup_ids(record) do
+    pending = Map.get(record, :pending_execution_cleanup, [])
+
+    case Map.get(record, :server_turn) do
+      %{id: id, status: status} when status in [:running, :released, :accepted] -> List.delete(pending, id)
+      _turn -> Enum.uniq(pending ++ terminal_execution_ids(record))
+    end
+  end
+
+  @doc false
+  def carry_execution_cleanup(record, current, collected) do
+    # The latest terminal Flow already carries its own ID. Save only the
+    # unfinished work that would be lost when the receipt advances.
+    pending =
+      (execution_cleanup_ids(current) ++ committed_predecessor_ids(record, current))
+      |> Enum.uniq()
+      |> Kernel.--(collected)
+      |> Kernel.--(terminal_execution_ids(record))
+
+    if pending == [],
+      do: Map.delete(record, :pending_execution_cleanup),
+      else: Map.put(record, :pending_execution_cleanup, pending)
+  end
+
+  defp terminal_execution_ids(%{server_turn: %{id: id, status: status, expires_at: _}})
+       when status in [:completed, :failed, :cancelled],
+       do: [id]
+
+  defp terminal_execution_ids(_record), do: []
+
+  # A durable handoff replaces the Flow receipt with the accepted successor
+  # in the same write that commits the predecessor.
+  defp committed_predecessor_ids(
+         %{server_turn: %{status: :accepted, predecessor_id: id}},
+         %{server_turn: %{id: id, status: status, expires_at: _}}
+       )
+       when status in [:running, :released],
+       do: [id]
+
+  defp committed_predecessor_ids(_record, _current), do: []
+
+  defp validate_execution_cleanup(ids) when is_list(ids) do
+    if not List.improper?(ids) and Enum.all?(ids, &(is_binary(&1) and byte_size(&1) > 0)) and
+         Enum.uniq(ids) == ids,
+       do: :ok,
+       else: invalid(:pending_execution_cleanup)
+  end
+
+  defp validate_execution_cleanup(_ids), do: invalid(:pending_execution_cleanup)
 
   @doc false
   def put_topology_owner(record, nil), do: record

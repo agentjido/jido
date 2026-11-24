@@ -1537,7 +1537,98 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     assert {:ok, restored} = Jido.activate_agent(instance, address)
     assert :ok = Server.await_ready(restored)
     assert {:ok, ^result} = Jido.turn_result(instance, address, result.turn_id)
+
+    Jido.Test.Eventually.eventually(fn ->
+      Jido.Persistence.Store.scan(file, "jido:execution:", limit: 256) == {:ok, [], nil}
+    end)
+  end
+
+  @tag :tmp_dir
+  test "restart collects an earlier committed execution after a second commit", c do
+    start_supervised!({Probe, self()})
+
+    {instance, server, {Storage, opts} = persistence, address} =
+      start_persisted_agent(c.tmp_dir, "review-collection-backlog", [], LargeOutputAgent, Storage)
+
+    file = {Jido.Persistence.File, opts}
+    payload = String.duplicate("A saved result. ", 512)
+    expect(Tools.LargeOutput, :run, fn %{}, _context -> {:ok, %{content: payload}} end)
+
+    expect(ReqLLM, :generate_text, 4, fn model, llm_context, _options ->
+      cond do
+        roles(llm_context) == [:system, :user, :assistant, :tool] ->
+          {:ok, response(model, llm_context, "Result saved.", "first-answer")}
+
+        message_text(List.last(llm_context.messages)) == "Run the tool" ->
+          call = ReqLLM.ToolCall.new("collection-tool", "large_output", "{}")
+          {:ok, tool_response(model, llm_context, [call], "call-tool")}
+
+        true ->
+          {:ok, response(model, llm_context, "Second result.", "second-answer")}
+      end
+    end)
+
+    assert :ok = Probe.configure(:execution_fact_delete)
+    first = Server.submit(server, LargeOutputAgent.request_signal!(%{input: "Run the tool"}))
+    assert {:ok, %{status: :committed, turn_id: first_id}} = Server.await(first, 10_000)
+    assert_receive {:durable_barrier, :execution_fact_delete, collector}, 5_000
+
+    second = Server.submit(server, LargeOutputAgent.request_signal!(%{input: "Reply directly"}))
+    assert {:ok, %{status: :committed} = result} = Server.await(second, 10_000)
+    assert first_id != result.turn_id
+    assert %{pending_execution_cleanup: [^first_id]} = stored_agent_record(file, address)
+
+    first_scope = {:jido_execution, address.namespace, address.partition, address.id, first_id}
+    prefix = "jido:execution:v3:" <> Base.url_encode64(:erlang.term_to_binary(first_scope), padding: false)
+    assert {:ok, [_ | _], nil} = Jido.Persistence.Store.scan(file, prefix, limit: 256)
+    monitor = Process.monitor(collector)
+    assert :ok = stop_supervised(instance)
+    assert_receive {:DOWN, ^monitor, :process, ^collector, _reason}
+
+    assert :ok = Probe.configure(:execution_fact_delete)
+    start_supervised!({Jido, name: instance, namespace: address.namespace, persistence: persistence}, id: instance)
+    assert {:ok, restored} = Jido.activate_agent(instance, address)
+    assert_receive {:durable_barrier, :execution_fact_delete, retry}, 5_000
+    monitor = Process.monitor(retry)
+
+    assert :ok = Server.await_ready(restored)
+    assert %{server_turn: %{id: restored_turn_id, status: :completed}} = stored_agent_record(file, address)
+    assert restored_turn_id == result.turn_id
+
+    assert :ok = Probe.release()
+    assert_receive {:DOWN, ^monitor, :process, ^retry, :normal}, 5_000
     assert {:ok, [], nil} = Jido.Persistence.Store.scan(file, "jido:execution:", limit: 256)
+
+    third = Server.submit(restored, LargeOutputAgent.request_signal!(%{input: "Keep going"}))
+    assert {:ok, %{status: :committed}} = Server.await(third, 10_000)
+    refute Map.has_key?(stored_agent_record(file, address), :pending_execution_cleanup)
+  end
+
+  @tag :tmp_dir
+  test "a blocked collector does not stop Agent reactivation", c do
+    start_supervised!({Probe, self()})
+
+    {instance, server, _persistence, address} =
+      start_persisted_agent(c.tmp_dir, "review-collection-activation", [], LargeOutputAgent, Storage)
+
+    expect(ReqLLM, :generate_text, fn model, llm_context, _options ->
+      {:ok, response(model, llm_context, "Result saved.", "answer")}
+    end)
+
+    assert :ok = Probe.configure(:execution_fact_delete)
+    first = Server.submit(server, LargeOutputAgent.request_signal!(%{input: "Reply directly"}), result_handoff: true)
+    assert {:ok, %{status: :committed} = result} = Server.await(first, 10_000)
+    assert_receive {:durable_barrier, :execution_fact_delete, collector}, 5_000
+
+    monitor = Process.monitor(collector)
+    assert :ok = Jido.stop_agent(instance, server)
+
+    assert {:ok, restored} = Jido.activate_agent(instance, address)
+    assert :ok = Server.await_ready(restored)
+    assert {:ok, ^result} = Jido.turn_result(instance, address, result.turn_id)
+
+    assert :ok = Probe.release()
+    assert_receive {:DOWN, ^monitor, :process, ^collector, :normal}, 5_000
   end
 
   @tag :tmp_dir
@@ -1796,6 +1887,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     after
       10 -> signals
     end
+  end
+
+  defp stored_agent_record(store, address) do
+    assert {:ok, bytes, _condition} = Jido.Persistence.Store.read(store, Jido.Persistence.agent_key(address))
+    assert {:ok, record} = Jido.Persistence.Record.decode(bytes)
+    record
   end
 
   defp start_persisted_agent(path, label, create_opts \\ [], module \\ SimpleAgent, store \\ Jido.Persistence.File) do

@@ -360,7 +360,7 @@ defmodule Jido.AgentServer.Lifecycle do
   defp open_activation(data, mode) do
     with :ok <- ServerSupervisor.close_execution(data.activation_state),
          {:ok, config} <- Jido.Persistence.resolve_agent_config(data.persistence, data.jido),
-         {:ok, agent, revision, agent_revision, turn, handoffs} <-
+         {:ok, agent, revision, agent_revision, turn, handoffs, cleanup_ids} <-
            Jido.Persistence.open_agent(
              config,
              data.agent,
@@ -371,8 +371,7 @@ defmodule Jido.AgentServer.Lifecycle do
          {:ok, revision, turn} <- settle_unreleased_handoff(data, config, agent, revision, turn),
          :ok <- validate_continuation(agent, turn),
          :ok <- reconcile_owned_member(data) do
-      _ = collect_terminal_execution(data, config, turn)
-      {:ok, agent, revision, agent_revision, config, turn, handoffs}
+      {:ok, agent, revision, agent_revision, config, turn, handoffs, cleanup_ids}
     end
   end
 
@@ -400,7 +399,20 @@ defmodule Jido.AgentServer.Lifecycle do
         ]
 
     handoffs = Keyword.get(opts, :topology_handoffs, :preserve)
-    Jido.Persistence.save_agent_runtime(data.persistence, agent, persistence_opts, handoffs)
+    collected = collected_execution_ids(data.activation_state)
+
+    with :ok <- Jido.Persistence.save_agent_runtime(data.persistence, agent, persistence_opts, handoffs, collected),
+         do: forget_collected_executions(data.activation_state, collected)
+  end
+
+  defp collected_execution_ids(state) do
+    :ets.select(state, [{{{:execution_collected, :"$1"}, :_}, [], [:"$1"]}])
+  end
+
+  defp forget_collected_executions(state, ids) do
+    Enum.each(ids, &:ets.delete(state, {:execution_collected, &1}))
+  rescue
+    ArgumentError -> :ok
   end
 
   def write_result(result, deadline) do
@@ -541,12 +553,35 @@ defmodule Jido.AgentServer.Lifecycle do
 
   def validate_continuation(_agent, _receipt), do: :ok
 
-  defp collect_terminal_execution(data, config, %{id: turn_id, status: status, expires_at: _})
-       when status in [:completed, :failed, :cancelled] do
-    ContinuationStore.collect_committed(data.jido, execution_identity(data, turn_id), config)
+  def collect_execution(data) do
+    state = data.activation_state
+    turn_id = data.active.turn_id
+    ContinuationStore.collect(data.jido, data.active.worker_id, fn -> mark_execution_collected(state, turn_id) end)
   end
 
-  defp collect_terminal_execution(_data, _config, _turn), do: :ok
+  def retry_execution_cleanup(_data, []), do: :ok
+
+  def retry_execution_cleanup(data, turn_ids) do
+    # A Store can block. The collector runs independently of Agent readiness.
+    jido = data.jido
+    config = data.persistence
+    state = data.activation_state
+    ids = Enum.map(turn_ids, &{&1, execution_identity(data, &1)})
+
+    Task.Supervisor.start_child(Jido.Instance.Names.task_supervisor(jido), fn ->
+      Enum.each(ids, fn {turn_id, id} ->
+        with :ok <- ContinuationStore.collect_committed(jido, id, config),
+             do: mark_execution_collected(state, turn_id)
+      end)
+    end)
+  end
+
+  defp mark_execution_collected(state, turn_id) do
+    :ets.insert(state, {{:execution_collected, turn_id}, true})
+    :ok
+  rescue
+    ArgumentError -> :ok
+  end
 
   def execution_identity(data), do: execution_identity(data, data.active.turn_id)
 

@@ -41,6 +41,12 @@ checkpoint. Keep any wait retry receipt and any terminal result that awaits
 acknowledgement. Leave the original admission data in the running receipt
 while recovery still needs it. Continue to read older settled receipts.
 
+When a later checkpoint replaces a terminal receipt, save any unfinished
+collection ID with the new checkpoint. Retry collection in a supervised
+task on activation. Store reads and deletes for collection run outside the
+Agent readiness deadline. A later checkpoint can drop confirmed IDs without
+an extra Agent write.
+
 ## Consequences
 
 These changes use the existing execution identity and collection lifetime.

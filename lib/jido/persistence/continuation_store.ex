@@ -239,13 +239,13 @@ defmodule Jido.Persistence.ContinuationStore do
 
   # Terminal checkpoint collection is best effort. A failed physical delete
   # must not change a Turn result which is already durable in the Agent record.
-  def collect(jido, id) do
+  def collect(jido, id, on_collected \\ fn -> :ok end) do
     case RuntimeStore.fetch(jido, __MODULE__, id) do
       {:ok, {owner, %{config: config}}} when owner == self() ->
         with :ok <- RuntimeStore.delete_owned(jido, __MODULE__, id, owner),
              {:ok, _pid} <-
                Task.Supervisor.start_child(Jido.Instance.Names.task_supervisor(jido), fn ->
-                 collect_committed(jido, id, config)
+                 with :ok <- collect_committed(jido, id, config), do: on_collected.()
                end),
              do: :ok
 
@@ -258,28 +258,33 @@ defmodule Jido.Persistence.ContinuationStore do
   end
 
   def collect_committed(jido, id, %Config{} = config) do
-    with_collection_lock(jido, id, fn ->
-      case RuntimeStore.fetch(jido, __MODULE__, id) do
-        :error ->
-          delete_execution(config, id)
+    with_collection_lock(
+      jido,
+      id,
+      fn ->
+        case RuntimeStore.fetch(jido, __MODULE__, id) do
+          :error ->
+            delete_execution(config, id)
 
-        {:ok, {owner, _entry}} ->
-          if Process.alive?(owner) do
-            {:error, :execution_owner_replaced}
-          else
-            with :ok <- RuntimeStore.delete_owned(jido, __MODULE__, id, owner),
-                 do: delete_execution(config, id)
-          end
+          {:ok, {owner, _entry}} ->
+            if Process.alive?(owner) do
+              {:error, :execution_owner_replaced}
+            else
+              with :ok <- RuntimeStore.delete_owned(jido, __MODULE__, id, owner),
+                   do: delete_execution(config, id)
+            end
 
-        error ->
-          error
-      end
-    end)
+          error ->
+            error
+        end
+      end,
+      0
+    )
   end
 
   # A collector must finish before another owner can register the same execution.
-  defp with_collection_lock(jido, id, fun),
-    do: :global.trans({{__MODULE__, jido, id}, self()}, fun, [node()])
+  defp with_collection_lock(jido, id, fun, retries \\ :infinity),
+    do: :global.trans({{__MODULE__, jido, id}, self()}, fun, [node()], retries)
 
   @impl true
   def append(id, events, {id, jido}), do: append(id, events, jido)

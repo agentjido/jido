@@ -35,7 +35,6 @@ defmodule Jido.AgentServer.Worker do
   alias Jido.Agent.Runner, as: AgentRunner
   alias Jido.Agent.Validation
   alias Jido.Durable.Continuation
-  alias Jido.Persistence.ContinuationStore
   alias Jido.Signal
   alias Jido.Telemetry.AgentServer, as: AgentServerTelemetry
   alias Jido.Trace.Context, as: TraceContext
@@ -2225,7 +2224,7 @@ defmodule Jido.AgentServer.Worker do
   defp bootstrap_timeout(_data), do: :readiness_timeout
 
   defp finish_bootstrap(
-         {:ok, agent, revision, agent_revision, config, turn, handoffs},
+         {:ok, agent, revision, agent_revision, config, turn, handoffs, cleanup_ids},
          %{bootstrap: %{kind: :persistence}} = data
        ) do
     Lifecycle.restore(data.activation_state, agent, revision, agent_revision)
@@ -2248,6 +2247,8 @@ defmodule Jido.AgentServer.Worker do
         topology_handoffs: handoffs,
         bootstrap: nil
     }
+
+    _ = Lifecycle.retry_execution_cleanup(data, cleanup_ids)
 
     case initialize_plugins(data) do
       {:ok, phase, next} -> {:next_state, phase, next}
@@ -3568,8 +3569,8 @@ defmodule Jido.AgentServer.Worker do
     end
 
     if data.active.durable and
-         (data.active.durable_finalized or data.server_turn.status == :completed),
-       do: ContinuationStore.collect(data.jido, data.active.worker_id)
+         (data.active.durable_finalized or data.server_turn.status == :completed or handoff_result?(result)),
+       do: Lifecycle.collect_execution(data)
 
     {next, status, stage, count} =
       case result do
