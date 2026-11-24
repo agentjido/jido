@@ -56,9 +56,10 @@ defmodule Jido.Blackboard do
     with :ok <- validate_owner_address(instance, address),
          {:ok, record} <- Record.configure(instance, address, name) do
       with_lifecycle_lock(instance, name, fn ->
-        case Registry.lookup(Jido.Blackboard.Registry, {instance, name}) do
-          [] -> Record.delete(record)
-          [_board] -> {:error, :running}
+        if board_running?(instance, name) do
+          {:error, :running}
+        else
+          Record.delete(record)
         end
       end)
     else
@@ -68,6 +69,14 @@ defmodule Jido.Blackboard do
   end
 
   def delete(_instance, _address, _name), do: {:error, :invalid_request}
+
+  defp board_running?(instance, name) do
+    # A stopped board can remain in the Registry until its exit is processed.
+    case Registry.lookup(Jido.Blackboard.Registry, {instance, name}) do
+      [{pid, _value}] -> Process.alive?(pid)
+      [] -> false
+    end
+  end
 
   defp validate_owner_address(instance, address) do
     case Jido.agent_address(instance, address.id, partition: address.partition) do
