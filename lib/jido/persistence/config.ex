@@ -8,16 +8,21 @@ defmodule Jido.Persistence.Config do
 
       [store: {Jido.Persistence.File, path: "data/jido"},
        codec: Jido.Persistence.Codec.JSON]
+
+  With the Term codec, set `:execution_compression` to `true` to compress
+  prepared execution records, fact values, and event batches. It defaults to
+  `false`. Both settings read compressed and uncompressed Term records.
   """
 
   alias Jido.Persistence.Codec
+  alias Jido.Persistence.Codec.Term
   alias Jido.Persistence.Store
 
   @enforce_keys [:store, :codec]
-  defstruct [:store, :codec]
+  defstruct [:store, :codec, execution_compression: false]
 
-  @type t :: %__MODULE__{store: Store.config(), codec: module()}
-  @profile_keys [:store, :codec]
+  @type t :: %__MODULE__{store: Store.config(), codec: module(), execution_compression: boolean()}
+  @profile_keys [:store, :codec, :execution_compression]
 
   @spec open(term()) :: {:ok, t() | nil} | {:error, term()}
   def open(nil), do: {:ok, nil}
@@ -27,22 +32,19 @@ defmodule Jido.Persistence.Config do
   def open(declaration) when is_list(declaration) do
     if Keyword.keyword?(declaration) and
          Enum.any?(@profile_keys, &Keyword.has_key?(declaration, &1)) do
-      with :ok <- validate_profile_keys(declaration),
-           {:ok, store} <- Store.open(Keyword.get(declaration, :store)),
-           {:ok, codec} <- Codec.open(Keyword.get(declaration, :codec, Jido.Persistence.Codec.Term)) do
-        {:ok, %__MODULE__{store: store, codec: codec}}
+      with :ok <- validate_profile_keys(declaration) do
+        validate(%__MODULE__{
+          store: Keyword.fetch!(declaration, :store),
+          codec: Keyword.get(declaration, :codec, Term),
+          execution_compression: Keyword.get(declaration, :execution_compression, false)
+        })
       end
     else
       {:error, {:invalid_persistence_profile, declaration}}
     end
   end
 
-  def open(declaration) do
-    with {:ok, store} <- Store.open(declaration),
-         {:ok, codec} <- Codec.open(Jido.Persistence.Codec.Term) do
-      {:ok, %__MODULE__{store: store, codec: codec}}
-    end
-  end
+  def open(declaration), do: validate(%__MODULE__{store: declaration, codec: Term})
 
   @spec normalize(term()) :: t() | nil
   def normalize(declaration) do
@@ -58,12 +60,18 @@ defmodule Jido.Persistence.Config do
   @spec decode(t(), binary(), keyword()) :: {:ok, term()} | {:error, term()}
   def decode(%__MODULE__{codec: codec}, bytes, opts \\ []), do: codec.decode(bytes, opts)
 
-  defp validate(%__MODULE__{store: store, codec: codec}) do
-    with {:ok, store} <- Store.open(store),
-         {:ok, codec} <- Codec.open(codec) do
-      {:ok, %__MODULE__{store: store, codec: codec}}
+  defp validate(%__MODULE__{} = config) do
+    with {:ok, store} <- Store.open(config.store),
+         {:ok, codec} <- Codec.open(config.codec),
+         :ok <- validate_compression(config.execution_compression, codec) do
+      {:ok, %{config | store: store, codec: codec}}
     end
   end
+
+  defp validate_compression(false, _codec), do: :ok
+  defp validate_compression(true, Term), do: :ok
+  defp validate_compression(true, codec), do: {:error, {:execution_compression_requires_term_codec, codec}}
+  defp validate_compression(value, _codec), do: {:error, {:invalid_execution_compression, value}}
 
   defp validate_profile_keys(opts) do
     keys = Keyword.keys(opts)

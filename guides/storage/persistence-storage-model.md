@@ -44,6 +44,20 @@ before safe term decoding. This makes their static atoms available on a cold
 node. Runtime-created atoms are not supported. Per-Agent Store or codec
 overrides are rejected.
 
+With the Term codec, you can opt in to compression for prepared execution
+records, fact values, and event batches.
+
+```elixir
+persistence: [
+  store: {Jido.Persistence.File, path: "data/jido"},
+  execution_compression: true
+]
+```
+
+The default is `false`. Both settings read compressed and uncompressed Term
+records in the same namespace. Agent, wake, and execution index records use
+their usual encoding.
+
 At startup, Jido creates or validates a namespace manifest. It pins the codec,
 Agent, execution, and wake formats, and the wake layout. A mismatch stops the
 instance before it accepts Agent work. This V3 format does not read older

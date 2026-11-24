@@ -3,6 +3,7 @@ defmodule Jido.Persistence.ContinuationStore do
   @behaviour Runic.Runner.Store
 
   alias Jido.Persistence.{Config, Store}
+  alias Jido.Persistence.Codec.Term
   alias Jido.Exec.Runtime
   alias __MODULE__.JoinCompletedRef
   alias Runic.Workflow.{Fact, FactRef, FactResolver, Rehydration, RunnableCompleted}
@@ -45,7 +46,7 @@ defmodule Jido.Persistence.ContinuationStore do
   def prepare(jido, id, value) do
     with {:ok, config} <- config(jido, id),
          record = {:jido_execution_prepared, 3, value},
-         {:ok, bytes} <- Config.encode(config, record) do
+         {:ok, bytes} <- encode_payload(config, record) do
       case Store.compare_and_swap(config.store, prepared_key(id), :not_found, bytes) do
         :ok -> :ok
         {:error, :conflict} -> accept_prepared(config, id, record)
@@ -296,7 +297,7 @@ defmodule Jido.Persistence.ContinuationStore do
   defp append_batch(config, id, batch_count, condition, events) do
     next = batch_count + 1
 
-    with {:ok, bytes} <- Config.encode(config, events),
+    with {:ok, bytes} <- encode_payload(config, events),
          :ok <-
            Store.compare_and_swap(
              config.store,
@@ -316,7 +317,7 @@ defmodule Jido.Persistence.ContinuationStore do
 
       {:error, :not_found} ->
         with :ok <- record_fact_hash(config, id, hash),
-             {:ok, bytes} <- Config.encode(config, full_fact_record(value)) do
+             {:ok, bytes} <- encode_payload(config, full_fact_record(value)) do
           case Store.compare_and_swap(
                  config.store,
                  fact_key(id, hash),
@@ -481,6 +482,11 @@ defmodule Jido.Persistence.ContinuationStore do
       Store.compare_and_swap(config.store, key(id), condition, bytes)
     end
   end
+
+  defp encode_payload(%Config{codec: Term, execution_compression: true}, value),
+    do: Term.encode_compact(value)
+
+  defp encode_payload(config, value), do: Config.encode(config, value)
 
   # Runic events contain domain atoms and code references. These are trusted
   # runtime records, not ingress payloads, so :safe cannot decode them.

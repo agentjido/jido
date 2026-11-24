@@ -173,7 +173,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
     {_, compact} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":batches:1") end)
     {_, inline} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":batches:2") end)
     assert byte_size(compact) < byte_size(value)
-    assert byte_size(inline) > byte_size(value)
+    assert {:ok, [^completed]} = Jido.Persistence.Codec.Term.decode(inline, trusted: true)
 
     {fact_key, _} =
       Enum.find(records, fn {key, _} ->
@@ -182,6 +182,49 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
 
     Agent.update(c.store, &Map.delete(&1, fact_key))
     assert {:error, :invalid_execution_checkpoint} = Store.stream(c.id, c.jido)
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "writes plain execution records by default and reads both encodings after opt-in", c do
+    alias Jido.Persistence.Codec.Term
+
+    payload = Enum.map_join(1..128, &:crypto.hash(:sha256, <<&1::32>>))
+    value = %{input: payload, copies: List.duplicate(payload, 4)}
+
+    assert :ok = Store.prepare(c.jido, c.id, value)
+    assert :ok = Store.save_fact(c.id, :plain, value, c.jido)
+    assert {:ok, 1} = Store.append(c.id, [value], c.jido)
+
+    plain_records = Agent.get(c.store, & &1)
+    plain_payloads = execution_payloads(plain_records)
+    assert length(plain_payloads) == 3
+
+    for bytes <- plain_payloads do
+      assert {:ok, term} = Term.decode(bytes, trusted: true)
+      assert {:ok, ^bytes} = Term.encode(term)
+    end
+
+    assert :ok = Store.register(c.jido, c.id, store: c.config, execution_compression: true)
+    assert :ok = Store.prepare(c.jido, c.id, value)
+    assert :ok = Store.save_fact(c.id, :compact, value, c.jido)
+    assert {:ok, 2} = Store.append(c.id, [value], c.jido)
+
+    compact_id = identity(c.init, "compact-job")
+    assert :ok = Store.register(c.jido, compact_id, store: c.config, execution_compression: true)
+    assert :ok = Store.prepare(c.jido, compact_id, value)
+
+    new_payloads = Agent.get(c.store, &Map.drop(&1, Map.keys(plain_records))) |> execution_payloads()
+    assert length(new_payloads) == 3
+    assert {:ok, plain} = Term.encode(value)
+
+    for bytes <- new_payloads do
+      assert byte_size(bytes) < div(byte_size(plain), 2)
+    end
+
+    assert :ok = Store.register(c.jido, c.id, c.config)
+    assert {:ok, [^value, ^value]} = Store.stream(c.id, c.jido)
+    assert {:ok, ^value} = Store.load_fact(c.id, :plain, c.jido)
+    assert {:ok, ^value} = Store.load_fact(c.id, :compact, c.jido)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
@@ -566,5 +609,12 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
     Enum.each(blocked, fn {writer, key} ->
       send(writer, {:continue_fact_cas, stage, key})
     end)
+  end
+
+  defp execution_payloads(records) do
+    for {key, bytes} <- records,
+        String.ends_with?(key, ":prepared") or String.contains?(key, ":batches:") or
+          (String.contains?(key, ":facts:") and not String.ends_with?(key, ":facts:index")),
+        do: bytes
   end
 end
