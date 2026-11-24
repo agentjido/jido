@@ -48,7 +48,7 @@ defmodule Jido.Examples.Observability.MetricsTest do
       assert {:ok, signal} = Agent.increment_signal(%{})
       assert {:ok, %AgentServer.TurnResult{status: :committed}} = AgentServer.call(server, signal)
 
-      assert_receive {:metric_event, [:jido, :agent_server, :turn, :stop], measurements, metadata},
+      assert_receive {:metric_event, [:jido, :agent_server, :turn, :stop], measurements, %{agent_id: ^id} = metadata},
                      1_000
 
       assert is_integer(measurements.duration)
