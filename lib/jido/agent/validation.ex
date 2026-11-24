@@ -136,6 +136,23 @@ defmodule Jido.Agent.Validation do
 
   defp plugin_schema(_, false), do: :ok
 
+  @doc false
+  def validate_declared_routes(routes, signal_source, inline_schemas) do
+    with {:ok, _} <-
+           Error.prefix_result_path(list(routes, &resolve_declared_mappings(&1, inline_schemas)), :routes) do
+      reply_source(routes, signal_source, true)
+    end
+  end
+
+  defp resolve_declared_mappings(%{handler: %{kind: :action, target: target}} = route, inline_schemas) do
+    case Map.fetch(inline_schemas, target) do
+      {:ok, schema} -> Route.resolve_output_mappings(route, schema)
+      :error -> {:ok, route}
+    end
+  end
+
+  defp resolve_declared_mappings(route, _inline_schemas), do: {:ok, route}
+
   defp reply_source(routes, signal_source, related?) do
     if related? and is_nil(signal_source) and Enum.any?(routes, &(!is_nil(&1.reply))),
       do:
