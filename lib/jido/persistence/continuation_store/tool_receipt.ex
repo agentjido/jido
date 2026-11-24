@@ -2,30 +2,16 @@ defmodule Jido.Persistence.ContinuationStore.ToolReceipt do
   @moduledoc false
 
   alias Jido.Persistence.{Config, Store}
-  alias Jido.Persistence.Codec.Term
   alias Jido.Persistence.ContinuationStore.{SharedToolPayload, ToolPayload}
 
-  def build(profile, id, signature, {%{normalized: outcome}, _effects} = result) do
+  def build(profile, signature, {%{normalized: outcome}, _effects} = result) do
     with :ok <- validate_result(result),
          {:ok, encoded} <- Config.encode(profile, result) do
       payloads = ToolPayload.payloads(outcome)
-      build_record(profile, id, signature, encoded, payloads)
-    end
-  end
-
-  defp build_record(%Config{codec: Term} = profile, id, signature, encoded, payloads)
-       when map_size(payloads) > 0 do
-    with :ok <- SharedToolPayload.save(profile, id, payloads) do
-      catalogue = ToolPayload.add_shared(ToolPayload.new(), payloads)
-      receipt = {:jido_tool_result, 2, signature, Map.keys(payloads), ToolPayload.pack(encoded, catalogue)}
+      local = ToolPayload.add(ToolPayload.new(), :local, payloads)
+      receipt = {:jido_tool_result, 1, signature, payloads, ToolPayload.pack(encoded, local)}
       {:ok, receipt, payloads}
     end
-  end
-
-  defp build_record(_profile, _id, signature, encoded, payloads) do
-    local = ToolPayload.add(ToolPayload.new(), :local, payloads)
-    receipt = {:jido_tool_result, 1, signature, payloads, ToolPayload.pack(encoded, local)}
-    {:ok, receipt, payloads}
   end
 
   def read(profile, key, opts) do

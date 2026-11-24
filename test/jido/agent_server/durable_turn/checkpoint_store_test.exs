@@ -402,11 +402,11 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
     assert {:ok, [^values, ^values]} = Store.stream(c.id, c.jido)
 
     records = Agent.get(c.store, & &1)
-    assert [{source, ^payload}] = Enum.filter(records, fn {_, bytes} -> :binary.match(bytes, payload) != :nomatch end)
-    assert String.starts_with?(source, "jido:tool-payload:")
-    {:ok, profile} = Jido.Persistence.Config.open(c.config)
-    other_partition = identity(%{c.init | partition: "south"}, "job")
-    assert {:error, :not_found} = SharedToolPayload.read(profile, other_partition, ToolPayload.digest(payload))
+    assert [{source, receipt}] = Enum.filter(records, fn {_, bytes} -> :binary.match(bytes, payload) != :nomatch end)
+    assert String.contains?(source, ":facts:")
+    assert {:ok, {:jido_tool_result, 1, _, _, _}} = Jido.Persistence.Codec.Term.decode(receipt, [])
+    assert length(:binary.matches(receipt, payload)) == 1
+    refute Enum.any?(Map.keys(records), &String.starts_with?(&1, "jido:tool-payload:"))
 
     Agent.update(c.store, &Map.put(&1, source, "wrong content"))
     assert {:error, :invalid_execution_checkpoint} = Store.stream(c.id, c.jido)
@@ -418,33 +418,32 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
-  test "inspects a referenced preparation and redacts the shared payload by default", c do
+  test "inspects a preparation that owns a prior tool result", c do
     alias Jido.Persistence.Inspector
 
     payload = String.duplicate("stored tool output / ", 256)
-    result = {%{normalized: %{status: :ok, model_content: payload}}, []}
-    assert {:ok, ^result} = Store.tool_recorder(c.jido, c.id).("run/0:0", %{name: "read"}, fn -> result end)
 
     session =
       Jido.Session.append(Jido.Session.new(), %{kind: :ai_message, payload: %{"role" => "tool", "output" => payload}})
 
     later_id = identity(c.init, "later")
     assert :ok = Store.register(c.jido, later_id, c.config)
-    prepared = %{context: %{jido_ai_session: Jido.Session.encode(session)}}
+    signal = Jido.Signal.new!("jido.ai.request", %{input: "Continue."}, source: "/test")
+    prepared = %{signal: signal, context: %{jido_ai_session: Jido.Session.encode(session)}}
     assert :ok = Store.prepare(c.jido, later_id, prepared)
+    assert :ok = Store.save_fact(later_id, :output, payload, c.jido)
     records = Agent.get(c.store, & &1)
-    prepared_key = Enum.find(Map.keys(records), &String.ends_with?(&1, ":prepared"))
-    source = Enum.find(Map.keys(records), &String.starts_with?(&1, "jido:tool-payload:"))
+    assert [{prepared_key, _}] = Enum.filter(records, fn {_, bytes} -> :binary.match(bytes, payload) != :nomatch end)
+    assert String.ends_with?(prepared_key, ":prepared")
     {:ok, profile} = Jido.Persistence.Config.open(c.config)
 
     assert {:ok, %{kind: "execution_prepared"}} = Inspector.read(profile, prepared_key)
     assert {:ok, {:jido_execution_prepared, 3, ^prepared}} = Inspector.read(profile, prepared_key, full: true)
-    assert {:ok, %{kind: "tool_payload", bytes: size}} = Inspector.read(profile, source)
-    assert size == byte_size(payload)
+    assert {:ok, ^payload} = Store.load_fact(later_id, :output, c.jido)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
-  test "restores an execution-local tool receipt written before shared payloads", c do
+  test "restores a prior receipt that references a shared payload", c do
     payload = String.duplicate("legacy tool value 12345 ", 300)
     slot = "run/0:0"
     call = %{name: "read"}
@@ -456,20 +455,24 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
 
     [{receipt_key, signature}] =
       for {key, bytes} <- records,
-          {:ok, {:jido_tool_result, 2, signature, _, _}} <- [Jido.Persistence.Config.decode(profile, bytes)],
+          {:ok, {:jido_tool_result, 1, signature, _, _}} <- [Jido.Persistence.Config.decode(profile, bytes)],
           do: {key, signature}
 
-    payloads = %{ToolPayload.digest(payload) => payload}
-    local = ToolPayload.add(ToolPayload.new(), :local, payloads)
+    digest = ToolPayload.digest(payload)
+    shared = ToolPayload.add_shared(ToolPayload.new(), %{digest => payload})
     assert {:ok, encoded} = Jido.Persistence.Config.encode(profile, result)
-    receipt = {:jido_tool_result, 1, signature, payloads, ToolPayload.pack(encoded, local)}
+    receipt = {:jido_tool_result, 2, signature, [digest], ToolPayload.pack(encoded, shared)}
     assert {:ok, encoded_receipt} = Jido.Persistence.Config.encode(profile, receipt)
 
-    Agent.update(c.store, fn records ->
-      records
-      |> Map.reject(fn {key, _bytes} -> String.starts_with?(key, "jido:tool-payload:") end)
-      |> Map.put(receipt_key, encoded_receipt)
-    end)
+    {:jido_execution, namespace, partition, agent_id, _turn_id} = c.id
+    scope = Base.url_encode64(:erlang.term_to_binary({namespace, partition, agent_id}), padding: false)
+    payload_key = "jido:tool-payload:v1:" <> scope <> ":" <> Base.url_encode64(digest, padding: false)
+    Agent.update(c.store, &(&1 |> Map.put(receipt_key, encoded_receipt) |> Map.put(payload_key, payload)))
+
+    assert {:ok, %{kind: "tool_payload", bytes: size}} = Jido.Persistence.Inspector.read(profile, payload_key)
+    assert size == byte_size(payload)
+    other_partition = identity(%{c.init | partition: "south"}, "job")
+    assert {:error, :not_found} = SharedToolPayload.read(profile, other_partition, digest)
 
     replacement = start_supervised!({Agent, fn -> nil end}, id: :replacement)
     assert :ok = Store.register(c.jido, c.id, c.config, replacement)

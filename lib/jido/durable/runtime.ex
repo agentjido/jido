@@ -35,7 +35,6 @@ defmodule Jido.Durable.Runtime do
          :ok <- cancel(runner, id),
          {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}, []),
          :ok <- ContinuationStore.register(instance, id, persistence, owner),
-         :ok <- ContinuationStore.seed_tool_history(instance, id, context),
          {:ok, saved} <-
            ContinuationStore.update_workflow(instance, id, &resolve_wait_inputs(&1, now)),
          options =

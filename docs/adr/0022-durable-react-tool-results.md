@@ -17,17 +17,15 @@ position. Compare the validated call on replay. The provider call ID can change
 when the model request repeats. A changed call at the same position fails the
 Turn.
 
-The Jido continuation store owns the receipt and its payloads. With the Term
-codec, save each large tool payload under its digest and the Agent address.
-Use references in receipts, prepared execution records, facts, and event
-batches. Later Turns can reuse payloads from their input Session after the
-earlier execution is collected. Load and verify the digest before decoding
-the original record. Sessions with no matching stored payload keep their
-inline values. Read existing execution-local receipts and references as before.
+The Jido continuation store owns the receipt and its payloads. Store tool
+bytes in the current execution's receipt. With the Term codec, facts and
+batches can reference the receipt by slot and payload digest. A later Turn
+can store earlier tool results in its own preparation with the conversation
+it uses. Load and verify referenced bytes before restoring the original record.
+Read older receipts and records that use separate shared payloads.
 
-Collect receipts with the execution. Keep the immutable payloads separately so
-subsequent Turns can use them. The Agent checkpoint, committed Session, and
-public reply remain self-contained.
+Collect receipts and preparations with the execution after settlement. The Agent
+checkpoint, committed Session, and public reply remain self-contained.
 
 ## Consequences
 
@@ -35,8 +33,6 @@ The Store must confirm the receipt before ReAct can use it. Work can repeat if
 the tool returns before its receipt is saved and the process stops in that gap.
 This receipt does not make an external tool operation atomic with a Jido write.
 Recovery can send a model request again and use the saved tool result. The
-receipt adds Store operations. Shared payload records keep one copy per unique
-payload and Agent address. Execution collection and the Agent tombstone do not
-reclaim these records. A cleanup policy must account for active references and
-in-flight recoveries. Applications continue to choose whether to enable
-execution compression.
+receipt adds Store operations during the Turn. The Turn does not add a separate
+tool payload record to the Agent's retained data. Applications continue to
+choose whether to enable execution compression.

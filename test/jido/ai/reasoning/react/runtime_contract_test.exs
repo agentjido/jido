@@ -1449,8 +1449,18 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
     assert Agent.get(calls, & &1) == 4
     refute_received :tool_executed
-    assert Enum.all?(records, fn {_key, bytes} -> :binary.match(bytes, payload) == :nomatch end)
-    assert {:ok, [{_key, ^payload}], nil} = Jido.Persistence.Store.scan(persistence, "jido:tool-payload:")
+    assert {:ok, [], nil} = Jido.Persistence.Store.scan(persistence, "jido:tool-payload:")
+
+    assert [{receipt_key, receipt}] =
+             Enum.filter(records, fn {_key, bytes} -> :binary.match(bytes, payload) != :nomatch end)
+
+    assert String.contains?(receipt_key, ":facts:")
+    assert length(:binary.matches(receipt, payload)) == 1
+
+    Jido.Test.Eventually.eventually(
+      fn -> Jido.Persistence.Store.scan(persistence, "jido:execution:", limit: 256) == {:ok, [], nil} end,
+      timeout: 5_000
+    )
 
     thread = Server.snapshot(restored).agent.state.session.thread
 
@@ -1469,7 +1479,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
   end
 
   @tag :tmp_dir
-  test "a later ReAct Turn restores earlier tool results without copying them into its execution", c do
+  test "a later ReAct Turn restores earlier tools from its preparation", c do
     {_instance, server, persistence, _address} =
       start_persisted_agent(c.tmp_dir, "tool-history", [], LargeOutputAgent)
 
@@ -1560,13 +1570,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     {prepared, progress} = Enum.split_with(later_records, fn {key, _bytes} -> String.ends_with?(key, ":prepared") end)
     assert [{_key, source}] = prepared
 
-    for text <- [first_input, first_reply, later_input] do
+    for text <- [first_input, first_reply, later_input, payload] do
       assert :binary.match(source, text) != :nomatch
       assert Enum.all?(progress, fn {_key, bytes} -> :binary.match(bytes, text) == :nomatch end)
     end
 
-    assert Enum.sum(for {_key, bytes} <- later_records, do: length(:binary.matches(bytes, payload))) == 0
-    assert {:ok, [{_key, ^payload}], nil} = Jido.Persistence.Store.scan(persistence, "jido:tool-payload:")
+    assert {:ok, [], nil} = Jido.Persistence.Store.scan(persistence, "jido:tool-payload:")
   end
 
   @tag :tmp_dir

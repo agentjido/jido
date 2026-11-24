@@ -68,22 +68,6 @@ defmodule Jido.Persistence.ContinuationStore do
     end
   end
 
-  def seed_tool_history(jido, id, context) do
-    with {:ok, owner, %{config: profile, catalogue: catalogue}} <- registration(jido, id) do
-      seed_tool_history(jido, id, owner, profile, catalogue, context)
-    end
-  end
-
-  defp seed_tool_history(jido, id, owner, %Config{codec: Term} = profile, catalogue, context) do
-    candidates = SharedToolPayload.candidates(context)
-
-    with {:ok, available} <- SharedToolPayload.available(profile, id, candidates, catalogue) do
-      update_tool_catalogue(jido, id, owner, &ToolPayload.add_shared(&1, available))
-    end
-  end
-
-  defp seed_tool_history(_jido, _id, _owner, _profile, _catalogue, _context), do: :ok
-
   defp update_tool_catalogue(jido, id, owner, update) do
     update_registration(jido, id, owner, &Map.update!(&1, :catalogue, update))
   end
@@ -129,7 +113,7 @@ defmodule Jido.Persistence.ContinuationStore do
     hash = tool_hash(slot)
     key = fact_key(id, hash)
 
-    with {:ok, receipt, payloads} <- ToolReceipt.build(profile, id, signature, result),
+    with {:ok, receipt, payloads} <- ToolReceipt.build(profile, signature, result),
          {:ok, bytes} <- encode_payload(profile, receipt),
          :ok <- record_fact_hash(profile, id, hash) do
       case Store.compare_and_swap(profile.store, key, :not_found, bytes) do
@@ -175,8 +159,7 @@ defmodule Jido.Persistence.ContinuationStore do
   defp tool_hash(slot), do: {:jido_tool_result, slot}
 
   def prepare(jido, id, value) do
-    with :ok <- seed_tool_history(jido, id, Map.get(value, :context, %{})),
-         {:ok, owner, %{config: config, catalogue: catalogue}} <- registration(jido, id),
+    with {:ok, owner, %{config: config, catalogue: catalogue}} <- registration(jido, id),
          record = {:jido_execution_prepared, 3, value},
          {:ok, bytes} <- encode_referenced(config, record, ToolPayload.without_source(catalogue, :prepared)),
          :ok <- save_prepared(config, id, record, bytes) do
@@ -221,23 +204,34 @@ defmodule Jido.Persistence.ContinuationStore do
 
     context = Map.get(value, :context, %{})
 
-    case Jido.Session.decode(Map.get(context, :jido_ai_session)) do
-      {:ok, session} ->
-        Enum.reduce(session.thread.entries, payloads, fn
-          %{kind: :ai_message, payload: %{"role" => role, "content" => content}}, acc
-          when role in ["user", "assistant"] ->
-            ToolPayload.payloads(content, acc)
-
-          _entry, acc ->
-            acc
-        end)
-
-      {:error, _reason} ->
-        payloads
-    end
+    context
+    |> session_sources()
+    |> Enum.reduce(payloads, &session_payloads/2)
   end
 
   defp prepared_payloads(_config, _value), do: %{}
+
+  defp session_sources(%{agent_state: %{session: session}} = context),
+    do: [session, Map.get(context, :jido_ai_session)]
+
+  defp session_sources(context), do: [Map.get(context, :jido_ai_session)]
+
+  defp session_payloads(value, payloads) do
+    case Jido.Session.decode(value) do
+      {:ok, session} -> Enum.reduce(session.thread.entries, payloads, &entry_payloads/2)
+      {:error, _reason} -> payloads
+    end
+  end
+
+  defp entry_payloads(%{kind: :ai_message, payload: %{"role" => role, "content" => content}}, payloads)
+       when role in ["user", "assistant"],
+       do: ToolPayload.payloads(content, payloads)
+
+  defp entry_payloads(%{kind: :ai_message, payload: %{"role" => "tool"} = tool}, payloads),
+    do: ToolPayload.payloads(tool, payloads)
+
+  defp entry_payloads(%{kind: :ai_tool_attempt, payload: tool}, payloads), do: ToolPayload.payloads(tool, payloads)
+  defp entry_payloads(_entry, payloads), do: payloads
 
   # Terminal checkpoint collection is best effort. A failed physical delete
   # must not change a Turn result which is already durable in the Agent record.

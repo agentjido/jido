@@ -11,8 +11,6 @@ defmodule Jido.Persistence.ContinuationStore.ToolPayload do
 
   def add_shared(catalogue, payloads), do: add_references(catalogue, payloads, &{:shared, &1})
 
-  def known?({known, _pattern}, bytes), do: Map.has_key?(known, bytes)
-
   def without_source({known, _pattern} = catalogue, source) do
     kept = Map.reject(known, fn {_bytes, {candidate, _digest}} -> candidate == source end)
     if map_size(kept) == map_size(known), do: catalogue, else: compile(kept)
