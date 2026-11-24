@@ -27,6 +27,8 @@ This directory records decisions that constrain the Jido V3 architecture. The [m
 | [0019](0019-one-owner-for-agent-state-fields.md) | Accepted | Give each Agent state field one authoritative owner |
 | [0020](0020-fixed-home-instance-clustering.md) | Accepted | Configure one home per clustered Jido instance namespace |
 | [0021](0021-shared-blackboard-ownership.md) | Proposed | Give each shared blackboard one owner |
+| [0022](0022-durable-react-tool-results.md) | Proposed | Save completed ReAct tool results within their execution |
+| [0023](0023-reuse-durable-execution-inputs.md) | Proposed | Reuse saved input in durable execution records |
 
 ## Backlog
 

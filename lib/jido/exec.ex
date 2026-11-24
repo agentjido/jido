@@ -119,6 +119,7 @@ defmodule Jido.Exec do
     context =
       instruction.context
       |> Runtime.caller_context()
+      |> Runtime.inherit_tool_recorder()
       |> Map.put(:__jido_exec_max_concurrency__, component_limit)
 
     opts = [

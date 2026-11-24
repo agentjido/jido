@@ -228,7 +228,8 @@ defmodule Jido.Agent.Validation do
           :signal,
           :plugin_inputs,
           :__jido_wait_host__,
-          :__jido_wait_result__
+          :__jido_wait_result__,
+          :__jido_tool_recorder__
         ],
         &Map.has_key?(context, &1)
       )

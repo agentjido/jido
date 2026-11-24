@@ -165,6 +165,16 @@ defmodule Jido.Instance.RuntimeStore do
   end
 
   @doc false
+  def compare_and_swap_owned(instance, hive, key, owner, current, next) do
+    call(
+      instance,
+      {:compare_and_swap_owned, hive, key, owner, current, next},
+      {:error, :not_running},
+      {:error, :timeout}
+    )
+  end
+
+  @doc false
   @spec list(atom(), hive()) :: [{key(), value()}]
   def list(instance, hive) when is_atom(instance) do
     case fetch_all(instance, hive) do
@@ -216,6 +226,23 @@ defmodule Jido.Instance.RuntimeStore do
   def handle_call({:delete_owned, hive, key, owner}, _from, %{table: table} = state) do
     :ets.match_delete(table, {{hive, key}, {owner, :_}})
     {:reply, :ok, state}
+  end
+
+  def handle_call({:compare_and_swap_owned, hive, key, owner, current, next}, _from, %{table: table} = state) do
+    reply =
+      case :ets.lookup(table, {hive, key}) do
+        [{{^hive, ^key}, {^owner, ^current}}] ->
+          true = :ets.insert(table, {{hive, key}, {owner, next}})
+          :ok
+
+        [{{^hive, ^key}, {^owner, _changed}}] ->
+          {:error, :conflict}
+
+        _missing_or_replaced ->
+          {:error, :execution_owner_replaced}
+      end
+
+    {:reply, reply, state}
   end
 
   def handle_call({:list, hive}, _from, %{table: table} = state) do

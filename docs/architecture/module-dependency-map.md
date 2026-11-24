@@ -754,7 +754,7 @@ Disposition terms:
 | `Jido.Persistence.Codec.Term` | Added | Compact default codec for compatible application releases |
 | `Jido.Persistence.Codec.JSON` | Added | Opt-in bounded tagged JSON codec |
 | `Jido.Persistence.Config` | Added | One validated Store and codec profile for an instance namespace |
-| `Jido.Persistence.ContinuationStore` | Keep | Runic workflow checkpoints, facts, wait receipts, and read-only checkpoint projection |
+| `Jido.Persistence.ContinuationStore` | Keep | Runic workflow checkpoints, facts, wait and tool receipts, Agent-scoped tool payloads, and read-only checkpoint projection |
 | `Jido.Persistence.Ecto` | Keep | Ecto adapter |
 | `Jido.Persistence.ETS` | Keep | ETS adapter |
 | `Jido.Persistence.File` | Keep | File adapter |

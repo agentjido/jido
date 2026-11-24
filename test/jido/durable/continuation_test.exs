@@ -28,9 +28,11 @@ defmodule Jido.Durable.ContinuationTest do
     assert :ok = Continuation.validate(continuation)
     assert :ok = Continuation.portable(continuation)
 
-    completed = Continuation.put_status!(continuation, :completed)
-    assert completed.id == continuation.id
-    assert completed.status == :completed
+    # Earlier releases stored the original admission data even after settlement.
+    assert :ok = Continuation.validate(%{continuation | status: :completed})
+
+    assert Continuation.put_status!(continuation, :completed) ==
+             %{id: continuation.id, status: :completed, expires_at: 100}
   end
 
   test "a non-portable context value is a Jido error naming the key and why" do

@@ -232,7 +232,7 @@ defmodule Jido.Persistence do
 
   def save_agent(source, %Agent{} = agent, opts) do
     with :ok <- validate_operation_options(opts, @save_options),
-         do: save_record(source, agent, agent.module, opts, :preserve, :direct)
+         do: save_record(source, agent, agent.module, opts, [], :direct)
   end
 
   def save_agent(_source, agent, _opts),
@@ -242,16 +242,18 @@ defmodule Jido.Persistence do
   def replace_agent(source, %Agent{} = agent, previous_module, opts)
       when is_atom(previous_module) do
     with :ok <- validate_operation_options(opts, @save_options),
-         do: save_record(source, agent, previous_module, opts, :preserve, :direct)
+         do: save_record(source, agent, previous_module, opts, [], :direct)
   end
 
   @doc false
-  def save_agent_runtime(source, %Agent{} = agent, opts, topology_handoffs) do
+  def save_agent_runtime(source, %Agent{} = agent, opts, topology_handoffs, collected_executions \\ []) do
+    runtime = [topology_handoffs: topology_handoffs, collected_executions: collected_executions]
+
     with :ok <- validate_operation_options(opts, @save_options),
-         do: save_record(source, agent, agent.module, opts, topology_handoffs, :runtime)
+         do: save_record(source, agent, agent.module, opts, runtime, :runtime)
   end
 
-  defp save_record(source, agent, previous_module, opts, topology_handoffs, scope) do
+  defp save_record(source, agent, previous_module, opts, runtime, scope) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
       Store.protect(:compare_and_swap, fn ->
         with {:ok, %Config{} = config, instance} <- resolve_source(source, opts),
@@ -260,7 +262,7 @@ defmodule Jido.Persistence do
              {:ok, expected_revision} <- expected_revision(opts),
              {:ok, manifest} <- check_write_manifest(config, address, scope),
              {:ok, expected_value, record} <-
-               current_value(config, record, address, expected_revision, previous_module, topology_handoffs),
+               current_value(config, record, address, expected_revision, previous_module, runtime),
              :ok <- Record.validate(record, address, agent.module),
              {:ok, value} <- Record.encode(record, config),
              :ok <-
@@ -517,7 +519,7 @@ defmodule Jido.Persistence do
                    ],
                    address
                  ),
-               next_record = with_runtime_record(next_record, :preserve, record),
+               next_record = with_runtime_record(next_record, [], record),
                {:ok, next_value} <- Record.encode(next_record, config),
                :ok <- write_agent_record(config, address, manifest, condition, next_value) do
             {:ok, upgraded, next_revision}
@@ -669,8 +671,15 @@ defmodule Jido.Persistence do
              :ok <- Record.require_active(record),
              :ok <- check_runtime_owner(runtime?, config, address, record, telemetry_opts),
              {:ok, agent} <- Checkpoint.restore_agent(record, agent_module, agent_id, instance) do
-          result = {:ok, agent, Record.revision(record), Record.agent_revision(record), Map.get(record, :server_turn)}
-          if runtime?, do: :erlang.append_element(result, Record.topology_handoffs(record)), else: result
+          revision = Record.revision(record)
+          agent_revision = Record.agent_revision(record)
+          turn = Map.get(record, :server_turn)
+
+          if runtime?,
+            do:
+              {:ok, agent, revision, agent_revision, turn, Record.topology_handoffs(record),
+               Record.execution_cleanup_ids(record)},
+            else: {:ok, agent, revision, agent_revision, turn}
         end
       end)
     end)
@@ -697,7 +706,7 @@ defmodule Jido.Persistence do
          {:ok, agent} <-
            Jido.Agent.Topology.identify(nil, agent, &Jido.Agent.Validation.resolve/2),
          :ok <- create_agent_record(source, agent, opts, owner, :runtime),
-         do: {:ok, agent, 0, 0, nil, Record.empty_topology_handoffs()}
+         do: {:ok, agent, 0, 0, nil, Record.empty_topology_handoffs(), []}
   end
 
   def open_agent(source, %Agent{} = agent, :restore, opts),
@@ -744,10 +753,10 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp current_value(%Config{} = config, record, address, expected_revision, current_module, handoffs) do
+  defp current_value(%Config{} = config, record, address, expected_revision, current_module, runtime) do
     case Store.read(config.store, Record.agent_key(address)) do
       {:error, :not_found} when expected_revision in [:any, 0] ->
-        {:ok, :not_found, with_runtime_record(record, handoffs, %{})}
+        {:ok, :not_found, with_runtime_record(record, runtime, %{})}
 
       {:error, :not_found} ->
         {:error, :conflict}
@@ -756,7 +765,7 @@ defmodule Jido.Persistence do
         with {:ok, current} <- decode_record(value, current_module, config),
              :ok <- Record.validate(current, address, current_module),
              :ok <- Record.require_active_for_write(current),
-             record = with_runtime_record(record, handoffs, current),
+             record = with_runtime_record(record, runtime, current),
              :ok <- check_revision(current, record, expected_revision) do
           {:ok, condition, record}
         end
@@ -766,12 +775,14 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp with_runtime_record(record, handoffs, current) do
+  defp with_runtime_record(record, runtime, current) do
+    handoffs = Keyword.get(runtime, :topology_handoffs, :preserve)
     handoffs = if handoffs == :preserve, do: Record.topology_handoffs(current), else: handoffs
 
     record
     |> Record.put_topology_handoffs(handoffs)
     |> Record.put_topology_owner(Map.get(current, :topology_owner))
+    |> Record.carry_execution_cleanup(current, Keyword.get(runtime, :collected_executions, []))
   end
 
   defp check_revision(current, record, expected_revision) do

@@ -39,7 +39,10 @@ defmodule Jido.Durable.Runtime do
            ContinuationStore.update_workflow(instance, id, &resolve_wait_inputs(&1, now)),
          options =
            Keyword.put(options, :run_context, %{
-             _global: wait_context(context, id, saved, now, max_concurrency)
+             _global:
+               context
+               |> wait_context(id, saved, now, max_concurrency)
+               |> Map.put(:__jido_tool_recorder__, ContinuationStore.tool_recorder(instance, id))
            }) do
       if saved && not halted?(saved) && not Workflow.is_runnable?(saved) && Runtime.pending_waits(saved) != [] do
         waiting(saved)

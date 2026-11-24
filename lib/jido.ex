@@ -540,7 +540,7 @@ defmodule Jido do
          :ok <- validate_create_agent_options(opts),
          {instance_opts, _runtime_opts} = Keyword.split(opts, [:id, :state]),
          {:ok, agent} <- startup_agent(agent, instance_opts, []),
-         {:ok, _agent, 0, 0, nil, _handoffs} <-
+         {:ok, _agent, 0, 0, nil, _handoffs, []} <-
            Jido.Persistence.open_agent(instance, agent, :create,
              instance: instance,
              namespace: address.namespace,

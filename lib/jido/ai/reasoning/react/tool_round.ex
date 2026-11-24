@@ -29,6 +29,7 @@ defmodule Jido.AI.Reasoning.ReAct.ToolRound do
          :ok <- Telemetry.record_tool_calls(context, tool_call_index(calls)) do
       build_flow(
         calls,
+        turn,
         Keyword.get(opts, :continuation),
         Keyword.get(opts, :handoff_continuation, false)
       )
@@ -51,8 +52,8 @@ defmodule Jido.AI.Reasoning.ReAct.ToolRound do
 
   defp resolve_calls(_tools, calls), do: {:error, {:invalid_tool_calls, calls}}
 
-  defp build_flow(calls, continuation, handoff_continuation?) do
-    components = [parallel(calls), record(calls)]
+  defp build_flow(calls, turn, continuation, handoff_continuation?) do
+    components = [parallel(calls, turn), record(calls)]
 
     {schema, components, output} =
       if continuation do
@@ -75,7 +76,7 @@ defmodule Jido.AI.Reasoning.ReAct.ToolRound do
     })
   end
 
-  defp parallel(calls) do
+  defp parallel(calls, turn) do
     %{
       kind: :parallel,
       name: "tools",
@@ -87,11 +88,21 @@ defmodule Jido.AI.Reasoning.ReAct.ToolRound do
           %{
             name: action_name(index),
             action: ExecuteTool,
-            params: %{call: Map.take(call, [:id, :name, :arguments, :params, :executor, :tool])}
+            params:
+              Map.put(
+                receipt_params(turn, index),
+                :call,
+                Map.take(call, [:id, :name, :arguments, :params, :executor, :tool])
+              )
           }
         end)
     }
   end
+
+  defp receipt_params(%{run_id: run_id, tool_rounds: round, max_tool_output_bytes: limit}, index),
+    do: %{slot: "#{run_id}/#{round}:#{index}", max_output_bytes: limit}
+
+  defp receipt_params(_turn, _index), do: %{}
 
   defp record(calls) do
     %{

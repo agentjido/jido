@@ -8,7 +8,8 @@ defmodule Jido.Persistence.Inspector do
   redacts topology handoff data.
   """
 
-  alias Jido.Persistence.{Config, Store}
+  alias Jido.Persistence.{Config, ContinuationStore, Store}
+  alias Jido.Persistence.ContinuationStore.{SharedToolPayload, ToolReceipt}
 
   @redacted "[REDACTED]"
 
@@ -96,11 +97,15 @@ defmodule Jido.Persistence.Inspector do
   end
 
   defp decode(config, "jido:execution:v3:" <> _rest = key, bytes, _opts) when is_binary(bytes) do
-    with {:ok, value} <- Config.decode(config, bytes),
+    with {:ok, encoded} <- Config.decode(config, bytes),
+         {:ok, value} <- ContinuationStore.inspect_record(config, key, encoded),
          :ok <- validate_execution_record(key, value) do
       {:ok, value}
     end
   end
+
+  defp decode(_config, "jido:tool-payload:v1:" <> _rest = key, bytes, _opts),
+    do: SharedToolPayload.inspect_record(key, bytes)
 
   defp decode(config, "jido:wake:v3:" <> _rest, bytes, _opts) when is_binary(bytes) do
     with {:ok, value} <- Config.decode(config, bytes),
@@ -157,6 +162,12 @@ defmodule Jido.Persistence.Inspector do
       else: {:error, :invalid_execution_checkpoint}
   end
 
+  defp validate_execution_record(key, {:jido_tool_result, _, _, _, _} = receipt) do
+    if String.contains?(key, ":facts:") and ToolReceipt.valid_record?(receipt),
+      do: :ok,
+      else: {:error, :invalid_execution_checkpoint}
+  end
+
   defp validate_execution_record(key, value) when is_integer(value) and value >= 0 do
     if String.contains?(key, ":batches:") or String.contains?(key, ":facts:"),
       do: {:error, :invalid_execution_checkpoint},
@@ -190,6 +201,14 @@ defmodule Jido.Persistence.Inspector do
     else
       project_redacted(value, opts)
     end
+  end
+
+  defp project_redacted({:jido_shared_tool_payload, bytes}, _opts) do
+    %{kind: "tool_payload", bytes: byte_size(bytes)}
+  end
+
+  defp project_redacted({:jido_tool_result, version, _signature, _payloads, _body}, _opts) do
+    %{kind: "tool_receipt", version: version}
   end
 
   defp project_redacted({:jido_execution_prepared, version, value}, _opts) do

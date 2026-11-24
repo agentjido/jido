@@ -13,7 +13,42 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExecuteTool do
     output_schema: Joi.map()
 
   @impl Jido.Action
-  def run(%{call: call}, context) do
+  def run(%{call: call} = params, context) do
+    recorder = Jido.Exec.Runtime.tool_recorder()
+    execute = fn -> observe(call, context) end
+
+    result =
+      case params do
+        %{slot: slot, max_output_bytes: max_bytes} when is_function(recorder, 3) ->
+          identity = Map.take(call, [:name, :arguments, :params, :executor, :tool])
+          recorder.(slot, {identity, max_bytes}, fn -> normalize_observation(execute.(), max_bytes) end)
+
+        _ ->
+          {:ok, execute.()}
+      end
+
+    case result do
+      {:ok, {observation, effects}} ->
+        # A replay can receive a new provider ID for the same validated call.
+        observation = put_in(observation.call.id, call.id)
+        if effects == [], do: {:ok, observation}, else: {:ok, observation, effects}
+
+      {:error, reason} ->
+        {:error,
+         Jido.Error.execution_error("Could not confirm the tool result", %{
+           reason: :jido_tool_result_store,
+           storage_reason: reason
+         })}
+    end
+  end
+
+  defp normalize_observation({observation, effects}, max_bytes) do
+    {outcome, observation} = Map.pop!(observation, :outcome)
+    normalized = outcome |> ToolResult.normalize(max_bytes) |> Map.delete(:value)
+    {Map.put(observation, :normalized, normalized), effects}
+  end
+
+  defp observe(call, context) do
     started_at_ms = System.system_time(:millisecond)
     started_at = System.monotonic_time(:millisecond)
 
@@ -32,7 +67,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExecuteTool do
       effects_count: length(effects)
     }
 
-    if effects == [], do: {:ok, observation}, else: {:ok, observation, effects}
+    {observation, effects}
   end
 
   defp execute(%{executor: %{kind: :action, target: action}, params: params}, context) do

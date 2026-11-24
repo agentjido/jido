@@ -18,6 +18,7 @@ defmodule Jido.Exec.Runtime do
     :__jido_exec_max_concurrency__,
     :__jido_wait_host__,
     :__jido_wait_result__,
+    :__jido_tool_recorder__,
     :jido_exec_capabilities
   ]
 
@@ -158,7 +159,7 @@ defmodule Jido.Exec.Runtime do
   @spec user_context(map()) :: map()
   def user_context(context) do
     waits? = Map.has_key?(context, :__jido_wait_host__)
-    context = Map.drop(context, @reserved)
+    context = caller_context(context)
 
     if waits?,
       do: Map.put(context, :jido_exec_capabilities, [:waits]),
@@ -168,6 +169,31 @@ defmodule Jido.Exec.Runtime do
   @doc false
   @spec caller_context(map()) :: map()
   def caller_context(context), do: Map.drop(context, @reserved)
+
+  @doc false
+  def tool_recorder, do: Process.get({__MODULE__, :tool_recorder})
+
+  @doc false
+  def inherit_tool_recorder(context) do
+    case tool_recorder() do
+      nil -> context
+      recorder -> Map.put(context, :__jido_tool_recorder__, recorder)
+    end
+  end
+
+  @doc false
+  def with_tool_recorder(nil, work), do: work.()
+
+  def with_tool_recorder(recorder, work) do
+    key = {__MODULE__, :tool_recorder}
+    previous = Process.put(key, recorder)
+
+    try do
+      work.()
+    after
+      if is_nil(previous), do: Process.delete(key), else: Process.put(key, previous)
+    end
+  end
 
   @doc false
   @spec with_execution_context(map(), (-> term())) :: term()
@@ -242,6 +268,7 @@ defmodule Jido.Exec.Runtime do
   @spec run(GenServer.server(), deadline(), (-> term())) :: term()
   def run(task_supervisor, deadline, work) do
     trace_context = Jido.Trace.Context.capture()
+    tool_recorder = tool_recorder()
     supervisor = if TaskScope.current(), do: nil, else: task_supervisor
 
     if remaining(deadline) == 0 do
@@ -249,7 +276,9 @@ defmodule Jido.Exec.Runtime do
     else
       work = fn ->
         Jido.Trace.Context.with_context(trace_context, fn ->
-          if remaining(deadline) == 0, do: deadline_error(deadline), else: work.()
+          if remaining(deadline) == 0,
+            do: deadline_error(deadline),
+            else: with_tool_recorder(tool_recorder, work)
         end)
       end
 

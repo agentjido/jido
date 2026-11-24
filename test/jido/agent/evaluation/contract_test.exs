@@ -175,7 +175,8 @@ defmodule Jido.Agent.EvaluationContractTest do
           :plugin_inputs,
           :signal,
           :__jido_wait_host__,
-          :__jido_wait_result__
+          :__jido_wait_result__,
+          :__jido_tool_recorder__
         ] do
       assert {:error, _} = Agent.cmd(source, F.signal(), context: %{key => :forged})
     end

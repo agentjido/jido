@@ -30,6 +30,15 @@ defmodule Jido.Durable.Continuation do
           completed_at: non_neg_integer()
         }
 
+  @type settled_flow :: %{
+          optional(:resume) => resume_receipt(),
+          optional(:terminal_result) => Jido.AgentServer.TurnResult.t(),
+          optional(:completed_at) => non_neg_integer(),
+          id: id(),
+          status: :completed | :failed | :cancelled,
+          expires_at: non_neg_integer() | :infinity
+        }
+
   @type accepted_handoff :: %{
           optional(:result_handoff) => true,
           id: id(),
@@ -59,7 +68,7 @@ defmodule Jido.Durable.Continuation do
           predecessor_id: id()
         }
 
-  @type t :: direct() | accepted_handoff() | released_handoff() | terminal_receipt()
+  @type t :: direct() | accepted_handoff() | released_handoff() | terminal_receipt() | settled_flow()
 
   @doc false
   @spec running(map()) :: {:ok, direct()} | {:error, term()}
@@ -149,6 +158,17 @@ defmodule Jido.Durable.Continuation do
 
   @doc false
   @spec put_status!(t(), status()) :: t()
+  def put_status!(%{expires_at: _} = continuation, status)
+      when status in [:completed, :failed, :cancelled] and not is_map_key(continuation, :instruction) do
+    updated =
+      continuation
+      |> Map.take([:id, :expires_at, :resume, :terminal_result, :completed_at])
+      |> Map.put(:status, status)
+
+    :ok = validate(updated)
+    updated
+  end
+
   def put_status!(continuation, status) do
     updated = %{continuation | status: status}
     :ok = validate(updated)
@@ -252,6 +272,16 @@ defmodule Jido.Durable.Continuation do
 
   @doc false
   @spec validate(term()) :: :ok | {:error, term()}
+  def validate(%{id: id, status: status, expires_at: expires_at} = continuation)
+      when status in [:completed, :failed, :cancelled] and map_size(continuation) in 3..6 and
+             (expires_at == :infinity or (is_integer(expires_at) and expires_at >= 0)) do
+    if valid_id?(id) and valid_keys?(continuation, [:id, :status, :expires_at]) and
+         not Map.has_key?(continuation, :result_handoff) and valid_resume?(continuation) and
+         valid_terminal_result?(continuation),
+       do: :ok,
+       else: invalid()
+  end
+
   def validate(
         %{
           id: id,
