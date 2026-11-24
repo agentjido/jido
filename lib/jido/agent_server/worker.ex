@@ -1797,10 +1797,10 @@ defmodule Jido.AgentServer.Worker do
     end
   end
 
-  def handle_event(:info, {:worker_complete, id}, :starting, %{active: %{turn_id: id}}),
+  def handle_event(:info, {:worker_complete, id}, :starting, %{active: %{worker_id: id}}),
     do: {:keep_state_and_data, [:postpone]}
 
-  def handle_event(:info, {:worker_complete, id}, :running, %{active: %{turn_id: id}} = data) do
+  def handle_event(:info, {:worker_complete, id}, :running, %{active: %{worker_id: id}} = data) do
     active = data.active
     runner = data.runner
 
@@ -2431,7 +2431,9 @@ defmodule Jido.AgentServer.Worker do
       worker: nil,
       worker_ref: nil,
       execution_id: nil,
-      worker_id: turn_id,
+      # Temporary Workers belong to this AgentServer process. Durable startup
+      # replaces this key with the stable execution identity for recovery.
+      worker_id: {:jido_turn, self(), turn_id},
       durable: match?({:restore, _}, mode),
       result_handoff:
         case mode do
@@ -2676,7 +2678,7 @@ defmodule Jido.AgentServer.Worker do
       _instruction ->
         owner = self()
         runner = data.runner
-        id = data.active.turn_id
+        id = data.active.worker_id
         exec_opts = data.exec_opts
         operation(:start, data, fn -> start_worker(runner, id, owner, prepared, exec_opts, kind) end)
     end
@@ -2840,7 +2842,7 @@ defmodule Jido.AgentServer.Worker do
   end
 
   defp operation_result(:durable_advance, :complete, data),
-    do: handle_event(:info, {:worker_complete, data.active.turn_id}, :running, data)
+    do: handle_event(:info, {:worker_complete, data.active.worker_id}, :running, data)
 
   defp operation_result(:durable_terminal, :ok, data) do
     case publish_durable_revision(data) do
