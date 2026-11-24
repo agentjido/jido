@@ -54,7 +54,7 @@ downstream operation results stay with their owning components.
 ### jido.instance.I5 — Agent lifecycle selection
 
 - **scope:** `Jido.start_agent/3`, `Jido.stop_agent/3`, `Jido.whereis_agent/3`, `Jido.list_agents/2`, `Jido.agent_count/2`
-- **must:** Require an explicit selected instance for every Agent lifecycle function and route through its exact partition. Isolate equal Agent IDs across instances and partitions. List and count only the selected partition. Reject a PID operation whose explicit partition does not match its registration. A generated instance module must not copy these runtime functions.
+- **must:** Require an explicit selected instance for every Agent lifecycle function and route through its exact partition. Isolate equal Agent IDs across instances and partitions. List and count only the selected partition. Reject a PID operation whose explicit partition does not match its registration. Inherit the instance persistence profile on managed starts by default. Honor `persistence: false` on managed and externally supervised starts in a persistent instance. Use the stop idle policy for those activations and reject checkpoint restore for them. A generated instance module must not copy these runtime functions.
 - **why:** Instance and partition selection must not target another activation.
 - **kind:** functional
 - **status:** active

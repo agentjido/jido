@@ -100,7 +100,8 @@ defmodule Jido.AgentServer.Lifecycle do
          :ok <- validate_timeout(opts, :persistence_timeout),
          :ok <-
            validate_setting(
-             opts[:persistence_mode] in [:create, :restore],
+             opts[:persistence_mode] == :create or
+               (opts[:persistence_mode] == :restore and persistence_enabled?(opts[:persistence])),
              :persistence_mode
            ),
          :ok <-

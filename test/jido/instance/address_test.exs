@@ -543,6 +543,71 @@ defmodule Jido.Instance.AddressTest do
     assert {:error, :not_found} = Jido.resolve_agent(instance, address)
   end
 
+  @tag obligation: "jido.instance.I5"
+  test "an Agent can opt out of checkpoints in a persistent instance" do
+    instance = unique_instance("persistence-opt-out")
+    start_durable_instance!(instance, unique_namespace("persistence-opt-out"))
+
+    assert {:ok, durable} = Jido.start_agent(instance, Counter, id: "durable")
+    assert :ok = Jido.AgentServer.await_ready(durable)
+    assert %{persistence_revision: 0} = Jido.AgentServer.snapshot(durable)
+
+    assert {:ok, transient} =
+             Jido.start_agent(instance, Counter, id: "transient", persistence: false)
+
+    assert :ok = Jido.AgentServer.await_ready(transient)
+    assert {:ok, address} = Jido.agent_address(instance, "transient")
+    assert {:ok, ^transient} = Jido.resolve_agent(instance, address)
+
+    assert {:ok, %Jido.AgentServer.TurnResult{status: :committed, durability: :memory}} =
+             Jido.call(instance, address, signal(3))
+
+    assert %{persistence_revision: nil, agent: %{state: %{count: 3}}} =
+             Jido.AgentServer.snapshot(transient)
+
+    assert :ok = Jido.stop_agent(instance, transient)
+    assert {:error, :not_found} = Jido.Persistence.load_agent(instance, Counter, "transient")
+
+    assert {:ok, restarted} =
+             Jido.start_agent(instance, Counter, id: "transient", persistence: false)
+
+    assert :ok = Jido.AgentServer.await_ready(restarted)
+
+    assert %{persistence_revision: nil, agent: %{state: %{count: 0}}} =
+             Jido.AgentServer.snapshot(restarted)
+  end
+
+  @tag obligation: "jido.instance.I5"
+  test "an externally supervised Agent can opt out of checkpoints" do
+    instance = unique_instance("supervised-persistence-opt-out")
+    start_durable_instance!(instance, unique_namespace("supervised-persistence-opt-out"))
+    agent = Counter.instantiate!(id: "transient")
+
+    start_supervised!({Jido.AgentServer, agent: agent, jido: instance, persistence: false})
+
+    assert {:ok, address} = Jido.agent_address(instance, agent.id)
+    assert server = Jido.whereis_agent(instance, agent.id)
+    assert :ok = Jido.AgentServer.await_ready(server)
+    assert {:ok, ^server} = Jido.resolve_agent(instance, address)
+    assert %{persistence_revision: nil} = Jido.AgentServer.snapshot(server)
+  end
+
+  @tag obligation: "jido.instance.I5"
+  test "checkpoint opt-out rejects restore mode" do
+    instance = unique_instance("restore-persistence-opt-out")
+    start_durable_instance!(instance, unique_namespace("restore-persistence-opt-out"))
+
+    assert {:error, %Error.ValidationError{message: "invalid persistence_mode"}} =
+             Jido.start_agent(instance, Counter,
+               id: "transient",
+               persistence: false,
+               persistence_mode: :restore
+             )
+
+    assert {:ok, address} = Jido.agent_address(instance, "transient")
+    assert {:error, :not_found} = Jido.resolve_agent(instance, address)
+  end
+
   @tag obligation: "jido.instance.I9"
   test "strict activation does not create a missing durable Agent" do
     namespace = unique_namespace("strict-activation")
