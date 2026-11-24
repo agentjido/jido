@@ -23,9 +23,15 @@ defmodule TopologyGuide.Packer do
   state do
     schema Jido.Joi.object(%{
              station: Jido.Joi.string() |> Jido.Joi.default("unassigned"),
-             packed: Jido.Joi.integer() |> Jido.Joi.default(0)
+             packed: Jido.Joi.integer() |> Jido.Joi.default(0),
+             slot: Jido.Joi.integer() |> Jido.Joi.default(0)
            })
   end
+
+  def initialize(state, %{slot: slot}) when is_integer(slot),
+    do: {:ok, Map.put(state, :slot, slot)}
+
+  def initialize(state, _context), do: {:ok, state}
 
   routes do
     signal_source "/orders/packer"
@@ -89,39 +95,56 @@ The cell returns `[{:auditor, 1, %{station: "audit"}}, {:packers, 2, %{station: 
 
 ```elixir
 {:ok, _instance} = Jido.start(name: TopologyGuide.Jido)
-{:ok, owner} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Desk, id: "desk-1")
+{:ok, owner} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Desk, id: "desk-1", partition: "desk")
 :ok = Jido.AgentServer.await_ready(owner)
 
-Jido.agent_count(TopologyGuide.Jido)
+4 = Jido.resident_agent_count(TopologyGuide.Jido, partition: "desk")
 ```
 
-The cell returns `4`: the owner, the auditor, and two packers. An Agent with members needs a supervised activation, so `Jido.AgentServer.start_link/1` rejects it.
+The cell returns `4`: the owner, the auditor, and two packers.
 
 ## Read and address members
 
-`Jido.AgentServer.members/3` returns live PIDs in slot order. Each member is an ordinary AgentServer with its own state.
+Use `Jido.list_agents/2` to find live Agents in the partition. Read their snapshots and select members by module and state. This example starts one topology in each partition.
 
 ```elixir
-[auditor] = Jido.AgentServer.members(owner, :auditor)
-[first_packer, second_packer] = packers = Jido.AgentServer.members(owner, :packers)
+agents_in = fn partition, module ->
+  for {_id, pid} <- Jido.list_agents(TopologyGuide.Jido, partition: partition),
+      %{agent: %{module: ^module, state: state}} <- [Jido.AgentServer.snapshot(pid)],
+      do: {pid, state}
+end
+
+[{auditor, _state}] =
+  Enum.filter(agents_in.("desk", TopologyGuide.Packer), fn {_pid, state} ->
+    state.station == "audit"
+  end)
+
+[{first_packer, _}, {second_packer, _}] =
+  agents_in.("desk", TopologyGuide.Packer)
+  |> Enum.filter(fn {_pid, state} -> state.station == "north" end)
+  |> Enum.sort_by(fn {_pid, state} -> state.slot end)
 
 {:ok, pack} = TopologyGuide.Packer.pack_signal(%{items: 4})
-{:ok, _committed, []} = Jido.AgentServer.call(first_packer, pack)
+{:ok, %{status: :committed}} = Jido.AgentServer.call(first_packer, pack)
 
-Enum.map([auditor | packers], &Jido.AgentServer.snapshot(&1).agent.state)
+[
+  %{station: "audit", packed: 0, slot: 1},
+  %{station: "north", packed: 4, slot: 1},
+  %{station: "north", packed: 0, slot: 2}
+] = Enum.map([auditor, first_packer, second_packer], &Jido.AgentServer.snapshot(&1).agent.state)
 ```
 
 Only the first packer changed:
 
 ```text
 [
-  %{station: "audit", packed: 0},
-  %{station: "north", packed: 4},
-  %{station: "north", packed: 0}
+  %{station: "audit", packed: 0, slot: 1},
+  %{station: "north", packed: 4, slot: 1},
+  %{station: "north", packed: 0, slot: 2}
 ]
 ```
 
-`Jido.AgentServer.children/2` returns all children, with each worker and activation PID. Its keys for members are generated, so do not match on them. Use `members/3` instead.
+If a partition contains several topologies with the same member module, use an application field in member state to tell them apart.
 
 ## Tell slots apart
 
@@ -147,17 +170,20 @@ defmodule TopologyGuide.Conveyor do
   end
 end
 
-{:ok, conveyor} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Conveyor, id: "conveyor-1")
+{:ok, conveyor} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Conveyor, id: "conveyor-1", partition: "conveyor")
 :ok = Jido.AgentServer.await_ready(conveyor)
 
-Jido.AgentServer.members(conveyor, :lanes) |> Enum.map(&Jido.AgentServer.snapshot(&1).agent.state.lane)
+[1, 2] =
+  agents_in.("conveyor", TopologyGuide.Lane)
+  |> Enum.map(fn {_pid, state} -> state.lane end)
+  |> Enum.sort()
 ```
 
 The cell returns `[1, 2]`.
 
 ## Nest a team
 
-A member can declare its own topology. Each level owns the level below it, so `members/3` reads one level at a time.
+A member can declare its own topology. All levels appear in the same partition list. Each level owns the level below it.
 
 ```elixir
 defmodule TopologyGuide.Team do
@@ -176,11 +202,11 @@ defmodule TopologyGuide.Warehouse do
   end
 end
 
-{:ok, warehouse} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Warehouse, id: "warehouse-1")
+{:ok, warehouse} = Jido.start_agent(TopologyGuide.Jido, TopologyGuide.Warehouse, id: "warehouse-1", partition: "warehouse")
 :ok = Jido.AgentServer.await_ready(warehouse)
 
-[team] = Jido.AgentServer.members(warehouse, :team)
-length(Jido.AgentServer.members(team, :packers))
+[{_team, _state}] = agents_in.("warehouse", TopologyGuide.Team)
+2 = length(agents_in.("warehouse", TopologyGuide.Packer))
 ```
 
 The cell returns `2`.
@@ -192,14 +218,18 @@ Do not declare a cycle. A module that lists itself as a member, or two modules t
 Stopping an owner stops its whole subtree. Stop each owner from this tutorial and count what remains.
 
 ```elixir
-:ok = Jido.stop_agent(TopologyGuide.Jido, owner)
-:ok = Jido.stop_agent(TopologyGuide.Jido, conveyor)
-:ok = Jido.stop_agent(TopologyGuide.Jido, warehouse)
+:ok = Jido.stop_agent(TopologyGuide.Jido, owner, partition: "desk")
+:ok = Jido.stop_agent(TopologyGuide.Jido, conveyor, partition: "conveyor")
+:ok = Jido.stop_agent(TopologyGuide.Jido, warehouse, partition: "warehouse")
 
-Enum.find(1..100, fn _attempt ->
-  Process.sleep(10)
-  Jido.agent_count(TopologyGuide.Jido) == 0
-end) != nil
+true =
+  Enum.any?(1..100, fn _attempt ->
+    Process.sleep(10)
+
+    Enum.all?(["desk", "conveyor", "warehouse"], fn partition ->
+      Jido.list_agents(TopologyGuide.Jido, partition: partition) == []
+    end)
+  end)
 ```
 
 The cell returns `true`.

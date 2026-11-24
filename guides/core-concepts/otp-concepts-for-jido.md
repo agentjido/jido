@@ -211,8 +211,7 @@ The worker traps exits and monitors the processes it depends on. Each one has a 
 | The Runner | The worker stops with the same reason. |
 | A running Worker | The worker stops with the same reason, unless the Turn is durable. A durable Turn exits abnormally, so the worker restarts and resumes it. |
 | A stage task | The worker stops with the same reason. |
-| Its parent activation | `:on_parent_exit` decides. See [Child Agent Adoption](../agent-servers/child-agents-and-adoption.md). |
-| A child's activation | The worker forgets the child unless a restart is expected. |
+| Its current runtime owner | The child activation stops. See [Start and Transfer Child Agents](../agent-servers/child-agents-and-adoption.md). |
 | An attached owner | The worker drops the owner, and the idle timer can start. See [Control Activations](../agent-servers/inspect-and-control-activations.livemd). |
 
 During effects, the first four rows use `{:shutdown, :effect_lifecycle_failed}` instead. Trapping exits also means the worker runs `terminate/3` when its supervisor stops it, which cancels any running execution.

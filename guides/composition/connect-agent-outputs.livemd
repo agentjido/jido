@@ -88,7 +88,7 @@ end
 
 ## Follow one Signal
 
-Each Agent commits its own Turn. The reply to `Jido.AgentServer.call/3` confirms only the desk's Turn, so the receipt has not arrived yet when the call returns. The `wait_until` helper polls until a check passes.
+Each Agent commits its own Turn. The result from `Jido.AgentServer.call/3` confirms the desk's first Turn. The `wait_until` helper polls for the receipt. Use `Jido.list_agents/2` in the example partition and match the member module in each snapshot.
 
 ```elixir
 wait_until = fn check ->
@@ -98,19 +98,27 @@ wait_until = fn check ->
 end
 
 {:ok, _instance} = Jido.start(name: ConnectGuide.Jido)
-{:ok, desk} = Jido.start_agent(ConnectGuide.Jido, ConnectGuide.Desk, id: "desk-1")
+{:ok, desk} = Jido.start_agent(ConnectGuide.Jido, ConnectGuide.Desk, id: "desk-1", partition: "orders")
 :ok = Jido.AgentServer.await_ready(desk)
 
 {:ok, request} = ConnectGuide.Desk.request_signal(%{amount: 7})
-{:ok, at_reply, [_forward]} = Jido.AgentServer.call(desk, request)
+{:ok, %{status: :committed}} = Jido.AgentServer.call(desk, request)
 
 true = wait_until.(fn -> Jido.AgentServer.snapshot(desk).agent.state.receipted == 7 end)
 
-[packer] = Jido.AgentServer.members(desk, :packer)
-{at_reply.state.receipted, Jido.AgentServer.snapshot(desk).agent.state.receipted, Jido.AgentServer.snapshot(packer).agent.state.total}
+members_in = fn partition, module ->
+  for {_id, pid} <- Jido.list_agents(ConnectGuide.Jido, partition: partition),
+      %{agent: %{module: ^module}} <- [Jido.AgentServer.snapshot(pid)],
+      do: pid
+end
+
+[packer] = members_in.("orders", ConnectGuide.Packer)
+{7, 7} =
+  {Jido.AgentServer.snapshot(desk).agent.state.receipted,
+   Jido.AgentServer.snapshot(packer).agent.state.total}
 ```
 
-The cell returns `{0, 7, 7}`.
+The cell returns `{7, 7}`.
 
 ## How Jido selects a destination
 
@@ -123,7 +131,7 @@ An `Emit` with no explicit dispatch goes to the first of these that applies:
 3. The AgentServer's `:default_dispatch` option.
 4. The Agent's own AgentServer, as a new cast.
 
-A runtime child skips step 2. Use `Jido.Agent.Directive.parent_send/1` from a child, as [Parent and Child Agents](parent-and-child-agents.md) shows. That Directive and `forward to: parent()` also work from a member, and they send straight to the parent's routes without using connections.
+A member can also use `Jido.Agent.Directive.emit(signal, :parent)` or `forward to: parent()` to send directly to the parent's routes.
 
 Connections differ from routes. A route is selected by first match. A Signal follows every connection that matches. `Jido.Agent.Topology.connections_for/3` returns the matches for one source and an exact type, and rejects a wildcard type.
 
@@ -199,16 +207,16 @@ defmodule ConnectGuide.Dispatch do
   end
 end
 
-{:ok, dispatch} = Jido.start_agent(ConnectGuide.Jido, ConnectGuide.Dispatch, id: "dispatch-1")
+{:ok, dispatch} = Jido.start_agent(ConnectGuide.Jido, ConnectGuide.Dispatch, id: "dispatch-1", partition: "shipments")
 :ok = Jido.AgentServer.await_ready(dispatch)
 
 {:ok, ship} = ConnectGuide.Dispatch.ship_signal(%{order_id: "ord-1"})
-{:ok, _accepted, [_emit]} = Jido.AgentServer.call(dispatch, ship)
+{:ok, %{status: :committed}} = Jido.AgentServer.call(dispatch, ship)
 
-notifiers = Jido.AgentServer.members(dispatch, :notifiers)
+notifiers = members_in.("shipments", ConnectGuide.Notifier)
 true = wait_until.(fn -> Enum.all?(notifiers, &(Jido.AgentServer.snapshot(&1).agent.state.sent == 1)) end)
 
-length(notifiers)
+3 = length(notifiers)
 ```
 
 The cell returns `3`. Each notifier committed one Turn.
@@ -251,7 +259,7 @@ The cell returns:
 | --- | --- | --- |
 | `path` | Signal type, with `*` or `**` wildcards | Required. A source, destination, and path together identify the connection. |
 | `from`, `to` | Member name, `:root`, or `bus(:name)` | Must be declared. Otherwise the code is `:unknown_endpoint`. |
-| `delivery` | `:single` (default) or `:broadcast` | A member with a count other than 1, or a state-bound count, needs `:broadcast`. Otherwise the code is `:counted_delivery`. |
+| `delivery` | `:single` (default) or `:broadcast` | A member with a count other than 1 needs `:broadcast`. Otherwise the code is `:counted_delivery`. |
 
 The `delivery` value is checked when Jido validates the definition. At runtime both values send to every live slot of the destination.
 
@@ -260,14 +268,14 @@ The `delivery` value is checked when Jido validates the definition. At runtime b
 Delivery uses best-effort casts, and each destination commits on its own. Nothing rolls back the sender.
 
 - A destination Turn that fails stays at the destination. The sender is not told.
-- A failed delivery of an output from `:root` marks that Turn's effects as failed. See `last_effect_outcome` in `Jido.AgentServer.status/1`. The Agent keeps running with its commit.
-- A member output or Bus delivery that finds no live destination is dropped. This can happen while the destination member restarts. The owner keeps running, logs a warning with the Signal type and reason, and sets `last_effect_outcome` to `status: :failed` with `turn_id: nil`, because no Turn of the owner sent it.
+- Jido records a failed delivery of an output from `:root` as an effect failure. The Agent keeps its commit.
+- A member output or Bus delivery that finds no live destination is dropped. This can happen while the destination member restarts. The owner keeps running and logs a warning with the Signal type and reason.
 
 ## Clean up
 
 ```elixir
-:ok = Jido.stop_agent(ConnectGuide.Jido, desk)
-:ok = Jido.stop_agent(ConnectGuide.Jido, dispatch)
+:ok = Jido.stop_agent(ConnectGuide.Jido, desk, partition: "orders")
+:ok = Jido.stop_agent(ConnectGuide.Jido, dispatch, partition: "shipments")
 ```
 
 Both calls return `:ok`.

@@ -117,12 +117,12 @@ The AgentServer worker can crash and restart. An activation is the part that sta
 
 - the last committed Agent and revision, in a local checkpoint
 - the Agent's Plugin runtimes and topology buses, which restart with the worker
-- its relationship to a parent Agent and to independent children
+- its relationship to its runtime owner and child Agents
 - attached owners, and whether admission is closed
 
-The worker's PID therefore changes on a restart, and the activation's PID does not. `Jido.AgentServer.activation/1` returns the activation. A parent's link to its child is to the activation, so it outlasts a worker restart. See [Agent Lifecycle](../agent-servers/agent-activation-control.md).
+The worker's PID changes on a worker restart. Resolve the Agent again by ID or Address to find the current worker. A runtime ownership link follows the activation through a worker restart. See [Agent Lifecycle](../agent-servers/agent-activation-control.md).
 
-A bare worker from `Jido.AgentServer.start_link/1` has no activation, and it rejects topology, persistence, and runtime Plugins. Prefer `Jido.start_agent/3`. See [Agent Lifecycle](../agent-servers/agent-activation-control.md#run-a-bare-worker).
+Use `Jido.start_agent/3` to start an Agent under its instance. See [Start and Address Agents](../agent-servers/start-and-address-live-agents.livemd).
 
 ## A durable Agent outlives its processes
 

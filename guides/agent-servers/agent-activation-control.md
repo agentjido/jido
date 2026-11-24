@@ -211,27 +211,9 @@ worker = Jido.whereis_agent(LifecycleGuide.Jido, "shelf-4")
 
 `Jido.AgentServer.start/1` is the lower-level form of `Jido.start_agent/3`. It needs a complete Agent instance and `:jido`.
 
-## Run a bare worker
+## Start an Agent under supervision
 
-`Jido.AgentServer.start_link/1` starts a worker linked to the caller, with no activation. Choose it when the calling process must own the link. A linked caller receives the worker's exit, so a `:shutdown` stop also stops a caller that does not trap exits.
-
-```elixir
-{:ok, bare} =
-  Jido.AgentServer.start_link(
-    agent: LifecycleGuide.Counter.instantiate!(id: "shelf-5"),
-    jido: LifecycleGuide.Jido
-  )
-
-%{activation: :bare} = Jido.AgentServer.status(bare)
-nil = Jido.AgentServer.activation(bare)
-
-{:error, :activation_required} =
-  Jido.AgentServer.spawn_child(bare, LifecycleGuide.Counter.instantiate!(id: "shelf-6"), :extra)
-
-:ok = Jido.AgentServer.stop(bare, :normal)
-```
-
-A bare worker has no restart group and no local checkpoint. It cannot own children, persistence, topology, or runtime Plugins. `start_link/1` returns an error for an Agent or options that need them. Without `:jido`, it needs a `:runner` that names a running Runic Runner configured with the Jido.Persistence.ContinuationStore module.
+Use `Jido.start_agent/3` to start a registered Agent. If an application supervisor owns the Agent, add the child spec from `Jido.AgentServer.child_spec/1` to that supervisor. The child spec starts a complete activation.
 
 ## Startup options
 
