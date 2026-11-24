@@ -180,24 +180,21 @@ defmodule Jido.Agent.DSL do
   def verify!(module) do
     case module.__jido_definition__(related?: true) do
       {:ok, _} -> :ok
-      {:error, error} -> compile_error!(module, error)
+      {:error, error} -> raise compile_error(module, module.__jido_location__(), error)
     end
   rescue
-    error in Error.ValidationError -> compile_error!(module, error)
+    error in Error.ValidationError -> raise compile_error(module, module.__jido_location__(), error)
   end
 
-  defp compile_error!(module, error) do
-    compile_error!(module, module.__jido_location__(), error)
-  end
-
-  defp compile_error!(module, {file, line}, error) do
-    raise CompileError,
+  defp compile_error(module, {file, line}, error) do
+    CompileError.exception(
       file: file,
       line: line,
       description:
         "#{inspect(module)}: #{Exception.message(error)} " <>
           "(code: #{inspect(Map.get(error, :code))}, path: #{inspect(Map.get(error, :path))}, " <>
           "details: #{inspect(Map.get(error, :details))})"
+    )
   end
 
   @doc false
@@ -305,7 +302,7 @@ defmodule Jido.Agent.DSL do
 
       {:error, error} ->
         details = Map.put_new(error.details, :definition, definition.name)
-        compile_error!(caller.module, {caller.file, caller.line}, %{error | details: details})
+        raise compile_error(caller.module, {caller.file, caller.line}, %{error | details: details})
     end
   end
 
