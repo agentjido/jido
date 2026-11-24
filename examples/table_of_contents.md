@@ -620,6 +620,7 @@ Proposed comparison lessons:
 3. Tree of Thoughts and Graph of Thoughts.
 4. TRM and Adaptive reasoning.
 5. Custom reasoning Flows, strategy selection, and trade-offs.
+6. [Build and work a task list](17_ai_reasoning_flows/17_06_reasoning_task_list/README.md) with a reasoning Flow and a work Flow.
 
 Primary coverage:
 

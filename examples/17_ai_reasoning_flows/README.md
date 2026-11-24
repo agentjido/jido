@@ -8,6 +8,7 @@ deterministic inference or pure Flow behavior.
 3. [Branching reasoning comparison](17_03_branching_reasoning_comparison/README.md) compares Tree of Thoughts and Graph of Thoughts.
 4. [Revision and adaptive reasoning](17_04_revision_and_adaptive/README.md) compares TRM with local strategy selection.
 5. [Define a Custom Reasoning Flow](17_05_custom_reasoning_flow/README.md) shows schema-owned defaults and overrides.
+6. [Build and Work a Task List](17_06_reasoning_task_list/README.md) shows how a reasoning Flow plans tasks and a work Flow advances them.
 
 Run the current chapter:
 
