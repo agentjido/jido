@@ -44,8 +44,7 @@ while recovery still needs it. Continue to read older settled receipts.
 ## Consequences
 
 These changes use the existing execution identity and collection lifetime.
-They add sources to the execution reference format. Agent state, Session,
-and reply formats stay the same. Recovery may read a preparation before
-it can load a fact or stream a batch. Recovery can load saved contributions
-to rebuild a Join result. Older Jido versions cannot read the new
-execution formats and compact settled receipts.
+The new encodings apply to execution records and the Agent Server's internal
+receipt. Recovery can read a preparation to load a fact or stream a batch.
+It can read saved contributions to rebuild a Join result. Use this Jido
+version or a later version to read the new records and receipts.
