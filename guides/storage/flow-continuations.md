@@ -103,15 +103,6 @@ defmodule ContinuationGuide.Poll do
         value
     end
   end
-
-  def wait_for_open_wait(server) do
-    until(fn ->
-      case Jido.AgentServer.status(server) do
-        %{active: %{stage: :waiting}, waits: [wait]} -> wait
-        _other -> nil
-      end
-    end)
-  end
 end
 
 {:ok, _pid} = ContinuationGuide.ObservedStore.start_link()
@@ -128,6 +119,7 @@ store = {ContinuationGuide.ObservedStore, table: :continuation_guide}
   )
 
 :ok = Jido.AgentServer.await_ready(refund)
+{:ok, address} = Jido.agent_address(ContinuationGuide.Jido, "refund-1001")
 
 %{agent: 1} = ContinuationGuide.ObservedStore.families()
 ```
@@ -136,14 +128,13 @@ Revision zero is the only record so far. Now start the Flow and let it reach its
 
 ```elixir
 request = Jido.Signal.new!("refund.requested", %{refund_id: "rf-1"}, source: "/refunds")
-_pending = Jido.AgentServer.submit(refund, request)
-
-wait = ContinuationGuide.Poll.wait_for_open_wait(refund)
+{:ok, %{status: :waiting, turn_id: turn_id, waits: [wait]}} =
+  Jido.call(ContinuationGuide.Jido, address, request)
 
 %{agent: 1, execution: execution_keys} = ContinuationGuide.ObservedStore.families()
 true = execution_keys > 0
 
-{:ok, %{state: %{approved_by: ""}}, 1} =
+{:ok, %{state: %{approved_by: ""}}, 2} =
   Jido.Persistence.load_agent_with_revision(
     ContinuationGuide.Jido,
     ContinuationGuide.Refund,
@@ -151,36 +142,44 @@ true = execution_keys > 0
   )
 ```
 
-Acceptance wrote revision one, with unchanged Agent state and a running receipt. The first step's progress is in execution records. No process holds the Flow now. The Agent can hibernate, and a new activation finds the same wait in storage:
+Acceptance writes revision one. Opening the wait writes revision two with the same Agent state. The first step's progress is in execution records. No process holds the Flow now. Kill the Worker to simulate a failure. Its replacement finds the same wait in storage.
 
 ```elixir
-:ok = Jido.hibernate(ContinuationGuide.Jido, refund)
+Process.exit(refund, :kill)
 
-{:ok, thawed} =
-  Jido.thaw(ContinuationGuide.Jido, ContinuationGuide.Refund, "refund-1001",
-    turn_timeout: :infinity
-  )
+restored =
+  ContinuationGuide.Poll.until(fn ->
+    case Jido.resolve_agent(ContinuationGuide.Jido, address) do
+      {:ok, pid} when pid != refund -> pid
+      _other -> nil
+    end
+  end)
 
-:ok = Jido.AgentServer.await_ready(thawed)
+:ok = Jido.AgentServer.await_ready(restored)
 
-^wait = ContinuationGuide.Poll.wait_for_open_wait(thawed)
+true =
+  ContinuationGuide.Poll.until(fn ->
+    match?(%{work_state: :waiting, active_turn_id: ^turn_id, waits: [^wait]},
+      Jido.status(ContinuationGuide.Jido, address)
+    )
+  end)
 ```
 
-Deliver the input. `:ok` from `Jido.AgentServer.deliver_wait/4` confirms that the input was saved, not that the Flow finished. Completion commits the state with a terminal receipt in one write, and then the execution records are collected:
+Send the approval Signal to the same Agent Address. The result identifies the original Turn. Completion commits the state with a terminal receipt in one write. Jido then deletes the execution records.
 
 ```elixir
 approval =
   Jido.Signal.new!("refund.approved", %{refund_id: "rf-1", reviewer: "ana"}, source: "/refunds")
 
-:ok = Jido.AgentServer.deliver_wait(thawed, wait.id, approval)
-:ok = Jido.AgentServer.quiesce(thawed)
+{:ok, %{status: :committed, turn_id: ^turn_id} = completed} =
+  Jido.call(ContinuationGuide.Jido, address, approval)
 
-%{approved_by: "ana"} = Jido.AgentServer.snapshot(thawed).agent.state
-%{status: :completed} = Jido.AgentServer.status(thawed).durable_turn
+%{approved_by: "ana"} = Jido.AgentServer.snapshot(restored).agent.state
 
 ContinuationGuide.Poll.until(fn -> ContinuationGuide.ObservedStore.families() == %{agent: 1} end)
 
 %{agent: 1} = ContinuationGuide.ObservedStore.families()
+{:ok, ^completed} = Jido.call(ContinuationGuide.Jido, address, approval)
 ```
 
 ## Write order

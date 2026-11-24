@@ -65,7 +65,7 @@ Use `needs: ["step_name"]` as a field in `selection`, or as an option on `await`
 
 ## Host the Flow in an Agent
 
-Route a Signal to the Flow and start the Agent with persistence. This example stores files in a temporary directory.
+Route a Signal to the Flow and start the Agent with persistence. This example uses the ETS adapter to save state across Agent stops in the same VM.
 
 The Agent commits nothing while the Flow waits. A Turn's default limit is 60 seconds, so set `turn_timeout: :infinity` when the Flow's own timer owns the deadline.
 
@@ -90,11 +90,10 @@ signal = fn type, data ->
   signal
 end
 
-storage = Path.join(System.tmp_dir!(), "flow-waits-guide-#{System.unique_integer([:positive])}")
 {:ok, _instance} =
   Jido.start_link(name: FlowWaitsGuide.Jido,
     namespace: "flow_waits_guide",
-    persistence: {Jido.Persistence.File, path: storage}
+    persistence: {Jido.Persistence.ETS, table: :flow_waits_guide}
   )
 
 {:ok, server} =
@@ -104,24 +103,21 @@ storage = Path.join(System.tmp_dir!(), "flow-waits-guide-#{System.unique_integer
   )
 
 :ok = Jido.AgentServer.await_ready(server)
-pending = Jido.AgentServer.submit(server, signal.("refund.review", %{refund_id: "rf-1"}))
+{:ok, address} = Jido.agent_address(FlowWaitsGuide.Jido, "refund-agent")
+
+{:ok, %{status: :waiting, turn_id: turn_id, waits: [wait]}} =
+  Jido.call(FlowWaitsGuide.Jido, address, signal.("refund.review", %{refund_id: "rf-1"}))
 ```
 
-`Jido.AgentServer.submit/3` returns a handle at once. See [Make an Agent Durable](../durability/make-an-agent-durable.livemd) for persistence setup.
+`Jido.call/3` returns a waiting result when the Flow suspends. See [Make an Agent Durable](../durability/make-an-agent-durable.livemd) for persistence setup.
 
 ## Read open waits
 
-`Jido.AgentServer.status/2` reports `phase: :waiting` and the open waits as `Jido.Exec.Wait` structs. Poll or react to your own trigger, because the wait opens after the Turn has started.
+`Jido.status/2` reports the current Turn and its open waits. Each wait is a `Jido.Exec.Wait` struct.
 
 ```elixir
-wait_for_open = fn wait_for_open, attempts_left ->
-  case Jido.AgentServer.status(server) do
-    %{phase: :waiting, waits: [wait]} -> wait
-    _not_yet when attempts_left > 0 -> Process.sleep(10) && wait_for_open.(wait_for_open, attempts_left - 1)
-  end
-end
-
-wait = wait_for_open.(wait_for_open, 200)
+%{work_state: :waiting, active_turn_id: ^turn_id, waits: [^wait]} =
+  Jido.status(FlowWaitsGuide.Jido, address)
 
 ["review"] = wait.path
 ["approved", "rejected", "expired"] = Enum.map(wait.options, & &1.name)
@@ -129,47 +125,35 @@ wait = wait_for_open.(wait_for_open, 200)
 true = is_integer(Jido.Exec.Wait.next_deadline([wait]))
 ```
 
-A wait has a stable `id`, the `execution_id` of its Turn, its authored component `path`, resolved `options`, and `opened_at`. Each timer option has an absolute `deadline` in UTC Unix milliseconds. Save the `id` wherever your callback needs it. The struct holds portable data only.
+A wait has a stable `id`, the `execution_id` of its Turn, its authored component `path`, resolved `options`, and `opened_at`. Each timer option has an absolute `deadline` in UTC Unix milliseconds. The struct holds portable data only.
 
-Reads stay available while the Flow waits. Other state-changing Turns stay queued until this Turn finishes.
+Reads stay available while the Flow waits.
 
 ## Deliver an event
 
-Build a Signal and call `Jido.AgentServer.deliver_wait/4` with the wait ID. The Signal `type` selects the event, its `data` is the payload, and its `id` identifies a retry.
-
-`:ok` means the input was saved. It does not mean the Flow finished. Wait for the handle from `Jido.AgentServer.submit/3`, or read status later.
+Send a Signal to the same Agent Address with `Jido.call/3`. Jido matches the Signal type and data against the open waits. Wait until the Flow reports `:waiting` before you send the event.
 
 ```elixir
-{:error, %{details: %{reason: :unmatched_input}}} =
-  Jido.AgentServer.deliver_wait(server, wait.id, signal.("refund.approved", %{refund_id: "rf-2"}))
-
-{:error, %{details: %{reason: :stale_target}}} =
-  Jido.AgentServer.deliver_wait(server, "not-a-wait", signal.("refund.approved", %{refund_id: "rf-1"}))
-
 approval = signal.("refund.approved", %{refund_id: "rf-1", reviewer: "ana"})
-:ok = Jido.AgentServer.deliver_wait(server, wait.id, approval)
+wrong = put_in(approval.data.refund_id, "rf-2")
 
-{:ok, %{state: %{status: "approved", reviewer: "ana"}}, []} = Jido.AgentServer.await(pending)
-```
+{:error, :wait_not_matched} = Jido.call(FlowWaitsGuide.Jido, address, wrong)
 
-`Jido.AgentServer.deliver_wait/4` can return:
+%{work_state: :waiting, active_turn_id: ^turn_id, waits: [^wait]} =
+  Jido.status(FlowWaitsGuide.Jido, address)
 
-| Result | Meaning | What to do |
-| --- | --- | --- |
-| `:ok` | Saved. A retry with the same Signal is harmless | Wait for the Turn |
-| `details.reason: :unmatched_input` | The event or payload does not match | Fix the Signal |
-| `details.reason: :stale_target` | No open wait has this ID | Read status again |
-| `details.reason: :input_limit` | The execution holds 1,024 accepted inputs | Stop sending inputs |
-| `{:error, :not_waiting}` | The wait has not opened, the Worker is running, or the Turn finished | Read status, then retry or stop |
+{:ok, %{status: :committed, turn_id: ^turn_id} = completed} =
+  Jido.call(FlowWaitsGuide.Jido, address, approval)
 
-A caller timeout does not cancel delivery. Retry with the same Signal and wait ID. Jido has no mailbox for early input, so deliver only after `status` shows the wait.
+{:ok, ^completed} = Jido.call(FlowWaitsGuide.Jido, address, approval)
+{:error, :conflicting_input_id} = Jido.call(FlowWaitsGuide.Jido, address, wrong)
 
-```elixir
-{:error, :not_waiting} = Jido.AgentServer.deliver_wait(server, wait.id, approval)
+%{status: "approved", reviewer: "ana"} = Jido.AgentServer.snapshot(server).agent.state
 
 :ok = Jido.stop(FlowWaitsGuide.Jido)
-File.rm_rf!(storage)
 ```
+
+The matching Signal completes the original Turn. While Jido retains that result, the same Signal returns it again. If you reuse that Signal ID with different data, Jido returns `{:error, :conflicting_input_id}`.
 
 ## Know how a selection chooses
 
@@ -179,15 +163,15 @@ A timer resolves with no Signal, so a Flow with only a timer needs nothing deliv
 
 ## Combine waits with other components
 
-- Independent waits can be open at once. `status` lists them all, and you deliver to each by ID. They can resolve in any order.
+- Independent waits can be open at once. Status lists them all. Send a Signal that matches the wait you want to resume.
 - Put each wait on the executed root Flow. A nested Flow and a Flow selected by Invoke are atomic authored components and cannot suspend inside that boundary.
 - Map and Iterate reject a Flow body that waits. The Flow module fails at compile time with a "wrong target kind" error. Map and Iterate call Action modules only.
 
 ## Restart, hibernate, and cancel
 
-A waiting Turn holds no Worker. Hibernation and restore keep the same wait ID and absolute deadline, and completed Actions do not run again. The process that called `Jido.AgentServer.submit/3` loses its handle, so read `status` and the Agent after a restore.
+A waiting Turn holds no Worker. Hibernation and restore keep the same wait ID and absolute deadline, and completed Actions do not run again. Read status at the stable Agent Address after a restore. Send the matching Signal to that same Address.
 
-`Jido.AgentServer.cancel/2` ends the Turn without committing state. Late input then returns `{:error, :not_waiting}`. A rejection event is different: it completes the Flow normally and commits whatever the Flow returns.
+`Jido.cancel_turn/3` ends the Turn without committing state. A rejection event is different: it completes the Flow normally and commits whatever the Flow returns.
 
 ## Limits
 
