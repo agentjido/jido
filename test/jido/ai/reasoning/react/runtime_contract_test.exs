@@ -1385,29 +1385,30 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
   end
 
   @tag :tmp_dir
-  test "a restart inside the ReAct loop replays earlier calls on the same Turn", context do
-    {_instance, server, _persistence, _address} = start_persisted_agent(context.tmp_dir, "loop-replay")
+  test "a restart inside the ReAct loop reuses the stored tool result", context do
+    {instance, server, persistence, address} =
+      start_persisted_agent(context.tmp_dir, "loop-replay", [], LargeOutputAgent)
+
     activation = Jido.Test.AgentServer.Assertions.activation(server)
     test_pid = self()
-    {:ok, calls} = Agent.start_link(fn -> 0 end)
-    {:ok, operations} = Agent.start_link(fn -> MapSet.new() end)
+    calls = start_supervised!({Agent, fn -> 0 end})
+    payload = String.duplicate("saved tool content 0123456789 / ", 256)
 
-    expect(Tools.Add, :run, 2, fn %{left: 2, right: 3}, context ->
-      operation = {context.signal.id, :add}
-      first? = Agent.get_and_update(operations, &{not MapSet.member?(&1, operation), MapSet.put(&1, operation)})
-      send(test_pid, {:tool_executed, operation, first?})
-      {:ok, %{value: 5}}
+    stub(Tools.LargeOutput, :run, fn %{}, _context ->
+      send(test_pid, :tool_executed)
+      {:ok, %{content: payload}}
     end)
 
     expect(ReqLLM, :generate_text, 4, fn model, llm_context, _options ->
       case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
         round when round in [1, 3] ->
           assert roles(llm_context) == [:system, :user]
-          call = ReqLLM.ToolCall.new("replayed-add", "add", ~s({"left":2,"right":3}))
+          call = ReqLLM.ToolCall.new("tool-#{round}", "large_output", "{}")
           {:ok, tool_response(model, llm_context, [call], "replay-tool")}
 
         2 ->
           assert roles(llm_context) == [:system, :user, :assistant, :tool]
+          assert List.last(llm_context.messages).metadata.tool_output == %{"content" => payload}
           owner = Process.monitor(server)
           send(test_pid, :second_round_started)
 
@@ -1419,33 +1420,175 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
 
         4 ->
           assert roles(llm_context) == [:system, :user, :assistant, :tool]
-          {:ok, response(model, llm_context, "The result is 5.", "replay-final")}
+          assert List.last(llm_context.messages).metadata.tool_output == %{"content" => payload}
+          {:ok, response(model, llm_context, "Read the result.", "replay-final")}
       end
     end)
 
-    pending = Server.submit(server, SimpleAgent.request_signal!(%{input: "Add 2 and 3"}))
+    request = LargeOutputAgent.request_signal!(%{input: "Read one result"})
+    pending = Server.submit(server, request, result_handoff: true)
     turn_id = pending.turn_id
-    assert_receive {:tool_executed, operation, true}, 5_000
+    assert_receive :tool_executed, 5_000
     assert_receive :second_round_started, 5_000
+    assert {:ok, records, nil} = Jido.Persistence.Store.scan(persistence, "jido:execution:", limit: 256)
+
+    assert Enum.any?(records, fn {key, bytes} ->
+             String.contains?(key, ":facts:") and
+               match?(
+                 {:ok, {:jido_fact_value, 1, 0, _digest, :join, [_ | _]}},
+                 Jido.Persistence.Codec.Term.decode(bytes, trusted: true)
+               )
+           end)
 
     Process.exit(server, :kill)
     assert {:error, %Jido.Error.ExecutionError{}} = Server.await(pending)
     restored = Jido.Test.AgentServer.Assertions.replacement(activation, server, timeout: 10_000)
 
-    assert_receive {:tool_executed, ^operation, false}, 5_000
-
     assert {:ok, %Jido.AgentServer.Status{last_outcome: %{turn_id: ^turn_id, committed?: true}}} =
              Server.quiesce(restored, timeout: 10_000)
 
     assert Agent.get(calls, & &1) == 4
-    assert Agent.get(operations, &MapSet.to_list/1) == [operation]
+    refute_received :tool_executed
+    assert Enum.all?(records, fn {_key, bytes} -> :binary.match(bytes, payload) == :nomatch end)
+    assert {:ok, [{_key, ^payload}], nil} = Jido.Persistence.Store.scan(persistence, "jido:tool-payload:")
 
     thread = Server.snapshot(restored).agent.state.session.thread
 
     messages = Jido.Thread.filter_by_kind(thread, :ai_message)
     assert Enum.map(messages, & &1.payload["role"]) == ["user", "assistant", "tool", "assistant"]
-    assert List.last(messages).payload["content"] == "The result is 5."
+    assert Enum.at(messages, 2).payload["output"] == %{"content" => payload}
+    assert List.last(messages).payload["content"] == "Read the result."
     assert length(Jido.Thread.filter_by_kind(thread, :ai_model_attempt)) == 2
+
+    assert [%{payload: %{"output" => %{"content" => ^payload}}}] =
+             Jido.Thread.filter_by_kind(thread, :ai_tool_attempt)
+
+    assert {:ok, %{reply: %{data: reply}}} = Jido.turn_result(instance, address, turn_id)
+    assert [%{output: %{"content" => ^payload}}] = reply.tool_attempts
+    assert Enum.any?(reply.session_entries, &(&1["payload"]["output"] == %{"content" => payload}))
+  end
+
+  @tag :tmp_dir
+  test "a later ReAct Turn restores earlier tool results without copying them into its execution", c do
+    {_instance, server, persistence, _address} =
+      start_persisted_agent(c.tmp_dir, "tool-history", [], LargeOutputAgent)
+
+    activation = Jido.Test.AgentServer.Assertions.activation(server)
+    test_pid = self()
+    calls = start_supervised!({Agent, fn -> 0 end})
+    payload = String.duplicate("tool history abcdef 0123456789 / ", 256)
+    first_input = String.duplicate("Read the original result. ", 64)
+    first_reply = String.duplicate("This is the original result. ", 64)
+    later_input = String.duplicate("Use the earlier result. ", 64)
+
+    expect(Tools.LargeOutput, :run, fn %{}, _context -> {:ok, %{content: payload}} end)
+
+    expect(ReqLLM, :generate_text, 4, fn model, llm_context, _options ->
+      case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
+        1 ->
+          call = ReqLLM.ToolCall.new("earlier-result", "large_output", "{}")
+          {:ok, tool_response(model, llm_context, [call], "earlier-tool")}
+
+        round ->
+          tool_message = Enum.find(llm_context.messages, &(&1.role == :tool))
+          assert tool_message.metadata.tool_output == %{"content" => payload}
+
+          if round > 2 do
+            text = for message <- llm_context.messages, part <- message.content, part.type == :text, do: part.text
+            assert first_input in text
+            assert first_reply in text
+            assert later_input in text
+          end
+
+          if round == 3 do
+            owner = Process.monitor(server)
+            send(test_pid, :later_request_started)
+
+            receive do
+              {:DOWN, ^owner, :process, ^server, :killed} -> exit(:shutdown)
+            after
+              15_000 -> flunk("The AgentServer did not stop during the later Turn")
+            end
+          else
+            reply = if round == 2, do: first_reply, else: "Read the earlier result."
+            {:ok, response(model, llm_context, reply, "history-#{round}")}
+          end
+      end
+    end)
+
+    first = LargeOutputAgent.request_signal!(%{input: first_input})
+    assert {:ok, %{status: :committed}} = Server.call(server, first)
+    session = Server.snapshot(server).agent.state.session
+
+    later = LargeOutputAgent.request_signal!(%{input: later_input})
+    pending = Server.submit(server, later, context: %{jido_ai_session: Jido.Session.encode(session)})
+    turn_id = pending.turn_id
+    assert_receive :later_request_started, 5_000
+
+    assert {:ok, records, nil} = Jido.Persistence.Store.scan(persistence, "jido:execution:", limit: 256)
+
+    later_records =
+      Enum.filter(records, fn {"jido:execution:v3:" <> suffix, _bytes} ->
+        [encoding | _] = String.split(suffix, ":", parts: 2)
+
+        {:jido_execution, _, _, _, saved_turn} =
+          encoding |> Base.url_decode64!(padding: false) |> :erlang.binary_to_term([:safe])
+
+        saved_turn == turn_id
+      end)
+
+    Process.exit(server, :kill)
+    assert {:error, %Jido.Error.ExecutionError{}} = Server.await(pending)
+    restored = Jido.Test.AgentServer.Assertions.replacement(activation, server, timeout: 10_000)
+
+    assert {:ok, %Jido.AgentServer.Status{last_outcome: %{turn_id: ^turn_id, committed?: true}}} =
+             Server.quiesce(restored, timeout: 10_000)
+
+    assert Agent.get(calls, & &1) == 4
+    assert later_records != []
+    assert {:ok, profile} = Jido.Persistence.Config.open(persistence)
+
+    assert Enum.any?(later_records, fn {key, bytes} ->
+             if String.contains?(key, ":batches:") do
+               assert {:ok, stored} = Jido.Persistence.Config.decode(profile, bytes, trusted: true)
+               assert {:ok, events} = Jido.Persistence.ContinuationStore.inspect_record(profile, key, stored)
+
+               Enum.any?(events, &match?(%Runic.Workflow.RunnableDispatched{input_fact: %Runic.Workflow.FactRef{}}, &1))
+             end
+           end)
+
+    {prepared, progress} = Enum.split_with(later_records, fn {key, _bytes} -> String.ends_with?(key, ":prepared") end)
+    assert [{_key, source}] = prepared
+
+    for text <- [first_input, first_reply, later_input] do
+      assert :binary.match(source, text) != :nomatch
+      assert Enum.all?(progress, fn {_key, bytes} -> :binary.match(bytes, text) == :nomatch end)
+    end
+
+    assert Enum.sum(for {_key, bytes} <- later_records, do: length(:binary.matches(bytes, payload))) == 0
+    assert {:ok, [{_key, ^payload}], nil} = Jido.Persistence.Store.scan(persistence, "jido:tool-payload:")
+  end
+
+  @tag :tmp_dir
+  test "an unconfirmed tool result stops ReAct before the next model call", c do
+    start_supervised!({Probe, self()})
+
+    {_instance, server, _persistence, _address} =
+      start_persisted_agent(c.tmp_dir, "tool-save", [], SimpleAgent, Storage)
+
+    :ok = Probe.configure(:tool_result_write)
+
+    expect(ReqLLM, :generate_text, fn model, llm_context, _options ->
+      call = ReqLLM.ToolCall.new("add-unconfirmed", "add", ~s({"left":2,"right":3}))
+      {:ok, tool_response(model, llm_context, [call], "tool-save")}
+    end)
+
+    pending = Server.submit(server, SimpleAgent.request_signal!(%{input: "Add 2 and 3"}))
+    assert_receive {:durable_barrier, :tool_result_write, _writer}, 5_000
+    :ok = Probe.release({:error, :connection_lost})
+
+    assert {:ok, %{status: :failed, reply: nil}} = Server.await(pending, 10_000)
+    assert Server.snapshot(server).agent.state.session == nil
   end
 
   @tag :tmp_dir

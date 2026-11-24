@@ -4,7 +4,7 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
 
   alias Jido.Durable.Runtime
   alias Jido.Persistence.ContinuationStore, as: Store
-  alias Jido.Persistence.ContinuationStore.JoinCompletedRef
+  alias Jido.Persistence.ContinuationStore.{JoinCompletedRef, SharedToolPayload, ToolPayload}
   alias Jido.Test.AgentServer.DurableFixtures, as: F
 
   defmodule Increment do
@@ -185,6 +185,117 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "dispatch references require a saved fact with the exact value and restore after replacement", c do
+    alias Runic.Workflow.{Fact, FactRef, RunnableDispatched}
+
+    value = :binary.copy("dispatch input / ", 512)
+    fact = Fact.new(value: value)
+    dispatch = %RunnableDispatched{runnable_id: "saved", input_fact: fact}
+    different = %RunnableDispatched{runnable_id: "different", input_fact: %{fact | value: :different}}
+    missing = %RunnableDispatched{runnable_id: "missing", input_fact: Fact.new(value: :missing)}
+    assert :ok = Store.save_fact(c.id, fact.hash, value, c.jido)
+
+    replacement = start_supervised!({Agent, fn -> nil end}, id: :replacement)
+    assert :ok = Store.register(c.jido, c.id, c.config, replacement)
+    assert {:ok, 1} = Store.append(c.id, [dispatch, different, missing], c.jido)
+    assert {:ok, [^dispatch, ^different, ^missing]} = Store.stream(c.id, c.jido)
+
+    records = Agent.get(c.store, & &1)
+    {_, batch} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":batches:1") end)
+    hash = fact.hash
+
+    assert {:ok, [%RunnableDispatched{input_fact: %FactRef{hash: ^hash}}, ^different, ^missing]} =
+             Jido.Persistence.Codec.Term.decode(batch, trusted: true)
+
+    assert :binary.match(batch, value) == :nomatch
+
+    fact_key =
+      Enum.find(Map.keys(records), fn key ->
+        String.contains?(key, ":facts:") and not String.ends_with?(key, ":index")
+      end)
+
+    Agent.update(c.store, &Map.delete(&1, fact_key))
+    assert {:error, :invalid_execution_checkpoint} = Store.stream(c.id, c.jido)
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "the fact index compacts occurrence keys and preserves legacy and opaque keys after restart", c do
+    alias Jido.Persistence.{Config, Inspector}
+    alias Jido.Persistence.Codec.Term
+    alias Runic.Workflow.Fact
+
+    first = Fact.new(value: :first)
+    second = Fact.new(value: :second)
+    opaque = first.hash.digest
+
+    assert :ok = Store.save_fact(c.id, first.hash, first.value, c.jido)
+    assert :ok = Store.save_fact(c.id, opaque, :opaque, c.jido)
+    index = Agent.get(c.store, fn records -> Enum.find(Map.keys(records), &String.ends_with?(&1, ":facts:index")) end)
+    assert {:ok, legacy} = Term.encode({:jido_fact_index, 1, [opaque, first.hash]})
+    Agent.update(c.store, &Map.put(&1, index, legacy))
+
+    replacement = start_supervised!({Agent, fn -> nil end}, id: :index_replacement)
+    assert :ok = Store.register(c.jido, c.id, c.config, replacement)
+    assert :ok = Store.save_fact(c.id, second.hash, second.value, c.jido)
+    assert :ok = Store.save_fact(c.id, second.hash, second.value, c.jido)
+    bytes = Agent.get(c.store, &Map.fetch!(&1, index))
+    hashes = [second.hash, opaque, first.hash]
+
+    assert {:ok, {:jido_fact_index, 2, _entries}} = Term.decode(bytes, trusted: true)
+    assert {:ok, expanded} = Term.encode({:jido_fact_index, 1, hashes})
+    assert byte_size(bytes) * 2 < byte_size(expanded)
+    assert {:ok, profile} = Config.open(c.config)
+    assert {:ok, {:jido_fact_index, 1, ^hashes}} = Inspector.read(profile, index, full: true)
+    assert :ok = Store.register(c.jido, c.id, c.config)
+    assert {:ok, :first} = Store.load_fact(c.id, first.hash, c.jido)
+    assert {:ok, :second} = Store.load_fact(c.id, second.hash, c.jido)
+    assert {:ok, :opaque} = Store.load_fact(c.id, opaque, c.jido)
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "execution references require a saved preparation and reject a missing source", c do
+    input = :binary.copy("durable AI input / ", 64)
+    signal = Jido.Signal.new!("jido.ai.request", %{input: input}, source: "/test")
+    preparation = %{signal: signal}
+    value = %{input: input, repeated: input}
+
+    assert :ok = Store.prepare(c.jido, c.id, preparation)
+    assert :ok = Store.prepare(c.jido, c.id, preparation)
+    assert {:error, :execution_prepare_conflict} = Store.prepare(c.jido, c.id, %{signal: %{signal | data: %{}}})
+
+    replacement = start_supervised!({Agent, fn -> nil end}, id: :prepared_replacement)
+    assert :ok = Store.register(c.jido, c.id, c.config, replacement)
+    assert :ok = Store.save_fact(c.id, :input, value, c.jido)
+    assert {:ok, 1} = Store.append(c.id, [value], c.jido)
+
+    records = Agent.get(c.store, & &1)
+    {prepared_key, prepared} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":prepared") end)
+    {batch_key, batch} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":batches:1") end)
+    assert :binary.match(prepared, input) != :nomatch
+
+    assert {:ok, {:jido_tool_payload_refs, 1, segments}} =
+             Jido.Persistence.Codec.Term.decode(batch, trusted: true)
+
+    digest = :crypto.hash(:sha256, input)
+    assert {:prepared, digest} in segments
+    assert :binary.match(batch, input) == :nomatch
+    assert {:ok, ^value} = Store.load_fact(c.id, :input, c.jido)
+    assert {:ok, [^value]} = Store.stream(c.id, c.jido)
+    assert {:ok, profile} = Jido.Persistence.Config.open(c.config)
+    assert {:ok, [^value]} = Store.inspect_record(profile, batch_key, {:jido_tool_payload_refs, 1, segments})
+
+    circular = {:jido_tool_payload_refs, 1, [{:prepared, digest}]}
+    assert {:ok, circular_bytes} = Jido.Persistence.Codec.Term.encode(circular)
+    Agent.update(c.store, &Map.put(&1, prepared_key, circular_bytes))
+    assert {:error, :invalid_execution_checkpoint} = Store.load_fact(c.id, :input, c.jido)
+    assert {:error, :invalid_execution_checkpoint} = Jido.Persistence.Inspector.read(profile, prepared_key, full: true)
+
+    Agent.update(c.store, &Map.delete(&1, prepared_key))
+    assert {:error, :invalid_execution_checkpoint} = Store.load_fact(c.id, :input, c.jido)
+    assert {:error, :invalid_execution_checkpoint} = Store.stream(c.id, c.jido)
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
   test "writes plain execution records by default and reads both encodings after opt-in", c do
     alias Jido.Persistence.Codec.Term
 
@@ -259,6 +370,112 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
       assert {:error, :invalid_execution_checkpoint} = Store.stream(c.id, c.jido)
       assert Agent.get(c.store, & &1) == invalid
     end
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "Session, attempts, and reply reuse tool payloads across execution records", c do
+    payload = String.duplicate("one stored tool value 12345 ", 300)
+    slot = "run/0:0"
+    call = %{name: "read"}
+    result = {%{normalized: %{status: :ok, model_content: payload}}, []}
+    record_tool = Store.tool_recorder(c.jido, c.id)
+
+    assert {:ok, ^result} = record_tool.(slot, call, fn -> result end)
+    assert {:ok, ^result} = record_tool.(slot, call, fn -> flunk("completed tool ran again") end)
+
+    assert {:error, :tool_call_changed_on_replay} =
+             record_tool.(slot, %{name: "write"}, fn -> flunk("a different tool ran on replay") end)
+
+    values = %{
+      session: %{entries: [%{payload: payload}]},
+      tool_attempts: [%{output: payload}],
+      reply: %{output: payload}
+    }
+
+    assert :ok = Store.save_fact(c.id, :values, values, c.jido)
+    assert {:ok, 1} = Store.append(c.id, [values], c.jido)
+
+    replacement = start_supervised!({Agent, fn -> nil end}, id: :replacement)
+    assert :ok = Store.register(c.jido, c.id, c.config, replacement)
+    assert {:ok, 2} = Store.append(c.id, [values], c.jido)
+    assert {:ok, ^values} = Store.load_fact(c.id, :values, c.jido)
+    assert {:ok, [^values, ^values]} = Store.stream(c.id, c.jido)
+
+    records = Agent.get(c.store, & &1)
+    assert [{source, ^payload}] = Enum.filter(records, fn {_, bytes} -> :binary.match(bytes, payload) != :nomatch end)
+    assert String.starts_with?(source, "jido:tool-payload:")
+    {:ok, profile} = Jido.Persistence.Config.open(c.config)
+    other_partition = identity(%{c.init | partition: "south"}, "job")
+    assert {:error, :not_found} = SharedToolPayload.read(profile, other_partition, ToolPayload.digest(payload))
+
+    Agent.update(c.store, &Map.put(&1, source, "wrong content"))
+    assert {:error, :invalid_execution_checkpoint} = Store.stream(c.id, c.jido)
+    assert {:error, :invalid_execution_checkpoint} = Store.load_fact(c.id, :values, c.jido)
+
+    Agent.update(c.store, &Map.delete(&1, source))
+    assert {:error, :invalid_execution_checkpoint} = Store.stream(c.id, c.jido)
+    assert {:error, :invalid_execution_checkpoint} = Store.load_fact(c.id, :values, c.jido)
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "inspects a referenced preparation and redacts the shared payload by default", c do
+    alias Jido.Persistence.Inspector
+
+    payload = String.duplicate("stored tool output / ", 256)
+    result = {%{normalized: %{status: :ok, model_content: payload}}, []}
+    assert {:ok, ^result} = Store.tool_recorder(c.jido, c.id).("run/0:0", %{name: "read"}, fn -> result end)
+
+    session =
+      Jido.Session.append(Jido.Session.new(), %{kind: :ai_message, payload: %{"role" => "tool", "output" => payload}})
+
+    later_id = identity(c.init, "later")
+    assert :ok = Store.register(c.jido, later_id, c.config)
+    prepared = %{context: %{jido_ai_session: Jido.Session.encode(session)}}
+    assert :ok = Store.prepare(c.jido, later_id, prepared)
+    records = Agent.get(c.store, & &1)
+    prepared_key = Enum.find(Map.keys(records), &String.ends_with?(&1, ":prepared"))
+    source = Enum.find(Map.keys(records), &String.starts_with?(&1, "jido:tool-payload:"))
+    {:ok, profile} = Jido.Persistence.Config.open(c.config)
+
+    assert {:ok, %{kind: "execution_prepared"}} = Inspector.read(profile, prepared_key)
+    assert {:ok, {:jido_execution_prepared, 3, ^prepared}} = Inspector.read(profile, prepared_key, full: true)
+    assert {:ok, %{kind: "tool_payload", bytes: size}} = Inspector.read(profile, source)
+    assert size == byte_size(payload)
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "restores an execution-local tool receipt written before shared payloads", c do
+    payload = String.duplicate("legacy tool value 12345 ", 300)
+    slot = "run/0:0"
+    call = %{name: "read"}
+    result = {%{normalized: %{status: :ok, model_content: payload}}, []}
+    record_tool = Store.tool_recorder(c.jido, c.id)
+    assert {:ok, ^result} = record_tool.(slot, call, fn -> result end)
+    {:ok, profile} = Jido.Persistence.Config.open(c.config)
+    records = Agent.get(c.store, & &1)
+
+    [{receipt_key, signature}] =
+      for {key, bytes} <- records,
+          {:ok, {:jido_tool_result, 2, signature, _, _}} <- [Jido.Persistence.Config.decode(profile, bytes)],
+          do: {key, signature}
+
+    payloads = %{ToolPayload.digest(payload) => payload}
+    local = ToolPayload.add(ToolPayload.new(), :local, payloads)
+    assert {:ok, encoded} = Jido.Persistence.Config.encode(profile, result)
+    receipt = {:jido_tool_result, 1, signature, payloads, ToolPayload.pack(encoded, local)}
+    assert {:ok, encoded_receipt} = Jido.Persistence.Config.encode(profile, receipt)
+
+    Agent.update(c.store, fn records ->
+      records
+      |> Map.reject(fn {key, _bytes} -> String.starts_with?(key, "jido:tool-payload:") end)
+      |> Map.put(receipt_key, encoded_receipt)
+    end)
+
+    replacement = start_supervised!({Agent, fn -> nil end}, id: :replacement)
+    assert :ok = Store.register(c.jido, c.id, c.config, replacement)
+    assert {:ok, ^result} = record_tool.(slot, call, fn -> flunk("completed tool ran again") end)
+    assert :ok = Store.save_fact(c.id, :values, result, c.jido)
+    assert {:ok, ^result} = Store.load_fact(c.id, :values, c.jido)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
@@ -370,6 +587,73 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
             ]} = Store.stream(c.id, c.jido)
 
     assert {:ok, ^value} = Store.load_fact(c.id, :joined, c.jido)
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "rebuilds nested Join lists from ordered saved facts after replacement", c do
+    alias Jido.Persistence.{Config, Inspector}
+    alias Jido.Persistence.Codec.Term
+    alias Runic.Workflow.Events.JoinCompleted
+
+    left = :binary.copy("first contribution / ", 256)
+    right = :binary.copy("second contribution / ", 256)
+    assert :ok = Store.save_fact(c.id, :left, left, c.jido)
+    assert :ok = Store.save_fact(c.id, :right, right, c.jido)
+    assert :ok = Store.save_fact(c.id, :empty, nil, c.jido)
+
+    first = %JoinCompleted{
+      join_hash: :join,
+      result_fact_hash: :joined,
+      result_value: [right, left, nil, right],
+      result_ancestry: {:join, :parent},
+      contribution_fact_hashes: [:right, :left, :empty, :right],
+      weight: 2
+    }
+
+    second = %{
+      first
+      | result_fact_hash: :nested,
+        result_value: [left, first.result_value],
+        contribution_fact_hashes: [:left, :joined]
+    }
+
+    assert {:ok, 1} = Store.append(c.id, [first, second], c.jido)
+    records = Agent.get(c.store, & &1)
+
+    join_records =
+      for {key, bytes} <- records,
+          {:ok, {:jido_fact_value, 1, 0, digest, :join, hashes}} <- [Term.decode(bytes, trusted: true)],
+          into: %{},
+          do: {hashes, {key, bytes, digest}}
+
+    assert %{
+             [:right, :left, :empty, :right] => {_first_key, first_bytes, _digest},
+             [:left, :joined] => {nested_key, nested_bytes, nested_digest}
+           } = join_records
+
+    assert byte_size(first_bytes) < byte_size(left)
+    assert byte_size(nested_bytes) < byte_size(left)
+
+    replacement = start_supervised!({Agent, fn -> nil end}, id: :join_replacement)
+    assert :ok = Store.register(c.jido, c.id, c.config, replacement)
+    expected = second.result_value
+    assert {:ok, ^expected} = Store.load_fact(c.id, :nested, c.jido)
+    assert {:ok, profile} = Config.open(c.config)
+
+    assert {:ok, {:jido_fact_value, 1, 0, ^nested_digest, :full, ^expected}} =
+             Inspector.read(profile, nested_key, full: true)
+
+    assert {:ok, cyclic} = Term.encode({:jido_fact_value, 1, 0, nested_digest, :join, [:nested]})
+    Agent.update(c.store, &Map.put(&1, nested_key, cyclic))
+    assert {:error, :invalid_execution_checkpoint} = Store.load_fact(c.id, :nested, c.jido)
+
+    {right_key, _bytes} =
+      Enum.find(records, fn {_key, bytes} ->
+        match?({:ok, {:jido_fact_value, 1, 0, _, :full, ^right}}, Term.decode(bytes, trusted: true))
+      end)
+
+    Agent.update(c.store, fn _ -> Map.delete(records, right_key) end)
+    assert {:error, :invalid_execution_checkpoint} = Store.load_fact(c.id, :nested, c.jido)
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"

@@ -35,11 +35,15 @@ defmodule Jido.Durable.Runtime do
          :ok <- cancel(runner, id),
          {:ok, workflow} <- Jido.Exec.compile(%{instruction | context: %{}}, []),
          :ok <- ContinuationStore.register(instance, id, persistence, owner),
+         :ok <- ContinuationStore.seed_tool_history(instance, id, context),
          {:ok, saved} <-
            ContinuationStore.update_workflow(instance, id, &resolve_wait_inputs(&1, now)),
          options =
            Keyword.put(options, :run_context, %{
-             _global: wait_context(context, id, saved, now, max_concurrency)
+             _global:
+               context
+               |> wait_context(id, saved, now, max_concurrency)
+               |> Map.put(:__jido_tool_recorder__, ContinuationStore.tool_recorder(instance, id))
            }) do
       if saved && not halted?(saved) && not Workflow.is_runnable?(saved) && Runtime.pending_waits(saved) != [] do
         waiting(saved)

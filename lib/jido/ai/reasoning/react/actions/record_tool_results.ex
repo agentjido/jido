@@ -18,26 +18,31 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RecordToolResults do
       Enum.reduce_while(
         results,
         {:ok, Jido.Session.decode!(turn.session), []},
-        fn result, {:ok, session, attempts} ->
-          execution = execution(result)
-          normalized = ToolResult.normalize(execution.outcome, turn.max_tool_output_bytes)
-          refs = refs(turn, result.id)
-          attempt = tool_attempt(turn, result, execution, normalized)
-          session = Projection.observe(session, :ai_tool_attempt, attempt, refs, execution.completed_at_ms)
+        fn
+          %{outcome: %{status: :error, error: %{details: %{reason: :jido_tool_result_store, storage_reason: reason}}}},
+          _acc ->
+            {:halt, {:error, {:jido_tool_result_store, reason}}}
 
-          message = %{
-            role: :tool,
-            content: normalized.content_parts || "",
-            name: result.name,
-            tool_call_id: result.id,
-            output: normalized.model_content,
-            metadata: message_metadata(normalized)
-          }
+          result, {:ok, session, attempts} ->
+            execution = execution(result)
+            normalized = normalized_result(execution, turn.max_tool_output_bytes)
+            refs = refs(turn, result.id)
+            attempt = tool_attempt(turn, result, execution, normalized)
+            session = Projection.observe(session, :ai_tool_attempt, attempt, refs, execution.completed_at_ms)
 
-          case Projection.append(session, message, refs, execution.completed_at_ms) do
-            {:ok, next} -> {:cont, {:ok, next, attempts ++ [attempt]}}
-            error -> {:halt, error}
-          end
+            message = %{
+              role: :tool,
+              content: normalized.content_parts || "",
+              name: result.name,
+              tool_call_id: result.id,
+              output: normalized.model_content,
+              metadata: message_metadata(normalized)
+            }
+
+            case Projection.append(session, message, refs, execution.completed_at_ms) do
+              {:ok, next} -> {:cont, {:ok, next, attempts ++ [attempt]}}
+              error -> {:halt, error}
+            end
         end
       )
 
@@ -63,6 +68,10 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RecordToolResults do
        when is_map(outcome),
        do: execution
 
+  defp execution(%{outcome: %{status: :ok, value: %{normalized: normalized} = execution}})
+       when is_map(normalized),
+       do: execution
+
   defp execution(result) do
     now = System.system_time(:millisecond)
 
@@ -80,6 +89,9 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RecordToolResults do
 
   defp outer_outcome(%{status: :error, error: error}), do: %{status: :error, error: error}
   defp outer_outcome(_outcome), do: %{status: :error, error: :invalid_tool_execution}
+
+  defp normalized_result(%{normalized: normalized}, _max_bytes), do: normalized
+  defp normalized_result(%{outcome: outcome}, max_bytes), do: ToolResult.normalize(outcome, max_bytes)
 
   defp tool_attempt(turn, result, execution, normalized) do
     %{

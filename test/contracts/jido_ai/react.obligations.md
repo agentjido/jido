@@ -48,7 +48,7 @@ model-execution, conversation, and tools components.
 ### jido_ai.react.I4 — Durable resume uses saved checkpoints
 
 - **scope:** ReAct Flow waits and durable AgentServer resume
-- **must:** Resume the same saved graph and Turn after restart. Retain the same review wait identity and do not repeat calls confirmed by its saved checkpoint. If the ReAct Iterate has no saved result, resume from the start of that component. Calls from its interrupted execution can repeat.
+- **must:** Resume the same saved graph and Turn after restart. Retain the same review wait identity. If the ReAct Iterate has no saved result, resume from the start of that component. Reuse a confirmed tool receipt at the same run, tool round, and position when the validated call matches, even if its provider call ID changes. Reject a changed call at an existing position. A lost process can repeat work that had no confirmed receipt.
 - **kind:** persisted-format
 - **status:** active
 

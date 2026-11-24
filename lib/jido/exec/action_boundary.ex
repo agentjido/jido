@@ -53,7 +53,10 @@ defmodule Jido.Exec.ActionBoundary do
     Telemetry.span(:action, Telemetry.action_metadata(metadata_node, context), fn ->
       with {:ok, params} <-
              Validation.callback(instruction.target, :validate_params, instruction.params, :input),
-           result <- invoke(instruction.target, params, Runtime.user_context(action_context), control),
+           result <-
+             Runtime.with_tool_recorder(Map.get(context.runtime, :__jido_tool_recorder__), fn ->
+               invoke(instruction.target, params, Runtime.user_context(action_context), control)
+             end),
            result <- validate_output(instruction.target, result) do
         result
       end

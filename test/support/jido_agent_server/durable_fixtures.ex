@@ -164,6 +164,7 @@ defmodule Jido.Test.AgentServer.DurableFixtures do
         case Jido.Persistence.Codec.Term.decode(value, trusted: true) do
           {:ok, %{server_turn: %{status: :completed}} = record} -> {:completion_write, record[:agent_module]}
           {:ok, %{rev: 1} = record} -> {:intent_write, record[:agent_module]}
+          {:ok, {:jido_tool_result, version, _, _, _}} when version in [1, 2] -> {:tool_result_write, nil}
           {:ok, [_ | _] = events} -> {event_write(events), nil}
           _ -> {:other, nil}
         end
