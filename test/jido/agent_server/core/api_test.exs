@@ -69,6 +69,39 @@ defmodule Jido.AgentServer.ApiTest do
     assert AgentServer.snapshot(server).agent.state.count == 2
   end
 
+  @tag obligation: "jido.agent_server.I108"
+  test "agents in one instance can run concurrent Turns with the same ID", c do
+    assert {:ok, first} = Jido.start_agent(c.jido, QueueAgent, id: "first")
+    assert {:ok, second} = Jido.start_agent(c.jido, QueueAgent, id: "second")
+    assert :ok = AgentServer.await_ready(first)
+    assert :ok = AgentServer.await_ready(second)
+
+    turn_id = "shared"
+    observer = self()
+    unblocked = signal("queue.work", %{block: false})
+
+    held =
+      Task.async(fn ->
+        AgentServer.call(first, signal("queue.work", %{block: true}),
+          turn_id: turn_id,
+          context: %{observer: observer}
+        )
+      end)
+
+    assert_receive {:queue_gate, action}, 1_000
+    assert {:ok, %TurnResult{status: :committed}} = AgentServer.call(second, unblocked, turn_id: "control")
+    concurrent = AgentServer.call(second, unblocked, turn_id: turn_id)
+
+    send(action, :release)
+
+    assert {{:ok, %TurnResult{status: :committed, turn_id: ^turn_id}},
+            {:ok, %TurnResult{status: :committed, turn_id: ^turn_id}}} =
+             {concurrent, Task.await(held)}
+
+    assert AgentServer.snapshot(first).agent.state.count == 1
+    assert AgentServer.snapshot(second).agent.state.count == 2
+  end
+
   @tag obligation: "jido.agent_server.I106"
   test "stop finishes the accepted Turn while admission stays closed", c do
     assert {:ok, server} = Jido.start_agent(c.jido, QueueAgent, id: "stop")

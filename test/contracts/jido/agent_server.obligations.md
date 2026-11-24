@@ -432,3 +432,11 @@ authoring surface.
 - **why:** A rejected or undelivered request must release its reply process while the caller stays alive.
 - **kind:** functional
 - **status:** active
+
+### jido.agent_server.I108 — Turn identity across Agents
+
+- **scope:** `Jido.AgentServer.call/3`, `Jido.AgentServer.submit/3`, `Jido.AgentServer.cast/3`
+- **must:** Let distinct Agents in one Instance run overlapping Turns with the same caller-supplied ID. Keep each Turn's execution and cleanup within its Agent and preserve the caller-supplied ID.
+- **why:** One Agent's Turn must be able to finish independently of another Agent's Turn.
+- **kind:** functional
+- **status:** active
