@@ -155,6 +155,36 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "stores one copy of a completion fact and restores the full event", c do
+    alias Runic.Workflow.{Fact, RunnableCompleted}
+    alias Runic.Workflow.Events.FactProduced
+
+    value = :binary.copy("completion value ", 1_024)
+    fact = Fact.new(value: value)
+    produced = %{FactProduced.new(fact, producer_label: :produced, weight: 0) | value: nil}
+    completed = %RunnableCompleted{runnable_id: "action", result_fact: fact}
+
+    assert :ok = Store.save_fact(c.id, fact.hash, value, c.jido)
+    assert {:ok, 1} = Store.append(c.id, [produced, completed], c.jido)
+    assert {:ok, 2} = Store.append(c.id, [completed], c.jido)
+    assert {:ok, [^produced, ^completed, ^completed]} = Store.stream(c.id, c.jido)
+
+    records = Agent.get(c.store, & &1)
+    {_, compact} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":batches:1") end)
+    {_, inline} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":batches:2") end)
+    assert byte_size(compact) < byte_size(value)
+    assert byte_size(inline) > byte_size(value)
+
+    {fact_key, _} =
+      Enum.find(records, fn {key, _} ->
+        String.contains?(key, ":facts:") and not String.ends_with?(key, ":facts:index")
+      end)
+
+    Agent.update(c.store, &Map.delete(&1, fact_key))
+    assert {:error, :invalid_execution_checkpoint} = Store.stream(c.id, c.jido)
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
   test "repairs a tail chunk before the next append", c do
     assert {:ok, 1} = Store.append(c.id, [:first], c.jido)
 
