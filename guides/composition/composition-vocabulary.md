@@ -1,8 +1,6 @@
 # Composition Vocabulary
 
-This guide defines the terms that the Compose Agents guides use and helps you choose between declared members and runtime children.
-
-Jido composes Agents in two ways. A definition can declare its members as data, or a running Agent can start children during a Turn. Both produce the same kind of process, an AgentServer activation under an owner. They differ in who decides that the process should exist.
+An Agent definition can declare members that start with its activation. Application code can also start Agents as work arrives and assign runtime ownership when needed.
 
 ## The terms in one definition
 
@@ -56,35 +54,22 @@ These terms describe live processes.
 | Term | Meaning |
 | --- | --- |
 | Activation | The internal supervisor tree for one resident Agent. The public API exposes semantic status, not the root PID. |
-| Owner | The AgentServer whose activation holds a member or child. |
+| Owner | The AgentServer whose activation holds a declared member. |
 | Slot | One running copy of a member, numbered from 1. |
-| Runtime child | An Agent started by `Jido.AgentServer.Directive.agent_start/3` or `Jido.AgentServer.spawn_child/4`. It does not appear in the definition. |
-| Tag | The atom or string that names a runtime child under its owner. Tags of topology members are generated and are not part of the API. |
-| Placement | Where a runtime child runs. `:owned` is under the parent's activation. `:independent` is under the instance supervisor. |
+| Agent started by the application | An Agent that the application starts with `Jido.start_agent/3` and manages by ID. It can acquire a runtime owner through `Jido.transfer_agent_ownership/4`. |
 | Binding | Resolving member definitions and returning their static count and initial state. `Jido.Agent.Topology.bind/3` does this without starting processes. |
 
-## Choose members or runtime children
+## Choose how to start an Agent
 
-Use a member when the Agent always needs that collaborator. Use a runtime child when a Turn decides that work needs its own process, such as one Agent per request.
-
-| Question | Declared member | Runtime child |
+| Question | Declared member | Agent started by the application |
 | --- | --- | --- |
-| Who decides that it exists? | The definition | A Turn or a caller |
-| Where is the intent saved? | In the Agent's topology, which a parent snapshot includes | Nowhere, unless your own state records it |
-| Restarted after the owner's worker crashes? | Yes, from the static definition | Owned children no. Independent children keep running. |
-| Addressed by | Member name, with all slots receiving the Signal | Its tag |
-| Stopped by | Stopping or upgrading the owner activation | `Jido.AgentServer.Directive.agent_stop/2` or `Jido.AgentServer.stop_child/3` |
-| Can outlive its owner? | No | Yes, with `placement: :independent` |
-
-The two do not mix for one name. A runtime Directive that starts or stops a
-declared member name fails with `:static_topology_member`.
-
-## What composition does not include
-
-Delivery between Agents uses best-effort casts, and each Agent commits its own Turn. There is no transaction across Agents, no durable acknowledgement, and no coordinated snapshot of an Agent family. Members and children run on the local node, and a remote `:node` on `agent_start/3` is rejected.
+| Who decides that it exists? | The topology definition | Application code |
+| Addressed by | Member name in routes and connections | Application-assigned Agent ID and partition |
+| Observed with | A scoped `Jido.list_agents/2` call and snapshots | `Jido.whereis_agent/3` and a snapshot |
+| Stopped by | The owner stopping, or `Jido.AgentServer.remove_topology_member/4` for one slot | `Jido.stop_agent/3`, or the current runtime owner stopping |
 
 ## Next steps
 
 - [Declare Agent Topology](declare-agent-topology.livemd) builds a definition with members.
 - [Connect Agent Outputs](connect-agent-outputs.livemd) routes Signals between members.
-- [Parent and Child Agents](parent-and-child-agents.md) starts Agents during a Turn.
+- [Parent and Child Agents](parent-and-child-agents.md) sends work to a declared member.

@@ -120,13 +120,11 @@ These runtime Directives run after commit:
 | `Jido.Agent.Directive.reply/1` | Sends one reply Signal to the caller. | There is no live caller: `:requester_not_found`. |
 | `Jido.Agent.Directive.agent_send/2` | Casts a Signal to a child by tag, or to all members of a topology name. | The server has no activation, or the name is invalid or reserved. |
 | `Jido.Agent.Directive.parent_send/1` | Casts a Signal to the parent. | The Agent has no parent: `:parent_not_found`. |
-| `Jido.AgentServer.Directive.agent_start/3` | Starts a tracked child and waits until it is ready. | The options are invalid, the name belongs to the topology, or the node is remote. |
-| `Jido.AgentServer.Directive.agent_stop/2` | Stops a tracked child. | The server has no activation, or the name belongs to the topology. |
 | `Jido.AgentServer.Directive.process_start/1` | Starts one untracked OTP child under the instance's Agent supervisor. | The server has no instance, or the child spec is invalid. |
 | `Jido.AgentServer.Directive.error_report/2` | Reports an error to the error policy. | Not applicable. |
 | `Jido.Agent.Directive.server_stop/1` | Stops the server. | It is not last in the batch: `:terminal_directive_not_last`. |
 
-[Child Agent Adoption](child-agents-and-adoption.md) shows the child Directives in use.
+[Start and Transfer Child Agents](child-agents-and-adoption.md) shows how to manage request-scoped Agents from application code.
 
 A Turn fails with `{:error, :too_many_directives}` when its batch exceeds `:max_directives_per_turn`, which has a default of 1,000. A failure here is an ordinary pre-commit Turn failure: the state does not change, and no effect runs.
 

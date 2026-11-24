@@ -172,7 +172,8 @@ pending = Jido.AgentServer.submit(pid, MigrationGuide.Counter.increment_signal!(
 | `whereis(registry, id)`, `via_tuple/2` | `Jido.whereis_agent/3` or `Jido.AgentServer.whereis/3` |
 | `MyApp.Jido.whereis(id)` | `Jido.whereis_agent(MyApp.Jido, id)` |
 | `attach/2`, `detach/2`, `touch/1` | Kept. `Jido.AgentServer.attach/3` and `Jido.AgentServer.detach/3` add a timeout. |
-| `adopt_child/4`, `stop_child/3` | Kept on `Jido.AgentServer` |
+| `adopt_child/4` | `Jido.transfer_agent_ownership/4` with `expected: nil` for first adoption. |
+| `stop_child/3` | `Jido.stop_agent/3` for an Agent started by the application, or `Jido.AgentServer.remove_topology_member/4` for a declared slot. |
 | Jido.AgentServer.State and `:sys.get_state` | `Jido.AgentServer.snapshot/2` and `Jido.AgentServer.status/2` |
 
 A caller timeout does not cancel a Turn. Use `Jido.AgentServer.cancel/2` or `Jido.AgentServer.cancel_turn/3`. See [Call, Cast, and Await](../agent-servers/send-signals-to-live-agents.livemd).
@@ -272,8 +273,8 @@ See [Plugin Design](../plugins/plugin-design.md).
 | `emit_to_parent(agent, signal)` | `Jido.Agent.Directive.parent_send/1` |
 | `error(error, context)` | `Jido.AgentServer.Directive.error_report/2` |
 | `spawn(child_spec, tag)` | `Jido.AgentServer.Directive.process_start/1` |
-| `spawn_agent(agent, tag, opts)` | `Jido.AgentServer.Directive.agent_start/3`, or a topology member |
-| `stop_child(tag, reason)` | `Jido.AgentServer.Directive.agent_stop/2` |
+| `spawn_agent(agent, tag, opts)` | `Jido.start_agent/3` from application code, or a declared topology member |
+| `stop_child(tag, reason)` | `Jido.stop_agent/3` from application code |
 | `stop(reason)` | `Jido.Agent.Directive.server_stop/1` |
 | `start_sensor/3`, `stop_sensor/2` | `Jido.Plugin.SensorManager.start/3`, `Jido.Plugin.SensorManager.stop/1` |
 | `schedule(delay_ms, message)` | `Jido.Plugin.Timer.schedule/2` |
