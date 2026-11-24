@@ -627,7 +627,9 @@ defmodule Jido.Persistence.ContinuationStore do
 
   defp resolve_fact_record({@fact_tag, @fact_version, 0, digest, format, contents}, config, id, key, known, opts)
        when is_binary(digest) and byte_size(digest) == 32 do
-    with {:ok, value, known} <- resolve_fact_contents(format, contents, config, id, Map.put(known, key, :loading), opts),
+    loading = Map.put(known, key, :loading)
+
+    with {:ok, value, known} <- resolve_fact_contents(format, contents, config, id, loading, opts),
          :ok <- verify_fact_digest(value, digest) do
       {:ok, value, Map.put(known, key, {:loaded, value})}
     end

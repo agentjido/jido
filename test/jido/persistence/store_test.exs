@@ -76,9 +76,7 @@ defmodule Jido.Persistence.StoreTest do
   end
 
   setup do
-    {:ok, owner} = Elixir.Agent.start_link(fn -> %{} end)
-    on_exit(fn -> if Process.alive?(owner), do: Elixir.Agent.stop(owner) end)
-    %{owner: owner}
+    %{owner: start_supervised!({Elixir.Agent, fn -> %{} end})}
   end
 
   @tag obligation: "jido.persistence.I1"
