@@ -92,7 +92,7 @@ adds no DSL.
 ### jido.agent_server.durable_turn.I9 — Terminal Flow receipt and collection
 
 - **scope:** durable Flow completion and failure
-- **must:** Save completed, failed, or cancelled Turn status with the complete Agent revision before a terminal reply or later Turn starts. Commit a successful Flow once. Preserve Agent state on failure. Restore a confirmed completion without rerunning Actions, Plugin commit hooks, or returned Directives. Delete the separate execution checkpoint only after the terminal Agent revision is durable. A failed physical delete must not change the terminal Turn result.
+- **must:** Save completed, failed, or cancelled Turn status with the complete Agent revision before a terminal reply or later Turn starts. Commit a successful Flow once. Preserve Agent state on failure. Restore a confirmed completion without rerunning Actions, Plugin commit hooks, or returned Directives. Delete the separate execution checkpoint only after the terminal Agent revision is durable. A failed physical delete must not change the terminal Turn result. A settled direct Flow stores its Turn ID, status, and expiry, and preserves any required wait retry receipt or unacknowledged terminal result. It drops the original admission data. Earlier full terminal receipts remain readable.
 - **why:** Terminal recovery must distinguish completed work from work that still needs execution.
 - **kind:** ordering
 - **status:** active

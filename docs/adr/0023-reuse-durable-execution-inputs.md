@@ -36,11 +36,16 @@ Verify the text digest and restore the original record before replay.
 A preparation cannot refer to itself. A missing source fails recovery if a
 saved record refers to it.
 
+A settled direct Flow keeps its Turn ID, status, and expiry in the Agent
+checkpoint. Keep any wait retry receipt and any terminal result that awaits
+acknowledgement. Leave the original admission data in the running receipt
+while recovery still needs it. Continue to read older settled receipts.
+
 ## Consequences
 
 These changes use the existing execution identity and collection lifetime.
-They add sources to the existing reference format and leave the Agent,
-Session, and reply formats intact. Recovery may read a preparation before
+They add sources to the execution reference format. Agent state, Session,
+and reply formats stay the same. Recovery may read a preparation before
 it can load a fact or stream a batch. Recovery can load saved contributions
-to rebuild a Join result. Older Jido versions cannot resume a Turn that
-has these records.
+to rebuild a Join result. Older Jido versions cannot read the new
+execution formats and compact settled receipts.

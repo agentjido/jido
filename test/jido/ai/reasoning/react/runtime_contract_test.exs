@@ -1473,9 +1473,28 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeContractTest do
     assert [%{payload: %{"output" => %{"content" => ^payload}}}] =
              Jido.Thread.filter_by_kind(thread, :ai_tool_attempt)
 
-    assert {:ok, %{reply: %{data: reply}}} = Jido.turn_result(instance, address, turn_id)
+    assert {:ok, %{reply: %{data: reply}} = result} = Jido.turn_result(instance, address, turn_id)
+
+    assert {:ok, _agent, _revision, _agent_revision, receipt} =
+             Jido.Persistence.load_agent_address(instance, address, instance: instance)
+
+    assert receipt == %{
+             id: turn_id,
+             status: :completed,
+             expires_at: receipt.expires_at,
+             completed_at: result.completed_at,
+             terminal_result: result
+           }
+
     assert [%{output: %{"content" => ^payload}}] = reply.tool_attempts
     assert Enum.any?(reply.session_entries, &(&1["payload"]["output"] == %{"content" => payload}))
+
+    assert :ok = Jido.acknowledge_turn_result(instance, address, turn_id)
+    assert {:error, :not_found} = Jido.turn_result(instance, address, turn_id)
+    settled = Map.take(receipt, [:id, :status, :expires_at])
+
+    assert {:ok, _agent, _revision, _agent_revision, ^settled} =
+             Jido.Persistence.load_agent_address(instance, address, instance: instance)
   end
 
   @tag :tmp_dir
