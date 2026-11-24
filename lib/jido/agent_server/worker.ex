@@ -230,12 +230,13 @@ defmodule Jido.AgentServer.Worker do
              true <- Keyword.get(opts, :runner, runner) == runner,
              true <- valid_partition?(opts[:partition]) do
           defaults = Jido.Instance.RuntimeStore.instance_agent_server_options(jido)
+          idle_policy = if opts[:persistence] == false, do: :stop, else: Keyword.fetch!(defaults, :idle_policy)
 
           merged =
             defaults
             |> Keyword.merge(opts)
             |> Keyword.put(:idle_timeout, Keyword.fetch!(defaults, :idle_timeout))
-            |> Keyword.put(:idle_policy, Keyword.fetch!(defaults, :idle_policy))
+            |> Keyword.put(:idle_policy, idle_policy)
             |> Keyword.put(:runner, runner)
 
           {:ok, merged}

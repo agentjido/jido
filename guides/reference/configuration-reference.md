@@ -81,7 +81,7 @@ An instance is `use Jido` plus `config :my_app, MyApp.Jido, ...`, or a call to `
 | `:name` | Required for `Jido.start_link/1`. Jido.Default for `Jido.start/1`. The module, under `use Jido`. | A non-nil atom | The instance name. |
 | `:otp_app` | None. Required by `use Jido`. | A non-nil atom | The application that holds the configuration. |
 | `:namespace` | `nil` | A nonempty string | Stable identity for `Jido.Agent.Address` functions and durable records. Required for persistent Agents. |
-| `:persistence` | `nil` | A Store declaration, a `[store: ..., codec: ...]` profile, `nil`, or `false` | The one persistence profile for all Agents, Flow records, and wake records in the instance. Store declarations use the Term codec. |
+| `:persistence` | `nil` | A Store declaration, a `[store: ..., codec: ...]` profile, `nil`, or `false` | The instance profile for persistent Agents, Flow records, and wake records. Store declarations use the Term codec. |
 | `:agent_server` | `[]` | A keyword list of [AgentServer options](#agentserver-options) | Defaults for each AgentServer in the instance. Validated at start. Startup-only options are rejected. |
 | `:max_tasks` | `1_000` | A non-negative integer or `:infinity` | The child limit of the instance's Task supervisor. |
 | `:debug` | Off | `nil`, `false`, `true`, or `:verbose` | Sets the instance log mode. `true` selects `:interesting` and `:verbose` selects `:all`. |
@@ -114,8 +114,8 @@ from `0` to `4_294_967_295`.
 | `:default_dispatch` | `nil` | `nil` or a dispatch target | The target for an Emit with no target. |
 | `:readiness_timeout` | `5_000` | A finite timeout | The bound on Plugin startup and composition changes. |
 | `:commit_timeout` | `5_000` | A finite timeout | The bound on Plugin `after_commit/3` callbacks in one Turn. |
-| `:persistence` | Resolved from the instance | `:inherit`, `nil`, or `false` | Internal selection of the instance profile. `Jido.start_agent/3` rejects a Store or codec override. |
-| `:persistence_mode` | `:create` | `:create`, `:restore` | What startup does with a stored record. |
+| `:persistence` | Resolved from the instance | `:inherit`, `nil`, or `false` | Pass `false` to `Jido.start_agent/3` or `Jido.AgentServer.child_spec/1` to start an Agent without checkpoints. It uses `:stop` when its idle budget expires. |
+| `:persistence_mode` | `:create` | `:create`, `:restore` | What startup does with a stored record. Restore requires persistence. |
 | `:persistence_timeout` | `5_000` | A finite timeout | The bound on one durable save or restore. |
 | `:idle_timeout` | `:infinity` | A timeout or `:infinity` | The idle budget. |
 | `:idle_policy` | `:stop` | `:stop`, or `:hibernate` with persistence | The action when the idle budget ends. |

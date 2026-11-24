@@ -1543,8 +1543,10 @@ defmodule Jido do
   and partition. Starting a duplicate returns an error and leaves the existing
   Agent unchanged.
 
-  An instance with persistence uses its one configured Store and codec for all
-  Agents. Per-Agent Store overrides are not supported.
+  Agents inherit the instance's persistence profile by default. Pass
+  `persistence: false` to start an Agent without checkpoints. An Agent without
+  checkpoints stops when its idle budget expires. Persisted Agents use the
+  instance's one configured Store and codec.
 
   This is the standard example startup API. Domain command functions can stay
   in the Agent module; they do not need a matching startup wrapper.
@@ -1559,7 +1561,7 @@ defmodule Jido do
            :ok <- validate_agent_persistence_override(runtime_opts),
            {:ok, agent} <- startup_agent(agent, instance_opts, runtime_opts) do
         runtime_opts
-        |> inherit_instance_persistence(instance)
+        |> select_agent_persistence(instance)
         |> Keyword.merge(agent: agent, jido: instance)
         |> Jido.AgentServer.Worker.start()
       end
@@ -1585,10 +1587,13 @@ defmodule Jido do
     end
   end
 
-  defp inherit_instance_persistence(opts, instance) do
-    case Jido.Instance.RuntimeStore.instance_persistence(instance) do
-      %Jido.Persistence.Config{} -> Keyword.put(opts, :persistence, :inherit)
-      nil -> Keyword.put(opts, :persistence, false)
+  defp select_agent_persistence(opts, instance) do
+    case {opts[:persistence], RuntimeStore.instance_persistence(instance)} do
+      {source, %Jido.Persistence.Config{}} when source != false ->
+        Keyword.put(opts, :persistence, :inherit)
+
+      _other ->
+        Keyword.put(opts, :persistence, false)
     end
   end
 

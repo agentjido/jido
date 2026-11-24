@@ -303,8 +303,9 @@ to `:timer`. `Jido.Plugin.Heartbeat` was removed. Use a static
 ## Persistence
 
 V3 also configures persistence on the instance. A persistent V3 instance needs
-a stable namespace and one persistence profile. All Agents in that instance
-use the same Store and codec.
+a stable namespace and one persistence profile. Agents inherit its Store and
+codec by default. Pass `persistence: false` to `Jido.start_agent/3` to run an
+Agent in the same instance without checkpoints.
 
 ```elixir
 {:ok, durable} = Jido.start_agent(MigrationGuide.Jido, MigrationGuide.Counter, id: "counter-3")
