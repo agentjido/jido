@@ -146,9 +146,10 @@ If search reports `:search_not_configured`, check that the host selects
 Replace standalone `Jido.Browser.Actions.SearchWeb` and
 `Jido.Browser.Actions.WebFetch` tool declarations with the browser block. Move
 the Brave key to the host configuration above. Move destination restrictions to
-the host and Agent allowlists. For fetch only, use `expose [:fetch]` and supply
-only the host allowlist. Update consumers to read `results` from search and
-`url` and `text` from fetch.
+the host and Agent allowlists. For fetch only, use `expose [:fetch]` and
+configure both allowlists. Update consumers to read `results` from search
+and `url` and `text` from fetch.
 
-Keep Jido Browser for sessions, tabs, page interaction, screenshots,
-JavaScript, rendering, and rich document extraction.
+Remove the standalone `:jido_browser` dependency when you move to V3.
+Use a separate V3-compatible integration for sessions, tabs, page interaction,
+screenshots, JavaScript, rendering, or rich document extraction.

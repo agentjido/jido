@@ -109,18 +109,16 @@ The check is on the host. Passing `jido_exec_capabilities` in the context does n
 
 ## Start a durable Agent
 
-Give the Jido instance persistence and give the Agent a long `turn_timeout`. [Make an Agent Durable](../durability/make-an-agent-durable.livemd) covers the options. Use `submit/3` so that your process can do other work while the request waits. `Jido.Persistence.File` keeps this example self-contained.
+Give the Jido instance persistence and give the Agent a long `turn_timeout`. [Make an Agent Durable](../durability/make-an-agent-durable.livemd) covers the options. Use `submit/3` so that your process can do other work while the request waits. This example uses the ETS adapter to save state across Agent stops in the same VM.
 
 ```elixir
-review_dir = Path.join(System.tmp_dir!(), "tool-review-#{System.unique_integer([:positive])}")
-
 Application.put_env(:jido, :ai_inference_client, ToolReviewGuide.LocalModel)
 Process.register(self(), :billing_reviews)
 
 {:ok, _instance} =
   Jido.start(name: ToolReviewGuide.Jido,
     namespace: "guides/tool-review",
-    persistence: {Jido.Persistence.File, path: review_dir}
+    persistence: {Jido.Persistence.ETS, table: :tool_review_guide}
   )
 
 {:ok, server} =
@@ -130,6 +128,7 @@ Process.register(self(), :billing_reviews)
   )
 
 :ok = Jido.AgentServer.await_ready(server)
+{:ok, address} = Jido.agent_address(ToolReviewGuide.Jido, "billing-1")
 
 pending =
   Jido.AgentServer.submit(
@@ -146,6 +145,9 @@ The model call runs, and it requests the tool. A batch waits as one unit if any 
 Durable Turn context must be portable, so the target is a registered name, not a PID. With a PID target, `await/2` returns a `Jido.Error.ValidationError` with the code `:non_portable_term`, and the request does not run.
 
 ```elixir
+{:ok, %{status: :waiting, waits: [wait]}} =
+  Jido.AgentServer.await(pending)
+
 review =
   receive do
     {:signal, %{type: "jido.ai.review.requested"} = signal} -> signal.data
@@ -166,20 +168,9 @@ The expiry is fixed at 5 minutes. To change it, write your own review Flow.
 
 ## Find the wait
 
-`Jido.AgentServer.status/2` lists open waits, even without a dispatch target. The wait has three options, and the two event options name the values a decision must match.
+The waiting result lists open waits, even without a dispatch target. The wait has three options, and the two event options name the values a decision must match.
 
 ```elixir
-find_wait = fn find_wait, attempts ->
-  case Jido.AgentServer.status(server) do
-    %{active: %{stage: :waiting}, waits: [wait]} -> wait
-    _status when attempts > 0 ->
-      Process.sleep(10)
-      find_wait.(find_wait, attempts - 1)
-  end
-end
-
-wait = find_wait.(find_wait, 500)
-
 ["approved", "denied", "expired"] = Enum.map(wait.options, & &1.name)
 approved = Enum.find(wait.options, &(&1.name == "approved"))
 
@@ -191,35 +182,36 @@ true = approved.match.review_id == review.review_id
 
 A decision is a Signal with the option's event type. Its data must hold the option's `match` values. Add `actor_id` and `reason` for your audit trail. Jido records both.
 
-`Jido.AgentServer.deliver_wait/4` rejects data that does not match.
+Send the Signal to the Agent Address with `Jido.call/3`. Jido rejects data that does not match the open wait.
 
 ```elixir
-{:error, %Jido.Error.ValidationError{details: %{reason: :unmatched_input}}} =
-  Jido.AgentServer.deliver_wait(
-    server,
-    wait.id,
+{:error, :wait_not_matched} =
+  Jido.call(
+    ToolReviewGuide.Jido,
+    address,
     Jido.Signal.new!("jido.ai.review.approved", %{review_id: "forged"}, source: "/billing/reviews")
   )
 
 decision = Map.merge(approved.match, %{actor_id: "manager-12", reason: "Damaged in transit"})
 
-:ok =
-  Jido.AgentServer.deliver_wait(
-    server,
-    wait.id,
+{:ok, %{status: :committed, reply: approved_reply}} =
+  Jido.call(
+    ToolReviewGuide.Jido,
+    address,
     Jido.Signal.new!("jido.ai.review.approved", decision, source: "/billing/reviews")
   )
 
-{:ok, reviewed_agent, [%{signal: approved_reply}]} = Jido.AgentServer.await(pending, 5_000)
-
-%{status: :completed, output: "The refund is done.", tool_calls: 1} = approved_reply.data
+request_id = review.request_id
+%{request_id: ^request_id, status: :completed, output: "The refund is done.", tool_calls: 1} =
+  approved_reply.data
 [%{review: %{required: true, status: :approved}, output: %{"refunded" => "ORD-77"}}] = approved_reply.data.tool_attempts
 ```
 
 The Thread now holds two `:ai_review` entries, one for the request and one for the decision.
 
 ```elixir
-[requested, resolved] = Jido.Thread.filter_by_kind(reviewed_agent.state.session.thread, :ai_review)
+session = Jido.AgentServer.snapshot(server).agent.state.session
+[requested, resolved] = Jido.Thread.filter_by_kind(session.thread, :ai_review)
 
 "requested" = requested.payload["status"]
 %{"status" => "approved", "decision" => %{"actor_id" => "manager-12", "reason" => "Damaged in transit"}} = resolved.payload
@@ -236,17 +228,16 @@ pending =
     ToolReviewGuide.BillingAgent.request_signal!(%{input: "Refund order ORD-78."})
   )
 
-wait = find_wait.(find_wait, 500)
+{:ok, %{status: :waiting, waits: [wait]}} =
+  Jido.AgentServer.await(pending)
 denied = Enum.find(wait.options, &(&1.name == "denied"))
 
-:ok =
-  Jido.AgentServer.deliver_wait(
-    server,
-    wait.id,
+{:ok, %{status: :committed, reply: denied_reply}} =
+  Jido.call(
+    ToolReviewGuide.Jido,
+    address,
     Jido.Signal.new!("jido.ai.review.denied", denied.match, source: "/billing/reviews")
   )
-
-{:ok, _agent, [%{signal: denied_reply}]} = Jido.AgentServer.await(pending, 5_000)
 
 %{status: :blocked, reason_code: :review, reason: "tool use was denied", tool_calls: 0} = denied_reply.data
 
@@ -254,14 +245,13 @@ denied = Enum.find(wait.options, &(&1.name == "denied"))
 :ok = Jido.stop(ToolReviewGuide.Jido)
 Application.delete_env(:jido, :ai_inference_client)
 Process.unregister(:billing_reviews)
-File.rm_rf!(review_dir)
 ```
 
 Messages from a request that ends `:blocked` stay out of later model context. See [Thread Projection](thread-projection.md).
 
 ## Survive a restart
 
-The wait is part of the durable Turn. If the AgentServer hibernates or restarts, `Jido.thaw/4` restores it with the same wait ID, and you can deliver the decision to the restored server. A pending handle from before the restart returns an error, so read the result from the Agent's Session after the decision.
+The wait is part of the durable Turn. If the AgentServer stops or restarts, activation restores the same wait. Send the decision to the same Agent Address and read the result from the call.
 
 ## Related
 

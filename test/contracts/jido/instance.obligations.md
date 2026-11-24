@@ -70,7 +70,7 @@ downstream operation results stay with their owning components.
 ### jido.instance.I7 — Address resolution
 
 - **scope:** `Jido.resolve_agent/2`
-- **must:** Resolve the exact namespace, partition, and Agent ID through the selected instance Registry. Return the ready AgentServer PID, `not_found` when no matching worker is registered, `recovering` while the matching worker is not ready, and `unavailable` when the Registry or a resolved worker is lost. Treat a dead activation as absent even while its Registry entry remains. Resolve each operation again after worker replacement and do not replay work.
+- **must:** Resolve the exact namespace, partition, and Agent ID through the selected instance Registry. Require a matching stable instance namespace for all Addresses, including Addresses from Agent snapshots. Return the ready AgentServer PID, `not_found` when no matching worker is registered, `recovering` while the matching worker is not ready, and `unavailable` when the Registry or a resolved worker is lost. Treat a dead activation as absent even while its Registry entry remains. Resolve each operation again after worker replacement and do not replay work.
 - **why:** A stable Address must not retain or reuse a stale PID.
 - **kind:** functional
 - **status:** active

@@ -164,6 +164,13 @@ defmodule Jido.AgentServer do
   @doc """
   Returns the Agent and both Jido revisions for a resident activation.
 
+  To use `snapshot.agent_address` with `Jido.resolve_agent/2`, start the Jido
+  instance with a stable `:namespace`. For an activation without a stable
+  namespace, the snapshot uses `"jido.local"` as a fallback for local
+  observations. For an Agent started on an instance without a namespace, use
+  `Jido.whereis_agent/3` with `snapshot.agent.id` for local lookup. Pass the
+  snapshot address's `:partition` if the Agent uses a partition.
+
   For an Ecto-backed Agent, reads the current row into `snapshot.agent.state`.
   Jido-owned fields keep their values. The SQL read does not start a Turn or
   advance either revision. It uses the Repo's timeout in the caller's process.

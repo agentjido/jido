@@ -481,6 +481,21 @@ signal = MigrationGuide.MathAgent.request_signal!(%{input: "What is 19 + 23?"})
 {:ok, _turn} = Jido.AgentServer.call(pid, signal, context: %{locale: "en"})
 ```
 
+## Browser tools
+
+If your application uses `:jido_browser` for web search or page reading,
+remove that dependency. In your V3 AI Agent, add a `browser` block inside
+`ai do` → `tools do`. Use `expose [:fetch]` for page reading or
+`expose [:search, :fetch]` to include search. Set the host allowlist under
+`config :jido, :browser` and set the Agent allowlist in the browser block.
+Both allowlists must permit the URL.
+
+The V3 tools support search and text or Markdown extraction from public
+pages. If your application needs sessions, form input, JavaScript execution,
+or screenshots, use a separate browser automation integration that supports
+your V3 application. For setup, tool results, and an offline page fixture,
+see [Search and read web pages](../ai/basic-web-browser.livemd).
+
 ## Other removed modules
 
 | V2 module | V3 replacement |

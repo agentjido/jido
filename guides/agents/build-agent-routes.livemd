@@ -111,9 +111,14 @@ defmodule RoutesGuide.OrderAgent do
       end
     end
 
-    # A read that keeps the current state.
-    route "order.inspect", RoutesGuide.PriceOrder, as: :inspect, defaults: %{quantity: 0} do
+    # A read that returns reply data and keeps the current state.
+    route "order.inspect", as: :inspect do
+      action _input, schema: Jido.Joi.object(%{}), context: context do
+        {:ok, %{quote_count: context.agent_state.quotes}}
+      end
+
       state :unchanged
+      reply "order.inspected", from: output()
     end
 
     # One wildcard segment, then a fallback for everything else.
@@ -166,9 +171,9 @@ The cell returns `{"cancel:duplicate", ["gift wrap"]}`.
 
 ## Select state and a reply
 
-By default, the complete output of an Action or Flow becomes the next state. Two declarations change that:
+By default, the complete output of an Action or Flow becomes the next state. Set the state and reply mappings in the route block.
 
-- `state from: output(path)` selects one output field as the next state. `state :unchanged` keeps the current state and ignores the output.
+- `state from: output(path)` selects an output field as the next state. `state :unchanged` keeps the current state when the route maps its output.
 - `reply type, from: output(path)` adds a `Jido.Agent.Directive.Reply` to the Turn with the selected data.
 
 `output()` selects the whole output. `output(:field)` or `output([:field, :nested])` selects a path.
@@ -178,10 +183,16 @@ default broad output schema does not declare named fields. If a route selects
 an undeclared field, Agent compilation fails with `:unsupported_output_path`
 and reports the missing path.
 
-A `reply` declaration does not change the default state mapping. Without a
-`state` declaration, Jido still treats the complete handler output as the next
-Agent state. A reply-only route must also use `state :unchanged` or select a
-complete candidate state with `state from: output(...)`.
+The `reply` declaration selects reply data independently of the state mapping.
+Use `state :unchanged` for a reply-only route. Use `state from: output(...)`
+to select a complete candidate state from a larger output.
+
+Jido checks the selector paths when it validates the Agent definition. During
+a Turn, Jido runs the handler, applies the mappings, and checks the complete
+candidate state against the Agent schema before commit. A partial state can
+fail with `:incomplete_state`. If the handler already made an external write,
+the write stays in effect. Use a Directive for work that must wait for
+commit. See [Agent Turns and Replies](turns-state-and-replies.md).
 
 ```elixir
 {:ok, priced, [%Jido.Agent.Directive.Reply{signal: reply}]} =
@@ -193,13 +204,16 @@ complete candidate state with `state from: output(...)`.
 The cell returns `{1, "order.priced", %{total_cents: 1000}}`. A reply route needs a `signal_source`, because that becomes the reply's source.
 
 ```elixir
-{:ok, inspected, []} =
-  RoutesGuide.OrderAgent.cmd(order, RoutesGuide.OrderAgent.inspect_signal!())
+{:ok, inspected, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  RoutesGuide.OrderAgent.cmd(priced, RoutesGuide.OrderAgent.inspect_signal!())
 
-inspected === order
+{inspected.state == priced.state, reply.type, reply.data}
 ```
 
-The cell returns `true`, because `state :unchanged` kept the source state. Agent Turns and Replies explains how a caller receives a reply.
+The cell returns `{true, "order.inspected", %{quote_count: 1}}`. The reply
+contains the complete output of the Action. The Agent keeps its state.
+If you omit `state :unchanged`, Jido tries to use `%{quote_count: 1}` as the
+complete next state, and the state schema rejects it.
 
 ## Select one route
 
