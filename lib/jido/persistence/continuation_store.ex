@@ -5,7 +5,7 @@ defmodule Jido.Persistence.ContinuationStore do
   alias Jido.Persistence.{Config, Store}
   alias Jido.Persistence.Codec.Term
   alias Jido.Exec.Runtime
-  alias __MODULE__.{JoinCompletedRef, SharedToolPayload, ToolPayload, ToolReceipt}
+  alias __MODULE__.{BinaryDictionary, JoinCompletedRef, SharedToolPayload, ToolPayload, ToolReceipt}
   alias Jido.Instance.RuntimeStore
   alias Runic.Identity
   alias Runic.Workflow.{Fact, FactRef, FactResolver, Rehydration, RunnableCompleted, RunnableDispatched}
@@ -530,7 +530,7 @@ defmodule Jido.Persistence.ContinuationStore do
   defp append_batch(config, id, batch_count, condition, events, catalogue) do
     next = batch_count + 1
 
-    with {:ok, bytes} <- encode_referenced(config, events, catalogue),
+    with {:ok, bytes} <- encode_batch(config, events, catalogue),
          :ok <-
            Store.compare_and_swap(
              config.store,
@@ -814,6 +814,14 @@ defmodule Jido.Persistence.ContinuationStore do
     end
   end
 
+  defp encode_batch(%Config{codec: Term, execution_compression: false} = config, events, catalogue) do
+    with {:ok, bytes} <- encode_referenced(config, events, catalogue) do
+      BinaryDictionary.encode(bytes, BinaryDictionary.identity_patterns(events))
+    end
+  end
+
+  defp encode_batch(config, events, catalogue), do: encode_referenced(config, events, catalogue)
+
   defp encode_payload(%Config{codec: Term, execution_compression: true}, value),
     do: Term.encode_compact(value)
 
@@ -832,6 +840,9 @@ defmodule Jido.Persistence.ContinuationStore do
 
   defp encode_referenced(config, value, _catalogue), do: encode_payload(config, value)
 
+  def inspect_record(config, @prefix <> suffix, {:jido_execution_dictionary, 1, _, _} = record),
+    do: inspect_referenced_record(config, suffix, record)
+
   def inspect_record(config, @prefix <> suffix, {:jido_tool_payload_refs, 1, _segments} = packed),
     do: inspect_referenced_record(config, suffix, packed)
 
@@ -849,6 +860,7 @@ defmodule Jido.Persistence.ContinuationStore do
 
     with {:ok, bytes} <- Base.url_decode64(encoded_id, padding: false),
          {:ok, id} <- decode_identity(bytes),
+         {:ok, record} <- expand_dictionary(config, record, []),
          {:ok, record} <- expand_payloads(config, id, record, allow_prepared: record_key != ["prepared"]) do
       inspect_join_fact(config, id, @prefix <> suffix, record)
     else
@@ -878,10 +890,17 @@ defmodule Jido.Persistence.ContinuationStore do
   end
 
   defp decode_referenced(config, id, bytes, opts \\ [trusted: true]) do
-    with {:ok, record} <- decode(config, bytes, opts) do
+    with {:ok, record} <- decode(config, bytes, opts),
+         {:ok, record} <- expand_dictionary(config, record, opts) do
       expand_payloads(config, id, record, opts)
     end
   end
+
+  defp expand_dictionary(config, {:jido_execution_dictionary, 1, _, _} = record, opts) do
+    with {:ok, bytes} <- BinaryDictionary.unpack(record), do: decode(config, bytes, opts)
+  end
+
+  defp expand_dictionary(_config, record, _opts), do: {:ok, record}
 
   defp expand_payloads(config, id, {:jido_tool_payload_refs, 1, _} = packed, opts) do
     with {:ok, plain} <- ToolPayload.unpack(packed, &load_tool_payloads(config, id, &1, opts)),

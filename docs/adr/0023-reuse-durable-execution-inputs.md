@@ -19,6 +19,10 @@ to Runic. Keep older inline events readable. Store Runic fact occurrence
 keys as digests in new fact manifests. Restore the full keys for recovery,
 collection, and inspection.
 
+An uncompressed Term event batch can store a repeated Runic identity once
+in a dictionary for that batch. Restore the exact event bytes on read.
+Write the dictionary only when it makes the encoded batch smaller.
+
 Store a Join result as an ordered list of fact occurrence keys when the
 inputs match the saved values and the keys take less space. Rebuild the list
 in memory and verify its digest on recovery. Keep the full-value format for

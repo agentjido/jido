@@ -155,6 +155,33 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "stores repeated batch identities once and replays the original events", c do
+    alias Jido.Persistence.{Config, Inspector}
+    alias Jido.Persistence.Codec.Term
+    alias Runic.Workflow.Fact
+
+    first = Fact.new(value: :first).hash
+    second = Fact.new(value: :second).hash
+    events = for index <- 1..12, do: %{index: index, input: first, output: second}
+
+    assert {:ok, 1} = Store.append(c.id, events, c.jido)
+    {key, bytes} = Agent.get(c.store, &Enum.find(&1, fn {key, _} -> String.ends_with?(key, ":batches:1") end))
+    assert {:ok, original} = Term.encode(events)
+    assert byte_size(bytes) * 2 < byte_size(original)
+
+    replacement = start_supervised!({Agent, fn -> nil end}, id: :batch_replacement)
+    assert :ok = Store.register(c.jido, c.id, c.config, replacement)
+    assert {:ok, ^events} = Store.stream(c.id, c.jido)
+    assert {:ok, profile} = Config.open(c.config)
+    assert {:ok, ^events} = Inspector.read(profile, key, full: true)
+
+    assert {:ok, invalid} = Term.encode({:jido_execution_dictionary, 1, {"entry"}, [1]})
+    Agent.update(c.store, &Map.put(&1, key, invalid))
+    assert {:error, :invalid_execution_checkpoint} = Store.stream(c.id, c.jido)
+    assert {:error, :invalid_execution_checkpoint} = Inspector.read(profile, key, full: true)
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
   test "stores one copy of a completion fact and restores the full event", c do
     alias Runic.Workflow.{Fact, RunnableCompleted}
     alias Runic.Workflow.Events.FactProduced
@@ -171,9 +198,10 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
 
     records = Agent.get(c.store, & &1)
     {_, compact} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":batches:1") end)
-    {_, inline} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":batches:2") end)
+    {inline, _} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":batches:2") end)
     assert byte_size(compact) < byte_size(value)
-    assert {:ok, [^completed]} = Jido.Persistence.Codec.Term.decode(inline, trusted: true)
+    assert {:ok, profile} = Jido.Persistence.Config.open(c.config)
+    assert {:ok, [^completed]} = Jido.Persistence.Inspector.read(profile, inline, full: true)
 
     {fact_key, _} =
       Enum.find(records, fn {key, _} ->
@@ -201,11 +229,12 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
     assert {:ok, [^dispatch, ^different, ^missing]} = Store.stream(c.id, c.jido)
 
     records = Agent.get(c.store, & &1)
-    {_, batch} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":batches:1") end)
+    {batch_key, batch} = Enum.find(records, fn {key, _} -> String.ends_with?(key, ":batches:1") end)
     hash = fact.hash
+    assert {:ok, profile} = Jido.Persistence.Config.open(c.config)
 
     assert {:ok, [%RunnableDispatched{input_fact: %FactRef{hash: ^hash}}, ^different, ^missing]} =
-             Jido.Persistence.Codec.Term.decode(batch, trusted: true)
+             Jido.Persistence.Inspector.read(profile, batch_key, full: true)
 
     assert :binary.match(batch, value) == :nomatch
 
