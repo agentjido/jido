@@ -3,9 +3,11 @@ defmodule Jido.Persistence.ContinuationStore do
   @behaviour Runic.Runner.Store
 
   alias Jido.Persistence.{Config, Store}
+  alias Jido.Persistence.Codec.Term
   alias Jido.Exec.Runtime
   alias __MODULE__.JoinCompletedRef
-  alias Runic.Workflow.{Fact, FactResolver, Rehydration}
+  alias Runic.Workflow.{Fact, FactRef, FactResolver, Rehydration, RunnableCompleted}
+  alias Runic.Workflow.Events.FactProduced
 
   @prefix "jido:execution:v3:"
   @fact_tag :jido_fact_value
@@ -44,7 +46,7 @@ defmodule Jido.Persistence.ContinuationStore do
   def prepare(jido, id, value) do
     with {:ok, config} <- config(jido, id),
          record = {:jido_execution_prepared, 3, value},
-         {:ok, bytes} <- Config.encode(config, record) do
+         {:ok, bytes} <- encode_payload(config, record) do
       case Store.compare_and_swap(config.store, prepared_key(id), :not_found, bytes) do
         :ok -> :ok
         {:error, :conflict} -> accept_prepared(config, id, record)
@@ -80,7 +82,7 @@ defmodule Jido.Persistence.ContinuationStore do
     with {:ok, events} <- detach_join_values(events, id, jido),
          {:ok, config} <- config(jido, id),
          {:ok, batch_count, condition} <- read_batch_count(config, id) do
-      append_batch(config, id, batch_count, condition, events)
+      append_batch(config, id, batch_count, condition, detach_completion_values(events))
     end
   end
 
@@ -91,7 +93,10 @@ defmodule Jido.Persistence.ContinuationStore do
   def stream(id, {id, jido}), do: stream(id, jido)
 
   def stream({:jido_execution, _, _, _, _} = id, jido) do
-    with {:ok, config} <- config(jido, id), do: read_events(config, id, :repair)
+    with {:ok, config} <- config(jido, id),
+         {:ok, events} <- read_events(config, id, :repair) do
+      restore_completion_values(events, FactResolver.new({__MODULE__, {id, config}}))
+    end
   end
 
   def stream(_id, _jido), do: {:error, :not_found}
@@ -151,6 +156,45 @@ defmodule Jido.Persistence.ContinuationStore do
          event ->
            event
        end)}
+
+  # Runic persists FactProduced values before it appends a batch with their
+  # values cleared. A matching completion can use the same saved value.
+  defp detach_completion_values(events) do
+    saved =
+      for %FactProduced{value: nil, hash: hash, payload_digest: %Runic.Identity{} = digest} <- events,
+          into: MapSet.new(),
+          do: {hash, digest}
+
+    Enum.map(events, fn
+      %RunnableCompleted{result_fact: %Fact{} = fact} = event ->
+        if MapSet.member?(saved, {fact.hash, fact.payload_digest}) do
+          %{event | result_fact: struct!(FactRef, Map.drop(Map.from_struct(fact), [:value]))}
+        else
+          event
+        end
+
+      event ->
+        event
+    end)
+  end
+
+  defp restore_completion_values(events, resolver) do
+    events
+    |> Enum.reduce_while([], fn
+      %RunnableCompleted{result_fact: %FactRef{} = ref} = event, restored ->
+        case FactResolver.resolve(ref, resolver) do
+          {:ok, fact} -> {:cont, [%{event | result_fact: fact} | restored]}
+          {:error, _reason} -> {:halt, {:error, :invalid_execution_checkpoint}}
+        end
+
+      event, restored ->
+        {:cont, [event | restored]}
+    end)
+    |> case do
+      {:error, _reason} = error -> error
+      restored -> {:ok, Enum.reverse(restored)}
+    end
+  end
 
   def read_workflow(%Config{} = profile, id), do: load_workflow(profile, id, :read)
 
@@ -220,7 +264,7 @@ defmodule Jido.Persistence.ContinuationStore do
 
   defp persist_event_facts(events, id, jido) do
     Enum.reduce_while(events, :ok, fn
-      %Runic.Workflow.Events.FactProduced{} = event, :ok ->
+      %FactProduced{} = event, :ok ->
         case save_fact(id, event.hash, event.value, jido) do
           :ok -> {:cont, :ok}
           {:error, _reason} = error -> {:halt, error}
@@ -233,7 +277,7 @@ defmodule Jido.Persistence.ContinuationStore do
 
   defp strip_event_fact_values(events) do
     Enum.map(events, fn
-      %Runic.Workflow.Events.FactProduced{} = event -> %{event | value: nil}
+      %FactProduced{} = event -> %{event | value: nil}
       event -> event
     end)
   end
@@ -253,7 +297,7 @@ defmodule Jido.Persistence.ContinuationStore do
   defp append_batch(config, id, batch_count, condition, events) do
     next = batch_count + 1
 
-    with {:ok, bytes} <- Config.encode(config, events),
+    with {:ok, bytes} <- encode_payload(config, events),
          :ok <-
            Store.compare_and_swap(
              config.store,
@@ -273,7 +317,7 @@ defmodule Jido.Persistence.ContinuationStore do
 
       {:error, :not_found} ->
         with :ok <- record_fact_hash(config, id, hash),
-             {:ok, bytes} <- Config.encode(config, full_fact_record(value)) do
+             {:ok, bytes} <- encode_payload(config, full_fact_record(value)) do
           case Store.compare_and_swap(
                  config.store,
                  fact_key(id, hash),
@@ -438,6 +482,11 @@ defmodule Jido.Persistence.ContinuationStore do
       Store.compare_and_swap(config.store, key(id), condition, bytes)
     end
   end
+
+  defp encode_payload(%Config{codec: Term, execution_compression: true}, value),
+    do: Term.encode_compact(value)
+
+  defp encode_payload(config, value), do: Config.encode(config, value)
 
   # Runic events contain domain atoms and code references. These are trusted
   # runtime records, not ingress payloads, so :safe cannot decode them.

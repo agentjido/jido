@@ -23,6 +23,22 @@ defmodule Jido.Persistence.CodecConfigTest do
              Config.open(store: store, unknown: true)
   end
 
+  test "execution compression requires an explicit Term profile", %{store: store} do
+    assert {:ok, %Config{execution_compression: false}} = Config.open(store)
+    assert {:ok, %Config{execution_compression: false}} = Config.open(store: store, execution_compression: false)
+
+    assert {:ok, %Config{execution_compression: true} = compact} =
+             Config.open(store: store, execution_compression: true)
+
+    assert {:ok, ^compact} = Config.open(compact)
+
+    assert {:error, {:invalid_execution_compression, :yes}} =
+             Config.open(store: store, execution_compression: :yes)
+
+    assert {:error, {:execution_compression_requires_term_codec, Codec.JSON}} =
+             Config.open(store: store, codec: Codec.JSON, execution_compression: true)
+  end
+
   test "JSON round-trips supported Elixir values and rejects release-local values" do
     value = %{
       atom: :ok,

@@ -22,10 +22,15 @@ defmodule Jido.Persistence.Codec.Term do
   def version, do: 1
 
   @impl true
-  def encode(value) do
+  def encode(value), do: encode(value, [:deterministic])
+
+  @doc false
+  def encode_compact(value), do: encode(value, [:deterministic, {:compressed, 1}])
+
+  defp encode(value, options) do
     modules = value |> modules(MapSet.new()) |> MapSet.to_list() |> Enum.sort()
     header = JSON.encode!(%{"modules" => modules})
-    payload = :erlang.term_to_binary(value, [:deterministic])
+    payload = :erlang.term_to_binary(value, options)
     {:ok, <<@magic, byte_size(header)::unsigned-big-32, header::binary, payload::binary>>}
   rescue
     error -> {:error, {:persistence_encode_failed, __MODULE__, error}}
