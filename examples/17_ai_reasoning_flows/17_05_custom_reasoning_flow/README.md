@@ -42,4 +42,4 @@ core SDK gap.
 - [Tests](schema_driven_overrides_test.exs)
 
 [Previous: Revision and adaptive reasoning](../17_04_revision_and_adaptive/README.md) |
-[Next: Support Desk](../../24_application_patterns/24_09_support_desk/README.md)
+[Next lesson](../17_06_reasoning_task_list/README.md)
