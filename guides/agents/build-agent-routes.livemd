@@ -106,7 +106,10 @@ defmodule RoutesGuide.OrderAgent do
     # An inline Flow. Its output is the next state.
     route "order.annotate", as: :annotate do
       flow schema: Jido.Joi.object(%{note: Jido.Joi.string()}) do
-        step "add_note", action: RoutesGuide.AddNote, params: %{note: input(:note)}
+        step "add_note", note <- input(:note), inline: [context: ctx] do
+          RoutesGuide.OrderAgent.add_note(ctx.agent_state, note)
+        end
+
         output result("add_note")
       end
     end
@@ -121,6 +124,8 @@ defmodule RoutesGuide.OrderAgent do
 
     route "**", RoutesGuide.AddNote, defaults: %{note: "unrouted"}
   end
+
+  def add_note(state, note), do: {:ok, %{state | notes: [note | state.notes]}}
 end
 
 order = RoutesGuide.OrderAgent.instantiate!(id: "order-1")
@@ -130,6 +135,13 @@ order.state.quotes
 The cell returns `0`. A route has exactly one handler. It can be an Action or Flow module, an inline `action`, an inline `flow`, a `transform`, or a `forward`. See Transforms and Forwards for the last two.
 
 A positional module can be an Action or a Flow. Jido resolves which one it is. The route for `order.submit` would look the same with a Flow module.
+
+Jido compiles an inline route Flow in a separate module. Its inline steps
+cannot call Agent functions by local name or read Agent module attributes.
+Use a qualified call to a public function, as in
+`RoutesGuide.OrderAgent.add_note/2`. To use private helpers, define a
+standalone Flow with its helpers in the same module and pass that Flow
+module to `route`.
 
 ## Merge defaults and input
 

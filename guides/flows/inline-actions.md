@@ -57,7 +57,12 @@ The compiler rejects these headers with a `CompileError`:
 
 ## Write the body
 
-The body is normal Elixir. It returns any Action result, such as `{:ok, map}` or `{:error, reason}`. It runs in the owning module, so it can call private functions and read module attributes.
+The body is normal Elixir. It returns any Action result, such as `{:ok, map}` or `{:error, reason}`. In a standalone Flow, the body can call private functions and read attributes in the module that uses `Jido.Flow`.
+
+Jido compiles an inline Agent route Flow in a separate module. To call an
+Agent helper from a step in that Flow, use a qualified call to a public
+function. See [Routes and Handlers](../agents/build-agent-routes.livemd) for
+a working example.
 
 ```elixir
 defmodule InlineGuide.Scope do
