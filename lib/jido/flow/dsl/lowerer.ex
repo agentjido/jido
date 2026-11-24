@@ -106,7 +106,7 @@ defmodule Jido.Flow.DSL.Lowerer do
            ValueParser.parse_fields(map, collection: :value, params: :value) do
       component(map, :map,
         collection: collection,
-        action: map.action,
+        action: await_map_action(map.action),
         params: params,
         on_error: map.on_error
       )
@@ -183,6 +183,16 @@ defmodule Jido.Flow.DSL.Lowerer do
       {:ok, value}
     end
   end
+
+  defp await_map_action(action) when is_atom(action) and not is_nil(action) do
+    # The Map needs its Action before validation can classify the target.
+    Code.ensure_compiled!(action)
+  rescue
+    # Leave missing targets to normal validation so it can report the source location.
+    ArgumentError -> action
+  end
+
+  defp await_map_action(action), do: action
 
   defp step_component(step, params) do
     with {:module, _module} <- Code.ensure_compiled(step.action),
