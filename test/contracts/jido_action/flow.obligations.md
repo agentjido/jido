@@ -44,7 +44,7 @@ Check focused facets of the [reviewed public promises](../../../guides/public-ap
 
 ### jido_action.flow.I7 — Authoring forms preserve one Flow meaning
 - **scope:** `Jido.Flow.new/1, Jido.Flow.__using__/1, Jido.Flow.Codec`
-- **must:** DSL, public data definitions, and stored documents produce equivalent validated Flow meaning for supported components, references, schemas, and outputs. Resolve literal module aliases in the declaration scope. Reject duplicate literal map keys after key conversion. Generated module plans use the module input callback and keep DSL source locations. Direct Flow structs use their data schemas.
+- **must:** DSL, public data definitions, and stored documents produce equivalent validated Flow meaning for supported components, references, schemas, and outputs. Resolve literal module aliases in the declaration scope. Map declarations in authored Flow modules wait for their Action modules in parallel compilation, including in generated inline Flows. Reject duplicate literal map keys after key conversion. Generated module plans use the module input callback and keep DSL source locations. Direct Flow structs use their data schemas.
 - **kind:** functional
 - **status:** active
 
