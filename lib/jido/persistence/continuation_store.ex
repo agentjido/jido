@@ -551,8 +551,8 @@ defmodule Jido.Persistence.ContinuationStore do
       {:error, :not_found} ->
         with {:ok, format, contents} <- fact_contents(contributions, value, hash, config, id, facts),
              :ok <- record_fact_hash(config, id, hash),
-             {:ok, bytes} <-
-               encode_referenced(config, {@fact_tag, @fact_version, 0, digest, format, contents}, catalogue) do
+             record = {@fact_tag, @fact_version, 0, digest, format, contents},
+             {:ok, bytes} <- encode_fact(config, record, catalogue) do
           case Store.compare_and_swap(
                  config.store,
                  fact_key(id, hash),
@@ -821,6 +821,20 @@ defmodule Jido.Persistence.ContinuationStore do
   end
 
   defp encode_batch(config, events, catalogue), do: encode_referenced(config, events, catalogue)
+
+  defp encode_fact(
+         %Config{codec: Term, execution_compression: false} = config,
+         {@fact_tag, @fact_version, 0, _digest, :full, value} = record,
+         catalogue
+       ) do
+    with {:ok, bytes} <- encode_referenced(config, record, catalogue) do
+      payloads = value |> ToolPayload.payloads() |> Map.values()
+      patterns = Enum.uniq(payloads ++ BinaryDictionary.identity_patterns(value))
+      BinaryDictionary.encode(bytes, patterns)
+    end
+  end
+
+  defp encode_fact(config, record, catalogue), do: encode_referenced(config, record, catalogue)
 
   defp encode_payload(%Config{codec: Term, execution_compression: true}, value),
     do: Term.encode_compact(value)

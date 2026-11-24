@@ -511,6 +511,32 @@ defmodule Jido.AgentServer.DurableTurn.CheckpointStoreTest do
   end
 
   @tag obligation: "jido.agent_server.durable_turn.I2"
+  test "stores repeated bytes once inside a fact and verifies the restored value", c do
+    alias Jido.Persistence.{Config, Inspector}
+    alias Jido.Persistence.Codec.Term
+
+    payload = :binary.copy("exact fact payload / ", 512)
+    value = %{input: payload, result: %{answer: payload, evidence: [payload]}}
+    assert :ok = Store.save_fact(c.id, :repeated, value, c.jido)
+
+    {key, bytes} = Agent.get(c.store, &Enum.find(&1, fn {key, _bytes} -> not String.ends_with?(key, ":index") end))
+    assert length(:binary.matches(bytes, payload)) == 1
+    assert byte_size(bytes) < byte_size(payload) + 1_024
+    assert {:ok, profile} = Config.open(c.config)
+    assert {:ok, {:jido_fact_value, 1, 0, _digest, :full, ^value}} = Inspector.read(profile, key, full: true)
+
+    replacement = start_supervised!({Agent, fn -> nil end}, id: :fact_replacement)
+    assert :ok = Store.register(c.jido, c.id, c.config, replacement)
+    assert {:ok, ^value} = Store.load_fact(c.id, :repeated, c.jido)
+
+    assert {:ok, {:jido_execution_dictionary, 1, {^payload}, parts}} = Term.decode(bytes, [])
+    altered = :binary.copy("x", byte_size(payload))
+    assert {:ok, corrupt} = Term.encode({:jido_execution_dictionary, 1, {altered}, parts})
+    Agent.update(c.store, &Map.put(&1, key, corrupt))
+    assert {:error, :invalid_execution_checkpoint} = Store.load_fact(c.id, :repeated, c.jido)
+  end
+
+  @tag obligation: "jido.agent_server.durable_turn.I2"
   test "stores and restores one complete fact value", c do
     value = %{input: %{session: large_session()}, results: %{}}
 

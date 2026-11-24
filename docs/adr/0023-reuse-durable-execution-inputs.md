@@ -21,7 +21,9 @@ collection, and inspection.
 
 An uncompressed Term event batch can store a repeated Runic identity once
 in a dictionary for that batch. Restore the exact event bytes on read.
-Write the dictionary only when it makes the encoded batch smaller.
+An uncompressed Term fact can also store a large binary value or repeated
+identity once in a dictionary for that fact. Verify the fact digest after
+reconstruction. Write a dictionary only when it makes the record smaller.
 
 Store a Join result as an ordered list of fact occurrence keys when the
 inputs match the saved values and the keys take less space. Rebuild the list
