@@ -28,10 +28,13 @@ defmodule Jido.Examples.SharedBlackboard.Counter do
       <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="waiting" datamodel="jido">
         <datamodel>
           <data id="request_id" expr="''"/>
+          <data id="outcome" expr="''"/>
         </datamodel>
         <state id="waiting">
           <transition event="jido.blackboard.patch.result" cond="confirmed" target="recorded"/>
-          <transition event="jido.blackboard.patch.result" cond="recheck" target="read_again"/>
+          <transition event="jido.blackboard.patch.result" cond="recheck" target="read_again">
+            <assign location="outcome" expr="_event.data.status"/>
+          </transition>
         </state>
         <final id="recorded"/>
         <final id="read_again"/>
@@ -43,7 +46,8 @@ defmodule Jido.Examples.SharedBlackboard.Counter do
     end
 
     def recheck?(%{data: %{"request_id" => request_id}, event: %{data: result}}) do
-      result["request_id"] == request_id and result["status"] in ["conflict", "timeout", "unavailable"]
+      result["request_id"] == request_id and
+        result["status"] in ["conflict", "timeout", "unavailable", "indeterminate"]
     end
   end
 

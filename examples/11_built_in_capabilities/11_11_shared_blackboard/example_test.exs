@@ -1,12 +1,37 @@
 Code.require_file("example.ex", __DIR__)
+Code.require_file("job_board.ex", __DIR__)
+Code.require_file("support/store_fixture.exs", __DIR__)
 
 defmodule Jido.Examples.SharedBlackboardTest do
   use Jido.Test.Case, async: false
 
   alias Jido.{AgentServer, Blackboard, Statechart}
-  alias Jido.Examples.SharedBlackboard.{Counter, Desk}
+  alias Jido.Examples.SharedBlackboard.{Counter, Desk, JobBoard, StoreFixture}
 
   @moduletag :integration
+
+  for adapter <- [:ets, :mnesia, :ecto] do
+    test "a job board restores its count when the owner reopens with #{adapter}" do
+      instance = __MODULE__.Persistent
+      profile = StoreFixture.profile(unquote(adapter))
+      start_supervised!({Jido, name: instance, namespace: unique_id("inventory"), persistence: profile})
+
+      assert {:ok, address} = JobBoard.create(instance, "job-42")
+      assert {:ok, owner} = Jido.activate_agent(instance, address)
+      assert {:ok, %{revision: initial}} = Blackboard.read(instance, "job-42")
+      assert {:ok, %{revision: saved}} = Blackboard.patch(instance, "job-42", initial, %{"bin-a" => 12})
+      assert :ok = Jido.stop_agent(instance, owner)
+      assert {:error, :unavailable} = Blackboard.read(instance, "job-42")
+
+      assert {:ok, reopened} = Jido.activate_agent(instance, address)
+      assert {:ok, %{values: %{"bin-a" => 12}}} = Blackboard.read(instance, "job-42")
+      assert {:error, :conflict} = Blackboard.patch(instance, "job-42", saved, %{"bin-a" => 15})
+      assert :ok = Jido.stop_agent(instance, reopened)
+      assert :ok = Blackboard.delete(instance, address, "job-42")
+      assert :ok = Jido.delete_agent(instance, address)
+      assert {:error, :deleted} = Jido.activate_agent(instance, address)
+    end
+  end
 
   test "one counter records an inventory count and another reads it", %{jido: jido} do
     {desk, [{_first_id, first}, {_second_id, second}]} = start_desk(jido)

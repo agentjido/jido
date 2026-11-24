@@ -568,6 +568,7 @@ commits. [Shared Blackboard](../built-in-plugins/shared-blackboard.md).
 | --- | --- |
 | `Jido.Blackboard.read/3` | Reads the board's current values and revision. |
 | `Jido.Blackboard.patch/6` | Sets and removes keys in one conditional update. |
+| `Jido.Blackboard.delete/3` | Retires a stopped board's saved record. |
 
 ### `Jido.Statechart`
 

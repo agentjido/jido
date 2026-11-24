@@ -3,6 +3,7 @@ defmodule Jido.Plugin.BlackboardTest do
   use Covenant.Case, component: "jido.plugin.blackboard", async: true
 
   alias Jido.{Agent, AgentServer, Blackboard}
+  alias Jido.Persistence.ETS
   alias Jido.Plugin.Blackboard.{Client, Server}
   alias Jido.Test.AgentServer.Assertions
 
@@ -10,6 +11,36 @@ defmodule Jido.Plugin.BlackboardTest do
     use Jido.Agent,
       name: "blackboard_owner",
       plugins: [{Server, %{name: "inventory", initial: %{"old" => 1}}}]
+  end
+
+  defmodule DurableOwner do
+    use Jido.Agent,
+      name: "durable_blackboard_owner",
+      plugins: [{Server, %{name: "inventory", initial: %{"old" => 1}, persistence: :inherit}}]
+  end
+
+  defmodule IndeterminateStore do
+    @behaviour Jido.Persistence.Store
+
+    @impl true
+    defdelegate validate_options(opts), to: ETS
+    @impl true
+    defdelegate get(key, opts), to: ETS
+    @impl true
+    defdelegate delete(key, opts), to: ETS
+
+    @impl true
+    def compare_and_swap("jido:blackboard:v1:" <> _suffix = key, expected, value, opts) do
+      case Jido.Persistence.Codec.Term.decode(value, []) do
+        {:ok, {1, _generation, version, _values}} when version > 0 ->
+          with :ok <- ETS.compare_and_swap(key, expected, value, opts), do: {:error, :indeterminate}
+
+        _other ->
+          ETS.compare_and_swap(key, expected, value, opts)
+      end
+    end
+
+    def compare_and_swap(key, expected, value, opts), do: ETS.compare_and_swap(key, expected, value, opts)
   end
 
   defmodule Probe do
@@ -168,6 +199,60 @@ defmodule Jido.Plugin.BlackboardTest do
     assert {:ok, %{status: :committed}} = AgentServer.call(probe, patch_signal(revision, "stale"))
     assert_eventually(AgentServer.snapshot(probe).agent.state.result["status"] == "conflict")
     assert AgentServer.snapshot(probe).agent.state.result["request_id"] == "stale"
+  end
+
+  @tag obligation: "jido.plugin.blackboard.I5"
+  test "a saved board keeps its identity on reopen and explicit deletion retires it" do
+    instance = start_persistent_instance(__MODULE__.Durable, ETS)
+
+    assert {:ok, address} = Jido.agent_address(instance, "board")
+    assert {:ok, address} = Jido.create_agent(instance, address, DurableOwner)
+    assert {:ok, owner} = Jido.activate_agent(instance, address)
+    assert {:error, :running} = Blackboard.delete(instance, address, "inventory")
+    assert {:ok, %{revision: initial}} = Blackboard.read(instance, "inventory")
+    assert {:ok, %{revision: written}} = Blackboard.patch(instance, "inventory", initial, %{"old" => 12})
+    assert :ok = Jido.stop_agent(instance, owner)
+    assert {:error, :unavailable} = Blackboard.read(instance, "inventory")
+
+    assert {:ok, reopened} = Jido.activate_agent(instance, address)
+    assert {:ok, %{values: %{"old" => 12}}} = Blackboard.read(instance, "inventory")
+    assert {:error, :conflict} = Blackboard.patch(instance, "inventory", written, %{"old" => 13})
+    assert :ok = Jido.stop_agent(instance, reopened)
+
+    assert :ok = Blackboard.delete(instance, address, "inventory")
+    assert :ok = Blackboard.delete(instance, address, "inventory")
+    assert {:error, _reason} = Jido.activate_agent(instance, address)
+    assert {:error, :unavailable} = Blackboard.read(instance, "inventory")
+
+    assert {:ok, _replacement} = Assertions.start_agent(instance, DurableOwner)
+    assert {:ok, %{values: %{"old" => 1}}} = Blackboard.read(instance, "inventory")
+  end
+
+  @tag obligation: "jido.plugin.blackboard.I6"
+  test "a client sees an indeterminate write and the next read loads the committed snapshot" do
+    instance = start_persistent_instance(__MODULE__.FaultStore, IndeterminateStore)
+    assert {:ok, _owner} = Assertions.start_agent(instance, DurableOwner)
+    assert {:ok, probe} = Assertions.start_agent(instance, Probe)
+    assert {:ok, %{revision: revision}} = Blackboard.read(instance, "inventory")
+
+    assert {:ok, %{status: :committed}} = AgentServer.call(probe, patch_signal(revision, "indeterminate"))
+
+    assert_eventually(
+      AgentServer.snapshot(probe).agent.state.result == %{
+        "board" => "inventory",
+        "request_id" => "indeterminate",
+        "status" => "indeterminate"
+      }
+    )
+
+    assert {:ok, %{values: %{"old" => 2}} = committed} = Blackboard.read(instance, "inventory")
+    assert {:error, :conflict} = Blackboard.patch(instance, "inventory", revision, %{"old" => 3})
+    assert {:ok, ^committed} = Blackboard.read(instance, "inventory")
+  end
+
+  defp start_persistent_instance(name, adapter) do
+    start_supervised!({Jido, name: name, namespace: unique_id("board"), persistence: adapter})
+    name
   end
 
   defp patch_signal(revision, request_id) do

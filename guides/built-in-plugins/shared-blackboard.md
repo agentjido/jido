@@ -49,14 +49,49 @@ in milliseconds when needed, within the Agent's turn and effect budgets.
 
 Outside a turn, use `Jido.Blackboard.read(instance, name)` and
 `Jido.Blackboard.patch(instance, name, revision, puts, deletes)`.
-If a write times out or its result Signal does not arrive, read the board
-before deciding whether to request another write. The original patch may
-already have applied.
+If a write times out, reports `"indeterminate"`, or has no result Signal,
+read the board before deciding whether to request another write. The patch
+may already have applied.
 
 ## Board lifetime
 
-The board lives in memory on the owner's BEAM node. Stopping the owner
-stops the board. A replacement board starts from its initial values and
-rejects revisions issued by the previous process. Members resolve the board
-by name for each operation. A member restart can therefore read the same
-board while the owner stays live.
+The owner serves the board on its BEAM node. A board name identifies one
+live owner in each Jido instance. Stopping the owner stops the board.
+Members resolve the name for each operation and can read the board again
+when an owner reopens it.
+
+Use one small owner Agent per work item when agents publish independent
+results. Agents that share a board also share its revision. Use one board
+when a decision depends on several keys together. The example uses
+`Jido.Agent.define!/1` to give each owner a name chosen at runtime.
+
+## Keep values across owner restarts
+
+Add `persistence: :inherit` to the Server Plugin configuration:
+
+```elixir
+plugins: [
+  {Jido.Plugin.Blackboard.Server,
+   %{name: "inventory", initial: %{"bin-a" => 0}, persistence: :inherit}}
+]
+```
+
+Configure a stable namespace and a persistence profile on the Jido instance.
+Each board record uses the owner's stable Agent Address and the board name.
+The board uses the instance Store and codec. It serves reads from memory and
+writes the complete record with an atomic condition before reporting success.
+An indeterminate write clears the cached snapshot. The next read reloads it
+from the Store. [Persistence adapters](../reference/persistence-adapter-matrix.md).
+
+1. Use `Jido.create_agent/4` and `Jido.activate_agent/3` to create and open a
+   durable owner.
+2. Use `Jido.stop_agent/3` to take its board offline. Activate the same
+   Address again to restore its saved values and issue a fresh revision.
+3. Use `Jido.Blackboard.delete(instance, address, name)` after stopping the
+   owner to retire the saved board. A tombstone prevents that owner Address
+   from reopening the same board. Delete the stopped Agent record separately
+   if the application also wants to retire the Agent.
+
+A board without `persistence: :inherit` starts with its configured initial
+values after each owner restart. Every new board process rejects revisions
+issued by earlier processes.

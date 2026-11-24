@@ -4,26 +4,80 @@ defmodule Jido.Blackboard.Server do
   use GenServer
 
   alias Jido.{Blackboard, Id}
+  alias Jido.Blackboard.Record
+  alias Jido.Plugin.Init
 
-  def start_link({instance, name, initial}) when is_atom(instance) and not is_nil(instance) do
-    GenServer.start_link(__MODULE__, initial, name: Blackboard.via(instance, name))
+  def start_link(%Init{jido: instance, options: opts} = init) when is_atom(instance) and not is_nil(instance) do
+    name = Keyword.fetch!(opts, :name)
+    initial = Keyword.get(opts, :initial, %{})
+
+    with {:ok, record} <- configure(init, name) do
+      Blackboard.with_lifecycle_lock(instance, name, fn ->
+        GenServer.start_link(__MODULE__, {initial, record}, name: Blackboard.via(instance, name))
+      end)
+    end
   end
 
   def start_link(_args), do: {:error, :jido_instance_required}
 
   @impl true
-  def init(initial), do: {:ok, %{values: initial, generation: Id.uuid7(), version: 0}}
+  def init({values, record}) do
+    initial = %{values: values, generation: Id.uuid7(), version: 0}
+
+    case Record.open(record, initial) do
+      {:ok, data} -> {:ok, %{record: record, generation: data.generation, data: data}}
+      {:error, reason} -> {:stop, reason}
+    end
+  end
 
   @impl true
-  def handle_call(:read, _from, state), do: {:reply, {:ok, snapshot(state)}, state}
+  def handle_call(message, _from, state) do
+    case refresh(state) do
+      {:ok, current} -> respond(message, current)
+      {:error, _reason} = error -> {:reply, error, state}
+    end
+  end
 
-  def handle_call({:patch, expected, put, delete}, _from, state) do
-    if expected == revision(state) do
-      values = state.values |> Map.drop(delete) |> Map.merge(put)
-      next = %{state | values: values, version: state.version + 1}
-      {:reply, {:ok, snapshot(next)}, next}
+  defp respond(:read, state), do: {:reply, {:ok, snapshot(state.data)}, state}
+
+  defp respond({:patch, expected, put, delete}, %{data: current} = state) do
+    if expected == revision(current) do
+      values = current.values |> Map.drop(delete) |> Map.merge(put)
+      next = %{current | values: values, version: current.version + 1}
+
+      case Record.commit(state.record, current, next) do
+        :ok ->
+          {:reply, {:ok, snapshot(next)}, %{state | data: next}}
+
+        {:error, reason} = error when reason in [:conflict, :indeterminate] ->
+          {:reply, error, %{state | data: nil}}
+
+        {:error, _reason} = error ->
+          {:reply, error, state}
+      end
     else
       {:reply, {:error, :conflict}, state}
+    end
+  end
+
+  defp refresh(%{data: nil, record: record, generation: generation} = state) do
+    case Record.read(record) do
+      {:ok, %{generation: ^generation} = data, _condition} -> {:ok, %{state | data: data}}
+      _other -> {:error, :unavailable}
+    end
+  end
+
+  defp refresh(state), do: {:ok, state}
+
+  defp configure(%Init{jido: instance, agent_id: id, partition: partition, options: opts}, name) do
+    case Keyword.get(opts, :persistence, false) do
+      false ->
+        {:ok, nil}
+
+      :inherit ->
+        with {:ok, address} <- Jido.agent_address(instance, id, partition: partition) do
+          Record.configure(instance, address, name)
+        end
     end
   end
 

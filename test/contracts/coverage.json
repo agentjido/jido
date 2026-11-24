@@ -11,9 +11,9 @@
       "covered": 17
     },
     "jido.plugin": {
-      "active": 46,
+      "active": 48,
       "coverage": 1.0,
-      "covered": 46
+      "covered": 48
     },
     "jido.telemetry": {
       "active": 2,
@@ -2881,10 +2881,10 @@
       }
     },
     "jido.plugin.blackboard": {
-      "active": 4,
+      "active": 6,
       "app": "jido.plugin",
       "coverage": 1.0,
-      "covered": 4,
+      "covered": 6,
       "form": "light",
       "obligations": {
         "jido.plugin.blackboard.I1": {
@@ -2925,6 +2925,26 @@
           "testable": true,
           "tests": [
             "test invalid Directives cannot patch and a committed timeout can have applied a write"
+          ]
+        },
+        "jido.plugin.blackboard.I5": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a saved board keeps its identity on reopen and explicit deletion retires it"
+          ]
+        },
+        "jido.plugin.blackboard.I6": {
+          "failing": 0,
+          "kind": "ordering",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a client sees an indeterminate write and the next read loads the committed snapshot"
           ]
         }
       }
@@ -6327,8 +6347,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 271,
+    "active": 273,
     "coverage": 1.0,
-    "covered": 271
+    "covered": 273
   }
 }

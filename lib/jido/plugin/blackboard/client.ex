@@ -13,12 +13,12 @@ defmodule Jido.Plugin.Blackboard.Client do
   after commit. The client casts a `jido.blackboard.patch.result` Signal
   to the same activation. Its data includes the board name, request ID,
   status, and a revision when the patch succeeds. Status is one of
-  `"ok"`, `"conflict"`, `"unavailable"`, `"timeout"`, or
-  `"invalid_request"`. Keys are strings.
+  `"ok"`, `"conflict"`, `"unavailable"`, `"timeout"`,
+  `"indeterminate"`, or `"invalid_request"`. Keys are strings.
 
-  Result delivery is best effort. A timeout or a missing result can occur
-  after the board applies the patch. Read the board before deciding how to
-  proceed. The client does not retry the patch.
+  Result delivery is best effort. A timeout, an indeterminate result, or a
+  missing result can occur after the board applies the patch. Read the board
+  before deciding how to proceed. The client does not retry the patch.
   """
 
   use Jido.Plugin, option_keys: [agent_server: [:name, :read_on, :timeout]]

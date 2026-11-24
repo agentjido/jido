@@ -12,6 +12,10 @@ product_contract_source: direct-request
 
 # Shared blackboard for Jido agent topologies
 
+This plan describes the initial in-memory board. The follow-up adds
+[instance persistence and board retirement](../adr/0021-shared-blackboard-ownership.md)
+and extends the inventory example to 20 and 100 counters.
+
 ## Start with an example
 
 A warehouse desk owns an `inventory` board. One counter agent posts a count

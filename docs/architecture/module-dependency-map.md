@@ -114,8 +114,9 @@ startup entry. See
 [ADR 0017](../adr/0017-behavior-tree-turn-ownership.md).
 
 `Jido.Blackboard` and `Jido.Plugin.Blackboard.*` are capabilities. They use
-the existing Plugin lifecycle and post-commit dispatch. The application
-supervises the board registry. Each board belongs to its owning activation.
+the existing Plugin lifecycle, post-commit dispatch, and optional instance
+Store. The application supervises the board registry. Each board belongs to
+its owning activation and owns its saved record and revision.
 See [ADR 0021](../adr/0021-shared-blackboard-ownership.md).
 
 ### Covenant ownership rule
